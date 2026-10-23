@@ -12721,3 +12721,97 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   display: grid;
   gap: 0.75rem;
 }
+
+/* Registration form builder on a phone (#1071). The same editor shell, under 768px: a per-step question list, a sticky Save draft
+   and Preview bar, full-screen sheets for settings, Add question and Move. New rules only, all prefixed fb-; no existing rule or
+   shared font size is changed. Every control is at least 44px; small text is 0.875rem or larger. */
+.fb-inspector-note, .fb-inspector-notices { display: none; }
+.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; }
+.fb-phone-sheet-full { top: var(--picker-top, 0px); height: var(--picker-height, 100dvh); }
+.fb-phone-sheet-menu { top: 0; bottom: 0; }
+.fb-phone-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 43, 69, 0.42); }
+.fb-phone-sheet-panel { display: flex; flex-direction: column; box-sizing: border-box; background: var(--paper); color: var(--ink); overscroll-behavior: contain; }
+.fb-phone-sheet-panel:focus { outline: 0; }
+.fb-phone-sheet-full .fb-phone-sheet-panel { height: 100%; }
+.fb-phone-sheet-menu .fb-phone-sheet-panel { position: absolute; right: 0; bottom: 0; left: 0; max-height: 80dvh; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.18); }
+.fb-phone-sheet-bar { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+.fb-phone-sheet-menu .fb-phone-sheet-bar { border-radius: 16px 16px 0 0; padding-top: 8px; }
+.fb-phone-sheet-bar h2 { flex: 1 1 auto; margin: 0; min-width: 0; color: var(--imsda-navy); font-size: 1.05rem; overflow-wrap: anywhere; }
+.fb-phone-sheet-body { display: grid; flex: 1 1 auto; align-content: start; gap: 16px; min-height: 0; overflow: auto; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; }
+.fb-phone-sheet .fb-btn { min-height: 48px; }
+.fb-phone-sheet .fb-btn:focus-visible, .fb-phone-card .fb-btn:focus-visible, .fb-phone-step-pill:focus-visible, .fb-phone-bar .fb-btn:focus-visible, .fb-phone-return:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.fb-phone-sheet .fb-btn[aria-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
+.fb-phone-status { margin: 0; color: var(--ink); font-size: 1rem; }
+.fb-phone-refusal { margin: 0; border: 1px solid var(--danger-line, #e3b8b1); border-left: 5px solid var(--danger, #8f3a30); border-radius: 8px; background: var(--danger-soft, #fdf4f2); padding: 10px 12px; color: var(--ink); font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; }
+.fb-phone-move-buttons { display: flex; gap: 10px; }
+.fb-phone-move-buttons .fb-btn { flex: 1 1 0; }
+.fb-phone-steps { display: grid; gap: 4px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; }
+.fb-phone-steps legend { padding: 0 6px; color: var(--muted); font-size: 0.9375rem; font-weight: 700; }
+.fb-phone-step-option { display: flex; align-items: center; gap: 10px; min-height: var(--touch-target, 44px); font-size: 1rem; overflow-wrap: anywhere; }
+.fb-phone-step-option input { flex: 0 0 auto; width: 22px; height: 22px; margin: 0; accent-color: var(--imsda-navy); }
+.fb-phone-steps .fb-btn { justify-self: start; margin-top: 4px; }
+.fb-phone-menu { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.fb-phone-menu .fb-btn { width: 100%; justify-content: flex-start; }
+.fb-phone-menu .fb-phone-danger, .fb-phone-danger { border-color: #d9a3a3; color: #9b2c2c; }
+.fb-phone-steps-nav { display: flex; gap: 8px; overflow-x: auto; margin-inline: -4px; padding: 2px 4px 6px; scrollbar-width: thin; }
+.fb-phone-step-pill { flex: 0 0 auto; max-width: 70vw; min-height: var(--touch-target, 44px); overflow: hidden; border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--ink); cursor: pointer; padding: 0 16px; font: inherit; font-size: 0.9375rem; text-overflow: ellipsis; white-space: nowrap; }
+.fb-phone-step-pill[aria-current="step"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #ffffff; font-weight: 700; }
+.fb-phone-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.fb-phone-card { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; }
+.fb-phone-card.selected { border: 2px solid var(--imsda-navy); padding: 11px; }
+.fb-phone-card p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.fb-phone-card-label { color: var(--ink); font-size: 1rem; font-weight: 700; }
+.fb-phone-card-meta, .fb-phone-card-rule { color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
+.fb-phone-card-rule { color: var(--ink); }
+.fb-phone-card-actions { display: flex; gap: 8px; margin-top: 4px; }
+.fb-phone-card-actions .fb-btn { flex: 1 1 0; min-height: 48px; min-width: var(--touch-target, 44px); }
+.fb-phone-card-actions .fb-phone-more { flex: 0 0 48px; padding: 0; }
+.fb-phone-add { width: 100%; min-height: 48px; border-style: dashed; }
+.fb-phone-return { justify-self: start; min-height: 48px; }
+.fb-phone-bar { display: none; }
+@media (max-width: 767px) {
+  .fb-shell { gap: 0; }
+  .fb-topbar { position: static; padding: 8px; }
+  .fb-form-name { flex: 1 1 0; min-width: 0; }
+  .fb-form-switch { flex: 1 1 0; min-width: 0; }
+  .fb-form-switch select { width: 100%; max-width: none; }
+  .fb-nav { flex: 1 1 100%; flex-wrap: nowrap; gap: 4px; overflow-x: auto; order: 5; }
+  .fb-nav a { flex: 0 0 auto; white-space: nowrap; font-size: 0.9375rem; }
+  .fb-nav a[href="#builder-editor"] { display: none; }
+  .fb-version-chips { flex: 1 1 100%; order: 6; }
+  .fb-undo-redo { order: 7; }
+  .fb-topbar > .fb-btn.primary { order: 8; margin-left: auto; min-height: 48px; }
+  .fb-rail { display: none; }
+  .fb-body { display: block; margin-top: 8px; }
+  .fb-canvas { padding: 12px; }
+  .fb-canvas > * { max-width: none; }
+  .fb-shell[data-inspector="open"] .fb-sidebar { top: var(--picker-top, 0px); bottom: auto; height: var(--picker-height, 100dvh); overflow: hidden; }
+  .fb-shell[data-inspector="open"] .fb-sidebar:focus { outline: 0; }
+  .fb-shell[data-inspector="open"] .fb-inspector-bar .fb-btn { min-height: 48px; }
+  .fb-shell[data-inspector="open"] .fb-inspector-note { display: block; margin: 0; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 12px; }
+  .fb-shell[data-inspector="open"] .fb-inspector-notices { display: grid; flex: 0 0 auto; gap: 6px; max-height: 30dvh; overflow: auto; padding: 8px 12px 0; }
+  .fb-shell[data-inspector="open"] .fb-tabpanel { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; }
+  .fb-shell[data-inspector="open"] .fb-palette-items { grid-template-columns: minmax(0, 1fr); }
+  .fb-shell[data-inspector="open"] .fb-palette-item { min-height: 52px; cursor: pointer; }
+  .fb-shell[data-inspector="open"] .fb-palette select, .fb-shell[data-inspector="open"] .fb-palette input[type="search"], .fb-shell[data-inspector="open"] .fb-basic-settings input:not([type="checkbox"]):not([type="radio"]) { min-height: 48px; font-size: max(16px, 1rem); }
+  .fb-shell[data-inspector="open"] .fb-inspector-actions .fb-tool { flex: 1 1 calc(50% - 6px); min-height: 48px; }
+  .fb-shell[data-inspector="open"] .fb-palette-grip { display: none; }
+  /* Save draft and Preview stay on screen: above the phone tab bar and the safe area, and above the keyboard when it is open. */
+  .fb-phone-bar { position: static; bottom: calc(var(--fb-keyboard-inset, 0px) + 8px); z-index: 30; display: grid; gap: 8px; margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: 0 -6px 18px rgba(18, 38, 63, 0.12); padding: 10px; }
+  .fb-phone-bar[data-engaged], .fb-phone-bar[data-keyboard="open"] { position: sticky; }
+  body:has(.mobile-nav) .fb-phone-bar { bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 8px); }
+  body:has(.mobile-nav) .fb-phone-bar[data-keyboard="open"] { bottom: calc(var(--fb-keyboard-inset, 0px) + 8px); }
+  .fb-phone-bar-notices { display: grid; gap: 6px; max-height: 30dvh; overflow: auto; }
+  .fb-phone-bar-notices:empty { display: none; }
+  .fb-phone-bar-notices .inline-notice, .fb-phone-bar-notices .panel { margin: 0; }
+  .fb-phone-bar-actions { display: flex; gap: 8px; }
+  .fb-phone-bar-actions .fb-btn { flex: 1 1 0; min-height: 48px; }
+  html:has(.fb-phone-bar) { scroll-padding-bottom: calc(var(--fb-phone-bar-height, 120px) + 24px); }
+  .fb-phone-bar[data-keyboard="open"] .fb-phone-bar-notices { max-height: 4.5rem; overflow: auto; }
+  .fb-shell .preview-step-progress button { min-height: var(--touch-target, 44px); }
+  .fb-phone-step .section-actions button { min-height: 48px; min-width: 48px; }
+  .fb-phone-step .section-actions .drag-handle { display: none; }
+  /* Until the page knows it is on a phone (the first paint), mask the desktop canvas and top-bar buttons so they do not flash. */
+  .fb-shell:not([data-phone]) .fb-body, .fb-shell:not([data-phone]) .fb-topbar > .fb-btn:not(.primary), .fb-shell:not([data-phone]) .fb-topbar > .fb-icon-button[aria-controls] { visibility: hidden; }
+  .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
+}

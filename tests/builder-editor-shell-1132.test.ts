@@ -826,14 +826,14 @@ describe("shell keyboard and layout rules (#1132)", () => {
 });
 
 describe("the editor shell wiring (#1132)", () => {
-  it("phones and the first paint keep today's builder; only wide viewports get the shell", () => {
+  it("every width gets the shell; phone width swaps in the phone list and sheets after hydration (#1071)", () => {
     const workspace = read("components/registration-builder-workspace.tsx");
-    expect(workspace).toContain("useEditorShellViewport()");
+    expect(workspace).not.toContain("useEditorShellViewport");
     expect(workspace).toContain("showShell ? <BuilderEditorShell");
     expect(workspace).toContain('<div className="builder-layout">');
     const hook = read("components/registration-builder/use-editor-layout.ts");
-    expect(hook).toContain('"(min-width: 768px)"');
-    expect(hook).toMatch(/\(\) => true,\n\s*\);/); // the server renders the shell: no flash of the old layout on a desktop
+    expect(hook).toContain('"(max-width: 767px)"');
+    expect(hook).toMatch(/\(\) => false,\n\s*\);/); // the server renders the desktop shell: no flash of the phone layout on a desktop
   });
 
   it("the form template editor still uses the section cards", () => {

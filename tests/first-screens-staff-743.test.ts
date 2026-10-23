@@ -263,10 +263,12 @@ describe("Form builder marks Computer or tablet before any click", () => {
     expect(before(html, "Computer or tablet", "Phone")).toBe(true);
   });
 
-  it("sits first inside the builder, beside the phone-only notice that still replaces it on phones", () => {
+  it("is no longer hidden on phones, so the registration builder drops the phone notice and the device hint (#1071)", () => {
     const page = read("app/(workspace)/registration-builder/page.tsx");
-    expect(page).toContain('<div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace');
-    expect(page.indexOf("<BuilderPhoneNotice")).toBeLessThan(page.indexOf("<BuilderDeviceHint"));
+    expect(page).not.toContain("builder-phone-hidden");
+    expect(page).not.toContain("BuilderPhoneNotice");
+    expect(page).not.toContain("BuilderDeviceHint");
+    expect(page).toContain("<RegistrationBuilderWorkspace");
   });
 });
 

@@ -3,10 +3,10 @@
 // Registration form builder. This file only wires the pieces together: it
 // builds the builder model (state, edits and actions, see use-builder-model.ts)
 // and lays out the zones, each of which reads the model from BuilderContext.
-// Two layouts share that model. Tablets and desktops get the editor shell
-// (builder-editor-shell: top bar, live form canvas and one sidebar, #1132).
-// Phones, and the first paint everywhere, keep the earlier layout: form list,
-// section cards with their fields opening inline, and the preview column.
+// Two layouts share that model. Every screen width gets the editor shell
+// (builder-editor-shell: top bar, live form canvas and one sidebar, #1132; at phone
+// width a per-step question list with full-screen sheets, #1071). The earlier layout (form list,
+// section cards, preview column) remains for `layout: "classic"` and as the fallback with no form open.
 // Zones: top bar (builder-top-bar), field list (builder-field-list), canvas
 // (builder-section-card and its field rows), field settings
 // (builder-field-settings) and preview (builder-preview).
@@ -34,15 +34,13 @@ import { BuilderWithdrawZone } from "@/components/registration-builder/builder-w
 import { BuilderEditorShell } from "@/components/registration-builder/builder-editor-shell";
 import { BuilderContext } from "@/components/registration-builder/builder-context";
 import { useBuilderModel } from "@/components/registration-builder/use-builder-model";
-import { useEditorShellViewport } from "@/components/registration-builder/use-editor-layout";
 
 export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const model = useBuilderModel(props, askConfirm);
   const { forms, selectedForm, selectedVersion, definition, showTemplates, setShowTemplates, canEdit, addSection, eventId, canEditNotifications, information } = model;
-  const shellViewport = useEditorShellViewport();
   const formOpen = Boolean(selectedForm && selectedVersion && definition);
-  const showShell = shellViewport && formOpen && props.layout !== "classic";
+  const showShell = formOpen && props.layout !== "classic";
   return <BuilderContext.Provider value={model}><section className="page-stack builder-workspace">{confirmDialog}
     <BuilderPageIntro />
     <BuilderDraftTemplatePanel />

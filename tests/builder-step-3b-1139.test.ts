@@ -227,8 +227,9 @@ describe("the phone inspector (#1139)", () => {
     for (const forbidden of ["saveDraft", "replaceDefinition", "beginPublish", "setDirty", "updateField", "discard", "reset"]) {
       expect(close, forbidden).not.toContain(forbidden);
     }
-    // Focus goes back to the question's card.
-    expect(close).toContain('request({ kind: "field", fieldId: expandedFieldId })');
+    // Focus goes back to the control that opened it, which usePhoneModal restores (#1071).
+    expect(shell).toContain("usePhoneModal({");
+    expect(read("components/registration-builder/use-phone-modal.ts")).toContain("opener.focus");
     const sidebar = read("components/registration-builder/builder-sidebar.tsx");
     expect(sidebar).toContain("onClick={inspector.onBack}");
     expect(sidebar).toContain("onClick={inspector.onDone}");

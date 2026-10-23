@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BuilderDeviceHint } from "@/components/builder-device-hint";
-import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { RegistrationBuilderWorkspace } from "@/components/registration-builder-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listMealPlanPrices } from "@/modules/meals/config-repository";
@@ -16,8 +14,6 @@ export default async function RegistrationBuilderPage({ searchParams }: { search
   if (!permissions.includes("MANAGE_FORMS")) {
     return <AccessRestricted title="Registration form access is restricted" detail="Event administrators and registration managers can create, test, and publish event forms." />;
   }
-  return <>
-    <BuilderPhoneNotice eventId={event.id} />
-    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} mealPlanPrices={await listMealPlanPrices(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} /></div>
-  </>;
+  // The builder works at every width, phones included (#1071), so there is no phone notice or device hint here.
+  return <RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} mealPlanPrices={await listMealPlanPrices(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} />;
 }
