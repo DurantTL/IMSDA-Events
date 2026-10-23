@@ -121,7 +121,7 @@ describe("settings another module owns (#1139)", () => {
 
 describe("the Form settings tab (#1139)", () => {
   it("is registered with the other tabs and reachable by the arrow keys", () => {
-    expect(sidebarTabOrder).toEqual(["questions", "settings", "form-settings", "history"]);
+    expect(sidebarTabOrder).toEqual(["questions", "settings", "rules", "form-settings", "history"]);
     expect(nextTabIndex("ArrowRight", 1, sidebarTabOrder.length)).toBe(2);
     expect(tabAfterSelectionChange("form-settings", "a", "a")).toBe("form-settings");
   });

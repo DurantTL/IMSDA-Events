@@ -83,47 +83,47 @@ describe("All / Any truth tables (#1072)", () => {
 });
 
 describe("validation of every member (#1072)", () => {
-  const base = [yesNo("a"), yesNo("b")];
+  const base = [yesNo("qa"), yesNo("qb")];
   const group = (conditions: RuleCondition[], patch: Partial<RegistrationFormField> = {}) => field("target", { conditionalGroup: { match: "ALL", conditions }, ...patch });
 
   it("accepts a valid group", () => {
-    expect(parse([...base, group([yes("a"), yes("b")])]).success).toBe(true);
+    expect(parse([...base, group([yes("qa"), yes("qb")])]).success).toBe(true);
   });
 
   it("refuses both shapes on one question and an empty group", () => {
-    expect(messages(parse([...base, group([yes("a"), yes("b")], { conditional: yes("a") })]))).toContain("A question has one show-when rule: a single condition or a group, not both.");
+    expect(messages(parse([...base, group([yes("qa"), yes("qb")], { conditional: yes("qa") })]))).toContain("A question has one show-when rule: a single condition or a group, not both.");
     expect(parse([...base, group([])]).success).toBe(false);
   });
 
   it("refuses a missing or deleted reference in the second member", () => {
-    expect(messages(parse([...base, group([yes("a"), yes("gone")])]))).toContain("Conditional logic must reference another configured field.");
+    expect(messages(parse([...base, group([yes("qa"), yes("gone")])]))).toContain("Conditional logic must reference another configured field.");
   });
 
   it("refuses self reference in any member", () => {
-    expect(messages(parse([...base, group([yes("a"), yes("target")])]))).toContain("Conditional logic must reference another configured field.");
+    expect(messages(parse([...base, group([yes("qa"), yes("target")])]))).toContain("Conditional logic must reference another configured field.");
   });
 
   it("refuses a registration-level question depending on an attendee answer through a later member", () => {
     const attendee = yesNo("rider", { scope: "ATTENDEE" });
-    const result = parse([...base, attendee, group([yes("a"), yes("rider")])], { attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 5, attendeeLabel: "Attendee", addButtonLabel: "Add" } });
+    const result = parse([...base, attendee, group([yes("qa"), yes("rider")])], { attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 5, attendeeLabel: "Attendee", addButtonLabel: "Add" } });
     expect(messages(result)).toContain("A registration-level field cannot depend on an attendee answer.");
   });
 
   it("refuses a controller that comes later in the form, and a loop", () => {
-    expect(messages(parse([group([yes("a"), yes("b")]), ...base]))).toContain("A question that is shown only when another is answered has to stay after that question.");
-    const loop = [yesNo("a"), field("x", { conditionalGroup: { match: "ANY", conditions: [yes("a"), yes("y")] } }), field("y", { conditional: yes("x") })];
+    expect(messages(parse([group([yes("qa"), yes("qb")]), ...base]))).toContain("A question that is shown only when another is answered has to stay after that question.");
+    const loop = [yesNo("qa"), field("x", { conditionalGroup: { match: "ANY", conditions: [yes("qa"), yes("y")] } }), field("y", { conditional: yes("x") })];
     expect(messages(parse(loop))).toContain("This rule depends on itself through other questions' rules.");
   });
 
   it("refuses an address checked for a value, and an empty answer to match", () => {
     const address = field("home", { type: "ADDRESS" });
-    expect(messages(parse([...base, address, group([yes("a"), yes("home")])]))).toContain("An address can only be checked as answered.");
-    expect(messages(parse([...base, group([yes("a"), { fieldKey: "b", operator: "EQUALS", value: "" }])]))).toContain("Choose or enter the answer this condition looks for.");
-    expect(parse([...base, address, group([yes("a"), { fieldKey: "home", operator: "NOT_EMPTY", value: "" }])]).success).toBe(true);
+    expect(messages(parse([...base, address, group([yes("qa"), yes("home")])]))).toContain("An address can only be checked as answered.");
+    expect(messages(parse([...base, group([yes("qa"), { fieldKey: "qb", operator: "EQUALS", value: "" }])]))).toContain("Choose or enter the answer this condition looks for.");
+    expect(parse([...base, address, group([yes("qa"), { fieldKey: "home", operator: "NOT_EMPTY", value: "" }])]).success).toBe(true);
   });
 
   it("refuses an unknown operator at the schema", () => {
-    const bad = { ...group([yes("a"), yes("b")]), conditionalGroup: { match: "ALL", conditions: [yes("a"), { fieldKey: "b", operator: "GREATER", value: "1" }] } };
+    const bad = { ...group([yes("qa"), yes("qb")]), conditionalGroup: { match: "ALL", conditions: [yes("qa"), { fieldKey: "qb", operator: "GREATER", value: "1" }] } };
     expect(parse([...base, bad as unknown as RegistrationFormField]).success).toBe(false);
   });
 });
@@ -156,13 +156,13 @@ describe("hidden answers stay out of validation, price and capacity (#1072)", ()
 
 describe("copy and remap (#1072)", () => {
   it("maps every member of a module field to the copy's keys", () => {
-    const module = { fields: [
+    const moduleDef = { fields: [
       { ...field("kind", { type: "RADIO", options: ["A", "B"] }), id: undefined as never },
       { ...field("note", { conditionalGroup: { match: "ANY", conditions: [{ fieldKey: "kind", operator: "EQUALS", value: "A" }, { fieldKey: "extra", operator: "NOT_EMPTY", value: "" }] } }), id: undefined as never },
       { ...field("extra"), id: undefined as never },
     ] };
     let n = 0;
-    const copies = instantiateModuleFields(module, new Set(["kind", "extra"]), () => `new_${n++}`);
+    const copies = instantiateModuleFields(moduleDef, new Set(["kind", "extra"]), () => `new_${n++}`);
     const note = copies.find((copy) => copy.label === "note")!;
     expect(visibilityControllerKeys(note)).toEqual([copies[0]!.key, copies[2]!.key]);
     expect(copies[0]!.key).not.toBe("kind");
@@ -170,13 +170,13 @@ describe("copy and remap (#1072)", () => {
   });
 
   it("warns for an unsatisfiable member of an inserted module field", () => {
-    const plan = planModuleInsert({ fields: [{ ...field("detail", { conditionalGroup: { match: "ALL", conditions: [yes("a"), { fieldKey: "role", operator: "EQUALS", value: "Cook" }] } }), id: undefined as never }] } as never, [{ key: "role", label: "Role", options: ["Lead"] }], () => "x");
+    const plan = planModuleInsert({ fields: [{ ...field("detail", { conditionalGroup: { match: "ALL", conditions: [yes("a"), { fieldKey: "role", operator: "EQUALS", value: "Cook" }] } }), id: undefined as never }], singleton: true, presenceKeys: ["detail_marker"] } as never, [{ key: "role", label: "Role", options: ["Lead"] }], () => "x");
     expect(plan.kind === "insert" && plan.conditionWarnings).toEqual([{ controllerLabel: "Role", value: "Cook", dependentLabels: ["detail"] }]);
   });
 
   it("follows renamed keys when a palette entry collides", () => {
     const existing = [field("kind"), field("note")];
-    const fields = avoidCollisions([field("kind"), field("note", { conditionalGroup: { match: "ALL", conditions: [yes("kind"), yes("other")] } }), field("other")], existing, () => "fresh");
+    const fields = avoidCollisions([field("kind"), field("note", { conditionalGroup: { match: "ALL", conditions: [yes("kind"), yes("other")] } }), field("other")], existing, (() => { let n = 0; return () => `fresh_${n++}`; })());
     expect(visibilityControllerKeys(fields[1]!)).toEqual([fields[0]!.key, fields[2]!.key]);
     expect(fields[0]!.key).not.toBe("kind");
   });
