@@ -28,6 +28,15 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
   const [responses, setResponses] = useState<Record<string, PreviewValue>>({});
   const [previewAttendees, setPreviewAttendees] = useState<PreviewAttendee[]>(() => blankPreviewAttendees(selectedVersion?.definition ?? null));
   const [dirty, setDirty] = useState(false);
+  // Fields whose key still follows their label (#1132): a new question's key is made from its label as it is typed,
+  // until the key is edited by hand or the draft is saved or another version is opened (dirty goes back to false),
+  // after which a key never changes on its own.
+  const [autoKeyFieldIds, setAutoKeyFieldIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [seenDirty, setSeenDirty] = useState(false);
+  if (seenDirty !== dirty) {
+    setSeenDirty(dirty);
+    if (!dirty) setAutoKeyFieldIds(new Set());
+  }
   const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | "dismiss-notice" | "save-template" | null>(null);
   const [notice, setNotice] = useState("");
   // Fields the builder just turned into a choice field that defaulted to radio cards (FB-9).
@@ -87,7 +96,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { templates, setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
+  return { autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;

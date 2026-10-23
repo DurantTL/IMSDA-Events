@@ -3,6 +3,10 @@
 // Registration form builder. This file only wires the pieces together: it
 // builds the builder model (state, edits and actions, see use-builder-model.ts)
 // and lays out the zones, each of which reads the model from BuilderContext.
+// Two layouts share that model. Tablets and desktops get the editor shell
+// (builder-editor-shell: top bar, live form canvas and one sidebar, #1132).
+// Phones, and the first paint everywhere, keep the earlier layout: form list,
+// section cards with their fields opening inline, and the preview column.
 // Zones: top bar (builder-top-bar), field list (builder-field-list), canvas
 // (builder-section-card and its field rows), field settings
 // (builder-field-settings) and preview (builder-preview).
@@ -10,9 +14,8 @@
 import { useConfirm } from "@/components/use-confirm";
 import { EmptyState } from "@/components/empty-state";
 import { PUBLIC_DRAFT_STAFF_HELP } from "@/modules/forms/public-draft";
-import { CopyPlus, FileClock, Plus } from "lucide-react";
+import { CopyPlus, Plus } from "lucide-react";
 import { RegistrationFormNotificationsPanel } from "@/components/registration-form-notifications-panel";
-import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
 import { TemplateCleanupChecklistPanel } from "@/components/template-cleanup-checklist-panel";
 import type { BuilderWorkspaceProps } from "@/components/registration-builder/builder-types";
 import { BuilderPageIntro, BuilderEditorHead } from "@/components/registration-builder/builder-top-bar";
@@ -26,20 +29,26 @@ import { BuilderPaymentSettings } from "@/components/registration-builder/builde
 import { BuilderSectionCard } from "@/components/registration-builder/builder-section-card";
 import { BuilderPreview } from "@/components/registration-builder/builder-preview";
 import { BuilderDialogs } from "@/components/registration-builder/builder-dialogs";
+import { BuilderWithdrawZone } from "@/components/registration-builder/builder-withdraw-zone";
+import { BuilderEditorShell } from "@/components/registration-builder/builder-editor-shell";
 import { BuilderContext } from "@/components/registration-builder/builder-context";
 import { useBuilderModel } from "@/components/registration-builder/use-builder-model";
+import { useEditorShellViewport } from "@/components/registration-builder/use-editor-layout";
 
 export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const model = useBuilderModel(props, askConfirm);
-  const { forms, selectedForm, selectedVersion, definition, busy, showTemplates, setShowTemplates, setConfirmingUnpublish, publishedVersion, canEdit, addSection, eventId, canEditNotifications } = model;
+  const { forms, selectedForm, selectedVersion, definition, showTemplates, setShowTemplates, canEdit, addSection, eventId, canEditNotifications } = model;
+  const shellViewport = useEditorShellViewport();
+  const formOpen = Boolean(selectedForm && selectedVersion && definition);
+  const showShell = shellViewport && formOpen && props.layout !== "classic";
   return <BuilderContext.Provider value={model}><section className="page-stack builder-workspace">{confirmDialog}
     <BuilderPageIntro />
     <BuilderDraftTemplatePanel />
     <BuilderNewTemplatePanel />
     <BuilderSaveTemplatePanel />
-    <BuilderNotices />
-    {forms.length === 0 ? <EmptyState action={{ label: "Choose a template", onClick: () => setShowTemplates(true) }} canCreate={canEdit && !showTemplates} className="panel builder-empty" hint={canEdit ? undefined : "Ask an event administrator with form access to create the first form."} icon={<CopyPlus size={32} />} title="No registration form yet">Without a form, nobody can register for this event. Choose “Blank form” or a tested local template to begin. Nothing will be published publicly or sent to an external service.</EmptyState> : <div className="builder-layout">
+    {!showShell && <BuilderNotices />}
+    {forms.length === 0 ? <EmptyState action={{ label: "Choose a template", onClick: () => setShowTemplates(true) }} canCreate={canEdit && !showTemplates} className="panel builder-empty" hint={canEdit ? undefined : "Ask an event administrator with form access to create the first form."} icon={<CopyPlus size={32} />} title="No registration form yet">Without a form, nobody can register for this event. Choose “Blank form” or a tested local template to begin. Nothing will be published publicly or sent to an external service.</EmptyState> : showShell ? <BuilderEditorShell focusTarget={props.focusTarget} /> : <div className="builder-layout">
       <BuilderFormList />
       {selectedForm && selectedVersion && definition && <>
         <div className="builder-canvas"><BuilderEditorHead />
@@ -52,14 +61,7 @@ export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
         <BuilderPaymentSettings />
         {canEditNotifications && selectedForm && <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />}
         <BuilderConfirmationEditor />
-        {publishedVersion && selectedForm && (
-          <DangerZone className="builder-danger-zone" heading="Withdraw this form">
-            <DangerZoneItem title="Withdraw from public page">
-              <p>The form disappears from the public event page and stops accepting new registrations. Registrations already taken keep the version they were submitted under. Publishing again later creates a new version.</p>
-              <button className="secondary-button danger-outline-button" type="button" disabled={busy !== null} onClick={() => setConfirmingUnpublish(true)}><FileClock size={15} aria-hidden="true" /> Withdraw {selectedForm.name}…</button>
-            </DangerZoneItem>
-          </DangerZone>
-        )}
+        <BuilderWithdrawZone />
         </div>
         <BuilderPreview />
       </>}

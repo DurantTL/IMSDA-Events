@@ -7,31 +7,55 @@ import { formFieldScopes, formFieldTypes, directorySourceNoun, isChoiceFieldType
 import { hasOfferedChoices, resolveFieldFlags, resolveFieldOffer, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { defaultTypeForNewChoiceField, singleChoiceTypeHint } from "@/modules/forms/choice-defaults";
 import { creditPatchForKindChange, hasCredit } from "@/modules/forms/credit-fields";
-import { fieldTypeLabels, fieldKey } from "./builder-types";
+import { fieldTypeLabels } from "./builder-types";
+import { autoFieldKey } from "./field-keys";
 import { BuilderChoiceSettings } from "./builder-choice-settings";
 import { BuilderFieldAdvanced } from "./builder-field-advanced";
 import { useLoadedBuilder } from "./builder-context";
 
-export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex }: { section: RegistrationFormDefinition["sections"][number]; field: RegistrationFormField; sectionIndex: number; fieldIndex: number }) {
+type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
+
+/** The patch for changing a field's scope: credits, conditions that would now cross scopes, and directory sources follow (#482). */
+export function scopeChangePatch(field: RegistrationFormField, scope: RegistrationFormField["scope"], allFields: RegistrationFormField[]): Partial<RegistrationFormField> {
+  const controller = field.conditional ? allFields.find((candidate) => candidate.key === field.conditional?.fieldKey) : null;
+  return {
+    scope,
+    ...creditPatchForKindChange(field, { scope }),
+    conditional: scope === "REGISTRATION" && controller?.scope === "ATTENDEE" ? undefined : field.conditional,
+    optionalWhen: scope === "REGISTRATION" && allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey)?.scope === "ATTENDEE" ? undefined : field.optionalWhen,
+    // Directory sources apply only to the whole registration (#482).
+    ...(scope === "ATTENDEE" && isDirectoryOptionSource(field.optionSource) ? { optionSource: undefined, options: [] } : {}),
+  };
+}
+
+export function BuilderLabelInput({ field, sectionIndex, fieldIndex, inputId }: FieldTarget & { inputId?: string }) {
+  const { canEdit, updateField, allFields, autoKeyFieldIds, setAutoKeyFieldIds } = useLoadedBuilder();
+  // A new question's key (still the `new_field_N` placeholder) follows its label as it is typed, until the key is
+  // edited by hand or the draft is saved: kept unique, and never a key other code treats specially. Clearing the
+  // label keeps it following.
+  const following = field.key.startsWith("new_field_") || autoKeyFieldIds.has(field.id);
+  const nextKey = (label: string) => following ? autoFieldKey(label, allFields.filter((other) => other.id !== field.id).map((other) => other.key), field.type) : field.key;
+  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => { if (following) setAutoKeyFieldIds((current) => current.has(field.id) ? current : new Set(current).add(field.id)); updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) }); }} /></label>;
+}
+
+export function BuilderRequiredToggle({ field, sectionIndex, fieldIndex, className = "required-toggle" }: FieldTarget & { className?: string }) {
+  const { canEdit, updateField } = useLoadedBuilder();
+  return <label className={className}><input disabled={!canEdit || field.type === "CALCULATED" || field.optionSource === "ATTENDEE_TYPES"} type="checkbox" checked={field.optionSource === "ATTENDEE_TYPES" ? true : field.required} onChange={(event) => updateField(sectionIndex, fieldIndex, { required: event.target.checked, optionalWhen: event.target.checked ? field.optionalWhen : undefined })} /> Required{field.optionSource === "ATTENDEE_TYPES" && <small> — the attendee-type selector is always required</small>}</label>;
+}
+
+/**
+ * `inline` is the settings block under a field (phones, form templates). `panel` is the editor sidebar (#1132),
+ * which shows label, required and scope itself, above this, so they are left out here and nothing is edited twice.
+ */
+export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex, variant = "inline" }: { section: RegistrationFormDefinition["sections"][number]; field: RegistrationFormField; sectionIndex: number; fieldIndex: number; variant?: "inline" | "panel" }) {
   const { definition, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, allFields, policyVersions, canEdit, updateField, eventId } = useLoadedBuilder();
   return (
     <div className="field-editor-body">
               <div className="field-settings field-basic-settings">
-                <label>Label<input autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => updateField(sectionIndex, fieldIndex, { label: event.target.value, key: field.key.startsWith("new_field_") ? fieldKey(event.target.value) : field.key })} /></label>
+                {variant === "inline" && <BuilderLabelInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
                 <label>Field type<select disabled={!canEdit} value={field.type} onChange={(event) => { const requestedType = event.target.value as RegistrationFormField["type"]; const type = defaultTypeForNewChoiceField(field.type, requestedType, field.options.length < 2 ? 2 : field.options.length); if (type !== requestedType) setAutoRadioFieldIds((current) => new Set(current).add(field.id)); const choiceType = isChoiceFieldType(type); const changedPricingKind = choiceType !== isChoiceFieldType(field.type); const nextOptions = choiceType ? (field.options.length < 2 ? ["Option one", "Option two"] : field.options) : []; updateField(sectionIndex, fieldIndex, { type, required: type === "CALCULATED" ? false : field.required, options: nextOptions, optionDescriptions: choiceType && field.options.length >= 2 ? field.optionDescriptions : undefined, minSelections: type === "RANKED_CHOICE" ? field.minSelections ?? 2 : type === "MULTISELECT" ? field.minSelections ?? 1 : undefined, maxSelections: type === "MULTISELECT" || type === "RANKED_CHOICE" ? field.maxSelections ?? 2 : undefined, availabilityMode: choiceType ? field.availabilityMode : undefined, choiceLimits: choiceType ? field.choiceLimits : undefined, choicePricesCents: choiceType ? field.choicePricesCents : undefined, latePricing: changedPricingKind ? undefined : field.latePricing, ...creditPatchForKindChange(field, { type }), ...acknowledgmentTypePatch(field, type) }); }}>{formFieldTypes.map((type) => <option key={type} value={type}>{fieldTypeLabels[type]}</option>)}</select></label>
-                <label>Applies to<select disabled={!canEdit} value={field.scope} onChange={(event) => {
-                  const scope = event.target.value as RegistrationFormField["scope"];
-                  const controller = field.conditional ? allFields.find((candidate) => candidate.key === field.conditional?.fieldKey) : null;
-                  updateField(sectionIndex, fieldIndex, {
-                    scope,
-                    ...creditPatchForKindChange(field, { scope }),
-                    conditional: scope === "REGISTRATION" && controller?.scope === "ATTENDEE" ? undefined : field.conditional,
-                    optionalWhen: scope === "REGISTRATION" && allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey)?.scope === "ATTENDEE" ? undefined : field.optionalWhen,
-                    // Directory sources apply only to the whole registration (#482).
-                    ...(scope === "ATTENDEE" && isDirectoryOptionSource(field.optionSource) ? { optionSource: undefined, options: [] } : {}),
-                  });
-                }}>{formFieldScopes.map((scope) => <option key={scope} value={scope}>{scope === "ATTENDEE" ? "Each attendee" : "Registration"}</option>)}</select></label>
-                <label className="required-toggle"><input disabled={!canEdit || field.type === "CALCULATED" || field.optionSource === "ATTENDEE_TYPES"} type="checkbox" checked={field.optionSource === "ATTENDEE_TYPES" ? true : field.required} onChange={(event) => updateField(sectionIndex, fieldIndex, { required: event.target.checked, optionalWhen: event.target.checked ? field.optionalWhen : undefined })} /> Required{field.optionSource === "ATTENDEE_TYPES" && <small> — the attendee-type selector is always required</small>}</label>
+                {variant === "inline" && <label>Applies to<select disabled={!canEdit} value={field.scope} onChange={(event) => updateField(sectionIndex, fieldIndex, scopeChangePatch(field, event.target.value as RegistrationFormField["scope"], allFields))}>{formFieldScopes.map((scope) => <option key={scope} value={scope}>{scope === "ATTENDEE" ? "Each attendee" : "Registration"}</option>)}</select></label>}
+                {variant === "inline" && <BuilderRequiredToggle field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
                 <div className="field-full field-visibility-flags" data-testid={`field-flags-${field.key}`}>
                   {(() => {
                     const paymentKey = definition.payment?.paymentMethodFieldKey;
@@ -76,7 +100,7 @@ export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex 
       {isChoiceFieldType(field.type) && <BuilderChoiceSettings field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
               {field.type === "ACKNOWLEDGMENT" && <AcknowledgmentFieldSettings field={field} canEdit={canEdit} policyVersions={policyVersions} allowPolicyVersion={Boolean(eventId)} onChange={(acknowledgment) => updateField(sectionIndex, fieldIndex, { acknowledgment })} />}
               {field.type === "CALCULATED" && !hasCredit(field) && <div className="field-settings field-registration-fee"><label className="field-full">Registration fee (standard price)<span className="money-input"><b>$</b><input id={`registration-fee-${field.id}`} aria-label={`Price for ${field.label}`} disabled={!canEdit} type="number" min={0} max={100000} step="0.01" placeholder="0.00" value={field.priceCents === undefined ? "" : field.priceCents / 100} onChange={(event) => updateField(sectionIndex, fieldIndex, { priceCents: event.target.value === "" ? undefined : Math.round(Number(event.target.value) * 100), latePricing: event.target.value === "" ? undefined : field.latePricing })} /></span></label></div>}
-      <BuilderFieldAdvanced field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />
+      <BuilderFieldAdvanced field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} variant={variant} />
     </div>
   );
 }
