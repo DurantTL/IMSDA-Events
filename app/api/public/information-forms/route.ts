@@ -7,8 +7,8 @@ import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-se
 import { InformationFormError } from "@/modules/information-forms/errors";
 import { publicInformationFormKey, resolvePublicInformationForm } from "@/modules/information-forms/public";
 import { storeInformationFormResponse } from "@/modules/information-forms/responses";
-import { applyRateLimitHeaders, type RateLimitOutcome } from "@/modules/rate-limit/domain";
-import { checkInformationFormRateLimit } from "@/modules/rate-limit/service";
+import { applyRateLimitHeaders, mergeRateLimitOutcomes, type RateLimitOutcome } from "@/modules/rate-limit/domain";
+import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
 
 /**
  * Submitting a public information form (#1150). The form is found by its public address (never by an id from the
@@ -32,6 +32,29 @@ function json(body: unknown, status: number, rateLimit?: RateLimitOutcome) {
   return rateLimit ? applyRateLimitHeaders(response, rateLimit) : response;
 }
 
+function limited(rateLimit: RateLimitOutcome) {
+  return json({ error: "RATE_LIMITED", message: "Too many answers sent from here. Try again in a few minutes." }, 429, rateLimit);
+}
+
+/** The body as text, or null once it passes `limit` bytes; never holds more than the limit. */
+async function readCapped(request: Request, limit: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /** The verified attendee account of this browser, or null (also null while a required second step is pending). */
 async function verifiedAccountId() {
   const { account } = await getCurrentAttendee();
@@ -44,31 +67,42 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   let rateLimit: RateLimitOutcome | undefined;
   try {
-    if (Number(request.headers.get("content-length") ?? 0) > maximumBodyBytes) {
-      return json({ error: "REQUEST_TOO_LARGE", message: "The form is too large." }, 413);
+    // The per-client budget is charged before anything is read.
+    const clientLimit = await checkInformationFormClientRateLimit(request, "submit");
+    rateLimit = clientLimit;
+    if (!clientLimit.allowed) return limited(rateLimit);
+    // The size cap needs a declared length, and the body is read through a capped reader so a lying or chunked
+    // request can never be buffered whole.
+    const declaredLength = request.headers.get("content-length");
+    if (declaredLength === null || !/^\d+$/.test(declaredLength)) {
+      return json({ error: "LENGTH_REQUIRED", message: "The request must state its size." }, 411, rateLimit);
     }
-    const text = await request.text();
-    if (Buffer.byteLength(text, "utf8") > maximumBodyBytes) return json({ error: "REQUEST_TOO_LARGE", message: "The form is too large." }, 413);
+    if (Number(declaredLength) > maximumBodyBytes) return json({ error: "REQUEST_TOO_LARGE", message: "The form is too large." }, 413, rateLimit);
+    const text = await readCapped(request, maximumBodyBytes);
+    if (text === null) return json({ error: "REQUEST_TOO_LARGE", message: "The form is too large." }, 413, rateLimit);
     let raw: unknown;
     try {
       raw = JSON.parse(text);
     } catch {
-      return json({ error: "INVALID_JSON_BODY", message: "Send a JSON request body." }, 400);
+      return json({ error: "INVALID_JSON_BODY", message: "Send a JSON request body." }, 400, rateLimit);
     }
     const parsed = bodySchema.safeParse(raw);
-    if (!parsed.success) return json({ error: "INVALID_REQUEST", message: "The request is not valid." }, 400);
+    if (!parsed.success) return json({ error: "INVALID_REQUEST", message: "The request is not valid." }, 400, rateLimit);
     const { slug, eventSlug, idempotencyKey, answers } = parsed.data;
     const target = { slug, ...(eventSlug ? { eventSlug } : {}) };
 
-    rateLimit = await checkInformationFormRateLimit(request, publicInformationFormKey(target), "submit");
-    if (!rateLimit.allowed) return json({ error: "RATE_LIMITED", message: "Too many answers sent from here. Try again in a few minutes." }, 429, rateLimit);
+    const pairLimit = await checkInformationFormRateLimit(request, publicInformationFormKey(target), "submit");
+    rateLimit = mergeRateLimitOutcomes(clientLimit, pairLimit);
+    if (!pairLimit.allowed) return limited(rateLimit);
 
     const view = await resolvePublicInformationForm(target);
     if (view.state === "NOT_FOUND") return json({ error: "FORM_NOT_FOUND", message: "That form was not found." }, 404, rateLimit);
 
-    // The account is only ever the verified session. A form for signed-in people refuses without one.
-    const attendeeAccountId = await verifiedAccountId();
-    if (view.state === "OPEN" && view.form.fillAccess === "SIGNED_IN" && !attendeeAccountId) {
+    // The account is only ever the verified session, and is stored only for a form that asks people to sign in:
+    // "anyone with the link" responses stay unlinked even when the visitor happens to be signed in.
+    const signedInForm = view.state === "OPEN" && view.form.fillAccess === "SIGNED_IN";
+    const attendeeAccountId = signedInForm ? await verifiedAccountId() : null;
+    if (signedInForm && !attendeeAccountId) {
       return json({ error: "SIGN_IN_REQUIRED", message: "Sign in to answer this form." }, 401, rateLimit);
     }
 

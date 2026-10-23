@@ -12643,3 +12643,5 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .information-form-answers dt { font-weight: 700; }
 .information-form-answers dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .information-form-table td { overflow-wrap: anywhere; }
+.information-form-table th a { display: inline-flex; align-items: center; min-height: 44px; }
+.information-form-fill .field-error { display: block; }

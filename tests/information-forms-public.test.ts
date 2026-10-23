@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   secondStep: vi.fn(),
   store: vi.fn(),
   rateLimit: vi.fn(),
+  clientLimit: vi.fn(),
   logError: vi.fn(),
 }));
 
@@ -19,7 +20,7 @@ vi.mock("@/modules/events/public-repository", () => ({ getPublicEventLanding: mo
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.secondStep }));
 vi.mock("@/modules/information-forms/responses", () => ({ storeInformationFormResponse: mocks.store }));
-vi.mock("@/modules/rate-limit/service", () => ({ checkInformationFormRateLimit: mocks.rateLimit }));
+vi.mock("@/modules/rate-limit/service", () => ({ checkInformationFormRateLimit: mocks.rateLimit, checkInformationFormClientRateLimit: mocks.clientLimit }));
 
 import { POST } from "@/app/api/public/information-forms/route";
 import { InformationFormError } from "@/modules/information-forms/errors";
@@ -40,6 +41,7 @@ function row(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rateLimit.mockResolvedValue({ allowed: true, decisions: [] });
+  mocks.clientLimit.mockResolvedValue({ allowed: true, decisions: [] });
   mocks.getLanding.mockResolvedValue({ event: { name: "Sample Camporee" } });
   mocks.findForm.mockResolvedValue(row());
   mocks.getAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
@@ -84,7 +86,11 @@ describe("resolvePublicInformationForm", () => {
   });
 });
 
-const post = (body: unknown) => POST(new Request("https://events.example.test/api/public/information-forms", { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body), headers: { "Content-Type": "application/json" } }));
+const url = "https://events.example.test/api/public/information-forms";
+const post = (body: unknown) => {
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  return POST(new Request(url, { method: "POST", body: text, headers: { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(text)) } }));
+};
 const valid = { slug: "camp-survey", idempotencyKey: "key-12345678", answers: { comments: "synthetic answer" } };
 
 describe("POST /api/public/information-forms", () => {
@@ -94,15 +100,50 @@ describe("POST /api/public/information-forms", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ ok: true, confirmationMessage: "Thanks for telling us." });
     expect(mocks.store).toHaveBeenCalledWith({ formId: "form-1", idempotencyKey: "key-12345678", answers: { comments: "synthetic answer" }, attendeeAccountId: null });
-    expect(mocks.rateLimit).toHaveBeenCalledWith(expect.any(Request), "general/camp-survey", "submit");
+    expect(mocks.rateLimit).toHaveBeenCalledWith(expect.any(Request), "general:camp-survey", "submit");
   });
 
-  it("passes only the verified session account, never one from the body", async () => {
+  it("passes only the verified session account, never one from the body, and only for a signed-in form", async () => {
+    mocks.findForm.mockResolvedValue(row({ fillAccess: "SIGNED_IN" }));
     expect((await post({ ...valid, attendeeAccountId: "someone-else" })).status).toBe(400);
     expect(mocks.store).not.toHaveBeenCalled();
     mocks.getAttendee.mockResolvedValue({ account: { id: "account-1", verifiedEmail: "a@example.test", displayName: "A" }, via: "attendee", sessionId: "s" });
     await post(valid);
     expect(mocks.store).toHaveBeenCalledWith(expect.objectContaining({ attendeeAccountId: "account-1" }));
+  });
+
+  it("leaves an anyone-with-the-link response unlinked even for a signed-in visitor", async () => {
+    mocks.getAttendee.mockResolvedValue({ account: { id: "account-1", verifiedEmail: "a@example.test", displayName: "A" }, via: "attendee", sessionId: "s" });
+    await post(valid);
+    expect(mocks.store).toHaveBeenCalledWith(expect.objectContaining({ attendeeAccountId: null }));
+  });
+
+  it("keys event and general forms apart for rate limits", async () => {
+    await post({ ...valid, eventSlug: "sample-camporee" });
+    expect(mocks.rateLimit).toHaveBeenCalledWith(expect.any(Request), "event:sample-camporee/camp-survey", "submit");
+  });
+
+  it("charges the client first, and requires a numeric Content-Length under the cap", async () => {
+    const text = JSON.stringify(valid);
+    const missing = await POST(new Request(url, { method: "POST", body: text }));
+    expect(missing.status).toBe(411);
+    const bad = await POST(new Request(url, { method: "POST", body: text, headers: { "Content-Length": "12abc" } }));
+    expect(bad.status).toBe(411);
+    const big = await POST(new Request(url, { method: "POST", body: text, headers: { "Content-Length": "999999" } }));
+    expect(big.status).toBe(413);
+    expect(mocks.clientLimit).toHaveBeenCalledTimes(3);
+    expect(mocks.rateLimit).not.toHaveBeenCalled();
+    mocks.clientLimit.mockResolvedValue({ allowed: false, decisions: [] });
+    expect((await post(valid)).status).toBe(429);
+  });
+
+  it("stops reading a chunked body that passes the cap even when it states a small length", async () => {
+    let pulls = 0;
+    const stream = new ReadableStream<Uint8Array>({ pull(controller) { pulls += 1; controller.enqueue(new Uint8Array(50_000)); if (pulls > 100) controller.close(); } });
+    const response = await POST(new Request(url, { method: "POST", body: stream, headers: { "Content-Length": "100" }, duplex: "half" } as RequestInit));
+    expect(response.status).toBe(413);
+    expect(pulls).toBeLessThan(20);
+    expect(mocks.store).not.toHaveBeenCalled();
   });
 
   it("requires sign-in for a signed-in form, and treats a pending second step as signed out", async () => {

@@ -25,7 +25,9 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
 
   const problemFor = (field: RegistrationFormField) => {
     const raw = typedAnswerProblem(field, answers[field.key]);
-    return raw && (attempted || touched[field.key]) ? raw : "";
+    if (raw && (attempted || touched[field.key])) return raw;
+    // A server refusal tied to this field (cleared once the answer is edited).
+    return issues.find((issue) => issue.key === field.key && !touched[field.key])?.message ?? "";
   };
   const blocking = definition.sections.flatMap((section) => section.fields)
     .filter((field) => isFieldVisible(field, answers) && typedAnswerProblem(field, answers[field.key]));
@@ -50,6 +52,11 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
       if (!response.ok) {
         setError(result.message ?? "Your answers could not be sent.");
         setIssues(result.issues ?? []);
+        setTouched((current) => {
+          const next = { ...current };
+          for (const issue of result.issues ?? []) if (issue.key) delete next[issue.key];
+          return next;
+        });
         return;
       }
       setDoneMessage(result.confirmationMessage || "Thank you. Your answers have been received.");
@@ -86,7 +93,10 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
                   key={field.id}
                   lockedDate={false}
                   onBlur={() => setTouched((current) => ({ ...current, [field.key]: true }))}
-                  onChange={(value) => setAnswers((current) => ({ ...current, [field.key]: value }))}
+                  onChange={(value) => {
+                    setAnswers((current) => ({ ...current, [field.key]: value }));
+                    setTouched((current) => ({ ...current, [field.key]: true }));
+                  }}
                   problem={problemFor(field)}
                   value={answers[field.key]}
                 />

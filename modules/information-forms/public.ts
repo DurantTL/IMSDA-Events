@@ -31,7 +31,7 @@ export function publicInformationFormPath(target: PublicInformationFormTarget) {
 
 /** A stable key for rate limits: one per public address. */
 export function publicInformationFormKey(target: PublicInformationFormTarget) {
-  return `${target.eventSlug ?? "general"}/${target.slug}`;
+  return target.eventSlug ? `event:${target.eventSlug}/${target.slug}` : `general:${target.slug}`;
 }
 
 export async function resolvePublicInformationForm(target: PublicInformationFormTarget, now = new Date()): Promise<PublicInformationFormView> {

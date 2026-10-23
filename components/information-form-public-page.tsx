@@ -7,7 +7,7 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInPathFor, twoStepPathFor } from "@/modules/attendee-accounts/return-destination";
 import { publicInformationFormKey, publicInformationFormPath, resolvePublicInformationForm, type PublicInformationFormTarget } from "@/modules/information-forms/public";
-import { checkInformationFormRateLimit } from "@/modules/rate-limit/service";
+import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -48,8 +48,9 @@ function when(date: Date) {
  */
 export async function InformationFormPublicPage({ target }: { target: PublicInformationFormTarget }) {
   const requestLike = new Request("http://information-forms.invalid/", { headers: await headers() });
-  const rateLimit = await checkInformationFormRateLimit(requestLike, publicInformationFormKey(target), "read");
-  if (!rateLimit.allowed) {
+  const clientLimit = await checkInformationFormClientRateLimit(requestLike, "read");
+  const pairLimit = clientLimit.allowed ? await checkInformationFormRateLimit(requestLike, publicInformationFormKey(target), "read") : clientLimit;
+  if (!pairLimit.allowed) {
     return <Notice eyebrow="Please wait" title="Too many attempts"><p>Try this page again in a few minutes.</p></Notice>;
   }
   const view = await resolvePublicInformationForm(target);

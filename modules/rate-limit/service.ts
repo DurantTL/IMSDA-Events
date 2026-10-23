@@ -1007,24 +1007,27 @@ export async function checkAttendeeVerifyByAddressRateLimit(request: Request, em
 /**
  * A public information form's fill page and submit route (#1150), per 15 minutes. `read` is opening the page,
  * `submit` is sending answers. A venue or church Wi-Fi shares one client address across many phones, so the client
- * budget is generous; the per-form budget stops a script flooding one form.
+ * budgets are generous. There is deliberately no form-wide bucket: one visitor must never be able to lock everyone
+ * else out of a form. The client budget is charged first (before a body is read); the client+form pair after.
  */
 const informationFormBudgets = {
-  read: { client: 120, form: 600 },
-  submit: { client: 40, form: 300 },
+  read: { client: 300, clientForm: 300 },
+  submit: { client: 120, clientForm: 60 },
 } as const;
 
-export async function checkInformationFormRateLimit(
-  request: Request,
-  formKey: string,
-  operation: keyof typeof informationFormBudgets,
-) {
+export async function checkInformationFormClientRateLimit(request: Request, operation: keyof typeof informationFormBudgets) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  return evaluate([
+    { policy: `information-form.${operation}.client`, limit: informationFormBudgets[operation].client, windowSeconds: fifteenMinutes, identifierHashes: [client] },
+  ], configuration);
+}
+
+export async function checkInformationFormRateLimit(request: Request, formKey: string, operation: keyof typeof informationFormBudgets) {
   const configuration = getRateLimitConfiguration();
   const { client } = requestIdentities(request, configuration);
   const form = hashRateLimitIdentifier("information-form", formKey, configuration);
-  const budget = informationFormBudgets[operation];
   return evaluate([
-    { policy: `information-form.${operation}.client`, limit: budget.client, windowSeconds: fifteenMinutes, identifierHashes: [client] },
-    { policy: `information-form.${operation}.form`, limit: budget.form, windowSeconds: fifteenMinutes, identifierHashes: [form] },
+    { policy: `information-form.${operation}.client-form`, limit: informationFormBudgets[operation].clientForm, windowSeconds: fifteenMinutes, identifierHashes: [client, form] },
   ], configuration);
 }
