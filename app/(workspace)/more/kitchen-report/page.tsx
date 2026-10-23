@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { KitchenCountsTable } from "@/components/kitchen-counts-table";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -28,6 +29,10 @@ export default async function KitchenReportPage({ searchParams }: { searchParams
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   return (
     <div className="page-stack">
+      {/* Meal money closeout (#212) holds amounts, so only finance access sees the way in; the page checks it again on the server. */}
+      {permissions.includes("MANAGE_FINANCE") && (
+        <p><Link className="secondary-button" href={`/more/kitchen-report/closeout?${eventQuery}`}>Meal money closeout</Link></p>
+      )}
       <KitchenReportView eventName={event.name} report={report} csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen`} />
       {/* Meals served against tickets sold (#1028): its own section and component, apart from the report above. */}
       <KitchenMealsServed

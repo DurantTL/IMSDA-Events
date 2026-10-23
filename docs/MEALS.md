@@ -225,6 +225,38 @@ paying vs conference-paid. Each service drills down to ticket ids without names.
 confirmed registrations. Served comes from the redemption records whatever the ticket's status now, so a meal eaten on a
 ticket that was cancelled afterwards stays served, is shown as "includes N on cancelled tickets", and is not counted as sold.
 
+## Meal money closeout (#212)
+
+**More > Kitchen report > Meal money closeout** (`/more/kitchen-report/closeout`, `exports/meals-closeout`). `MANAGE_FINANCE` only,
+checked on the server: the Kitchen staff role and report-only roles cannot open the page, the CSV or the review route, and the
+page links to no registration or person (ids and amounts only). It is a read-only projection built from the records as they are
+(`modules/meals/closeout.ts`); it posts no charge, issues no refund, changes no price and rewrites no source row.
+
+Per service it shows: attendee-paid ledger charges, credits and net (split by where the ledger says the money went: inside the
+registration price, posted to the registration, walk-up at the counter, registration not live); tickets ordered and served by case
+(paid, complimentary, conference-paid, walk-up); meals served on tickets cancelled afterwards, kept apart (a later cancellation
+never erases a meal served); conference-paid meals served times the rate on file for each order (what the conference is billed);
+and the kitchen's prepared, wasted, donated and transferred counts for reading only (they are never financial entries or proof of
+revenue). Totals are the sum of the rows shown, and the CSV carries the same figures. The "as of" time and a short digest of the
+source records are shown: unchanged source records always give the same figures and digest.
+
+**Exceptions.** Missing or different source data is listed, never guessed as zero: an order with no ledger entries or a ledger net
+that differs from quantity times price; a registration-posted ledger line with no matching meal adjustment line, a different
+amount, or a meal adjustment with no ledger line; conference-paid meals served with no rate on file; walk-up orders whose counter
+receipts are not recorded here (compare with the till); a standing note that registration payments and refunds are not split by
+meal, so the charges shown are what was billed rather than received; no scanner import; no prepared count, served over prepared,
+or served plus wasted, donated and transferred over prepared; meals served on cancelled tickets; and accepted un-redeem
+corrections (a finance-only action).
+
+**Reviews.** Staff acknowledge or reopen an exception with a required note. Each review is an append-only row
+(`EventMealCloseoutReview`: who, when, note, and a digest of the figures reviewed) and the earlier rows stay visible. An exception
+whose figures change after it was acknowledged shows as open again, and a review of figures that changed since the person
+looked is refused. The audit entry (`meals.closeout_review`) holds the exception key and status, not the note.
+
+**Future ledger.** The projection reads the meal ledger and the registration's MEAL adjustment lines (the standing #98 decision).
+When the full ledger (#117 to #123) exists, only the loader in `closeout-repository.ts` changes; the projection and the exceptions
+stay the same. Splitting registration receipts and refunds by meal, and recording walk-up counter receipts, are not built here.
+
 ## Dietary categories and protected detail
 
 A selection may carry only the configured, non-medical categories in `mealDietaryCategories` (vegetarian, vegan,
@@ -246,6 +278,6 @@ when the new event has a type with that code. A template payload can carry the s
 
 ## Out of scope here
 
-Credentials and redemption (#211), kitchen counts and preparation (#212), the invitation flow for conference-paid
+Credentials and redemption (#211), the invitation flow for conference-paid
 registrations (#804), Camporee meal sponsorship (#409), protected allergy records, and collecting donations for
 donation-only meals.
