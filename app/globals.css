@@ -12661,3 +12661,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .information-form-table td { overflow-wrap: anywhere; }
 .information-form-table th a { display: inline-flex; align-items: center; min-height: 44px; }
 .information-form-fill .field-error { display: block; }
+
+/* #1151: the All forms hub. */
+.forms-hub-filter input[type="search"] { min-height: 44px; }
+.forms-hub-filter select { min-height: 44px; }
+.forms-hub-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }

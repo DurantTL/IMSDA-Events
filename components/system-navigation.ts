@@ -22,6 +22,7 @@ import {
   UsersRound,
   BarChart3,
   KeyRound,
+  ListChecks,
   Bell,
 } from "lucide-react";
 
@@ -94,6 +95,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "Forms",
     collapsedByDefault: false,
     items: [
+      { href: "/admin/forms", label: "All forms", description: "Every club, general and event form in one list.", icon: ListChecks },
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
       { href: "/admin/information-forms", label: "Information forms", description: "Surveys and interest forms that belong to no event.", icon: ClipboardPen },
@@ -193,6 +195,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/clubs\/reports(\/|$)/, "Club Monthly Records"],
   [/^\/admin\/clubs\/summary(\/|$)/, "Club summary"],
   [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
+  [/^\/admin\/forms(\/|$)/, "All forms"],
   [/^\/admin\/form-templates\/[^/]+(\/|$)/, "Form template"],
   [/^\/admin\/form-templates(\/|$)/, "Form templates"],
   [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Form responses"],

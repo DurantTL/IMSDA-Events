@@ -93,6 +93,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/admin/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
     expect(staffSubpageTitle("/admin/clubs/reports/year-end")).toBe("Club Year-End Reports");
     expect(staffSubpageTitle("/admin/club-forms/membership")).toBe("Club form builder");
+    expect(staffSubpageTitle("/admin/forms")).toBe("All forms");
   });
 
   it("gives every /admin page a topbar title equal to its own <title>, and never the section name", () => {
