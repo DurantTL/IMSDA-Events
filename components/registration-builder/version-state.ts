@@ -16,7 +16,7 @@ export function versionStateChips({ versions, selected, isHistorical, dirty }: {
   const chips: VersionChip[] = [];
   const live = versions.find((version) => version.status === "PUBLISHED");
   const draft = versions.find((version) => version.status === "DRAFT");
-  if (isHistorical) chips.push({ kind: "viewing-old", text: `Viewing old version ${selected.versionNumber} (read-only)` });
+  if (isHistorical) chips.push({ kind: "viewing-old", text: `Viewing ${selected.status === "PUBLISHED" ? "live" : "old"} version ${selected.versionNumber} (read-only)` });
   if (live) chips.push({ kind: "live", text: `Live (version ${live.versionNumber})` });
   if (draft) chips.push({ kind: "draft", text: `Draft (version ${draft.versionNumber})` });
   // Nothing live and no draft: the open version is archived, which the page calls withdrawn, and still has to be named.

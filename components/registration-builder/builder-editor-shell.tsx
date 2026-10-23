@@ -298,8 +298,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           ? <label className="fb-form-switch"><span className="sr-only">Form</span><select value={selectedFormId} onChange={(event) => { const form = forms.find((candidate) => candidate.id === event.target.value); if (form) void chooseForm(form); }}>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
           : <span className="fb-form-name">{selectedForm.name}</span>}
         <nav className="fb-nav" aria-label="Form sections">
-          <a href="#builder-editor" aria-current={activeSection === "editor" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
-          <a href="#builder-settings" data-fb-nav="settings" aria-current={activeSection === "settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>
+          <a href="#builder-editor" aria-current={activeSection === "editor" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
+          <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>
           {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
         <BuilderVersionChips />

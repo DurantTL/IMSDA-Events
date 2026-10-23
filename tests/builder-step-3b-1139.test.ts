@@ -167,6 +167,10 @@ describe("version-state chips (#1139)", () => {
     expect(versionStateChips({ versions: [live, old], selected: old, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing old version 2 (read-only)", "Live (version 3)"]);
   });
 
+  it("viewing the live version while a newer draft exists says live, not old", () => {
+    expect(versionStateChips({ versions: [draft, live], selected: live, isHistorical: true, dirty: false }).map((chip) => chip.text)).toEqual(["Viewing live version 3 (read-only)", "Live (version 3)", "Draft (version 4)"]);
+  });
+
   it("unsaved changes is its own chip, next to the state", () => {
     expect(versionStateChips({ versions: [live], selected: live, isHistorical: false, dirty: true }).map((chip) => chip.text)).toEqual(["Live (version 3)", "Unsaved changes"]);
   });

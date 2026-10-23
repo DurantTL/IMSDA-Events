@@ -12,7 +12,7 @@ export type FieldChip = { kind: FieldChipKind; label: string };
 /** The module a question came from: Meals for a meal ticket, else the palette module that carries its key (never the generic Common ones). */
 export function sourceModuleName(field: Pick<RegistrationFormField, "key" | "type" | "scope">): string | null {
   if (isMealTicketField(field)) return "Meals";
-  const found = builderFieldModules.find((module) => module.category !== "Common" && module.fields.some((moduleField) => moduleField.key === field.key));
+  const found = builderFieldModules.find((module) => module.category !== "Common" && module.fields.some((moduleField) => moduleField.key === field.key && moduleField.type === field.type));
   return found?.name ?? null;
 }
 
