@@ -16,8 +16,8 @@ const NON_RETURNABLE_PATHS = [
 
 /**
  * A destination that may be carried through attendee sign-in and the second
- * step (#568): a `safeReturnTo` path inside the signed-in account area or the
- * profile page, never one of the sign-in screens themselves. Anything else
+ * step (#568): a `safeReturnTo` path inside the signed-in account area, the
+ * profile page, or one information form's fill page (#1150), never one of the sign-in screens themselves. Anything else
  * (an off-site URL, an API route, another workspace) yields `fallback`.
  */
 export function attendeeReturnDestination(value: string | null | undefined, fallback: string): string {
@@ -38,7 +38,9 @@ export function attendeeReturnDestination(value: string | null | undefined, fall
   if ((NON_RETURNABLE_PATHS as readonly string[]).includes(pathname)) return fallback;
   const inAccount = pathname === "/account" || pathname.startsWith("/account/");
   const inProfile = pathname === "/profile" || pathname.startsWith("/profile/");
-  return inAccount || inProfile ? safe : fallback;
+  // Information form fill pages (#1150): a signed-in-only form sends people through sign-in and back to itself.
+  const inInformationForm = /^\/forms\/[a-z0-9-]+$/.test(pathname) || /^\/events\/[a-z0-9-]+\/forms\/[a-z0-9-]+$/.test(pathname);
+  return inAccount || inProfile || inInformationForm ? safe : fallback;
 }
 
 function pathWithNext(base: string, target: string | null | undefined): string {
