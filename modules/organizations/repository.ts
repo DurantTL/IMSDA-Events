@@ -557,6 +557,7 @@ export async function getOrganizationDeletionCheck(
           clubFormSubmissions: true,
           clubFormLinks: true,
           billingContacts: true,
+          contacts: true,
           billingResponsibilities: true,
         },
       },
@@ -585,6 +586,9 @@ export async function getOrganizationDeletionCheck(
   }
   if ((counts.billingContacts ?? 0) > 0 || (counts.billingResponsibilities ?? 0) > 0) {
     blockers.push(`This organization has ${counts.billingContacts ?? 0} billing contact${(counts.billingContacts ?? 0) === 1 ? "" : "s"} on record and is the responsible party for ${counts.billingResponsibilities ?? 0} registration${(counts.billingResponsibilities ?? 0) === 1 ? "" : "s"}. Billing records are kept, so deactivate it instead.`);
+  }
+  if ((counts.contacts ?? 0) > 0) {
+    blockers.push(`This church has ${counts.contacts} pastor contact record${counts.contacts === 1 ? "" : "s"}, which are kept. Deactivate it instead.`);
   }
   if (counts.honorEnrollments > 0) {
     blockers.push(`This club has ${counts.honorEnrollments} honor enrollment${counts.honorEnrollments === 1 ? "" : "s"}. Deactivate the club instead.`);

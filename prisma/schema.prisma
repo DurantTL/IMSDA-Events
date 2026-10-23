@@ -270,6 +270,12 @@ enum BillingContactSource {
   STAFF_ENTERED
 }
 
+/// Kinds of non-billing church contact (#977). A treasurer is the billing contact and lives in
+/// `OrganizationBillingContact`; this table never feeds invoice recipient resolution.
+enum OrganizationContactKind {
+  PASTOR
+}
+
 enum BillingResponsibleKind {
   ORGANIZATION
   PERSON
@@ -893,6 +899,8 @@ model User {
   verifiedBillingContacts      OrganizationBillingContact[]              @relation("BillingContactVerifiedBy")
   createdBillingContacts       OrganizationBillingContact[]              @relation("BillingContactCreatedBy")
   endedBillingContacts         OrganizationBillingContact[]              @relation("BillingContactEndedBy")
+  createdOrganizationContacts  OrganizationContact[]                     @relation("OrganizationContactCreatedBy")
+  endedOrganizationContacts    OrganizationContact[]                     @relation("OrganizationContactEndedBy")
   setBillingResponsibilities   RegistrationBillingResponsibility[]       @relation("BillingResponsibilitySetBy")
   billingResponsibilityChanges RegistrationBillingResponsibilityChange[] @relation("BillingResponsibilityChangeActor")
   attendanceCorrections        AttendanceCorrection[]                    @relation("AttendanceCorrectionActor")
@@ -2572,6 +2580,7 @@ model Organization {
   sponsoredPromoCodes PromoCode[] @relation("PromoCodeSponsor")
   clubFormSubmissions ClubFormSubmission[]
   billingContacts         OrganizationBillingContact[]
+  contacts                OrganizationContact[]
   billingResponsibilities RegistrationBillingResponsibility[]
   clubFormLinks       ClubFormLink[]
 
@@ -7219,6 +7228,30 @@ model OrganizationBillingContact {
   endedBy      User?        @relation("BillingContactEndedBy", fields: [endedByUserId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, effectiveFrom])
+}
+
+/// A non-billing contact for an organization, today the church pastor (#977). One active row
+/// (effectiveTo NULL) per organization and kind, enforced by a partial unique index the migration
+/// adds. Rows are ended, never deleted or rewritten. Never used to address invoices or any message.
+model OrganizationContact {
+  id              String                  @id @default(cuid())
+  organizationId  String
+  kind            OrganizationContactKind
+  name            String
+  email           String?
+  phone           String?
+  effectiveFrom   DateTime                @default(now())
+  effectiveTo     DateTime?
+  createdByUserId String?
+  endedByUserId   String?
+  endReason       String?
+  createdAt       DateTime                @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User?        @relation("OrganizationContactCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  endedBy      User?        @relation("OrganizationContactEndedBy", fields: [endedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, kind, effectiveFrom])
 }
 
 /// Who is financially responsible for one deferred-invoice registration (#165). One current row
