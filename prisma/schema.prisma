@@ -811,6 +811,8 @@ model User {
   moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
   importRuns                ImportRun[]
   createdRegistrationForms  RegistrationForm[]        @relation("RegistrationFormCreatedBy")
+  createdInformationForms         InformationForm[]        @relation("InformationFormCreatedBy")
+  createdInformationFormVersions  InformationFormVersion[] @relation("InformationFormVersionCreatedBy")
   createdFormVersions       RegistrationFormVersion[] @relation("RegistrationFormVersionCreatedBy")
   formTestSubmissions       FormTestSubmission[]      @relation("FormTestSubmissionSubmittedBy")
   createdMessageVersions    MessageTemplateVersion[]  @relation("MessageTemplateVersionCreatedBy")
@@ -1088,6 +1090,7 @@ model AttendeeAccount {
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
   /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
   linkedUser         User?                 @relation("UserAttendeeLink")
+  informationFormResponses InformationFormResponse[]
   email              String                @unique
   displayName        String
   firstName          String?
@@ -1692,6 +1695,7 @@ model Event {
   importRuns                          ImportRun[]
   awardItems                          EventAwardItem[]
   registrationForms                   RegistrationForm[]
+  informationForms                    InformationForm[]
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -4310,6 +4314,100 @@ model RegistrationFormVersion {
 
   @@unique([formId, versionNumber])
   @@index([formId, status, versionNumber])
+}
+
+enum InformationFormScope {
+  GENERAL
+  EVENT
+}
+
+enum InformationFormStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum InformationFormFillAccess {
+  ANYONE_WITH_LINK
+  SIGNED_IN
+}
+
+enum InformationFormVersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+/// An information form (#1148): a survey, interest form or post-event form that gathers answers only (no registration,
+/// roster, payment, meals or health data). GENERAL forms belong to no event and are managed by system administrators;
+/// EVENT forms belong to one event and are managed by whoever holds MANAGE_FORMS on it. `scopeKey` is the event id, or
+/// "GENERAL", so one unique index makes the slug unique per scope/event even where `eventId` is null.
+model InformationForm {
+  id                      String                    @id @default(cuid())
+  scope                   InformationFormScope
+  eventId                 String?
+  scopeKey                String
+  name                    String
+  slug                    String
+  status                  InformationFormStatus     @default(DRAFT)
+  fillAccess              InformationFormFillAccess @default(ANYONE_WITH_LINK)
+  opensAt                 DateTime?
+  closesAt                DateTime?
+  createdByUserId         String
+  sourceTemplateVersionId String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  event                 Event?                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy             User                        @relation("InformationFormCreatedBy", fields: [createdByUserId], references: [id])
+  sourceTemplateVersion SeededFormTemplateVersion?  @relation("InformationFormSourceTemplateVersion", fields: [sourceTemplateVersionId], references: [id], onDelete: Restrict)
+  versions              InformationFormVersion[]
+  responses             InformationFormResponse[]
+
+  @@unique([scopeKey, slug])
+  @@index([scope, status, updatedAt])
+  @@index([eventId, status, updatedAt])
+}
+
+/// One version of an information form's definition. Once PUBLISHED the definition never changes; a later publish
+/// marks it SUPERSEDED, and edits go into a new DRAFT version (the same pattern as `RegistrationFormVersion`).
+model InformationFormVersion {
+  id              String                       @id @default(cuid())
+  formId          String
+  createdByUserId String
+  versionNumber   Int
+  status          InformationFormVersionStatus @default(DRAFT)
+  definition      Json
+  publishedAt     DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  form      InformationForm           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  createdBy User                      @relation("InformationFormVersionCreatedBy", fields: [createdByUserId], references: [id])
+  responses InformationFormResponse[]
+
+  @@unique([formId, versionNumber])
+  @@index([formId, status, versionNumber])
+}
+
+/// One submitted answer set, tied to the version it was answered on. `idempotencyKey` makes a retried submit store once.
+model InformationFormResponse {
+  id                String   @id @default(cuid())
+  formId            String
+  versionId         String
+  answers           Json
+  attendeeAccountId String?
+  idempotencyKey    String
+  submittedAt       DateTime @default(now())
+
+  form            InformationForm        @relation(fields: [formId], references: [id], onDelete: Cascade)
+  version         InformationFormVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  attendeeAccount AttendeeAccount?       @relation(fields: [attendeeAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([formId, idempotencyKey])
+  @@index([formId, submittedAt])
+  @@index([versionId])
+  @@index([attendeeAccountId])
 }
 
 /// A reusable, versioned event blueprint (#152). `status` is the template's
@@ -9695,6 +9793,7 @@ model SeededFormTemplateVersion {
   template SeededFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
   formsCreatedFrom  RegistrationForm[] @relation("RegistrationFormSourceTemplateVersion")
   formsDismissed    RegistrationForm[] @relation("RegistrationFormDismissedTemplateVersion")
+  informationFormsCreatedFrom InformationForm[] @relation("InformationFormSourceTemplateVersion")
 
   @@unique([templateId, version])
 }

@@ -11,12 +11,17 @@ import {
   PaymentStatus,
   PrismaClient,
   RefundStatus,
+  InformationFormFillAccess,
+  InformationFormScope,
+  InformationFormStatus,
+  InformationFormVersionStatus,
   RegistrationFormStatus,
   RegistrationStatus,
 } from "@prisma/client";
 import { rolePermissions } from "../modules/access/permissions";
 import { hashPassword } from "../modules/access/passwords";
 import { formTemplates } from "../modules/forms/definition";
+import { parseInformationFormDefinition } from "../modules/information-forms/definition";
 import { starterDescription, starterEventTemplates, starterPayload } from "../modules/event-templates/starters";
 import { assertLocalDatabase } from "../scripts/support/local-only-guard";
 
@@ -406,6 +411,51 @@ async function main() {
       definition: retreatDefinition,
     },
   });
+
+  // Information forms (#1148): one synthetic GENERAL survey and one EVENT post-event survey, both published and open.
+  // They hold no personal data; a re-seed leaves any later edits alone.
+  const surveyDefinition = (title: string, fields: Array<Record<string, unknown>>) => parseInformationFormDefinition({
+    title,
+    description: "A short synthetic survey for local development.",
+    confirmationMessage: "Thank you. Your answers have been received.",
+    sections: [{ id: "section_survey", title: "Survey", description: "", fields }],
+  });
+  const informationForms = [
+    {
+      formId: "infoform_general_interest", versionId: "infoformver_general_interest_1", scope: InformationFormScope.GENERAL, eventId: null, scopeKey: "GENERAL",
+      name: "Camp interest survey (synthetic)", slug: "camp-interest-survey", fillAccess: InformationFormFillAccess.ANYONE_WITH_LINK,
+      definition: surveyDefinition("Camp interest survey (synthetic)", [
+        { id: "field_interest_level", key: "interest_level", label: "How interested are you in a summer camp?", helpText: "", type: "RADIO", scope: "REGISTRATION", required: true, options: ["Very interested", "Somewhat interested", "Not interested"] },
+        { id: "field_interest_ideas", key: "ideas", label: "What would you like to see offered?", helpText: "", type: "LONG_TEXT", scope: "REGISTRATION", required: false, options: [] },
+      ]),
+    },
+    {
+      formId: "infoform_wr26_post_event", versionId: "infoformver_wr26_post_event_1", scope: InformationFormScope.EVENT, eventId: wr26.id, scopeKey: wr26.id,
+      name: "Post-event survey (synthetic)", slug: "post-event-survey", fillAccess: InformationFormFillAccess.SIGNED_IN,
+      definition: surveyDefinition("Post-event survey (synthetic)", [
+        { id: "field_post_rating", key: "overall_rating", label: "How would you rate the event overall?", helpText: "", type: "SELECT", scope: "REGISTRATION", required: true, options: ["Excellent", "Good", "Fair", "Poor"] },
+        { id: "field_post_comments", key: "comments", label: "Any other comments?", helpText: "", type: "LONG_TEXT", scope: "REGISTRATION", required: false, options: [] },
+      ]),
+    },
+  ];
+  for (const seed of informationForms) {
+    await prisma.informationForm.upsert({
+      where: { scopeKey_slug: { scopeKey: seed.scopeKey, slug: seed.slug } },
+      update: {},
+      create: {
+        id: seed.formId, scope: seed.scope, eventId: seed.eventId, scopeKey: seed.scopeKey, name: seed.name, slug: seed.slug,
+        status: InformationFormStatus.OPEN, fillAccess: seed.fillAccess, createdByUserId: admin.id,
+      },
+    });
+    await prisma.informationFormVersion.upsert({
+      where: { formId_versionNumber: { formId: seed.formId, versionNumber: 1 } },
+      update: {},
+      create: {
+        id: seed.versionId, formId: seed.formId, createdByUserId: admin.id, versionNumber: 1,
+        status: InformationFormVersionStatus.PUBLISHED, publishedAt: new Date("2026-07-01T12:00:00.000Z"), definition: seed.definition as Prisma.InputJsonValue,
+      },
+    });
+  }
 
   // Published starter event templates (#546), so "Start from template" works
   // on a fresh dev database. A starter that already exists in any state
