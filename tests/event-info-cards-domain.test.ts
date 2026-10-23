@@ -282,14 +282,14 @@ describe("event info card edge cases", () => {
     });
     const tiers = (extra: Record<string, unknown>) => buildFeesCard({ ...input, forms: [feeForm([field(extra)])] })?.sections[0]?.groups[0]?.lines[0]?.tiers;
 
-    it("omits the tier a late empty choice map would charge as $0", () => {
-      // From the late date the engine is in choice mode with an empty map: $0.
+    it("shows both tiers when a late empty choice map is ignored by the engine (#680)", () => {
+      // An empty late map is not choice mode: the engine charges the late priceCents.
       expect(tiers({ priceCents: 900, latePricing: { startsOn: "2026-08-24", label: "Late", priceCents: 1400, choicePricesCents: {} } }))
-        .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }]);
+        .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1400, note: "from Aug 24, 2026" }]);
     });
 
-    it("shows no price for an empty choice map on the field, which charges $0 throughout", () => {
-      expect(tiers({ priceCents: 900, choicePricesCents: {} })).toBeUndefined();
+    it("shows the field price for an empty choice map on the field, which the engine charges as priceCents (#680)", () => {
+      expect(tiers({ priceCents: 900, choicePricesCents: {} })).toEqual([{ amountCents: 900, note: null }]);
     });
 
     it("shows the field price then the late option price for a late-only non-empty choice map", () => {

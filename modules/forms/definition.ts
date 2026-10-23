@@ -1582,14 +1582,17 @@ function attendeeDisplayName(responses: Record<string, unknown>, index: number, 
 
 /**
  * The prices a field charges in one pricing state, exactly as `pricedLineItem`
- * resolves them. A field is choice-priced whenever `choicePricesCents` is
- * defined (even empty), or the late map is defined while late pricing is active.
+ * resolves them. The base map and, while late pricing is active, the late map
+ * are merged (late wins per choice). A field is choice-priced only when that
+ * merged map has at least one entry; an empty map (the builder used to write
+ * `{}` for the Quick choices preset and the late-pricing toggle) falls back to
+ * `priceCents`. An entry of 0 is an explicit free choice and still counts.
  * Shared so a display of prices can never disagree with what is charged.
  */
 export function resolveFieldPrices(field: RegistrationFormField, latePricingActive: boolean) {
   const priceCents = latePricingActive ? field.latePricing?.priceCents ?? field.priceCents : field.priceCents;
-  const hasChoicePrices = field.choicePricesCents !== undefined || (latePricingActive && field.latePricing?.choicePricesCents !== undefined);
-  const choicePricesCents = hasChoicePrices ? { ...(field.choicePricesCents ?? {}), ...(latePricingActive ? field.latePricing?.choicePricesCents ?? {} : {}) } : undefined;
+  const merged = { ...(field.choicePricesCents ?? {}), ...(latePricingActive ? field.latePricing?.choicePricesCents ?? {} : {}) };
+  const choicePricesCents = Object.keys(merged).length > 0 ? merged : undefined;
   return { priceCents, choicePricesCents };
 }
 
