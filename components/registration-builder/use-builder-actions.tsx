@@ -13,7 +13,7 @@ import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
 
 export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceProps, "eventId" | "eventSlug">, state: BuilderState, derived: BuilderDerived, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
-  const { setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setNotice, setError, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
+  const { setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setFocusRequest, setNotice, setError, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
   const { roster, previewSteps, editsCreateDraft, slugMayNeedSync } = derived;
   function syncForm(form: FormView, message?: string, preserveTestResponses = false) {
     setForms((current) => [form, ...current.filter((item) => item.id !== form.id)]);
@@ -244,9 +244,9 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to restore this version.");
       syncForm(result.form, restoreNotice(version.versionNumber));
-      // Focus follows the draft's chip once the new draft has rendered.
-      setTimeout(() => document.getElementById("fb-version-chip-draft")?.focus(), 0);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore this version."); }
+      // Focus follows the draft's chip; the effect in use-builder-state moves it once the chip is rendered.
+      setFocusRequest({ kind: "draft-chip" });
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore this version."); setFocusRequest({ kind: "restore-button", versionId: version.id }); }
     finally { setBusy(null); }
   }
   return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion, restoreVersion };

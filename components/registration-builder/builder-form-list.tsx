@@ -1,6 +1,6 @@
 // Event forms and version history: the form switcher beside the editor.
 import { ChevronRight, FileClock, RotateCcw } from "lucide-react";
-import { canRestoreVersion, versionStateLabel, versionWhoWhen } from "./version-history";
+import { canRestoreVersion, restoreButtonId, versionStateLabel, versionWhoWhen } from "./version-history";
 import { statusLabel } from "./builder-types";
 import { useBuilder } from "./builder-context";
 
@@ -21,7 +21,7 @@ export function BuilderVersionHistory({ detailed = false }: { detailed?: boolean
             <FileClock size={15} />
             <span><strong>Version {version.versionNumber} · {versionStateLabel(version, versions)}</strong><small>{versionWhoWhen(version)}</small><small>{version.testSubmissionCount} tests</small></span>
           </button>
-          {canRestoreVersion(version) && <button className="version-restore" type="button" disabled={busy !== null} onClick={() => restoreVersion(version)}><RotateCcw size={14} /> Restore version {version.versionNumber} as draft</button>}
+          {canRestoreVersion(version) && <button className="version-restore" id={restoreButtonId(version.id)} type="button" disabled={busy !== null} onClick={() => restoreVersion(version)}><RotateCcw size={14} /> Restore version {version.versionNumber} as draft</button>}
         </li>
       ))}</ul>
     </div>

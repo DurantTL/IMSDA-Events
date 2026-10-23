@@ -13,7 +13,7 @@ vi.mock("@/modules/attendee-types/repository", () => ({
   listActiveAttendeeTypes: dependencies.listActiveAttendeeTypes,
 }));
 
-import { canRestoreVersion, restoreConfirmation, restoreNotice, restoreSaveTarget, versionStateLabel, versionWhoWhen } from "@/components/registration-builder/version-history";
+import { canRestoreVersion, focusTargetId, restoreButtonId, restoreConfirmLabel, restoreConfirmation, restoreNotice, restoreSaveTarget, versionStateLabel, versionWhoWhen } from "@/components/registration-builder/version-history";
 import { formTemplates, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { updateRegistrationForm } from "@/modules/forms/repository";
 
@@ -96,6 +96,27 @@ describe("Restore as draft rules (#1140)", () => {
     expect(restoreConfirmation({ versionNumber: 1, draftVersionNumber: 3, unsavedEdits: false })?.lines.join(" ")).toContain("The current draft (version 3) will be replaced by a copy of version 1.");
     expect(restoreConfirmation({ versionNumber: 1, draftVersionNumber: null, unsavedEdits: true })?.lines.join(" ")).toContain("unsaved edits will be discarded");
   });
+  it("words the confirm button for each of the three cases", () => {
+    expect(restoreConfirmLabel({ versionNumber: 2, draftVersionNumber: 4, unsavedEdits: false })).toBe("Replace the draft with version 2");
+    expect(restoreConfirmLabel({ versionNumber: 2, draftVersionNumber: null, unsavedEdits: true })).toBe("Discard edits and restore version 2");
+    expect(restoreConfirmLabel({ versionNumber: 2, draftVersionNumber: 4, unsavedEdits: true })).toBe("Discard edits and replace the draft with version 2");
+    const both = restoreConfirmation({ versionNumber: 2, draftVersionNumber: 4, unsavedEdits: true });
+    expect(both?.confirmLabel).toBe("Discard edits and replace the draft with version 2");
+    expect(both?.lines).toHaveLength(3);
+  });
+  it("maps a focus request to the element that receives focus", () => {
+    expect(focusTargetId({ kind: "draft-chip" })).toBe("fb-version-chip-draft");
+    expect(focusTargetId({ kind: "restore-button", versionId: "v1" })).toBe(restoreButtonId("v1"));
+    expect(restoreButtonId("v1")).toBe("fb-restore-v1");
+  });
+  it("sets the focus flag on success and on failure, not with a timeout", () => {
+    const actions = read("components/registration-builder/use-builder-actions.tsx");
+    const restore = actions.slice(actions.indexOf("async function restoreVersion"), actions.indexOf("return { createFromTemplate"));
+    expect(restore).toContain('setFocusRequest({ kind: "draft-chip" })');
+    expect(restore).toContain('kind: "restore-button"');
+    expect(restore).not.toContain("setTimeout");
+    expect(read("components/registration-builder/builder-form-list.tsx")).toContain("id={restoreButtonId(version.id)}");
+  });
   it("uses the notice wording from the issue", () => {
     expect(restoreNotice(2)).toBe("Version 2 copied into the draft. Publish to make it live.");
   });
@@ -163,8 +184,7 @@ describe("Restore wiring (#1140)", () => {
     expect(restore).toContain('method: "PATCH"');
     expect(restore).toContain("expectedUpdatedAt");
     expect(restore).toContain("restoreNotice(version.versionNumber)");
-    expect(restore).toContain("fb-version-chip-draft");
-    expect(read("app/api/events/[eventId]/forms/[formId]/route.ts")).toContain('"MANAGE_FORMS"');
+        expect(read("app/api/events/[eventId]/forms/[formId]/route.ts")).toContain('"MANAGE_FORMS"');
     expect(read("modules/access/permissions.ts")).not.toMatch(/RESTORE/i);
   });
   it("shows Restore only in the History tab", () => {

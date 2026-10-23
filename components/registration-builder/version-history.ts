@@ -55,6 +55,22 @@ export function restoreConfirmation({ versionNumber, draftVersionNumber, unsaved
   return {
     title: `Restore version ${versionNumber} as the draft`,
     lines,
-    confirmLabel: draftVersionNumber !== null ? `Replace the draft with version ${versionNumber}` : `Discard edits and restore version ${versionNumber}`,
+    confirmLabel: restoreConfirmLabel({ versionNumber, draftVersionNumber, unsavedEdits }),
   };
+}
+
+export function restoreConfirmLabel({ versionNumber, draftVersionNumber, unsavedEdits }: { versionNumber: number; draftVersionNumber: number | null; unsavedEdits: boolean }) {
+  if (unsavedEdits && draftVersionNumber !== null) return `Discard edits and replace the draft with version ${versionNumber}`;
+  if (draftVersionNumber !== null) return `Replace the draft with version ${versionNumber}`;
+  return `Discard edits and restore version ${versionNumber}`;
+}
+
+export type FocusRequest = { kind: "draft-chip" } | { kind: "restore-button"; versionId: string };
+
+export function restoreButtonId(versionId: string) {
+  return `fb-restore-${versionId}`;
+}
+
+export function focusTargetId(request: FocusRequest) {
+  return request.kind === "draft-chip" ? "fb-version-chip-draft" : restoreButtonId(request.versionId);
 }
