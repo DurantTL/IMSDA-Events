@@ -481,14 +481,14 @@ describe("one filled primary per screen (#743)", () => {
   }
   const filledPrimaries = (markup: string) => markup.match(/<[^>]*class="[^"]*(?:\bprimary-button\b|\bfb-btn primary\b)[^"]*"[^>]*>/g) ?? [];
 
-  it("editor shell: exactly one filled primary, Save draft, and Publish is outlined", () => {
+  it("editor shell: exactly one filled primary, Publish, and Save draft is outlined", () => {
     const { markup } = renderShellDefault("DRAFT");
     expect(markup).toContain('class="fb-topbar"');
     expect(markup).not.toContain('class="builder-layout"');
     const primaries = filledPrimaries(markup);
     expect(primaries).toHaveLength(1);
-    expect(markup).toMatch(/class="fb-btn primary"[^>]*>(?:(?!<\/button>)[\s\S])*Save draft/);
-    expect(markup).toMatch(/class="fb-btn outline"[^>]*>(?:(?!<\/button>)[\s\S])*Publish version/);
+    expect(markup).toMatch(/class="fb-btn primary"[^>]*>(?:(?!<\/button>)[\s\S])*Publish version/);
+    expect(markup).toMatch(/class="fb-btn outline"[^>]*>(?:(?!<\/button>)[\s\S])*Save draft/);
   });
 
   it("editor shell: the Withdraw danger zone comes after the canvas and the settings", () => {
@@ -499,6 +499,7 @@ describe("one filled primary per screen (#743)", () => {
     expect(markup.slice(zone)).toContain("Withdraw from public page");
     expect(markup.slice(zone)).toContain(`Withdraw ${definition.title}`);
     expect(markup.slice(0, zone)).not.toContain("Withdraw from public page");
+    // A clean live version has no Publish button (#1137), so Save is the filled one.
     expect(filledPrimaries(markup)).toHaveLength(1);
   });
 });

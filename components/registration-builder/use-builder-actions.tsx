@@ -2,9 +2,11 @@
 // from a template, save, test, publish, withdraw, slug sync, and switching form
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
+import { useRef } from "react";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
+import { runPublishFlow } from "./publish-flow";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
@@ -163,16 +165,23 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     finally { setBusy(null); }
   }
 
+  const publishingRef = useRef(false);
+
   async function publish() {
-    if (!selectedForm) return;
+    if (!selectedForm || !selectedVersion || !definition) return;
+    if (publishingRef.current) return;
+    publishingRef.current = true;
+    const saveFirst = dirty;
     setBusy("publish"); setError(""); setNotice(""); setConfirmingPublish(false);
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/publish`, { method: "POST" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Unable to publish this form.");
-      syncForm(result.form, `Version ${result.form.activeVersion.versionNumber} is published. The public registration link is now available; future edits create a new draft version.`);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to publish this form."); }
-    finally { setBusy(null); }
+      const result = await runPublishFlow({ eventId, formId: selectedForm.id, saveFirst, definition, expectedUpdatedAt: selectedVersion.updatedAt });
+      if (result.ok) syncForm(result.form, `Version ${result.form.activeVersion.versionNumber} is published. The public registration link is now available; future edits create a new draft version.`);
+      else if (result.stage === "save") setError(`${result.message} Nothing was published.`);
+      else {
+        if (result.savedForm) syncForm(result.savedForm);
+        setError(result.savedForm ? `Your changes are saved as a draft but not published. ${result.message}` : result.message);
+      }
+    } finally { publishingRef.current = false; setBusy(null); }
   }
 
   async function unpublish() {

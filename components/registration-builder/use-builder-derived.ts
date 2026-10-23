@@ -86,11 +86,7 @@ export function useBuilderDerived(eventId: string | null, state: BuilderState) {
   // (#564, #1061). After that a test is optional; the server enforces the same.
   const hasEverPublished = Boolean(selectedForm?.versions.some((version) => version.publishedAt));
   const testRequired = !hasEverPublished;
-  const publishBlockedReason = dirty
-    ? "Save your changes as a draft before publishing."
-    : testRequired && !hasValidTest
-      ? "Run a test submission first: open the last step of the preview and choose Run test submission."
-      : "";
+  const publishBlockedReason = publishBlockedReasonFor({ dirty, hasEverPublished, hasValidTest });
   // A form copied from a template can keep the template's web address after
   // its title changes. Before a form's first publish only, offer to sync the
   // slug to the current title — after that, shared links depend on the slug
@@ -104,3 +100,14 @@ export function useBuilderDerived(eventId: string | null, state: BuilderState) {
 }
 
 export type BuilderDerived = ReturnType<typeof useBuilderDerived>;
+
+/**
+ * After a first publish, Publish saves unsaved edits itself (#1137). Before
+ * one, edits must be saved as a draft first, and a valid test is required
+ * (#564, #1061).
+ */
+export function publishBlockedReasonFor({ dirty, hasEverPublished, hasValidTest }: { dirty: boolean; hasEverPublished: boolean; hasValidTest: boolean }) {
+  if (dirty && !hasEverPublished) return "Save your changes as a draft before publishing.";
+  if (!hasEverPublished && !hasValidTest) return "Run a test submission first: open the last step of the preview and choose Run test submission.";
+  return "";
+}

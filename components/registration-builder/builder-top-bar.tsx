@@ -24,18 +24,26 @@ export function BuilderPublicLink({ className = "secondary-button" }: { classNam
   return publishedVersion ? <a className={className} href={`/register/${eventSlug}/${selectedForm.slug}`} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open public form</a> : <button className={className} type="button" disabled title="Publish this form to create its public link"><ExternalLink size={15} /> Open public form</button>;
 }
 
-/** Renders nothing unless the open version is a draft, the only status that can be published. */
+/**
+ * Shows for a draft, and for a live or withdrawn version with unsaved edits
+ * (#1137): Publish then saves the edits, which creates the new draft, and
+ * publishes it. Historical versions never show it.
+ */
+export function showsPublishButton({ status, canEdit, editsCreateDraft, dirty }: { status: string; canEdit: boolean; editsCreateDraft: boolean; dirty: boolean }) {
+  return status === "DRAFT" || (canEdit && editsCreateDraft && dirty);
+}
+
 export function BuilderPublishButton({ className = "primary-button" }: { className?: string }) {
-  const { selectedVersion, busy, publishBlockedReason, beginPublish } = useLoadedBuilder();
-  if (selectedVersion.status !== "DRAFT") return null;
-  return <button className={className} type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> Publish version</button>;
+  const { selectedVersion, busy, dirty, editsCreateDraft, canEdit, hasEverPublished, publishBlockedReason, beginPublish } = useLoadedBuilder();
+  if (!showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty })) return null;
+  return <button className={className} type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> {busy === "publish" ? "Publishing…" : dirty && hasEverPublished ? "Publish changes" : "Publish version"}</button>;
 }
 
 /** Why Save or Publish is unavailable, and what a live version means for edits. Both layouts point `aria-describedby` at it. */
 export function BuilderActionHints() {
-  const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, editsCreateDraft } = useLoadedBuilder();
+  const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, hasEverPublished, editsCreateDraft } = useLoadedBuilder();
   return (
-    <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Save as new draft to keep your edits; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
+    <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Publish changes to save and publish your edits, or Save as new draft to keep them unpublished; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && !hasEverPublished && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
   );
 }
 
