@@ -1,3 +1,4 @@
+import { staffPageTitles } from "@/components/staff-navigation";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -5,7 +6,7 @@ import { InformationFormResponsesView } from "@/components/information-form-resp
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadInformationFormResponsesPage } from "@/modules/information-forms/responses-page";
 
-export const metadata: Metadata = { title: "Form responses" };
+export const metadata: Metadata = { title: staffPageTitles.formResponses };
 export const dynamic = "force-dynamic";
 
 /** The responses of an event's information form (#1150): MANAGE_FORMS on the event, like the event form APIs. */
