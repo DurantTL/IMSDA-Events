@@ -191,7 +191,7 @@ export function buildCloseout(input: CloseoutInput): CloseoutProjection {
     if (selection.status === "ACTIVE" && !selection.registrationLive) {
       exceptions.push(makeException(
         "ACTIVE_ORDER_ON_CANCELLED_REGISTRATION", "FINANCIAL", selection.id, label(row.serviceDate, row.mealType),
-        "A meal order is still active on a registration that is cancelled or waitlisted. Its tickets are treated as cancelled here and the amount still charged is not changed.",
+        "A meal order is still active on a registration that is no longer submitted or confirmed. Its tickets are treated as cancelled here and the amount still charged is not changed.",
         { quantity: selection.quantity, stillChargedCents: actual }, [selection.id, ...entries.map((entry) => entry.id)],
       ));
     }
@@ -300,7 +300,7 @@ export function buildCloseout(input: CloseoutInput): CloseoutProjection {
     if (row.servedOnCancelled > 0) {
       exceptions.push(makeException(
         "SERVED_ON_CANCELLED", "CREDENTIAL", row.key, row.label,
-        "Meals were served on tickets that were cancelled afterwards. They stay counted as served; any credit already given is not changed.",
+        "Meals were served on tickets that were cancelled afterwards, or whose registration is no longer submitted or confirmed. They stay counted as served; any credit already given is not changed.",
         { meals: row.servedOnCancelled }, servedOnCancelledIds.get(row.key),
       ));
     }
@@ -458,7 +458,7 @@ export function closeoutCsv(projection: CloseoutProjection): string {
       "Service", "Meal charges", "Meal credits", "Net meal charges",
       "Net: in registration price", "Net: posted to registration", "Net: walk-up at counter", "Net: registration not live",
       "Ordered: paid", "Ordered: complimentary", "Ordered: conference-paid", "Ordered: walk-up",
-      "Served: paid", "Served: complimentary", "Served: conference-paid", "Served: walk-up", "Served on cancelled tickets",
+      "Served: paid", "Served: complimentary", "Served: conference-paid", "Served: walk-up", "Served on cancelled tickets or registrations",
       "Conference-paid meals served", "Billed to conference at rates on file", "Served conference meals with no rate",
       "Kitchen prepared", "Kitchen wasted", "Kitchen donated", "Kitchen transferred",
     ],

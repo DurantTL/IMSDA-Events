@@ -21,7 +21,7 @@ export const closeoutDefinitions = [
   ["Meal charges and credits", "From the meal ledger, attendee-paid only. A cancellation or a lower quantity is a credit at the price charged. Nothing is edited or netted away."],
   ["Where the net went", "In registration price: already in the registration's total. Posted: a meal line on the registration. Walk-up: paid at the counter. Not live: the registration is cancelled, so the credit is on the ledger only."],
   ["Ordered and served", "Active café tickets by case: paid, complimentary (no charge), conference-paid, walk-up. Served is what the scanner shows as eaten, never changed by kitchen counts."],
-  ["Served on cancelled tickets", "Meals eaten on a ticket cancelled afterwards. They stay served and are kept apart from the cases above."],
+  ["Served on cancelled tickets or registrations", "Meals eaten on a ticket cancelled afterwards, or on a registration that is no longer submitted or confirmed. They stay served and are kept apart from the cases above."],
   ["Billed to conference", "Conference-paid meals served times the rate on file for each order. A meal with no rate is an exception, not zero."],
   ["Kitchen counts", "Prepared, wasted, donated and transferred, as entered. Shown for reading: they are not charges and not proof of revenue."],
 ] as const;
