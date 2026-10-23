@@ -1,3 +1,4 @@
+import { directBalanceCell } from "@/modules/attendee-accounts/account-overview";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -40,6 +41,16 @@ const moneyFormatter = new Intl.NumberFormat("en-US", {
 
 function money(cents: number) {
   return moneyFormatter.format(cents / 100);
+}
+
+function DirectBalance({ registration }: { registration: AttendeeRegistrationSummary }) {
+  const { main, history } = directBalanceCell(registration);
+  return (
+    <>
+      {main}
+      {history && <><br /><small>{history}</small></>}
+    </>
+  );
 }
 
 function dateLabel(startsAt: string, endsAt: string, timeZone: string) {
@@ -111,9 +122,7 @@ function RegistrationCard({
               ? registration.churchBilling.billed
                 ? <PerPersonPriceNotice price={registration.churchBilling.perPerson} />
                 : registration.churchBilling.label
-              : registration.balanceCents > 0
-                ? `${money(registration.balanceCents)} due of ${money(registration.totalCents ?? 0)}`
-                : `Paid in full · ${money(registration.totalCents ?? 0)}`}
+              : <DirectBalance registration={registration} />}
           </dd>
         </div>
       </dl>
@@ -127,7 +136,7 @@ function RegistrationCard({
       >
         Open attendee hub <ArrowRight size={16} aria-hidden="true" />
       </Link>
-      {editable && !registration.event.isDeferredOrganizationBilling && registration.balanceCents > 0 && (
+      {editable && registration.payment.paymentEligible && registration.balanceCents > 0 && (
         <PublicSquarePayment
           manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`}
         />

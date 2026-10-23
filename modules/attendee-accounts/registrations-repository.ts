@@ -18,11 +18,13 @@ import {
 import { getAttendeeRosterConfig, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { enqueueRegistrationContactUpdatedMessage } from "@/modules/communications/transactional-messages";
-import { moneyToCents, registrationBalanceCents } from "@/modules/payments/square-domain";
+import { moneyToCents } from "@/modules/payments/square-domain";
 import {
   describePublicRegistrationStatus,
+  summarizePublicPayment,
   publicAttendeeName,
   publicContactFromSnapshot,
+  type PublicPaymentState,
   type PublicRegistrationStatusSummary,
   type PublicContactUpdateInput,
 } from "@/modules/public-access/domain";
@@ -304,7 +306,15 @@ export type AttendeeRegistrationSummary = {
   /** Null on a church-billed event (#621): registrants never see a total, amount paid or balance there. */
   totalCents: number | null;
   paidCents: number | null;
+  /** Money collected and refunded, before netting: the payment history kept visible on cancelled and waitlisted records (#1100). */
+  grossPaidCents: number | null;
+  refundedCents: number | null;
+  /** The amount payable now (#1100): always 0 while waitlisted, cancelled or draft, and on a church-billed event. */
   balanceCents: number;
+  /** The raw lifecycle status, for choosing what to feature; the display wording is in `status`. */
+  lifecycle: "DRAFT" | "SUBMITTED" | "CONFIRMED" | "WAITLISTED" | "CANCELLED";
+  /** The shared lifecycle-aware payment meaning (summarizePublicPayment), so every account surface agrees with checkout. */
+  payment: { state: PublicPaymentState; label: string; detail: string; paymentEligible: boolean };
 };
 
 /**
@@ -403,7 +413,19 @@ export async function listRegistrationsForVerifiedEmail(
     // so a balance shown here can never disagree with the one shown there.
     // A deferred-organization event's recorded amount is what the church
     // owes (#409), never an attendee or director balance to pay online.
-    const balanceCents = isDeferredOrganizationBilling ? 0 : registrationBalanceCents(registration);
+    // Lifecycle-aware (#1100): the same summary the public management page and checkout use,
+    // so a waitlisted or cancelled registration never reads as owing money.
+    const paymentSummary = summarizePublicPayment({
+      status: registration.status,
+      totalCents,
+      payments: registration.payments.map((payment) => ({
+        amountCents: moneyToCents(payment.amount),
+        refundedCents: payment.refunds.reduce((sum, refund) => sum + moneyToCents(refund.amount), 0),
+      })),
+      isDeferredOrganizationBilling,
+      billedToGroup: Boolean(registration.groupRegistration),
+    });
+    const balanceCents = isDeferredOrganizationBilling ? 0 : paymentSummary.amountDueCents;
     const parsedDefinition = registration.publicFormSubmission
       ? registrationFormDefinitionSchema.safeParse(
           registration.publicFormSubmission.formVersion.definition,
@@ -534,8 +556,17 @@ export async function listRegistrationsForVerifiedEmail(
         })),
       },
       totalCents: isDeferredOrganizationBilling ? null : totalCents,
-      paidCents: isDeferredOrganizationBilling ? null : Math.max(0, totalCents - balanceCents),
+      paidCents: isDeferredOrganizationBilling ? null : paymentSummary.paidCents,
+      grossPaidCents: isDeferredOrganizationBilling ? null : paymentSummary.paidCents + paymentSummary.refundedCents,
+      refundedCents: isDeferredOrganizationBilling ? null : paymentSummary.refundedCents,
       balanceCents,
+      lifecycle: registration.status,
+      payment: {
+        state: paymentSummary.state,
+        label: paymentSummary.label,
+        detail: paymentSummary.detail,
+        paymentEligible: !isDeferredOrganizationBilling && paymentSummary.paymentEligible,
+      },
     };
   });
 }
