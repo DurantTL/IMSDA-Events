@@ -7,6 +7,7 @@ import { OrganizationListPager, OrganizationSearchControls } from "@/components/
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { listDirectoryContacts } from "@/modules/organizations/contacts-repository";
 import { disbandedNotice, organizationKindLabels, safeWebsiteHref } from "@/modules/organizations/eadventist-import";
 import { listDirectoryOrganizations, type DirectoryStatusFilter } from "@/modules/organizations/eadventist-import-repository";
 import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
@@ -32,6 +33,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
   const status = statuses.find((candidate) => candidate.value === params.status)?.value ?? "ALL";
   const query = cleanSearchQuery(params.q);
   const { organizations, total, page, pageSize } = await listDirectoryOrganizations({ kind, status, query, page: parsePageParam(params.page) });
+  const contacts = await listDirectoryContacts(organizations.map((organization) => organization.id), { id: user.id, globalRole: user.globalRole });
   const state = { q: query, kind: kind ?? "", status };
   const searching = query.trim() !== "" || kind !== null || status !== "ALL";
 
@@ -86,6 +88,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
                 {organizations.map((organization) => {
                   const notice = disbandedNotice(organization.disbandedOn, organization.isActive);
                   const href = safeWebsiteHref(organization.website);
+                  const rowContacts = contacts.get(organization.id);
                   const place = [organization.city, organization.state].filter(Boolean).join(", ");
                   const kindLabel = organizationKindLabels[organization.type];
                   const subType = organization.sourceOrgType && organization.sourceOrgType !== kindLabel ? organization.sourceOrgType : null;
@@ -108,12 +111,27 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
                       <td {...cardCell("Contact")}>
                         {organization.officePhone && <span className="org-cell-main">{organization.officePhone}</span>}
                         {href && <a className="org-cell-sub org-cell-link" href={href} rel="noopener noreferrer" target="_blank">Website</a>}
-                        {!organization.officePhone && !href && <span className="org-cell-main">—</span>}
+                        {organization.type === "CHURCH" && (
+                          <>
+                            <span className="org-cell-sub">Pastor: {rowContacts?.pastor ? rowContacts.pastor.name : "none on file"}</span>
+                            <span className="org-cell-sub">Billing contact: {rowContacts?.billing ? `${rowContacts.billing.name} (${rowContacts.billing.roleLabel})` : "none on file"}</span>
+                          </>
+                        )}
+                        {!organization.officePhone && !href && organization.type !== "CHURCH" && <span className="org-cell-main">—</span>}
                       </td>
                       <td {...cardCell(null)} className="org-cell-actions">
                         <OrganizationStatusButton isActive={organization.isActive} name={organization.name} organizationId={organization.id} />
                         {/* A company or group can sponsor a club (#822), so it is billed like a church and needs a billing contact. This page is system administrators only. */}
-                        {(organization.type === "COMPANY" || organization.type === "GROUP") && (
+                        {organization.type === "CHURCH" && (
+                          <Link
+                            aria-label={`Pastor contact for ${organization.name}`}
+                            className="secondary-button"
+                            href={`/admin/organizations/${organization.id}/pastor`}
+                          >
+                            Pastor contact
+                          </Link>
+                        )}
+                        {(organization.type === "CHURCH" || organization.type === "COMPANY" || organization.type === "GROUP") && (
                           <Link
                             aria-label={`Billing contact for ${organization.name}`}
                             className="secondary-button"
