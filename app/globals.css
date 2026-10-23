@@ -12611,7 +12611,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .fb-rule-match { display: flex; flex-wrap: wrap; align-self: start; width: fit-content; max-width: 100%; border: 1px solid var(--imsda-navy); border-radius: 10px; overflow: hidden; }
 .fb-rule-toggle { min-height: var(--touch-target, 44px); border: 0; background: var(--card); color: var(--ink); cursor: pointer; padding: 0 14px; font: inherit; font-size: 0.875rem; }
 .fb-rule-toggle[aria-pressed="true"] { background: var(--imsda-navy-soft); box-shadow: inset 0 -4px 0 var(--imsda-navy); color: var(--imsda-navy); font-weight: 700; }
-.fb-rule-toggle:disabled { cursor: not-allowed; opacity: 0.6; }
+.fb-rule-toggle:disabled, .fb-rule-toggle[aria-disabled="true"], .fb-rule-add[aria-disabled="true"] { cursor: not-allowed; opacity: 0.6; }
 .fb-rule-toggle:focus-visible, .fb-rule-link:focus-visible, .fb-rule-row select:focus-visible, .fb-rule-row input:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .fb-rule-rows, .fb-rule-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .fb-rule-row { display: grid; gap: 8px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }

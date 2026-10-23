@@ -22,7 +22,7 @@ export function BuilderRuleSummary({ onEditRule }: { onEditRule: (fieldId: strin
                 <li className="fb-rule-item" key={entry.fieldId} data-needs-fix={entry.needsFix ? "true" : undefined}>
                   <span className="fb-rule-item-title">{entry.label}</span>
                   <span className="fb-hint">Step {entry.sectionIndex + 1} · {entry.stepTitle}</span>
-                  {entry.needsFix && <strong className="fb-rule-fix-badge">Needs a fix</strong>}
+                  {entry.needsFix && <strong className="fb-rule-fix-badge">{entry.fixMessage?.startsWith("Fix before saving") ? "Fix before saving" : "Needs a fix"}</strong>}
                   <span className="fb-rule-item-text">
                     {entry.needsFix && entry.fixMessage
                       ? entry.fixMessage

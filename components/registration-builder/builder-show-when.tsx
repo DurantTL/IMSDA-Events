@@ -85,8 +85,8 @@ export function BuilderShowWhen({ field, sectionIndex, fieldIndex }: { field: Re
       {rule && (
         <>
           <div role="group" aria-label="Match" aria-describedby={single ? `fb-rule-match-hint-${field.id}` : undefined} className="fb-rule-match">
-            <button type="button" className="fb-rule-toggle" disabled={!canEdit} aria-disabled={single ? "true" : undefined} aria-pressed={rule.match === "ALL"} onClick={() => chooseMatch("ALL")}>All of these are true</button>
-            <button type="button" className="fb-rule-toggle" disabled={!canEdit} aria-disabled={single ? "true" : undefined} aria-pressed={rule.match === "ANY"} onClick={() => chooseMatch("ANY")}>Any of these is true</button>
+            <button type="button" className="fb-rule-toggle" disabled={!canEdit} aria-disabled={single ? "true" : undefined} aria-pressed={single ? undefined : rule.match === "ALL"} onClick={() => chooseMatch("ALL")}>All of these are true</button>
+            <button type="button" className="fb-rule-toggle" disabled={!canEdit} aria-disabled={single ? "true" : undefined} aria-pressed={single ? undefined : rule.match === "ANY"} onClick={() => chooseMatch("ANY")}>Any of these is true</button>
           </div>
           {single && <p className="fb-hint" id={`fb-rule-match-hint-${field.id}`}>Add a second condition to choose All or Any</p>}
           <ol className="fb-rule-rows">
