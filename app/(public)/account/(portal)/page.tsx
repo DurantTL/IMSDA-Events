@@ -9,7 +9,8 @@ import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
-import { listRegistrationsForVerifiedEmail, type AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
+import { accountAmountDue, upcomingRegistrations } from "@/modules/attendee-accounts/account-overview";
+import { listRegistrationsForVerifiedEmail } from "@/modules/attendee-accounts/registrations-repository";
 import { listInvitesForAccount } from "@/modules/club-imports/invites";
 import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
@@ -30,13 +31,6 @@ function eventDate(startsAt: string, timeZone: string) {
     .format(new Date(startsAt));
 }
 
-/** Registrations for events that haven't ended yet, soonest first. */
-function upcomingOnly(registrations: AttendeeRegistrationSummary[], now = new Date()) {
-  return registrations
-    .filter((registration) => new Date(registration.event.endsAt) >= now)
-    .sort((a, b) => a.event.startsAt.localeCompare(b.event.startsAt));
-}
-
 /** The account's front page: where things stand, and a way into each area. */
 export default async function AttendeeAccountOverviewPage() {
   await requireAttendeeSecondStep();
@@ -55,9 +49,9 @@ export default async function AttendeeAccountOverviewPage() {
     via === "attendee" ? listInstructorInvitesForAccount(account.verifiedEmail) : Promise.resolve([]),
     via === "attendee" ? accountIsInstructor(account.id) : Promise.resolve(false),
   ]);
-  const upcoming = upcomingOnly(registrations);
+  const upcoming = upcomingRegistrations(registrations);
   const next = upcoming[0];
-  const balanceDue = registrations.reduce((total, registration) => total + Math.max(registration.balanceCents, 0), 0);
+  const amountDue = accountAmountDue(registrations);
   const authenticatorOn = mfaStatus.status === "ACTIVE";
 
   return (
@@ -80,6 +74,9 @@ export default async function AttendeeAccountOverviewPage() {
             <>
               <h2>{next.event.name}</h2>
               <p>{eventDate(next.event.startsAt, next.event.timezone)}{next.event.location ? ` · ${next.event.location}` : ""}</p>
+              {next.lifecycle === "WAITLISTED" && (
+                <p className="field-help"><strong>{next.status.label}.</strong> A place is not confirmed yet, and no payment is due while you wait.</p>
+              )}
               <p className="field-help">
                 {upcoming.length === 1 ? "Your next event." : `Your next of ${upcoming.length} upcoming events.`}
               </p>
@@ -87,12 +84,13 @@ export default async function AttendeeAccountOverviewPage() {
           ) : (
             <>
               <h2>{registrations.length === 0 ? "No registrations yet" : "Nothing coming up"}</h2>
+              {registrations.length > 0 && <p className="field-help">Past and cancelled registrations are still listed under My registrations.</p>}
               <p className="field-help">Registrations made with {account.verifiedEmail} show up here. <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>, or ask the event team.</p>
             </>
           )}
-          {balanceDue > 0 && (
+          {amountDue.totalCents > 0 && (
             <p className="account-overview-alert">
-              <CircleDollarSign size={16} aria-hidden="true" /> <span translate="no">{moneyFormatter.format(balanceDue / 100)}</span> still due
+              <CircleDollarSign size={16} aria-hidden="true" /> <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span> still due {amountDue.scope}
             </p>
           )}
           <Link className="secondary-button account-overview-link" href="/account/registrations">

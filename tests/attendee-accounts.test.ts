@@ -317,6 +317,71 @@ describe("verified attendee registration views", () => {
     expect(registration?.churchBilling?.perPerson.notice).toBe("$30 per person. Your church is billed after the event.");
   });
 
+  function directRegistrationFixture(status: string, payments: unknown[] = []) {
+    dependencies.getPrisma.mockReturnValue({
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "registration-1" }]),
+      registration: {
+        findMany: vi.fn().mockResolvedValue([{
+          id: "registration-1",
+          confirmationCode: "REG-DIRECT",
+          status,
+          submittedAt: new Date("2026-08-01T12:00:00.000Z"),
+          updatedAt: new Date("2026-08-01T13:00:00.000Z"),
+          totalAmount: { toString: () => "100" },
+          contactSnapshot: { email: "holder@example.test" },
+          groupRegistration: null,
+          accountHolderPerson: { firstName: "Sam", lastName: "Holder", normalizedEmail: "holder@example.test", phone: null },
+          event: {
+            name: "Spring Camporee",
+            slug: "spring-camporee",
+            startsAt: new Date("2027-02-19T21:00:00.000Z"),
+            endsAt: new Date("2027-02-21T17:00:00.000Z"),
+            timezone: "America/Chicago",
+            location: "Camp",
+            attendeeEditPolicy: "TIERED",
+            billingMode: "DIRECT",
+            seminarPreferenceClosesOn: null,
+            seminarPreferenceSelfServiceLocked: false,
+            programAssignmentRuns: [],
+          },
+          attendees: [],
+          publicFormSubmission: null,
+          payments,
+          waitlistEntry: null,
+          operations: [],
+        }]),
+      },
+    });
+  }
+
+  it("never shows a waitlisted or cancelled registration as payable (#1100)", async () => {
+    for (const status of ["WAITLISTED", "CANCELLED"]) {
+      directRegistrationFixture(status);
+      const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+      expect(registration?.lifecycle).toBe(status);
+      expect(registration?.balanceCents).toBe(0);
+      expect(registration?.payment).toMatchObject({ state: "NOT_DUE", paymentEligible: false });
+      // The historical total is kept.
+      expect(registration?.totalCents).toBe(10000);
+    }
+  });
+
+  it("keeps a cancelled paid-and-refunded registration at no amount due with its history (#1100)", async () => {
+    directRegistrationFixture("CANCELLED", [{ amount: { toString: () => "100" }, refunds: [{ amount: { toString: () => "100" } }] }]);
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration?.balanceCents).toBe(0);
+    expect(registration?.paidCents).toBe(0);
+    expect(registration?.totalCents).toBe(10000);
+  });
+
+  it("still shows a submitted direct registration's balance as payable (#1100)", async () => {
+    directRegistrationFixture("SUBMITTED", [{ amount: { toString: () => "40" }, refunds: [] }]);
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration?.balanceCents).toBe(6000);
+    expect(registration?.paidCents).toBe(4000);
+    expect(registration?.payment.paymentEligible).toBe(true);
+  });
+
   it("shows nothing owed by the church while a club is waitlisted or cancelled (#409)", async () => {
     deferredRegistrationFixture("WAITLISTED");
     const [waitlisted] = await listRegistrationsForVerifiedEmail("director@example.test");

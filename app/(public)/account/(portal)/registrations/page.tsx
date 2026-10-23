@@ -111,9 +111,11 @@ function RegistrationCard({
               ? registration.churchBilling.billed
                 ? <PerPersonPriceNotice price={registration.churchBilling.perPerson} />
                 : registration.churchBilling.label
-              : registration.balanceCents > 0
+              : registration.payment.paymentEligible && registration.balanceCents > 0
                 ? `${money(registration.balanceCents)} due of ${money(registration.totalCents ?? 0)}`
-                : `Paid in full · ${money(registration.totalCents ?? 0)}`}
+                : registration.payment.state === "PAID"
+                  ? `Paid in full · ${money(registration.totalCents ?? 0)}`
+                  : registration.payment.label}
           </dd>
         </div>
       </dl>
@@ -127,7 +129,7 @@ function RegistrationCard({
       >
         Open attendee hub <ArrowRight size={16} aria-hidden="true" />
       </Link>
-      {editable && !registration.event.isDeferredOrganizationBilling && registration.balanceCents > 0 && (
+      {editable && registration.payment.paymentEligible && registration.balanceCents > 0 && (
         <PublicSquarePayment
           manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`}
         />
