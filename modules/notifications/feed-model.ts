@@ -65,3 +65,38 @@ export function safeFeedHref(href: string | null | undefined): string | null {
 export function feedAlertName(key: string): string {
   return isNotificationKey(key) ? getNotificationDefinition(key).name : "Alert";
 }
+
+/** The button's accessible name when only the alert feed is known (the live counts could not be read). */
+export function alertsOnlyButtonName(unread: number) {
+  return `Notifications, ${unread} unread ${unread === 1 ? "alert" : "alerts"}`;
+}
+
+/** What the live region says after a mark-read, matching the button that was pressed. */
+export function feedAnnouncement(action: "read" | "read-all", partial: boolean) {
+  if (action === "read") return "Marked read";
+  return partial ? "Shown alerts marked read" : "All alerts marked read";
+}
+
+/** The same message twice in a row would not be announced again, so every other one carries a no-break space. */
+export function announcementText(text: string, count: number) {
+  return text === "" ? "" : `${text}${count % 2 === 0 ? "" : " "}`;
+}
+
+const feedTimeFormat = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+/**
+ * "Nov 30, 2026, 6:05 AM CT", built from parts so the server and the browser produce the same characters (ICU versions
+ * differ in the space before AM/PM), which keeps hydration quiet.
+ */
+export function formatFeedTime(iso: string) {
+  const parts = Object.fromEntries(feedTimeFormat.formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
+  return `${parts.month} ${parts.day}, ${parts.year}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toUpperCase()} CT`;
+}

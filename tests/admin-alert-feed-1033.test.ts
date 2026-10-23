@@ -35,6 +35,10 @@ import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { notificationCatalog } from "@/modules/notifications/catalog";
 import {
   ALERT_FEED_RETENTION_DAYS,
+  alertsOnlyButtonName,
+  announcementText,
+  feedAnnouncement,
+  formatFeedTime,
   alertFeedCutoff,
   cleanFeedSummary,
   safeFeedHref,
@@ -465,6 +469,31 @@ describe("the bell with the feed (#1033)", () => {
     const markup = renderToStaticMarkup(createElement(AdminAttentionBell, { initialFeed: { unreadCount: 0, items: [] } }));
     expect(markup).toContain('aria-label="Notifications"');
     expect(markup).not.toContain("nothing needs attention");
+  });
+
+  it("names and badges the alerts alone when the live counts failed but the feed has unread alerts", () => {
+    const markup = renderToStaticMarkup(createElement(AdminAttentionBell, { initialFeed: { unreadCount: 3, items: [] } }));
+    expect(markup).toContain('aria-label="Notifications, 3 unread alerts"');
+    expect(markup).toContain("attention-badge");
+    expect(alertsOnlyButtonName(1)).toBe("Notifications, 1 unread alert");
+    // Both unknown or nothing unread: the plain name, no badge.
+    expect(renderToStaticMarkup(createElement(AdminAttentionBell))).toContain('aria-label="Notifications"');
+    expect(renderToStaticMarkup(createElement(AdminAttentionBell, { initialFeed: { unreadCount: 0, items: [] } }))).not.toContain("attention-badge");
+  });
+
+  it("announces what the button said, and announces a repeat again", () => {
+    expect(feedAnnouncement("read", false)).toBe("Marked read");
+    expect(feedAnnouncement("read-all", false)).toBe("All alerts marked read");
+    expect(feedAnnouncement("read-all", true)).toBe("Shown alerts marked read");
+    const first = announcementText("Marked read", 1);
+    const second = announcementText("Marked read", 2);
+    expect(first).not.toBe(second);
+    expect(announcementText("", 3)).toBe("");
+  });
+
+  it("formats the time label the same everywhere, without locale-dependent spacing", () => {
+    expect(formatFeedTime("2026-11-30T12:05:00.000Z")).toBe("Nov 30, 2026, 6:05 AM CT");
+    expect(formatFeedTime("2026-07-04T01:00:00.000Z")).toBe("Jul 3, 2026, 8:00 PM CT");
   });
 
   it("says so when the feed is empty, and shows no mark-all button", () => {

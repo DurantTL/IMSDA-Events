@@ -9,7 +9,7 @@ import {
   isSafeAttentionHref,
   type AttentionSummary,
 } from "@/modules/system-admin/attention-model";
-import type { AlertFeed } from "@/modules/notifications/feed-model";
+import { alertsOnlyButtonName, announcementText, feedAnnouncement, formatFeedTime, type AlertFeed } from "@/modules/notifications/feed-model";
 
 export const ATTENTION_ENDPOINT = "/api/admin/attention";
 export const ALERT_FEED_ENDPOINT = "/api/admin/alert-feed";
@@ -46,7 +46,7 @@ export function AdminAttentionBell({
   const [feed, setFeed] = useState<AlertFeed | null>(initialFeed);
   const [feedFailed, setFeedFailed] = useState(false);
   const [feedBusy, setFeedBusy] = useState(false);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
   const feedHeadingRef = useRef<HTMLHeadingElement>(null);
   /** Where focus goes once the feed has changed: the button that was pressed is gone by then. */
   const focusPlan = useRef<{ kind: "read"; index: number } | { kind: "all" } | null>(null);
@@ -86,7 +86,7 @@ export function AdminAttentionBell({
   }, []);
 
   /** Marks one item, or the unread items that were on screen, read. The server answers with the new feed. */
-  const changeFeed = useCallback(async (body: { action: "read"; id: string } | { action: "read-all"; ids: string[] }) => {
+  const changeFeed = useCallback(async (body: { action: "read"; id: string } | { action: "read-all"; ids: string[] }, announce: string) => {
     setFeedBusy(true);
     try {
       const response = await fetch(ALERT_FEED_ENDPOINT, {
@@ -100,7 +100,8 @@ export function AdminAttentionBell({
       const parsed = (await response.json()) as { feed?: AlertFeed };
       if (parsed.feed) setFeed(parsed.feed);
       setFeedFailed(false);
-      setAnnouncement(body.action === "read" ? "Marked read" : "All alerts marked read");
+      // A changing suffix makes the same message announce again when it repeats.
+      setAnnouncement((previous) => ({ text: announce, count: previous.count + 1 }));
     } catch {
       focusPlan.current = null;
       setFeedFailed(true);
@@ -115,7 +116,7 @@ export function AdminAttentionBell({
       const unread = (feed?.items ?? []).filter((item) => !item.read);
       focusPlan.current = { kind: "read", index: Math.max(0, unread.findIndex((item) => item.id === id)) };
     }
-    void changeFeed({ action: "read", id });
+    void changeFeed({ action: "read", id }, feedAnnouncement("read", false));
   }, [changeFeed, feed]);
 
   // After the feed changes, put focus somewhere real: the pressed button has been removed from the page.
@@ -181,7 +182,12 @@ export function AdminAttentionBell({
   // Unknown while the live counts are unknown (not yet read, or the read failed): the button then says plain "Notifications"
   // rather than claiming nothing needs attention.
   const total = summary === null ? null : summary.total + (feed?.unreadCount ?? 0);
+  // The counts failed but the feed loaded with unread alerts: show what is known, for the alerts alone.
+  const alertsOnly = summary === null && feed !== null && feed.unreadCount > 0 ? feed.unreadCount : null;
+  const badgeCount = alertsOnly ?? total ?? 0;
   const unreadItems = feed?.items.filter((item) => !item.read) ?? [];
+  /** More are unread than are listed, so the button marks only the shown ones. */
+  const partialView = feed !== null && feed.unreadCount > unreadItems.length;
 
   return (
     <div
@@ -197,14 +203,14 @@ export function AdminAttentionBell({
       <button
         aria-controls={open ? panelId : undefined}
         aria-expanded={open}
-        aria-label={attentionButtonName(total)}
+        aria-label={alertsOnly !== null ? alertsOnlyButtonName(alertsOnly) : attentionButtonName(total)}
         className="avatar attention-bell"
         onClick={toggle}
         ref={triggerRef}
         type="button"
       >
         <Bell aria-hidden="true" size={19} />
-        {total !== null && total > 0 && <span aria-hidden="true" className="attention-badge">{attentionBadgeText(total)}</span>}
+        {badgeCount > 0 && <span aria-hidden="true" className="attention-badge">{attentionBadgeText(badgeCount)}</span>}
       </button>
       {open && (
         <div aria-label="Notifications" className="header-popover attention-popover" id={panelId} role="group">
@@ -231,7 +237,7 @@ export function AdminAttentionBell({
               </ul>
             </section>
           ))}
-          <p aria-live="polite" className="sr-only" role="status">{announcement}</p>
+          <p aria-live="polite" className="sr-only" role="status">{announcementText(announcement.text, announcement.count)}</p>
           <section aria-label="Recent alerts" className="attention-group alert-feed">
             <div className="alert-feed-head">
               <h3 ref={feedHeadingRef} tabIndex={-1}>Recent alerts{feed && feed.unreadCount > 0 ? `, ${feed.unreadCount} unread` : ""}</h3>
@@ -243,11 +249,11 @@ export function AdminAttentionBell({
                     if (feedBusy) return;
                     focusPlan.current = { kind: "all" };
                     // Only the items that were on screen: one that arrived, or committed, since stays unread.
-                    void changeFeed({ action: "read-all", ids: unreadItems.map((item) => item.id) });
+                    void changeFeed({ action: "read-all", ids: unreadItems.map((item) => item.id) }, feedAnnouncement("read-all", partialView));
                   }}
                   type="button"
                 >
-                  {feed && feed.unreadCount > unreadItems.length ? "Mark these read" : "Mark all read"}
+                  {partialView ? "Mark these read" : "Mark all read"}
                 </button>
               )}
             </div>
@@ -262,7 +268,7 @@ export function AdminAttentionBell({
                         <Link
                           className="attention-item"
                           href={item.href}
-                          onClick={() => { if (!item.read) markRead(item.id, false); setOpen(false); }}
+                          onClick={() => { if (!item.read && !feedBusy) markRead(item.id, false); setOpen(false); }}
                         >
                           <span><strong className="alert-feed-name">{item.alertName}</strong>{item.read ? "" : <span className="alert-feed-unread"> (unread)</span>}<br />{item.summary}</span>
                         </Link>
@@ -275,7 +281,7 @@ export function AdminAttentionBell({
                     {!item.read && (
                       <button
                         aria-disabled={feedBusy}
-                        aria-label={`Mark read: ${item.alertName}, ${item.summary} (${new Date(item.occurredAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" })})`}
+                        aria-label={`Mark read: ${item.alertName}, ${item.summary} (${formatFeedTime(item.occurredAt)})`}
                         className="alert-feed-action"
                         data-mark-read=""
                         onClick={() => { if (!feedBusy) markRead(item.id, true); }}
