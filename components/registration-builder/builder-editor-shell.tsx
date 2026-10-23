@@ -1,6 +1,6 @@
 // The Fluent-style editor shell (#1132), for tablets and desktops: a top bar,
 // the live form canvas in the middle and one sidebar with Questions, Question
-// settings and History tabs, which can be hidden, moved to the other side and
+// settings, Form settings and History tabs, which can be hidden, moved to the other side and
 // resized. It is a layout over the existing builder model (BuilderContext):
 // every edit and action it triggers is one the builder already had.
 // Phones keep the older layout (see registration-builder-workspace.tsx).
@@ -10,9 +10,8 @@ import { ChevronLeft, Eye, EllipsisVertical, PanelLeft, PanelRight, Plus } from 
 import { RegistrationFormNotificationsPanel } from "@/components/registration-form-notifications-panel";
 import { TemplateCleanupChecklistPanel } from "@/components/template-cleanup-checklist-panel";
 import { PUBLIC_DRAFT_STAFF_HELP } from "@/modules/forms/public-draft";
-import { statusLabel } from "./builder-types";
 import { useLoadedBuilder } from "./builder-context";
-import { showsPublishButton, BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton } from "./builder-top-bar";
+import { showsPublishButton, BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton, BuilderVersionChips } from "./builder-top-bar";
 import { BuilderNotices } from "./builder-notices";
 import { BuilderTemplateNotice } from "./builder-template-notice";
 import { BuilderRosterSettings, BuilderConfirmationEditor } from "./builder-form-settings";
@@ -23,9 +22,10 @@ import { BuilderVersionHistory } from "./builder-form-list";
 import { BuilderCanvas, type ToolbarAction } from "./builder-canvas";
 import { BuilderPalette } from "./builder-palette";
 import { BuilderQuestionSettings, LABEL_INPUT_ID } from "./builder-question-settings";
-import { BuilderSidebar, type SidebarTabDefinition } from "./builder-sidebar";
+import { BuilderSidebar, sidebarPanelId, sidebarTabId, type SidebarTabDefinition } from "./builder-sidebar";
 import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
 import { locateField } from "./canvas-rows";
+import { inspectorAfterClose, inspectorAfterSelection } from "./phone-inspector";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
 import { focusTargetAction, isSearchShortcut } from "./shell-keys";
 import { useEditorLayout, useHydrated } from "./use-editor-layout";
@@ -36,7 +36,9 @@ type FocusRequest =
   | { kind: "search" }
   | { kind: "toolbar"; fieldId: string; action: ToolbarAction }
   | { kind: "field"; fieldId: string }
-  | { kind: "step-add"; sectionId: string };
+  | { kind: "step-add"; sectionId: string }
+  | { kind: "tab"; tab: SidebarTab }
+  | { kind: "settings-link" };
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -50,6 +52,8 @@ function focusSelector(request: FocusRequest) {
     case "toolbar": return `[data-fb-action="${request.action}"][data-field-id="${request.fieldId}"]`;
     case "field": return `.fb-field[data-field-id="${request.fieldId}"]`;
     case "step-add": return `[data-fb-step-add="${request.sectionId}"]`;
+    case "tab": return `#${sidebarTabId(request.tab)}`;
+    case "settings-link": return '[data-fb-nav="settings"]';
   }
 }
 
@@ -91,6 +95,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   const [targetSectionId, setTargetSectionId] = useState<string | null>(null);
   const [paletteDrag, setPaletteDrag] = useState<PaletteEntry | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Phone width only (#1139): whether Question settings covers the screen. The stylesheet decides whether that means anything.
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<"editor" | "settings" | "notifications">("editor");
   const [focusRequest, setFocusRequest] = useState<{ request: FocusRequest; nonce: number } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -114,6 +120,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   if (seenSelection !== expandedFieldId) {
     setSeenSelection(expandedFieldId);
     setTab(tabAfterSelectionChange(tab, seenSelection, expandedFieldId));
+    setInspectorOpen(inspectorAfterSelection(inspectorOpen, seenSelection, expandedFieldId));
   }
 
   const targetIndexById = definition.sections.findIndex((section) => section.id === targetSectionId);
@@ -126,7 +133,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   // Runs after the render a request came with, so the element it names exists. Only reads and moves focus.
   useEffect(() => {
     if (!focusRequest) return;
-    const element = document.querySelector<HTMLElement>(focusSelector(focusRequest.request));
+    // The first match that is on screen: at phone width the inspector's own buttons stand in for the canvas's, and the other way round.
+    const element = Array.from(document.querySelectorAll<HTMLElement>(focusSelector(focusRequest.request))).find((candidate) => candidate.getClientRects().length > 0);
     if (!element) return;
     element.focus();
     if (focusRequest.request.kind === "label" && element instanceof HTMLInputElement) element.select();
@@ -183,6 +191,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
 
   function selectField(fieldId: string, sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
+    setActiveSection("editor");
     setExpandedFieldId(fieldId);
     setTab("settings");
     // Selecting while the sidebar is hidden shows it, so the settings the selection opens can be seen.
@@ -212,9 +221,25 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     openRemoveField(sectionIndex, fieldIndex);
   }
 
-  function scrollToSection(id: "editor" | "settings" | "notifications") {
+  // Back and Done only close the inspector: the edits stay, nothing is saved, and "Unsaved changes" stays on. Focus returns to the question's card.
+  function closeInspector() {
+    setInspectorOpen(inspectorAfterClose());
+    if (tab === "form-settings") request({ kind: "settings-link" });
+    else if (expandedFieldId) request({ kind: "field", fieldId: expandedFieldId });
+  }
+
+  // The "Settings & payment" link opens the Form settings tab (#1139), showing the sidebar first if it is hidden.
+  function openFormSettings() {
+    setActiveSection("settings");
+    showSidebar();
+    setTab("form-settings");
+    setInspectorOpen(true);
+    request({ kind: "tab", tab: "form-settings" });
+  }
+
+  function scrollToSection(id: "editor" | "notifications") {
     setActiveSection(id);
-    const element = document.getElementById(id === "editor" ? "builder-editor" : id === "settings" ? "builder-settings" : "builder-notifications");
+    const element = document.getElementById(id === "editor" ? "builder-editor" : "builder-notifications");
     element?.scrollIntoView({ block: "start" });
     element?.focus({ preventScroll: true });
   }
@@ -236,7 +261,21 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         />
       ),
     },
-    { id: "settings", label: "Question settings", panel: <BuilderQuestionSettings selection={selection} /> },
+    { id: "settings", label: "Question settings", panel: <BuilderQuestionSettings selection={selection} onAction={onToolbarAction} /> },
+    {
+      id: "form-settings",
+      label: "Form settings",
+      // The form-wide controls, reused as they are (#1139): who the form registers, payment, the confirmation message and Withdraw.
+      panel: (
+        <div className="fb-form-settings" id="builder-settings" role="group" aria-label="Settings and payment">
+          <div className="fb-public-link"><BuilderPublicLink /></div>
+          <BuilderRosterSettings />
+          <BuilderPaymentSettings />
+          <BuilderConfirmationEditor />
+          <BuilderWithdrawZone />
+        </div>
+      ),
+    },
     {
       id: "history",
       label: "History",
@@ -250,22 +289,20 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   ];
 
   const sidebarSide = layout.side;
-  const status = selectedVersion.status;
 
   return (
-    <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
+    <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} data-inspector={inspectorOpen ? "open" : "closed"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
       <header className="fb-topbar" ref={topbarRef}>
         <Link className="fb-icon-button" href={`/event-setup?event=${encodeURIComponent(eventId)}`} aria-label="Back to event setup"><ChevronLeft size={18} aria-hidden="true" /></Link>
         {forms.length > 1
           ? <label className="fb-form-switch"><span className="sr-only">Form</span><select value={selectedFormId} onChange={(event) => { const form = forms.find((candidate) => candidate.id === event.target.value); if (form) void chooseForm(form); }}>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
           : <span className="fb-form-name">{selectedForm.name}</span>}
         <nav className="fb-nav" aria-label="Form sections">
-          <a href="#builder-editor" aria-current={activeSection === "editor" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
-          <a href="#builder-settings" aria-current={activeSection === "settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("settings"); }}>Settings &amp; payment</a>
-          {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
+          <a href="#builder-editor" aria-current={activeSection === "editor" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
+          <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>
+          {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
-        <span className={`status-chip fb-version-chip ${status === "PUBLISHED" ? "green" : status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(status)} · version {selectedVersion.versionNumber}</span>
-        {dirty && <span className="unsaved-dot">Unsaved changes</span>}
+        <BuilderVersionChips />
         <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
         {/* Publish is the main button; with no Publish (a clean live or withdrawn version) Save is (#1137). */}
         <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
@@ -314,14 +351,6 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
               setPaletteDrag(null);
             }}
           />
-          <div className="fb-form-sections" id="builder-settings" tabIndex={-1} aria-label="Settings and payment">
-            <h2 className="fb-section-title">Settings &amp; payment</h2>
-            <div className="fb-public-link"><BuilderPublicLink /></div>
-            <BuilderRosterSettings />
-            <BuilderPaymentSettings />
-            <BuilderConfirmationEditor />
-            <BuilderWithdrawZone />
-          </div>
           {canEditNotifications && (
             <div className="fb-form-sections" id="builder-notifications" tabIndex={-1} aria-label="Notifications">
               <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />
@@ -330,7 +359,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <div className="fb-preview-section"><BuilderPreview /></div>
         </div>
         {layout.sidebarVisible
-          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} />
+          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} inspector={{ title: tab === "form-settings" ? "Form settings" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector }} />
           : <div className="fb-rail"><button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{sidebarSide === "left" ? <PanelLeft size={15} aria-hidden="true" /> : <PanelRight size={15} aria-hidden="true" />} Show sidebar</button><button className="fb-btn" type="button" onClick={() => addToStep(targetIndex)}><Plus size={15} aria-hidden="true" /> Add question</button></div>}
       </div>
     </div>
