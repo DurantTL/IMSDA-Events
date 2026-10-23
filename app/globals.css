@@ -12466,6 +12466,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .fb-btn.primary { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #ffffff; }
 .fb-btn.outline { border-color: var(--imsda-navy); color: var(--imsda-navy); }
 .fb-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.fb-undo-redo { display: inline-flex; gap: 6px; }
 .fb-icon-button:focus-visible, .fb-btn:focus-visible, .fb-tool:focus-visible, .fb-tab:focus-visible, .fb-field:focus-visible, .fb-add-button:focus-visible, .fb-palette-item:focus-visible, .fb-palette-group-toggle:focus-visible, .fb-link-button:focus-visible, .fb-nav a:focus-visible, .fb-resize-handle:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .fb-layout-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; border: 1px solid #f0d58a; border-radius: 12px; background: #fffaf0; padding: 10px 12px; }
 .fb-layout-menu .fb-hint { flex: 1 1 100%; }

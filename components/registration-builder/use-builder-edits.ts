@@ -7,15 +7,41 @@ import type { PaletteEntry } from "./palette-registry";
 import { planPaletteInsert } from "./palette-insert";
 import { planFieldDrop } from "./field-drop";
 import { localId, defaultField, blankPreviewAttendees } from "./builder-types";
+import { isAtBaseline, recordEdit, redo as redoStep, singleValueEditKey, undo as undoStep } from "./edit-history";
 import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
 
 export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
-  const { definition, setDefinition, setPreviewAttendees, setDirty, setNotice, setError, setTestIssues, dragging, setDragging, setExpandedFieldId, previewRef, closeModuleLibrary } = state;
+  const { history, setHistory, expandedFieldId, setAutoKeyFieldIds, definition, setDefinition, setPreviewAttendees, setDirty, setNotice, setError, setTestIssues, dragging, setDragging, setExpandedFieldId, previewRef, closeModuleLibrary } = state;
   const { totalFields, allFields } = derived;
   function replaceDefinition(next: RegistrationFormDefinition) {
-    setDefinition(pruneRequireAtLeastOne(next)); setDirty(true); setNotice(""); setError(""); setTestIssues([]);
+    const pruned = pruneRequireAtLeastOne(next);
+    if (definition && pruned !== definition) {
+      const before = definition;
+      const now = Date.now();
+      setHistory((current) => recordEdit(current, before, singleValueEditKey(before, pruned), now));
+    }
+    setDefinition(pruned); setDirty(true); setNotice(""); setError(""); setTestIssues([]);
   }
+
+  // Undo and redo (#1134) swap the draft for an earlier or later one. They always mark the draft changed: the
+  // saved definition is not kept here, so the builder never claims a draft is clean when it might not be.
+  // Dirty is false only when the draft is the saved or loaded definition itself.
+  function stepHistory(step: typeof undoStep, message: string) {
+    if (!definition) return;
+    const result = step(history, definition);
+    if (!result) return;
+    const restored = result.value;
+    setHistory(result.history); setDefinition(restored); setDirty(!isAtBaseline(result.history, restored)); setError(""); setTestIssues([]);
+    const ids = new Set(restored.sections.flatMap((section) => section.fields.map((field) => field.id)));
+    if (expandedFieldId && !ids.has(expandedFieldId)) setExpandedFieldId(null);
+    setAutoKeyFieldIds((current) => current.size === 0 || Array.from(current).every((id) => ids.has(id)) ? current : new Set(Array.from(current).filter((id) => ids.has(id))));
+    if (JSON.stringify(restored.attendeeRoster ?? null) !== JSON.stringify(definition.attendeeRoster ?? null)) setPreviewAttendees(blankPreviewAttendees(restored));
+    // Announced through the notices' status region.
+    setNotice(message);
+  }
+  const undoEdit = () => stepHistory(undoStep, "Undid last change.");
+  const redoEdit = () => stepHistory(redoStep, "Redid change.");
 
   function updateSection(index: number, patch: Partial<RegistrationFormDefinition["sections"][number]>) {
     if (!definition) return;
@@ -224,7 +250,7 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     closeModuleLibrary();
     replaceDefinition({ ...definition, sections });
   }
-  return { replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addPaletteEntry, addSection, removeSection, setReviewSection };
+  return { undoEdit, redoEdit, replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addPaletteEntry, addSection, removeSection, setReviewSection };
 }
 
 export type BuilderEdits = ReturnType<typeof useBuilderEdits>;

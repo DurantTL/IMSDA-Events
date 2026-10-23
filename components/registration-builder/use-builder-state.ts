@@ -2,6 +2,7 @@
 // There is exactly one copy of the unsaved definition; zones read it through
 // the builder context and change it only through the edit and action hooks.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { emptyHistory, type EditHistory } from "./edit-history";
 import { focusTargetId, type FocusRequest } from "./version-history";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -26,6 +27,8 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
   const [selectedVersionId, setSelectedVersionId] = useState(selectedForm?.activeVersion.id ?? "");
   const selectedVersion = selectedForm?.versions.find((version) => version.id === selectedVersionId) ?? selectedForm?.activeVersion ?? null;
   const [definition, setDefinition] = useState<RegistrationFormDefinition | null>(selectedVersion?.definition ?? null);
+  // Undo and redo steps for the unsaved draft (#1134); cleared whenever the draft is replaced wholesale.
+  const [history, setHistory] = useState<EditHistory<RegistrationFormDefinition>>(() => emptyHistory(selectedVersion?.definition ?? null));
   const [responses, setResponses] = useState<Record<string, PreviewValue>>({});
   const [previewAttendees, setPreviewAttendees] = useState<PreviewAttendee[]>(() => blankPreviewAttendees(selectedVersion?.definition ?? null));
   const [dirty, setDirty] = useState(false);
@@ -108,7 +111,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
+  return { history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;
