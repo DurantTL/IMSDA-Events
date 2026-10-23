@@ -116,6 +116,9 @@ describe("server environment contract", () => {
     expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "999999999999" }).some((issue) => issue.startsWith("SES_AWS_ACCOUNT_ID:"))).toBe(true);
     expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: "https://evil.example.test/topic", SES_AWS_ACCOUNT_ID: "123456789012" }).some((issue) => issue.startsWith("SES_SNS_TOPIC_ARN:"))).toBe(true);
     expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "12345" }).some((issue) => issue.startsWith("SES_AWS_ACCOUNT_ID:"))).toBe(true);
+    const both = { ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "123456789012" };
+    for (const value of [undefined, "", "1", "2"]) expect(validateServerEnv({ ...both, SES_SNS_SIGNATURE_VERSION: value }).ok, String(value)).toBe(true);
+    expect(issuesFor({ ...both, SES_SNS_SIGNATURE_VERSION: "3" }).some((issue) => issue.startsWith("SES_SNS_SIGNATURE_VERSION:"))).toBe(true);
   });
 
   it("requires somewhere to send account email from in production", () => {

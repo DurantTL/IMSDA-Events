@@ -28,18 +28,20 @@ function utcTime(date: Date): Buffer {
 
 export type SyntheticCertificate = { privateKey: KeyObject; pem: string };
 
-export function createSyntheticCertificate(options: { notBefore: Date; notAfter: Date }): SyntheticCertificate {
+export function createSyntheticCertificate(options: { notBefore: Date; notAfter: Date; subject?: string; issuer?: string }): SyntheticCertificate {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const sha256WithRsa = der(0x30, Buffer.from([0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b]), Buffer.from([0x05, 0x00]));
-  const name = derName("synthetic-sns-signing-test");
+  // Like the real one: a certificate for sns.amazonaws.com from an Amazon issuer (here a synthetic one).
+  const subject = derName(options.subject ?? "sns.amazonaws.com");
+  const issuer = derName(options.issuer ?? "Amazon Synthetic Test CA");
   const tbs = der(
     0x30,
     Buffer.from([0xa0, 0x03, 0x02, 0x01, 0x02]),
     der(0x02, Buffer.from([0x01])),
     sha256WithRsa,
-    name,
+    issuer,
     der(0x30, utcTime(options.notBefore), utcTime(options.notAfter)),
-    name,
+    subject,
     publicKey.export({ type: "spki", format: "der" }) as Buffer,
   );
   const signature = createSign("RSA-SHA256").update(tbs).sign(privateKey);
@@ -52,6 +54,7 @@ export const SYNTHETIC_REGION = "us-east-2";
 export const SYNTHETIC_ACCOUNT = "123456789012";
 export const SYNTHETIC_TOPIC_ARN = `arn:aws:sns:${SYNTHETIC_REGION}:${SYNTHETIC_ACCOUNT}:synthetic-ses-events`;
 export const SYNTHETIC_CERT_URL = `https://sns.${SYNTHETIC_REGION}.amazonaws.com/SimpleNotificationService-0123456789abcdef0123456789abcdef.pem`;
+export const SYNTHETIC_NOW_TIMESTAMP = "2026-10-23T12:00:00.000Z";
 
 export const syntheticSnsEnvironment = {
   SES_SNS_TOPIC_ARN: SYNTHETIC_TOPIC_ARN,

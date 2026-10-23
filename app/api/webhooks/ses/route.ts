@@ -4,6 +4,7 @@ import {
   SnsVerificationError,
   confirmSnsSubscription,
   parseSesNotification,
+  readSnsBody,
   verifySnsRequest,
 } from "@/integrations/email/ses-sns";
 import { logError, logInfo, logWarn } from "@/lib/logger";
@@ -24,8 +25,9 @@ export const runtime = "nodejs";
  * Logs carry the SNS message id and counts only, never an address or a notification body.
  */
 async function postHandler(request: Request) {
-  const rawBody = await request.text();
   try {
+    // Capped at SNS's own maximum, before anything is parsed: this endpoint is public.
+    const rawBody = await readSnsBody(request);
     const verified = await verifySnsRequest(rawBody, request.headers);
     const { envelope } = verified;
 

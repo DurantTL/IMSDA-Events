@@ -254,6 +254,9 @@ queued before the bounce is also held back (its delivery log row ends
 **1. Create the SNS topic** (an AWS administrator, in `us-east-2`, the same
 region as SES):
 
+**Use a topic dedicated to this app, fed only by this app's configuration set**
+(step 3). Do not reuse a topic that other applications publish to.
+
 1. Open **Amazon SNS**, **Topics**, **Create topic**, type **Standard**, name it
    `imsda-ses-events`. Leave encryption and the access policy at their defaults
    (the default policy allows only your own account to publish).
@@ -286,9 +289,33 @@ console (`us-east-2`):
    optional variable described above) and redeploy, so every message the app
    sends is tagged with the set.
 
-(Identity-level notifications, where each verified domain publishes bounces,
-complaints and deliveries to the topic, are also understood and work too. The
-configuration set is preferred because it covers exactly this app's mail.)
+**Do not use identity-level notifications** (a verified domain or address
+publishing bounces, complaints and deliveries to the topic). The app can read
+them, but they cover every sender on the AWS account, not just this app. A hard
+bounce or complaint from any other system sending as `imsda.org` or
+`imadventist.org` would then stop **this app's** email to that address too, with
+nothing in the app to say where the report came from. The configuration set
+covers exactly this app's mail, which is why it is the supported setup.
+
+**Set the topic to signature version 2** (SHA-256; version 1 is SHA-1). It is the
+topic attribute `SignatureVersion`, set from the console where it is offered or
+with the AWS CLI:
+
+```
+aws sns set-topic-attributes --region us-east-2 --topic-arn <topic ARN> \
+  --attribute-name SignatureVersion --attribute-value 2
+```
+
+Then add this to the environment panel and redeploy:
+
+```
+SES_SNS_SIGNATURE_VERSION=2
+```
+
+With it set, the endpoint refuses any message signed with version 1. Leave it
+blank only if you cannot change the topic: the default accepts both versions.
+Change the topic first; setting the variable while the topic still signs with
+version 1 makes every report fail with a 400.
 
 **4. Subscribe the app's endpoint to the topic.** In SNS, on the topic,
 **Create subscription**: protocol **HTTPS**, endpoint
@@ -311,13 +338,20 @@ subscription. An `UnsubscribeConfirmation` is acknowledged and never followed:
 re-subscribing is always this manual step.
 
 **What the endpoint checks** (so you know what a failure means). Every request
-must be signed by AWS (`SignatureVersion` 1 or 2, checked over the string AWS
-defines for the message type) with a certificate fetched only from
-`https://sns.<region>.amazonaws.com/` for the topic's own region; carry the
-topic in `SES_SNS_TOPIC_ARN`; and, for a notification, name the account in
-`SES_AWS_ACCOUNT_ID` as the sender. Responses: `200` recorded, a duplicate, or
+must be at most 256 KB; be signed by AWS (`SignatureVersion` 1 or 2, or only 2
+with `SES_SNS_SIGNATURE_VERSION=2`, checked over the string AWS defines for the
+message type) with a certificate for `sns.amazonaws.com` issued by Amazon,
+fetched only from
+`https://sns.<region>.amazonaws.com/SimpleNotificationService-<32 hex digits>.pem`
+for the topic's own region; carry the topic in `SES_SNS_TOPIC_ARN`; have a
+`Timestamp` no more than 7 days old (SNS's longest retry window) and not more
+than 5 minutes in the future; and, for a notification, name the account in
+`SES_AWS_ACCOUNT_ID` as the sender. A certificate address that AWS answers with
+a 4xx is treated as an invalid message (4xx); a 5xx or a network failure is a
+503 so SNS retries. Failed certificate lookups are remembered for five minutes
+so a flood of bad requests cannot make the app call AWS for each one. Responses: `200` recorded, a duplicate, or
 a notification the app does not act on; `400`/`403`/`413` the request is not
-valid or not allowed (SNS stops retrying it); `503` not configured, or AWS could
+valid, too large or not allowed (SNS stops retrying it); `503` not configured, or AWS could
 not be reached to check the signature (SNS retries); `500` storing the report
 failed (SNS retries). Each report is stored once, keyed by the SNS message id,
 so redelivery is harmless, and a late or repeated report can never move a

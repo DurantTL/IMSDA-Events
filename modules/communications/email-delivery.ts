@@ -98,7 +98,8 @@ export const PROVIDER_QUOTA_MESSAGE = "The email provider's sending limit was re
 type DeliveryPrisma = Pick<
   PrismaClient,
   "$transaction" | "eventMessageSettings" | "messageOutbox" | "auditLog" | "invoiceDeliveryRecipient"
-> & Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings" | "emailAddressSuppression">>;
+> & Pick<PrismaClient, "emailAddressSuppression">
+& Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings">>;
 
 export type ExternalEmailDeliveryDependencies = {
   prisma?: DeliveryPrisma;
@@ -529,8 +530,8 @@ async function suppressIfAnnouncementOptedOut(
  * the reason and the skip is audited (ids only, never the address).
  *
  * Fails closed like the opt-out check: if the lookup fails the message is retried later, never sent. The result values
- * mean the same as `OptOutCheckResult`. A run whose `prisma` has no suppression table (a test double for another path)
- * checks nothing, exactly as the opt-out check does.
+ * mean the same as `OptOutCheckResult`. The suppression table is a required part of `DeliveryPrisma`, so the check can
+ * never be skipped by leaving it out.
  */
 async function suppressIfAddressSuppressed(
   prisma: DeliveryPrisma,
@@ -538,7 +539,6 @@ async function suppressIfAddressSuppressed(
   at: Date,
 ): Promise<OptOutCheckResult> {
   const table = prisma.emailAddressSuppression;
-  if (!table) return false;
   let decision: Awaited<ReturnType<typeof checkRecipientDeliverable>>;
   try {
     decision = await checkRecipientDeliverable({ emailAddressSuppression: table }, message.recipientEmail);
@@ -823,7 +823,7 @@ export async function nextAttemptRowNumber(
 async function finalizeSuccessfulAttempt(
   prisma: DeliveryPrisma,
   message: ClaimedMessage,
-  providerMessageId: string,
+  providerMessageId: string | null,
   completedAt: Date,
   provider: EmailProviderName = getActiveEmailProviderName(),
   fromEmail: string | null = null,
@@ -870,50 +870,53 @@ async function finalizeSuccessfulAttempt(
       },
     });
 
-    await tx.messageProviderEvent.updateMany({
-      where: {
+    // A message SES accepted without an id has nothing to link held events by.
+    if (providerMessageId) {
+      await tx.messageProviderEvent.updateMany({
+        where: {
+          provider: provider,
+          providerMessageId,
+          messageOutboxId: null,
+        },
+        data: { messageOutboxId: message.id },
+      });
+      const heldWhere = {
         provider: provider,
         providerMessageId,
-        messageOutboxId: null,
-      },
-      data: { messageOutboxId: message.id },
-    });
-    const heldWhere = {
-      provider: provider,
-      providerMessageId,
-      mappedDeliveryStatus: { not: null },
-    } as const;
-    const heldOrder = [{ occurredAt: "desc" }, { receivedAt: "desc" }] as const;
-    let transition: ProviderDeliveryTransition | null;
-    if (provider === "SES") {
-      // SES events can arrive before the send is recorded (a delivery report racing the SMTP reply). The furthest stage
-      // wins, so a held DELIVERED never covers a held bounce (#863).
-      const heldEvents = await tx.messageProviderEvent.findMany({
-        where: heldWhere,
-        orderBy: [...heldOrder],
-        select: { eventType: true, occurredAt: true },
-      });
-      transition = strongestTransition(heldEvents
-        .map((event) => mapProviderDeliveryEvent(provider, event.eventType, event.occurredAt))
-        .filter((candidate): candidate is ProviderDeliveryTransition => candidate !== null));
-    } else {
-      const latestEvent = await tx.messageProviderEvent.findFirst({
-        where: heldWhere,
-        orderBy: [...heldOrder],
-        select: {
-          eventType: true,
-          occurredAt: true,
-        },
-      });
-      transition = latestEvent
-        ? mapProviderDeliveryEvent(provider, latestEvent.eventType, latestEvent.occurredAt)
-        : null;
-    }
-    if (transition) {
-      await tx.messageOutbox.update({
-        where: { id: message.id },
-        data: providerTransitionUpdate(transition),
-      });
+        mappedDeliveryStatus: { not: null },
+      } as const;
+      const heldOrder = [{ occurredAt: "desc" }, { receivedAt: "desc" }] as const;
+      let transition: ProviderDeliveryTransition | null;
+      if (provider === "SES") {
+        // SES events can arrive before the send is recorded (a delivery report racing the SMTP reply). The furthest stage
+        // wins, so a held DELIVERED never covers a held bounce (#863).
+        const heldEvents = await tx.messageProviderEvent.findMany({
+          where: heldWhere,
+          orderBy: [...heldOrder],
+          select: { eventType: true, occurredAt: true },
+        });
+        transition = strongestTransition(heldEvents
+          .map((event) => mapProviderDeliveryEvent(provider, event.eventType, event.occurredAt))
+          .filter((candidate): candidate is ProviderDeliveryTransition => candidate !== null));
+      } else {
+        const latestEvent = await tx.messageProviderEvent.findFirst({
+          where: heldWhere,
+          orderBy: [...heldOrder],
+          select: {
+            eventType: true,
+            occurredAt: true,
+          },
+        });
+        transition = latestEvent
+          ? mapProviderDeliveryEvent(provider, latestEvent.eventType, latestEvent.occurredAt)
+          : null;
+      }
+      if (transition) {
+        await tx.messageOutbox.update({
+          where: { id: message.id },
+          data: providerTransitionUpdate(transition),
+        });
+      }
     }
     return true;
   });

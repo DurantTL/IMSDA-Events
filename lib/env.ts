@@ -77,6 +77,8 @@ export const serverEnvSchema = z
     // Bounce, complaint and delivery reports from SES through SNS (#863). Both are required for the endpoint to accept
     // anything: the one SNS topic it trusts, and the AWS account that owns it and sends the mail.
     SES_SNS_TOPIC_ARN: z.string().trim().regex(/^arn:aws:sns:[a-z]{2}(?:-[a-z]+)+-\d{1,2}:\d{12}:[A-Za-z0-9_-]{1,256}$/, "must be an SNS topic ARN such as arn:aws:sns:us-east-2:123456789012:imsda-ses-events").optional(),
+    // "2" refuses SNS SignatureVersion 1 (SHA1). Blank accepts both; set the topic's SignatureVersion to 2 first.
+    SES_SNS_SIGNATURE_VERSION: z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), z.enum(["1", "2"]).optional()),
     SES_AWS_ACCOUNT_ID: z.string().trim().regex(/^\d{12}$/, "must be a 12-digit AWS account id").optional(),
 
     // Sender identity for account email. Event messages take theirs from
@@ -379,6 +381,7 @@ export const SERVER_ENV_KEYS = [
     "SES_MAX_SEND_RATE",
     "SES_SNS_TOPIC_ARN",
     "SES_AWS_ACCOUNT_ID",
+    "SES_SNS_SIGNATURE_VERSION",
     "ACCOUNT_EMAIL_SENDER_NAME",
     "ACCOUNT_EMAIL_SENDER_ADDRESS",
     "ACCOUNT_EMAIL_REPLY_TO",

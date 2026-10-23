@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -7,11 +7,14 @@ import {
   SnsUnavailableError,
   SnsVerificationError,
   buildSnsCanonicalString,
+  SNS_MAX_BODY_BYTES,
   confirmSnsSubscription,
   getSnsConfiguration,
   parseSesNotification,
   parseSigningCertUrl,
   parseSubscribeUrl,
+  readSnsBody,
+  resetSnsCertificateCache,
   verifySnsRequest,
   type SnsEnvelope,
 } from "@/integrations/email/ses-sns";
@@ -104,7 +107,8 @@ describe("SNS signature verification (#863)", () => {
     await expect(verify(envelope, { env: {} }).promise).rejects.toBeInstanceOf(SnsConfigurationError);
     await expect(verify(envelope, { env: { SES_SNS_TOPIC_ARN: SYNTHETIC_TOPIC_ARN } }).promise).rejects.toBeInstanceOf(SnsConfigurationError);
     await expect(verify(envelope, { env: { SES_SNS_TOPIC_ARN: SYNTHETIC_TOPIC_ARN, SES_AWS_ACCOUNT_ID: "999999999999" } }).promise).rejects.toBeInstanceOf(SnsConfigurationError);
-    expect(getSnsConfiguration(syntheticSnsEnvironment)).toEqual({ topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION });
+    expect(getSnsConfiguration(syntheticSnsEnvironment)).toEqual({ topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION, minSignatureVersion: "1" });
+    expect(getSnsConfiguration({ ...syntheticSnsEnvironment, SES_SNS_SIGNATURE_VERSION: "2" })?.minSignatureVersion).toBe("2");
   });
 
   it("rejects a malformed body, a missing or mismatched type header, and an oversized body", async () => {
@@ -158,7 +162,7 @@ describe("SNS signature verification (#863)", () => {
 
 describe("subscription confirmation is narrow (#863)", () => {
   const token = "synthetic-token-0001";
-  const config = { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION };
+  const config = { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION, minSignatureVersion: "1" as const };
   const good = `https://sns.${SYNTHETIC_REGION}.amazonaws.com/?Action=ConfirmSubscription&TopicArn=${encodeURIComponent(SYNTHETIC_TOPIC_ARN)}&Token=${token}`;
 
   it("accepts only the SNS host root with this topic and this token and nothing else", () => {
@@ -202,6 +206,15 @@ describe("subscription confirmation is narrow (#863)", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("releases the confirmation response without reading it", async () => {
+    const verified = await verify(signedSnsEnvelope(certificate.privateKey, { type: "SubscriptionConfirmation", token })).promise;
+    const cancel = vi.fn(async () => undefined);
+    const text = vi.fn(async () => "");
+    await confirmSnsSubscription(verified, async () => ({ ok: true, status: 200, text, body: { cancel } }));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(text).not.toHaveBeenCalled();
+  });
+
   it("treats a failed confirmation request as retryable", async () => {
     const verified = await verify(signedSnsEnvelope(certificate.privateKey, { type: "SubscriptionConfirmation", token })).promise;
     await expect(confirmSnsSubscription(verified, async () => { throw new Error("network"); })).rejects.toBeInstanceOf(SnsUnavailableError);
@@ -217,7 +230,7 @@ describe("subscription confirmation is narrow (#863)", () => {
 });
 
 describe("SES notifications inside SNS (#863)", () => {
-  const config = { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION };
+  const config = { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION, minSignatureVersion: "1" as const };
   const envelopeFor = (message: string) => ({ Message: message, Timestamp: "2026-10-23T12:00:30.000Z" }) as SnsEnvelope;
 
   it("reads a permanent bounce as a hard bounce that suppresses the reported addresses, normalized", () => {
@@ -270,13 +283,20 @@ describe("SES notifications inside SNS (#863)", () => {
 describe("provider message id normalization (#863)", () => {
   it("the id the adapter records from the SMTP reply is the id SES reports as mail.messageId", () => {
     const sesId = "0100018f2c1d7a3b-4d6e8f10-1a2b-4c3d-8e9f-0a1b2c3d4e5f-000000";
-    const recorded = messageIdFromResponse(`250 Ok ${sesId}`, undefined);
+    const recorded = messageIdFromResponse(`250 Ok ${sesId}`);
     expect(recorded).toBe(sesId);
     const feedback = parseSesNotification(
       { Message: sesNotificationMessage({ type: "Delivery", messageId: sesId }), Timestamp: "2026-10-23T12:00:00Z" } as SnsEnvelope,
-      { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION },
+      { topicArn: SYNTHETIC_TOPIC_ARN, accountId: SYNTHETIC_ACCOUNT, region: SYNTHETIC_REGION, minSignatureVersion: "1" },
     )!;
     expect(feedback.providerMessageId).toBe(recorded);
+  });
+
+  it("never falls back to the Message-ID this app generated, and normalizes what SES returned", () => {
+    expect(messageIdFromResponse("250 Ok <abc-123@email.amazonses.com>")).toBe("abc-123");
+    expect(messageIdFromResponse("250 Ok")).toBeNull();
+    expect(messageIdFromResponse("250 2.0.0 Ok: queued as XYZ")).toBeNull();
+    expect(messageIdFromResponse(undefined)).toBeNull();
   });
 
   it("also reads the Message-ID header form and refuses anything that is not a plain id", () => {
@@ -305,5 +325,151 @@ describe("Email health reports whether SES reports come back (#863)", () => {
       for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
       Object.assign(process.env, saved);
     }
+  });
+});
+
+describe("stricter verification (#863 review)", () => {
+  const envAt = (timestamp: string) => signedSnsEnvelope(certificate.privateKey, { timestamp });
+
+  it("requires the signing certificate path to be exactly SimpleNotificationService-<32 hex>.pem", () => {
+    const base = `https://sns.${SYNTHETIC_REGION}.amazonaws.com/SimpleNotificationService-`;
+    expect(parseSigningCertUrl(`${base}${"a".repeat(32)}.pem`, SYNTHETIC_REGION)).not.toBeNull();
+    for (const bad of ["a".repeat(31), "a".repeat(33), "A".repeat(32), "g".repeat(32), "abc"]) {
+      expect(parseSigningCertUrl(`${base}${bad}.pem`, SYNTHETIC_REGION), bad).toBeNull();
+    }
+  });
+
+  it("requires a certificate for sns.amazonaws.com issued by Amazon", async () => {
+    const wrongSubject = createSyntheticCertificate({ notBefore: new Date("2026-01-01T00:00:00Z"), notAfter: new Date("2027-01-01T00:00:00Z"), subject: "evil.example.test" });
+    await expect(verify(signedSnsEnvelope(wrongSubject.privateKey, {}), { pem: wrongSubject.pem }).promise).rejects.toThrow(/Amazon SNS certificate/);
+    const wrongIssuer = createSyntheticCertificate({ notBefore: new Date("2026-01-01T00:00:00Z"), notAfter: new Date("2027-01-01T00:00:00Z"), issuer: "Some Other CA" });
+    await expect(verify(signedSnsEnvelope(wrongIssuer.privateKey, {}), { pem: wrongIssuer.pem }).promise).rejects.toThrow(/Amazon SNS certificate/);
+  });
+
+  it("refuses SignatureVersion 1 when SES_SNS_SIGNATURE_VERSION is 2, and accepts both by default", async () => {
+    const strict = { ...syntheticSnsEnvironment, SES_SNS_SIGNATURE_VERSION: "2" };
+    const v1 = signedSnsEnvelope(certificate.privateKey, { version: "1" });
+    const v2 = signedSnsEnvelope(certificate.privateKey, { version: "2" });
+    const refused = verify(v1, { env: strict });
+    await expect(refused.promise).rejects.toBeInstanceOf(SnsVerificationError);
+    expect(refused.fetchCertificate).not.toHaveBeenCalled();
+    await expect(verify(v2, { env: strict }).promise).resolves.toBeTruthy();
+    await expect(verify(v1).promise).resolves.toBeTruthy();
+  });
+
+  it("refuses an envelope more than 7 days old or more than 5 minutes in the future, and an unreadable timestamp", async () => {
+    // now = 2026-10-23T12:05:00Z
+    await expect(verify(envAt("2026-10-16T12:06:00Z")).promise).resolves.toBeTruthy(); // just under 7 days
+    await expect(verify(envAt("2026-10-16T12:04:00Z")).promise).rejects.toBeInstanceOf(SnsVerificationError);
+    await expect(verify(envAt("2026-10-23T12:09:00Z")).promise).resolves.toBeTruthy(); // 4 minutes ahead
+    await expect(verify(envAt("2026-10-23T12:11:00Z")).promise).rejects.toBeInstanceOf(SnsVerificationError);
+    await expect(verify(envAt("yesterday")).promise).rejects.toBeInstanceOf(SnsVerificationError);
+    const stale = verify(envAt("2026-10-01T00:00:00Z"));
+    await expect(stale.promise).rejects.toBeInstanceOf(SnsVerificationError);
+    expect(stale.fetchCertificate).not.toHaveBeenCalled();
+  });
+});
+
+describe("reading the body with a cap (#863 review)", () => {
+  const streamOf = (chunks: Uint8Array[], onCancel?: () => void) => {
+    let index = 0;
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (index < chunks.length) controller.enqueue(chunks[index++]!);
+        else controller.close();
+      },
+      cancel() { onCancel?.(); },
+    });
+  };
+  const req = (body: BodyInit | null, headers: Record<string, string> = {}) =>
+    new Request("https://events.imsda.test/x", { method: "POST", headers, body, duplex: "half" } as RequestInit);
+
+  it("reads a normal body, multi-byte characters across chunks included", async () => {
+    const bytes = new TextEncoder().encode('{"a":"é€"}');
+    expect(await readSnsBody(req(streamOf([bytes.slice(0, 7), bytes.slice(7)])))).toBe('{"a":"é€"}');
+    expect(await readSnsBody(req(null))).toBe("");
+  });
+
+  it("refuses a declared length above the cap before reading, and a bad one", async () => {
+    const oversized = req(streamOf([new Uint8Array(10)]), { "content-length": String(SNS_MAX_BODY_BYTES + 1) });
+    await expect(readSnsBody(oversized)).rejects.toMatchObject({ status: 413 });
+    // Never even opened a reader on the stream.
+    expect(oversized.body?.locked).toBe(false);
+    await expect(readSnsBody(req("{}", { "content-length": "-5" }))).rejects.toMatchObject({ status: 400 });
+    await expect(readSnsBody(req("{}", { "content-length": "abc" }))).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("aborts a stream that exceeds the cap and cancels it", async () => {
+    let cancelled = false;
+    const chunk = new Uint8Array(100).fill(97);
+    await expect(readSnsBody(req(streamOf([chunk, chunk, chunk], () => { cancelled = true; })), 250)).rejects.toMatchObject({ status: 413 });
+    expect(cancelled).toBe(true);
+  });
+});
+
+describe("fetching the signing certificate (#863 review)", () => {
+  const fetchMock = vi.fn();
+  const urlN = (n: number) => `https://sns.${SYNTHETIC_REGION}.amazonaws.com/SimpleNotificationService-${n.toString(16).padStart(32, "0")}.pem`;
+  const run = (n: number) => verifySnsRequest(
+    JSON.stringify(signedSnsEnvelope(certificate.privateKey, { certUrl: urlN(n) })),
+    headersFor("Notification"),
+    syntheticSnsEnvironment,
+    { now: () => now },
+  );
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    resetSnsCertificateCache();
+    fetchMock.mockReset();
+  });
+  const stub = () => { resetSnsCertificateCache(); vi.stubGlobal("fetch", fetchMock); };
+
+  it("treats a 4xx from AWS as an invalid message and remembers the failure for five minutes", async () => {
+    stub();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    fetchMock.mockImplementation(async () => new Response("", { status: 404 }));
+    await expect(run(1)).rejects.toBeInstanceOf(SnsVerificationError);
+    await expect(run(1)).rejects.toBeInstanceOf(SnsVerificationError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(new Date(now.getTime() + 5 * 60 * 1000 + 1000));
+    await expect(run(1)).rejects.toBeInstanceOf(SnsVerificationError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a 5xx or a network failure as retryable and also remembers it briefly", async () => {
+    stub();
+    fetchMock.mockImplementation(async () => new Response("", { status: 503 }));
+    await expect(run(2)).rejects.toBeInstanceOf(SnsUnavailableError);
+    await expect(run(2)).rejects.toBeInstanceOf(SnsUnavailableError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockImplementation(async () => { throw new Error("network down"); });
+    await expect(run(3)).rejects.toBeInstanceOf(SnsUnavailableError);
+  });
+
+  it("shares one in-flight request per URL, and caches a good certificate", async () => {
+    stub();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    fetchMock.mockImplementation(async () => { await gate; return new Response(certificate.pem, { status: 200 }); });
+    const concurrent = Array.from({ length: 6 }, () => run(4));
+    release();
+    await Promise.all(concurrent);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await run(4);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts the oldest cached certificate, never clearing the rest", async () => {
+    stub();
+    fetchMock.mockImplementation(async () => new Response(certificate.pem, { status: 200 }));
+    for (let n = 10; n < 19; n += 1) await run(n); // nine distinct URLs, a cache of eight
+    expect(fetchMock).toHaveBeenCalledTimes(9);
+    await run(18);
+    await run(11);
+    expect(fetchMock).toHaveBeenCalledTimes(9); // the newest and the second oldest are still cached
+    await run(10);
+    expect(fetchMock).toHaveBeenCalledTimes(10); // only the oldest was evicted
   });
 });

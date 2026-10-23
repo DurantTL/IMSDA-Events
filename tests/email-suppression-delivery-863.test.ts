@@ -141,6 +141,14 @@ describe("a suppressed address receives nothing (#863)", () => {
     }
   });
 
+  it("records a message SES accepted without an id as sent, with no provider message id", async () => {
+    const store = fakeStore({});
+    const sendEmail = vi.fn(async () => ({ provider: "SES" as const, providerMessageId: null }));
+    const result = await processExternalEmailQueue("event-1", { dependencies: { ...dependencies, prisma: store.prisma as never, sendEmail } });
+    expect(result.sentIds).toEqual(["message-1"]);
+    expect(store.message).toMatchObject({ status: "SENT", provider: "SES", providerMessageId: null, providerDeliveryStatus: "ACCEPTED" });
+  });
+
   it("fails closed: when the lookup fails the message is retried later and never sent", async () => {
     const store = fakeStore({ lookupFails: true });
     const sendEmail = accepted();

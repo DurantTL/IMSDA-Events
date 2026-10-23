@@ -60,6 +60,8 @@ function store(templateKey = "DEADLINE_REMINDER") {
   const prisma = {
     messageOutbox,
     invoiceDeliveryRecipient: { findFirst: vi.fn(async () => null) },
+    // The delivery worker requires the suppression table (#863): nobody is suppressed in these tests.
+    emailAddressSuppression: { findFirst: vi.fn(async () => null) },
     auditLog: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { auditRows.push(data); }) },
     $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
   };

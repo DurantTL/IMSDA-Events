@@ -38,7 +38,8 @@ export type EmailDeliveryInput = {
 
 export type EmailDeliveryResult = {
   provider: EmailProviderName;
-  providerMessageId: string;
+  /** Null when the provider accepted the message but returned no id to match reports by (SES only). */
+  providerMessageId: string | null;
 };
 
 export class EmailProviderConfigurationError extends Error {

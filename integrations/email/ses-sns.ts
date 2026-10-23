@@ -14,9 +14,11 @@ import { normalizeSesMessageId } from "./ses";
  * 2. `TopicArn` equals the one allowed topic (`SES_SNS_TOPIC_ARN`), before anything else is looked at;
  * 3. `SigningCertURL` must be `https://sns.<region>.amazonaws.com/SimpleNotificationService-<id>.pem` for the topic's own
  *    region (no other host, port, credentials, query or redirect), and only then is it fetched;
- * 4. the signature is checked over the canonical string AWS defines for that message type, using SHA1 for
- *    `SignatureVersion` 1 and SHA256 for 2;
- * 5. the notification must name the allowed AWS account as the sender (`mail.sendingAccountId`).
+ * 4. the envelope's `Timestamp` must be recent (at most 7 days old, SNS's longest retry window, and not in the future);
+ * 5. the signing certificate must be for `sns.amazonaws.com` and issued by Amazon, and the signature is checked over the
+ *    canonical string AWS defines for that message type, using SHA1 for `SignatureVersion` 1 and SHA256 for 2
+ *    (`SES_SNS_SIGNATURE_VERSION=2` refuses version 1);
+ * 6. the notification must name the allowed AWS account as the sender (`mail.sendingAccountId`).
  *
  * A subscription confirmation is handled narrowly (see `confirmSnsSubscription`): only the verified message of the
  * allowed topic, only its own `SubscribeURL` on the same AWS host, nothing else.
@@ -27,6 +29,10 @@ const CERTIFICATE_MAX_BYTES = 16 * 1024;
 const CERTIFICATE_TIMEOUT_MS = 5_000;
 const CERTIFICATE_CACHE_MS = 60 * 60 * 1000;
 const CERTIFICATE_CACHE_LIMIT = 8;
+const CERTIFICATE_FAILURE_CACHE_MS = 5 * 60 * 1000;
+/** SNS retries a notification for at most this long, so an older envelope is never a real delivery. */
+export const SNS_MAX_ENVELOPE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SNS_MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const MAX_RECIPIENTS_PER_NOTIFICATION = 50;
 
 /** The environment does not allow any SNS topic yet. The endpoint answers 503 and SNS retries. */
@@ -53,7 +59,13 @@ export class SnsUnavailableError extends Error {
   }
 }
 
-export type SnsConfiguration = { topicArn: string; accountId: string; region: string };
+export type SnsConfiguration = {
+  topicArn: string;
+  accountId: string;
+  region: string;
+  /** `"2"` refuses SignatureVersion 1 (`SES_SNS_SIGNATURE_VERSION`); the default accepts both. */
+  minSignatureVersion: "1" | "2";
+};
 
 const TOPIC_ARN_PATTERN = /^arn:aws:sns:([a-z]{2}(?:-[a-z]+)+-\d{1,2}):(\d{12}):[A-Za-z0-9_-]{1,256}$/;
 
@@ -64,7 +76,7 @@ export function getSnsConfiguration(env: Record<string, string | undefined> = pr
   if (!topicArn || !accountId) return null;
   const match = TOPIC_ARN_PATTERN.exec(topicArn);
   if (!match || match[2] !== accountId) return null;
-  return { topicArn, accountId, region: match[1]! };
+  return { topicArn, accountId, region: match[1]!, minSignatureVersion: env.SES_SNS_SIGNATURE_VERSION?.trim() === "2" ? "2" : "1" };
 }
 
 const snsEnvelopeSchema = z.object({
@@ -106,7 +118,7 @@ export function buildSnsCanonicalString(envelope: SnsEnvelope): string {
   return canonical;
 }
 
-const SIGNING_CERT_PATH = /^\/SimpleNotificationService-[A-Za-z0-9]+\.pem$/;
+const SIGNING_CERT_PATH = /^\/SimpleNotificationService-[0-9a-f]{32}\.pem$/;
 
 /** Parses a URL that must be on `sns.<region>.amazonaws.com` over https, or returns null. Never fetches anything. */
 function parseSnsHostUrl(value: string, region: string): URL | null {
@@ -150,7 +162,9 @@ export function parseSubscribeUrl(value: string, config: SnsConfiguration, token
   return url;
 }
 
-export type SnsFetch = (url: string, init: { redirect: "error"; signal: AbortSignal; headers: Record<string, string> }) => Promise<Pick<Response, "ok" | "status" | "text">>;
+type SnsResponse = Pick<Response, "ok" | "status" | "text"> & { body?: Pick<ReadableStream, "cancel"> | null };
+
+export type SnsFetch = (url: string, init: { redirect: "error"; signal: AbortSignal; headers: Record<string, string> }) => Promise<SnsResponse>;
 
 export type SnsVerifierDependencies = {
   /** Fetches the signing certificate PEM from an already validated URL. Tests supply their own. */
@@ -159,27 +173,111 @@ export type SnsVerifierDependencies = {
 };
 
 const certificateCache = new Map<string, { pem: string; at: number }>();
+/** A URL that failed, remembered briefly so a flood of requests cannot make this process call AWS for each one. */
+const certificateFailures = new Map<string, { at: number; permanent: boolean }>();
+/** One request per URL at a time: concurrent verifications share the same fetch. */
+const certificateInFlight = new Map<string, Promise<string>>();
 
-/** Test hook: forget every cached certificate. */
+/** Test hook: forget every cached certificate, failure and in-flight request. */
 export function resetSnsCertificateCache() {
   certificateCache.clear();
+  certificateFailures.clear();
+  certificateInFlight.clear();
+}
+
+/** Adds to a bounded map, evicting the oldest entry (never clearing the rest). */
+function remember<V>(map: Map<string, V>, key: string, value: V) {
+  map.delete(key);
+  map.set(key, value);
+  while (map.size > CERTIFICATE_CACHE_LIMIT) {
+    const oldest = map.keys().next().value;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+}
+
+function certificateFailure(permanent: boolean) {
+  return permanent
+    ? new SnsVerificationError("The SNS signing certificate is not available.")
+    : new SnsUnavailableError("The SNS signing certificate could not be fetched right now.");
+}
+
+async function fetchCertificateOnce(url: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(CERTIFICATE_TIMEOUT_MS), headers: { accept: "application/x-pem-file, text/plain" } });
+  } catch {
+    remember(certificateFailures, url, { at: Date.now(), permanent: false });
+    throw certificateFailure(false);
+  }
+  if (!response.ok) {
+    // AWS answering 4xx means this certificate does not exist: the request is invalid (4xx), not something to retry.
+    const permanent = response.status >= 400 && response.status < 500;
+    void response.body?.cancel().catch(() => undefined);
+    remember(certificateFailures, url, { at: Date.now(), permanent });
+    throw certificateFailure(permanent);
+  }
+  let pem: string;
+  try {
+    pem = await response.text();
+  } catch {
+    remember(certificateFailures, url, { at: Date.now(), permanent: false });
+    throw certificateFailure(false);
+  }
+  if (pem.length > CERTIFICATE_MAX_BYTES) {
+    remember(certificateFailures, url, { at: Date.now(), permanent: true });
+    throw new SnsVerificationError("The SNS signing certificate is not valid.");
+  }
+  remember(certificateCache, url, { pem, at: Date.now() });
+  return pem;
 }
 
 async function defaultFetchCertificate(url: string): Promise<string> {
   const cached = certificateCache.get(url);
   if (cached && Date.now() - cached.at < CERTIFICATE_CACHE_MS) return cached.pem;
-  let pem: string;
-  try {
-    const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(CERTIFICATE_TIMEOUT_MS), headers: { accept: "application/x-pem-file, text/plain" } });
-    if (!response.ok) throw new Error(`status ${response.status}`);
-    pem = await response.text();
-  } catch {
-    throw new SnsUnavailableError("The SNS signing certificate could not be fetched right now.");
+  const failed = certificateFailures.get(url);
+  if (failed && Date.now() - failed.at < CERTIFICATE_FAILURE_CACHE_MS) throw certificateFailure(failed.permanent);
+  const running = certificateInFlight.get(url);
+  if (running) return running;
+  const request = fetchCertificateOnce(url).finally(() => certificateInFlight.delete(url));
+  certificateInFlight.set(url, request);
+  return request;
+}
+
+/**
+ * Reads a request body with a hard byte cap, so a public endpoint never buffers more than SNS can send (#863). A
+ * declared `content-length` above the cap is refused with 413 before anything is read; a body that grows past it while
+ * streaming is cut off (the stream is cancelled) and refused the same way; a stream that breaks is a 400.
+ */
+export async function readSnsBody(request: Request, maxBytes: number = SNS_MAX_BODY_BYTES): Promise<string> {
+  const declared = request.headers.get("content-length");
+  if (declared !== null) {
+    const length = Number(declared);
+    if (!Number.isFinite(length) || length < 0) throw new SnsVerificationError("The request length is not valid.");
+    if (length > maxBytes) throw new SnsVerificationError("The SNS message is too large.", 413);
   }
-  if (pem.length > CERTIFICATE_MAX_BYTES) throw new SnsVerificationError("The SNS signing certificate is not valid.");
-  if (certificateCache.size >= CERTIFICATE_CACHE_LIMIT) certificateCache.clear();
-  certificateCache.set(url, { pem, at: Date.now() });
-  return pem;
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let received = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new SnsVerificationError("The SNS message is too large.", 413);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  } catch (error) {
+    if (error instanceof SnsVerificationError) throw error;
+    throw new SnsVerificationError("The request body could not be read.");
+  }
+  return text;
 }
 
 function headerValue(headers: Headers, name: string) {
@@ -223,6 +321,15 @@ export async function verifySnsRequest(
   if (envelope.TopicArn !== config.topicArn) {
     throw new SnsVerificationError("This SNS topic is not allowed.", 403);
   }
+  if (config.minSignatureVersion === "2" && envelope.SignatureVersion !== "2") {
+    throw new SnsVerificationError("SNS signature version 1 is not accepted here.");
+  }
+  const now = (dependencies.now ?? (() => new Date()))();
+  const sentAt = new Date(envelope.Timestamp);
+  if (Number.isNaN(sentAt.getTime())) throw new SnsVerificationError("The SNS timestamp is not valid.");
+  if (now.getTime() - sentAt.getTime() > SNS_MAX_ENVELOPE_AGE_MS || sentAt.getTime() - now.getTime() > SNS_MAX_FUTURE_SKEW_MS) {
+    throw new SnsVerificationError("The SNS message is too old or from the future.");
+  }
   const certificateUrl = parseSigningCertUrl(envelope.SigningCertURL, config.region);
   if (!certificateUrl) throw new SnsVerificationError("The SNS signing certificate address is not allowed.");
   if (envelope.Type !== "Notification" && (!envelope.Token || !envelope.SubscribeURL)) {
@@ -230,7 +337,6 @@ export async function verifySnsRequest(
   }
   const canonical = buildSnsCanonicalString(envelope);
 
-  const now = (dependencies.now ?? (() => new Date()))();
   const pem = await (dependencies.fetchCertificate ?? defaultFetchCertificate)(certificateUrl.toString());
   let certificate: X509Certificate;
   try {
@@ -240,6 +346,10 @@ export async function verifySnsRequest(
   }
   if (now < new Date(certificate.validFrom) || now > new Date(certificate.validTo)) {
     throw new SnsVerificationError("The SNS signing certificate is not valid right now.");
+  }
+  // AWS signs with a certificate for sns.amazonaws.com that Amazon issued. Anything else is not an SNS certificate.
+  if (!certificate.checkHost("sns.amazonaws.com") || !/\bAmazon\b/.test(certificate.issuer)) {
+    throw new SnsVerificationError("The SNS signing certificate is not an Amazon SNS certificate.");
   }
   const signature = Buffer.from(envelope.Signature, "base64");
   const algorithm = envelope.SignatureVersion === "2" ? "RSA-SHA256" : "RSA-SHA1";
@@ -268,12 +378,14 @@ export async function confirmSnsSubscription(
   }
   const url = parseSubscribeUrl(envelope.SubscribeURL ?? "", config, envelope.Token ?? "");
   if (!url) throw new SnsVerificationError("The SNS confirmation address is not allowed.");
-  let response: Pick<Response, "ok" | "status" | "text">;
+  let response: SnsResponse;
   try {
     response = await fetchImpl(url.toString(), { redirect: "error", signal: AbortSignal.timeout(CERTIFICATE_TIMEOUT_MS), headers: { accept: "text/xml" } });
   } catch {
     throw new SnsUnavailableError("The SNS subscription could not be confirmed right now.");
   }
+  // The answer is never read: release the connection.
+  await response.body?.cancel().catch(() => undefined);
   if (!response.ok) throw new SnsUnavailableError("The SNS subscription could not be confirmed right now.");
 }
 

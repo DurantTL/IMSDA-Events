@@ -52,8 +52,12 @@ function request(body: unknown, type = "Notification") {
   });
 }
 
+/** Signed now, because the route checks the envelope's age against the real clock. */
+const sign = (options: Parameters<typeof signedSnsEnvelope>[1] = {}) =>
+  signedSnsEnvelope(certificate.privateKey, { timestamp: new Date().toISOString(), ...options });
+
 const notification = (overrides: Parameters<typeof signedSnsEnvelope>[1] = {}) =>
-  signedSnsEnvelope(certificate.privateKey, { message: sesNotificationMessage({ type: "Delivery" }), ...overrides });
+  sign({ message: sesNotificationMessage({ type: "Delivery" }), ...overrides });
 
 describe("POST /api/webhooks/ses (#863)", () => {
   it("records a verified delivery event keyed by the SNS MessageId", async () => {
@@ -101,6 +105,60 @@ describe("POST /api/webhooks/ses (#863)", () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain("https://evil.example.test/SimpleNotificationService-abc.pem");
   });
 
+  it("refuses an oversized body with 413 from content-length alone, reading none of it", async () => {
+    const response = await POST(new Request("https://events.imsda.test/api/webhooks/ses", {
+      method: "POST",
+      headers: { "x-amz-sns-message-type": "Notification", "content-length": String(256 * 1024 + 1) },
+      body: "{}",
+    }));
+    expect(response.status).toBe(413);
+    expect(mocks.record).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("cuts off a body that streams past the cap, whatever it declared, with 413", async () => {
+    const chunk = new Uint8Array(64 * 1024).fill(120);
+    let pulled = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+        if (pulled > 200) controller.close();
+      },
+      cancel() { cancelled = true; },
+    });
+    const response = await POST(new Request("https://events.imsda.test/api/webhooks/ses", {
+      method: "POST",
+      headers: { "x-amz-sns-message-type": "Notification" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit));
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    // Stopped soon after the cap (256 KB is four 64 KB chunks), not after draining the whole stream.
+    expect(pulled).toBeLessThan(20);
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it("answers a broken upload with a clean 400", async () => {
+    const stream = new ReadableStream<Uint8Array>({ pull() { throw new Error("connection reset"); } });
+    const response = await POST(new Request("https://events.imsda.test/api/webhooks/ses", {
+      method: "POST",
+      headers: { "x-amz-sns-message-type": "Notification" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit));
+    expect(response.status).toBe(400);
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it("answers 4xx, not 503, when AWS says the signing certificate does not exist", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+    const response = await POST(request(notification()));
+    expect(response.status).toBe(400);
+  });
+
   it("returns 503 when the topic and account are not configured", async () => {
     delete process.env.SES_SNS_TOPIC_ARN;
     delete process.env.SES_AWS_ACCOUNT_ID;
@@ -124,7 +182,7 @@ describe("POST /api/webhooks/ses (#863)", () => {
   });
 
   it("confirms the subscription of the allowed topic with one request to its own SubscribeURL", async () => {
-    const envelope = signedSnsEnvelope(certificate.privateKey, { type: "SubscriptionConfirmation" });
+    const envelope = sign({ type: "SubscriptionConfirmation" });
     const response = await POST(request(envelope, "SubscriptionConfirmation"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ confirmed: true });
@@ -134,7 +192,7 @@ describe("POST /api/webhooks/ses (#863)", () => {
   });
 
   it("refuses a signed confirmation that points anywhere else, and fetches nothing for it", async () => {
-    const envelope = signedSnsEnvelope(certificate.privateKey, {
+    const envelope = sign({
       type: "SubscriptionConfirmation",
       subscribeUrl: "https://evil.example.test/?Action=ConfirmSubscription",
     });
@@ -144,7 +202,7 @@ describe("POST /api/webhooks/ses (#863)", () => {
   });
 
   it("acknowledges an UnsubscribeConfirmation without following anything", async () => {
-    const envelope = signedSnsEnvelope(certificate.privateKey, { type: "UnsubscribeConfirmation" });
+    const envelope = sign({ type: "UnsubscribeConfirmation" });
     const response = await POST(request(envelope, "UnsubscribeConfirmation"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ignored: true });

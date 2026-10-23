@@ -286,10 +286,14 @@ export function normalizeSesMessageId(value: string | null | undefined): string 
   return /^[A-Za-z0-9._-]{1,200}$/.test(bare) ? bare : null;
 }
 
-export function messageIdFromResponse(response: string | undefined, fallback: string | undefined) {
-  // SES answers `250 Ok <id>`.
-  const match = /^250\s+Ok\s+([A-Za-z0-9._-]+)/i.exec(response?.trim() ?? "");
-  return match?.[1] ?? fallback?.replace(/^<|>$/g, "") ?? null;
+/**
+ * The SES message id from the SMTP reply (`250 Ok <id>`), normalized, or null when the reply carries none. There is no
+ * fallback to nodemailer's own `Message-ID` (the one this app generated): it is not an id SES will ever report, so
+ * storing it would only look matchable. A message SES accepted without an id is stored with a null provider message id.
+ */
+export function messageIdFromResponse(response: string | undefined) {
+  const match = /^250\s+Ok\s+(\S+)/i.exec(response?.trim() ?? "");
+  return normalizeSesMessageId(match?.[1]);
 }
 
 export async function sendEmailWithSes(
@@ -328,11 +332,8 @@ export async function sendEmailWithSes(
   } finally {
     if (!options.transport) (transport as { close?: () => void }).close?.();
   }
-  const providerMessageId = messageIdFromResponse(info.response, info.messageId);
-  if (!providerMessageId) {
-    throw new EmailProviderRequestError("The email provider did not accept this message.", "SES_NO_MESSAGE_ID", false, 0);
-  }
-  return { provider: "SES", providerMessageId };
+  // SES accepted the message (no error was thrown). Its id is recorded when the reply carries one; otherwise null.
+  return { provider: "SES", providerMessageId: messageIdFromResponse(info.response) };
 }
 
 /**
