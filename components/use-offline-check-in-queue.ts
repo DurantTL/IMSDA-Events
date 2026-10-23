@@ -276,7 +276,7 @@ export function useOfflineCheckInQueue({
       }));
       return {
         status: "QUEUED",
-        message: "Not saved on the server yet. It stays on this device and retries on its own; tap Retry to try now.",
+        message: "Saved on this device, not confirmed by the server yet. It retries on its own; tap Retry to try now.",
       };
     } finally {
       processingRef.current.delete(item.idempotencyKey);

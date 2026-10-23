@@ -252,8 +252,9 @@ export default async function OperationalReportsPage({
                 <h2>Sterling Volunteers needed</h2>
                 <p>
                   Adults registered: {backgroundFlags.adults}. Not in compliance with Sterling Volunteers through
-                  {" "}{backgroundFlags.lastDay}: {backgroundFlags.people.length}. Registration and check-in aren&apos;t blocked;
-                  follow up before the event. Clubs never see this list.
+                  {" "}{backgroundFlags.lastDay}: {backgroundFlags.people.length}. Registration stays open. At this event, adult and staff check-in is held until
+                  Sterling Volunteers is current; a staff member with check-in permission can override with a recorded reason.
+                  Follow up before the event. Clubs never see this list.
                 </p>
               </div>
             </div>
