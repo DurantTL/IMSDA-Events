@@ -9,9 +9,10 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { localCalendarDate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import type { PublicRegistrationStepId } from "@/modules/forms/public-registration-steps";
 import { duplicatePublicFormGroups } from "@/modules/forms/duplicate-public-forms";
+import { noInformationIssues, type InformationIssueMap } from "./information-mode";
 import { type PreviewValue, type DragState, moduleCategories, type PreviewAttendee, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 
-export function useBuilderState({ initialForms, templates: initialTemplates = [], focusTarget = null }: Pick<BuilderWorkspaceProps, "initialForms"> & Partial<Pick<BuilderWorkspaceProps, "focusTarget" | "templates">>) {
+export function useBuilderState({ initialForms, templates: initialTemplates = [], focusTarget = null, information = null }: Pick<BuilderWorkspaceProps, "initialForms"> & Partial<Pick<BuilderWorkspaceProps, "focusTarget" | "templates">> & { information?: BuilderWorkspaceProps["information"] | null }) {
   const [forms, setForms] = useState(initialForms);
   // The picker's templates; refreshed after a save as template so a second save names the current version (#1065).
   const [templates, setTemplates] = useState(initialTemplates);
@@ -41,7 +42,9 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setSeenDirty(dirty);
     if (!dirty) setAutoKeyFieldIds(new Set());
   }
-  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | "dismiss-notice" | "save-template" | "restore" | null>(null);
+  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | "dismiss-notice" | "save-template" | "restore" | "settings" | "status" | null>(null);
+  // Information mode (#1149): the server's refusal of the last save or publish, by where it applies. Replaced on every attempt.
+  const [informationIssues, setInformationIssues] = useState<InformationIssueMap>(noInformationIssues);
   const [notice, setNotice] = useState("");
   // Fields the builder just turned into a choice field that defaulted to radio cards (FB-9).
   const [autoRadioFieldIds, setAutoRadioFieldIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -111,7 +114,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
+  return { information, informationIssues, setInformationIssues, history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;

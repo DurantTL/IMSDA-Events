@@ -79,8 +79,10 @@ export function PaletteList({ snapshot, query, openGroups, onToggleGroup, onAdd,
   );
 }
 
-export function BuilderPalette({ registry = paletteRegistry, searchRef, steps, targetIndex, onTargetChange, onAdd, onDragStart, onDragEnd, disabled }: {
+export function BuilderPalette({ registry = paletteRegistry, searchRef, steps, targetIndex, onTargetChange, onAdd, onDragStart, onDragEnd, disabled, searchPlaceholder = "Name, email, roster, meals…" }: {
   registry?: PaletteRegistry;
+  /** What the search box suggests; information mode (#1149) has no roster or meals. */
+  searchPlaceholder?: string;
   searchRef?: Ref<HTMLInputElement>;
   /** The form's steps, for "Add to step". */
   steps: Array<{ id: string; title: string }>;
@@ -122,7 +124,7 @@ export function BuilderPalette({ registry = paletteRegistry, searchRef, steps, t
             type="search"
             autoComplete="off"
             name="builder-rb-palette-search"
-            placeholder="Name, email, roster, meals…"
+            placeholder={searchPlaceholder}
             value={query}
             disabled={disabled}
             onChange={(event) => setQuery(event.target.value)}

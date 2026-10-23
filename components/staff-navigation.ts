@@ -15,6 +15,7 @@ import {
   MessagesSquare,
   MoreHorizontal,
   PanelsTopLeft,
+  ClipboardPen,
   Settings2,
   ShieldCheck,
   ShoppingBag,
@@ -202,6 +203,8 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/lodging", "prefix", staffPageTitles.lodging],
   ["/more/issued-assets", "prefix", staffPageTitles.issuedAssets],
   ["/communications/scheduled", "prefix", staffPageTitles.scheduledEmails],
+  // An event's information forms (#1149) sit in the event workspace but are not a nav item: the More launcher reaches them.
+  ["/information-forms", "prefix", "Information forms"],
   ["/more/program-assignments/", "under", staffPageTitles.assignmentRoster],
   ["/more/program-assignments", "exact", staffPageTitles.programAssignments],
 ];
@@ -555,6 +558,7 @@ export function buildMoreDirectoryCards({
     { key: "lodging", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/lodging${eventQuery}`, icon: BedDouble, title: "Lodging", description: "See rooms, beds and sites night by night, set capacity, mark units unavailable, and place holds.", cta: "Open lodging" },
     { key: "issued-assets", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/issued-assets${eventQuery}`, icon: KeyRound, title: "Issued assets", description: "Set up keys, keycards, wristbands and welcome packets, add numbered ranges like K-201 to K-260, and see what is in stock.", cta: "Set up assets" },
     { key: "registration-builder", group: "setup", allowed: has("MANAGE_FORMS"), href: `/registration-builder${eventQuery}`, icon: PanelsTopLeft, title: "Registration forms", description: "Build, test, and publish the form people use to register.", cta: "Open form builder" },
+    { key: "information-forms", group: "setup", allowed: has("MANAGE_FORMS"), href: `/information-forms${eventQuery}`, icon: ClipboardPen, title: "Information forms", description: "Build surveys and interest forms that gather answers only, with no registration or payment.", cta: "Open information forms" },
     { key: "program-assignments", group: "setup", allowed: canManageProgramAssignments(permissions), href: `/more/program-assignments${eventQuery}`, icon: ListChecks, title: "Seminar assignments", description: "Turn attendee rankings and room limits into reviewed, printable session rosters.", cta: "Preview assignments" },
     { key: "event-content", group: "content-sales", allowed: has("CONFIGURE_EVENT"), href: `/more/event-content${eventQuery}`, icon: FileText, title: "Public content", description: "Speaker bios, seminar descriptions, lodging, schedules, and downloads shown publicly.", cta: "Edit page" },
     { key: "merchandise", group: "content-sales", allowed: has("CONFIGURE_EVENT"), href: `/more/merchandise${eventQuery}`, icon: ShoppingBag, title: "Merchandise", description: "Add products, set artwork and pricing, and control what's available at registration.", cta: "Open merchandise" },

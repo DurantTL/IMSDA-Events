@@ -8,6 +8,7 @@ import { recordTemplateCleanupCreated } from "@/components/template-cleanup-chec
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 import { clearHistory } from "./edit-history";
 import { runPublishFlow } from "./publish-flow";
+import { useInformationActions } from "./use-information-actions";
 import { canRestoreVersion, restoreConfirmation, restoreNotice, restoreSaveTarget } from "./version-history";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderState } from "./use-builder-state";
@@ -34,6 +35,9 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     }
     if (message) setNotice(message);
   }
+
+  // Information mode (#1149) has its own save, publish and restore against the information-forms API; the rest below is the registration builder's.
+  const info = useInformationActions(state, derived, askConfirm, syncForm);
 
   async function createFromTemplate(templateKey: string, templateVersionId?: string | null) {
     setBusy("create"); setError(""); setNotice("");
@@ -89,6 +93,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   }
 
   async function saveDraft() {
+    if (state.information) return info.saveInformationDraft();
     if (!selectedForm || !selectedVersion || !definition) return;
     setBusy("save"); setError(""); setNotice("");
     try {
@@ -104,7 +109,8 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   }
 
   async function runTest() {
-    if (!selectedForm || !selectedVersion) return;
+    // An information form has no test submission (#1149).
+    if (state.information || !selectedForm || !selectedVersion) return;
     if (dirty) { setError("Save the draft before running a test submission."); return; }
     setBusy("test"); setError(""); setNotice(""); setTestIssues([]);
     try {
@@ -171,6 +177,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   const publishingRef = useRef(false);
 
   async function publish() {
+    if (state.information) return info.publishInformation();
     if (!selectedForm || !selectedVersion || !definition) return;
     if (publishingRef.current) return;
     publishingRef.current = true;
@@ -226,6 +233,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   // Restore as draft (#1140): the old version's definition goes through the same draft save as an edit, so validation,
   // price sync, policy checks, MANAGE_FORMS and the expectedUpdatedAt stale-save rule are the server's, unchanged.
   async function restoreVersion(version: FormVersionView) {
+    if (state.information) return info.restoreInformationVersion(version);
     if (!selectedForm || !canRestoreVersion(version)) return;
     const { draft, expectedUpdatedAt } = restoreSaveTarget(selectedForm.versions);
     if (!expectedUpdatedAt) return;
@@ -251,5 +259,5 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore this version."); setFocusRequest({ kind: "restore-button", versionId: version.id }); }
     finally { setBusy(null); }
   }
-  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion, restoreVersion };
+  return { saveInformationSettings: info.saveInformationSettings, setInformationStatus: info.setInformationStatus, createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion, restoreVersion };
 }

@@ -12627,6 +12627,22 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-canvas { padding: 16px; }
 }
 
+/* Information forms (#1149): the builder's information mode and the forms list. New rules only. */
+.fb-info-issues { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--danger-line, #e3b8b1); border-left: 5px solid var(--danger, #8f3a30); border-radius: 8px; background: var(--danger-soft, #fdf4f2); color: var(--ink); }
+.fb-info-issues-title { margin: 0 0 4px; color: var(--danger, #8f3a30); font-size: 0.875rem; font-weight: 700; }
+.fb-info-issues ul { margin: 0; padding-left: 20px; font-size: 0.875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.fb-info-settings, .fb-info-status, .fb-info-link { display: grid; gap: 12px; }
+.fb-info-access { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.fb-info-access .fb-option { align-items: flex-start; padding: 10px 12px; height: auto; }
+.fb-info-access .fb-option span { display: grid; gap: 2px; }
+.fb-info-access .fb-option small { color: var(--muted); }
+.fb-info-dates { align-items: end; }
+.fb-info-status-line { margin: 0; }
+.fb-info-path { display: inline-block; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.fb-info-preview-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.information-forms-home .information-forms-new { max-width: 520px; margin-top: 12px; }
+.information-forms-home code { overflow-wrap: anywhere; }
+
 /* Information forms (#1150): public fill page and staff responses view. */
 .information-form-fill input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
 .information-form-fill select { min-height: 44px; }

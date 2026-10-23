@@ -7,9 +7,16 @@ import { canRedo, canUndo } from "./edit-history";
 import { statusLabel } from "./builder-types";
 import { useLoadedBuilder, useBuilder } from "./builder-context";
 import { versionStateChips, type VersionChipKind } from "./version-state";
+import { informationPublicPath } from "./information-mode";
+import { InformationFormIssues } from "./builder-information-issues";
 
 export function BuilderPageIntro() {
-  const { selectedForm, definition, busy, setShowTemplates, showDraftTemplates, setShowDraftTemplates, showPreview, eventName, canSaveAsTemplate, showSaveTemplate, setShowSaveTemplate } = useBuilder();
+  const { selectedForm, definition, busy, setShowTemplates, showDraftTemplates, setShowDraftTemplates, showPreview, eventName, canSaveAsTemplate, showSaveTemplate, setShowSaveTemplate, information } = useBuilder();
+  if (information) {
+    return (
+      <div className="page-intro"><div><p className="eyebrow">Information form</p><h2 className="duplicate-page-title">Information form builder</h2><p>Build, preview and publish a survey, interest or post-event form for {information.ownerLabel}. It gathers answers only: no registration, roster, meals or payment.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview</button>}</div></div>
+    );
+  }
   return (
     <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button>{selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowDraftTemplates((value) => !value)} aria-expanded={showDraftTemplates}><Layers3 size={16} /> Update draft from a template</button>}{canSaveAsTemplate && selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowSaveTemplate((value) => !value)} aria-expanded={showSaveTemplate}><BookmarkPlus size={16} /> Save as template</button>}</div></div>
   );
@@ -50,8 +57,9 @@ export function BuilderUndoRedo() {
 }
 
 export function BuilderPublicLink({ className = "secondary-button" }: { className?: string }) {
-  const { selectedForm, publishedVersion, eventSlug } = useLoadedBuilder();
-  return publishedVersion ? <a className={className} href={`/register/${eventSlug}/${selectedForm.slug}`} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open public form</a> : <button className={className} type="button" disabled title="Publish this form to create its public link"><ExternalLink size={15} /> Open public form</button>;
+  const { selectedForm, publishedVersion, eventSlug, information } = useLoadedBuilder();
+  const publicPath = information ? informationPublicPath(information, selectedForm.slug) : `/register/${eventSlug}/${selectedForm.slug}`;
+  return publishedVersion ? <a className={className} href={publicPath} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open public form</a> : <button className={className} type="button" disabled title="Publish this form to create its public link"><ExternalLink size={15} /> Open public form</button>;
 }
 
 /**
@@ -71,9 +79,9 @@ export function BuilderPublishButton({ className = "primary-button" }: { classNa
 
 /** Why Save or Publish is unavailable, and what a live version means for edits. Both layouts point `aria-describedby` at it. */
 export function BuilderActionHints() {
-  const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, hasEverPublished, editsCreateDraft } = useLoadedBuilder();
+  const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, hasEverPublished, editsCreateDraft, information } = useLoadedBuilder();
   return (
-    <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Publish changes to save and publish your edits, or Save as new draft to keep them unpublished; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && !hasEverPublished && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
+    <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Publish changes to save and publish your edits, or Save as new draft to keep them unpublished; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} {information ? "Answers already received keep the version they were given under." : "Existing registrations keep the version they were submitted under."}</p>}{!information && selectedVersion.status === "DRAFT" && dirty && !hasEverPublished && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{!information && selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
   );
 }
 
@@ -100,6 +108,6 @@ export function BuilderHistoricalGate() {
 export function BuilderEditorHead() {
   const { selectedVersion, definition, dirty, canEdit, replaceDefinition } = useLoadedBuilder();
   return (
-    <section className="panel builder-editor-head"><div className="builder-status-row"><span className={`status-chip ${selectedVersion.status === "PUBLISHED" ? "green" : selectedVersion.status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(selectedVersion.status)}</span><span>Version {selectedVersion.versionNumber}</span>{dirty && <span className="unsaved-dot">Unsaved changes</span>}</div><label>Form title<input autoComplete="off" name="builder-rb-field-1" disabled={!canEdit} value={definition.title} maxLength={120} onChange={(event) => replaceDefinition({ ...definition, title: event.target.value })} /></label><label>Description<textarea autoComplete="off" name="builder-rb-note-2" disabled={!canEdit} value={definition.description} maxLength={500} rows={2} onChange={(event) => replaceDefinition({ ...definition, description: event.target.value })} /></label><div className="builder-actions"><BuilderSaveDraftButton /><BuilderPublicLink /><BuilderPublishButton /></div><BuilderActionHints /><BuilderHistoricalGate /></section>
+    <section className="panel builder-editor-head"><div className="builder-status-row"><span className={`status-chip ${selectedVersion.status === "PUBLISHED" ? "green" : selectedVersion.status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(selectedVersion.status)}</span><span>Version {selectedVersion.versionNumber}</span>{dirty && <span className="unsaved-dot">Unsaved changes</span>}</div><label>Form title<input autoComplete="off" name="builder-rb-field-1" disabled={!canEdit} value={definition.title} maxLength={120} onChange={(event) => replaceDefinition({ ...definition, title: event.target.value })} /></label><label>Description<textarea autoComplete="off" name="builder-rb-note-2" disabled={!canEdit} value={definition.description} maxLength={500} rows={2} onChange={(event) => replaceDefinition({ ...definition, description: event.target.value })} /></label><div className="builder-actions"><BuilderSaveDraftButton /><BuilderPublicLink /><BuilderPublishButton /></div><InformationFormIssues /><BuilderActionHints /><BuilderHistoricalGate /></section>
   );
 }

@@ -29,7 +29,17 @@ export function hasCapacity(field: RegistrationFormField) {
   return Object.keys(field.choiceLimits ?? {}).length > 0;
 }
 
-export function deriveFieldChips(field: RegistrationFormField, sectionTitle = ""): FieldChip[] {
+/**
+ * In information mode (#1149) a question is never priced, limited, per person or sensitive, and comes from no module's
+ * price plan, so only Required and Has logic describe it.
+ */
+export function deriveFieldChips(field: RegistrationFormField, sectionTitle = "", { information = false }: { information?: boolean } = {}): FieldChip[] {
+  if (information) {
+    const chips: FieldChip[] = [];
+    if (field.required) chips.push({ kind: "required", label: "Required" });
+    if (field.conditional) chips.push({ kind: "logic", label: "Has logic" });
+    return chips;
+  }
   const chips: FieldChip[] = [{ kind: "scope", label: field.scope === "ATTENDEE" ? "Asked of each person" : "Asked once" }];
   if (field.required || field.optionSource === "ATTENDEE_TYPES") chips.push({ kind: "required", label: "Required" });
   if (field.conditional) chips.push({ kind: "logic", label: "Has logic" });

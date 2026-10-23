@@ -6,11 +6,12 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import { BuilderFieldRow } from "./builder-field-row";
 import { BuilderFieldList } from "./builder-field-list";
 import { useLoadedBuilder } from "./builder-context";
+import { InformationSectionIssues } from "./builder-information-issues";
 
 // The step's own settings: title, description, progress label, final-review toggle, reorder and remove.
 // The editor shell (#1132) shows the same block behind each step's "Step settings" button.
 export function BuilderSectionHead({ section, sectionIndex }: { section: RegistrationFormDefinition["sections"][number]; sectionIndex: number }) {
-  const { definition, setDragging, canEdit, updateSection, moveSection, setReviewSection, openRemoveSection } = useLoadedBuilder();
+  const { definition, setDragging, canEdit, updateSection, moveSection, setReviewSection, openRemoveSection, information } = useLoadedBuilder();
   return (
           <div className="builder-section-head">
             <span className="section-number">{sectionIndex + 1}</span>
@@ -20,7 +21,7 @@ export function BuilderSectionHead({ section, sectionIndex }: { section: Registr
               <textarea autoComplete="off" name="builder-rb-note-6" aria-label={`Section ${sectionIndex + 1} description`} className="section-description-input" rows={2} disabled={!canEdit} value={section.description} maxLength={500} placeholder="Optional section description" onChange={(event) => updateSection(sectionIndex, { description: event.target.value })} />
               <div className="builder-step-settings">
                 <label>Progress label<input autoComplete="off" name="builder-rb-field-7" aria-label={`Step ${sectionIndex + 1} progress label`} disabled={!canEdit} value={section.stepLabel ?? section.title.slice(0, 40)} maxLength={40} onChange={(event) => updateSection(sectionIndex, { stepLabel: event.target.value })} /></label>
-                <label className="builder-review-toggle"><input disabled={!canEdit} type="checkbox" checked={isPublicReviewSection(definition, section)} onChange={(event) => setReviewSection(sectionIndex, event.target.checked)} /> Final review and payment step</label>
+                {!information && <label className="builder-review-toggle"><input disabled={!canEdit} type="checkbox" checked={isPublicReviewSection(definition, section)} onChange={(event) => setReviewSection(sectionIndex, event.target.checked)} /> Final review and payment step</label>}
               </div>
             </div>
             {canEdit && <div className="section-actions">
@@ -47,6 +48,7 @@ export function BuilderSectionCard({ section, sectionIndex }: { section: Registr
           }}
         >
           <BuilderSectionHead section={section} sectionIndex={sectionIndex} />
+          <InformationSectionIssues sectionId={section.id} />
           <div className="builder-fields">{section.fields.map((field, fieldIndex) => <BuilderFieldRow key={field.id} section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />)}</div>
           <BuilderFieldList section={section} sectionIndex={sectionIndex} />
     </section>

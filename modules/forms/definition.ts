@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
@@ -724,7 +725,7 @@ export function isBlankFormTemplateKey(key: string) {
  * On a church-billed event (#606) a template that collects card payment is
  * left out too: a deferred-billing event refuses a form with payment enabled.
  */
-export function templatesForPicker<T extends { key: string; name: string; collectsPayment?: boolean }>(
+export function templatesForPicker<T extends { key: string; name: string; collectsPayment?: boolean; audience?: string }>(
   templates: T[],
   eventAudience: string | null | undefined,
   billingMode?: string | null,
@@ -732,7 +733,8 @@ export function templatesForPicker<T extends { key: string; name: string; collec
   const blankKey = blankFormTemplateKey(eventAudience);
   const blank = templates.find((template) => template.key === blankKey);
   const churchBilled = billingMode === "DEFERRED_ORGANIZATION_INVOICE";
-  const rest = templates.filter((template) => !isBlankFormTemplateKey(template.key) && !(churchBilled && template.collectsPayment));
+  // Information form templates (#1149) are for the information form builder, never a registration form.
+  const rest = templates.filter((template) => !isBlankFormTemplateKey(template.key) && !(churchBilled && template.collectsPayment) && !isInformationTemplateAudience(template.audience));
   return blank ? [{ ...blank, name: "Blank form" }, ...rest] : rest;
 }
 
