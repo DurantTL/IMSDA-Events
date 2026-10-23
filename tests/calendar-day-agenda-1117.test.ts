@@ -7,6 +7,7 @@ import {
   formatLongDate,
   itemsOnDate,
   parseDateParam,
+  resolveMonthAndDate,
   type CalendarItem,
 } from "@/modules/calendar/domain";
 
@@ -55,6 +56,21 @@ describe("calendar day agenda (#1117)", () => {
   });
 });
 
+describe("month and date resolution (#1117)", () => {
+  it("opens an adjacent-month date on its own month", () => {
+    expect(resolveMonthAndDate("month", "2027-04", "2027-05-01", today)).toEqual({ selectedDate: "2027-05-01", month: { year: 2027, month: 5 } });
+  });
+  it("lets the date win over a mismatched month", () => {
+    expect(resolveMonthAndDate("month", "2027-09", "2027-04-24", today).month).toEqual({ year: 2027, month: 4 });
+  });
+  it("shows no panel for a date beyond five years and keeps the month param", () => {
+    expect(resolveMonthAndDate("month", "2027-06", "2040-01-01", today)).toEqual({ selectedDate: undefined, month: { year: 2027, month: 6 } });
+  });
+  it("ignores the date in list view", () => {
+    expect(resolveMonthAndDate("list", undefined, "2027-04-24", today).selectedDate).toBeUndefined();
+  });
+});
+
 describe("calendar page wiring (#1117)", () => {
   const page = readFileSync(path.join(process.cwd(), "app/(public)/calendar/page.tsx"), "utf8");
   const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
@@ -76,6 +92,6 @@ describe("calendar page wiring (#1117)", () => {
   it("keeps the phone dots decorative and gives the day link a 44px target", () => {
     expect(chip).toContain('"aria-hidden": true');
     expect(chip).toContain("tabIndex: -1");
-    expect(css).toMatch(/\.calendar-day-link \{ width: 44px; height: 44px;/);
+    expect(css).toMatch(/\.calendar-day-link \{ width: 100%; min-height: 44px;/);
   });
 });
