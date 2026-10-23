@@ -154,6 +154,23 @@ export function itemsOnDate(items: CalendarItem[], date: string) {
   return items.filter((item) => item.startsOn <= date && item.endsOn >= date);
 }
 
+/** The `date` query value: a real calendar date within the month span, else undefined (the day detail is simply not shown). */
+export function parseDateParam(value: string | undefined, today: string): string | undefined {
+  if (!value || !isCalendarDate(value)) return undefined;
+  const month = parseMonthParam(value.slice(0, 7), today);
+  return monthKey(month) === value.slice(0, 7) ? value : undefined;
+}
+
+/** "April 24, 2027". */
+export function formatLongDate(date: string) {
+  return formatDateRange(date, date);
+}
+
+/** "1 event", "5 events": the count is always words, never colour. */
+export function calendarCountLabel(count: number) {
+  return `${count} ${count === 1 ? "event" : "events"}`;
+}
+
 export function itemsOverlapping(items: CalendarItem[], from: string, to: string) {
   return sortCalendarItems(items.filter((item) => item.startsOn <= to && item.endsOn >= from));
 }
