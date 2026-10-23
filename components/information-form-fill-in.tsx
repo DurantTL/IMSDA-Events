@@ -95,7 +95,8 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
                   onBlur={() => setTouched((current) => ({ ...current, [field.key]: true }))}
                   onChange={(value) => {
                     setAnswers((current) => ({ ...current, [field.key]: value }));
-                    setTouched((current) => ({ ...current, [field.key]: true }));
+                    // Editing clears the server's message for this field; format errors still wait for blur.
+                    setIssues((current) => current.filter((issue) => issue.key !== field.key));
                   }}
                   problem={problemFor(field)}
                   value={answers[field.key]}
