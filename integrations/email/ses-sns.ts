@@ -211,8 +211,9 @@ async function fetchCertificateOnce(url: string): Promise<string> {
     throw certificateFailure(false);
   }
   if (!response.ok) {
-    // AWS answering 4xx means this certificate does not exist: the request is invalid (4xx), not something to retry.
-    const permanent = response.status >= 400 && response.status < 500;
+    // AWS answering 403/404/410 means this certificate does not exist: the request is invalid, not something to retry.
+    // Throttling (429), timeouts (408) and everything else are a 503 so SNS retries instead of dropping the message.
+    const permanent = response.status === 403 || response.status === 404 || response.status === 410;
     void response.body?.cancel().catch(() => undefined);
     remember(certificateFailures, url, { at: Date.now(), permanent });
     throw certificateFailure(permanent);

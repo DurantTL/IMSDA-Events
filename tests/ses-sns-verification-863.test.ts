@@ -425,7 +425,7 @@ describe("fetching the signing certificate (#863 review)", () => {
   });
   const stub = () => { resetSnsCertificateCache(); vi.stubGlobal("fetch", fetchMock); };
 
-  it("treats a 4xx from AWS as an invalid message and remembers the failure for five minutes", async () => {
+  it("treats a 404 from AWS as an invalid message and remembers the failure for five minutes", async () => {
     stub();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(now);
@@ -446,6 +446,14 @@ describe("fetching the signing certificate (#863 review)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     fetchMock.mockImplementation(async () => { throw new Error("network down"); });
     await expect(run(3)).rejects.toBeInstanceOf(SnsUnavailableError);
+  });
+
+  it("treats AWS throttling (429) or a timeout (408) as retryable, not as an invalid message", async () => {
+    stub();
+    fetchMock.mockImplementation(async () => new Response("", { status: 429 }));
+    await expect(run(5)).rejects.toBeInstanceOf(SnsUnavailableError);
+    fetchMock.mockImplementation(async () => new Response("", { status: 408 }));
+    await expect(run(6)).rejects.toBeInstanceOf(SnsUnavailableError);
   });
 
   it("shares one in-flight request per URL, and caches a good certificate", async () => {

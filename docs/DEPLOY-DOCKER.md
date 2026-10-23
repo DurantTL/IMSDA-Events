@@ -347,9 +347,11 @@ for the topic's own region; carry the topic in `SES_SNS_TOPIC_ARN`; have a
 `Timestamp` no more than 7 days old (SNS's longest retry window) and not more
 than 5 minutes in the future; and, for a notification, name the account in
 `SES_AWS_ACCOUNT_ID` as the sender. A certificate address that AWS answers with
-a 4xx is treated as an invalid message (4xx); a 5xx or a network failure is a
-503 so SNS retries. Failed certificate lookups are remembered for five minutes
-so a flood of bad requests cannot make the app call AWS for each one. Responses: `200` recorded, a duplicate, or
+a 403, 404 or 410 is treated as an invalid message (400); any other error,
+including throttling, or a network failure is a 503 so SNS retries. Failed
+certificate lookups are remembered for five minutes, so repeating the same bad
+certificate address does not make the app call AWS again. Certificate addresses
+can only point at AWS's own SNS host. Responses: `200` recorded, a duplicate, or
 a notification the app does not act on; `400`/`403`/`413` the request is not
 valid, too large or not allowed (SNS stops retrying it); `503` not configured, or AWS could
 not be reached to check the signature (SNS retries); `500` storing the report
