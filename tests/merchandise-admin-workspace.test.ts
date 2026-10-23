@@ -44,13 +44,12 @@ describe("merchandise admin workspace accessibility", () => {
     expect(workspaceSource).toContain('role="dialog"');
     expect(workspaceSource).toContain('aria-modal="true"');
 
-    expect(workspaceSource).toContain('aria-labelledby="variant-editor-title"');
-    expect(workspaceSource).toContain('id="variant-editor-title"');
-    expect(workspaceSource).toContain('aria-labelledby="merchandise-editor-title"');
-    expect(workspaceSource).toContain('id="merchandise-editor-title"');
+    // Both editors share EditorDialog, which wires aria-labelledby to its own heading id.
+    expect(workspaceSource).toContain("aria-labelledby={titleId}");
+    expect(workspaceSource).toContain("<h2 id={titleId}>");
 
-    expect(workspaceSource).toContain('aria-label="Close variant editor"');
-    expect(workspaceSource).toContain('aria-label="Close product editor"');
+    expect(workspaceSource).toContain('closeLabel="Close variant editor"');
+    expect(workspaceSource).toContain('closeLabel="Close product editor"');
   });
 
   it("keeps every landmark section's heading connected via aria-labelledby so assistive tech can name each region", () => {
@@ -101,5 +100,24 @@ describe("merchandise admin workspace responsive layout", () => {
     const body = smallBreakpoint![1];
     expect(body).toContain(".previewCard { grid-template-columns: 48px minmax(0, 1fr); }");
     expect(body).toContain(".previewCard > img { width: 48px; height: 48px; }");
+  });
+
+  it("ties preview cards to the audience they were evaluated for and ignores stale responses (#1108)", () => {
+    expect(workspaceSource).toContain("previewRequestId.current");
+    expect(workspaceSource).toContain("requestId !== previewRequestId.current");
+    expect(workspaceSource).toContain("preview.audience === previewAudience");
+    expect(workspaceSource).toContain("Preview as…");
+    expect(workspaceSource).toContain("could not be loaded");
+    expect(workspaceSource).toContain("Try again");
+    expect(workspaceSource).not.toContain("integer cents");
+  });
+
+  it("gives both editors the shared accessible dialog and a discard confirmation (#1108)", () => {
+    expect(workspaceSource).toContain("useAccessibleDialog<HTMLElement>(true, onRequestClose)");
+    expect(workspaceSource).toContain('requestCloseEditor("variant")');
+    expect(workspaceSource).toContain('requestCloseEditor("product")');
+    expect(workspaceSource).toContain("Discard your changes?");
+    expect(workspaceSource).toMatch(/if \(saving\) return;\s+if \(editorDirty\)/);
+    expect(workspaceCss).toContain("position: sticky");
   });
 });
