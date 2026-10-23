@@ -76,7 +76,7 @@ export const defaultPaletteGroups: readonly PaletteGroup[] = [
 ];
 
 export type PaletteRegistry = {
-  /** Add an entry. Registering an id that already exists throws, so two features cannot silently replace each other. */
+  /** Add an entry, or replace the one with the same id. Returns a function that removes it again. */
   register: (entry: PaletteEntry) => () => void;
   registerGroup: (group: PaletteGroup) => void;
   unregister: (id: string) => void;
@@ -101,10 +101,14 @@ export function createPaletteRegistry(groups: readonly PaletteGroup[] = defaultP
 
   return {
     register(entry) {
-      if (entries.has(entry.id)) throw new Error(`A palette entry with the id "${entry.id}" is already registered.`);
-      entries.set(entry.id, entry);
-      publish();
-      return () => unregister(entry.id);
+      // Registering an id again replaces the entry in place (hot reload, or a feature registering twice, must not throw);
+      // registering the very same entry again changes nothing. The returned function removes the entry only while it is
+      // still the one registered, so an old cleanup cannot remove its replacement.
+      if (entries.get(entry.id) !== entry) {
+        entries.set(entry.id, entry);
+        publish();
+      }
+      return () => { if (entries.get(entry.id) === entry) unregister(entry.id); };
     },
     registerGroup(group) {
       if (groupList.has(group.id)) return;

@@ -19,6 +19,25 @@ export function clampSidebarWidth(width: number): number {
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)));
 }
 
+/** The layout with the sidebar shown: the same object when it already is, so nothing is written for no change. */
+export function revealSidebar(layout: EditorLayout): EditorLayout {
+  return layout.sidebarVisible ? layout : { ...layout, sidebarVisible: true };
+}
+
+/** The width the sidebar really has: its remembered width, held inside what the page has room for. */
+export function displayedSidebarWidth(width: number, maxWidth: number): number {
+  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(clampSidebarWidth(width), maxWidth));
+}
+
+/** The most the sidebar can be on a page `containerWidth` wide (it may take half), never above the overall maximum. */
+export function maxSidebarWidthFor(containerWidth: number | null): number {
+  if (!containerWidth) return MAX_SIDEBAR_WIDTH;
+  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.floor(containerWidth * SIDEBAR_MAX_SHARE)));
+}
+
+/** The share of the editor's width the sidebar may take; the stylesheet's `max-width` is the same figure. */
+export const SIDEBAR_MAX_SHARE = 0.5;
+
 export function resizeSidebar(layout: EditorLayout, delta: number): EditorLayout {
   return { ...layout, width: clampSidebarWidth(layout.width + delta) };
 }
@@ -78,8 +97,11 @@ export function writeEditorLayout(layout: EditorLayout, storage: LayoutStorage |
 export type EditorLayoutStore = {
   getSnapshot: () => EditorLayout;
   subscribe: (listener: () => void) => () => void;
-  /** Remembers `next` in memory and, when storage allows, in the browser. */
-  set: (next: EditorLayout) => void;
+  /**
+   * Remembers `next` in memory and, when storage allows and `persist` is not false, in the browser.
+   * A drag passes `persist: false` for every move and writes once, when it ends.
+   */
+  set: (next: EditorLayout, persist?: boolean) => void;
   /** Back to the default layout, and forget what was stored. */
   reset: () => void;
 };
@@ -101,9 +123,9 @@ export function createEditorLayoutStore(getStorage: () => LayoutStorage | null =
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
-    set(next) {
+    set(next, persist = true) {
       current = next;
-      writeEditorLayout(next, getStorage());
+      if (persist) writeEditorLayout(next, getStorage());
       notify();
     },
     reset() {

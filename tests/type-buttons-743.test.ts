@@ -400,7 +400,7 @@ describe("one filled primary per screen (#743)", () => {
         createdAt: "2028-08-01T00:00:00.000Z", updatedAt: "2028-08-01T00:00:00.000Z", createdBy: "Synthetic Staff",
         activeVersion: version, versions: [version],
       }],
-      templates: [],
+      templates: [], layout: "classic",
     } as never));
     expect(primaryCount(markup)).toBe(1);
     expect(markup).toMatch(/class="primary-button"[^>]*>(?:(?!<\/button>)[\s\S])*Publish version/);
@@ -420,7 +420,7 @@ describe("one filled primary per screen (#743)", () => {
         createdAt: "2028-08-01T00:00:00.000Z", updatedAt: "2028-08-01T00:00:00.000Z", createdBy: "Synthetic Staff",
         activeVersion: version, versions: [version],
       }],
-      templates: [],
+      templates: [], layout: "classic",
     } as never));
     const canvasStart = markup.lastIndexOf("<div", markup.indexOf('class="builder-canvas"'));
     const zoneStart = markup.indexOf('class="panel danger-zone');

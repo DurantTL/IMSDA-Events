@@ -77,7 +77,7 @@ function FieldToolbar({ section, field, sectionIndex, fieldIndex, onAction }: { 
     >{icon}<span>{label}</span></button>
   );
   return (
-    <div className="fb-toolbar" role="toolbar" aria-label={`Actions for ${field.label}`}>
+    <div className="fb-toolbar" role="group" aria-label={`Actions for ${field.label}`}>
       {action("settings", "Settings", <Settings2 size={15} aria-hidden="true" />, { ariaLabel: `Edit settings for ${field.label}` })}
       {action("up", "Move up", <ArrowUp size={15} aria-hidden="true" />, { ariaLabel: `Move ${field.label} up`, disabled: first })}
       {action("down", "Move down", <ArrowDown size={15} aria-hidden="true" />, { ariaLabel: `Move ${field.label} down`, disabled: last })}

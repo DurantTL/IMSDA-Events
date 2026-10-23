@@ -7,7 +7,8 @@ import { formFieldScopes, formFieldTypes, directorySourceNoun, isChoiceFieldType
 import { hasOfferedChoices, resolveFieldFlags, resolveFieldOffer, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { defaultTypeForNewChoiceField, singleChoiceTypeHint } from "@/modules/forms/choice-defaults";
 import { creditPatchForKindChange, hasCredit } from "@/modules/forms/credit-fields";
-import { fieldTypeLabels, fieldKey } from "./builder-types";
+import { fieldTypeLabels } from "./builder-types";
+import { autoFieldKey } from "./field-keys";
 import { BuilderChoiceSettings } from "./builder-choice-settings";
 import { BuilderFieldAdvanced } from "./builder-field-advanced";
 import { useLoadedBuilder } from "./builder-context";
@@ -28,8 +29,10 @@ export function scopeChangePatch(field: RegistrationFormField, scope: Registrati
 }
 
 export function BuilderLabelInput({ field, sectionIndex, fieldIndex, inputId }: FieldTarget & { inputId?: string }) {
-  const { canEdit, updateField } = useLoadedBuilder();
-  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => updateField(sectionIndex, fieldIndex, { label: event.target.value, key: field.key.startsWith("new_field_") ? fieldKey(event.target.value) : field.key })} /></label>;
+  const { canEdit, updateField, allFields } = useLoadedBuilder();
+  // While the key is still the placeholder, it follows the label: kept unique, and never a key other code treats specially.
+  const nextKey = (label: string) => field.key.startsWith("new_field_") ? autoFieldKey(label, allFields.filter((other) => other.id !== field.id).map((other) => other.key)) : field.key;
+  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) })} /></label>;
 }
 
 export function BuilderRequiredToggle({ field, sectionIndex, fieldIndex, className = "required-toggle" }: FieldTarget & { className?: string }) {

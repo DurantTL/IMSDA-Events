@@ -4,7 +4,7 @@
 // resized. It is a layout over the existing builder model (BuilderContext):
 // every edit and action it triggers is one the builder already had.
 // Phones keep the older layout (see registration-builder-workspace.tsx).
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { ChevronLeft, Eye, EllipsisVertical, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { RegistrationFormNotificationsPanel } from "@/components/registration-form-notifications-panel";
@@ -26,9 +26,10 @@ import { BuilderQuestionSettings, LABEL_INPUT_ID } from "./builder-question-sett
 import { BuilderSidebar, type SidebarTabDefinition } from "./builder-sidebar";
 import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
 import { locateField } from "./canvas-rows";
-import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "./editor-layout";
+import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
+import { isSearchShortcut } from "./shell-keys";
 import { useEditorLayout } from "./use-editor-layout";
-import type { PaletteEntry } from "./palette-registry";
+import type { PaletteEntry, PaletteRegistry } from "./palette-registry";
 
 type FocusRequest =
   | { kind: "label" }
@@ -52,7 +53,31 @@ function focusSelector(request: FocusRequest) {
   }
 }
 
-export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { formId: string; fieldId: string } | null }) {
+/** Width and height of an element, kept current. Null until the browser has measured it (never on the server). */
+function useMeasuredSize(ref: RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const rect = element.getBoundingClientRect();
+      setSize((current) => current && current.width === rect.width && current.height === rect.height ? current : { width: rect.width, height: rect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return size;
+}
+
+function dialogIsOpen() {
+  return document.querySelector('dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"]') !== null;
+}
+
+/**
+ * `registry` is the palette's source. It defaults to the shared registry; entries that belong to one organization
+ * (saved questions, #1070) belong in a registry made for that provider and passed here. See docs/FORM-BUILDER-PALETTE.md.
+ */
+export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
     eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, canEditNotifications,
     expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
@@ -71,6 +96,13 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const lastSelection = useRef<{ fieldId: string; sectionId: string } | null>(null);
   const handledFocusTarget = useRef(false);
+  const lastVersionKey = useRef<string | null>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  const topbarSize = useMeasuredSize(topbarRef);
+  const bodySize = useMeasuredSize(bodyRef);
+  // What the page has room for: the sidebar takes at most half the editor, so a remembered width can be wider than what shows.
+  const maxWidth = maxSidebarWidthFor(bodySize?.width ?? null);
+  const shownWidth = displayedSidebarWidth(layout.width, maxWidth);
 
   const selection = locateField(definition.sections, expandedFieldId);
   const selectedSectionId = selection ? definition.sections[selection.sectionIndex]!.id : null;
@@ -100,9 +132,11 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
   }, [focusRequest]);
 
   // The question a setup warning links to (#617): its fee box may sit inside the closed Advanced fold, so open the folds and focus it.
+  // A hidden sidebar is shown first, or the box would not exist to focus.
   useEffect(() => {
     if (!focusTarget || handledFocusTarget.current || focusTarget.formId !== selectedFormId) return;
     if (expandedFieldId !== focusTarget.fieldId || tab !== "settings") return;
+    if (!layout.sidebarVisible) { showSidebar(); return; }
     const input = document.getElementById(`registration-fee-${focusTarget.fieldId}`);
     if (!input) { handledFocusTarget.current = true; return; }
     handledFocusTarget.current = true;
@@ -111,24 +145,31 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
     }
     input.scrollIntoView({ block: "center" });
     input.focus();
-  }, [focusTarget, selectedFormId, expandedFieldId, tab]);
+  }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar]);
 
   // Remember where the selection was; if the question is then removed, focus goes to its step's add button instead of being lost.
+  // Opening another form or version forgets it. The removal confirmation puts focus back itself when it closes, so this waits a
+  // tick and only acts if focus has been lost (it is on nothing, or on the page body) and no dialog is open.
+  const versionKey = `${selectedFormId}:${selectedVersion.id}`;
   useEffect(() => {
+    if (lastVersionKey.current !== versionKey) { lastVersionKey.current = versionKey; lastSelection.current = null; }
     if (selection && selectedSectionId) {
       lastSelection.current = { fieldId: selection.field.id, sectionId: selectedSectionId };
     } else if (lastSelection.current && lastSelection.current.fieldId === expandedFieldId) {
       const { sectionId } = lastSelection.current;
       lastSelection.current = null;
-      const target = document.querySelector<HTMLElement>(`[data-fb-step-add="${sectionId}"]`) ?? document.getElementById("fb-form-title");
-      target?.focus();
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        if ((active && active !== document.body) || dialogIsOpen()) return;
+        (document.querySelector<HTMLElement>(`[data-fb-step-add="${sectionId}"]`) ?? document.getElementById("fb-form-title"))?.focus();
+      }, 0);
     }
   });
 
-  // "/" jumps to the question search, as in Fluent Forms, unless the person is typing somewhere.
+  // "/" jumps to the question search, as in Fluent Forms, unless the person is typing somewhere or a dialog is open.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented || isTypingTarget(event.target)) return;
+      if (!isSearchShortcut({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, defaultPrevented: event.defaultPrevented, fromTypingTarget: isTypingTarget(event.target), dialogOpen: dialogIsOpen() })) return;
       event.preventDefault();
       showSidebar();
       setTab("questions");
@@ -142,6 +183,8 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
     setExpandedFieldId(fieldId);
     setTab("settings");
+    // Selecting while the sidebar is hidden shows it, so the settings the selection opens can be seen.
+    showSidebar();
   }
 
   function addToStep(sectionIndex: number) {
@@ -180,6 +223,7 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
       label: "Questions",
       panel: (
         <BuilderPalette
+          registry={registry}
           steps={definition.sections.map((section) => ({ id: section.id, title: section.title }))}
           targetIndex={targetIndex}
           onTargetChange={(index) => setTargetSectionId(definition.sections[index]?.id ?? null)}
@@ -207,8 +251,8 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
   const status = selectedVersion.status;
 
   return (
-    <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"}>
-      <header className="fb-topbar">
+    <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
+      <header className="fb-topbar" ref={topbarRef}>
         <Link className="fb-icon-button" href={`/event-setup?event=${encodeURIComponent(eventId)}`} aria-label="Back to event setup"><ChevronLeft size={18} aria-hidden="true" /></Link>
         {forms.length > 1
           ? <label className="fb-form-switch"><span className="sr-only">Form</span><select value={selectedFormId} onChange={(event) => { const form = forms.find((candidate) => candidate.id === event.target.value); if (form) void chooseForm(form); }}>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
@@ -228,7 +272,6 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
           className="fb-icon-button"
           type="button"
           aria-label="Layout options"
-          aria-haspopup="true"
           aria-expanded={menuOpen}
           aria-controls="fb-layout-menu"
           onClick={() => setMenuOpen((open) => !open)}
@@ -244,8 +287,8 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
         >
           <button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{layout.sidebarVisible ? "Hide sidebar" : "Show sidebar"}</button>
           <button className="fb-btn" type="button" onClick={layoutControls.swapSide}>{layout.side === "right" ? "Move sidebar to the left" : "Move sidebar to the right"}</button>
-          <button className="fb-btn" type="button" disabled={layout.width <= MIN_SIDEBAR_WIDTH} onClick={layoutControls.narrower}>Sidebar narrower</button>
-          <button className="fb-btn" type="button" disabled={layout.width >= MAX_SIDEBAR_WIDTH} onClick={layoutControls.wider}>Sidebar wider</button>
+          <button className="fb-btn" type="button" disabled={shownWidth <= MIN_SIDEBAR_WIDTH} onClick={() => layoutControls.setWidth(shownWidth - SIDEBAR_WIDTH_STEP)}>Sidebar narrower</button>
+          <button className="fb-btn" type="button" disabled={shownWidth >= maxWidth} onClick={() => layoutControls.setWidth(shownWidth + SIDEBAR_WIDTH_STEP)}>Sidebar wider</button>
           <button className="fb-btn" type="button" onClick={layoutControls.resetLayout}>Reset layout</button>
           <p className="fb-hint">You can also drag the sidebar&apos;s edge, or focus it and use the arrow keys. Your layout is remembered in this browser.</p>
         </div>
@@ -284,7 +327,7 @@ export function BuilderEditorShell({ focusTarget = null }: { focusTarget?: { for
           <div className="fb-preview-section"><BuilderPreview /></div>
         </div>
         {layout.sidebarVisible
-          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} onResize={layoutControls.setWidth} containerRef={bodyRef} />
+          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} />
           : <div className="fb-rail"><button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{sidebarSide === "left" ? <PanelLeft size={15} aria-hidden="true" /> : <PanelRight size={15} aria-hidden="true" />} Show sidebar</button><button className="fb-btn" type="button" onClick={() => addToStep(targetIndex)}><Plus size={15} aria-hidden="true" /> Add question</button></div>}
       </div>
     </div>

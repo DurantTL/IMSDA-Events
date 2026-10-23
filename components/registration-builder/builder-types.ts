@@ -133,5 +133,7 @@ export type BuilderWorkspaceProps = {
   canEditNotifications?: boolean;
   /** System administrators only (#1065); the server checks it again on every save. */
   canSaveAsTemplate?: boolean;
+  /** `classic` always uses the phone-width layout (form list, section cards, preview column); `auto` (the default) uses the editor shell (#1132) from 768px. */
+  layout?: "auto" | "classic";
 };
 

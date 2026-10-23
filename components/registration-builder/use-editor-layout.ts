@@ -2,7 +2,7 @@
 // browser, and the viewport check that keeps phones on today's builder.
 import { useCallback, useSyncExternalStore } from "react";
 import {
-  DEFAULT_EDITOR_LAYOUT, SIDEBAR_WIDTH_STEP, clampSidebarWidth, createEditorLayoutStore, resizeSidebar,
+  DEFAULT_EDITOR_LAYOUT, SIDEBAR_WIDTH_STEP, clampSidebarWidth, createEditorLayoutStore, resizeSidebar, revealSidebar,
 } from "./editor-layout";
 
 /** The editor shell is for tablets and desktops; below this the builder keeps its phone layout (#685, #1071). */
@@ -15,12 +15,12 @@ function subscribeToViewport(onChange: () => void) {
   return () => query.removeEventListener("change", onChange);
 }
 
-/** False on the server and on phones, so the first paint is always today's builder. */
+/** True on the server: the page renders the shell first, so a desktop never flashes the phone layout. A phone never shows it (the builder is hidden under 768px, #685) and switches once the browser reports its width. */
 export function useEditorShellViewport(): boolean {
   return useSyncExternalStore(
     subscribeToViewport,
     () => typeof window.matchMedia === "function" && window.matchMedia(EDITOR_SHELL_MEDIA_QUERY).matches,
-    () => false,
+    () => true,
   );
 }
 
@@ -31,9 +31,9 @@ export function useEditorLayout() {
   return {
     layout,
     toggleSidebar: useCallback(() => layoutStore.set({ ...layoutStore.getSnapshot(), sidebarVisible: !layoutStore.getSnapshot().sidebarVisible }), []),
-    showSidebar: useCallback(() => { const current = layoutStore.getSnapshot(); if (!current.sidebarVisible) layoutStore.set({ ...current, sidebarVisible: true }); }, []),
+    showSidebar: useCallback(() => { const current = layoutStore.getSnapshot(); const next = revealSidebar(current); if (next !== current) layoutStore.set(next); }, []),
     swapSide: useCallback(() => { const current = layoutStore.getSnapshot(); layoutStore.set({ ...current, side: current.side === "right" ? "left" : "right" }); }, []),
-    setWidth: useCallback((width: number) => layoutStore.set({ ...layoutStore.getSnapshot(), width: clampSidebarWidth(width) }), []),
+    setWidth: useCallback((width: number, persist = true) => layoutStore.set({ ...layoutStore.getSnapshot(), width: clampSidebarWidth(width) }, persist), []),
     narrower: useCallback(() => layoutStore.set(resizeSidebar(layoutStore.getSnapshot(), -SIDEBAR_WIDTH_STEP)), []),
     wider: useCallback(() => layoutStore.set(resizeSidebar(layoutStore.getSnapshot(), SIDEBAR_WIDTH_STEP)), []),
     resetLayout: useCallback(() => layoutStore.reset(), []),

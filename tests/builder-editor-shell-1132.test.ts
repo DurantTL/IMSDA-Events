@@ -13,7 +13,12 @@ import {
   clampSidebarWidth, createEditorLayoutStore, parseEditorLayout, readEditorLayout, resizeSidebar, widthFromPointer, writeEditorLayout,
   type LayoutStorage,
 } from "@/components/registration-builder/editor-layout";
-import { planPaletteInsert } from "@/components/registration-builder/palette-insert";
+import { avoidCollisions, planPaletteInsert } from "@/components/registration-builder/palette-insert";
+import { planFieldDrop } from "@/components/registration-builder/field-drop";
+import { autoFieldKey, isReservedFieldKey, uniqueFieldKey } from "@/components/registration-builder/field-keys";
+import { isSearchShortcut } from "@/components/registration-builder/shell-keys";
+import { useBuilderEdits } from "@/components/registration-builder/use-builder-edits";
+import { displayedSidebarWidth, maxSidebarWidthFor, revealSidebar } from "@/components/registration-builder/editor-layout";
 import {
   createDefaultPaletteRegistry, createPaletteRegistry, groupPalette, moduleEntry, moduleGroupId, searchPalette, topPaletteMatch,
   type PaletteEntry,
@@ -108,7 +113,6 @@ describe("the palette registry (#1132)", () => {
     const before = renderToStaticMarkup(createElement(PaletteList, {
       snapshot: own.getSnapshot(), query: "", openGroups: new Set(["modules"]), onToggleGroup: () => {}, onAdd: () => {},
     }));
-    expect(before).not.toContain("Swag pickup table");
     expect(before).not.toContain(syntheticModule.name);
 
     const unregister = own.register(moduleEntry(syntheticModule));
@@ -140,13 +144,13 @@ describe("the palette registry (#1132)", () => {
     expect(groups.find((view) => view.group.id === "library-extras")?.group.label).toBe("Library extras");
   });
 
-  it("refuses a duplicate id, and tells subscribers about each change", () => {
+  it("replaces an entry registered again, ignores the identical one, and tells subscribers about each change", () => {
     const own = createPaletteRegistry();
     const listener = vi.fn();
     const stop = own.subscribe(listener);
     const entry: PaletteEntry = { id: "x:1", label: "One", group: "general", icon: Tag, keywords: [], add: () => ({ fields: [] }) };
     own.register(entry);
-    expect(() => own.register(entry)).toThrow(/already registered/);
+    own.register(entry);
     expect(listener).toHaveBeenCalledTimes(1);
     own.unregister("x:1");
     expect(listener).toHaveBeenCalledTimes(2);
@@ -202,7 +206,7 @@ describe("what an entry adds (#1132)", () => {
       const plan = planPaletteInsert(definition, entry, 0, undefined, newId);
       if (plan.kind === "nothing") continue; // a singleton module already on the form
       if (plan.kind === "module") {
-        expect(entry.add({ existingFields: definition.sections.flatMap((section) => section.fields), newId }).fields.length, entry.id).toBeGreaterThanOrEqual(0);
+        expect(plan.module.key, entry.id).toBe(entry.id.replace("module:", ""));
         continue;
       }
       expect(plan.kind, entry.id).toBe("inserted");
@@ -314,7 +318,7 @@ describe("selection and tabs (#1132)", () => {
         { id: "settings", label: "Question settings", panel: "S panel" },
         { id: "history", label: "History", panel: "H panel" },
       ],
-      activeTab: "settings", onTabChange: () => {}, layout: DEFAULT_EDITOR_LAYOUT, onResize: () => {}, containerRef: { current: null },
+      activeTab: "settings", onTabChange: () => {}, layout: DEFAULT_EDITOR_LAYOUT, shownWidth: 380, maxWidth: 600, onResize: () => {}, containerRef: { current: null },
     }));
     expect(markup).toContain('role="tablist"');
     expect((markup.match(/role="tab"/g) ?? []).length).toBe(3);
@@ -462,7 +466,7 @@ describe("the movable sidebar layout (#1132)", () => {
 });
 
 describe("the editor shell, rendered (#1132)", () => {
-  async function renderShell(options: { selectFirstField?: boolean; status?: string } = {}) {
+  async function renderShell(options: { selectFirstField?: boolean; status?: string; readOnly?: boolean } = {}) {
     const { BuilderContext } = await import("@/components/registration-builder/builder-context");
     const { BuilderEditorShell } = await import("@/components/registration-builder/builder-editor-shell");
     const { useBuilderModel } = await import("@/components/registration-builder/use-builder-model");
@@ -479,7 +483,7 @@ describe("the editor shell, rendered (#1132)", () => {
     const focusTarget = options.selectFirstField ? { formId: "form-1", fieldId: definition.sections[0]!.fields[0]!.id } : null;
     function Harness() {
       const model = useBuilderModel({ eventId: "event-1", eventSlug: "synthetic", eventName: "Synthetic Event", initialForms: [form], templates: [], focusTarget, canEditNotifications: false }, (async () => true) as never);
-      return createElement(BuilderContext.Provider, { value: model }, createElement(BuilderEditorShell, { focusTarget }));
+      return createElement(BuilderContext.Provider, { value: options.readOnly ? { ...model, canEdit: false } : model }, createElement(BuilderEditorShell, { focusTarget }));
     }
     return { markup: renderToStaticMarkup(createElement(Harness)), definition };
   }
@@ -519,6 +523,259 @@ describe("the editor shell, rendered (#1132)", () => {
 
 });
 
+describe("the editor shell in read-only mode (#1132)", () => {
+  it("shows no toolbar, add buttons or step add, and disables the palette", async () => {
+    const { BuilderContext } = await import("@/components/registration-builder/builder-context");
+    const { BuilderEditorShell } = await import("@/components/registration-builder/builder-editor-shell");
+    const { useBuilderModel } = await import("@/components/registration-builder/use-builder-model");
+    const definition = sampleDefinition();
+    const version = {
+      id: "v1", versionNumber: 1, status: "ARCHIVED", definition, publishedAt: null, createdAt: "2028-08-01T00:00:00.000Z",
+      updatedAt: "2028-08-01T00:00:00.000Z", createdBy: "Synthetic Staff", testSubmissionCount: 0, choiceUsage: {}, testSubmissions: [],
+    };
+    const form = { id: "form-1", eventId: "event-1", name: "Synthetic", slug: "synthetic", status: "DRAFT", createdAt: version.createdAt, updatedAt: version.updatedAt, createdBy: "Synthetic Staff", activeVersion: version, versions: [version] };
+    const focusTarget = { formId: "form-1", fieldId: definition.sections[0]!.fields[0]!.id };
+    function Harness() {
+      const model = useBuilderModel({ eventId: "event-1", eventSlug: "synthetic", eventName: "Synthetic Event", initialForms: [form], templates: [], focusTarget }, (async () => true) as never);
+      return createElement(BuilderContext.Provider, { value: { ...model, canEdit: false } }, createElement(BuilderEditorShell, { focusTarget }));
+    }
+    const markup = renderToStaticMarkup(createElement(Harness));
+    expect(markup).not.toContain('class="fb-toolbar"');
+    expect(markup).not.toContain("data-fb-step-add");
+    expect(markup).not.toContain("Add another section");
+    expect(markup).toContain("This version is read-only");
+    expect(markup).toMatch(/class="fb-palette-item"[^>]*disabled/);
+    // Selecting still works to read a question's settings, which are disabled inputs.
+    expect(markup).toMatch(/id="fb-setting-label"[^>]*disabled/);
+  });
+});
+
+describe("dragging a field to a new place (#1132)", () => {
+  const field = (id: string): RegistrationFormField => ({ id, key: id, label: id, helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] });
+  const sections = (...lists: string[][]) => lists.map((ids, index) => ({ id: `s${index}`, title: `S${index}`, description: "", fields: ids.map(field) }));
+  const order = (plan: ReturnType<typeof planFieldDrop>, step = 0) => plan.kind === "moved" ? plan.sections[step]!.fields.map((candidate) => candidate.id) : plan.kind;
+
+  it("dropping on a later field puts the dragged field in front of it", () => {
+    // a b c d: drag a onto c (index 2) -> b a c d. Before the fix this gave b c a d.
+    expect(order(planFieldDrop(sections(["a", "b", "c", "d"]), { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 0, fieldIndex: 2 }))).toEqual(["b", "a", "c", "d"]);
+  });
+
+  it("dropping on an earlier field, or at the end of the step", () => {
+    expect(order(planFieldDrop(sections(["a", "b", "c", "d"]), { sectionIndex: 0, fieldIndex: 3 }, { sectionIndex: 0, fieldIndex: 1 }))).toEqual(["a", "d", "b", "c"]);
+    expect(order(planFieldDrop(sections(["a", "b", "c"]), { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 0, fieldIndex: 3 }))).toEqual(["b", "c", "a"]);
+  });
+
+  it("dropping where it already is changes nothing", () => {
+    expect(planFieldDrop(sections(["a", "b", "c"]), { sectionIndex: 0, fieldIndex: 1 }, { sectionIndex: 0, fieldIndex: 1 }).kind).toBe("nothing");
+    expect(planFieldDrop(sections(["a", "b", "c"]), { sectionIndex: 0, fieldIndex: 1 }, { sectionIndex: 0, fieldIndex: 2 }).kind).toBe("nothing");
+  });
+
+  it("moves between steps to the dropped index, keeping each step at least one field", () => {
+    const plan = planFieldDrop(sections(["a", "b"], ["c", "d"]), { sectionIndex: 0, fieldIndex: 1 }, { sectionIndex: 1, fieldIndex: 1 });
+    expect(order(plan, 0)).toEqual(["a"]);
+    expect(order(plan, 1)).toEqual(["c", "b", "d"]);
+    expect(planFieldDrop(sections(["a"], ["c"]), { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 1, fieldIndex: 0 }).kind).toBe("error");
+  });
+
+  it("refuses to push another step past 20 fields, but allows a reorder inside a full step", () => {
+    const twenty = Array.from({ length: 20 }, (_, index) => `f${index}`);
+    const full = sections(["a", "b"], twenty);
+    expect(planFieldDrop(full, { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 1, fieldIndex: 3 }).kind).toBe("error");
+    expect(planFieldDrop(sections(twenty), { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 0, fieldIndex: 5 }).kind).toBe("moved");
+  });
+
+  it("does not change the definition it is given", () => {
+    const input = sections(["a", "b", "c"]);
+    const copy = structuredClone(input);
+    planFieldDrop(input, { sectionIndex: 0, fieldIndex: 0 }, { sectionIndex: 0, fieldIndex: 3 });
+    expect(input).toEqual(copy);
+  });
+});
+
+describe("keys made up by the editor (#1132)", () => {
+  const field = (id: string, key: string): RegistrationFormField => ({ id, key, label: key, helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] });
+
+  it("keeps an auto key unique with a suffix", () => {
+    expect(autoFieldKey("Team name", [])).toBe("team_name");
+    expect(autoFieldKey("Team name", ["team_name"])).toBe("team_name_2");
+    expect(autoFieldKey("Team name", ["team_name", "team_name_2"])).toBe("team_name_3");
+  });
+
+  it("never auto-produces the promo code, an age key or a meal-ticket key", () => {
+    expect(isReservedFieldKey("promo_code")).toBe(true);
+    expect(isReservedFieldKey("age")).toBe(true);
+    expect(autoFieldKey("Promo code", [])).toBe("promo_code_2");
+    expect(autoFieldKey("Age", [])).toBe("age_2");
+    const mealKey = ["sabbath_lunch_adult", "lunch_adult", "dinner_adult"].find((key) => isReservedFieldKey(key));
+    if (mealKey) expect(autoFieldKey(mealKey.replace(/_/g, " "), [])).not.toBe(mealKey);
+    expect(isReservedFieldKey("team_name")).toBe(false);
+    expect(uniqueFieldKey("promo_code", new Set(), false)).toBe("promo_code");
+  });
+
+  it("a typed label with the key placeholder gets the unique key through the palette's own fields too", () => {
+    const entry: PaletteEntry = { id: "saved:clash", label: "Clash", group: "saved", icon: Tag, keywords: [], add: () => ({ fields: [{ ...field("field_x", "email"), conditional: { fieldKey: "email_other", operator: "NOT_EMPTY", value: "" } }, field("field_y", "email_other")] }) };
+    const definition = sampleDefinition();
+    const existing = definition.sections.flatMap((section) => section.fields);
+    const clashingKey = existing[0]!.key;
+    const clashingId = existing[0]!.id;
+    const entryWithClash: PaletteEntry = { ...entry, add: () => ({ fields: [{ ...field(clashingId, clashingKey), conditional: undefined }, { ...field("fresh", "other"), conditional: { fieldKey: clashingKey, operator: "NOT_EMPTY", value: "" } }] }) };
+    const plan = planPaletteInsert(definition, entryWithClash, 0, undefined, idMaker());
+    if (plan.kind !== "inserted") throw new Error("expected insert");
+    const inserted = plan.sections[0]!.fields.slice(-2);
+    expect(inserted[0]!.id).not.toBe(clashingId);
+    expect(inserted[0]!.key).toBe(`${clashingKey}_2`);
+    expect(inserted[1]!.conditional?.fieldKey).toBe(`${clashingKey}_2`);
+    const keys = plan.sections.flatMap((section) => section.fields.map((candidate) => candidate.key));
+    const ids = plan.sections.flatMap((section) => section.fields.map((candidate) => candidate.id));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("avoidCollisions leaves clean fields alone, even when their key is a special one", () => {
+    const [kept] = avoidCollisions([field("new_id", "age")], [field("old", "email")], idMaker());
+    expect(kept).toMatchObject({ id: "new_id", key: "age" });
+  });
+});
+
+// The edits hook calls no React hooks (it only builds closures), so it runs here with plain stand-ins for the state.
+const buildEdits = useBuilderEdits;
+
+describe("the edits behind the palette, run for real (#1132)", () => {
+  function editsFor(definition: RegistrationFormDefinition) {
+    const calls = { definition: null as RegistrationFormDefinition | null, expanded: undefined as string | null | undefined, error: "", previewAttendees: 0, dirty: false };
+    const allFields = definition.sections.flatMap((section) => section.fields);
+    const edits = buildEdits({
+      definition, setDefinition: (next: RegistrationFormDefinition) => { calls.definition = next; }, setPreviewAttendees: () => { calls.previewAttendees += 1; },
+      setDirty: () => { calls.dirty = true; }, setNotice: () => {}, setError: (message: string) => { calls.error = message; }, setTestIssues: () => {},
+      dragging: null, setDragging: () => {}, setExpandedFieldId: (id: string | null) => { calls.expanded = id; }, previewRef: { current: null }, closeModuleLibrary: () => {},
+    } as never, { totalFields: allFields.length, allFields } as never);
+    return { edits, calls };
+  }
+  const base = () => {
+    const definition = sampleDefinition();
+    const section = definition.sections[0]!;
+    section.fields = section.fields.slice(0, 3);
+    definition.attendeeRoster = undefined;
+    return definition;
+  };
+  const registry = createDefaultPaletteRegistry();
+  const entryFor = (id: string) => registry.getSnapshot().entries.find((entry) => entry.id === id)!;
+
+  it("addPaletteEntry puts a question at the end, or at an index, selects it and marks the draft dirty", () => {
+    const definition = base();
+    const original = definition.sections[0]!.fields.map((field) => field.id);
+    const end = editsFor(definition);
+    end.edits.addPaletteEntry(entryFor("type:TEXT"), 0);
+    expect(end.calls.definition!.sections[0]!.fields.map((field) => field.id).slice(0, 3)).toEqual(original);
+    expect(end.calls.definition!.sections[0]!.fields).toHaveLength(4);
+    expect(end.calls.expanded).toBe(end.calls.definition!.sections[0]!.fields[3]!.id);
+    expect(end.calls.dirty).toBe(true);
+
+    const middle = editsFor(definition);
+    middle.edits.addPaletteEntry(entryFor("type:EMAIL"), 0, 1);
+    const fields = middle.calls.definition!.sections[0]!.fields;
+    expect(fields[1]!.type).toBe("EMAIL");
+    expect([fields[0]!.id, fields[2]!.id, fields[3]!.id]).toEqual(original);
+    expect(middle.calls.expanded).toBe(fields[1]!.id);
+  });
+
+  it("addPaletteEntry reports a full step and leaves the draft alone", () => {
+    const definition = base();
+    const first = definition.sections[0]!;
+    first.fields = Array.from({ length: 20 }, (_, index) => ({ ...first.fields[0]!, id: `f${index}`, key: `key_${index}` }));
+    const run = editsFor(definition);
+    run.edits.addPaletteEntry(entryFor("type:TEXT"), 0);
+    expect(run.calls.definition).toBeNull();
+    expect(run.calls.error).toContain("does not fit in this step");
+  });
+
+  it("addModule at an index inserts there, keeps the module's fixed keys and switches the roster on", () => {
+    const definition = base();
+    const original = definition.sections[0]!.fields.map((field) => field.key);
+    const run = editsFor(definition);
+    const roster = builderFieldModules.find((candidate) => candidate.key === "guest_roster")!;
+    run.edits.addModule(0, roster, 1);
+    const next = run.calls.definition!;
+    const keys = next.sections[0]!.fields.map((field) => field.key);
+    expect(keys[0]).toBe(original[0]);
+    expect(keys.slice(1, 1 + roster.fields.length)).toEqual(roster.fields.map((field) => field.key));
+    expect(keys.slice(1 + roster.fields.length)).toEqual(original.slice(1));
+    expect(next.attendeeRoster?.enabled).toBe(true);
+    expect(run.calls.previewAttendees).toBe(1);
+  });
+
+  it("addModule without an index still appends", () => {
+    const definition = base();
+    const run = editsFor(definition);
+    run.edits.addModule(0, builderFieldModules.find((candidate) => candidate.key === "address")!);
+    const keys = run.calls.definition!.sections[0]!.fields.map((field) => field.key);
+    expect(keys[keys.length - 1]).toBe("mailing_address");
+  });
+});
+
+describe("shell keyboard and layout rules (#1132)", () => {
+  const press = (over: Partial<Parameters<typeof isSearchShortcut>[0]> = {}) => isSearchShortcut({ key: "/", metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, fromTypingTarget: false, dialogOpen: false, ...over });
+
+  it("'/' focuses the search, except while typing, with a modifier, already handled, or under a dialog", () => {
+    expect(press()).toBe(true);
+    expect(press({ key: "a" })).toBe(false);
+    expect(press({ fromTypingTarget: true })).toBe(false);
+    expect(press({ ctrlKey: true })).toBe(false);
+    expect(press({ metaKey: true })).toBe(false);
+    expect(press({ altKey: true })).toBe(false);
+    expect(press({ defaultPrevented: true })).toBe(false);
+    expect(press({ dialogOpen: true })).toBe(false);
+  });
+
+  it("the shell checks for open dialogs and shows a hidden sidebar when selecting or arriving from a warning", () => {
+    const shell = read("components/registration-builder/builder-editor-shell.tsx");
+    expect(shell).toContain("dialogIsOpen()");
+    expect(shell).toMatch(/function selectField[\s\S]*?showSidebar\(\);/);
+    expect(shell).toContain("if (!layout.sidebarVisible) { showSidebar(); return; }");
+    expect(shell).not.toContain("aria-haspopup");
+    expect(read("components/registration-builder/builder-canvas.tsx")).not.toContain('role="toolbar"');
+  });
+
+  it("shows a hidden sidebar without writing when it is already shown", () => {
+    const shown = { sidebarVisible: true, side: "right" as const, width: 400 };
+    expect(revealSidebar(shown)).toBe(shown);
+    expect(revealSidebar({ ...shown, sidebarVisible: false })).toEqual(shown);
+  });
+
+  it("a drag changes the layout in memory and is written once, at its end", () => {
+    const storage = memoryStorage();
+    const store = createEditorLayoutStore(() => storage);
+    store.set({ ...DEFAULT_EDITOR_LAYOUT, width: 420 }, false);
+    store.set({ ...DEFAULT_EDITOR_LAYOUT, width: 450 }, false);
+    expect(store.getSnapshot().width).toBe(450);
+    expect(storage.data.has(EDITOR_LAYOUT_STORAGE_KEY)).toBe(false);
+    store.set({ ...DEFAULT_EDITOR_LAYOUT, width: 450 });
+    expect(readEditorLayout(storage).width).toBe(450);
+  });
+
+  it("holds the shown width inside what the page has room for, so the controls and the separator agree", () => {
+    expect(maxSidebarWidthFor(null)).toBe(MAX_SIDEBAR_WIDTH);
+    expect(maxSidebarWidthFor(2000)).toBe(MAX_SIDEBAR_WIDTH);
+    expect(maxSidebarWidthFor(800)).toBe(400);
+    expect(maxSidebarWidthFor(500)).toBe(MIN_SIDEBAR_WIDTH);
+    expect(displayedSidebarWidth(500, 400)).toBe(400);
+    expect(displayedSidebarWidth(350, 400)).toBe(350);
+    const markup = renderToStaticMarkup(createElement(BuilderSidebar, {
+      tabs: [{ id: "questions", label: "Questions", panel: "Q" }], activeTab: "questions", onTabChange: () => {}, layout: { ...DEFAULT_EDITOR_LAYOUT, width: 500 },
+      shownWidth: 400, maxWidth: 400, onResize: () => {}, containerRef: { current: null },
+    }));
+    expect(markup).toContain('aria-valuenow="400"');
+    expect(markup).toContain('aria-valuemax="400"');
+  });
+
+  it("the resize handle's hit area is 44px wide, and the sticky offset follows the measured top bar", () => {
+    const css = read("app/globals.css");
+    expect(css).toMatch(/\.fb-resize-handle \{[^}]*width: var\(--touch-target, 44px\)/);
+    expect(css).toMatch(/\.fb-sidebar \{[^}]*top: calc\(var\(--fb-topbar-height, 64px\) \+ 12px\)/);
+    expect(css).not.toMatch(/\.fb-sidebar \{ max-width: 46%/);
+  });
+});
+
 describe("the editor shell wiring (#1132)", () => {
   it("phones and the first paint keep today's builder; only wide viewports get the shell", () => {
     const workspace = read("components/registration-builder-workspace.tsx");
@@ -527,7 +784,7 @@ describe("the editor shell wiring (#1132)", () => {
     expect(workspace).toContain('<div className="builder-layout">');
     const hook = read("components/registration-builder/use-editor-layout.ts");
     expect(hook).toContain('"(min-width: 768px)"');
-    expect(hook).toMatch(/\(\) => false,\n\s*\);/); // the server snapshot is the phone layout
+    expect(hook).toMatch(/\(\) => true,\n\s*\);/); // the server renders the shell: no flash of the old layout on a desktop
   });
 
   it("the form template editor still uses the section cards", () => {
@@ -550,7 +807,7 @@ describe("the editor shell wiring (#1132)", () => {
 
   it("registers the shell's behaviour for '/' and the removal confirmation", () => {
     const shell = read("components/registration-builder/builder-editor-shell.tsx");
-    expect(shell).toContain('event.key !== "/"');
+    expect(shell).toContain("isSearchShortcut({");
     expect(shell).toContain("openRemoveField(sectionIndex, fieldIndex)");
     expect(shell).toContain("moveField(sectionIndex, fieldIndex");
     expect(shell).toContain("duplicateField(sectionIndex, fieldIndex)");

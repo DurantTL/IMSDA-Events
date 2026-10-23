@@ -41,7 +41,7 @@ export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
   const { forms, selectedForm, selectedVersion, definition, showTemplates, setShowTemplates, canEdit, addSection, eventId, canEditNotifications } = model;
   const shellViewport = useEditorShellViewport();
   const formOpen = Boolean(selectedForm && selectedVersion && definition);
-  const showShell = shellViewport && formOpen;
+  const showShell = shellViewport && formOpen && props.layout !== "classic";
   return <BuilderContext.Provider value={model}><section className="page-stack builder-workspace">{confirmDialog}
     <BuilderPageIntro />
     <BuilderDraftTemplatePanel />

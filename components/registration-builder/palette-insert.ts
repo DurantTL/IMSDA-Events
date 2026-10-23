@@ -4,6 +4,7 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import type { BuilderModuleDefinition } from "@/modules/forms/builder-modules";
 import type { PaletteEntry } from "./palette-registry";
+import { uniqueFieldKey } from "./field-keys";
 
 export const MAX_FIELDS_PER_STEP = 20;
 
@@ -14,6 +15,31 @@ export type PaletteInsertPlan =
   | { kind: "module"; module: BuilderModuleDefinition; atIndex: number | undefined }
   | { kind: "error"; message: string }
   | { kind: "nothing" };
+
+/**
+ * An entry (saved questions, later) may carry ids and keys that are already on the form. The copy gets fresh ids and
+ * suffixed keys, and conditions between the inserted fields follow the renamed keys. The entry's own objects are untouched.
+ */
+export function avoidCollisions(fields: RegistrationFormField[], existing: readonly RegistrationFormField[], newId: () => string): RegistrationFormField[] {
+  const usedIds = new Set(existing.map((field) => field.id));
+  const usedKeys = new Set(existing.map((field) => field.key));
+  const renamed = new Map<string, string>();
+  const copies = fields.map((field) => {
+    let id = field.id;
+    while (usedIds.has(id)) id = newId();
+    usedIds.add(id);
+    // Only a clash is renamed: an entry may deliberately use a special key (the age field, say) when it is not yet on the form.
+    const key = uniqueFieldKey(field.key, usedKeys, false);
+    usedKeys.add(key);
+    if (key !== field.key) renamed.set(field.key, key);
+    return { ...field, id, key };
+  });
+  return copies.map((field) => {
+    const conditional = field.conditional && renamed.has(field.conditional.fieldKey) ? { ...field.conditional, fieldKey: renamed.get(field.conditional.fieldKey)! } : field.conditional;
+    const optionalWhen = field.optionalWhen && renamed.has(field.optionalWhen.fieldKey) ? { ...field.optionalWhen, fieldKey: renamed.get(field.optionalWhen.fieldKey)! } : field.optionalWhen;
+    return { ...field, conditional, optionalWhen };
+  });
+}
 
 /**
  * `atIndex` puts the new fields before that field; left out they go at the end of the step ("click a question to add it
@@ -31,6 +57,7 @@ export function planPaletteInsert(
   const insert = entry.add({ existingFields: definition.sections.flatMap((candidate) => candidate.fields), newId });
   if (insert.module) return { kind: "module", module: insert.module, atIndex };
   if (insert.fields.length === 0) return { kind: "nothing" };
+  insert.fields = avoidCollisions(insert.fields, definition.sections.flatMap((candidate) => candidate.fields), newId);
   if (section.fields.length + insert.fields.length > MAX_FIELDS_PER_STEP) {
     return { kind: "error", message: `${entry.label} does not fit in this step. Add another step and place the question there.` };
   }

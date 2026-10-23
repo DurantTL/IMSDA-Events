@@ -16,7 +16,7 @@ An entry is:
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Stable and unique, for example `type:TEXT`, `module:housing`, `saved:<id>`. Registering an existing id throws. |
+| `id` | Stable and unique, for example `type:TEXT`, `module:housing`, `saved:<id>`. Registering an existing id replaces the entry. |
 | `label` | What the question is called in the palette. |
 | `description` | Optional one-line help, also searched. |
 | `group` | A group id: `general`, `people`, `money`, `agreements`, `modules`, `saved`. An id that is not registered gets a group of its own, so a new group needs no sidebar change either. |
@@ -60,9 +60,39 @@ paletteRegistry.register({
 });
 ```
 
-`register` returns a function that removes the entry again. The palette updates
-on its own (it subscribes to the registry). Saved questions (#1070) register
-under the `saved` group, which already shows an empty hint.
+`register` returns a function that removes the entry again. Registering an id
+that already exists replaces that entry (and registering the very same entry
+again does nothing), so hot reload or a double registration cannot throw; the
+returned cleanup only removes the entry if it is still the one registered. The
+palette updates on its own (it subscribes to the registry).
+
+### Entries that belong to one organization or person
+
+`paletteRegistry` is a process-wide singleton: on the server it is shared by
+every request and every organization. **Never put organization-scoped entries
+(saved questions, #1070) in it.** Use one of these instead:
+
+1. **A registry per provider.** Make one with `createDefaultPaletteRegistry()`
+   (or `createPaletteRegistry()`), fill it from the signed-in organization's
+   data, and pass it to the editor: `<BuilderEditorShell registry={registry} />`.
+   Create it in component state or a provider, so each organization gets its own.
+2. **Client-only registration in an effect, with cleanup.**
+
+```ts
+useEffect(() => {
+  const removers = savedQuestions.map((question) => paletteRegistry.register(savedQuestionEntry(question)));
+  return () => removers.forEach((remove) => remove());
+}, [savedQuestions]);
+```
+
+Option 1 is safer because nothing is shared. If you use option 2, the entries
+exist only in that browser tab while the effect is mounted, and the cleanup
+removes them when the person leaves or switches organization.
+
+Saved questions register under the `saved` group, which already shows an empty
+hint. Their ids and keys may already be on the form: `planPaletteInsert` gives
+the inserted copy fresh ids and suffixes any key that clashes (and follows
+conditions between the inserted fields), so `add()` need not check.
 
 Keep `add()` free of side effects: it only builds fields. The builder inserts
 them with `addPaletteEntry` (use-builder-edits.ts), which goes through the same

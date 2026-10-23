@@ -5,6 +5,7 @@ import { moduleAlreadyPresentNotice, moduleAttendeeRoster, moduleInsertNotice, p
 import { isPublicReviewSection } from "@/modules/forms/public-registration-steps";
 import type { PaletteEntry } from "./palette-registry";
 import { planPaletteInsert } from "./palette-insert";
+import { planFieldDrop } from "./field-drop";
 import { localId, defaultField, blankPreviewAttendees } from "./builder-types";
 import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
@@ -89,17 +90,10 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
 
   function dropField(targetSectionIndex: number, targetFieldIndex: number) {
     if (!definition || dragging?.kind !== "field") return;
-    const { sectionIndex: sourceSectionIndex, fieldIndex: sourceFieldIndex } = dragging;
-    if (sourceSectionIndex !== targetSectionIndex && definition.sections[sourceSectionIndex].fields.length === 1) {
-      setDragging(null);
-      setError("Each section must keep at least one field. Add another field before moving this one.");
-      return;
-    }
-    const sections = structuredClone(definition.sections);
-    const [field] = sections[sourceSectionIndex].fields.splice(sourceFieldIndex, 1);
-    sections[targetSectionIndex].fields.splice(targetFieldIndex, 0, field);
+    const plan = planFieldDrop(definition.sections, { sectionIndex: dragging.sectionIndex, fieldIndex: dragging.fieldIndex }, { sectionIndex: targetSectionIndex, fieldIndex: targetFieldIndex });
     setDragging(null);
-    replaceDefinition({ ...definition, sections });
+    if (plan.kind === "error") setError(plan.message);
+    else if (plan.kind === "moved") replaceDefinition({ ...definition, sections: plan.sections });
   }
 
   function showPreview() {
