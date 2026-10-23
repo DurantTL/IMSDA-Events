@@ -12590,6 +12590,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .fb-sidebar .choice-limit-editor, .fb-sidebar .choice-description-editor { overflow-x: auto; }
 .fb-sidebar .choice-description-editor > label { grid-template-columns: minmax(0, 1fr); }
 .fb-history { display: grid; gap: 10px; }
+.version-history-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.version-history-row { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.version-history-row > button { min-height: var(--touch-target, 44px); }
+.version-history .version-restore { justify-content: center; border: 1px solid var(--line); background: var(--card); color: var(--ink); min-height: var(--touch-target, 44px); font: inherit; font-size: 0.875rem; font-weight: 700; }
+.version-history .version-restore:disabled { cursor: not-allowed; opacity: 0.6; }
+#fb-version-chip-draft:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
 /* Form settings tab, summary chips, module-owned settings, version chips and the phone inspector (#1139). New rules only. */
 .fb-form-settings { display: grid; gap: 12px; min-width: 0; }
 .fb-form-settings .panel { margin: 0; box-shadow: none; }
