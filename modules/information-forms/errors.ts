@@ -11,7 +11,8 @@ export type InformationFormErrorCode =
   | "INVALID_REQUEST"
   | "FORM_NOT_OPEN"
   | "SIGN_IN_REQUIRED"
-  | "ANSWERS_INVALID";
+  | "ANSWERS_INVALID"
+  | "EXPORT_TOO_LARGE";
 
 const statusByCode: Record<InformationFormErrorCode, number> = {
   FORM_NOT_FOUND: 404,
@@ -26,6 +27,7 @@ const statusByCode: Record<InformationFormErrorCode, number> = {
   INVALID_DEFINITION: 400,
   INVALID_REQUEST: 400,
   ANSWERS_INVALID: 400,
+  EXPORT_TOO_LARGE: 413,
   SIGN_IN_REQUIRED: 401,
 };
 

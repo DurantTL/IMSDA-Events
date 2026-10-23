@@ -439,7 +439,7 @@ async function main() {
     },
   ];
   for (const seed of informationForms) {
-    await prisma.informationForm.upsert({
+    const seededForm = await prisma.informationForm.upsert({
       where: { scopeKey_slug: { scopeKey: seed.scopeKey, slug: seed.slug } },
       update: {},
       create: {
@@ -448,10 +448,10 @@ async function main() {
       },
     });
     await prisma.informationFormVersion.upsert({
-      where: { formId_versionNumber: { formId: seed.formId, versionNumber: 1 } },
+      where: { formId_versionNumber: { formId: seededForm.id, versionNumber: 1 } },
       update: {},
       create: {
-        id: seed.versionId, formId: seed.formId, createdByUserId: admin.id, versionNumber: 1,
+        id: seed.versionId, formId: seededForm.id, createdByUserId: admin.id, versionNumber: 1,
         status: InformationFormVersionStatus.PUBLISHED, publishedAt: new Date("2026-07-01T12:00:00.000Z"), definition: seed.definition as Prisma.InputJsonValue,
       },
     });

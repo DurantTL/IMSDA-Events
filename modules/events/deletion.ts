@@ -17,6 +17,7 @@ export type EventDeletionCounts = {
   queuedMessages: number;
   /** Registration form submissions (public and club) that came through the forms. */
   formSubmissions: number;
+  informationFormResponses: number;
   /** Data import runs recorded against the event. */
   imports: number;
   merchandiseOrders: number;
@@ -66,6 +67,7 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   if (counts.scholarshipContributions > 0) blockers.push(plural(counts.scholarshipContributions, "scholarship fund contribution"));
   if (counts.honorEnrollments > 0) blockers.push(plural(counts.honorEnrollments, "honors enrollment"));
   if (counts.formSubmissions > 0) blockers.push(plural(counts.formSubmissions, "form submission"));
+  if (counts.informationFormResponses > 0) blockers.push(plural(counts.informationFormResponses, "information form response"));
   if (counts.imports > 0) blockers.push(plural(counts.imports, "import run"));
   if (counts.merchandiseOrders > 0) blockers.push(plural(counts.merchandiseOrders, "merchandise order"));
   if (counts.clubRegistrationDrafts > 0) blockers.push(plural(counts.clubRegistrationDrafts, "club registration draft"));

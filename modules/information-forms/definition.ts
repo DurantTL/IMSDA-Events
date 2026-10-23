@@ -1,5 +1,5 @@
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
-import { isSensitiveField } from "@/modules/forms/sensitive-fields";
+import { isSensitiveField, isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 
 /**
  * An information form gathers answers only (#1148): no prices, payment, roster, meals, lodging or attendee types, and no
@@ -27,7 +27,8 @@ function fieldRefusals(field: RegistrationFormField): string[] {
   if (REFUSED_KEY_PATTERN.test(field.key) || REFUSED_LABEL_PATTERN.test(field.label)) {
     reasons.push("information forms cannot ask payment, roster, meal, lodging or attendee-type questions");
   }
-  if (field.sensitive === true || isSensitiveField(field)) {
+  const otherText = [field.placeholder ?? "", ...Object.values(field.optionDescriptions ?? {})];
+  if (field.sensitive === true || isSensitiveField(field) || otherText.some((text) => isSensitiveFieldText(text.replaceAll("_", " ")))) {
     reasons.push("information forms cannot collect health, medical or other sensitive answers");
   }
   return reasons;
@@ -42,6 +43,17 @@ export function informationFormDefinitionIssues(definition: InformationFormDefin
   if (definition.attendeeRoster) {
     issues.push({ path: ["attendeeRoster"], message: "Information forms cannot have an attendee roster." });
   }
+  if (isSensitiveFieldText(definition.description)) {
+    issues.push({ path: ["description"], message: "The form description is not allowed: information forms cannot collect health, medical or other sensitive answers." });
+  }
+  definition.sections.forEach((section, sectionIndex) => {
+    if (isSensitiveFieldText(section.title) || isSensitiveFieldText(section.description) || isSensitiveFieldText(section.stepLabel ?? "")) {
+      issues.push({
+        path: ["sections", sectionIndex],
+        message: `The section "${section.title}" is not allowed: information forms cannot collect health, medical or other sensitive answers.`,
+      });
+    }
+  });
   definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
     for (const reason of fieldRefusals(field)) {
       issues.push({
@@ -59,6 +71,15 @@ export const informationFormDefinitionSchema = registrationFormDefinitionSchema.
     context.addIssue({ code: "custom", path: issue.path, message: issue.message });
   }
 });
+
+/**
+ * Reads a stored definition for display and export: structure only. The refusal check runs where a definition is
+ * written (create, save, publish) and where an answer is accepted, never when reading what was already answered, so a
+ * response is always readable even if the rules tighten later.
+ */
+export function parseStoredInformationFormDefinition(input: unknown): InformationFormDefinition {
+  return registrationFormDefinitionSchema.parse(input);
+}
 
 /** Parses a definition for storage, throwing a ZodError whose first message names the offending field. */
 export function parseInformationFormDefinition(input: unknown): InformationFormDefinition {

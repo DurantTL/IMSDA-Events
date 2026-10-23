@@ -61,6 +61,17 @@ describe("information form definitions (#1148)", () => {
     expect(messageFor(definitionWith({ type: "RADIO", options: ["Youth", "Adult"], scope: "ATTENDEE", optionSource: "ATTENDEE_TYPES", required: true, key: "kind", label: "Who" }))).toContain("attendee type");
   });
 
+  it("refuses sensitive wording in section text, descriptions, placeholders and choice descriptions", () => {
+    const sectionTitle = definitionWith({ label: "Please list", type: "LONG_TEXT", key: "list" });
+    sectionTitle.sections[0]!.title = "Medical history";
+    const titleMessage = messageFor(sectionTitle);
+    expect(titleMessage).toContain('The section "Medical history"');
+    expect(titleMessage).toContain("health, medical or other sensitive");
+    expect(messageFor(definitionWith({}, { description: "Tell us about your health" }))).toContain("The form description");
+    expect(messageFor(definitionWith({ placeholder: "List any medications" }))).toContain('"Favorite topic" (topic)');
+    expect(messageFor(definitionWith({ type: "RADIO", options: ["A", "B"], optionDescriptions: { A: "For people with allergies" } }))).toContain("health, medical or other sensitive");
+  });
+
   it("refuses health, medical and sensitive-flagged fields", () => {
     expect(messageFor(definitionWith({ key: "current_medications", label: "Current medications" }))).toContain("health, medical or other sensitive");
     expect(messageFor(definitionWith({ label: "Any allergies?" }))).toContain("health, medical or other sensitive");

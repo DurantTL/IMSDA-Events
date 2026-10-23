@@ -34,6 +34,11 @@ export const informationFormSettingsSchema = z.object({
   closesAt: z.union([isoDateTime, z.null()]).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "Send at least one setting to change.");
 
+export const publishInformationFormSchema = z.object({
+  /** The draft's `updatedAt` as the editor last saw it; the publish is refused when the draft has changed since. */
+  expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
 export const informationFormStatusSchema = z.object({
   status: z.enum(["OPEN", "CLOSED"]),
 }).strict();

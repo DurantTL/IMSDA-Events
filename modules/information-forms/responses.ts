@@ -3,15 +3,17 @@ import "server-only";
 import { InformationFormStatus, InformationFormVersionStatus, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { fieldDisplayLabel, isFieldVisible, validateTestResponses } from "@/modules/forms/definition";
-import { parseInformationFormDefinition, informationFormFields, type InformationFormDefinition } from "@/modules/information-forms/definition";
+import { parseInformationFormDefinition, parseStoredInformationFormDefinition, informationFormFields, type InformationFormDefinition } from "@/modules/information-forms/definition";
 import { scopeWhere, type InformationFormTarget } from "@/modules/information-forms/domain";
 import { InformationFormError } from "@/modules/information-forms/errors";
+import { writeAuditLog } from "@/modules/audit/audit-service";
 import { toCsv } from "@/modules/reporting/csv";
 
 /** One answer, labelled from the version it was answered on. */
 export type LabelledAnswer = { key: string; label: string; type: string; value: unknown };
 
-const MAX_EXPORT_ROWS = 20_000;
+/** Past this many responses an export is refused rather than silently cut short. */
+export const MAX_EXPORT_ROWS = 20_000;
 
 /**
  * The answers of one response, labelled by the definition of the version they were answered on (#1148). A field a later
@@ -52,7 +54,7 @@ function present(row: ResponseRow) {
     versionNumber: row.version.versionNumber,
     submittedAt: row.submittedAt,
     signedIn: row.attendeeAccountId !== null,
-    answers: labelAnswers(parseInformationFormDefinition(row.version.definition), answersOf(row.answers)),
+    answers: labelAnswers(parseStoredInformationFormDefinition(row.version.definition), answersOf(row.answers)),
   };
 }
 
@@ -96,9 +98,13 @@ export async function getInformationFormResponse(target: InformationFormTarget, 
  * Every response as CSV. Columns cover every version of the form: a field a later version dropped keeps its column,
  * headed by the label of the newest version that still had it. Cells go through the formula-safe escaper.
  */
-export async function buildInformationFormResponsesCsv(target: InformationFormTarget, formId: string) {
+export async function buildInformationFormResponsesCsv(target: InformationFormTarget, formId: string, actorUserId: string) {
   const form = await assertFormInTarget(target, formId);
   const prisma = getPrisma();
+  const total = await prisma.informationFormResponse.count({ where: { formId } });
+  if (total > MAX_EXPORT_ROWS) {
+    throw new InformationFormError("EXPORT_TOO_LARGE", `This form has ${total.toLocaleString("en-US")} responses, more than the ${MAX_EXPORT_ROWS.toLocaleString("en-US")} one export can hold. Ask a developer for a bulk export.`);
+  }
   const versions = await prisma.informationFormVersion.findMany({
     where: { formId, status: { not: InformationFormVersionStatus.DRAFT } },
     orderBy: { versionNumber: "desc" },
@@ -107,7 +113,7 @@ export async function buildInformationFormResponsesCsv(target: InformationFormTa
   // Newest version first, so its label wins; column order follows the newest definition, then older-only fields.
   const columns = new Map<string, string>();
   for (const version of versions) {
-    for (const field of informationFormFields(parseInformationFormDefinition(version.definition))) {
+    for (const field of informationFormFields(parseStoredInformationFormDefinition(version.definition))) {
       if (!columns.has(field.key)) columns.set(field.key, fieldDisplayLabel(field));
     }
   }
@@ -123,6 +129,13 @@ export async function buildInformationFormResponsesCsv(target: InformationFormTa
       return [row.submittedAt.toISOString(), row.version.versionNumber, row.attendeeAccountId ? "Yes" : "No", ...keys.map((key) => formatCell(answers[key]))];
     }),
   ]);
+  // Counts and ids only; no answer ever reaches the audit log.
+  await writeAuditLog({
+    ...(target.scope === "EVENT" ? { eventId: target.eventId } : {}),
+    actorUserId, action: "INFORMATION_FORM_RESPONSES_EXPORTED", entityType: "InformationForm", entityId: formId,
+    summary: `Exported ${rows.length} response${rows.length === 1 ? "" : "s"} of ${form.name}.`,
+    metadata: { formId, scope: target.scope, rowCount: rows.length, productionWrite: false },
+  });
   return { csv, filename: `${form.slug}-responses.csv`, rowCount: rows.length };
 }
 

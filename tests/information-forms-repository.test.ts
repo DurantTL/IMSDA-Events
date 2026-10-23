@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
-const state = vi.hoisted(() => ({ prisma: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ prisma: {} as Record<string, unknown>, audit: vi.fn(), loadFormTemplate: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => state.prisma }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: state.audit }));
+vi.mock("@/modules/forms/seeded-templates", () => ({ loadFormTemplate: state.loadFormTemplate }));
 
 import { blankInformationFormDefinition, parseInformationFormDefinition } from "@/modules/information-forms/definition";
 import { InformationFormError } from "@/modules/information-forms/errors";
 import {
+  createInformationForm,
   publishInformationForm,
   saveInformationFormDraft,
   setInformationFormStatus,
 } from "@/modules/information-forms/repository";
-import { buildInformationFormResponsesCsv, labelAnswers, storeInformationFormResponse } from "@/modules/information-forms/responses";
+import { MAX_EXPORT_ROWS, buildInformationFormResponsesCsv, getInformationFormResponse, labelAnswers, listInformationFormResponses, storeInformationFormResponse } from "@/modules/information-forms/responses";
 
 const target = { scope: "EVENT", eventId: "event-1" } as const;
 const t0 = new Date("2026-08-01T00:00:00.000Z");
@@ -117,6 +120,14 @@ describe("publishing (#1148)", () => {
     expect(calls[1].data).toEqual({ status: "PUBLISHED", publishedAt: expect.any(Date) });
     // No call ever carries a definition: published versions are immutable.
     expect(calls.every((call) => !("definition" in call.data))).toBe(true);
+  });
+
+  it("refuses to publish a draft that changed since the editor loaded it", async () => {
+    const tx = install([version({ definition: survey([rating]) })]);
+    await expect(publishInformationForm(target, "form-1", "user-1", t1.toISOString())).rejects.toMatchObject({ code: "EDIT_CONFLICT", status: 409 });
+    expect(tx.informationFormVersion.updateMany).not.toHaveBeenCalled();
+    await publishInformationForm(target, "form-1", "user-1", t0.toISOString());
+    expect(tx.informationFormVersion.updateMany).toHaveBeenCalled();
   });
 
   it("refuses to publish with no draft", async () => {
@@ -227,14 +238,20 @@ describe("reading responses (#1148)", () => {
         ]),
       },
       informationFormResponse: {
+        count: vi.fn().mockResolvedValue(2),
         findMany: vi.fn().mockResolvedValue([
           { answers: { overall: "Good", parking: "=HYPERLINK(\"x\")" }, attendeeAccountId: null, submittedAt: t0, version: { versionNumber: 1 } },
           { answers: { overall: "Poor" }, attendeeAccountId: "account-1", submittedAt: t1, version: { versionNumber: 2 } },
         ]),
       },
     };
-    const file = await buildInformationFormResponsesCsv(target, "form-1");
+    const file = await buildInformationFormResponsesCsv(target, "form-1", "user-1");
     expect(file.filename).toBe("post-event-survey-responses.csv");
+    // The export is audited with counts and ids only, never an answer.
+    expect(state.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: "INFORMATION_FORM_RESPONSES_EXPORTED", eventId: "event-1", actorUserId: "user-1", metadata: { formId: "form-1", scope: "EVENT", rowCount: 2, productionWrite: false },
+    }));
+    expect(JSON.stringify(state.audit.mock.calls)).not.toContain("HYPERLINK");
     const lines = file.csv.trim().split("\r\n");
     expect(lines[0]).toBe('"Submitted at","Form version","Signed in","Overall experience","Parking was easy"');
     expect(lines[1]).toContain('"Good"');
@@ -242,7 +259,101 @@ describe("reading responses (#1148)", () => {
     expect(lines[2]).toBe(`"${t1.toISOString()}","2","Yes","Poor",""`);
   });
 
+  it("refuses an export over the row limit instead of truncating", async () => {
+    state.prisma = {
+      informationForm: { findFirst: vi.fn().mockResolvedValue({ id: "form-1", name: "Survey", slug: "survey" }) },
+      informationFormResponse: { count: vi.fn().mockResolvedValue(MAX_EXPORT_ROWS + 1), findMany: vi.fn() },
+    };
+    await expect(buildInformationFormResponsesCsv(target, "form-1", "user-1")).rejects.toMatchObject({ code: "EXPORT_TOO_LARGE", status: 413 });
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("still reads a response whose stored version no longer passes the refusal check", async () => {
+    const storedBeforeRulesTightened = { ...survey([rating]), sections: [{ id: "section_one", title: "Medical history", description: "", fields: [{ id: "field_0", key: "list", label: "Please list", helpText: "", type: "LONG_TEXT", scope: "REGISTRATION", required: false, options: [] }] }] };
+    expect(() => parseInformationFormDefinition(storedBeforeRulesTightened)).toThrow();
+    const row = { id: "response-1", versionId: "v1", answers: { list: "Synthetic answer" }, attendeeAccountId: null, submittedAt: t0, version: { versionNumber: 1, definition: storedBeforeRulesTightened } };
+    state.prisma = {
+      informationForm: { findFirst: vi.fn().mockResolvedValue({ id: "form-1", name: "Survey", slug: "survey" }) },
+      informationFormResponse: { findMany: vi.fn().mockResolvedValue([row]), findFirst: vi.fn().mockResolvedValue(row), count: vi.fn().mockResolvedValue(1) },
+      informationFormVersion: { findMany: vi.fn().mockResolvedValue([{ versionNumber: 1, definition: storedBeforeRulesTightened }]) },
+    };
+    expect((await listInformationFormResponses(target, "form-1", { limit: 10 })).responses[0]!.answers).toEqual([{ key: "list", label: "Please list", type: "LONG_TEXT", value: "Synthetic answer" }]);
+    expect((await getInformationFormResponse(target, "form-1", "response-1")).answers).toHaveLength(1);
+    state.prisma = { ...state.prisma, informationFormResponse: { count: vi.fn().mockResolvedValue(1), findMany: vi.fn().mockResolvedValue([{ answers: { list: "x" }, attendeeAccountId: null, submittedAt: t0, version: { versionNumber: 1 } }]) } };
+    expect((await buildInformationFormResponsesCsv(target, "form-1", "user-1")).csv).toContain('"Please list"');
+  });
+
+  it("answers a form id from another scope, and a response id from another form, as not found", async () => {
+    // The GENERAL form is not found when looked up through the event scope.
+    const findForm = vi.fn().mockResolvedValue(null);
+    state.prisma = { informationForm: { findFirst: findForm }, informationFormResponse: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn(), count: vi.fn() } };
+    await expect(listInformationFormResponses(target, "general-form", { limit: 10 })).rejects.toMatchObject({ code: "FORM_NOT_FOUND", status: 404 });
+    expect(findForm).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "general-form", scope: "EVENT", eventId: "event-1" } }));
+    // A response belonging to another form is not found under this form.
+    const findResponse = vi.fn().mockResolvedValue(null);
+    state.prisma = { informationForm: { findFirst: vi.fn().mockResolvedValue({ id: "form-1", name: "Survey", slug: "survey" }) }, informationFormResponse: { findFirst: findResponse } };
+    await expect(getInformationFormResponse(target, "form-1", "response-of-form-2")).rejects.toMatchObject({ code: "RESPONSE_NOT_FOUND", status: 404 });
+    expect(findResponse).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "response-of-form-2", formId: "form-1" } }));
+  });
+
   it("is an InformationFormError type the routes can map", () => {
     expect(new InformationFormError("FORM_NOT_FOUND", "x").status).toBe(404);
+  });
+});
+
+describe("creating forms (#1148)", () => {
+  function createClient(options: { collisions?: number } = {}) {
+    let remaining = options.collisions ?? 0;
+    const create = vi.fn(async (args: { data: Record<string, unknown> }) => {
+      void args;
+      if (remaining > 0) {
+        remaining -= 1;
+        throw new Prisma.PrismaClientKnownRequestError("duplicate slug", { code: "P2002", clientVersion: "test" });
+      }
+      return { id: "form-new", name: "Post-event survey", versions: [] };
+    });
+    const tx = { informationForm: { create }, auditLog: { create: vi.fn().mockResolvedValue({}) } };
+    state.prisma = { $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)) };
+    return { create, tx };
+  }
+
+  it("creates from a given definition, titled with the form name", async () => {
+    const { create } = createClient();
+    await createInformationForm(target, "user-1", { name: "Post-event survey", definition: survey([rating], "Ignored title") });
+    const data = create.mock.calls[0]![0].data as { versions: { create: { definition: { title: string } } } };
+    expect(data).toMatchObject({ scope: "EVENT", eventId: "event-1", scopeKey: "event-1", slug: "post-event-survey", sourceTemplateVersionId: null });
+    expect(data.versions.create.definition.title).toBe("Post-event survey");
+  });
+
+  it("creates a GENERAL form with no event and the GENERAL scope key", async () => {
+    const { create } = createClient();
+    await createInformationForm({ scope: "GENERAL" }, "user-1", { name: "Interest survey" });
+    expect(create.mock.calls[0]![0].data).toMatchObject({ scope: "GENERAL", eventId: null, scopeKey: "GENERAL" });
+  });
+
+  it("creates from a stored template and records its version", async () => {
+    state.loadFormTemplate.mockResolvedValue({ definition: survey([rating]), versionId: "template-version-1" });
+    const { create } = createClient();
+    await createInformationForm(target, "user-1", { name: "Post-event survey", templateKey: "post_event" });
+    expect(create.mock.calls[0]![0].data).toMatchObject({ sourceTemplateVersionId: "template-version-1" });
+  });
+
+  it("refuses a template that holds a health field, and creates nothing", async () => {
+    state.loadFormTemplate.mockResolvedValue({ definition: { title: "Health template", description: "", confirmationMessage: "Thank you for answering.", sections: [{ id: "section_one", title: "Survey", description: "", fields: [{ id: "field_0", key: "current_medications", label: "Current medications", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] }] }] }, versionId: "template-version-2" });
+    const { create } = createClient();
+    await expect(createInformationForm(target, "user-1", { name: "Post-event survey", templateKey: "health_template" })).rejects.toThrow(/health, medical or other sensitive/);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("reports an unknown template as not found", async () => {
+    state.loadFormTemplate.mockResolvedValue(null);
+    createClient();
+    await expect(createInformationForm(target, "user-1", { name: "Post-event survey", templateKey: "nope" })).rejects.toMatchObject({ code: "TEMPLATE_NOT_FOUND", status: 404 });
+  });
+
+  it("retries with the next web address when the slug is taken", async () => {
+    const { create } = createClient({ collisions: 2 });
+    await createInformationForm(target, "user-1", { name: "Post-event survey" });
+    expect(create.mock.calls.map((call) => (call[0].data as { slug: string }).slug)).toEqual(["post-event-survey", "post-event-survey-2", "post-event-survey-3"]);
   });
 });

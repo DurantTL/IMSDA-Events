@@ -171,12 +171,15 @@ export async function saveInformationFormDraft(
 }
 
 /** Publishes the draft: it becomes immutable, and any earlier published version is superseded. */
-export async function publishInformationForm(target: InformationFormTarget, formId: string, actorUserId: string) {
+export async function publishInformationForm(target: InformationFormTarget, formId: string, actorUserId: string, expectedUpdatedAt?: string) {
   await writeTransaction(target, formId, async (tx) => {
     const form = await tx.informationForm.findFirst({ where: { id: formId, ...scopeWhere(target) }, include: formInclude });
     if (!form) throw new InformationFormError("FORM_NOT_FOUND", NOT_FOUND);
     const draft = form.versions.find((version) => version.status === InformationFormVersionStatus.DRAFT);
     if (!draft) throw new InformationFormError("NO_DRAFT", "This form has no draft version to publish.");
+    if (expectedUpdatedAt && draft.updatedAt.getTime() !== new Date(expectedUpdatedAt).getTime()) {
+      throw new InformationFormError("EDIT_CONFLICT", "This draft changed in another session. Reload it before publishing.");
+    }
     // Re-checked on publish, so a definition stored before a rule tightened can never go live.
     const definition = definitionOf(draft.definition);
     await tx.informationFormVersion.updateMany({ where: { formId, status: InformationFormVersionStatus.PUBLISHED }, data: { status: InformationFormVersionStatus.SUPERSEDED } });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
   findActiveMembership: vi.fn(),
+  findEvent: vi.fn(),
   listInformationForms: vi.fn(),
   createInformationForm: vi.fn(),
   getInformationForm: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findUnique: mocks.findEvent } }) }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
@@ -60,6 +62,7 @@ const adminParams = { params: Promise.resolve({ formId: "form-1" }) };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.findEvent.mockResolvedValue({ id: "event-1" });
   mocks.listInformationForms.mockResolvedValue([]);
   mocks.getInformationForm.mockResolvedValue({ id: "form-1" });
   mocks.createInformationForm.mockResolvedValue({ id: "form-1" });
@@ -120,6 +123,24 @@ describe("EVENT information form routes (MANAGE_FORMS on the event)", () => {
     expect((await EVENT_STATUS(request("PATCH", { status: "OPEN" }), eventParams())).status).toBe(200);
     expect((await EVENT_RESPONSES(request(), eventParams())).status).toBe(200);
     expect((await EVENT_RESPONSE(request(), eventParams({ responseId: "response-1" }))).status).toBe(200);
+  });
+
+  it("answers an event id that does not exist as 404 for a system administrator, and 403 for anyone else", async () => {
+    mocks.findEvent.mockResolvedValue(null);
+    mocks.getCurrentSession.mockResolvedValue(systemAdmin);
+    expect((await EVENT_LIST(request(), eventParams())).status).toBe(404);
+    mocks.getCurrentSession.mockResolvedValue(eventStaff);
+    mocks.findActiveMembership.mockResolvedValue(null);
+    expect((await EVENT_LIST(request(), eventParams())).status).toBe(403);
+    expect(mocks.listInformationForms).not.toHaveBeenCalled();
+  });
+
+  it("publishes with no body, or with the expected draft timestamp", async () => {
+    mocks.getCurrentSession.mockResolvedValue(systemAdmin);
+    expect((await EVENT_PUBLISH(new Request("https://events.example.test/api", { method: "POST" }), eventParams())).status).toBe(200);
+    expect(mocks.publishInformationForm).toHaveBeenLastCalledWith({ scope: "EVENT", eventId: "event-1" }, "form-1", "admin-1", undefined);
+    expect((await EVENT_PUBLISH(request("POST", { expectedUpdatedAt: "2026-08-01T00:00:00.000Z" }), eventParams())).status).toBe(200);
+    expect(mocks.publishInformationForm).toHaveBeenLastCalledWith({ scope: "EVENT", eventId: "event-1" }, "form-1", "admin-1", "2026-08-01T00:00:00.000Z");
   });
 
   it("serve staff given MANAGE_FORMS as an extra permission", async () => {

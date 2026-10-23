@@ -6,6 +6,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import {
   createInformationFormSchema,
   informationFormSettingsSchema,
+  publishInformationFormSchema,
   informationFormStatusSchema,
   responseListQuerySchema,
   saveInformationFormDraftSchema,
@@ -47,8 +48,9 @@ function failure(error: unknown) {
   return Response.json({ error: "INFORMATION_FORM_REQUEST_FAILED", message: "The information form request could not be completed." }, { status: 500, headers: noStore });
 }
 
-async function readJson(request: Request) {
+async function readJson(request: Request, optional = false) {
   try {
+    if (optional && (await request.clone().text()).trim() === "") return undefined;
     return await request.json();
   } catch {
     throw new InformationFormError("INVALID_REQUEST", "The request body must be valid JSON.");
@@ -67,12 +69,12 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
     }
   }
 
-  async function write(request: Request, params: P, work: (access: InformationFormAuthorization, body: unknown) => Promise<Response>) {
+  async function write(request: Request, params: P, work: (access: InformationFormAuthorization, body: unknown) => Promise<Response>, optionalBody = false) {
     const originError = rejectCrossOriginRequest(request);
     if (originError) return originError;
     try {
       const access = await authorize(params);
-      return await work(access, await readJson(request));
+      return await work(access, await readJson(request, optionalBody));
     } catch (error) {
       return failure(error);
     }
@@ -91,7 +93,10 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
       const input = saveInformationFormDraftSchema.parse(body);
       return json({ form: await saveInformationFormDraft(target, params.formId, userId, input) });
     }),
-    publish: (request: Request, params: FormParams) => write(request, params, async ({ userId, target }) => json({ form: await publishInformationForm(target, params.formId, userId) })),
+    publish: (request: Request, params: FormParams) => write(request, params, async ({ userId, target }, body) => {
+      const input = publishInformationFormSchema.parse(body ?? {});
+      return json({ form: await publishInformationForm(target, params.formId, userId, input.expectedUpdatedAt) });
+    }, true),
     setStatus: (request: Request, params: FormParams) => write(request, params, async ({ userId, target }, body) => {
       const input = informationFormStatusSchema.parse(body);
       return json({ form: await setInformationFormStatus(target, params.formId, userId, input.status) });
@@ -105,8 +110,8 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
       return json(await listInformationFormResponses(target, params.formId, query));
     }),
     getResponse: (request: Request, params: ResponseParams) => read(params, async ({ target }) => json({ response: await getInformationFormResponse(target, params.formId, params.responseId) })),
-    exportResponses: (request: Request, params: FormParams) => read(params, async ({ target }) => {
-      const file = await buildInformationFormResponsesCsv(target, params.formId);
+    exportResponses: (request: Request, params: FormParams) => read(params, async ({ userId, target }) => {
+      const file = await buildInformationFormResponsesCsv(target, params.formId, userId);
       return new Response(file.csv, { headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${file.filename}"`,

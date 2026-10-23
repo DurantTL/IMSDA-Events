@@ -109,3 +109,9 @@ ALTER TABLE "InformationFormResponse" ADD CONSTRAINT "InformationFormResponse_ve
 -- AddForeignKey
 ALTER TABLE "InformationFormResponse" ADD CONSTRAINT "InformationFormResponse_attendeeAccountId_fkey" FOREIGN KEY ("attendeeAccountId") REFERENCES "AttendeeAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+
+-- A GENERAL form has no event and the scope key "GENERAL"; an EVENT form has an event and uses its id as the scope key.
+ALTER TABLE "InformationForm" ADD CONSTRAINT "InformationForm_scope_consistency_check" CHECK (
+  ("scope" = 'GENERAL' AND "eventId" IS NULL AND "scopeKey" = 'GENERAL')
+  OR ("scope" = 'EVENT' AND "eventId" IS NOT NULL AND "scopeKey" = "eventId")
+);
