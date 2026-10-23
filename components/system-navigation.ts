@@ -180,6 +180,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/organizations\/import(\/|$)/, "Import organizations"],
   [/^\/admin\/organizations\/map-locations(\/|$)/, "Find map locations"],
   [/^\/admin\/organizations\/[^/]+\/billing(\/|$)/, "Billing contact"],
+  [/^\/admin\/organizations\/[^/]+\/pastor(\/|$)/, "Pastor contact"],
   [/^\/admin\/organizations\/[^/]+\/club\/honors(\/|$)/, "Club honors"],
   [/^\/admin\/organizations\/[^/]+\/club(\/|$)/, "Open club"],
   [/^\/admin\/organizations\/[^/]+\/directors(\/|$)/, "Club directors"],
