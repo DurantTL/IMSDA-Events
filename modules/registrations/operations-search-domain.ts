@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { EventPermission } from "@/modules/access/permissions";
+import { sortOrderText, type SortKind } from "@/lib/list-sort";
 import type { ChoiceQuestion } from "@/modules/registrations/choice-answer-filter";
 
 /**
@@ -746,6 +747,27 @@ export function buildRegistrationWhere(query: OperationsSearchQuery, context: Se
     clauses.push(question ? answerPredicate(answer, question, context.answerRegistrationIds?.get(answer.question) ?? []) : { id: { in: [] } });
   }
   return { eventId: context.eventId, ...(clauses.length ? { AND: clauses } : {}) };
+}
+
+const SORT_DESCRIPTION: Record<SearchSortKey, { label: string; kind: SortKind }> = {
+  submitted: { label: "submitted date", kind: "date" },
+  created: { label: "created date", kind: "date" },
+  code: { label: "confirmation code", kind: "text" },
+  name: { label: "last name", kind: "text" },
+  total: { label: "total", kind: "number" },
+};
+
+/**
+ * The sentence for the order a search actually ran in ("Sorted by last name, A to Z."),
+ * from the resolved query the service ordered by, never from raw URL text. A
+ * search that did not run (`ok` false: an invalid or unavailable sort among the
+ * issues) has no order to describe, so this returns null rather than name a
+ * field the viewer may not use.
+ */
+export function describeSearchOrder(result: { ok: boolean; query: Pick<OperationsSearchQuery, "sort" | "direction"> }): string | null {
+  if (!result.ok) return null;
+  const { label, kind } = SORT_DESCRIPTION[result.query.sort];
+  return sortOrderText(label, result.query.direction, kind);
 }
 
 /**

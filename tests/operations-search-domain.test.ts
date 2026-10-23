@@ -4,6 +4,7 @@ import {
   FILTER_KEYS,
   availableOperationsFilters,
   buildRegistrationWhere,
+  describeSearchOrder,
   emptyOperationsSearchQuery,
   emptySearchCatalog,
   escapeLikePattern,
@@ -163,6 +164,28 @@ describe("what a viewer may search", () => {
     const result = resolveOperationsSearch(parse("tag=gone&attendeeType=GONE&location=nowhere").query, admin, catalog({ locations: [{ id: "loc-1", name: "North" }] }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.issues.map((issue) => issue.filter).sort()).toEqual(["attendeeType", "location", "tag"]);
+  });
+
+  it("describes the order the search ran in, and none for a search that did not run", () => {
+    const order = (qs: string, who: SearchViewer = admin) => {
+      const parsed = parse(qs);
+      const resolved = resolveOperationsSearch(parsed.query, who, catalog());
+      return describeSearchOrder({ ok: resolved.ok && parsed.issues.length === 0, query: parsed.query });
+    };
+    expect(order("q=smith")).toBe("Sorted by submitted date, newest first.");
+    expect(order("sort=name")).toBe("Sorted by last name, A to Z.");
+    expect(order("sort=name.desc")).toBe("Sorted by last name, Z to A.");
+    expect(order("sort=submitted.asc")).toBe("Sorted by submitted date, oldest first.");
+    expect(order("sort=total")).toBe("Sorted by total, highest first.");
+    expect(order("sort=total.asc")).toBe("Sorted by total, lowest first.");
+    expect(order("sort=code")).toBe("Sorted by confirmation code, A to Z.");
+    expect(order("sort=created.asc")).toBe("Sorted by created date, oldest first.");
+    // Denied or invalid: the search did not run, so no field is named.
+    expect(order("sort=name", viewer("VIEW_EVENT", "MANAGE_FINANCE"))).toBeNull();
+    expect(order("sort=total", viewer("VIEW_EVENT", "VIEW_SENSITIVE_DATA"))).toBeNull();
+    expect(order("sort=password")).toBeNull();
+    // A rejected service result names no field, whatever its query says.
+    expect(describeSearchOrder({ ok: false, query: { sort: "name", direction: "asc" } })).toBeNull();
   });
 
   it("needs the identity domain to sort by name and the payment domain to sort by total", () => {
