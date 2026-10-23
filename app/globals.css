@@ -11483,6 +11483,21 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .staff-invite-table td { overflow-wrap: anywhere; }
   .staff-invite-table td:empty { display: none; }
 }
+/* Tablet widths (#1045): when the box around the table is narrower than 760px (about 861px beside the sidebar) the same cards show,
+   so the table is never wider than its box. The box decides (container query on the `.card-box` wrapper), not the viewport. Phones keep the rules above. */
+@media screen and (min-width: 641px) {
+  @container (max-width: 760px) {
+    .report-table-wrap.card-box:has(> .staff-invite-table) { overflow: visible; }
+    .staff-invite-table, .staff-invite-table tbody, .staff-invite-table tr, .staff-invite-table td { display: block; width: 100%; box-sizing: border-box; }
+    .staff-invite-table { min-width: 0; }
+    .staff-invite-table thead { display: none; }
+    .staff-invite-table tr { margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .staff-invite-table td, .staff-invite-table td:first-child, .staff-invite-table td:last-child { width: 100%; border: 0; padding: 4px 0; }
+    .staff-invite-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-weight: 600; font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.8rem); }
+    .staff-invite-table td { overflow-wrap: anywhere; }
+    .staff-invite-table td:empty { display: none; }
+  }
+}
 .staff-invite-preview { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); overflow-wrap: anywhere; }
 .staff-invite-preview pre { white-space: pre-wrap; margin: 0; font: inherit; }
 .staff-invite-party { margin: 0; padding-left: 18px; }

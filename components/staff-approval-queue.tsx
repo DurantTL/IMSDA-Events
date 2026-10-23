@@ -170,7 +170,7 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
       {visible.length === 0 ? (
         <section className="panel empty-state"><h3>Nothing here</h3><p>No registrations match. People appear here after they register through their personal link.</p></section>
       ) : (
-        <div className="report-table-wrap">
+        <div className="report-table-wrap card-box">
           <table className="report-table staff-invite-table">
             <thead>
               <tr>

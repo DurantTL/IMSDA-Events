@@ -269,7 +269,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
       {visible.length === 0 ? (
         <p className="empty-state">{rows.length === 0 ? "Import a CSV above to create the first personal links." : "Nobody matches these filters."}</p>
       ) : (
-        <div className="report-table-wrap">
+        <div className="report-table-wrap card-box">
           <table className="report-table staff-invite-table">
             <thead>
               <tr>
