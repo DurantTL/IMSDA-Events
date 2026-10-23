@@ -7,19 +7,11 @@ import { BuilderFieldRow } from "./builder-field-row";
 import { BuilderFieldList } from "./builder-field-list";
 import { useLoadedBuilder } from "./builder-context";
 
-export function BuilderSectionCard({ section, sectionIndex }: { section: RegistrationFormDefinition["sections"][number]; sectionIndex: number }) {
-  const { definition, dragging, setDragging, canEdit, updateSection, moveSection, dropSection, dropField, setReviewSection, openRemoveSection } = useLoadedBuilder();
+// The step's own settings: title, description, progress label, final-review toggle, reorder and remove.
+// The editor shell (#1132) shows the same block behind each step's "Step settings" button.
+export function BuilderSectionHead({ section, sectionIndex }: { section: RegistrationFormDefinition["sections"][number]; sectionIndex: number }) {
+  const { definition, setDragging, canEdit, updateSection, moveSection, setReviewSection, openRemoveSection } = useLoadedBuilder();
   return (
-    <section
-          className={dragging?.kind === "section" && dragging.sectionIndex === sectionIndex ? "panel builder-section dragging" : "panel builder-section"}
-          data-testid={`builder-section-${sectionIndex}`}
-          onDragOver={(event) => { if (dragging) event.preventDefault(); }}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (dragging?.kind === "section") dropSection(sectionIndex);
-            if (dragging?.kind === "field") dropField(sectionIndex, section.fields.length);
-          }}
-        >
           <div className="builder-section-head">
             <span className="section-number">{sectionIndex + 1}</span>
             <div className="builder-section-copy">
@@ -38,6 +30,23 @@ export function BuilderSectionCard({ section, sectionIndex }: { section: Registr
               <button className="danger" type="button" aria-label={`Remove ${section.title}`} onClick={() => openRemoveSection(sectionIndex)}><Trash2 size={14} /><span>Remove</span></button>
             </div>}
           </div>
+  );
+}
+
+export function BuilderSectionCard({ section, sectionIndex }: { section: RegistrationFormDefinition["sections"][number]; sectionIndex: number }) {
+  const { dragging, dropSection, dropField } = useLoadedBuilder();
+  return (
+    <section
+          className={dragging?.kind === "section" && dragging.sectionIndex === sectionIndex ? "panel builder-section dragging" : "panel builder-section"}
+          data-testid={`builder-section-${sectionIndex}`}
+          onDragOver={(event) => { if (dragging) event.preventDefault(); }}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (dragging?.kind === "section") dropSection(sectionIndex);
+            if (dragging?.kind === "field") dropField(sectionIndex, section.fields.length);
+          }}
+        >
+          <BuilderSectionHead section={section} sectionIndex={sectionIndex} />
           <div className="builder-fields">{section.fields.map((field, fieldIndex) => <BuilderFieldRow key={field.id} section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />)}</div>
           <BuilderFieldList section={section} sectionIndex={sectionIndex} />
     </section>

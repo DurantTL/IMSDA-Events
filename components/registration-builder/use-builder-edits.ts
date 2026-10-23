@@ -3,6 +3,8 @@
 import { isAgeFieldKey, pruneRequireAtLeastOne, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { moduleAlreadyPresentNotice, moduleAttendeeRoster, moduleInsertNotice, planModuleInsert, type BuilderModuleDefinition } from "@/modules/forms/builder-modules";
 import { isPublicReviewSection } from "@/modules/forms/public-registration-steps";
+import type { PaletteEntry } from "./palette-registry";
+import { planPaletteInsert } from "./palette-insert";
 import { localId, defaultField, blankPreviewAttendees } from "./builder-types";
 import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
@@ -139,7 +141,8 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     setExpandedFieldId(duplicate.id);
   }
 
-  function addModule(sectionIndex: number, module: BuilderModuleDefinition) {
+  // `atIndex` places the module's fields before that field; left out, they go at the end of the section.
+  function addModule(sectionIndex: number, module: BuilderModuleDefinition, atIndex?: number) {
     if (!definition) return;
     const existingFields = definition.sections.flatMap((section) => section.fields);
     const plan = planModuleInsert(module, existingFields, () => localId("field"));
@@ -158,8 +161,9 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
       return;
     }
     const section = definition.sections[sectionIndex];
+    const insertAt = atIndex === undefined ? section.fields.length : Math.min(Math.max(atIndex, 0), section.fields.length);
     const sections = definition.sections.map((candidate, index) => index === sectionIndex
-      ? { ...candidate, fields: [...section.fields, ...fields] }
+      ? { ...candidate, fields: [...section.fields.slice(0, insertAt), ...fields, ...section.fields.slice(insertAt)] }
       : candidate);
     const attendeeRoster = moduleAttendeeRoster(definition.attendeeRoster, module);
     const nextDefinition = { ...definition, sections, attendeeRoster };
@@ -171,6 +175,19 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     closeModuleLibrary();
     const insertNotice = moduleInsertNotice(plan);
     if (insertNotice) setNotice(insertNotice);
+  }
+
+  // The Questions palette (#1132): add an entry's fields to a step, at the end or before `atIndex`.
+  // Modules go through addModule so their fixed keys, "already on the form" check, roster switch-on and notices stay as they were.
+  function addPaletteEntry(entry: PaletteEntry, sectionIndex: number, atIndex?: number) {
+    if (!definition) return;
+    const plan = planPaletteInsert(definition, entry, sectionIndex, atIndex, () => localId("field"));
+    if (plan.kind === "module") addModule(sectionIndex, plan.module, plan.atIndex);
+    else if (plan.kind === "error") setError(plan.message);
+    else if (plan.kind === "inserted") {
+      replaceDefinition({ ...definition, sections: plan.sections });
+      setExpandedFieldId(plan.selectedFieldId);
+    }
   }
 
   function addSection() {
@@ -213,7 +230,7 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     closeModuleLibrary();
     replaceDefinition({ ...definition, sections });
   }
-  return { replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addSection, removeSection, setReviewSection };
+  return { replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addPaletteEntry, addSection, removeSection, setReviewSection };
 }
 
 export type BuilderEdits = ReturnType<typeof useBuilderEdits>;

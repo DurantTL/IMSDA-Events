@@ -12,9 +12,41 @@ export function BuilderPageIntro() {
   );
 }
 
-export function BuilderEditorHead() {
-  const { selectedForm, selectedVersion, definition, dirty, busy, setPreviewStepId, previewSteps, publishedVersion, isHistorical, canEdit, editsCreateDraft, hasValidTest, testRequired, publishBlockedReason, replaceDefinition, saveDraft, beginPublish, eventSlug } = useLoadedBuilder();
+// The three form actions are shared by the phone layout's header and the editor shell's top bar (#1132),
+// so Save draft and Publish have one set of labels and one set of rules.
+export function BuilderSaveDraftButton({ className = "secondary-button" }: { className?: string }) {
+  const { dirty, busy, canEdit, editsCreateDraft, saveDraft } = useLoadedBuilder();
+  return <button className={className} type="button" disabled={!canEdit || (!dirty && !editsCreateDraft) || busy !== null} aria-describedby="builder-action-hints" onClick={saveDraft}><Save size={15} /> {busy === "save" ? "Saving…" : editsCreateDraft ? (dirty ? "Save as new draft" : "Create new version") : "Save draft"}</button>;
+}
+
+export function BuilderPublicLink({ className = "secondary-button" }: { className?: string }) {
+  const { selectedForm, publishedVersion, eventSlug } = useLoadedBuilder();
+  return publishedVersion ? <a className={className} href={`/register/${eventSlug}/${selectedForm.slug}`} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open public form</a> : <button className={className} type="button" disabled title="Publish this form to create its public link"><ExternalLink size={15} /> Open public form</button>;
+}
+
+/** Renders nothing unless the open version is a draft, the only status that can be published. */
+export function BuilderPublishButton({ className = "primary-button" }: { className?: string }) {
+  const { selectedVersion, busy, publishBlockedReason, beginPublish } = useLoadedBuilder();
+  if (selectedVersion.status !== "DRAFT") return null;
+  return <button className={className} type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> Publish version</button>;
+}
+
+/** Why Save or Publish is unavailable, and what a live version means for edits. Both layouts point `aria-describedby` at it. */
+export function BuilderActionHints() {
+  const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, editsCreateDraft } = useLoadedBuilder();
   return (
-    <section className="panel builder-editor-head"><div className="builder-status-row"><span className={`status-chip ${selectedVersion.status === "PUBLISHED" ? "green" : selectedVersion.status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(selectedVersion.status)}</span><span>Version {selectedVersion.versionNumber}</span>{dirty && <span className="unsaved-dot">Unsaved changes</span>}</div><label>Form title<input autoComplete="off" name="builder-rb-field-1" disabled={!canEdit} value={definition.title} maxLength={120} onChange={(event) => replaceDefinition({ ...definition, title: event.target.value })} /></label><label>Description<textarea autoComplete="off" name="builder-rb-note-2" disabled={!canEdit} value={definition.description} maxLength={500} rows={2} onChange={(event) => replaceDefinition({ ...definition, description: event.target.value })} /></label><div className="builder-actions"><button className="secondary-button" type="button" disabled={!canEdit || (!dirty && !editsCreateDraft) || busy !== null} aria-describedby="builder-action-hints" onClick={saveDraft}><Save size={15} /> {busy === "save" ? "Saving…" : editsCreateDraft ? (dirty ? "Save as new draft" : "Create new version") : "Save draft"}</button>{publishedVersion ? <a className="secondary-button" href={`/register/${eventSlug}/${selectedForm.slug}`} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Open public form</a> : <button className="secondary-button" type="button" disabled title="Publish this form to create its public link"><ExternalLink size={15} /> Open public form</button>}{selectedVersion.status === "DRAFT" && <button className="primary-button" type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> Publish version</button>}</div><div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Save as new draft to keep your edits; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>{isHistorical && <p className="builder-gate"><FileClock size={15} /> Historical versions are immutable and shown read-only.</p>}</section>
+    <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Save as new draft to keep your edits; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
+  );
+}
+
+export function BuilderHistoricalGate() {
+  const { isHistorical } = useLoadedBuilder();
+  return isHistorical ? <p className="builder-gate"><FileClock size={15} /> Historical versions are immutable and shown read-only.</p> : null;
+}
+
+export function BuilderEditorHead() {
+  const { selectedVersion, definition, dirty, canEdit, replaceDefinition } = useLoadedBuilder();
+  return (
+    <section className="panel builder-editor-head"><div className="builder-status-row"><span className={`status-chip ${selectedVersion.status === "PUBLISHED" ? "green" : selectedVersion.status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(selectedVersion.status)}</span><span>Version {selectedVersion.versionNumber}</span>{dirty && <span className="unsaved-dot">Unsaved changes</span>}</div><label>Form title<input autoComplete="off" name="builder-rb-field-1" disabled={!canEdit} value={definition.title} maxLength={120} onChange={(event) => replaceDefinition({ ...definition, title: event.target.value })} /></label><label>Description<textarea autoComplete="off" name="builder-rb-note-2" disabled={!canEdit} value={definition.description} maxLength={500} rows={2} onChange={(event) => replaceDefinition({ ...definition, description: event.target.value })} /></label><div className="builder-actions"><BuilderSaveDraftButton /><BuilderPublicLink /><BuilderPublishButton /></div><BuilderActionHints /><BuilderHistoricalGate /></section>
   );
 }
