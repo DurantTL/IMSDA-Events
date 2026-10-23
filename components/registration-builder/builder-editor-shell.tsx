@@ -27,8 +27,8 @@ import { BuilderSidebar, type SidebarTabDefinition } from "./builder-sidebar";
 import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
 import { locateField } from "./canvas-rows";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
-import { isSearchShortcut } from "./shell-keys";
-import { useEditorLayout } from "./use-editor-layout";
+import { focusTargetAction, isSearchShortcut } from "./shell-keys";
+import { useEditorLayout, useHydrated } from "./use-editor-layout";
 import type { PaletteEntry, PaletteRegistry } from "./palette-registry";
 
 type FocusRequest =
@@ -83,6 +83,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   const layoutControls = useEditorLayout();
+  const hydrated = useHydrated();
   const { layout, showSidebar } = layoutControls;
 
   // A question already selected on arrival (a setup warning's link) opens its settings.
@@ -134,9 +135,10 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   // The question a setup warning links to (#617): its fee box may sit inside the closed Advanced fold, so open the folds and focus it.
   // A hidden sidebar is shown first, or the box would not exist to focus.
   useEffect(() => {
-    if (!focusTarget || handledFocusTarget.current || focusTarget.formId !== selectedFormId) return;
-    if (expandedFieldId !== focusTarget.fieldId || tab !== "settings") return;
-    if (!layout.sidebarVisible) { showSidebar(); return; }
+    if (!focusTarget || focusTarget.formId !== selectedFormId) return;
+    const action = focusTargetAction({ handled: handledFocusTarget.current, hydrated, selected: expandedFieldId === focusTarget.fieldId, settingsOpen: tab === "settings", sidebarVisible: layout.sidebarVisible });
+    if (action === "skip") return;
+    if (action === "reveal") { showSidebar(); return; }
     const input = document.getElementById(`registration-fee-${focusTarget.fieldId}`);
     if (!input) { handledFocusTarget.current = true; return; }
     handledFocusTarget.current = true;
@@ -145,7 +147,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     }
     input.scrollIntoView({ block: "center" });
     input.focus();
-  }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar]);
+  }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar, hydrated]);
 
   // Remember where the selection was; if the question is then removed, focus goes to its step's add button instead of being lost.
   // Opening another form or version forgets it. The removal confirmation puts focus back itself when it closes, so this waits a
@@ -288,7 +290,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{layout.sidebarVisible ? "Hide sidebar" : "Show sidebar"}</button>
           <button className="fb-btn" type="button" onClick={layoutControls.swapSide}>{layout.side === "right" ? "Move sidebar to the left" : "Move sidebar to the right"}</button>
           <button className="fb-btn" type="button" disabled={shownWidth <= MIN_SIDEBAR_WIDTH} onClick={() => layoutControls.setWidth(shownWidth - SIDEBAR_WIDTH_STEP)}>Sidebar narrower</button>
-          <button className="fb-btn" type="button" disabled={shownWidth >= maxWidth} onClick={() => layoutControls.setWidth(shownWidth + SIDEBAR_WIDTH_STEP)}>Sidebar wider</button>
+          <button className="fb-btn" type="button" disabled={shownWidth >= maxWidth} onClick={() => layoutControls.setWidth(Math.min(shownWidth + SIDEBAR_WIDTH_STEP, maxWidth))}>Sidebar wider</button>
           <button className="fb-btn" type="button" onClick={layoutControls.resetLayout}>Reset layout</button>
           <p className="fb-hint">You can also drag the sidebar&apos;s edge, or focus it and use the arrow keys. Your layout is remembered in this browser.</p>
         </div>

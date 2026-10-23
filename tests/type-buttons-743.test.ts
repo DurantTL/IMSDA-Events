@@ -459,4 +459,46 @@ describe("one filled primary per screen (#743)", () => {
     expect(zone).toContain(`Withdraw ${definition.title}`);
     expect(markup.slice(0, markup.indexOf('class="panel danger-zone'))).not.toContain("Withdraw from public page");
   });
+
+  // The editor shell (#1132) is the default layout on a tablet or desktop, so the same rules are pinned there.
+  function renderShellDefault(status: "DRAFT" | "PUBLISHED") {
+    const definition = structuredClone(formTemplates[0].definition) as RegistrationFormDefinition;
+    const version = {
+      id: "version-1", versionNumber: 1, status, definition, publishedAt: status === "PUBLISHED" ? "2028-08-01T00:00:00.000Z" : null,
+      createdAt: "2028-08-01T00:00:00.000Z", updatedAt: "2028-08-01T00:00:00.000Z", createdBy: "Synthetic Staff",
+      testSubmissionCount: 0, choiceUsage: {}, testSubmissions: [],
+    };
+    const markup = renderToStaticMarkup(createElement(RegistrationBuilderWorkspace, {
+      eventId: "event-1", eventSlug: "fall-camporee-2028", eventName: "Fall Camporee 2028",
+      initialForms: [{
+        id: "form-1", eventId: "event-1", name: definition.title, slug: "synthetic-form", status,
+        createdAt: "2028-08-01T00:00:00.000Z", updatedAt: "2028-08-01T00:00:00.000Z", createdBy: "Synthetic Staff",
+        activeVersion: version, versions: [version],
+      }],
+      templates: [],
+    } as never));
+    return { markup, definition };
+  }
+  const filledPrimaries = (markup: string) => markup.match(/<[^>]*class="[^"]*(?:\bprimary-button\b|\bfb-btn primary\b)[^"]*"[^>]*>/g) ?? [];
+
+  it("editor shell: exactly one filled primary, Save draft, and Publish is outlined", () => {
+    const { markup } = renderShellDefault("DRAFT");
+    expect(markup).toContain('class="fb-topbar"');
+    expect(markup).not.toContain('class="builder-layout"');
+    const primaries = filledPrimaries(markup);
+    expect(primaries).toHaveLength(1);
+    expect(markup).toMatch(/class="fb-btn primary"[^>]*>(?:(?!<\/button>)[\s\S])*Save draft/);
+    expect(markup).toMatch(/class="fb-btn outline"[^>]*>(?:(?!<\/button>)[\s\S])*Publish version/);
+  });
+
+  it("editor shell: the Withdraw danger zone comes after the canvas and the settings", () => {
+    const { markup, definition } = renderShellDefault("PUBLISHED");
+    const zone = markup.indexOf('class="panel danger-zone');
+    expect(zone).toBeGreaterThan(markup.indexOf('class="fb-canvas"'));
+    expect(zone).toBeGreaterThan(markup.indexOf('id="builder-settings"'));
+    expect(markup.slice(zone)).toContain("Withdraw from public page");
+    expect(markup.slice(zone)).toContain(`Withdraw ${definition.title}`);
+    expect(markup.slice(0, zone)).not.toContain("Withdraw from public page");
+    expect(filledPrimaries(markup)).toHaveLength(1);
+  });
 });

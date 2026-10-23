@@ -29,7 +29,7 @@ export function avoidCollisions(fields: RegistrationFormField[], existing: reado
     while (usedIds.has(id)) id = newId();
     usedIds.add(id);
     // Only a clash is renamed: an entry may deliberately use a special key (the age field, say) when it is not yet on the form.
-    const key = uniqueFieldKey(field.key, usedKeys, false);
+    const key = uniqueFieldKey(field.key, usedKeys, { avoidReserved: false });
     usedKeys.add(key);
     if (key !== field.key) renamed.set(field.key, key);
     return { ...field, id, key };

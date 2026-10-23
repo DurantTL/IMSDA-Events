@@ -24,6 +24,13 @@ export function useEditorShellViewport(): boolean {
   );
 }
 
+const noSubscription = () => () => {};
+
+/** False while the page is being hydrated (and on the server), true from the first client render after it. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(noSubscription, () => true, () => false);
+}
+
 const layoutStore = createEditorLayoutStore();
 
 export function useEditorLayout() {

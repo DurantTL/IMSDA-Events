@@ -16,7 +16,7 @@ import {
 import { avoidCollisions, planPaletteInsert } from "@/components/registration-builder/palette-insert";
 import { planFieldDrop } from "@/components/registration-builder/field-drop";
 import { autoFieldKey, isReservedFieldKey, uniqueFieldKey } from "@/components/registration-builder/field-keys";
-import { isSearchShortcut } from "@/components/registration-builder/shell-keys";
+import { focusTargetAction, isSearchShortcut } from "@/components/registration-builder/shell-keys";
 import { useBuilderEdits } from "@/components/registration-builder/use-builder-edits";
 import { displayedSidebarWidth, maxSidebarWidthFor, revealSidebar } from "@/components/registration-builder/editor-layout";
 import {
@@ -609,7 +609,7 @@ describe("keys made up by the editor (#1132)", () => {
     const mealKey = ["sabbath_lunch_adult", "lunch_adult", "dinner_adult"].find((key) => isReservedFieldKey(key));
     if (mealKey) expect(autoFieldKey(mealKey.replace(/_/g, " "), [])).not.toBe(mealKey);
     expect(isReservedFieldKey("team_name")).toBe(false);
-    expect(uniqueFieldKey("promo_code", new Set(), false)).toBe("promo_code");
+    expect(uniqueFieldKey("promo_code", new Set(), { avoidReserved: false })).toBe("promo_code");
   });
 
   it("a typed label with the key placeholder gets the unique key through the palette's own fields too", () => {
@@ -629,6 +629,38 @@ describe("keys made up by the editor (#1132)", () => {
     const ids = plan.sections.flatMap((section) => section.fields.map((candidate) => candidate.id));
     expect(new Set(keys).size).toBe(keys.length);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("lets a Number question labelled Age have the age key, but not other types", () => {
+    expect(autoFieldKey("Age", [], "NUMBER")).toBe("age");
+    expect(autoFieldKey("Age", [], "TEXT")).toBe("age_2");
+    expect(isReservedFieldKey("age", "NUMBER")).toBe(false);
+    expect(isReservedFieldKey("age", "SELECT")).toBe(true);
+    expect(isReservedFieldKey("promo_code", "NUMBER")).toBe(true);
+  });
+
+  it("follows the label as it is typed, reaching the full key, and keeps following when the label is cleared", () => {
+    const typed = ["T", "Te", "Tea", "Team", "Team n", "Team name"].map((label) => autoFieldKey(label, []));
+    expect(typed[typed.length - 1]).toBe("team_name");
+    expect(typed[0]).toBe("t");
+    expect(autoFieldKey("", [])).toBe("new_field");
+    expect(autoFieldKey("Team", [])).toBe("team");
+  });
+
+  it("cuts a key to 60 characters only when a suffix is needed, leaving room for it", () => {
+    const long = "k".repeat(60);
+    expect(uniqueFieldKey(long, new Set())).toBe(long);
+    const suffixed = uniqueFieldKey(long, new Set([long]));
+    expect(suffixed).toHaveLength(60);
+    expect(suffixed.endsWith("_2")).toBe(true);
+  });
+
+  it("a key follows its label until it is edited by hand or the draft is saved", () => {
+    const state = read("components/registration-builder/use-builder-state.ts");
+    expect(state).toContain("autoKeyFieldIds");
+    expect(state).toMatch(/if \(!dirty\) setAutoKeyFieldIds\(new Set\(\)\)/);
+    expect(read("components/registration-builder/builder-field-settings.tsx")).toContain("autoKeyFieldIds.has(field.id)");
+    expect(read("components/registration-builder/builder-field-advanced.tsx")).toContain("next.delete(field.id)");
   });
 
   it("avoidCollisions leaves clean fields alone, even when their key is a special one", () => {
@@ -731,9 +763,26 @@ describe("shell keyboard and layout rules (#1132)", () => {
     const shell = read("components/registration-builder/builder-editor-shell.tsx");
     expect(shell).toContain("dialogIsOpen()");
     expect(shell).toMatch(/function selectField[\s\S]*?showSidebar\(\);/);
-    expect(shell).toContain("if (!layout.sidebarVisible) { showSidebar(); return; }");
+    expect(shell).toContain("focusTargetAction({");
+    expect(shell).toContain("Math.min(shownWidth + SIDEBAR_WIDTH_STEP, maxWidth)");
     expect(shell).not.toContain("aria-haspopup");
     expect(read("components/registration-builder/builder-canvas.tsx")).not.toContain('role="toolbar"');
+  });
+
+  it("arriving from a warning waits for hydration, then shows a sidebar the stored layout hides, then focuses", () => {
+    const stored = memoryStorage({ [EDITOR_LAYOUT_STORAGE_KEY]: JSON.stringify({ sidebarVisible: false, side: "left", width: 420 }) });
+    const hidden = createEditorLayoutStore(() => stored).getSnapshot();
+    expect(hidden.sidebarVisible).toBe(false);
+    const base = { handled: false, selected: true, settingsOpen: true };
+    // While hydrating the layout is still the default the server rendered: do nothing yet.
+    expect(focusTargetAction({ ...base, hydrated: false, sidebarVisible: DEFAULT_EDITOR_LAYOUT.sidebarVisible })).toBe("skip");
+    // Once hydrated it sees the real, hidden layout and shows the sidebar first.
+    expect(focusTargetAction({ ...base, hydrated: true, sidebarVisible: hidden.sidebarVisible })).toBe("reveal");
+    expect(focusTargetAction({ ...base, hydrated: true, sidebarVisible: true })).toBe("focus");
+    expect(focusTargetAction({ ...base, hydrated: true, sidebarVisible: true, handled: true })).toBe("skip");
+    expect(focusTargetAction({ ...base, hydrated: true, sidebarVisible: true, selected: false })).toBe("skip");
+    expect(focusTargetAction({ ...base, hydrated: true, sidebarVisible: true, settingsOpen: false })).toBe("skip");
+    expect(read("components/registration-builder/builder-editor-shell.tsx")).toContain("const hydrated = useHydrated();");
   });
 
   it("shows a hidden sidebar without writing when it is already shown", () => {

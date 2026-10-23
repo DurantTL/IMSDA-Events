@@ -29,10 +29,13 @@ export function scopeChangePatch(field: RegistrationFormField, scope: Registrati
 }
 
 export function BuilderLabelInput({ field, sectionIndex, fieldIndex, inputId }: FieldTarget & { inputId?: string }) {
-  const { canEdit, updateField, allFields } = useLoadedBuilder();
-  // While the key is still the placeholder, it follows the label: kept unique, and never a key other code treats specially.
-  const nextKey = (label: string) => field.key.startsWith("new_field_") ? autoFieldKey(label, allFields.filter((other) => other.id !== field.id).map((other) => other.key)) : field.key;
-  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) })} /></label>;
+  const { canEdit, updateField, allFields, autoKeyFieldIds, setAutoKeyFieldIds } = useLoadedBuilder();
+  // A new question's key (still the `new_field_N` placeholder) follows its label as it is typed, until the key is
+  // edited by hand or the draft is saved: kept unique, and never a key other code treats specially. Clearing the
+  // label keeps it following.
+  const following = field.key.startsWith("new_field_") || autoKeyFieldIds.has(field.id);
+  const nextKey = (label: string) => following ? autoFieldKey(label, allFields.filter((other) => other.id !== field.id).map((other) => other.key), field.type) : field.key;
+  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => { if (following) setAutoKeyFieldIds((current) => current.has(field.id) ? current : new Set(current).add(field.id)); updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) }); }} /></label>;
 }
 
 export function BuilderRequiredToggle({ field, sectionIndex, fieldIndex, className = "required-toggle" }: FieldTarget & { className?: string }) {

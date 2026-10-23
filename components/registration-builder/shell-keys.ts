@@ -12,6 +12,16 @@ export type SlashKeyEvent = {
   dialogOpen: boolean;
 };
 
+/**
+ * What the "arrived from a setup warning" focus does on this render. It waits until the page has hydrated, so it
+ * sees the layout stored in this browser rather than the default the server rendered (a saved hidden sidebar would
+ * otherwise be unmounted right after the effect had used it); then it shows a hidden sidebar; then it focuses.
+ */
+export function focusTargetAction(state: { handled: boolean; hydrated: boolean; selected: boolean; settingsOpen: boolean; sidebarVisible: boolean }): "skip" | "reveal" | "focus" {
+  if (state.handled || !state.hydrated || !state.selected || !state.settingsOpen) return "skip";
+  return state.sidebarVisible ? "focus" : "reveal";
+}
+
 /** "/" jumps to the question search, except while typing, with a modifier, after another handler took it, or under a dialog. */
 export function isSearchShortcut(event: SlashKeyEvent): boolean {
   return event.key === "/"
