@@ -1,19 +1,19 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useId, useMemo, useState } from "react";
-import { MapPin, Search, UsersRound } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ComponentType } from "react";
+import { List, MapPin, Search, UsersRound, X } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
+import type { PublicClubMapStatus } from "@/components/public-club-map";
+import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
 import { locationKey } from "@/components/public-club-map-content";
 import styles from "./public-club-directory.module.css";
 
-const PublicClubMap = dynamic(
-  () => import("@/components/public-club-map").then((mod) => mod.PublicClubMap),
-  { ssr: false, loading: () => <div className={styles.mapLoading}>Loading map…</div> },
-);
+type MapProps = ComponentProps<typeof import("@/components/public-club-map").PublicClubMap>;
 
-function matches(club: PublicClubListing, query: string) {
+const loadMap = createRetryableLoader(() => import("@/components/public-club-map").then((mod) => mod.PublicClubMap));
+
+export function matches(club: PublicClubListing, query: string) {
   if (!query) return true;
   const needle = query.trim().toLowerCase();
   return [club.town, club.zip, club.clubName, club.churchName]
@@ -21,7 +21,7 @@ function matches(club: PublicClubListing, query: string) {
 }
 
 /**
- * The public club listing and map (#437): search by town or ZIP, a list
+ * The public club listing and map (#437): search by town, ZIP, club or church, a list
  * that stays in sync with the map — filtering the list filters the pins,
  * selecting one highlights the other. Only ever shown here: church name,
  * club name, town, and meeting day/time — whatever the server sent, which
@@ -31,7 +31,14 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
   const [query, setQuery] = useState("");
   const [selection, setSelection] = useState<{ id: string; fromMap: boolean } | null>(null);
   const selectedId = selection?.id ?? null;
+  const [view, setView] = useState<"list" | "map">("list");
+  const [mapStatus, setMapStatus] = useState<PublicClubMapStatus>("loading");
+  const [mapAttempt, setMapAttempt] = useState(0);
+  const [MapComponent, setMapComponent] = useState<ComponentType<MapProps> | null>(null);
+  const [announced, setAnnounced] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const rowIdPrefix = useId();
+  const searchId = `${rowIdPrefix}-search`;
 
   const filtered = useMemo(() => clubs.filter((club) => matches(club, query)), [clubs, query]);
   const mappable = useMemo(() => filtered.filter((club) => club.latitude !== null && club.longitude !== null), [filtered]);
@@ -45,6 +52,10 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
   const selectedPoint = selected && selected.latitude !== null && selected.longitude !== null
     ? locationKey(selected.latitude, selected.longitude)
     : null;
+  const unmappedShown = filtered.length - mappable.length;
+  const mapProblem = mapStatus === "unavailable" || mapStatus === "tiles-failed";
+  const shownView = effectiveView(view, filtered.length, mapProblem);
+  const selectedUnmapped = selected !== null && selectedPoint === null;
   const rowId = (id: string) => `${rowIdPrefix}-club-${id}`;
 
   function selectFromList(id: string) {
@@ -62,30 +73,106 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     document.getElementById(`${rowIdPrefix}-club-${selection.id}`)?.scrollIntoView({ block: "nearest" });
   }, [selection, rowIdPrefix]);
 
+  // Load the map code; a failed load is retried by Retry, not cached.
+  useEffect(() => {
+    if (!anyMappable) return;
+    let cancelled = false;
+    loadMap().then(
+      (component) => { if (!cancelled) setMapComponent(() => component as ComponentType<MapProps>); },
+      () => { if (!cancelled) setMapStatus("unavailable"); },
+    );
+    return () => { cancelled = true; };
+  }, [anyMappable, mapAttempt]);
+
+  // The visible count updates at once; screen readers hear it once typing stops.
+  const countText = announcedCountText(filtered.length, mappable.length, !mapProblem);
+  useEffect(() => {
+    const timer = setTimeout(() => setAnnounced(countText), 600);
+    return () => clearTimeout(timer);
+  }, [countText]);
+
+  function clearSearch() {
+    setQuery("");
+    searchRef.current?.focus();
+  }
+
+  function retryMap() {
+    // Remounting the map only: the search and the selection live here.
+    setMapStatus("loading");
+    setMapComponent(null);
+    setMapAttempt((attempt) => attempt + 1);
+  }
+
   return (
     <div className={styles.layout}>
-      <label className={styles.search}>
-        <Search aria-hidden="true" size={17} />
-        <span className="sr-only">Search by town or ZIP</span>
-        <input
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by town or ZIP"
-          type="search"
-          value={query}
-        />
-      </label>
+      <div className={styles.searchBlock}>
+        <label className={styles.searchLabel} htmlFor={searchId}>Search town, ZIP, club or church</label>
+        <div className={styles.search}>
+          <Search aria-hidden="true" size={17} />
+          <input
+            id={searchId}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Town, ZIP, club or church"
+            ref={searchRef}
+            type="search"
+            value={query}
+          />
+          {query && (
+            <button className={styles.clearButton} onClick={clearSearch} type="button">
+              <X aria-hidden="true" size={15} /> Clear search
+            </button>
+          )}
+        </div>
+      </div>
+
+      {clubs.length > 0 && (
+        <div className={styles.status}>
+          <p className={styles.count}>
+            {countText}
+            {unmappedShown > 0 && <small> {unmappedSentence(unmappedShown)}</small>}
+          </p>
+          <p className="sr-only" role="status">{announced}</p>
+          {mapProblem && (
+            <p className={styles.mapProblem}>
+              {mapStatus === "unavailable"
+                ? "The map could not load. The list below still works."
+                : "Map pictures could not load. Pins and the list still work."}{" "}
+              <button className={styles.retryButton} onClick={retryMap} type="button">Retry map</button>
+            </p>
+          )}
+          {anyMappable && (
+            <div aria-label="Show results as" className={styles.viewToggle} role="group">
+              <button aria-pressed={shownView === "list"} onClick={() => setView("list")} type="button">
+                <List aria-hidden="true" size={16} /> List
+              </button>
+              <button aria-pressed={shownView === "map"} onClick={() => setView("map")} type="button">
+                <MapPin aria-hidden="true" size={16} /> Map
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {clubs.length === 0 ? (
         <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
       ) : (
-        <div className={styles.content}>
+        <div className={styles.content} data-view={shownView}>
           {anyMappable && (
-            <PublicClubMap clubs={mappable} onSelect={selectFromMap} selectedId={selectedId} />
+            <div className={styles.mapPane}>
+              {MapComponent ? (
+                <MapComponent clubs={mappable} key={mapAttempt} onSelect={selectFromMap} onStatus={setMapStatus} selectedId={selectedId} />
+              ) : (
+                <div className={styles.mapLoading}>{mapStatus === "unavailable" ? "Map unavailable" : "Loading map…"}</div>
+              )}
+            </div>
           )}
 
           <ul className={styles.list}>
             {filtered.length === 0 ? (
-              <li><EmptyState announce={false} className="empty-state panel" headingLevel={2} icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query}”`}>Try a different town or ZIP.</EmptyState></li>
+              <li><EmptyState announce={false} className="empty-state panel" headingLevel={2} icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query.trim()}”`}>
+                Try a different town, ZIP, club or church name.
+                <button className={styles.resetButton} onClick={clearSearch} type="button">Clear search</button>
+              </EmptyState></li>
             ) : (
               filtered.map((club) => {
                 const isSelected = selectedId === club.id;
@@ -113,6 +200,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
                       </span>
                     </button>
                     {isSelected && (
+                      <>
                       <dl className={styles.details}>
                         <div>
                           <dt>Church</dt>
@@ -126,7 +214,17 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
                           <dt>Meets</dt>
                           <dd>{club.meetingSchedule || "Not given"}</dd>
                         </div>
+                        {club.latitude === null || club.longitude === null ? (
+                          <div>
+                            <dt>Map</dt>
+                            <dd>Map location unavailable. This club is listed without a pin.</dd>
+                          </div>
+                        ) : null}
                       </dl>
+                      <p className={styles.disclaimer}>
+                        A listing does not show current openings or membership, and is not an invitation to visit any address.
+                      </p>
+                      </>
                     )}
                   </li>
                 );
@@ -140,6 +238,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
         {selected && (
           <>
             <MapPin aria-hidden="true" size={14} /> Showing {selected.clubName}.
+            {selectedUnmapped && " Map location unavailable."}
           </>
         )}
       </p>

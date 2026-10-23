@@ -146,3 +146,128 @@
 .samePinNote {
   color: var(--imsda-purple, #4a2e83) !important;
 }
+
+/* Find a club clarity (#1118): visible search label, counts, map status, phone List/Map. */
+.searchBlock {
+  display: grid;
+  gap: 6px;
+  max-width: 760px;
+}
+
+.searchLabel {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.search input {
+  min-width: 0;
+  min-height: 44px;
+}
+
+.clearButton,
+.retryButton,
+.resetButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.resetButton {
+  margin-top: 10px;
+}
+
+.clearButton:focus-visible,
+.retryButton:focus-visible,
+.resetButton:focus-visible,
+.viewToggle button:focus-visible,
+.clubButton:focus-visible {
+  outline: 3px solid #f9a13a;
+  outline-offset: 2px;
+}
+
+.status {
+  display: grid;
+  gap: 8px;
+}
+
+.count {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.count small {
+  color: var(--muted);
+}
+
+.mapProblem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.viewToggle {
+  display: none;
+}
+
+.mapPane {
+  min-width: 0;
+}
+
+.clubText strong,
+.clubText small {
+  overflow-wrap: anywhere;
+}
+
+.disclaimer {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 800px) {
+  .viewToggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .viewToggle button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .viewToggle button[aria-pressed="true"] {
+    border-color: var(--imsda-purple, #4a2e83);
+    background: #f6f1fb;
+    font-weight: 600;
+  }
+
+  .clubButton {
+    min-height: 44px;
+  }
+
+  .content[data-view="list"] .mapPane,
+  .content[data-view="map"] .list {
+    display: none;
+  }
+}
