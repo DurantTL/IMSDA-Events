@@ -1,6 +1,7 @@
 // The editor's one sidebar (#1132): a tab list over tab panels, plus the drag
 // handle that resizes it. What each tab shows is passed in, so the sidebar
 // itself does not change when a tab's content does.
+import { ChevronLeft } from "lucide-react";
 import { useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { nextTabIndex, type SidebarTab } from "./sidebar-tabs";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, widthFromPointer, type EditorLayout } from "./editor-layout";
@@ -12,7 +13,7 @@ export type SidebarTabDefinition = { id: SidebarTab; label: string; panel: React
 export const sidebarTabId = (tab: SidebarTab) => `fb-tab-${tab}`;
 export const sidebarPanelId = (tab: SidebarTab) => `fb-panel-${tab}`;
 
-export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidth, maxWidth, onResize, containerRef }: {
+export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidth, maxWidth, onResize, containerRef, inspector }: {
   tabs: SidebarTabDefinition[];
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
@@ -24,6 +25,8 @@ export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidt
   onResize: (width: number, persist?: boolean) => void;
   /** The element the sidebar sits in, for measuring a drag. */
   containerRef: RefObject<HTMLElement | null>;
+  /** Back and Done for the full-screen phone inspector (#1139). Both only close it; the bar is shown by the stylesheet at phone width. */
+  inspector?: { title: string; onBack: () => void; onDone: () => void };
 }) {
   const tabRefs = useRef(new Map<SidebarTab, HTMLButtonElement>());
   const dragging = useRef(false);
@@ -84,6 +87,13 @@ export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidt
         onPointerUp={(event) => { endDrag(); event.currentTarget.releasePointerCapture(event.pointerId); }}
         onPointerCancel={endDrag}
       />
+      {inspector && (
+        <div className="fb-inspector-bar">
+          <button type="button" className="fb-btn" onClick={inspector.onBack}><ChevronLeft size={16} aria-hidden="true" /> Back</button>
+          <p className="fb-inspector-title">{inspector.title}</p>
+          <button type="button" className="fb-btn outline" onClick={inspector.onDone}>Done</button>
+        </div>
+      )}
       <div className="fb-tablist" role="tablist" aria-label="Sidebar">
         {tabs.map((tab, index) => (
           <button

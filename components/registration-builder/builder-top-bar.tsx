@@ -4,6 +4,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { AlertTriangle, BookmarkPlus, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Save, Send, ShieldCheck } from "lucide-react";
 import { statusLabel } from "./builder-types";
 import { useLoadedBuilder, useBuilder } from "./builder-context";
+import { versionStateChips, type VersionChipKind } from "./version-state";
 
 export function BuilderPageIntro() {
   const { selectedForm, definition, busy, setShowTemplates, showDraftTemplates, setShowDraftTemplates, showPreview, eventName, canSaveAsTemplate, showSaveTemplate, setShowSaveTemplate } = useBuilder();
@@ -44,6 +45,21 @@ export function BuilderActionHints() {
   const { selectedVersion, dirty, setPreviewStepId, previewSteps, isHistorical, hasValidTest, testRequired, hasEverPublished, editsCreateDraft } = useLoadedBuilder();
   return (
     <div id="builder-action-hints">{editsCreateDraft && !isHistorical && <p className="builder-gate"><FileClock size={15} /> {selectedVersion.status === "PUBLISHED" ? `Version ${selectedVersion.versionNumber} is live and is never changed in place.` : `Version ${selectedVersion.versionNumber} is withdrawn from the public page.`} {dirty ? "Choose Publish changes to save and publish your edits, or Save as new draft to keep them unpublished; until then they are not saved." : "Make your edits, or choose Create new version to start a draft from it."} Existing registrations keep the version they were submitted under.</p>}{selectedVersion.status === "DRAFT" && dirty && !hasEverPublished && <p className="builder-gate"><AlertTriangle size={15} /> Save this draft to enable Publish version.</p>}{selectedVersion.status === "DRAFT" && !dirty && testRequired && !hasValidTest && <p className="builder-gate"><AlertTriangle size={15} /> Run a test submission first. A valid test is required only before a form&apos;s first publish, and saving edits clears earlier tests. <a href="#live-form-preview" onClick={() => { const last = previewSteps[previewSteps.length - 1]; if (last) setPreviewStepId(last.id); }}>Go to the test panel</a></p>}</div>
+  );
+}
+
+const versionChipTone: Record<VersionChipKind, string> = { live: "green", draft: "gold", withdrawn: "purple", "viewing-old": "purple", unsaved: "gold" };
+
+/** The editor's version state as text chips (#1139): Live, Draft, Viewing old version, Unsaved changes. A live version and a newer draft both show. */
+export function BuilderVersionChips() {
+  const { selectedForm, selectedVersion, isHistorical, dirty } = useLoadedBuilder();
+  const chips = versionStateChips({ versions: selectedForm.versions, selected: selectedVersion, isHistorical, dirty });
+  return (
+    <span className="fb-version-chips" role="group" aria-label="Version state">
+      {chips.map((chip) => chip.kind === "unsaved"
+        ? <span className="unsaved-dot fb-version-chip" key={chip.kind}>{chip.text}</span>
+        : <span className={`status-chip fb-version-chip ${versionChipTone[chip.kind]}`} key={chip.kind}>{chip.text}</span>)}
+    </span>
   );
 }
 

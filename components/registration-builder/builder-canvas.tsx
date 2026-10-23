@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, Copy, GripVertical, Plus, Settings2, Trash2 } from 
 import { directorySourceNoun, isDirectoryOptionSource, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { isPublicReviewSection } from "@/modules/forms/public-registration-steps";
 import { fieldTypeLabels, money } from "./builder-types";
+import { deriveFieldChips } from "./field-chips";
 import { BuilderSectionHead } from "./builder-section-card";
 import { useLoadedBuilder } from "./builder-context";
 import { buildCanvasRows } from "./canvas-rows";
@@ -147,6 +148,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
             <div className="fb-row-cells">
               {row.cells.map(({ field, fieldIndex }) => {
                 const selected = expandedFieldId === field.id;
+                const chips = deriveFieldChips(field, section.title);
                 return (
                   <div
                     className={`fb-cell${selected ? " selected" : ""}${dropIndex === fieldIndex && dragActive ? " drop-before" : ""}${dragging?.kind === "field" && dragging.sectionIndex === sectionIndex && dragging.fieldIndex === fieldIndex ? " dragging" : ""}`}
@@ -162,12 +164,14 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       className="fb-field"
                       data-field-id={field.id}
                       aria-current={selected ? "true" : undefined}
-                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}${field.required ? ", required" : ""}. ${selected ? "Selected." : "Select to edit."}`}
+                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}, ${chips.map((chip) => chip.label).join(", ")}. ${selected ? "Selected." : "Select to edit."}`}
                       onClick={() => onSelect(field.id, sectionIndex)}
                     >
-                      <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && <span className="fb-required"> *</span>}{field.scope === "ATTENDEE" && <span className="fb-chip">Each person</span>}</span>
+                      <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && <span className="fb-required"> *</span>}</span>
                       <span className="fb-control" aria-hidden="true"><FieldPreviewControl field={field} /></span>
                       {field.helpText && <span className="fb-field-help" aria-hidden="true">{field.helpText}</span>}
+                      {/* Text chips, never colour alone; plain spans inside the button, so they add no tab stops. They are in the button's name above. */}
+                      <span className="fb-chips" aria-hidden="true">{chips.map((chip) => <span className={`fb-q-chip fb-q-chip-${chip.kind}`} key={chip.kind}>{chip.label}</span>)}</span>
                     </button>
                     {canEdit && selected && <FieldToolbar section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} onAction={onAction} />}
                   </div>

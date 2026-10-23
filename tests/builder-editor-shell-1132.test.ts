@@ -488,16 +488,16 @@ describe("the editor shell, rendered (#1132)", () => {
     return { markup: renderToStaticMarkup(createElement(Harness)), definition };
   }
 
-  it("shows the top bar, the form as steps with real labels, and the three sidebar tabs", async () => {
+  it("shows the top bar, the form as steps with real labels, and the four sidebar tabs", async () => {
     const { markup, definition } = await renderShell();
     expect(markup).toContain('class="fb-topbar"');
     expect(markup).toContain("Synthetic Weekend");
-    expect(markup).toContain("Draft · version 2");
+    expect(markup).toContain("Draft (version 2)");
     for (const label of ["Editor", "Settings &amp; payment", "Preview &amp; test", "Publish version"]) expect(markup).toContain(label);
     expect(markup).toContain('aria-label="Layout options"');
     for (const section of definition.sections) expect(markup).toContain(`Step ${definition.sections.indexOf(section) + 1}`);
     expect(markup).toContain(definition.sections[0]!.fields[0]!.label);
-    expect((markup.match(/role="tab"/g) ?? []).length).toBe(3);
+    expect((markup.match(/role="tab"/g) ?? []).length).toBe(4);
     expect(markup).toMatch(/id="fb-tab-questions"[^>]*aria-selected="true"/);
     expect(markup).toContain("Add a question to step 1");
     expect(markup).toContain("Select a question on the form to change its settings.");
