@@ -157,6 +157,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     setOpenedForTarget(true);
     setInspectorOpen(true);
   }
+  // The sheet only exists at phone width: leaving it open when the window widens would bring it back on the next narrow one.
+  if (!phone && inspectorOpen) setInspectorOpen(false);
   // A question removed (or undone away) while its settings fill the phone screen leaves nothing to show: close the sheet.
   if (inspectorOpen && tab === "settings" && !selection) setInspectorOpen(false);
 
@@ -270,7 +272,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     setExpandedFieldId(fieldId);
     setTab("settings");
     // At phone width the settings fill the screen; Edit on the question that is already selected must open them again too.
-    setInspectorOpen(true);
+    if (phone) setInspectorOpen(true);
     // Selecting while the sidebar is hidden shows it, so the settings the selection opens can be seen.
     showSidebar();
   }
@@ -287,7 +289,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     showSidebar();
     setTab("questions");
     // At phone width the question search opens as its own sheet.
-    setInspectorOpen(true);
+    if (phone) setInspectorOpen(true);
     request({ kind: "search" });
   }
 
@@ -300,10 +302,10 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   function onToolbarAction(action: ToolbarAction, sectionIndex: number, fieldIndex: number) {
     const field = definition.sections[sectionIndex]?.fields[fieldIndex];
     if (!field) return;
-    if (action === "settings") { setTab("settings"); setInspectorOpen(true); showSidebar(); request({ kind: "label" }); return; }
+    if (action === "settings") { setTab("settings"); if (phone) setInspectorOpen(true); showSidebar(); request({ kind: "label" }); return; }
     if (action === "up" || action === "down") { moveField(sectionIndex, fieldIndex, action === "up" ? -1 : 1); request({ kind: "toolbar", fieldId: field.id, action }); return; }
     // The copy is selected; put the cursor in its label, since the button just pressed leaves the page with the old selection.
-    if (action === "duplicate") { duplicateField(sectionIndex, fieldIndex); request({ kind: "label" }); return; }
+    if (action === "duplicate") { duplicateField(sectionIndex, fieldIndex); if (phone) setInspectorOpen(true); request({ kind: "label" }); return; }
     openRemoveField(sectionIndex, fieldIndex);
   }
 

@@ -7,14 +7,18 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import { useLoadedBuilder } from "./builder-context";
 import { PhoneSheet } from "./builder-phone-sheet";
 import { locateField } from "./canvas-rows";
-import { positionStatus } from "./phone-move";
 import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
+import { positionStatus } from "./phone-move";
 
 export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string; onClose: () => void; onMoved: (sectionId: string) => void }) {
   const { definition, allFields, moveFieldBy, moveFieldToStep } = useLoadedBuilder();
   const location = locateField(definition.sections, fieldId);
   const [targetStep, setTargetStep] = useState(location?.sectionIndex ?? 0);
-  const [refusal, setRefusal] = useState("");
+  // A repeated refusal is announced again: the alert is keyed on how many refusals there have been.
+  const [refusalState, setRefusalState] = useState({ text: "", count: 0 });
+  const refusal = refusalState.text;
+  const setRefusal = (text: string) => setRefusalState((current) => ({ ...current, text }));
+  const refuse = (text: string) => setRefusalState((current) => ({ text, count: current.count + 1 }));
 
   // The question can disappear under the screen (undo, a removal); there is then nothing to move.
   useEffect(() => { if (!location) onClose(); });
@@ -25,17 +29,18 @@ export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string;
   const first = fieldIndex === 0;
   const last = fieldIndex === section.fields.length - 1;
   const dependsOn = visibilityControllerKeys(field).flatMap((key) => allFields.find((candidate) => candidate.key === key) ?? []);
+  const optionalOn = field.optionalWhen ? allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey) : undefined;
   const dependents = allFields.filter((candidate) => candidate.id !== field.id && (visibilityControllerKeys(candidate).includes(field.key) || candidate.optionalWhen?.fieldKey === field.key));
 
   function step(direction: -1 | 1) {
     const result = moveFieldBy(fieldId, direction);
-    setRefusal(result.ok ? "" : result.message);
+    if (result.ok) setRefusal(""); else refuse(result.message);
   }
 
   function moveToStep() {
     if (targetStep === sectionIndex) return;
     const result = moveFieldToStep(fieldId, targetStep);
-    setRefusal(result.ok ? "" : result.message);
+    if (result.ok) setRefusal(""); else refuse(result.message);
     const target = definition.sections[targetStep];
     if (result.ok && target) onMoved(target.id);
   }
@@ -43,7 +48,7 @@ export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string;
   return (
     <PhoneSheet title={`Move “${field.label || "Untitled question"}”`} closeLabel="Done" onClose={onClose}>
       <p className="fb-phone-status" role="status">{positionStatus(definition.sections, fieldId)}</p>
-      {refusal && <p className="fb-phone-refusal" role="alert">{refusal}</p>}
+      {refusal && <p className="fb-phone-refusal" role="alert" key={refusalState.count}>{refusal}</p>}
       <div className="fb-phone-move-buttons">
         {/* aria-disabled, not disabled: pressing Move up until the top keeps focus on the button. */}
         <button type="button" className="fb-btn outline" data-autofocus aria-disabled={first ? "true" : undefined} onClick={() => { if (!first) step(-1); }}><ArrowUp size={16} aria-hidden="true" /> Move up</button>
@@ -60,7 +65,8 @@ export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string;
         <button type="button" className="fb-btn outline" aria-disabled={targetStep === sectionIndex ? "true" : undefined} onClick={moveToStep}>Move to this step</button>
         <p className="fb-hint">It goes to the end of that step. The final review step stays last.</p>
       </fieldset>
-      {dependsOn.length > 0 && <p className="fb-hint">This question is shown only based on {dependsOn.length === 1 ? `“${dependsOn[0]!.label}”` : `${dependsOn.map((controller) => `“${controller.label}”`).join(", ")}`}. It stays after {dependsOn.length === 1 ? "that question" : "all of them"} wherever you move it; moving it before {dependsOn.length === 1 ? "that question" : "any of them"} is refused.</p>}
+      {dependsOn.length > 0 && <p className="fb-hint">This question is shown only based on {dependsOn.map((controller) => `“${controller.label}”`).join(", ")}. It stays after {dependsOn.length === 1 ? "that question" : "all of them"} wherever you move it; moving it before {dependsOn.length === 1 ? "that question" : "any of them"} is refused.</p>}
+      {optionalOn && optionalOn.id !== field.id && <p className="fb-hint">This question becomes optional when “{optionalOn.label}” is answered. Between steps it stays after that question; moving it to an earlier step is refused.</p>}
       {dependents.length > 0 && <p className="fb-hint">{dependents.length === 1 ? `“${dependents[0]!.label}” is shown based on this question, so this question stays before it.` : `${dependents.length} other questions are shown based on this one, so it stays before all of them.`}</p>}
     </PhoneSheet>
   );

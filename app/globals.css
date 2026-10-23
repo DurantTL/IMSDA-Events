@@ -12817,5 +12817,11 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-phone-bar-notices .inline-notice, .fb-phone-bar-notices .panel { margin: 0; }
   .fb-phone-bar-actions { display: flex; gap: 8px; }
   .fb-phone-bar-actions .fb-btn { flex: 1 1 0; min-height: 48px; }
-  html:has(.fb-phone-bar) { scroll-padding-bottom: 180px; }
+  html:has(.fb-phone-bar) { scroll-padding-bottom: calc(var(--fb-phone-bar-height, 120px) + 24px); }
+  .fb-phone-bar[data-keyboard="open"] .fb-phone-bar-notices { max-height: 4.5rem; overflow: auto; }
+  .fb-phone-step .section-actions button { min-height: 48px; min-width: 48px; }
+  .fb-phone-step .section-actions .drag-handle { display: none; }
+  /* Until the page knows it is on a phone (the first paint), mask the desktop canvas and top-bar buttons so they do not flash. */
+  .fb-shell:not([data-phone]) .fb-body, .fb-shell:not([data-phone]) .fb-topbar > .fb-btn:not(.primary), .fb-shell:not([data-phone]) .fb-topbar > .fb-icon-button[aria-controls] { visibility: hidden; }
+  .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }

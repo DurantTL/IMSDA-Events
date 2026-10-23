@@ -6,7 +6,7 @@ import { resolveFieldOffer, sectionTitleLookup } from "@/modules/forms/field-fla
 import { fieldVisibilityRule, mapVisibilityConditions, visibilityControllerKeys, visibilityRulePatch, type RuleCondition } from "@/modules/forms/visibility-rule";
 import { avoidCollisions } from "@/components/registration-builder/palette-insert";
 import { instantiateLibraryFragment } from "@/components/registration-builder/library-insert";
-import { dependencyOrderIssue, showWhenSummary } from "@/components/registration-builder/phone-move";
+import { newOrderInversion, showWhenSummary } from "@/components/registration-builder/phone-move";
 import { ruleEditPatch, ruleSummary, readsAs, withAddedCondition, withoutCondition } from "@/components/registration-builder/rule-editor";
 import { removeField, renameFieldKey } from "@/components/club-form-builder-state";
 import { staffEventQuestions } from "@/modules/staff-invitations/event-questions";
@@ -296,7 +296,7 @@ describe("rule summary, editor and move order (#1072)", () => {
     const fields = sections[0]!.fields;
     const [seats] = fields.splice(2, 1);
     fields.splice(1, 0, seats!);
-    expect(dependencyOrderIssue(sections, "id_seats")).toContain("Club size");
-    expect(dependencyOrderIssue(def.sections, "id_seats")).toBeNull();
+    expect(newOrderInversion(def.sections, sections, "id_seats")).toContain("Club size");
+    expect(newOrderInversion(def.sections, def.sections, "id_seats")).toBeNull();
   });
 });

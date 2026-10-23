@@ -6,7 +6,7 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import type { PaletteEntry } from "./palette-registry";
 import { planPaletteInsert } from "./palette-insert";
 import { planFieldDrop } from "./field-drop";
-import { dependencyOrderIssue, planAdjacentMove, planMoveToStep, type MovePlan } from "./phone-move";
+import { newOrderInversion, planAdjacentMove, planMoveToStep, type MovePlan } from "./phone-move";
 import { localId, defaultField, blankPreviewAttendees } from "./builder-types";
 import { isAtBaseline, recordEdit, redo as redoStep, singleValueEditKey, undo as undoStep } from "./edit-history";
 import type { BuilderState } from "./use-builder-state";
@@ -98,6 +98,8 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     ) return;
     const sections = [...definition.sections];
     [sections[sectionIndex], sections[nextIndex]] = [sections[nextIndex], sections[sectionIndex]];
+    const issue = newOrderInversion(definition.sections, sections);
+    if (issue) { setError(issue); return; }
     replaceDefinition({ ...definition, sections });
   }
 
@@ -122,6 +124,8 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
       section,
     );
     setDragging(null);
+    const issue = newOrderInversion(definition.sections, sections);
+    if (issue) { setError(issue); return; }
     replaceDefinition({ ...definition, sections });
   }
 
@@ -133,7 +137,7 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     if (plan.kind !== "moved") return;
     // A question shown only when another is answered stays after it (#1071).
     const movedId = definition.sections[dragging.sectionIndex]?.fields[dragging.fieldIndex]?.id;
-    const issue = movedId ? dependencyOrderIssue(plan.sections, movedId) : null;
+    const issue = movedId ? newOrderInversion(definition.sections, plan.sections, movedId) : null;
     if (issue) setError(issue);
     else replaceDefinition({ ...definition, sections: plan.sections });
   }

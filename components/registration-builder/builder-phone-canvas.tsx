@@ -43,6 +43,18 @@ export function BuilderPhoneCanvas({ activeStepIndex, onStepChange, onEdit, onMo
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [stepSettingsOpen, setStepSettingsOpen] = useState(false);
   const activeButton = useRef<HTMLButtonElement>(null);
+  // Remove asks for confirmation first, and the question's card is gone afterwards: put focus on the step's Add question button.
+  const removing = useRef<{ fieldId: string; sectionId: string } | null>(null);
+  useEffect(() => {
+    const watch = removing.current;
+    if (!watch || definition.sections.some((candidate) => candidate.fields.some((entry) => entry.id === watch.fieldId))) return;
+    removing.current = null;
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if ((active && active !== document.body) || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      document.querySelector<HTMLElement>(`[data-fb-step-add="${watch.sectionId}"]`)?.focus();
+    }, 0);
+  }, [definition]);
   const sectionIndex = Math.min(Math.max(activeStepIndex, 0), definition.sections.length - 1);
   const section = definition.sections[sectionIndex]!;
   const review = isPublicReviewSection(definition, section);
@@ -111,7 +123,7 @@ export function BuilderPhoneCanvas({ activeStepIndex, onStepChange, onEdit, onMo
         )}
       </div>
       {canEdit && <button className="add-section-button" type="button" onClick={addSection}><Plus size={17} aria-hidden="true" /> Add another section</button>}
-      {menuFor && <QuestionMenu fieldId={menuFor} onClose={() => setMenuFor(null)} onAction={onAction} />}
+      {menuFor && <QuestionMenu fieldId={menuFor} onClose={() => setMenuFor(null)} onAction={(action, si, fi) => { if (action === "remove") removing.current = { fieldId: menuFor, sectionId: definition.sections[si]?.id ?? "" }; onAction(action, si, fi); }} />}
     </section>
   );
 }
