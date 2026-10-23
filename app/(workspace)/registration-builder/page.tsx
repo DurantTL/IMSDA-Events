@@ -4,6 +4,7 @@ import { BuilderDeviceHint } from "@/components/builder-device-hint";
 import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { RegistrationBuilderWorkspace } from "@/components/registration-builder-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
+import { listMealPlanPrices } from "@/modules/meals/config-repository";
 import { listFormTemplates, listRegistrationForms } from "@/modules/forms/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 
@@ -17,6 +18,6 @@ export default async function RegistrationBuilderPage({ searchParams }: { search
   }
   return <>
     <BuilderPhoneNotice eventId={event.id} />
-    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} /></div>
+    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} mealPlanPrices={await listMealPlanPrices(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} /></div>
   </>;
 }

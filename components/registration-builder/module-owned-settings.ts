@@ -6,6 +6,8 @@ import { mealTicketBinding } from "@/modules/meals/domain";
 
 export type ModuleOwnedSetting = {
   setting: "price";
+  /** The owning module's current value, in cents. */
+  valueCents: number;
   /** What the setting is called in the panel. */
   label: string;
   /** The module that owns it. */
@@ -23,8 +25,15 @@ export function isMealTicketField(field: Pick<RegistrationFormField, "key" | "ty
   return field.type === "NUMBER" && field.scope === "REGISTRATION" && mealTicketBinding(field.key) !== null;
 }
 
-export function moduleOwnedSettings(field: Pick<RegistrationFormField, "key" | "type" | "scope">, eventId: string): ModuleOwnedSetting[] {
-  return isMealTicketField(field)
-    ? [{ setting: "price", label: "Price per item", owner: "Meals", href: mealsPageHref(eventId) }]
-    : [];
+/** The Meals plan's price for a meal ticket field, in cents; undefined when the field is not a meal ticket or the plan has no price for it. */
+export function mealPlanPriceFor(field: Pick<RegistrationFormField, "key" | "type" | "scope">, mealPlanPrices: Readonly<Record<string, number>>): number | undefined {
+  if (!isMealTicketField(field)) return undefined;
+  const binding = mealTicketBinding(field.key)!;
+  return mealPlanPrices[`${binding.mealType}:${binding.ageGroup}`];
+}
+
+/** A setting is owned by another module only while that module has a value for it; with none, the form's own value is used and stays editable. */
+export function moduleOwnedSettings(field: Pick<RegistrationFormField, "key" | "type" | "scope">, eventId: string, mealPlanPrices: Readonly<Record<string, number>>): ModuleOwnedSetting[] {
+  const cents = mealPlanPriceFor(field, mealPlanPrices);
+  return cents === undefined ? [] : [{ setting: "price", valueCents: cents, label: "Price per item", owner: "Meals", href: mealsPageHref(eventId) }];
 }

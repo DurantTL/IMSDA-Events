@@ -259,6 +259,11 @@ export async function loadTicketPrices(client: Client, eventId: string): Promise
   return prices;
 }
 
+/** The same prices as a plain object, for the registration builder page to hand to the browser. Scoped to the one event it is given. */
+export async function listMealPlanPrices(eventId: string): Promise<Record<string, number>> {
+  return Object.fromEntries(await loadTicketPrices(getPrisma(), eventId));
+}
+
 export { isDatabaseRefusal };
 
 // ---------------------------------------------------------------------------

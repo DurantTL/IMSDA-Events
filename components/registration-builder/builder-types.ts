@@ -128,6 +128,8 @@ export type BuilderWorkspaceProps = {
   eventAudience?: string;
   eventBillingMode?: string;
   initialForms: FormView[];
+  /** The event's Meals ticket plan prices in cents, keyed "LUNCH:ADULT" (#1139). A meal ticket field with a price here shows it read-only. */
+  mealPlanPrices?: Record<string, number>;
   templates: TemplateView[];
   focusTarget?: { formId: string; fieldId: string } | null;
   canEditNotifications?: boolean;

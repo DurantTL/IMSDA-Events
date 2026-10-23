@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { RegistrationBuilderWorkspace } from "@/components/registration-builder-workspace";
 import { ModuleOwnedSettingRow } from "@/components/registration-builder/builder-module-owned";
 import { deriveFieldChips, sourceModuleName } from "@/components/registration-builder/field-chips";
-import { mealsPageHref, moduleOwnedSettings } from "@/components/registration-builder/module-owned-settings";
+import { mealPlanPriceFor, mealsPageHref, moduleOwnedSettings } from "@/components/registration-builder/module-owned-settings";
 import { inspectorAfterClose, inspectorAfterSelection } from "@/components/registration-builder/phone-inspector";
 import { nextTabIndex, sidebarTabOrder, tabAfterSelectionChange } from "@/components/registration-builder/sidebar-tabs";
 import { versionStateChips } from "@/components/registration-builder/version-state";
@@ -74,13 +74,21 @@ function mealField(): RegistrationFormField {
 describe("settings another module owns (#1139)", () => {
   it("only a meal ticket's price is owned elsewhere today", () => {
     const meal = mealField();
-    expect(moduleOwnedSettings(meal, "event_1")).toEqual([{ setting: "price", label: "Price per item", owner: "Meals", href: mealsPageHref("event_1") }]);
-    expect(moduleOwnedSettings(field(), "event_1")).toEqual([]);
+    const prices = { "LUNCH:ADULT": 1500 };
+    expect(moduleOwnedSettings(meal, "event_1", prices)).toEqual([{ setting: "price", valueCents: 1500, label: "Price per item", owner: "Meals", href: mealsPageHref("event_1") }]);
+    expect(moduleOwnedSettings(field(), "event_1", prices)).toEqual([]);
+    // The plan's price, not the field's own (possibly drifted) priceCents, is what is owned.
+    expect(mealPlanPriceFor(meal, prices)).toBe(1500);
+    expect(meal.priceCents).toBe(1200);
+    // No plan price for that meal and age group: nothing is owned, so the form's own price stays editable.
+    expect(moduleOwnedSettings(meal, "event_1", {})).toEqual([]);
+    expect(moduleOwnedSettings(meal, "event_1", { "LUNCH:CHILD": 900 })).toEqual([]);
+    expect(mealPlanPriceFor(field({ key: "lunch_adult_qty", type: "NUMBER", scope: "ATTENDEE" }), prices)).toBeUndefined();
   });
 
   it("renders the value read-only with 'Set in Meals' and a link, and no input", () => {
     const markup = renderToStaticMarkup(createElement(ModuleOwnedSettingRow, {
-      setting: { setting: "price", label: "Price per item", owner: "Meals", href: mealsPageHref("event 1") },
+      setting: { setting: "price", valueCents: 1200, label: "Price per item", owner: "Meals", href: mealsPageHref("event 1") },
       value: "$12.00",
     }));
     expect(markup).toContain("Set in Meals");
@@ -91,13 +99,21 @@ describe("settings another module owns (#1139)", () => {
   });
 
   it("leaves out the link when the module has no page, and the advanced options use the read-only row for it", () => {
-    const markup = renderToStaticMarkup(createElement(ModuleOwnedSettingRow, { setting: { setting: "price", label: "Price per item", owner: "Meals", href: null }, value: "No price set yet" }));
+    const markup = renderToStaticMarkup(createElement(ModuleOwnedSettingRow, { setting: { setting: "price", valueCents: 1200, label: "Price per item", owner: "Meals", href: null }, value: "No price set yet" }));
     expect(markup).toContain("Set in Meals");
     expect(markup).not.toContain("<a ");
     const advanced = read("components/registration-builder/builder-field-advanced.tsx");
     expect(advanced).toContain("<ModuleOwnedSettingRow");
     expect(advanced).toContain("!ownedPrice && ");
-    expect(advanced).toContain("!isMealTicketField(field) && ");
+    expect(advanced).toContain("value={money(ownedPrice.valueCents)}");
+    expect(advanced).toContain("Not priced in Meals yet — this form&apos;s price is used.");
+    expect(advanced).toContain("{!ownedPrice && !hasCredit(field)");
+    expect(advanced).not.toContain("!isMealTicketField(field) && !hasCredit");
+    // The page loads the event's plan prices server-side, for the event it already authorized, and hands them to the builder.
+    const page = read("app/(workspace)/registration-builder/page.tsx");
+    expect(page).toContain("mealPlanPrices={await listMealPlanPrices(event.id)}");
+    expect(read("components/registration-builder/use-builder-model.ts")).toContain("mealPlanPrices");
+    expect(read("modules/meals/config-repository.ts")).toContain("export async function listMealPlanPrices(eventId: string)");
   });
 });
 
