@@ -5,6 +5,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { AgendaItem } from "@/components/calendar-agenda-item";
+import { CalendarDayLink } from "@/components/calendar-day-link";
+import { CalendarDayFocus } from "@/components/calendar-day-focus";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import {
   calendarCategories,
@@ -19,6 +21,10 @@ import {
   monthKey,
   monthLabel,
   parseMonthParam,
+  resolveMonthAndDate,
+  formatLongDate,
+  calendarCountLabel,
+  sortCalendarItems,
   shiftMonth,
   addDays,
   type CalendarItem,
@@ -35,17 +41,18 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-type SearchParams = Promise<{ view?: string; month?: string; category?: string }>;
+type SearchParams = Promise<{ view?: string; month?: string; category?: string; date?: string }>;
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function calendarHref(params: { view?: string; month?: string; category?: string }) {
+function calendarHref(params: { view?: string; month?: string; category?: string; date?: string }, hash?: string) {
   const search = new URLSearchParams();
   if (params.view && params.view !== "month") search.set("view", params.view);
   if (params.month) search.set("month", params.month);
   if (params.category) search.set("category", params.category);
+  if (params.date) search.set("date", params.date);
   const query = search.toString();
-  return query ? `/calendar?${query}` : "/calendar";
+  return `${query ? `/calendar?${query}` : "/calendar"}${hash ? `#${hash}` : ""}`;
 }
 
 function groupByMonth(items: CalendarItem[], from: string) {
@@ -63,7 +70,9 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const view = params.view === "list" ? "list" : "month";
   const category = params.category?.slice(0, 40) || undefined;
   const today = conferenceToday();
-  const month = parseMonthParam(params.month, today);
+  // A selected date (month view only) opens that date's complete agenda and decides the month shown, so an adjacent-month
+  // date from the grid lands on its own month instead of a list that excludes it.
+  const { selectedDate, month } = resolveMonthAndDate(view, params.month, params.date, today);
 
   const grid = monthGrid(month);
   const from = view === "month" ? grid[0][0] : today;
@@ -75,6 +84,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);
   const base = { view, month: view === "month" ? params.month : undefined, category };
+  const selectedItems = selectedDate ? itemsOnDate(items, selectedDate) : [];
 
   return (
     <main className="public-registration-page public-calendar-page">
@@ -129,11 +139,11 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
 
         {categories.length > 0 && (
           <nav aria-label="Filter by category" className="calendar-categories">
-            <Link aria-current={!category ? "page" : undefined} href={calendarHref({ ...base, category: undefined })}>All</Link>
+            <Link aria-current={!category ? "page" : undefined} href={calendarHref({ ...base, category: undefined, date: selectedDate })}>All</Link>
             {categories.map((name) => (
               <Link
                 aria-current={category?.toLowerCase() === name.toLowerCase() ? "page" : undefined}
-                href={calendarHref({ ...base, category: name })}
+                href={calendarHref({ ...base, category: name, date: selectedDate })}
                 key={name}
               >
                 {name}
@@ -148,12 +158,24 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             {grid.flat().map((date) => {
               const dayItems = itemsOnDate(items, date);
               const inMonth = date.slice(0, 7) === currentMonthKey;
+              const dayLabel = `${formatLongDate(date)}, ${calendarCountLabel(dayItems.length)}`;
+              const dayHref = calendarHref(
+                { view: "month", month: inMonth ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), category, date },
+                "calendar-day-detail",
+              );
               return (
                 <div
-                  className={`calendar-day${inMonth ? "" : " is-outside"}${date === today ? " is-today" : ""}${dayItems.length ? " has-items" : ""}`}
+                  id={`calendar-day-${date}`}
+                  className={`calendar-day${inMonth ? "" : " is-outside"}${date === today ? " is-today" : ""}${dayItems.length ? " has-items" : ""}${date === selectedDate ? " is-selected" : ""}`}
                   key={date}
                 >
-                  <span className="calendar-day-number">{Number(date.slice(8))}</span>
+                  {dayItems.length > 0 ? (
+                    <CalendarDayLink aria-current={date === selectedDate ? "true" : date === today ? "date" : undefined} aria-label={`${dayLabel}. View all`} className="calendar-day-number calendar-day-link" href={dayHref}>
+                      {Number(date.slice(8))}
+                    </CalendarDayLink>
+                  ) : (
+                    <span className="calendar-day-number">{Number(date.slice(8))}</span>
+                  )}
                   {dayItems.length > 0 && (
                     <ul>
                       {dayItems.slice(0, 3).map((item) => (
@@ -167,13 +189,41 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                           {item.title}
                         </CalendarMonthChip>
                       ))}
-                      {dayItems.length > 3 && <li className="calendar-more">+{dayItems.length - 3} more</li>}
+                      {dayItems.length > 3 && (
+                        <li className="calendar-more">
+                          <CalendarDayLink className="calendar-more-link" href={dayHref}>
+                            View all {dayItems.length}<span className="sr-only"> events for {formatLongDate(date)}</span>
+                          </CalendarDayLink>
+                        </li>
+                      )}
                     </ul>
                   )}
                 </div>
               );
             })}
           </div>
+        )}
+
+        {view === "month" && selectedDate && (
+          <section aria-labelledby="calendar-day-heading" className="calendar-day-detail" id="calendar-day-detail">
+            <CalendarDayFocus key={selectedDate} />
+            <h2 id="calendar-day-heading" tabIndex={-1}>Events on {formatLongDate(selectedDate)}</h2>
+            <p className="calendar-day-count">
+              {selectedItems.length === 0
+                ? `No events on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`
+                : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
+            </p>
+            {selectedItems.length > 0 && (
+              <ul className="calendar-agenda-list">{sortCalendarItems(selectedItems).map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
+            )}
+            <div className="calendar-day-actions">
+              <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>
+              <a className="text-button" href="#calendar-agenda-heading">Month agenda</a>
+              {category && (
+                <Link className="text-button" href={calendarHref({ view: "month", month: monthKey(month), date: selectedDate })}>Clear category ({category})</Link>
+              )}
+            </div>
+          </section>
         )}
 
         <section aria-labelledby="calendar-agenda-heading" className="calendar-agenda">
