@@ -143,6 +143,7 @@ import {
   loadPublicDraft,
   savePublicDraft,
 } from "@/modules/forms/public-draft";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 declare global {
   interface Window {
@@ -1350,7 +1351,7 @@ export function PublicRegistrationForm({
       for (let pass = 0; pass < allFields.length; pass += 1) {
         let removed = false;
         for (const field of allFields) {
-          if (field.conditional && field.key in next && !isFieldVisible(field, next)) {
+          if (hasVisibilityRule(field) && field.key in next && !isFieldVisible(field, next)) {
             delete next[field.key];
             removed = true;
           }
@@ -1376,7 +1377,7 @@ export function PublicRegistrationForm({
       let removed = false;
       for (const field of scopedFields) {
         if (
-          field.conditional
+          hasVisibilityRule(field)
           && field.key in next
           && !isFieldVisible(field, { ...shared, ...next })
         ) {

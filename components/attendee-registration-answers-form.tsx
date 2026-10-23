@@ -7,6 +7,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { inlineFieldProblem } from "@/lib/field-validation";
 import type { EditableAttendeeField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { formatAddressDisplay, isPlainAddressObject, type AddressValue } from "@/modules/forms/address";
+import { evaluateVisibilityRule, fieldVisibilityRule, type RuleCondition } from "@/modules/forms/visibility-rule";
 
 type EditableAttendee = {
   attendeeId: string;
@@ -15,12 +16,19 @@ type EditableAttendee = {
   lockedFieldKeys?: string[];
 };
 
-function fieldIsVisible(
+export function fieldIsVisible(
   field: EditableAttendeeField,
   responses: Record<string, unknown>,
 ) {
-  const condition = field.conditional;
-  if (!condition) return true;
+  const rule = fieldVisibilityRule({ conditional: field.conditional ?? undefined, conditionalGroup: field.conditionalGroup ?? undefined });
+  if (!rule) return true;
+  return evaluateVisibilityRule(rule, (condition) => conditionHolds(condition, responses));
+}
+
+function conditionHolds(
+  condition: RuleCondition,
+  responses: Record<string, unknown>,
+) {
   const actual = responses[condition.fieldKey];
   if (condition.operator === "NOT_EMPTY") {
     return Array.isArray(actual)

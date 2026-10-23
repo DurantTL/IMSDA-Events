@@ -1,9 +1,10 @@
 import type { RegistrationFormField } from "@/modules/forms/definition";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
  * Whether anything a field is wired to, in either direction, is blocked.
  *
- * Up: a field's `conditional` / `optionalWhen` controller chain. Showing an
+ * Up: a field's show-when (every member of an All/Any group) and `optionalWhen` controller chain. Showing an
  * answer would reveal the answer it depends on ("Need a special meal? Yes").
  * Down: every field that the field controls, transitively. A "Yes/No" field
  * that reveals "Describe allergies" gives that answer away just the same.
@@ -21,7 +22,8 @@ export function isLinkedToBlockedField(
   const pending = [field];
   while (pending.length > 0) {
     const current = pending.pop()!;
-    for (const controllerKey of [current.conditional?.fieldKey, current.optionalWhen?.fieldKey]) {
+    // Every member of an All/Any group is a controller, not only the first condition (#1072).
+    for (const controllerKey of [...visibilityControllerKeys(current), current.optionalWhen?.fieldKey]) {
       if (!controllerKey || visited.has(controllerKey)) continue;
       visited.add(controllerKey);
       const controller = byKey.get(controllerKey);
@@ -37,7 +39,7 @@ export function isLinkedToBlockedField(
     const key = queue.pop()!;
     for (const dependent of allFields) {
       if (seenDown.has(dependent.key)) continue;
-      if (dependent.conditional?.fieldKey !== key && dependent.optionalWhen?.fieldKey !== key) continue;
+      if (!visibilityControllerKeys(dependent).includes(key) && dependent.optionalWhen?.fieldKey !== key) continue;
       seenDown.add(dependent.key);
       if (isBlocked(dependent)) return true;
       queue.push(dependent.key);

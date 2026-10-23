@@ -3,6 +3,7 @@
 // Pure, so the rules are testable without a browser. Nothing here saves anything.
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { planFieldDrop } from "./field-drop";
+import { conditionPhrase, fieldVisibilityRule, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 type Sections = RegistrationFormDefinition["sections"];
 
@@ -46,7 +47,8 @@ function inversions(sections: Sections): Inversion[] {
   const order: Array<{ field: RegistrationFormField; sectionIndex: number }> = sections.flatMap((section, sectionIndex) => section.fields.map((field) => ({ field, sectionIndex })));
   const found: Inversion[] = [];
   order.forEach(({ field, sectionIndex }, position) => {
-    const rules = [{ kind: "conditional" as const, key: field.conditional?.fieldKey }, { kind: "optionalWhen" as const, key: field.optionalWhen?.fieldKey }];
+    // Every member of an All/Any show-when group is a controller (#1072), not only the first condition.
+    const rules = [...visibilityControllerKeys(field).map((key) => ({ kind: "conditional" as const, key })), { kind: "optionalWhen" as const, key: field.optionalWhen?.fieldKey }];
     for (const rule of rules) {
       if (!rule.key) continue;
       const controllerAt = order.findIndex((entry) => entry.field.key === rule.key);
@@ -112,13 +114,15 @@ export function planMoveToStep(sections: Sections, fieldId: string, targetSectio
   return { kind: "nothing" };
 }
 
-const OPERATOR_PHRASES = { EQUALS: "is", NOT_EQUALS: "is not", INCLUDES: "includes", NOT_EMPTY: "is answered" } as const;
-
-/** "Traveling by club bus is Yes": the show-when rule in words, for the question card. Null when the question always shows. */
+/**
+ * "Traveling by club bus is Yes": the show-when rule in words, for the question card. A group reads "All of: a; b" or
+ * "Any of: a; b" (#1072). Null when the question always shows.
+ */
 export function showWhenSummary(field: RegistrationFormField, all: readonly RegistrationFormField[]): string | null {
-  const rule = field.conditional;
+  const rule = fieldVisibilityRule(field);
   if (!rule) return null;
-  const controller = all.find((candidate) => candidate.key === rule.fieldKey);
-  const label = controller?.label || rule.fieldKey;
-  return rule.operator === "NOT_EMPTY" ? `${label} ${OPERATOR_PHRASES.NOT_EMPTY}` : `${label} ${OPERATOR_PHRASES[rule.operator]} ${rule.value}`;
+  const labelOf = (key: string) => all.find((candidate) => candidate.key === key)?.label;
+  const phrases = rule.conditions.map((condition) => conditionPhrase(condition, labelOf));
+  if (phrases.length === 1) return phrases[0]!;
+  return `${rule.match === "ANY" ? "Any" : "All"} of: ${phrases.join("; ")}`;
 }

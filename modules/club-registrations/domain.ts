@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, notListedCompanions, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 /**
  * Club registration (#358): how roster people map onto an event's published
@@ -397,14 +398,8 @@ export function clubDirectoryOwnedResponses(
     // directory match, so clear it rather than leaving a stale answer.
     // Only the free-text companion shown for "Not listed" — never another
     // field that merely depends on the club answer.
-    for (const companion of fields) {
-      if (
-        companion.conditional?.fieldKey === field.key
-        && companion.conditional.operator === "EQUALS"
-        && companion.conditional.value === DIRECTORY_NOT_LISTED_VALUE
-      ) {
-        responses[companion.key] = null;
-      }
+    for (const companion of notListedCompanions(fields, field.key)) {
+      responses[companion.key] = null;
     }
   }
   return responses;
@@ -427,7 +422,7 @@ export function clubDirectoryTextPrefill(
 ): Record<string, string> {
   const prefill: Record<string, string> = {};
   for (const field of registrationFields(definition)) {
-    if (field.type !== "TEXT" || field.optionSource || field.conditional) continue;
+    if (field.type !== "TEXT" || field.optionSource || hasVisibilityRule(field)) continue;
     const label = field.label.trim();
     if (identity.clubName && (CLUB_TEXT_KEYS.has(field.key) || CLUB_TEXT_LABEL.test(label))) prefill[field.key] = identity.clubName;
     else if (identity.churchName && (CHURCH_TEXT_KEYS.has(field.key) || CHURCH_TEXT_LABEL.test(label))) prefill[field.key] = identity.churchName;

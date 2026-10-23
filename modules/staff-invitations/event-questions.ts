@@ -2,6 +2,7 @@ import { isBirthDateField, isFieldVisible, validateTestResponses, type Registrat
 import { isLinkedToBlockedField } from "@/modules/forms/field-dependency-walk";
 import { isFieldSensitive, isHealthTypeField, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { mealTicketBinding } from "@/modules/meals/domain";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
  * The event's own attendee questions on the staff link form (#1027). Pure rules shared by the server (which decides) and the page
@@ -63,7 +64,7 @@ export function staffQuestionExclusion(field: RegistrationFormField, sectionTitl
 
 export type StaffQuestion = Pick<
   RegistrationFormField,
-  "id" | "key" | "label" | "helpText" | "placeholder" | "type" | "required" | "options" | "optionLabels" | "minSelections" | "maxSelections" | "conditional" | "optionalWhen" | "group" | "ageBounds"
+  "id" | "key" | "label" | "helpText" | "placeholder" | "type" | "required" | "options" | "optionLabels" | "minSelections" | "maxSelections" | "conditional" | "conditionalGroup" | "optionalWhen" | "group" | "ageBounds"
 >;
 
 /** The form's questions the link form asks, in the form's order. */
@@ -86,7 +87,7 @@ export function staffEventQuestions(definition: RegistrationFormDefinition | nul
     changed = false;
     for (const field of all) {
       if (left.has(field.key)) continue;
-      const dependsOn = [field.conditional?.fieldKey, field.optionalWhen?.fieldKey].filter((key): key is string => Boolean(key));
+      const dependsOn = [...visibilityControllerKeys(field), field.optionalWhen?.fieldKey].filter((key): key is string => Boolean(key));
       // A question that depends on a registration-level answer can't be asked either: the link form has none.
       if (dependsOn.some((key) => left.has(key) || !all.some((candidate) => candidate.key === key && !left.has(candidate.key)))) {
         left.add(field.key);
@@ -112,6 +113,7 @@ export function toStaffQuestion(field: RegistrationFormField): StaffQuestion {
     ...(field.minSelections !== undefined ? { minSelections: field.minSelections } : {}),
     ...(field.maxSelections !== undefined ? { maxSelections: field.maxSelections } : {}),
     ...(field.conditional ? { conditional: field.conditional } : {}),
+    ...(field.conditionalGroup ? { conditionalGroup: field.conditionalGroup } : {}),
     ...(field.optionalWhen ? { optionalWhen: field.optionalWhen } : {}),
     ...(field.group ? { group: field.group } : {}),
     ...(field.ageBounds ? { ageBounds: field.ageBounds } : {}),

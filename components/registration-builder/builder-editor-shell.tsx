@@ -21,6 +21,7 @@ import { BuilderPreview } from "./builder-preview";
 import { BuilderVersionHistory } from "./builder-form-list";
 import { BuilderCanvas, type ToolbarAction } from "./builder-canvas";
 import { BuilderPalette } from "./builder-palette";
+import { BuilderRuleSummary } from "./builder-rule-summary";
 import { BuilderQuestionSettings, LABEL_INPUT_ID } from "./builder-question-settings";
 import { BuilderSidebar, sidebarPanelId, sidebarTabId, type SidebarTabDefinition } from "./builder-sidebar";
 import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
@@ -44,6 +45,7 @@ type FocusRequest =
   | { kind: "search" }
   | { kind: "toolbar"; fieldId: string; action: ToolbarAction }
   | { kind: "field"; fieldId: string }
+  | { kind: "rule"; fieldId: string }
   | { kind: "step-add"; sectionId: string }
   | { kind: "tab"; tab: SidebarTab }
   | { kind: "settings-link" };
@@ -59,6 +61,7 @@ function focusSelector(request: FocusRequest) {
     case "search": return "#fb-palette-search";
     case "toolbar": return `[data-fb-action="${request.action}"][data-field-id="${request.fieldId}"]`;
     case "field": return `.fb-field[data-field-id="${request.fieldId}"], [data-fb-phone-edit="${request.fieldId}"]`;
+    case "rule": return `#fb-rule-heading-${request.fieldId}`;
     case "step-add": return `[data-fb-step-add="${request.sectionId}"]`;
     case "tab": return `#${sidebarTabId(request.tab)}`;
     case "settings-link": return '[data-fb-nav="settings"]';
@@ -274,6 +277,12 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     showSidebar();
   }
 
+  // Edit rule / Fix rule in the Rule summary (#1072): select the question, then put focus on its "Show this question when" section.
+  function editRule(fieldId: string, sectionIndex: number) {
+    selectField(fieldId, sectionIndex);
+    request({ kind: "rule", fieldId });
+  }
+
   function addToStep(sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
     setPhoneStepId(definition.sections[sectionIndex]?.id ?? null);
@@ -342,6 +351,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
       ),
     },
     { id: "settings", label: "Question settings", panel: <BuilderQuestionSettings selection={selection} onAction={onToolbarAction} /> },
+    { id: "rules", label: "Rule summary", panel: <BuilderRuleSummary onEditRule={editRule} /> },
     {
       id: "form-settings",
       label: "Form settings",
@@ -463,7 +473,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           {phone && <button className="fb-btn outline fb-phone-return" type="button" onClick={() => scrollToSection("editor")}>Back to the questions</button>}
         </div>
         {layout.sidebarVisible
-          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} asideRef={asideRef} modal={sheetActive} inspector={{ title: tab === "form-settings" ? "Form settings" : tab === "questions" ? "Add a question" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector, doneLabel: tab === "questions" ? "Close" : "Done", hideBack: tab === "questions", note: tab === "questions" ? undefined : "Done keeps your changes in this draft. They are saved with Save draft.", notices: phone && inspectorOpen ? phoneNotices : undefined }} />
+          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} asideRef={asideRef} modal={sheetActive} inspector={{ title: tab === "form-settings" ? "Form settings" : tab === "rules" ? "Rule summary" : tab === "questions" ? "Add a question" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector, doneLabel: tab === "questions" ? "Close" : "Done", hideBack: tab === "questions", note: tab === "questions" ? undefined : "Done keeps your changes in this draft. They are saved with Save draft.", notices: phone && inspectorOpen ? phoneNotices : undefined }} />
           : <div className="fb-rail"><button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{sidebarSide === "left" ? <PanelLeft size={15} aria-hidden="true" /> : <PanelRight size={15} aria-hidden="true" />} Show sidebar</button><button className="fb-btn" type="button" onClick={() => addToStep(targetIndex)}><Plus size={15} aria-hidden="true" /> Add question</button></div>}
         {/* Phone width (#1071): Save draft and Preview stay at the bottom, above the keyboard and the safe area. Inside the body so it only sticks while the builder is on screen, never over the page above it. Save is the one filled button unless Publish is showing (it is in the top bar). */}
       {phone && (

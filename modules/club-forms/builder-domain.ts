@@ -8,6 +8,7 @@ import {
 } from "@/modules/club-forms/domain";
 import { rosterMappingProblems, rosterMappingSchema } from "@/modules/club-forms/roster-mapping";
 import { fieldDisplayLabel, formFieldScopes, formFieldTypes, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { visibilityConditions } from "@/modules/forms/visibility-rule";
 
 /**
  * Pure rules for the club form builder (#712): the draft shape, the checks a
@@ -196,7 +197,7 @@ function flagIssues(spec: ClubFormDraftSpec): BuilderIssue[] {
   // A visible field must not depend on a hidden one: it could never show.
   for (const field of allFields(spec.definition)) {
     if (hidden.has(field.key)) continue;
-    for (const rule of [field.conditional, field.optionalWhen]) {
+    for (const rule of [...visibilityConditions(field), field.optionalWhen]) {
       if (rule && hidden.has(rule.fieldKey)) {
         issues.push({ key: fieldIdKey(field.id), message: `${describeField(field)}: it depends on a hidden field. Unhide that field or remove the rule.` });
       }

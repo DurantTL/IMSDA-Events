@@ -7,6 +7,7 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import { useLoadedBuilder } from "./builder-context";
 import { PhoneSheet } from "./builder-phone-sheet";
 import { locateField } from "./canvas-rows";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 import { positionStatus } from "./phone-move";
 
 export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string; onClose: () => void; onMoved: (sectionId: string) => void }) {
@@ -27,9 +28,9 @@ export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string;
   const section = definition.sections[sectionIndex]!;
   const first = fieldIndex === 0;
   const last = fieldIndex === section.fields.length - 1;
-  const dependsOn = field.conditional ? allFields.find((candidate) => candidate.key === field.conditional?.fieldKey) : undefined;
+  const dependsOn = visibilityControllerKeys(field).flatMap((key) => allFields.find((candidate) => candidate.key === key) ?? []);
   const optionalOn = field.optionalWhen ? allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey) : undefined;
-  const dependents = allFields.filter((candidate) => candidate.id !== field.id && (candidate.conditional?.fieldKey === field.key || candidate.optionalWhen?.fieldKey === field.key));
+  const dependents = allFields.filter((candidate) => candidate.id !== field.id && (visibilityControllerKeys(candidate).includes(field.key) || candidate.optionalWhen?.fieldKey === field.key));
 
   function step(direction: -1 | 1) {
     const result = moveFieldBy(fieldId, direction);
@@ -64,7 +65,7 @@ export function PhoneMoveSheet({ fieldId, onClose, onMoved }: { fieldId: string;
         <button type="button" className="fb-btn outline" aria-disabled={targetStep === sectionIndex ? "true" : undefined} onClick={moveToStep}>Move to this step</button>
         <p className="fb-hint">It goes to the end of that step. The final review step stays last.</p>
       </fieldset>
-      {dependsOn && <p className="fb-hint">This question is shown only when “{dependsOn.label}” is answered. It stays after that question wherever you move it; moving it before that question is refused.</p>}
+      {dependsOn.length > 0 && <p className="fb-hint">This question is shown only based on {dependsOn.map((controller) => `“${controller.label}”`).join(", ")}. It stays after {dependsOn.length === 1 ? "that question" : "all of them"} wherever you move it; moving it before {dependsOn.length === 1 ? "that question" : "any of them"} is refused.</p>}
       {optionalOn && optionalOn.id !== field.id && <p className="fb-hint">This question becomes optional when “{optionalOn.label}” is answered. Between steps it stays after that question; moving it to an earlier step is refused.</p>}
       {dependents.length > 0 && <p className="fb-hint">{dependents.length === 1 ? `“${dependents[0]!.label}” is shown based on this question, so this question stays before it.` : `${dependents.length} other questions are shown based on this one, so it stays before all of them.`}</p>}
     </PhoneSheet>
