@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { classSummaryWindow, netClassChanges, type LoggedClassChange } from "@/modules/honors/class-change-domain";
 import { deliverAfterCommit, rosterClosedBefore, settingsLoader } from "@/modules/honors/class-change-emails";
 import { instructorMarksOpen } from "@/modules/honors/instructor-domain";
@@ -154,6 +155,16 @@ async function queueWatchSummary(tx: Db, input: {
       select: { id: true, status: true },
     });
     if (message.status === "PENDING") messageIds.push(message.id);
+  }
+  // The feed item (#1033) beside the summary emails, in the same transaction: one per watch per day however many addresses.
+  // A count and a link; no names. A paused event queues nothing that can leave, so no item.
+  if (messageIds.length > 0) {
+    await recordAlertFeedItem(tx, {
+      notificationKey: "HONOR_WATCH_SUMMARIES",
+      occurrenceKey: `honor-watch-summary:${watch.id}:${input.dateKey}`,
+      summary: `An honor watch summary was sent covering ${content.changes} ${content.changes === 1 ? "change" : "changes"}.`,
+      href: `/more/honors?event=${encodeURIComponent(watch.eventId)}`,
+    });
   }
   return { messageIds, changes: content.changes, messages: watch.recipients.length };
 }

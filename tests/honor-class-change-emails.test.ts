@@ -105,6 +105,7 @@ function world() {
     honorEnrollment: {
       groupBy: vi.fn(async ({ where }: { where: { offeringId: { in: string[] } } }) => where.offeringId.in.map((offeringId) => ({ offeringId, _count: { _all: enrolled.get(offeringId) ?? 0 } }))),
     },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: {
       upsert: vi.fn(async ({ where, create }: { where: { idempotencyKey: string }; create: Row }) => {
         const existing = outbox.get(where.idempotencyKey);
@@ -376,6 +377,18 @@ describe("right-away emails (#1098)", () => {
     expect(bodies().every((text) => text.includes("Now 5 of 12 seats.") && !/birth|dob|born/i.test(text))).toBe(true);
     expect(w.changes.every((row) => row.immediateHandledAt !== null)).toBe(true);
     expect(mocks.processQueuedMessageIdsAfterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("keys the admin feed item (#1033) on the Central day, not the UTC day", async () => {
+    w.addInstructor({ classChangeEmails: "IMMEDIATE" });
+    // 9:30 PM Central on 20 October is already 21 October in UTC.
+    const lateEvening = new Date("2026-10-21T02:30:00.000Z");
+    w.addChange("JOINED", "2026-10-21T02:00:00Z");
+    await dispatchImmediateClassChangeEmails(lateEvening);
+    const createMany = (w.db as unknown as { adminAlertFeedItem: { createMany: { mock: { calls: unknown[][] } } } }).adminAlertFeedItem.createMany;
+    expect(createMany.mock.calls).toHaveLength(1);
+    const written = (createMany.mock.calls[0] as unknown as [{ data: Array<{ occurrenceKey: string }> }])[0].data[0]!;
+    expect(written.occurrenceKey).toBe("honor-instructor-class-emails:event-1:2026-10-20");
   });
 
   it("does not send a change twice, however often the sweep or a kick runs", async () => {

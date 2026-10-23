@@ -141,7 +141,7 @@ export function NotificationsWorkspace({
         <StaffPageHeader
           description={(
             <>
-              Every automatic email to staff and club leaders, who gets it, and a switch for each. Everything is on until you turn it off.{" "}
+              Every automatic email to staff and club leaders, who gets it, and a switch for each. Everything is on until you turn it off. Each switch also controls the alert that appears in the bell for system administrators.{" "}
               <Link className="text-button" href="/communications">Open the delivery log</Link>
             </>
           )}

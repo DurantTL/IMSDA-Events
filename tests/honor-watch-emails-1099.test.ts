@@ -60,6 +60,7 @@ function world(options: { watch?: Partial<{ honorIds: string[]; offeringIds: str
       findMany: vi.fn(async ({ where }: { where: { at: { gt: Date; lte: Date } } }) => changes.filter((row) => (row.at as Date) > where.at.gt && (row.at as Date) <= where.at.lte)),
     },
     honorOffering: { findMany: vi.fn(async () => offerings) },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: {
       upsert: vi.fn(async ({ where, create }: { where: { idempotencyKey: string }; create: Msg }) => {
         const existing = outbox.get(where.idempotencyKey);

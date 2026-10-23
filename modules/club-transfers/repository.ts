@@ -1,6 +1,7 @@
 import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
 import { promoteWaitlistAfterSeatsFreed } from "@/modules/registrations/lifecycle-repository";
 import { crossSitePickCount } from "@/modules/honors/locations";
@@ -308,6 +309,14 @@ async function queueTransferNotification(
     })),
   });
   await transferEvent(tx, transferId, "NOTIFIED", null, `${templateKey} queued to ${created.length} recipient(s).`, { templateKey, count: created.length });
+  // The feed item (#1033) beside the emails, in the same transaction. One per transfer and notice, however many people
+  // receive it. No names: the member and clubs are on the transfers page behind the link.
+  await recordAlertFeedItem(tx, {
+    notificationKey: templateKey,
+    occurrenceKey: `member-transfer:${transferId}:${templateKey}`,
+    summary: templateKey === "MEMBER_TRANSFER_STARTED" ? "A club asked to transfer a member." : "A member transfer was completed.",
+    href: "/admin/clubs/transfers",
+  });
   return created.map((row) => row.id);
 }
 

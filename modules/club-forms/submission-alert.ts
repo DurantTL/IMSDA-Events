@@ -9,6 +9,7 @@ import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import type { ClubFormActor } from "@/modules/club-forms/domain";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 
 /**
  * "Club form submitted" alert (#1017). One internal email per address the form's settings list, queued in the same
@@ -26,7 +27,7 @@ import type { ClubFormActor } from "@/modules/club-forms/domain";
 
 export const CLUB_FORM_SUBMITTED_TEMPLATE_KEY = "CLUB_FORM_SUBMITTED";
 
-type Client = Pick<Prisma.TransactionClient, "messageOutbox" | "clubFormTemplate" | "organization" | "attendeeAccount" | "user">;
+type Client = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedItem" | "clubFormTemplate" | "organization" | "attendeeAccount" | "user">;
 
 export type ClubFormSubmittedInput = {
   submissionId: string;
@@ -137,6 +138,16 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
     });
     ids.push(message.id);
   }
+  // The feed item (#1033) beside the emails, in the same transaction: one per submission however many addresses. The
+  // form's own name is a label staff chose; no answer and no submitter name.
+  if (ids.length > 0) {
+    await recordAlertFeedItem(client, {
+      notificationKey: "CLUB_FORM_SUBMITTED",
+      occurrenceKey: `club-form-submitted:${input.submissionId}`,
+      summary: `A club form was submitted: ${template.name}.`,
+      href: `/more/club-forms/${encodeURIComponent(input.submissionId)}`,
+    });
+  }
   return ids;
 }
 
@@ -149,7 +160,8 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
 export async function sendClubFormSubmittedAlert(input: ClubFormSubmittedInput, enabled: boolean): Promise<void> {
   if (!enabled) return;
   try {
-    const ids = await queueClubFormSubmittedEmails(getPrisma(), input, true);
+    // One transaction, so the emails and the feed item commit together or not at all.
+    const ids = await getPrisma().$transaction((tx) => queueClubFormSubmittedEmails(tx, input, true));
     await deliverClubFormSubmittedEmails(ids);
   } catch (error) {
     logError("A club form submitted alert could not be queued; the submission was saved.", error, { submissionId: input.submissionId });

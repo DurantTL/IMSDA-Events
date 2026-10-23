@@ -12453,6 +12453,19 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .attention-popover { position: absolute; top: 100%; right: 0; left: 0; width: auto; margin-top: 6px; }
 }
 
+/* Alert feed in the notification bell (#1033): separate rules, 44px targets, no filled button. */
+.attention-popover .alert-feed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.attention-popover .alert-feed-head h3 { margin: 0; }
+.attention-popover .alert-feed-item { display: flex; align-items: center; gap: 6px; }
+.attention-popover .alert-feed-item .attention-item { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.attention-popover .alert-feed-item[data-read="true"] .attention-item { opacity: 0.72; }
+.attention-popover .alert-feed-item .alert-feed-name { flex: initial; min-width: 0; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), 0.78rem); text-align: left; }
+.attention-popover .alert-feed-unread { color: var(--imsda-purple); font-weight: 800; }
+.attention-popover .alert-feed-action { flex: 0 0 auto; min-height: 44px; min-width: 44px; box-sizing: border-box; padding: 4px 10px; border: 1px solid var(--imsda-purple); border-radius: 10px; background: transparent; color: var(--imsda-purple); font-size: max(var(--type-body-floor, 0px), 0.74rem); font-weight: 700; cursor: pointer; }
+.attention-popover .alert-feed-action:hover:not(:disabled) { background: var(--imsda-purple-soft); }
+.attention-popover .alert-feed-action:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
+.attention-popover .alert-feed-action:disabled { opacity: 0.6; cursor: default; }
+
 /* Sterling Volunteers check-in hold and typed override (#874). */
 .sterling-check-in-override { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; max-width: 100%; }
 .sterling-check-in-override-form { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }

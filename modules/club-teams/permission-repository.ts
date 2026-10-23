@@ -2,7 +2,8 @@ import "server-only";
 
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getServerEnv } from "@/lib/env";
@@ -210,6 +211,16 @@ async function queuePermissionRequest(
       select: { id: true, status: true },
     });
     if (message.status === "PENDING") ids.push(message.id);
+  }
+  // The feed item (#1033) beside the emails, in the same transaction: one per request however many people receive it.
+  // A count and a link; the people's names and ages stay in the email and on the review page.
+  if (ids.length > 0) {
+    await recordAlertFeedItem(tx, {
+      notificationKey: "TEAM_APPROVAL_REQUESTED",
+      occurrenceKey: `team-permission:${input.registrationId}:${createHash("sha256").update(requestKey).digest("hex").slice(0, 32)}`,
+      summary: `${input.people.length} team ${input.people.length === 1 ? "member needs" : "members need"} approval to be registered.`,
+      href: "/more/team-results",
+    });
   }
   return ids;
 }

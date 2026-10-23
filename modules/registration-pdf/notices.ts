@@ -3,6 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { enqueueStaffRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 
 /** The line at the top of the registrant's "Updated" confirmation: the PDF is the new copy, and replaces the old. */
 export const REGISTRANT_UPDATED_PDF_NOTE = "Your updated registration copy is attached as a PDF. It replaces any earlier copy.";
@@ -41,6 +42,16 @@ export async function queueStaffUpdatedRegistrationCopies(
     });
     messageIds.push(...queued.messageIds);
     pendingMessageIds.push(...queued.pendingMessageIds);
+  }
+  // The feed item (#1033) beside the "Updated" staff copies, in the same transaction: one per change however many
+  // addresses. Same alert and switch as the first copy. A link only.
+  if (pendingMessageIds.length > 0) {
+    await recordAlertFeedItem(tx, {
+      notificationKey: "NEW_REGISTRATION_STAFF_COPY",
+      occurrenceKey: `registration-updated:${input.registrationId}:${input.changeKey}`,
+      summary: "A public registration was changed.",
+      href: `/people?event=${encodeURIComponent(input.eventId)}`,
+    });
   }
   return { messageIds, pendingMessageIds };
 }

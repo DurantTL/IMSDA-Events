@@ -87,16 +87,21 @@ function outboxFixture(options: { findEmail?: string; findDisplayName?: string }
         : { email: options.findEmail, displayName: options.findDisplayName ?? "" },
     ),
   };
-  return {
+  const adminAlertFeedItem = { createMany: vi.fn(async () => ({ count: 1 })) };
+  const fixture = {
     messageOutbox,
+    adminAlertFeedItem,
     user,
     attendeeAccount,
+    // The office email and its feed item share one transaction (#1033); the fixture runs it on itself.
+    $transaction: async <T,>(work: (tx: unknown) => Promise<T>) => work(fixture),
     created,
     /** Moves the fixture's idea of "now" for rows created afterwards. */
     setClock(value: Date) {
       clock = value;
     },
   };
+  return fixture;
 }
 
 const minutes = (count: number) => count * 60 * 1000;
@@ -245,6 +250,12 @@ describe("the office alert", () => {
     // The alert names the account without belonging to it.
     expect(office?.accountUserId).toBeUndefined();
     expect(office?.accountAttendeeId).toBeUndefined();
+    // The feed item (#1033) is written beside the office email, in the same transaction, with no account address in it.
+    expect(fixture.adminAlertFeedItem.createMany).toHaveBeenCalledTimes(1);
+    const feed = (fixture.adminAlertFeedItem.createMany.mock.calls[0] as unknown as [{ data: Array<{ notificationKey: string; summary: string }> }])[0].data[0]!;
+    expect(feed.notificationKey).toBe("SIGN_IN_LOCKOUT_OFFICE_COPY");
+    expect(feed.summary).not.toContain("staff@imsda.org");
+    expect(feed.summary).not.toContain("Alex Staff");
   });
 
   it("is skipped when its switch is off (#1016), and the account holder is still emailed", async () => {
@@ -261,6 +272,8 @@ describe("the office alert", () => {
 
     expect(fixture.created).toHaveLength(1);
     expect(fixture.created[0]?.recipientKind).toBe("ACCOUNT");
+    // Switched off: neither the office email nor its feed item.
+    expect(fixture.adminAlertFeedItem.createMany).not.toHaveBeenCalled();
   });
 
   it("is sent when its switch row is missing (#1016)", async () => {

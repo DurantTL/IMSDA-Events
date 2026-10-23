@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { after } from "next/server";
@@ -260,34 +261,46 @@ async function enqueueLockoutEmails(client: DbClient, input: LockoutEmailInput) 
       when,
     });
     const idempotencyKey = capKey(officePrefix, input.now, OFFICE_ALERT_WINDOW_MS);
-    const officeMessage = await client.messageOutbox.upsert({
-      where: { idempotencyKey },
-      update: {},
-      create: {
-        eventId: null,
-        // The office alert names an account without belonging to it — it is
-        // not the account holder's own inbox, so it carries neither account
-        // relation, only the address configured in platform settings.
-        templateKey,
-        recipientKind: "INTERNAL",
-        recipientEmail: settings.securityAlertEmail,
-        recipientName: null,
-        senderNameSnapshot: sender.name,
-        senderEmailSnapshot: sender.address,
-        replyToEmailSnapshot: sender.replyTo,
-        subjectSnapshot: office.subject,
-        bodyTextSnapshot: office.bodyText,
-        metadata: {
-          trigger: "SIGN_IN_LOCKOUT_ALERT",
-          lockoutKind: input.kind,
-          accountEmail: false,
-          realDelivery: true,
-        } satisfies Prisma.InputJsonValue,
-        idempotencyKey,
-        correlationId,
-        status: "PENDING",
-      },
-      select: { id: true },
+    const officeAddress = settings.securityAlertEmail;
+    // The email and its feed item (#1033) commit together; the switch was read above, before this transaction.
+    const officeMessage = await client.$transaction(async (tx) => {
+      const queued = await tx.messageOutbox.upsert({
+        where: { idempotencyKey },
+        update: {},
+        create: {
+          eventId: null,
+          // The office alert names an account without belonging to it — it is
+          // not the account holder's own inbox, so it carries neither account
+          // relation, only the address configured in platform settings.
+          templateKey,
+          recipientKind: "INTERNAL",
+          recipientEmail: officeAddress,
+          recipientName: null,
+          senderNameSnapshot: sender.name,
+          senderEmailSnapshot: sender.address,
+          replyToEmailSnapshot: sender.replyTo,
+          subjectSnapshot: office.subject,
+          bodyTextSnapshot: office.bodyText,
+          metadata: {
+            trigger: "SIGN_IN_LOCKOUT_ALERT",
+            lockoutKind: input.kind,
+            accountEmail: false,
+            realDelivery: true,
+          } satisfies Prisma.InputJsonValue,
+          idempotencyKey,
+          correlationId,
+          status: "PENDING",
+        },
+        select: { id: true },
+      });
+      await recordAlertFeedItem(tx, {
+        notificationKey: "SIGN_IN_LOCKOUT_OFFICE_COPY",
+        // One per account and window, exactly like the email it sits beside, so a retry or a race writes nothing more.
+        occurrenceKey: idempotencyKey,
+        summary: `A ${input.audience === "STAFF" ? "staff" : "attendee"} account was locked after too many wrong ${input.kind === "CODE" ? "two-step codes" : "passwords"}.`,
+        href: "/admin",
+      });
+      return queued;
     });
     messageIds.push(officeMessage.id);
   }

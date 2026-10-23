@@ -37,7 +37,7 @@ import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitli
 const sender = { name: "IMSDA Events", address: "no-reply@imsda-events.test", replyTo: null };
 
 function outbox() {
-  return { messageOutbox: { create: vi.fn().mockResolvedValue({ id: "message-1" }) } };
+  return { messageOutbox: { create: vi.fn().mockResolvedValue({ id: "message-1" }) }, adminAlertFeedItem: { createMany: vi.fn().mockResolvedValue({ count: 1 }) } };
 }
 
 beforeEach(() => {

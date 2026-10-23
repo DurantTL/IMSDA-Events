@@ -54,6 +54,7 @@ function database(options: { existing?: Row[]; coordinator?: boolean; coordinato
     eventTeamSettings: { findUnique: vi.fn().mockResolvedValue({ ageAsOf: "2026-01-01" }) },
     eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: null, replyToEmail: null }) },
     eventMembership: { findMany: vi.fn().mockResolvedValue((options.staff ?? []).map((user) => ({ user }))) },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { upsert: vi.fn().mockImplementation(async ({ create }: { create: { recipientEmail: string; status: string } }) => ({ id: `msg-${create.recipientEmail}`, status: create.status })) },
   };
   return tx;
@@ -81,6 +82,12 @@ describe("flagging team members of 18 or older (#809)", () => {
     expect(message.bodyTextSnapshot).not.toContain("Blake Two");
     expect(message.bodyTextSnapshot).toContain("/account/area-clubs/team-permissions");
     expect(result).toEqual({ declined: [], queuedMessageIds: ["msg-ac@example.test"] });
+    // The feed item (#1033) rides in the same transaction: a count, never the names or ages.
+    expect(tx.adminAlertFeedItem.createMany).toHaveBeenCalledTimes(1);
+    const feed = (tx.adminAlertFeedItem.createMany.mock.calls[0] as unknown as [{ data: Array<{ notificationKey: string; summary: string }> }])[0].data[0]!;
+    expect(feed.notificationKey).toBe("TEAM_APPROVAL_REQUESTED");
+    expect(feed.summary).not.toContain("Alex");
+    expect(feed.summary).toContain("1 team member");
   });
 
   it("with the approval alert switched off (#1016) still flags the person and audits it, and only skips the email", async () => {

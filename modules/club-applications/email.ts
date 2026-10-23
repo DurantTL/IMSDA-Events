@@ -7,6 +7,7 @@ import { logInfo } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
 import { AccountEmailNotConfiguredError, getAccountEmailSender } from "@/modules/communications/account-email";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 
 /**
  * New club application email (#817). Three messages, all queued in the account
@@ -30,6 +31,7 @@ import { AccountEmailNotConfiguredError, getAccountEmailSender } from "@/modules
  */
 
 type Outbox = Pick<Prisma.TransactionClient, "messageOutbox">;
+type OutboxAndFeed = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedItem">;
 
 export const NEW_CLUB_APPLICATION_LINK_SENTINEL = "{{new_club_application_link}}";
 export const NEW_CLUB_APPLICATION_INVITE_TEMPLATE_KEY = "NEW_CLUB_APPLICATION_INVITE";
@@ -94,7 +96,7 @@ export function submittedEmailContent(rawInput: SubmittedEmailInput) {
  * `enabled` is the "New club application submitted" switch (#1016). The caller reads it before its transaction opens;
  * this is called inside one, so it must not read the database. Off: the application still waits in the queue.
  */
-export async function queueSubmittedEmail(client: Outbox, notifyEmail: string | null, input: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
+export async function queueSubmittedEmail(client: OutboxAndFeed, notifyEmail: string | null, input: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
   if (!notifyEmail) {
     logInfo("A new club application arrived but no notification address is set in system settings.", { applicationId: input.applicationId });
     return [];
@@ -121,6 +123,13 @@ export async function queueSubmittedEmail(client: Outbox, notifyEmail: string | 
       status: "PENDING",
     },
     select: { id: true },
+  });
+  // The "New club application submitted" feed item (#1033), beside the email in the same transaction. Labels only.
+  await recordAlertFeedItem(client, {
+    notificationKey: "NEW_CLUB_APPLICATION",
+    occurrenceKey: `new-club-application:${input.applicationId}`,
+    summary: "A new club application was submitted and is waiting for a decision.",
+    href: "/admin/clubs/applications",
   });
   return [message.id];
 }

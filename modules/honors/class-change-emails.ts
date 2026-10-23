@@ -9,6 +9,8 @@ import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { centralDateKey } from "@/modules/event-locations/waitlist-digest-domain";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import {
   CLASS_CHANGE_RETENTION_DAYS,
   IMMEDIATE_STALE_MS,
@@ -132,6 +134,8 @@ async function queueInstructorMessage(tx: Db, input: {
   subject: string;
   bodyText: string;
   metadata: Record<string, string | number>;
+  /** The Central-time day (YYYY-MM-DD) the emails belong to: the grain of the feed item. */
+  day: string;
 }) {
   const holdNote = suppressionNote(input.settings);
   const message = await tx.messageOutbox.upsert({
@@ -162,6 +166,16 @@ async function queueInstructorMessage(tx: Db, input: {
     },
     select: { id: true, status: true },
   });
+  // The feed item (#1033) beside the email, in the same transaction: one per event per day however many instructors are
+  // emailed (a per-instructor item would bury the feed). A paused event queues nothing that can leave, so no item. No names.
+  if (message.status === "PENDING") {
+    await recordAlertFeedItem(tx, {
+      notificationKey: "HONOR_INSTRUCTOR_CLASS_EMAILS",
+      occurrenceKey: `honor-instructor-class-emails:${input.eventId}:${input.day}`,
+      summary: "Honors instructors were emailed about class changes.",
+      href: `/more/honors/instructors?event=${encodeURIComponent(input.eventId)}`,
+    });
+  }
   return message.status === "PENDING" ? message.id : null;
 }
 
@@ -262,6 +276,7 @@ export async function dispatchImmediateClassChangeEmails(now = new Date(), resul
               subject: content.subject,
               bodyText: content.bodyText,
               metadata: { honorClassChangeId: change.id },
+              day: centralDateKey(now),
             });
             if (id) ids.push(id);
           }
@@ -335,6 +350,7 @@ async function queueSummary(tx: Db, input: { instructor: SummaryInstructor; sett
     subject: content.subject,
     bodyText: content.bodyText,
     metadata: { summaryDate: input.summaryDate, changeCount: content.changes },
+    day: centralDateKey(input.until),
   });
   return { messageId, changes: content.changes };
 }

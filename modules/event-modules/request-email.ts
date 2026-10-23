@@ -10,6 +10,7 @@ import {
   isAccountEmailConfigured,
 } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 
 /**
@@ -30,6 +31,7 @@ import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
  */
 
 type Outbox = Pick<Prisma.TransactionClient, "messageOutbox">;
+type OutboxAndFeed = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedItem">;
 
 /**
  * Free text (a reason, an event name) goes into a body that delivery scans for
@@ -75,7 +77,7 @@ export async function conferenceOfficeAddress(): Promise<string | null> {
  * `enabled` is the "Event feature requested" switch (#1016). The caller reads it before its transaction opens; this is
  * called inside one, so it must not read the database. Off: the request still waits for review.
  */
-export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: string | null, rawInput: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
+export async function queueRequestSubmittedEmail(client: OutboxAndFeed, officeEmail: string | null, rawInput: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
   const input = {
     ...rawInput,
     moduleTitle: neutralizePlaceholders(rawInput.moduleTitle),
@@ -122,6 +124,14 @@ export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: st
       status: "PENDING",
     },
     select: { id: true },
+  });
+  // The "Event feature requested" feed item (#1033), beside the email in the same transaction. The feature's own
+  // title is a fixed label; the reason and the requester's name stay out.
+  await recordAlertFeedItem(client, {
+    notificationKey: "EVENT_MODULE_REQUESTED",
+    occurrenceKey: `module-request:${input.requestId}`,
+    summary: `An event admin asked for the ${input.moduleTitle} feature to be turned on.`,
+    href: "/admin#module-requests",
   });
   return [message.id];
 }

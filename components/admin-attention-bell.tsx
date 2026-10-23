@@ -9,8 +9,10 @@ import {
   isSafeAttentionHref,
   type AttentionSummary,
 } from "@/modules/system-admin/attention-model";
+import { alertsOnlyButtonName, announcementText, feedAnnouncement, formatFeedTime, type AlertFeed } from "@/modules/notifications/feed-model";
 
 export const ATTENTION_ENDPOINT = "/api/admin/attention";
+export const ALERT_FEED_ENDPOINT = "/api/admin/alert-feed";
 const DIRECTORY_REVIEW_EVENT_LIMIT_LABEL = 10;
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -29,15 +31,25 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 export function AdminAttentionBell({
   defaultOpen = false,
   initial = null,
+  initialFeed = null,
 }: {
   /** Render the panel already open (used by render tests). */
   defaultOpen?: boolean;
   /** A summary to show before any read (used by render tests). */
   initial?: AttentionSummary | null;
+  /** The alert feed to show before any read (used by render tests). */
+  initialFeed?: AlertFeed | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [summary, setSummary] = useState<AttentionSummary | null>(initial);
   const [state, setState] = useState<LoadState>(initial ? "ready" : "idle");
+  const [feed, setFeed] = useState<AlertFeed | null>(initialFeed);
+  const [feedFailed, setFeedFailed] = useState(false);
+  const [feedBusy, setFeedBusy] = useState(false);
+  const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
+  const feedHeadingRef = useRef<HTMLHeadingElement>(null);
+  /** Where focus goes once the feed has changed: the button that was pressed is gone by then. */
+  const focusPlan = useRef<{ kind: "read"; index: number } | { kind: "all" } | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -58,11 +70,75 @@ export function AdminAttentionBell({
     }
   }, []);
 
+  /** The alert feed (#1033) is read beside the counts; its failure never hides them, nor theirs the feed. */
+  const loadFeed = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch(ALERT_FEED_ENDPOINT, { cache: "no-store", credentials: "same-origin", signal });
+      if (!response.ok) throw new Error("alert feed request failed");
+      const body = (await response.json()) as { feed?: AlertFeed };
+      if (!body.feed || typeof body.feed.unreadCount !== "number" || !Array.isArray(body.feed.items)) throw new Error("unexpected response");
+      setFeed(body.feed);
+      setFeedFailed(false);
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return;
+      setFeedFailed(true);
+    }
+  }, []);
+
+  /** Marks one item, or the unread items that were on screen, read. The server answers with the new feed. */
+  const changeFeed = useCallback(async (body: { action: "read"; id: string } | { action: "read-all"; ids: string[] }, announce: string) => {
+    setFeedBusy(true);
+    try {
+      const response = await fetch(ALERT_FEED_ENDPOINT, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error("alert feed update failed");
+      const parsed = (await response.json()) as { feed?: AlertFeed };
+      if (parsed.feed) setFeed(parsed.feed);
+      setFeedFailed(false);
+      // A changing suffix makes the same message announce again when it repeats.
+      setAnnouncement((previous) => ({ text: announce, count: previous.count + 1 }));
+    } catch {
+      focusPlan.current = null;
+      setFeedFailed(true);
+    } finally {
+      setFeedBusy(false);
+    }
+  }, []);
+
+  /** Mark one read. From its button, focus then moves to the next unread item's button, or the heading. */
+  const markRead = useCallback((id: string, fromButton: boolean) => {
+    if (fromButton) {
+      const unread = (feed?.items ?? []).filter((item) => !item.read);
+      focusPlan.current = { kind: "read", index: Math.max(0, unread.findIndex((item) => item.id === id)) };
+    }
+    void changeFeed({ action: "read", id }, feedAnnouncement("read", false));
+  }, [changeFeed, feed]);
+
+  // After the feed changes, put focus somewhere real: the pressed button has been removed from the page.
+  useEffect(() => {
+    const plan = focusPlan.current;
+    if (!plan) return;
+    focusPlan.current = null;
+    if (plan.kind === "read") {
+      const buttons = anchorRef.current?.querySelectorAll<HTMLButtonElement>("button[data-mark-read]");
+      if (buttons && buttons.length > 0) {
+        buttons[Math.min(plan.index, buttons.length - 1)]?.focus();
+        return;
+      }
+    }
+    feedHeadingRef.current?.focus();
+  }, [feed]);
+
   // The first read waits until the browser is idle, so the badge never competes with the page itself.
   useEffect(() => {
     if (initial) return;
     const controller = new AbortController();
-    const start = () => { void load(controller.signal); };
+    const start = () => { void load(controller.signal); void loadFeed(controller.signal); };
     const idle = (window as unknown as { requestIdleCallback?: (callback: () => void) => number; cancelIdleCallback?: (id: number) => void });
     const handle = idle.requestIdleCallback ? idle.requestIdleCallback(start) : window.setTimeout(start, 300);
     return () => {
@@ -70,7 +146,7 @@ export function AdminAttentionBell({
       if (idle.requestIdleCallback) idle.cancelIdleCallback?.(handle);
       else window.clearTimeout(handle);
     };
-  }, [initial, load]);
+  }, [initial, load, loadFeed]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,10 +174,20 @@ export function AdminAttentionBell({
   function toggle() {
     const next = !open;
     setOpen(next);
-    if (next && !initial) void load();
+    if (next && !initial) { void load(); void loadFeed(); }
   }
 
-  const total = summary?.total ?? null;
+  // Unread alerts plus the live counts. Some records can appear in both, so this is a badge, not a count of unique records;
+  // the panel keeps the two lists apart.
+  // Unknown while the live counts are unknown (not yet read, or the read failed): the button then says plain "Notifications"
+  // rather than claiming nothing needs attention.
+  const total = summary === null ? null : summary.total + (feed?.unreadCount ?? 0);
+  // The counts failed but the feed loaded with unread alerts: show what is known, for the alerts alone.
+  const alertsOnly = summary === null && feed !== null && feed.unreadCount > 0 ? feed.unreadCount : null;
+  const badgeCount = alertsOnly ?? total ?? 0;
+  const unreadItems = feed?.items.filter((item) => !item.read) ?? [];
+  /** More are unread than are listed, so the button marks only the shown ones. */
+  const partialView = feed !== null && feed.unreadCount > unreadItems.length;
 
   return (
     <div
@@ -117,14 +203,14 @@ export function AdminAttentionBell({
       <button
         aria-controls={open ? panelId : undefined}
         aria-expanded={open}
-        aria-label={attentionButtonName(total)}
+        aria-label={alertsOnly !== null ? alertsOnlyButtonName(alertsOnly) : attentionButtonName(total)}
         className="avatar attention-bell"
         onClick={toggle}
         ref={triggerRef}
         type="button"
       >
         <Bell aria-hidden="true" size={19} />
-        {total !== null && total > 0 && <span aria-hidden="true" className="attention-badge">{attentionBadgeText(total)}</span>}
+        {badgeCount > 0 && <span aria-hidden="true" className="attention-badge">{attentionBadgeText(badgeCount)}</span>}
       </button>
       {open && (
         <div aria-label="Notifications" className="header-popover attention-popover" id={panelId} role="group">
@@ -151,6 +237,64 @@ export function AdminAttentionBell({
               </ul>
             </section>
           ))}
+          <p aria-live="polite" className="sr-only" role="status">{announcementText(announcement.text, announcement.count)}</p>
+          <section aria-label="Recent alerts" className="attention-group alert-feed">
+            <div className="alert-feed-head">
+              <h3 ref={feedHeadingRef} tabIndex={-1}>Recent alerts{feed && feed.unreadCount > 0 ? `, ${feed.unreadCount} unread` : ""}</h3>
+              {unreadItems.length > 0 && (
+                <button
+                  aria-disabled={feedBusy}
+                  className="alert-feed-action"
+                  onClick={() => {
+                    if (feedBusy) return;
+                    focusPlan.current = { kind: "all" };
+                    // Only the items that were on screen: one that arrived, or committed, since stays unread.
+                    void changeFeed({ action: "read-all", ids: unreadItems.map((item) => item.id) }, feedAnnouncement("read-all", partialView));
+                  }}
+                  type="button"
+                >
+                  {partialView ? "Mark these read" : "Mark all read"}
+                </button>
+              )}
+            </div>
+            {feedFailed && <p className="attention-note" role="status">Alerts could not be loaded. The rest of the page is unaffected.</p>}
+            {feed && feed.items.length === 0 && !feedFailed && <p role="status">No alerts in the last 90 days.</p>}
+            {feed && feed.items.length > 0 && (
+              <ul>
+                {feed.items.map((item) => (
+                  <li className="alert-feed-item" data-read={item.read ? "true" : "false"} key={item.id}>
+                    {item.href && isSafeAttentionHref(item.href)
+                      ? (
+                        <Link
+                          className="attention-item"
+                          href={item.href}
+                          onClick={() => { if (!item.read && !feedBusy) markRead(item.id, false); setOpen(false); }}
+                        >
+                          <span><strong className="alert-feed-name">{item.alertName}</strong>{item.read ? "" : <span className="alert-feed-unread"> (unread)</span>}<br />{item.summary}</span>
+                        </Link>
+                      )
+                      : (
+                        <span className="attention-item">
+                          <span><strong className="alert-feed-name">{item.alertName}</strong>{item.read ? "" : <span className="alert-feed-unread"> (unread)</span>}<br />{item.summary}</span>
+                        </span>
+                      )}
+                    {!item.read && (
+                      <button
+                        aria-disabled={feedBusy}
+                        aria-label={`Mark read: ${item.alertName}, ${item.summary} (${formatFeedTime(item.occurredAt)})`}
+                        className="alert-feed-action"
+                        data-mark-read=""
+                        onClick={() => { if (!feedBusy) markRead(item.id, true); }}
+                        type="button"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {summary?.partial && <p className="attention-note">Some checks could not be read, so this list may be incomplete.</p>}
           {summary?.truncated && <p className="attention-note">Only the {DIRECTORY_REVIEW_EVENT_LIMIT_LABEL} most recent events were checked for directory review.</p>}
         </div>

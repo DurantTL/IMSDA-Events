@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -268,6 +269,15 @@ export async function sendDueLocationWaitlistDigests(
       await tx.locationWaitlistChange.updateMany({
         where: { id: { in: stampable }, digestedAt: null },
         data: { digestedAt: now },
+      });
+    }
+    // The feed item (#1033) beside the digest emails, in the same transaction: one per digest date. Counts only.
+    if (messageIds.length > 0) {
+      await recordAlertFeedItem(tx, {
+        notificationKey: "LOCATION_WAITLIST_DIGEST",
+        occurrenceKey: `location-waitlist-digest:${window.dateKey}`,
+        summary: `The daily location waitlist digest went out, covering ${stampable.length} ${stampable.length === 1 ? "change" : "changes"}.`,
+        href: "/overview",
       });
     }
     return { changesCovered: stampable.length, messageIds, recipients: recipients.size };

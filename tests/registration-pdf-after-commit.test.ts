@@ -41,7 +41,7 @@ function database(rows: Array<{ id: string; recipientKind: string; bodyTextSnaps
   const update = vi.fn().mockResolvedValue({});
   const updateMany = vi.fn().mockResolvedValue({ count: 0 });
   const findMany = vi.fn().mockResolvedValue(rows);
-  const tx = {};
+  const tx = { adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) } };
   const db = { messageOutbox: { findMany, update, updateMany }, $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
   mocks.getPrisma.mockReturnValue(db);
   return { db, tx, update, updateMany, findMany };
