@@ -48,6 +48,14 @@ export async function setPastorContact(input: { organizationId: string; contact:
   try {
     return await getPrisma().$transaction(async (tx) => {
       await requireChurch(tx, input.organizationId);
+      // A retry of the same save changes nothing: the active pastor already has these details.
+      const current = await tx.organizationContact.findFirst({
+        where: { organizationId: input.organizationId, kind: "PASTOR", effectiveTo: null },
+        select: { id: true, name: true, email: true, phone: true },
+      });
+      if (current && current.name === input.contact.name && current.email === input.contact.email && current.phone === input.contact.phone) {
+        return { id: current.id, replaced: false };
+      }
       const now = new Date();
       const ended = await tx.organizationContact.updateMany({
         where: { organizationId: input.organizationId, kind: "PASTOR", effectiveTo: null },

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +39,7 @@ const fakeDb = {
       state.contacts.push(row);
       return { id: row.id };
     }),
+    findFirst: vi.fn(async ({ where }: { where: Row }) => state.contacts.find((row) => matches(row, where)) ?? null),
     findMany: vi.fn(async ({ where }: { where: { organizationId: string | { in: string[] }; effectiveTo?: null } }) =>
       state.contacts
         .filter((row) => (typeof where.organizationId === "string" ? row.organizationId === where.organizationId : where.organizationId.in.includes(row.organizationId as string)))
@@ -56,6 +57,7 @@ const fakeDb = {
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => fakeDb }));
 
 import { AccessDeniedError } from "@/modules/access/authorization";
+import { buildRecipientCandidates } from "@/modules/invoices/delivery-domain";
 import {
   OrganizationContactError,
   endPastorContact,
@@ -141,9 +143,14 @@ describe("setPastorContact", () => {
     expect(state.contacts.filter((row) => row.effectiveTo === null)).toHaveLength(1);
   });
 
-  it("allows a retry after losing the race", async () => {
+  it("treats a retry of the same details as already saved: no new row, no end, no audit", async () => {
     await setPastorContact({ organizationId: "church-1", contact: pastor, actor: admin });
-    await expect(setPastorContact({ organizationId: "church-1", contact: pastor, actor: admin })).resolves.toMatchObject({ replaced: true });
+    await expect(setPastorContact({ organizationId: "church-1", contact: pastor, actor: admin })).resolves.toEqual({ id: "pastor-1", replaced: false });
+    expect(state.contacts).toHaveLength(1);
+    expect(state.contacts[0].effectiveTo).toBeNull();
+    expect(state.audits).toHaveLength(1);
+    await expect(setPastorContact({ organizationId: "church-1", contact: { ...pastor, phone: null }, actor: admin })).resolves.toMatchObject({ replaced: true });
+    expect(state.contacts).toHaveLength(2);
   });
 });
 
@@ -221,5 +228,28 @@ describe("pastor contact migration (#977)", () => {
       if (/^ALTER TABLE/.test(statement)) expect(statement).toMatch(/^ALTER TABLE "OrganizationContact"/);
     }
     expect(sql).not.toContain('"OrganizationBillingContact"');
+  });
+});
+
+describe("invoice recipients stay billing-only (#977)", () => {
+  it("addresses the billing contact for a church that also has a pastor, and never the pastor", async () => {
+    await setPastorContact({ organizationId: "church-1", contact: pastor, actor: admin });
+    state.billing = [{ organizationId: "church-1", name: "Terry Treasurer", roleLabel: "Treasurer", email: "treasurer@example.test" }];
+    const { billing } = (await listDirectoryContacts(["church-1"], admin)).get("church-1")!;
+    const candidates = buildRecipientCandidates({ billingContact: billing && { ...billing, verified: true }, directors: [] });
+    expect(candidates.map((candidate) => candidate.email)).toEqual(["treasurer@example.test"]);
+    expect(candidates[0].kind).toBe("BILLING_CONTACT");
+    expect(JSON.stringify(candidates)).not.toContain("pastor@example.test");
+    expect(JSON.stringify(candidates)).not.toContain("Pat Pastor");
+  });
+
+  it("is not read by any invoice, promo-code, billing-responsibility or communications code", () => {
+    const roots = ["invoices", "promo-codes", "billing-responsibility", "communications"];
+    for (const root of roots) {
+      const dir = new URL(`../modules/${root}/`, import.meta.url);
+      for (const file of readdirSync(dir).filter((name) => name.endsWith(".ts"))) {
+        expect(readFileSync(new URL(file, dir), "utf8"), `${root}/${file}`).not.toMatch(/\.organizationContact\.|organizations\/contacts-repository|OrganizationContactKind/);
+      }
+    }
   });
 });

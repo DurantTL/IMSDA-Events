@@ -266,14 +266,14 @@ enum InvoiceGrouping {
 /// Where an organization billing contact came from (#165). Only office staff
 /// enter one for now; it is never inferred from an email domain, a form answer,
 /// the club director, or the submitter.
+enum BillingContactSource {
+  STAFF_ENTERED
+}
+
 /// Kinds of non-billing church contact (#977). A treasurer is the billing contact and lives in
 /// `OrganizationBillingContact`; this table never feeds invoice recipient resolution.
 enum OrganizationContactKind {
   PASTOR
-}
-
-enum BillingContactSource {
-  STAFF_ENTERED
 }
 
 enum BillingResponsibleKind {
