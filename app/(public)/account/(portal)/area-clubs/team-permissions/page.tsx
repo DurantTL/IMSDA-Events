@@ -96,7 +96,11 @@ export default async function TeamPermissionsPage() {
       </div>
       <TeamPermissionPanel
         canDecide={account !== null}
-        emptyText="No team members of 18 or older at your event locations need a decision right now."
+        emptyText={
+          account === null
+            ? "This staff act-as view does not read any coordinator's requests, so none are shown here."
+            : "No team members of 18 or older are on teams at your event locations."
+        }
         endpointBase="/api/attendee/area-clubs/team-permissions"
         rows={rows}
         showEvent

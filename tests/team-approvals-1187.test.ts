@@ -5,8 +5,10 @@ vi.mock("@/modules/communications/effective-delivery", async () => (await import
  * Team approvals keep their server rules (#1187): only the real coordinator, only
  * at their own event locations, only while their grant is active, only for flags
  * that are still active. A staff act-as, another location, a revoked grant, a
- * flag that no longer applies (a coach, a person who left or is not 18) and a
- * cancelled team are all refused or never listed. Synthetic ids only.
+ * flag that no longer applies (a coach, a person who left or is not 18) are
+ * refused, and a cancelled team is never listed. Only the list hides a
+ * cancelled team: the decide path does not refuse it yet (see the todo below).
+ * Synthetic ids only.
  */
 const mocks = vi.hoisted(() => ({
   getPrisma: vi.fn(),
@@ -143,11 +145,16 @@ describe("another location, or a flag that no longer applies, is denied (#1187)"
     const rows = await listCoordinatorTeamPermissions("acct-1");
     const where = findMany.mock.calls[0]![0].where;
     expect(where).toMatchObject({ active: true });
-    // A cancelled team is not listed, so it cannot be decided from this page either.
+    // A cancelled team is not listed on this page. (The decide path does not filter by registration status: see the todo.)
     expect(where.clubEventRegistration.registration.status).toEqual({ in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] });
     expect(where.clubEventRegistration.registration.location.is.coordinatorAccountId).toBe("acct-1");
     expect(rows.map((row) => row.id)).toEqual(["p-other-club"]);
   });
+});
+
+describe("follow-up", () => {
+  // Follow-up issue (opened by the coordinator of #1187): decideTeamPermission has no registration-status filter.
+  it.todo("refuses a decision on a flag whose team registration is cancelled, as the list already hides it");
 });
 
 describe("the age rule still decides who needs approval (#1187)", () => {

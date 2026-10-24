@@ -280,7 +280,7 @@ describe("Team approvals page (#1187)", () => {
 
   it("says plainly when nothing needs a decision", async () => {
     const html = renderToStaticMarkup(await TeamApprovalsPage());
-    expect(html).toContain("No team members of 18 or older at your event locations need a decision right now.");
+    expect(html).toContain("No team members of 18 or older are on teams at your event locations.");
   });
 
   it("offers a staff act-as no decision control, reads no coordinator's requests, and says why", async () => {
@@ -291,6 +291,10 @@ describe("Team approvals page (#1187)", () => {
     expect(html).not.toContain(">Approve<");
     expect(html).not.toContain(">Decline<");
     expect(html).toContain("A staff act-as view cannot approve or decline.");
+    // Unread data must never look empty.
+    expect(html).not.toContain("need a decision right now");
+    expect(html).not.toContain("are on teams at your event locations");
+    expect(html).toContain("does not read any coordinator&#x27;s requests");
   });
 
   it("shows unavailable, never an empty list, when the read fails", async () => {
@@ -298,7 +302,7 @@ describe("Team approvals page (#1187)", () => {
     const html = renderToStaticMarkup(await TeamApprovalsPage());
     expect(html).toContain("is unavailable");
     expect(html).toContain("Retry");
-    expect(html).not.toContain("need a decision right now");
+    expect(html).not.toContain("are on teams at your event locations");
   });
 
   it("refuses a revoked grant", async () => {
