@@ -7,7 +7,7 @@ import { LayoutDashboard, ShieldCheck, X } from "lucide-react";
 import { DestinationSearch } from "@/components/destination-search";
 import type { SearchDestination } from "@/components/destination-search-model";
 import { GuardedLink } from "@/components/guarded-link";
-import { desktopBreakpointQuery, nextLauncherIndex } from "@/components/more-launcher-model";
+import { desktopBreakpointQuery, isPlainClick, nextLauncherIndex } from "@/components/more-launcher-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import {
   systemMenuReturnsFocus,
@@ -55,7 +55,7 @@ export function SystemPhoneMenu({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [openedOn, setOpenedOn] = useState(pathname);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLAnchorElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const sheetId = useId();
@@ -120,14 +120,18 @@ export function SystemPhoneMenu({
   return (
     <>
       <nav className="mobile-nav mobile-nav-system" aria-label="Mobile navigation">
-        <button
+        {/* A link, like the More tab: it falls back to the System home and its full task directory, and keeps the
+            navigation bar a bar of links rather than an action bar. */}
+        <GuardedLink
           ref={triggerRef}
-          type="button"
+          href="/admin"
           className={showing ? "mobile-nav-system-trigger active" : "mobile-nav-system-trigger"}
           aria-haspopup="dialog"
           aria-expanded={showing}
           aria-controls={showing ? sheetId : undefined}
-          onClick={() => {
+          onClick={(event) => {
+            if (!isPlainClick(event.nativeEvent)) return;
+            event.preventDefault();
             if (showing) close("close");
             else { setOpenedOn(pathname); setOpen(true); }
           }}
@@ -135,7 +139,7 @@ export function SystemPhoneMenu({
           <ShieldCheck aria-hidden="true" size={22} />
           <span>System menu</span>
           <small>All events</small>
-        </button>
+        </GuardedLink>
         {switches.filter((entry) => entry.method === "get").map((entry) => (
           <GuardedLink key={entry.kind} href={entry.href}>
             <LayoutDashboard aria-hidden="true" size={22} />

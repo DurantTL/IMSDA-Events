@@ -204,6 +204,16 @@ describe("phone System menu", () => {
     expect(renderToStaticMarkup(createElement(SystemPhoneMenu, { isSystemAdmin: true, groups: [], switches: [] }))).toContain("System menu");
     expect(read("components/system-phone-menu.tsx")).toMatch(/if \(open && \(openedOn !== pathname \|\| !allowed\)\) setOpen\(false\)/);
   });
+
+  it("keeps the phone bar a bar of links, like the More tab: the trigger falls back to the System home", () => {
+    navState.pathname = "/admin";
+    const bar = renderToStaticMarkup(createElement(SystemPhoneMenu, { isSystemAdmin: true, groups: [], switches: [] }));
+    // The phone layout audit treats a fixed bar holding a button as an action bar that must not cover text (#996).
+    expect(bar).not.toContain("<button");
+    const trigger = bar.match(/<a [^>]*class="mobile-nav-system-trigger"[^>]*>/)?.[0] ?? "";
+    expect(trigger).toContain('href="/admin"');
+    expect(trigger).toContain('aria-haspopup="dialog"');
+  });
 });
 
 describe("role separation", () => {
