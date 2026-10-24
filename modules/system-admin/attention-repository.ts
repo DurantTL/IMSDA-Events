@@ -11,6 +11,7 @@ import {
   EMAIL_STUCK_AFTER_MINUTES,
   SCHEDULED_EMAIL_OVERDUE_AFTER_MINUTES,
   buildAttentionSummary,
+  type AttentionItemKey,
   type AttentionSignals,
   type AttentionSummary,
   type EventCount,
@@ -46,12 +47,17 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
   const stuckBefore = minutesAgo(EMAIL_STUCK_AFTER_MINUTES);
   const overdueBefore = minutesAgo(SCHEDULED_EMAIL_OVERDUE_AFTER_MINUTES);
   let unreadable = 0;
+  const unreadableKeys: AttentionItemKey[] = [];
+  const markUnreadable = (key: AttentionItemKey) => {
+    unreadable += 1;
+    unreadableKeys.push(key);
+  };
   let directoryReviewTruncated = false;
-  const read = async <T,>(name: string, fallback: T, query: () => Promise<T>): Promise<T> => {
+  const read = async <T,>(key: AttentionItemKey, name: string, fallback: T, query: () => Promise<T>): Promise<T> => {
     try {
       return await query();
     } catch (error) {
-      unreadable += 1;
+      markUnreadable(key);
       logError(`Admin attention check failed: ${name}`, error);
       return fallback;
     }
@@ -69,21 +75,21 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     scheduledEmailsOverdue,
     scheduledEmailsFailed,
   ] = await Promise.all([
-    read("club applications", 0, () => prisma.newClubApplication.count({ where: { status: "PENDING" } })),
-    read("pending teams", NONE, async () => {
+    read("club-applications", "club applications", 0, () => prisma.newClubApplication.count({ where: { status: "PENDING" } })),
+    read("pending-teams", "pending teams", NONE, async () => {
       const rows = await prisma.generalLinkSubmission.groupBy({
         by: ["eventId"], where: { status: "PENDING" }, _count: { _all: true },
       });
       return groupedCount(rows);
     }),
-    read("cancellation requests", NONE, countCancellationRequestsWaiting),
-    read("staff invitation approvals", NONE, async () => {
+    read("cancellation-requests", "cancellation requests", NONE, countCancellationRequestsWaiting),
+    read("staff-invitation-approvals", "staff invitation approvals", NONE, async () => {
       const rows = await prisma.staffInvitation.groupBy({
         by: ["eventId"], where: { approval: "WAITING" }, _count: { _all: true },
       });
       return groupedCount(rows);
     }),
-    read("directory review", NONE, async () => {
+    read("directory-review", "directory review", NONE, async () => {
       const events = await prisma.event.findMany({
         where: { archivedAt: null, endsAt: { gte: minutesAgo(DIRECTORY_REVIEW_RECENT_DAYS * 24 * 60) } },
         orderBy: { startsAt: "desc" },
@@ -99,10 +105,10 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
             listDirectoryReviewEntries(event.id).then((entries) => entries.length),
             new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), DIRECTORY_REVIEW_BUDGET_MS); }),
           ]);
-          if (counted === null) unreadable += 1;
+          if (counted === null) markUnreadable("directory-review");
           return { eventId: event.id, count: counted ?? 0 };
         } catch (error) {
-          unreadable += 1;
+          markUnreadable("directory-review");
           logError("Admin attention check failed: directory review for one event", error);
           return { eventId: event.id, count: 0 };
         } finally {
@@ -118,7 +124,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     }),
     // Two indexed reads that cannot overlap (the second leaves out status FAILED), so nothing is counted twice. Both
     // leave out an original that a later retry already got sent: it is no longer a problem.
-    read("failed email", NONE, async () => {
+    read("email-failed", "failed email", NONE, async () => {
       const notRecovered = { retries: { none: { status: "SENT" as const } } };
       const [failed, providerProblems] = await Promise.all([
         prisma.messageOutbox.groupBy({
@@ -140,7 +146,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
       ]);
       return groupedCount([...failed, ...providerProblems]);
     }),
-    read("stuck email", NONE, async () => {
+    read("email-stuck", "stuck email", NONE, async () => {
       const rows = await prisma.messageOutbox.groupBy({
         by: ["eventId"],
         where: { status: { in: ["PENDING", "PROCESSING"] }, availableAt: { lt: stuckBefore }, updatedAt: { lt: stuckBefore } },
@@ -148,8 +154,8 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
       });
       return groupedCount(rows);
     }),
-    read("email sweep", "never", async () => (await getSweepHeartbeat(now)).status),
-    read("overdue scheduled email", NONE, async () => {
+    read("outbox-sweep", "email sweep", "never", async () => (await getSweepHeartbeat(now)).status),
+    read("scheduled-emails-overdue", "overdue scheduled email", NONE, async () => {
       const rows = await prisma.scheduledEmailBatch.groupBy({
         by: ["eventId"],
         where: { status: "ACTIVE", claimToken: null, sendAt: { lt: overdueBefore } },
@@ -157,7 +163,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
       });
       return groupedCount(rows);
     }),
-    read("failed scheduled email", NONE, async () => {
+    read("scheduled-emails-failed", "failed scheduled email", NONE, async () => {
       const rows = await prisma.scheduledEmailBatch.groupBy({
         by: ["eventId"],
         where: { status: "FAILED", failedAt: { gte: problemSince } },
@@ -180,6 +186,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     scheduledEmailsOverdue,
     scheduledEmailsFailed,
     unreadableChecks: unreadable,
+    unreadableKeys,
     directoryReviewTruncated,
   };
 }

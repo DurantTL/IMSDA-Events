@@ -52,6 +52,11 @@ export type AttentionSummary = {
   partial: boolean;
   /** True when more current events exist than the directory review reads. */
   truncated: boolean;
+  /**
+   * The items whose check could not be read (#1182). An item missing from `groups` is "none found" only when its key is
+   * not listed here; a listed key means "unknown", which a page must show as unavailable, never as zero.
+   */
+  unreadable: AttentionItemKey[];
   /** Sum of the alert items' counts (review-only lists are left out). */
   total: number;
   groups: AttentionGroup[];
@@ -80,6 +85,8 @@ export type AttentionSignals = {
   scheduledEmailsFailed: EventCount;
   /** How many of the checks above could not be read and were left empty. */
   unreadableChecks: number;
+  /** Which items those unreadable checks belong to (#1182). Optional so older callers and tests may omit it. */
+  unreadableKeys?: readonly AttentionItemKey[];
   /** More current events exist than the directory review reads (not a failure). */
   directoryReviewTruncated: boolean;
 };
@@ -212,6 +219,7 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
     generatedAt: signals.now.toISOString(),
     partial: signals.unreadableChecks > 0,
     truncated: signals.directoryReviewTruncated,
+    unreadable: [...new Set(signals.unreadableKeys ?? [])],
     total: groups.reduce((sum, group) => sum + group.items.filter((item) => !item.reviewOnly).reduce((inner, item) => inner + item.count, 0), 0),
     groups,
   };

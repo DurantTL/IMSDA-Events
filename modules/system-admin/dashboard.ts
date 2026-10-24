@@ -70,6 +70,17 @@ function eventTiming(event: Pick<SystemAdminEventSource, "startsAt" | "endsAt">,
   return "IN_PROGRESS" as const;
 }
 
+/**
+ * "Upcoming events" on the System home (#1182). Unit: events. Scope: every event in the source, which the repository
+ * reads as all events that are not archived. Predicate: not archived AND has not ended (`endsAt >= now`), so an event
+ * in progress and one not yet started both count; a draft or unpublished event counts too, because publishing is not
+ * part of the definition. An event that ends exactly now still counts. This is the same boundary `eventTiming` uses for
+ * PAST (`endsAt < now`), kept as its own named predicate so the home value and its test cannot drift from it silently.
+ */
+export function isUpcomingEvent(event: Pick<SystemAdminEventSource, "endsAt" | "archivedAt">, now: Date) {
+  return event.archivedAt === null && event.endsAt.getTime() >= now.getTime();
+}
+
 export function buildSystemAdminDashboard(source: SystemAdminDashboardSource, now = new Date()) {
   const events = source.events.map((event) => {
     const activeRegistrations = event.registrations.filter((registration) =>
@@ -125,6 +136,9 @@ export function buildSystemAdminDashboard(source: SystemAdminDashboardSource, no
     events,
     summary: {
       eventCount: events.length,
+      /** Events that are not archived and have not ended; see `isUpcomingEvent`. */
+      upcomingEventCount: events.filter((event) => isUpcomingEvent(event, now)).length,
+      /** Same predicate as `timing !== "PAST"`; kept for existing readers. The System home shows `upcomingEventCount`. */
       currentEventCount: events.filter((event) => event.timing !== "PAST").length,
       publishedEventCount: events.filter((event) => event.isPublished).length,
       registrationCount: events.reduce((total, event) => total + event.activeRegistrationCount, 0),
