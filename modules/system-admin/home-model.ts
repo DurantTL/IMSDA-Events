@@ -195,7 +195,8 @@ export function buildWorkList(attention: AttentionSummary | null, featureRequest
         groupTitle: group.title,
         label: item.label,
         count: attention?.unreadable.includes(item.key) ? null : item.count,
-        atLeast: false,
+        // The directory list stops at its cap, so its count is a floor, the same as in "How these numbers differ".
+        atLeast: item.key === "directory-review" && attention?.truncated === true,
         href: homeHref(item.key, item.href),
         linkLabel: openLabels[item.key],
         reviewOnly: item.reviewOnly === true,

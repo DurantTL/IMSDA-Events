@@ -274,7 +274,7 @@ export default async function SystemAdminPage({
               <ul>
                 <li><strong>{dashboard.summary.attendeeCount}</strong> expected attendees</li>
                 <li><strong>{dashboard.summary.registrationCount}</strong> active registrations</li>
-                <li><strong>{dashboard.summary.operationalIssueCount}</strong> operational exceptions <small>({dashboard.summary.unresolvedAlertCount} open system alerts, failed or rejected imports, and email delivery issues)</small></li>
+                <li><strong>{dashboard.summary.operationalIssueCount}</strong> operational exceptions <small>(failed or rejected imports and email delivery issues, plus {dashboard.summary.unresolvedAlertCount} open system alerts, which are platform-wide)</small></li>
               </ul>
               <p><strong>Platform-wide, not per event:</strong> {dashboard.summary.activeUserCount} active staff accounts ({dashboard.summary.pendingUserCount} pending, {dashboard.summary.systemAdminCount} system admins).</p>
             </>

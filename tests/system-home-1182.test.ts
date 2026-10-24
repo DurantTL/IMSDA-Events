@@ -388,6 +388,14 @@ describe("System home page", () => {
     expect(html).toContain("The notification bell badge adds Notification list items and Unread alerts.");
     expect(html).toContain("except feature requests and the review-only directory list");
     expect(html).toContain("At least 6");
+    // The work row and the disclosure show the same floor, never a bare 6 next to "At least 6".
+    expect(buildWorkList(attention({ directoryReview: { total: 6, topEventId: "e1" }, directoryReviewTruncated: true }), 0).rows.find((row) => row.key === "directory-review")?.atLeast).toBe(true);
+    expect(buildWorkList(attention({ directoryReview: { total: 6, topEventId: "e1" } }), 0).rows.find((row) => row.key === "directory-review")?.atLeast).toBe(false);
+  });
+
+  it("marks the open system alerts inside the event totals as platform-wide", async () => {
+    loadAll({});
+    expect(await renderHome()).toContain("open system alerts, which are platform-wide");
   });
 
   it("shows a failed health read and a failed feed read as unavailable", async () => {
