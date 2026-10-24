@@ -45,6 +45,7 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
 type RegistrationOperationDraft = {
@@ -318,6 +319,7 @@ export function PeopleWorkspace({
   const [selected, setSelected] = useState<RegistrationRecord | null>(initialSelected);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [phoneAttempted, setPhoneAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingAttendee, setAddingAttendee] = useState(false);
   const [editingAttendeeEmailId, setEditingAttendeeEmailId] = useState<string | null>(null);
@@ -458,6 +460,13 @@ export function PeopleWorkspace({
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    setPhoneAttempted(true);
+    // The saved phone is the one the server compares with (#871); the same number never blocks.
+    if (phoneBlocks("Phone", String(form.get("phone") ?? ""), selected?.accountHolder.phone)) {
+      setSaving(false);
+      setError("Fix the highlighted phone number and save again.");
+      return;
+    }
     const payload = {
       firstName: String(form.get("firstName") ?? ""),
       lastName: String(form.get("lastName") ?? ""),
@@ -546,6 +555,12 @@ export function PeopleWorkspace({
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    setPhoneAttempted(true);
+    if (phoneBlocks("Phone", String(form.get("phone") ?? ""))) {
+      setSaving(false);
+      setError("Fix the highlighted phone number and add the attendee again.");
+      return;
+    }
     try {
       const response = await fetch(`/api/events/${eventId}/registrations/${selected.id}/attendees`, {
         method: "POST",
@@ -678,6 +693,11 @@ export function PeopleWorkspace({
     event.preventDefault();
     if (!operationDraft) return;
     const form = new FormData(event.currentTarget);
+    setPhoneAttempted(true);
+    if (phoneBlocks("New phone", String(form.get("phone") ?? ""))) {
+      setError("Fix the highlighted phone number to continue.");
+      return;
+    }
     setError("");
     setOperationDraft({
       ...operationDraft,
@@ -920,7 +940,7 @@ export function PeopleWorkspace({
                       </div>
                       <div className="form-grid two-column">
                         <label>{operationDraft.kind === "transfer" ? "New contact email" : "Replacement email (optional)"}<input name="email" type="email" required={operationDraft.kind === "transfer"} maxLength={160} defaultValue={operationDraft.email} /></label>
-                        <label>New phone (optional)<input name="phone" type="tel" maxLength={40} defaultValue={operationDraft.phone} /></label>
+                        <label>New phone (optional)<PhoneInput label="New phone" name="phone" defaultValue={operationDraft.phone} showNow={phoneAttempted} /></label>
                       </div>
                       {operationDraft.kind === "substitution" && (
                         <label>Age on the event&apos;s age date (team events only)<input name="age" inputMode="numeric" pattern="[0-9]{1,3}" maxLength={3} defaultValue={operationDraft.age} /></label>
@@ -1131,7 +1151,7 @@ export function PeopleWorkspace({
                 </section>
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
-                {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<input name="phone" type="tel" /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
+                {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" showNow={phoneAttempted} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
                 {canEdit && !addingAttendee && !lifecycleAction && (
                   <>
                     <div className="registration-management-actions">
@@ -1171,7 +1191,7 @@ export function PeopleWorkspace({
             ) : (
               <form className="form-stack" onSubmit={saveRegistration}>
                 <div className="form-grid two-column"><label>First name<input name="firstName" required defaultValue={formRecord?.accountHolder.firstName} /></label><label>Last name<input name="lastName" required defaultValue={formRecord?.accountHolder.lastName} /></label></div>
-                <div className="form-grid two-column"><label>Email<input name="email" type="email" defaultValue={formRecord?.accountHolder.email} /></label><label>Phone<input name="phone" type="tel" defaultValue={formRecord?.accountHolder.phone} /></label></div>
+                <div className="form-grid two-column"><label>Email<input name="email" type="email" defaultValue={formRecord?.accountHolder.email} /></label><label>Phone<PhoneInput label="Phone" name="phone" defaultValue={formRecord?.accountHolder.phone} stored={formRecord?.accountHolder.phone} showNow={phoneAttempted} /></label></div>
                 {formRecord && !formRecord.publicSubmission && formRecord.attendeeCount === 1 && <label>Attendee type<select name="attendeeType" defaultValue={formRecord.attendeeType}><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>}
                 <p className="quiet-copy">This screen updates contact details only. Use the clearly named registration actions to change status, and Finance to record payments or refunds.</p>
                 {error && <p className="form-error" role="alert">{error}</p>}

@@ -3,6 +3,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useState } from "react";
 import { RotateCcw, Save, Send } from "lucide-react";
+import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import {
   undatedHonorCompletionsNote,
   yearEndFields,
@@ -40,6 +41,12 @@ const originLabels = {
   "class-completions": "from your class completions",
   honors: "from your honor records",
 } as const;
+
+const phoneFields = [
+  ["contactWorkPhone", "Work phone"],
+  ["contactHomePhone", "Home phone"],
+  ["contactCellPhone", "Cell phone"],
+] as const;
 
 const toCount = (value: string) => {
   if (value.trim() === "") return null;
@@ -83,6 +90,9 @@ export function ClubYearEndReportForm({
     yearEndFields.map((field) => [field.key, String(initialResolved[field.key]?.value ?? 0)]),
   ));
   const [contact, setContact] = useState<Contact>(initialContact);
+  // The phones as last saved (#871): a number equal to its saved one is an old one left alone and never blocks.
+  const [savedContact, setSavedContact] = useState<Contact>(initialContact);
+  const [attempted, setAttempted] = useState(false);
   const [current, setCurrent] = useState(status);
   const [isLate, setIsLate] = useState(late);
   const [saving, setSaving] = useState(false);
@@ -105,6 +115,12 @@ export function ClubYearEndReportForm({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const next: "DRAFT" | "SUBMITTED" = submitter?.value === "draft" ? "DRAFT" : "SUBMITTED";
+    setAttempted(true);
+    if (phoneFields.some(([key, label]) => phoneBlocks(label, contact[key], savedContact[key]))) {
+      setError("Fix the highlighted phone number and save again.");
+      setNotice("");
+      return;
+    }
     setSavingIntent(next === "DRAFT" ? "draft" : "submit");
     setSaving(true);
     setError("");
@@ -124,6 +140,13 @@ export function ClubYearEndReportForm({
         setError(result.issues?.[0]?.message ?? result.message ?? "The report could not be saved.");
         return;
       }
+      const savedPhones = {
+        contactWorkPhone: result.report.contactWorkPhone,
+        contactHomePhone: result.report.contactHomePhone,
+        contactCellPhone: result.report.contactCellPhone,
+      };
+      setContact((now) => ({ ...now, ...savedPhones }));
+      setSavedContact((now) => ({ ...now, ...savedPhones }));
       setResolved(result.report.resolved);
       setCurrent(result.report.status);
       setIsLate(result.report.late);
@@ -193,9 +216,9 @@ export function ClubYearEndReportForm({
         <div className="form-grid two-column">
           <label>Name<input autoComplete="name" maxLength={120} onChange={(event) => setContact({ ...contact, contactName: event.target.value })} value={contact.contactName} /></label>
           <label>Email<input autoComplete="email" maxLength={200} onChange={(event) => setContact({ ...contact, contactEmail: event.target.value })} type="email" value={contact.contactEmail} /></label>
-          <label>Work phone<input autoComplete="tel" maxLength={40} onChange={(event) => setContact({ ...contact, contactWorkPhone: event.target.value })} type="tel" value={contact.contactWorkPhone} /></label>
-          <label>Home phone<input autoComplete="tel" maxLength={40} onChange={(event) => setContact({ ...contact, contactHomePhone: event.target.value })} type="tel" value={contact.contactHomePhone} /></label>
-          <label>Cell phone<input autoComplete="tel" maxLength={40} onChange={(event) => setContact({ ...contact, contactCellPhone: event.target.value })} type="tel" value={contact.contactCellPhone} /></label>
+          <label>Work phone<PhoneInput label="Work phone" onValueChange={(value) => setContact({ ...contact, contactWorkPhone: value })} showNow={attempted} stored={savedContact.contactWorkPhone} value={contact.contactWorkPhone} /></label>
+          <label>Home phone<PhoneInput label="Home phone" onValueChange={(value) => setContact({ ...contact, contactHomePhone: value })} showNow={attempted} stored={savedContact.contactHomePhone} value={contact.contactHomePhone} /></label>
+          <label>Cell phone<PhoneInput label="Cell phone" onValueChange={(value) => setContact({ ...contact, contactCellPhone: value })} showNow={attempted} stored={savedContact.contactCellPhone} value={contact.contactCellPhone} /></label>
         </div>
       </fieldset>
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateEmail } from "@/lib/field-validation";
 import { yearEndFieldKeys } from "@/modules/club-reports/year-end-domain";
 
 const count = z.number().int().min(0, "Counts can't be negative.").max(9999).nullable();
@@ -13,6 +14,8 @@ const valuesShape = Object.fromEntries(yearEndFieldKeys.map((key) => [key, count
  */
 export const yearEndReportInputSchema = z.object({
   contactName: z.string().trim().max(120).default(""),
+  // The three phones are judged against the saved report's phones by `saveYearEndReport` (#871), so an old saved
+  // number does not block a save that did not touch it.
   contactWorkPhone: z.string().trim().max(40).default(""),
   contactHomePhone: z.string().trim().max(40).default(""),
   contactCellPhone: z.string().trim().max(40).default(""),
@@ -20,7 +23,7 @@ export const yearEndReportInputSchema = z.object({
   values: z.object(valuesShape).strict(),
   status: z.enum(["DRAFT", "SUBMITTED"]),
 }).strict().superRefine((report, context) => {
-  if (report.contactEmail && !z.string().email().safeParse(report.contactEmail).success) {
+  if (report.contactEmail && !validateEmail(report.contactEmail).ok) {
     context.addIssue({ code: "custom", path: ["contactEmail"], message: "Enter a valid email address." });
   }
   if (report.status !== "SUBMITTED") return;
