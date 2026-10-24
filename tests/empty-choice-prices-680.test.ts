@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { hiddenPricePatchForType } from "@/modules/forms/choice-type-pricing";
 import { calculateFormTotal, registrationFormDefinitionSchema, resolveFieldPrices, type RegistrationFormField } from "@/modules/forms/definition";
 
 // Synthetic fields only (#680): an empty choice-price map must never make a
@@ -70,5 +71,28 @@ describe("empty choice-price maps (#680)", () => {
     expect(resolveFieldPrices(fieldOf({ priceCents: 900, latePricing: { startsOn: "2026-11-01", label: "Late", priceCents: 1400, choicePricesCents: {} } }), true))
       .toEqual({ priceCents: 1400, choicePricesCents: undefined });
     expect(resolveFieldPrices(fieldOf({ choicePricesCents: { Small: 0 } }), false).choicePricesCents).toEqual({ Small: 0 });
+  });
+
+  it("clears the hidden field price when a field becomes a choice type, and keeps it otherwise", () => {
+    expect(hiddenPricePatchForType("SELECT")).toEqual({ priceCents: undefined });
+    expect(hiddenPricePatchForType("RADIO")).toEqual({ priceCents: undefined });
+    expect(hiddenPricePatchForType("MULTISELECT")).toEqual({ priceCents: undefined });
+    expect(hiddenPricePatchForType("CHECKBOX")).toEqual({});
+    expect(hiddenPricePatchForType("NUMBER")).toEqual({});
+    // A $9 checkbox switched to a select, merged like the builder does, charges nothing until a choice price is set.
+    const asSelect = { priceCents: 900, ...hiddenPricePatchForType("SELECT") };
+    expect(total(asSelect, "2026-10-01")).toBe(0);
+  });
+
+  it("applies base prices after the late date when the late map is empty", () => {
+    const field = { choicePricesCents: { Small: 500, Large: 800 }, latePricing: { startsOn: "2026-11-01", label: "Late", choicePricesCents: {} } };
+    expect(total(field, "2026-12-01", "Large")).toBe(800);
+    expect(total(field, "2026-12-01", "Small")).toBe(500);
+  });
+
+  it("schema: late-map-only prices validate, a stored {} base with a field price still parses, no price at all is refused", () => {
+    expect(() => formWith({ latePricing: { startsOn: "2026-11-01", label: "Late", choicePricesCents: { Large: 900 } } })).not.toThrow();
+    expect(() => formWith({ choicePricesCents: {}, latePricing: { startsOn: "2026-11-01", label: "Late" } })).not.toThrow();
+    expect(() => formWith({ latePricing: { startsOn: "2026-11-01", label: "Late" } })).toThrow();
   });
 });

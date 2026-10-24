@@ -297,6 +297,14 @@ describe("event info card edge cases", () => {
         .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1500, note: "from Aug 24, 2026" }]);
     });
 
+    it("lists the unpriced choices at the field price before the late date when only the late map has prices (#680)", () => {
+      const lines = buildFeesCard({ ...input, forms: [feeForm([field({ priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })])] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.tiers])).toEqual([
+        ["A", [{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+      ]);
+    });
+
     it("adds a No charge tier before the date for an option priced only late", () => {
       const form = feeForm([{
         id: "fld-a", key: "lodging", label: "Lodging", type: "SELECT", scope: "ATTENDEE", required: true,

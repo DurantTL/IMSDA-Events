@@ -295,7 +295,9 @@ export const formFieldSchema = z.object({
   for (const choice of Object.keys(field.latePricing?.choicePricesCents ?? {})) {
     if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: ["latePricing", "choicePricesCents", choice], message: "Late choice prices must reference a configured choice." });
   }
-  if (field.latePricing && field.priceCents === undefined && !field.choicePricesCents) {
+  // A stored `{}` base map still satisfies this rule so forms saved by the old builder keep parsing (#680);
+  // the late map counts too, since the engine charges its entries from the late date.
+  if (field.latePricing && field.priceCents === undefined && !field.choicePricesCents && Object.keys(field.latePricing.choicePricesCents ?? {}).length === 0) {
     context.addIssue({ code: "custom", path: ["latePricing"], message: "Late pricing requires a regular field or choice price." });
   }
   if (field.creditCentsPerUnit !== undefined) {

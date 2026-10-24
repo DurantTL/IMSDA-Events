@@ -416,7 +416,10 @@ function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
         ...Object.keys(field.choicePricesCents ?? {}),
         ...Object.keys(latePricing?.choicePricesCents ?? {}),
       ]);
-      const choices = field.options.filter((option) => priced.has(option));
+      // When only the late map has prices, the engine charges the field-level price for every
+      // choice before the late date, so unpriced choices are listed too (#680); a choice with no
+      // price in either state yields no tiers and is dropped below.
+      const choices = field.options.some((option) => priced.has(option)) ? field.options : [];
       if (choices.length > 0) {
         const lines = choices.map((option): FeeLine => ({
           label: field.optionLabels?.[option] ?? option,
