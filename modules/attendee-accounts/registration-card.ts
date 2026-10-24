@@ -107,3 +107,8 @@ export function registrationViewLink(registration: Pick<AttendeeRegistrationSumm
   }
   return null;
 }
+
+/** The Overview's filled card (#1176): the first one that opens its event hub, so a waitlisted card listed earlier never takes the fill. */
+export function overviewPrimaryCardId(registrations: Pick<AttendeeRegistrationSummary, "id" | "lifecycle" | "event">[]): string | undefined {
+  return (registrations.find((registration) => registrationViewLink(registration)) ?? registrations[0])?.id;
+}

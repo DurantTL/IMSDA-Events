@@ -60,7 +60,7 @@ import { ProfileView } from "@/components/profile-view";
 import { RegistrationActionDisclosure } from "@/components/registration-action-disclosure";
 import { VerifiedEmailExplainer } from "@/components/verified-email-explainer";
 import { AccountRegistrationCard } from "@/components/account-registration-card";
-import { HUB_REGISTRATION_LIFECYCLES, registrationAnchorId, registrationMoneySummary, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
+import { HUB_REGISTRATION_LIFECYCLES, overviewPrimaryCardId, registrationAnchorId, registrationMoneySummary, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import { parseHistoryFilter, registrationActions, splitRegistrationHistory } from "@/modules/attendee-accounts/registration-history";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
@@ -370,6 +370,14 @@ describe("View link rule against the event hub (#1176)", () => {
     // A registration with a hub page keeps its direct link on the Overview.
     const submitted = renderToStaticMarkup(createElement("ul", null, createElement(AccountRegistrationCard, { registration: registration("s", "SUBMITTED"), primary: true, viewFallback: true })));
     expect(submitted).toContain('href="/account/events/synthetic-event-s"');
+  });
+
+  it("fills the Overview's first card that opens its hub, not an earlier waitlisted card", () => {
+    expect(overviewPrimaryCardId([registration("w", "WAITLISTED"), registration("s", "SUBMITTED")])).toBe("s");
+    expect(overviewPrimaryCardId([registration("w", "WAITLISTED")])).toBe("w");
+    expect(overviewPrimaryCardId([])).toBeUndefined();
+    const overview = readFileSync(path.join(process.cwd(), "app/(public)/account/(portal)/page.tsx"), "utf8");
+    expect(overview).toContain("primary={cardPrimary && registration.id === primaryCardId}");
   });
 
   it("keeps a cancelled registration's answers viewable inline, read-only", async () => {

@@ -42,7 +42,7 @@ export function splitRegistrationHistory<T extends HistoryRegistration>(registra
 }
 
 export type RegistrationActions = {
-  /** Always: View registration enters the existing event hub. */
+  /** Always true; the card shows View registration only where the event hub loads the record (see registrationViewLink). */
   view: true;
   /** The existing payment boundary (own session, payable lifecycle, a balance), unchanged from before. */
   continuePayment: boolean;
