@@ -5,6 +5,7 @@ import { LoaderCircle, MailCheck, Send, TriangleAlert, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import Link from "next/link";
 import { formatFileSize } from "@/modules/communications/message-file-rules";
+import { selectionLimitSummary } from "@/modules/communications/selected-audience-limit";
 import type { SelectedAudiencePreview } from "@/modules/communications/selected-audience";
 import {
   selectedAudienceTemplateKeys,
@@ -59,11 +60,14 @@ function previewDeliveryNote(preview: SelectedAudiencePreview) {
 export function SelectedAudienceDialog({
   eventId,
   registrationIds,
+  matchedCount,
   onClose,
   initialDraft,
 }: {
   eventId: string;
   registrationIds: string[];
+  /** Distinct registrations the report matched before the batch limit (#1103). Defaults to the selection. */
+  matchedCount?: number;
   onClose: () => void;
   /** A starting message (#783). Staff can edit all of it, and nothing sends until they confirm. */
   initialDraft?: { templateKey: SelectedAudienceTemplateKey; title: string; body: string };
@@ -76,6 +80,13 @@ export function SelectedAudienceDialog({
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [limitAcknowledged, setLimitAcknowledged] = useState(false);
+  const omittedCount = Math.max(0, (matchedCount ?? registrationIds.length) - registrationIds.length);
+  const limitSummary = selectionLimitSummary({
+    matchedCount: registrationIds.length + omittedCount,
+    selectedCount: registrationIds.length,
+    omittedCount,
+  });
   const batchIdRef = useRef(crypto.randomUUID());
   const dialogRef = useAccessibleDialog<HTMLElement>(true, () => {
     if (!sending) onClose();
@@ -139,6 +150,7 @@ export function SelectedAudienceDialog({
     }
   }
 
+  const limitReady = omittedCount === 0 || limitAcknowledged;
   const announcementReady = templateKey !== "EVENT_ANNOUNCEMENT"
     || (announcementTitle.trim().length > 0 && announcementBody.trim().length > 0);
 
@@ -156,7 +168,11 @@ export function SelectedAudienceDialog({
       >
         <div className="modal-head">
           <div>
-            <p className="eyebrow">{registrationIds.length} selected registration{registrationIds.length === 1 ? "" : "s"}</p>
+            <p className="eyebrow">
+              {omittedCount > 0
+                ? `${registrationIds.length} of ${registrationIds.length + omittedCount} registrations selected`
+                : `${registrationIds.length} selected registration${registrationIds.length === 1 ? "" : "s"}`}
+            </p>
             <h2 id="selected-audience-title">
               {operation ? "Message batch created" : "Email the selected registrations"}
             </h2>
@@ -187,6 +203,11 @@ export function SelectedAudienceDialog({
           </div>
         ) : (
           <div className="detail-stack">
+            {omittedCount > 0 && (
+              <div className="inline-notice" id="selected-audience-limit-note" role="note">
+                <TriangleAlert aria-hidden="true" size={16} /> {limitSummary}
+              </div>
+            )}
             <div className="form-stack selected-audience-fields">
               <label>
                 Message
@@ -316,13 +337,20 @@ export function SelectedAudienceDialog({
               </>
             ) : null}
 
+            {omittedCount > 0 && (
+              <label className="checkbox-label selected-audience-limit-ack">
+                <input aria-describedby="selected-audience-limit-note" checked={limitAcknowledged} disabled={sending} onChange={(changeEvent) => setLimitAcknowledged(changeEvent.target.checked)} type="checkbox" />
+                I understand only the first {registrationIds.length} will be contacted, not all {registrationIds.length + omittedCount}.
+              </label>
+            )}
+
             {error && <p className="form-error" role="alert">{error}</p>}
 
             <div className="form-actions">
               <button className="secondary-button" disabled={sending} onClick={onClose} type="button">Cancel</button>
               <button
                 className="primary-button"
-                disabled={sending || loading || !announcementReady || (preview?.includedCount ?? 0) === 0 || (templateKey === "CUSTOM_MESSAGE" && (!preview?.templatePublished || Boolean(preview?.attachmentProblem)))}
+                disabled={sending || loading || !announcementReady || !limitReady || (preview?.includedCount ?? 0) === 0 || (templateKey === "CUSTOM_MESSAGE" && (!preview?.templatePublished || Boolean(preview?.attachmentProblem)))}
                 onClick={() => void send()}
                 type="button"
               >

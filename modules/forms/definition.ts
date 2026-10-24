@@ -295,7 +295,9 @@ export const formFieldSchema = z.object({
   for (const choice of Object.keys(field.latePricing?.choicePricesCents ?? {})) {
     if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: ["latePricing", "choicePricesCents", choice], message: "Late choice prices must reference a configured choice." });
   }
-  if (field.latePricing && field.priceCents === undefined && !field.choicePricesCents) {
+  // A stored `{}` base map still satisfies this rule so forms saved by the old builder keep parsing (#680);
+  // the late map counts too, since the engine charges its entries from the late date.
+  if (field.latePricing && field.priceCents === undefined && !field.choicePricesCents && Object.keys(field.latePricing.choicePricesCents ?? {}).length === 0) {
     context.addIssue({ code: "custom", path: ["latePricing"], message: "Late pricing requires a regular field or choice price." });
   }
   if (field.creditCentsPerUnit !== undefined) {
@@ -1582,14 +1584,17 @@ function attendeeDisplayName(responses: Record<string, unknown>, index: number, 
 
 /**
  * The prices a field charges in one pricing state, exactly as `pricedLineItem`
- * resolves them. A field is choice-priced whenever `choicePricesCents` is
- * defined (even empty), or the late map is defined while late pricing is active.
+ * resolves them. The base map and, while late pricing is active, the late map
+ * are merged (late wins per choice). A field is choice-priced only when that
+ * merged map has at least one entry; an empty map (the builder used to write
+ * `{}` for the Quick choices preset and the late-pricing toggle) falls back to
+ * `priceCents`. An entry of 0 is an explicit free choice and still counts.
  * Shared so a display of prices can never disagree with what is charged.
  */
 export function resolveFieldPrices(field: RegistrationFormField, latePricingActive: boolean) {
   const priceCents = latePricingActive ? field.latePricing?.priceCents ?? field.priceCents : field.priceCents;
-  const hasChoicePrices = field.choicePricesCents !== undefined || (latePricingActive && field.latePricing?.choicePricesCents !== undefined);
-  const choicePricesCents = hasChoicePrices ? { ...(field.choicePricesCents ?? {}), ...(latePricingActive ? field.latePricing?.choicePricesCents ?? {} : {}) } : undefined;
+  const merged = { ...(field.choicePricesCents ?? {}), ...(latePricingActive ? field.latePricing?.choicePricesCents ?? {} : {}) };
+  const choicePricesCents = Object.keys(merged).length > 0 ? merged : undefined;
   return { priceCents, choicePricesCents };
 }
 

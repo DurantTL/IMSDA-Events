@@ -18,6 +18,7 @@ import {
   type AnnouncementOptOutRow,
 } from "@/modules/communications/email-preferences";
 import type { MessagingSettingsRecord } from "@/modules/communications/types";
+import { SELECTED_AUDIENCE_MAX_REGISTRATIONS } from "@/modules/communications/selected-audience-limit";
 
 export { selectedAudienceTemplateKeys, selectedAudienceTemplateLabels, type SelectedAudienceTemplateKey };
 
@@ -56,7 +57,7 @@ export const selectedAudienceBatchInputSchema = z.strictObject({
   templateKey: z.enum(selectedAudienceTemplateKeys),
   // A cap, not a guess: a staff-chosen set that runs to hundreds is the
   // event-wide batch wearing a disguise, and that batch has its own preview.
-  registrationIds: z.array(z.string().trim().min(1).max(64)).min(1).max(250),
+  registrationIds: z.array(z.string().trim().min(1).max(64)).min(1).max(SELECTED_AUDIENCE_MAX_REGISTRATIONS),
   announcementTitle: z.string().trim().max(120).default(""),
   announcementBody: z.string().trim().max(4_000).default(""),
   previewFingerprint: z.string().trim().length(64),

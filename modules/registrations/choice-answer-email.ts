@@ -10,9 +10,6 @@ import {
  * may edit the draft, and press Send themselves.
  */
 
-/** The composer accepts at most this many registrations in one batch. */
-export const CHOICE_EMAIL_MAX_REGISTRATIONS = 250;
-
 /** Each registration once, in result order, even when several attendees on it match. */
 export function choiceEmailRegistrationIds(matches: readonly Pick<ChoiceMatch, "registrationId">[]): string[] {
   return [...new Set(matches.map((match) => match.registrationId))];

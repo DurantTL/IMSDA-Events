@@ -11,12 +11,13 @@ import {
   selectedAudienceBatchInputSchema,
   selectedAudienceTemplateKeys,
 } from "@/modules/communications/selected-audience";
+import { SELECTED_AUDIENCE_MAX_REGISTRATIONS } from "@/modules/communications/selected-audience-limit";
 import { findActiveMembership } from "@/modules/events/repository";
 import { withRequestContext } from "@/lib/request-context";
 
 const previewRequestSchema = z.strictObject({
   templateKey: z.enum(selectedAudienceTemplateKeys),
-  registrationIds: z.array(z.string().trim().min(1).max(64)).min(1).max(250),
+  registrationIds: z.array(z.string().trim().min(1).max(64)).min(1).max(SELECTED_AUDIENCE_MAX_REGISTRATIONS),
 });
 
 async function authorize(eventId: string) {

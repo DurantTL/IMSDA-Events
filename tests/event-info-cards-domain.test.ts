@@ -11,7 +11,7 @@ import {
   type InfoCardOffering,
   type InfoCardsInput,
 } from "@/modules/event-info-cards/domain";
-import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { calculateFormTotal, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
 const definition = registrationFormDefinitionSchema.parse({
   title: "Honors Weekend club registration",
@@ -282,19 +282,52 @@ describe("event info card edge cases", () => {
     });
     const tiers = (extra: Record<string, unknown>) => buildFeesCard({ ...input, forms: [feeForm([field(extra)])] })?.sections[0]?.groups[0]?.lines[0]?.tiers;
 
-    it("omits the tier a late empty choice map would charge as $0", () => {
-      // From the late date the engine is in choice mode with an empty map: $0.
+    it("shows both tiers when a late empty choice map is ignored by the engine (#680)", () => {
+      // An empty late map is not choice mode: the engine charges the late priceCents.
       expect(tiers({ priceCents: 900, latePricing: { startsOn: "2026-08-24", label: "Late", priceCents: 1400, choicePricesCents: {} } }))
-        .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }]);
+        .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1400, note: "from Aug 24, 2026" }]);
     });
 
-    it("shows no price for an empty choice map on the field, which charges $0 throughout", () => {
-      expect(tiers({ priceCents: 900, choicePricesCents: {} })).toBeUndefined();
+    it("shows the field price for an empty choice map on the field, which the engine charges as priceCents (#680)", () => {
+      expect(tiers({ priceCents: 900, choicePricesCents: {} })).toEqual([{ amountCents: 900, note: null }]);
     });
 
     it("shows the field price then the late option price for a late-only non-empty choice map", () => {
       expect(tiers({ priceCents: 900, options: ["A"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } }))
         .toEqual([{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1500, note: "from Aug 24, 2026" }]);
+    });
+
+    it("lists the unpriced choices at the field price before the late date when only the late map has prices (#680)", () => {
+      const lines = buildFeesCard({ ...input, forms: [feeForm([field({ priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })])] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.tiers])).toEqual([
+        ["A", [{ amountCents: 900, note: "through Aug 23, 2026" }, { amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+      ]);
+    });
+
+    it("shows one single charge for a multi-select with a field price before the late date (#680)", () => {
+      const lines = buildFeesCard({ ...input, forms: [feeForm([field({ type: "MULTISELECT", priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })])] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.tiers])).toEqual([
+        ["Registration fee (one charge, however many are chosen)", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+        ["A", [{ amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", [{ amountCents: 0, note: "from Aug 24, 2026" }]],
+      ]);
+    });
+
+    it("agrees with the engine for a multi-select with a field price before and after the late date (#680)", () => {
+      const definition = feeForm([field({ key: "pick", type: "MULTISELECT", scope: "REGISTRATION", priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })]).definition;
+      // Before the late date: one charge of the field price, however many are chosen.
+      expect(calculateFormTotal(definition, { pick: ["A", "B"] }, "2026-08-23").subtotalCents).toBe(900);
+      expect(calculateFormTotal(definition, { pick: ["A"] }, "2026-08-23").subtotalCents).toBe(900);
+      // From the late date: A is 1500, B (no late price) is free.
+      expect(calculateFormTotal(definition, { pick: ["A", "B"] }, "2026-08-24").subtotalCents).toBe(1500);
+      expect(calculateFormTotal(definition, { pick: ["B"] }, "2026-08-24").subtotalCents).toBe(0);
+      const lines = buildFeesCard({ ...input, forms: [{ title: "Club registration", definition }] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.unit, line.tiers])).toEqual([
+        ["Registration fee (one charge, however many are chosen)", "per registration", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+        ["A", null, [{ amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", null, [{ amountCents: 0, note: "from Aug 24, 2026" }]],
+      ]);
     });
 
     it("adds a No charge tier before the date for an option priced only late", () => {

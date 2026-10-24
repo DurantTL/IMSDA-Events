@@ -230,7 +230,7 @@ export function CheckInWorkspace({
         : item
     )));
     clearBulkResult(attendeeId);
-    setMessage("A saved check-in was confirmed by the server.");
+    setMessage("A check-in saved on this device was confirmed by the server.");
     localActionsRef.current.add(attendeeId);
     window.setTimeout(() => localActionsRef.current.delete(attendeeId), 8_000);
   }, [clearBulkResult]);
@@ -533,7 +533,7 @@ export function CheckInWorkspace({
             <strong>{arrivals.length - checkedIn}</strong>
             <small>{AWAITING_ARRIVAL_LABEL}</small>
           </span>
-          <span><strong>{queue.length}</strong><small>Saved locally</small></span>
+          <span><strong>{queue.length}</strong><small>Saved on this device</small></span>
         </div>
       </div>
 
@@ -558,9 +558,9 @@ export function CheckInWorkspace({
               ? "Saved actions will appear here after this page loads."
               : online
                 ? queue.length > 0
-                  ? "Saved check-ins can now be retried. Queued items retry automatically after reconnection."
+                  ? "Check-ins saved on this device can now be retried and retry automatically while online. They are not confirmed until the server accepts them."
                   : "New check-ins are confirmed with the server immediately."
-                : "New check-ins are saved only on this device and are not confirmed yet. Undo is unavailable."}
+                : "New check-ins are saved on this device only and are queued, not confirmed. Undo is unavailable."}
           </span>
         </div>
         {ready && queue.length > 0 && (
@@ -632,8 +632,8 @@ export function CheckInWorkspace({
               <p className="eyebrow">Saved on this device</p>
               <h2 id="saved-check-ins-title">Check-ins needing confirmation</h2>
               <p>
-                These are not counted as checked in until the server confirms
-                them. Keep conflicts here until staff resolve or discard them.
+                These are saved on this device and are not counted as checked in
+                until the server confirms them. Keep conflicts here until staff resolve or discard them.
               </p>
             </div>
             <span className="count-badge">
@@ -685,7 +685,7 @@ export function CheckInWorkspace({
                         className={processing ? "is-spinning" : ""}
                         size={15}
                       />
-                      {processing ? "Retrying…" : "Retry"}
+                      {processing ? (item.attempts === 0 ? "Confirming…" : "Retrying…") : "Retry"}
                     </button>
                     <button
                       className="text-button danger-text"
@@ -759,7 +759,7 @@ export function CheckInWorkspace({
                   </small>
                 )}
               </span>
-              <span className="arrival-time">
+              <span className={`arrival-time${!arrival.checkedInAt && savedItem ? " is-queue-state" : ""}`}>
                 {arrival.checkedInAt
                   ? new Date(arrival.checkedInAt).toLocaleTimeString([], {
                       hour: "numeric",
@@ -768,7 +768,7 @@ export function CheckInWorkspace({
                   : savedItem?.state === "CONFLICT"
                     ? "Needs review"
                     : savedItem
-                      ? (processing ? "Retrying…" : "Not saved — tap to retry")
+                      ? (processing ? (savedItem.attempts === 0 ? "Confirming…" : "Retrying…") : "Queued — not confirmed")
                       : AWAITING_ARRIVAL_LABEL}
               </span>
               {!arrival.checkedIn && sterlingHeldIds.includes(arrival.id) ? (
@@ -812,13 +812,13 @@ export function CheckInWorkspace({
                 {undoPendingId === arrival.id
                   ? "Saving…"
                   : processing
-                    ? "Retrying…"
+                    ? (savedItem && savedItem.attempts === 0 ? "Confirming…" : "Retrying…")
                     : arrival.checkedIn
                       ? online ? "Undo" : "Reconnect to undo"
                       : savedItem?.state === "CONFLICT"
                         ? "Retry check-in"
                         : savedItem
-                          ? "Retry queued"
+                          ? "Retry saved check-in"
                           : "Check in"}
               </button>              )}
             </div>

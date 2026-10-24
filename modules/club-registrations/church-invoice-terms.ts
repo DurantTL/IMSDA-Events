@@ -67,7 +67,7 @@ function soleFeeField(definition: RegistrationFormDefinition): RegistrationFormF
   const priced = definition.sections.flatMap((section) => section.fields).filter(isPriced);
   if (priced.length !== 1) return null;
   const fee = priced[0];
-  if (fee.type !== "CALCULATED" || !fee.priceCents || fee.choicePricesCents || fee.latePricing?.choicePricesCents) return null;
+  if (fee.type !== "CALCULATED" || !fee.priceCents || Object.keys(fee.choicePricesCents ?? {}).length > 0 || Object.keys(fee.latePricing?.choicePricesCents ?? {}).length > 0) return null;
   if (hasVisibilityRule(fee) || fee.optionalWhen) return null;
   if (definition.attendeeRoster?.enabled && fee.scope !== "ATTENDEE") return null;
   return fee;

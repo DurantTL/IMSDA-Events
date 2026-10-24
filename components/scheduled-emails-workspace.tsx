@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { StaffPageHeader } from "@/components/staff-page-header";
+import { scheduleDiscardPrompt, scheduleEditorIsDirty, scheduleEditorSnapshot } from "@/components/announcement-draft-dirty";
+import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   SCHEDULED_EMAIL_TEMPLATE_KEYS,
   SCHEDULED_EMAIL_TEMPLATE_LABELS,
@@ -132,6 +135,24 @@ export function ScheduledEmailsWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The editor's loaded baseline (a blank new schedule or the saved one being edited), so unsaved edits are told apart from a clean form (#1104).
+  const [baseline, setBaseline] = useState<string | null>(() => (startWithForm ? scheduleEditorSnapshot(blankForm()) : null));
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const newScheduleRef = useRef<HTMLButtonElement>(null);
+  const pendingFocusRef = useRef(false);
+  /** The editor is gone, so focus would fall to the page: ask for it on the stable "New schedule" button instead. */
+  function focusNewSchedule() {
+    pendingFocusRef.current = true;
+  }
+  // Focus lands only once the editor is gone and the button is enabled again (it is disabled while busy),
+  // and after the confirm dialog has returned its own focus.
+  useEffect(() => {
+    if (!pendingFocusRef.current || form || busy) return;
+    pendingFocusRef.current = false;
+    newScheduleRef.current?.focus();
+  }, [form, busy]);
+  const dirty = Boolean(form) && scheduleEditorIsDirty(baseline, form!);
+  useUnsavedChangesGuard(dirty, "This schedule has unsaved edits. Nothing was saved, approved or sent. Leave and discard them?");
 
   const base = `/api/events/${eventId}/scheduled-emails`;
   const content = useMemo(() => (form ? contentFrom(form) : null), [form]);
@@ -187,20 +208,38 @@ export function ScheduledEmailsWorkspace({
       : [next, ...current]);
   }
 
-  function openNew() {
-    setError("");
-    setNotice("");
-    setApproval(null);
-    setFormReview(null);
-    setForm(blankForm());
+  /** True when the editor may be replaced or closed: it is clean, or the person chose Discard changes. */
+  async function confirmLeaveEditor() {
+    if (!dirty) return true;
+    return askConfirm({ ...scheduleDiscardPrompt, body: <p>{scheduleDiscardPrompt.body}</p> });
   }
 
-  function edit(record: ScheduledEmailRecord) {
+  function loadEditor(next: FormState | null) {
+    setForm(next);
+    setBaseline(next ? scheduleEditorSnapshot(next) : null);
+    setFormReview(null);
+  }
+
+  async function openNew() {
+    if (!(await confirmLeaveEditor())) return;
     setError("");
     setNotice("");
     setApproval(null);
-    setFormReview(null);
-    setForm(formFromRecord(record));
+    loadEditor(blankForm());
+  }
+
+  async function edit(record: ScheduledEmailRecord) {
+    if (!(await confirmLeaveEditor())) return;
+    setError("");
+    setNotice("");
+    setApproval(null);
+    loadEditor(formFromRecord(record));
+  }
+
+  async function cancelEditor() {
+    if (!(await confirmLeaveEditor())) return;
+    loadEditor(null);
+    focusNewSchedule();
   }
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -228,15 +267,16 @@ export function ScheduledEmailsWorkspace({
       : await call(base, { action: "create", scheduleId: form.scheduleId, previewFingerprint: formReview.reviewFingerprint, ...content });
     if (!result?.schedule) return;
     replace(result.schedule);
-    setForm(null);
-    setFormReview(null);
+    loadEditor(null);
+    focusNewSchedule();
     setNotice(`${result.schedule.name} was saved. Nothing will be sent until you review and approve it.`);
   }
 
   async function openApproval(schedule: ScheduledEmailRecord) {
+    if (!(await confirmLeaveEditor())) return;
     setError("");
     setNotice("");
-    setForm(null);
+    loadEditor(null);
     const result = await call(`${base}/${schedule.id}`, { action: "review" });
     if (result?.review) setApproval({ schedule, review: result.review });
   }
@@ -263,10 +303,11 @@ export function ScheduledEmailsWorkspace({
 
   return (
     <section className="page-stack scheduled-emails-workspace">
+      {confirmDialog}
       <StaffPageHeader
         description={`Emails that go out later, at a time in ${eventName}'s own time zone (${eventTimezone}). Nothing is sent until a person approves it.`}
         primary={(
-          <button className="primary-button" type="button" onClick={openNew} disabled={busy}>
+          <button className="primary-button" type="button" ref={newScheduleRef} onClick={() => void openNew()} disabled={busy}>
             <Plus aria-hidden="true" size={17} /> New schedule
           </button>
         )}
@@ -350,7 +391,7 @@ export function ScheduledEmailsWorkspace({
               <button className="secondary-button" type="button" onClick={() => void review()} disabled={busy}>
                 <CalendarClock aria-hidden="true" size={16} /> Review schedule
               </button>
-              <button className="text-button" type="button" onClick={() => { setForm(null); setFormReview(null); }} disabled={busy}>Cancel</button>
+              <button className="text-button" type="button" onClick={() => void cancelEditor()} disabled={busy}>Cancel</button>
             </div>
           </div>
           {formReview && (
@@ -437,7 +478,7 @@ export function ScheduledEmailsWorkspace({
                       </button>
                     )}
                     <ActionsMenu label="More" ariaLabel={`More actions for ${schedule.name}`}>
-                      {canEdit && <li><button type="button" disabled={busy} onClick={() => edit(schedule)}>Edit schedule</button></li>}
+                      {canEdit && <li><button type="button" disabled={busy} onClick={() => void edit(schedule)}>Edit schedule</button></li>}
                       {canPause && <li><button type="button" disabled={busy} onClick={() => void act(schedule, "pause")}>Pause</button></li>}
                       {canCancel && (
                         <li className="actions-menu-divider">

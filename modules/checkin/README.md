@@ -127,7 +127,7 @@ venue Wi-Fi.
   answer is under 80 bytes. Rows this device just touched are not overwritten.
 - **Slow networks**: requests time out after 12 s and stay in the saved queue
   with their key; unconfirmed items retry every 20 s while online. Rows read
-  "Not saved - tap to retry" or "Retrying...".
+  "Queued - not confirmed", "Needs review" or "Retrying...".
 - **Limits**: the staff scan, lookup, check-in, undo, staff pass image and live
   poll routes carry no rate limiter (authenticated and permission checked).
   Sign-in and attendee pass budgets are sized in `modules/rate-limit/service.ts`
