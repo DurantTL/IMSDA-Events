@@ -420,6 +420,27 @@ function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
       // choice before the late date, so unpriced choices are listed too (#680); a choice with no
       // price in either state yields no tiers and is dropped below.
       const choices = field.options.some((option) => priced.has(option)) ? field.options : [];
+      const singleCharge = (field.type === "MULTISELECT" || field.type === "RANKED_CHOICE")
+        && latePricing !== null
+        && field.priceCents !== undefined
+        && Object.keys(field.choicePricesCents ?? {}).length === 0;
+      if (choices.length > 0 && singleCharge) {
+        // Before the late date the engine charges the field price once, however many
+        // choices are picked; from the late date each priced choice is charged (#680).
+        const lines: FeeLine[] = [
+          { label: `${field.label} (one charge, however many are chosen)`, unit: null, tiers: tiersFor(field.priceCents!, { startsOn: latePricing.startsOn, cents: null }) },
+          ...choices.flatMap((option): FeeLine[] => {
+            const cents = chargedIn(field, true, option);
+            return cents === null ? [] : [{ label: field.optionLabels?.[option] ?? option, unit: null, tiers: [{ amountCents: cents, note: `from ${formatCardDate(latePricing.startsOn)}` }] }];
+          }),
+        ];
+        const key = `choice:${field.label}:${JSON.stringify(lines)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          groups.push({ title: field.label, lines });
+        }
+        continue;
+      }
       if (choices.length > 0) {
         const lines = choices.map((option): FeeLine => ({
           label: field.optionLabels?.[option] ?? option,

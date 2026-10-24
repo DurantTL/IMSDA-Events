@@ -305,6 +305,14 @@ describe("event info card edge cases", () => {
       ]);
     });
 
+    it("shows one single charge for a multi-select with a field price before the late date (#680)", () => {
+      const lines = buildFeesCard({ ...input, forms: [feeForm([field({ type: "MULTISELECT", priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })])] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.tiers])).toEqual([
+        ["Registration fee (one charge, however many are chosen)", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+        ["A", [{ amountCents: 1500, note: "from Aug 24, 2026" }]],
+      ]);
+    });
+
     it("adds a No charge tier before the date for an option priced only late", () => {
       const form = feeForm([{
         id: "fld-a", key: "lodging", label: "Lodging", type: "SELECT", scope: "ATTENDEE", required: true,

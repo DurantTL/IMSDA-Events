@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hiddenPricePatchForType } from "@/modules/forms/choice-type-pricing";
+import { hiddenPricePatchForType, hidesFieldPrice } from "@/modules/forms/choice-type-pricing";
 import { calculateFormTotal, registrationFormDefinitionSchema, resolveFieldPrices, type RegistrationFormField } from "@/modules/forms/definition";
 
 // Synthetic fields only (#680): an empty choice-price map must never make a
@@ -74,13 +74,22 @@ describe("empty choice-price maps (#680)", () => {
   });
 
   it("clears the hidden field price when a field becomes a choice type, and keeps it otherwise", () => {
-    expect(hiddenPricePatchForType("SELECT")).toEqual({ priceCents: undefined });
-    expect(hiddenPricePatchForType("RADIO")).toEqual({ priceCents: undefined });
-    expect(hiddenPricePatchForType("MULTISELECT")).toEqual({ priceCents: undefined });
-    expect(hiddenPricePatchForType("CHECKBOX")).toEqual({});
-    expect(hiddenPricePatchForType("NUMBER")).toEqual({});
+    const cleared = { priceCents: undefined, latePricing: undefined };
+    expect(hiddenPricePatchForType("CHECKBOX", "SELECT")).toEqual(cleared);
+    expect(hiddenPricePatchForType("CHECKBOX", "RADIO")).toEqual(cleared);
+    expect(hiddenPricePatchForType("CHECKBOX", "MULTISELECT")).toEqual(cleared);
+    expect(hiddenPricePatchForType("NUMBER", "ADDRESS")).toEqual(cleared);
+    expect(hiddenPricePatchForType("SELECT", "CHECKBOX")).toEqual({});
+    expect(hiddenPricePatchForType("CHECKBOX", "NUMBER")).toEqual({});
+    // Choice to choice, and choice to address, keep what is stored: the pricing kind did not change.
+    expect(hiddenPricePatchForType("SELECT", "RADIO")).toEqual({});
+    expect(hiddenPricePatchForType("MULTISELECT", "SELECT")).toEqual({});
+    expect(hiddenPricePatchForType("SELECT", "ADDRESS")).toEqual({});
+    expect(hidesFieldPrice("ADDRESS")).toBe(true);
+    expect(hidesFieldPrice("SELECT")).toBe(true);
+    expect(hidesFieldPrice("CHECKBOX")).toBe(false);
     // A $9 checkbox switched to a select, merged like the builder does, charges nothing until a choice price is set.
-    const asSelect = { priceCents: 900, ...hiddenPricePatchForType("SELECT") };
+    const asSelect = { priceCents: 900, ...hiddenPricePatchForType("CHECKBOX", "SELECT") };
     expect(total(asSelect, "2026-10-01")).toBe(0);
   });
 
