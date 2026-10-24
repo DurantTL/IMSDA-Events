@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, UsersRound } from "lucide-react";
-import { AreaClubsSubNav } from "@/components/area-clubs-subnav";
+import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { filterClubsByNameChurchOrCity, parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -50,13 +50,14 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
     const allClubs = filterClubsByNameChurchOrCity(everyClub, query);
     return (
       <>
-        <section className="public-registration-hero public-manage-hero account-page-hero">
-          <div>
-            <p className="public-registration-eyebrow">Area Coordinator</p>
-            <h1>Clubs</h1>
-          </div>
-        </section>
-        <AreaClubsSubNav />
+        <CoordinatorShellHeader>
+          <section className="public-registration-hero public-manage-hero account-page-hero">
+            <div>
+              <p className="public-registration-eyebrow">Area Coordinator</p>
+              <h1>Clubs</h1>
+            </div>
+          </section>
+        </CoordinatorShellHeader>
         <div className="account-page-body">
           <section className="public-manage-card">
             <p className="field-help">Every active club. Clubs you don&apos;t run open view only, with ages instead of birth dates.</p>

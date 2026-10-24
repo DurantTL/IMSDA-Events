@@ -71,10 +71,11 @@ describe("layout classes (#722)", () => {
   });
 
   it("wraps the Clubs sub-menu in the page-body column on both pages that show it", () => {
-    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["All clubs", "Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
+    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["Overview", "All clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
     for (const file of ["app/(public)/account/(portal)/area-clubs/layout.tsx", "app/(public)/account/(portal)/clubs/page.tsx"]) {
-      expect(readFileSync(file, "utf8")).toContain("<AreaClubsSubNav />");
+      expect(readFileSync(file, "utf8")).toContain("<CoordinatorShellHeader>");
     }
+    expect(readFileSync("components/coordinator-shell-header.tsx", "utf8")).toContain("<AreaClubsSubNav");
     expect(readFileSync("components/area-clubs-subnav.tsx", "utf8")).toContain('className="account-page-body account-page-subnav"');
   });
 

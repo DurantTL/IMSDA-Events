@@ -1,0 +1,224 @@
+import Link from "next/link";
+import { Download } from "lucide-react";
+import { AreaClubSearch } from "@/components/area-clubs-views";
+import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";
+import { cardCell } from "@/components/table-card-labels";
+import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
+import {
+  COORDINATOR_SCOPE_TEXT,
+  clubRecordStatus,
+  fullYearExportLabel,
+  overviewTableClubs,
+  type CoordinatorOverview,
+} from "@/modules/club-reports/coordinator-overview-domain";
+
+/**
+ * The coordinator Overview's body (#1186). Presentation only: every number comes
+ * from a `CoordinatorOverview` built over `getAreaClubsSummary`'s rows, and a
+ * failed read renders the "unavailable" state instead of any count. Counts only
+ * for screening; no birth dates, medical details, notes or contact records.
+ */
+
+const formatNumber = (value: number) => value.toLocaleString("en-US");
+const EXPORT_PATH = "/api/attendee/area-clubs/export";
+
+export type CoordinatorOverviewData =
+  | { status: "ready"; clubs: AreaClubSummary[]; overview: CoordinatorOverview }
+  | { status: "unavailable" };
+
+/** Task heading, the club year actually queried, and the honest scope. It claims no ministry or area filter. */
+export function CoordinatorOverviewHeading({ clubYear }: { clubYear: string }) {
+  return (
+    <header className="coordinator-overview-heading">
+      <h2>Club overview</h2>
+      <p className="coordinator-overview-scope">
+        <span>Club year <strong>{clubYear}</strong></span>
+        <span aria-hidden="true"> · </span>
+        <span>{COORDINATOR_SCOPE_TEXT}</span>
+      </p>
+    </header>
+  );
+}
+
+/** A failed read: said plainly, with a retry, and never a zero or "Submitted". */
+export function CoordinatorUnavailable({ what = "The club overview" }: { what?: string }) {
+  return (
+    <section aria-labelledby="coordinator-unavailable-title" className="coordinator-unavailable" role="alert">
+      <h3 id="coordinator-unavailable-title">{what} is unavailable</h3>
+      <p>The club information could not be read just now, so no counts or record statuses are shown. Nothing here means a club has no records.</p>
+      <CoordinatorRetryButton />
+    </section>
+  );
+}
+
+export function CoordinatorSummary({ overview }: { overview: CoordinatorOverview }) {
+  return (
+    <section aria-labelledby="coordinator-summary-title" className="coordinator-summary">
+      <h3 className="sr-only" id="coordinator-summary-title">Summary for {overview.clubYear}</h3>
+      <dl>
+        <div>
+          <dt>Active clubs</dt>
+          <dd>{formatNumber(overview.activeClubs)}</dd>
+        </div>
+        <div>
+          <dt>Submitted records, {overview.monthLabel}</dt>
+          <dd>{overview.recordsText}</dd>
+        </div>
+        <div>
+          <dt>Roster members, {overview.clubYear}</dt>
+          <dd>{formatNumber(overview.rosterMembers)}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+export function CoordinatorFollowUp({ overview, clubYear, query = "" }: { overview: CoordinatorOverview; clubYear: string; query?: string }) {
+  // The count always speaks about every club; the names follow the search, like the table beside it.
+  const listed = overviewTableClubs(overview.followUp, query);
+  const recordsHref = `/account/area-clubs/reports?year=${encodeURIComponent(clubYear)}`;
+  return (
+    <section aria-labelledby="coordinator-follow-up-title" className="coordinator-panel coordinator-follow-up">
+      <h3 id="coordinator-follow-up-title">Follow-up: {overview.monthLabel} records</h3>
+      {overview.activeClubs === 0 ? (
+        <p>There are no clubs to follow up on.</p>
+      ) : overview.monthNotDue ? (
+        <p>{overview.monthLabel} is not due yet, so no records are listed as missing.</p>
+      ) : overview.followUp.length === 0 ? (
+        <p>Every club has submitted its {overview.monthLabel} record.</p>
+      ) : (
+        <>
+          <p>{overview.followUp.length} of {overview.recordDenominator} clubs have no submitted {overview.monthLabel} record.</p>
+          {query && <p className="field-help">{listed.length} of {overview.followUp.length} listed below match “{query}”.</p>}
+          <ul>
+            {listed.map((club) => (
+              <li key={club.id}><span translate="no">{club.name}</span></li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="field-help">For information only. This page sets no deadline and sends no messages.</p>
+      <Link className="text-button" href={recordsHref}>Open Monthly Records</Link>
+    </section>
+  );
+}
+
+export function CoordinatorHelp() {
+  return (
+    <aside aria-labelledby="coordinator-help-title" className="coordinator-panel coordinator-help">
+      <h3 id="coordinator-help-title">About this view</h3>
+      <p>Your role is read-only. The club director maintains the roster and the club&apos;s settings, so ask the director for any change.</p>
+      <p>Screening shows counts only. Open a club to see what your role may view there.</p>
+      <Link className="text-button" href="/account/help">Account help</Link>
+    </aside>
+  );
+}
+
+/**
+ * Club-name search, "N of M clubs shown" and the table. The search narrows this
+ * table only; the CSV above it is the full year for every available club.
+ */
+export function CoordinatorClubsAtAGlance({
+  clubs,
+  overview,
+  query,
+}: {
+  clubs: AreaClubSummary[];
+  overview: CoordinatorOverview;
+  query: string;
+}) {
+  const shown = overviewTableClubs(clubs, query);
+  const clearHref = `/account/area-clubs/overview?year=${encodeURIComponent(overview.clubYear)}`;
+  return (
+    <section aria-labelledby="coordinator-clubs-title" className="coordinator-clubs">
+      <h3 id="coordinator-clubs-title">Clubs at a glance</h3>
+      <div className="coordinator-export">
+        <div className="intro-actions">
+          <a className="secondary-button" href={`${EXPORT_PATH}?report=summary&year=${encodeURIComponent(overview.clubYear)}`}>
+            <Download aria-hidden="true" size={15} /> {fullYearExportLabel(overview.clubYear)}
+          </a>
+          <a className="secondary-button" href={`${EXPORT_PATH}?report=points&year=${encodeURIComponent(overview.clubYear)}`}>
+            <Download aria-hidden="true" size={15} /> {fullYearExportLabel(overview.clubYear, "points")}
+          </a>
+        </div>
+        <p className="field-help">The CSV files cover the full club year for every available club. They do not change with the search below.</p>
+      </div>
+      {clubs.length === 0 ? (
+        <p className="report-empty">No active clubs are available to this role yet.</p>
+      ) : (
+        <>
+          <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs by name" query={query} shown={shown.length} total={clubs.length} />
+          <p className="coordinator-count">{shown.length} of {clubs.length} {clubs.length === 1 ? "club" : "clubs"} shown</p>
+          {shown.length === 0 ? (
+            <p className="report-empty">
+              No club name matches “{query}”.{" "}
+              <Link className="text-button" href={clearHref}>Clear search</Link>
+            </p>
+          ) : (
+            <div className="report-table-wrap card-box">
+              <table className="report-table table-cards table-cards-tablet" role="table">
+                <caption className="sr-only">Clubs for {overview.clubYear}, with the {overview.monthLabel} record status</caption>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th role="columnheader" scope="col">Club / church</th>
+                    <th role="columnheader" scope="col">Roster</th>
+                    <th role="columnheader" scope="col">Adults</th>
+                    <th role="columnheader" scope="col">{overview.monthLabel} record</th>
+                    <th role="columnheader" scope="col">Sterling Volunteers</th>
+                    <th role="columnheader" scope="col">Open club</th>
+                  </tr>
+                </thead>
+                <tbody role="rowgroup">
+                  {shown.map((club) => {
+                    const record = clubRecordStatus(club, overview.month);
+                    return (
+                      <tr key={club.id} role="row">
+                        <th className="coordinator-club-cell" role="rowheader" scope="row">
+                          <span translate="no">{club.name}</span>
+                          {club.church && <small translate="no">{club.church}</small>}
+                          <small translate="no">Director: {club.directors.length > 0 ? club.directors.join(", ") : "none listed"}</small>
+                        </th>
+                        <td {...cardCell("Roster")}>{formatNumber(club.rosterSize)}</td>
+                        <td {...cardCell("Adults")}>{formatNumber(club.adultCount)}</td>
+                        <td {...cardCell(`${overview.monthLabel} record`)}>
+                          {record.label}{record.detail && <small> ({record.detail})</small>}
+                        </td>
+                        <td {...cardCell("Sterling Volunteers")}>
+                          {/* Counts only: who and why stay with the club (#479). */}
+                          {club.backgroundChecks.notInCompliance} not in compliance · {club.backgroundChecks.expiringSoon} expiring soon · {club.backgroundChecks.missing} missing
+                        </td>
+                        <td {...cardCell("Open club")}>
+                          <Link className="secondary-button" href={`/account/area/${club.id}`}>
+                            Open club<span className="sr-only">: {club.name}</span>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** The whole Overview body for either outcome of the read. */
+export function CoordinatorOverviewBody({ data, query }: { data: CoordinatorOverviewData; query: string }) {
+  if (data.status === "unavailable") return <CoordinatorUnavailable />;
+  const { clubs, overview } = data;
+  return (
+    <>
+      <CoordinatorSummary overview={overview} />
+      <div className="coordinator-overview-layout">
+        <CoordinatorClubsAtAGlance clubs={clubs} overview={overview} query={query} />
+        <div className="coordinator-overview-side">
+          <CoordinatorFollowUp clubYear={overview.clubYear} overview={overview} query={query} />
+          <CoordinatorHelp />
+        </div>
+      </div>
+    </>
+  );
+}

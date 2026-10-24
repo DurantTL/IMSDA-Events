@@ -29,7 +29,7 @@ export async function getAreaClubsSummary(
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
   });
   const clubIds = clubs.map((club) => club.id);
-  const [reports, standings, rosterGroups, grants] = await Promise.all([
+  const [reports, standings, rosterGroups, adultGroups, grants] = await Promise.all([
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, organizationId: { in: clubIds } },
       select: { organizationId: true, reportMonth: true, status: true, totalPoints: true, onTimePoints: true },
@@ -38,6 +38,12 @@ export async function getAreaClubsSummary(
     prisma.clubRosterMember.groupBy({
       by: ["organizationId"],
       where: { clubYear, status: "ACTIVE", organizationId: { in: clubIds } },
+      _count: { _all: true },
+    }),
+    // Adults by roster type, the same Adult-or-Staff rule the Sterling Volunteers candidates use (#1186). A count, never names.
+    prisma.clubRosterMember.groupBy({
+      by: ["organizationId"],
+      where: { clubYear, status: "ACTIVE", attendeeType: { in: ["ADULT", "STAFF"] }, organizationId: { in: clubIds } },
       _count: { _all: true },
     }),
     prisma.clubDirectorGrant.findMany({
@@ -56,6 +62,7 @@ export async function getAreaClubsSummary(
   const checks = withChecks ? await clubsComplianceReminderCounts(clubIds, clubYear) : new Map();
   const onTime = new Map(standings.map((standing) => [standing.organizationId, standing.registrationOnTime]));
   const roster = new Map(rosterGroups.map((group) => [group.organizationId, group._count._all]));
+  const adults = new Map(adultGroups.map((group) => [group.organizationId, group._count._all]));
   return clubs.map((club) =>
     summarizeClub({
       id: club.id,
@@ -65,6 +72,7 @@ export async function getAreaClubsSummary(
         .filter((grant) => grant.organizationId === club.id && directorGrantIsActive(grant, now))
         .map((grant) => grant.attendeeAccount.displayName),
       rosterSize: roster.get(club.id) ?? 0,
+      adultCount: adults.get(club.id) ?? 0,
       registrationOnTime: onTime.get(club.id) ?? false,
       backgroundChecks: checks.get(club.id) ?? { missing: 0, notInCompliance: 0, expiringSoon: 0 },
       reports: reports.filter((report) => report.organizationId === club.id),

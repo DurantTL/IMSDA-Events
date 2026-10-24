@@ -11,6 +11,7 @@ const club: AreaClubSummary = {
   church: "Sample Hills Church",
   directors: ["Pat Sample"],
   rosterSize: 12,
+  adultCount: 3,
   registrationOnTime: true,
   backgroundChecks: { missing: 1, notInCompliance: 0, expiringSoon: 2 },
   months: [
