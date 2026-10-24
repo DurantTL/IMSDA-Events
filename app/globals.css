@@ -2704,6 +2704,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   .check-in-queue-actions .text-button { width: 100%; justify-content: center; }
   .arrival-row { grid-template-columns: auto 1fr auto; }
   .arrival-time { display: none; }
+  .arrival-time.is-queue-state { display: block; }
   .arrival-row button { grid-column: 2 / 4; justify-content: center; }
   .check-in-scanner-modal { padding: 18px; }
   .check-in-video-frame,
