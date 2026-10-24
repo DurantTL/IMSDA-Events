@@ -399,3 +399,19 @@ export function selectDestination(input: {
     input.navigate(input.destination.href);
   });
 }
+
+/**
+ * How the field treats an action inside the phone More sheet (`escapeBubbles`).
+ * An Escape with nothing left to undo is not handled, so it reaches the sheet
+ * and closes it, as in the sheet's own "Find a tool" field. Clearing keeps focus
+ * in the field there (there is no earlier focus to return to). Outside the sheet
+ * every action is handled as is.
+ */
+export function actionForSurface(
+  action: DestinationKeyAction,
+  escapeBubbles: boolean,
+): { action: DestinationKeyAction; handled: boolean; returnsFocus: boolean } {
+  if (action.type === "none") return { action, handled: false, returnsFocus: false };
+  if (escapeBubbles && action.type === "restore-focus") return { action: { type: "none" }, handled: false, returnsFocus: false };
+  return { action, handled: true, returnsFocus: !escapeBubbles && (action.type === "clear" || action.type === "restore-focus") };
+}

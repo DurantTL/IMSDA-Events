@@ -203,7 +203,7 @@ export function MoreLauncherPanel({
       {/* While the confirm is open the rest of the panel is inert, to match aria-modal. */}
       {variant === "tab" && destinations && destinations.length > 0 && (
         <div className="more-launcher-destination-search" inert={Boolean(confirming) || undefined}>
-          <DestinationSearch destinations={destinations} onNavigated={() => onNavigate?.()} />
+          <DestinationSearch destinations={destinations} escapeBubbles onNavigated={() => onNavigate?.()} />
         </div>
       )}
       <div className="more-launcher-search" role="search" inert={confirming ? true : undefined}>

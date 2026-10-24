@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { MoreLauncherPanel } from "@/components/more-launcher";
 import { DestinationOption, DestinationSearch } from "@/components/destination-search";
 import {
+  actionForSurface,
   activeDescendantId,
   buildSearchDestinations,
   clampActiveIndex,
@@ -243,6 +244,18 @@ describe("key and selection behaviour", () => {
     expect(key({ key: "Escape", open: false })).toEqual({ type: "clear" });
     expect(key({ key: "Escape", open: false, query: "" })).toEqual({ type: "restore-focus" });
     expect(key({ key: "Escape", query: "zzz", count: 0 })).toEqual({ type: "clear" });
+  });
+
+  it("lets an Escape with nothing to undo reach the More sheet, and keeps focus in the field when clearing there", () => {
+    const empty = key({ key: "Escape", open: false, query: "" });
+    expect(actionForSurface(empty, true)).toEqual({ action: { type: "none" }, handled: false, returnsFocus: false });
+    expect(actionForSurface(empty, false)).toEqual({ action: empty, handled: true, returnsFocus: true });
+    const clear = key({ key: "Escape", open: false });
+    expect(actionForSurface(clear, true)).toEqual({ action: clear, handled: true, returnsFocus: false });
+    expect(actionForSurface(clear, false)).toEqual({ action: clear, handled: true, returnsFocus: true });
+    const close = key({ key: "Escape" });
+    expect(actionForSurface(close, true)).toEqual({ action: close, handled: true, returnsFocus: false });
+    expect(actionForSurface({ type: "none" }, true).handled).toBe(false);
   });
 
   it("points aria-activedescendant at the active option only while the list shows", () => {

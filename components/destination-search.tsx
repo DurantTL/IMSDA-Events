@@ -9,6 +9,7 @@ import {
   destinationKeyAction,
   destinationScopeDescription,
   destinationScopeLabels,
+  actionForSurface,
   destinationSearchStatus,
   listExpanded,
   searchDestinations,
@@ -30,12 +31,15 @@ export function DestinationSearch({
   destinations,
   inputId: inputIdProp,
   onNavigated,
+  escapeBubbles = false,
 }: {
   destinations: readonly SearchDestination[];
   /** A fixed id, so the collapsed sidebar's button can focus the field. */
   inputId?: string;
   /** Called after a result is opened (the phone launcher closes itself). */
   onNavigated?: () => void;
+  /** The More sheet: an Escape with nothing to undo reaches the sheet, which closes. */
+  escapeBubbles?: boolean;
 }) {
   const router = useRouter();
   const baseId = useId();
@@ -88,24 +92,26 @@ export function DestinationSearch({
       count: results.length,
       active: activeRaw,
     });
-    if (action.type === "none") return;
+    const resolved = actionForSurface(action, escapeBubbles);
+    if (!resolved.handled) return;
     // The More launcher around the phone field also reads these keys; they are handled here.
     event.preventDefault();
     event.stopPropagation();
-    switch (action.type) {
+    const next = resolved.action;
+    switch (next.type) {
       case "move":
         setOpen(true);
-        setActive(action.index);
+        setActive(next.index);
         break;
       case "choose":
-        choose(results[action.index]);
+        choose(results[next.index]);
         break;
       case "close":
         setOpen(false);
         break;
       case "clear":
         reset();
-        giveFocusBack();
+        if (resolved.returnsFocus) giveFocusBack();
         break;
       case "restore-focus":
         giveFocusBack();
@@ -137,7 +143,7 @@ export function DestinationSearch({
           }}
           onFocus={(event) => {
             const from = event.relatedTarget;
-            if (from instanceof HTMLElement) returnFocus.current = from;
+            returnFocus.current = from instanceof HTMLElement ? from : null;
             if (hasQuery) setOpen(true);
           }}
           onKeyDown={onKeyDown}
