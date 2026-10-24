@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { createLinkNavigationListener } from "@/components/link-guard";
 import { registerUnsavedChanges } from "@/components/unsaved-changes-registry";
 
 const defaultMessage = "You have unsaved changes. Leave this page and discard them?";
@@ -29,34 +30,13 @@ export function useUnsavedChangesGuard(
       event.returnValue = "";
     }
 
-    function beforeLinkNavigation(event: MouseEvent) {
-      if (
-        allowNavigationRef.current
-        || event.defaultPrevented
-        || event.button !== 0
-        || event.metaKey
-        || event.ctrlKey
-        || event.shiftKey
-        || event.altKey
-      ) {
-        return;
-      }
-
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const link = target.closest<HTMLAnchorElement>("a[href]");
-      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
-
-      const href = link.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
-
-      const destination = new URL(link.href, window.location.href);
-      if (destination.href === window.location.href) return;
-      if (window.confirm(message)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-    }
+    // One confirm per click: a yes marks the click so `GuardedLink` does not ask again (#1180).
+    const beforeLinkNavigation = createLinkNavigationListener({
+      message,
+      confirm: (text) => window.confirm(text),
+      currentHref: () => window.location.href,
+      isAllowed: () => allowNavigationRef.current,
+    });
 
     window.addEventListener("beforeunload", beforeUnload);
     document.addEventListener("click", beforeLinkNavigation, true);

@@ -172,10 +172,17 @@ visibility condition is exactly what gated that destination before.
     when at least one of its cards is visible.
 - **System Command Center (`app/(workspace)/admin/page.tsx`):** its header
   actions (Create event, Team, Accounts, Platform settings, Churches and
-  clubs, Honor catalog, Public calendar, Sterling Volunteers, Refresh) now wrap
+  clubs, Honor catalog, Manage public calendar, Sterling Volunteers, Refresh) now wrap
   onto additional lines instead of being clipped by the hero's rounded
   corners, on both desktop and phone widths
   (`app/(workspace)/admin/system-admin.module.css`).
+
+- **Calendar labels (#1180):** `/admin/calendar` is one page with two tasks,
+  so the System sidebar lists it twice with labels that name the task:
+  "Create event from calendar item" (Events group; was "Set up from calendar")
+  and "Manage public calendar" (Catalogs and settings; was "Public calendar").
+  Work contexts, the phone System menu and the committed old-to-new route table
+  (`components/route-mapping.ts`) are described in `tests/admin-context-1180.test.ts`.
 
 ## Adding a new page below a section's top level
 

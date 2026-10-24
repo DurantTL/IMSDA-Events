@@ -53,6 +53,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
     permissions: permissionsByEvent.get(event.id) ?? [],
     clubEvent: event.audience === "CLUB",
     hiddenCardKeys: modulesByEvent.has(event.id) ? [...disabledModuleCardKeys(modulesByEvent.get(event.id)!.effective)] : undefined,
+    dataPresentModules: modulesByEvent.has(event.id) ? [...(modulesByEvent.get(event.id)!.dataPresent ?? [])] : undefined,
     removableModules: isSystemAdmin && modulesByEvent.has(event.id) ? removableModuleKeys(modulesByEvent.get(event.id)!) : undefined,
     clubFormsAccess,
     clubOversight: event.audience === "CLUB"

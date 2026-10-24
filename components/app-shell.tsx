@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -40,7 +39,7 @@ import {
 } from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
-import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
+import { alwaysOnModuleKeys, disabledModuleCardKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -82,6 +81,8 @@ type ShellEvent = {
   hiddenCardKeys?: readonly string[];
   /** Module keys a system administrator may turn off for this event (#810), computed server-side with the Event modules page's rule. */
   removableModules?: readonly string[];
+  /** Modules whose data keeps them usable for this event, so the module states match the Event features page (#1180). */
+  dataPresentModules?: readonly string[];
   /** Club forms (#610) are open to system admins and Event Admins of a current event; computed server-side. */
   clubFormsAccess?: boolean;
 };
@@ -267,6 +268,7 @@ export function AppShell({
   const moduleStates = selectedEvent?.hiddenCardKeys
     ? moduleDestinationStates({
       hiddenCardKeys: selectedHiddenCardKeys,
+      dataPresent: new Set((selectedEvent.dataPresentModules ?? []).filter(isEventModuleKey)),
       audience: selectedEvent.clubEvent ? "CLUB" : "GENERAL",
       isSystemAdmin,
       canConfigure: selectedPermissions.has("CONFIGURE_EVENT"),
@@ -331,10 +333,10 @@ export function AppShell({
       onKeyDown={(event) => { if (event.key === "Escape" && tooltip) setTooltip(null); }}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
-        <Link className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
+        <GuardedLink className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
           <BrandMark />
           <span><strong>IMSDA</strong><small>Events</small></span>
-        </Link>
+        </GuardedLink>
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
 
@@ -372,7 +374,7 @@ export function AppShell({
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </div>
-          {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
+          {!showSystemNav && <GuardedLink className="event-picker-archived-link" href="/archived-events">Archived events</GuardedLink>}
         </div>}
 
         <div className="sidebar-destination-search">
@@ -536,7 +538,7 @@ export function AppShell({
                 </form>
               )
               : !eventlessProfile && (
-                <Link
+                <GuardedLink
                   aria-label="Attendee experience"
                   className="attendee-preview-switch"
                   href={attendeePreviewHref}
@@ -544,7 +546,7 @@ export function AppShell({
                 >
                   <Eye aria-hidden="true" size={16} />
                   <span>Attendee experience</span>
-                </Link>
+                </GuardedLink>
               )}
             <span className="staff-pill">Staff mode</span>
             {isSystemAdmin && <AdminAttentionBell />}
@@ -579,7 +581,7 @@ export function AppShell({
         </div>
       </main>
 
-      {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} />}
+      {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
       {!showSystemNav && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
         {mobileNavigation.map(({ href, icon: Icon, label }) => {
           const isActive = !isProfileRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;

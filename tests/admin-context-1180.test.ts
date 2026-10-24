@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,11 +19,13 @@ vi.mock("@/components/sign-out-button", () => ({
 
 import { AppShell } from "@/components/app-shell";
 import { SystemPhoneMenu } from "@/components/system-phone-menu";
-import { buildSearchDestinations } from "@/components/destination-search-model";
-import { moduleDestinationStates } from "@/components/module-destination-states";
-import { buildRouteMapping, reachabilityDestinationSets, unreachableRoutes } from "@/components/route-mapping";
+import { buildSearchDestinations, searchDestinations } from "@/components/destination-search-model";
+import { moduleDestinationStates, moduleStateLabels } from "@/components/module-destination-states";
+import { createLinkNavigationListener, handleGuardedLinkClick } from "@/components/link-guard";
+import { buildFeatureRows } from "@/modules/event-features/model";
+import { guardedNavigate, registerUnsavedChanges } from "@/components/unsaved-changes-registry";
+import { buildRouteMapping, launcherEntryPaths, liveRegistries, missingFromRegistries, reachabilityDestinationSets, unmappedDynamicPages, unreachableRoutes } from "@/components/route-mapping";
 import { eventToRemember, resolveShellEvent } from "@/components/shell-event-selection";
-import { buildMoreDirectoryCards, navigation, eventFeaturesItem } from "@/components/staff-navigation";
 import { systemNavGroups } from "@/components/system-navigation";
 import {
   activeWorkContext,
@@ -35,7 +37,7 @@ import {
   systemMenuStillAllowed,
   workContextSwitches,
 } from "@/components/work-context-model";
-import { alwaysOnModuleKeys, disabledModuleCardKeys, eventModuleCatalog } from "@/modules/event-modules/catalog";
+import { alwaysOnModuleKeys, disabledModuleCardKeys, eventModuleCatalog, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 
 /** Admin usability 1B (#1180): work contexts, the phone System menu, the route mapping and module states. Synthetic data only. */
@@ -243,41 +245,86 @@ describe("distinct tool collections", () => {
 describe("old to new route mapping", () => {
   const rows = buildRouteMapping();
   const sets = reachabilityDestinationSets();
+  const routeOf = (route: string, scope?: string) => rows.find((row) => row.route === route && (!scope || row.scope === scope));
 
-  it("maps every registry route to a destination that is still reachable", () => {
+  it("keeps every committed menu route in the live registries and reachable for a full-permission administrator", () => {
+    expect(missingFromRegistries(rows)).toEqual([]);
     expect(unreachableRoutes(rows, sets)).toEqual([]);
+    // The administrator alone reaches every row except kitchen counts, which kitchen staff hold instead of the dashboard.
+    expect(unreachableRoutes(rows, [sets[0]]).map((row) => row.route)).toEqual(["/more/kitchen-report/counts"]);
   });
 
-  it("covers every route in the three registries", () => {
-    const routes = new Set(rows.map((row) => row.route));
-    for (const item of [...navigation, eventFeaturesItem]) expect(routes.has(item.href), item.href).toBe(true);
-    for (const group of systemNavGroups) for (const item of group.items) expect(routes.has(item.href), item.href).toBe(true);
-    for (const card of buildMoreDirectoryCards({ permissions: eventPermissions, clubOversight: true, clubEvent: true, isSystemAdmin: true, clubFormsAccess: true, eventQuery: "" })) {
-      expect(routes.has(card.href.split("?")[0]), card.href).toBe(true);
+  it("is a frozen list: the named routes are all in it", () => {
+    const frozen = [
+      "/admin/team", "/staff", "/imports", "/more/promo-codes", "/admin/readiness", "/archived-events", "/more",
+      "/admin/honors", "/admin/club-supplies", "/admin/master-award-rules", "/admin/club-forms",
+      "/admin/organizations", "/admin/clubs/reports", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/transfers",
+      "/more/clubs", "/more/club-forms", "/more/club-assignments",
+      "/admin/clubs/import", "/admin/organizations/import", "/admin/clubs/health-import", "/admin/organizations/directory",
+      "/admin/organizations/map-locations", "/admin/clubs/reports/year-end", "/people/staff-invitations",
+      "/people/staff-invitations/approvals", "/people/duplicates", "/people/matches", "/finance/invoices", "/finance/church-owed",
+      "/finance/square-payments", "/check-in/badges", "/check-in/passes", "/check-in/assets",
+    ];
+    for (const route of frozen) expect(routeOf(route), route).toBeDefined();
+    expect(routeOf("/admin/team", "System")).toMatchObject({ group: "People", label: "Team" });
+    expect(routeOf("/staff", "Event")).toMatchObject({ label: "Team" });
+    expect(routeOf("/admin/clubs/invites")?.destinationPath).toBe("/admin/clubs/applications");
+  });
+
+  it("maps /more as itself, a real page opened from the launcher and its footer", () => {
+    expect(routeOf("/more")).toMatchObject({ kind: "menu", destinationPath: "/more", scope: "Event" });
+    expect(read("app/(workspace)/more/page.tsx")).toContain("request-a-feature");
+    expect(launcherEntryPaths()).toContain("/more");
+  });
+
+  it("fails when a route is removed from a registry", () => {
+    const live = liveRegistries();
+    const withoutTeam = { ...live, systemGroups: live.systemGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.href !== "/admin/team") })) };
+    expect(missingFromRegistries(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/team"]);
+    const withoutImports = { ...live, navigationHrefs: live.navigationHrefs.filter((href) => href !== "/imports"), cardPaths: live.cardPaths.filter((path) => path !== "/imports") };
+    expect(missingFromRegistries(rows, withoutImports).map((row) => row.route)).toEqual(["/imports"]);
+  });
+
+  it("fails when a destination stops being reachable", () => {
+    const withoutTeam = sets.map((set) => set.filter((destination) => !destination.href.startsWith("/admin/team")));
+    expect(unreachableRoutes(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/team"]);
+    const planned = { route: "/planned/feature", kind: "menu", oldPlace: "More directory", scope: "Event", destinationPath: "/planned/feature", label: "Planned", group: "Event tools" } as const;
+    expect(unreachableRoutes([...rows, planned], sets).map((row) => row.route)).toEqual(["/planned/feature"]);
+  });
+
+  it("pins that each parent page still links to the sub-pages reached from it", () => {
+    const reached = rows.filter((row) => row.kind === "reached");
+    expect(reached.length).toBeGreaterThan(30);
+    for (const row of reached) {
+      const { parent, linkedIn } = row.reachedFrom!;
+      expect(rows.some((candidate) => candidate.route === parent), `${row.route} parent ${parent}`).toBe(true);
+      expect(read(linkedIn), `${linkedIn} should link ${row.route}`).toContain(row.route);
     }
   });
 
-  it("names where Team, Imports, Promo codes, Readiness, archived events, catalogs and club tools went", () => {
-    const find = (route: string, scope: string) => rows.find((row) => row.route === route && row.scope === scope);
-    expect(find("/admin/team", "System")).toMatchObject({ group: "People", label: "Team" });
-    expect(find("/staff", "Event")).toMatchObject({ label: "Team" });
-    expect(find("/imports", "Event")).toMatchObject({ label: "Imports" });
-    expect(find("/more/promo-codes", "Event")).toMatchObject({ label: "Promo codes" });
-    expect(find("/admin/readiness", "System")).toMatchObject({ group: "Catalogs and settings", label: "System readiness" });
-    expect(find("/archived-events", "System")).toMatchObject({ group: "Events" });
-    for (const catalog of ["/admin/honors", "/admin/club-supplies", "/admin/master-award-rules", "/admin/club-forms"]) expect(find(catalog, "System"), catalog).toBeDefined();
-    for (const clubTool of ["/admin/organizations", "/admin/clubs/reports", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/transfers"]) expect(find(clubTool, "System")?.group, clubTool).toBe("Clubs");
-    for (const eventClubTool of ["/more/clubs", "/more/club-forms", "/more/club-assignments"]) expect(find(eventClubTool, "Event"), eventClubTool).toBeDefined();
-    expect(find("/admin/clubs/invites", "System")?.destinationPath).toBe("/admin/clubs/applications");
-    expect(find("/more", "Event")?.destinationPath).toBe("/more/features");
+  it("has a row for every page.tsx under app/(workspace), apart from the commented dynamic detail pages", () => {
+    const pages: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(`${dir}/${entry.name}`);
+        else if (entry.name === "page.tsx") pages.push(dir.replace("app/(workspace)", "") || "/");
+      }
+    };
+    walk("app/(workspace)");
+    expect(pages.length).toBeGreaterThan(100);
+    const mapped = new Set(rows.map((row) => row.route));
+    const unmapped = pages.filter((route) => !mapped.has(route) && !(route in unmappedDynamicPages));
+    expect(unmapped).toEqual([]);
+    // The exclusion list holds dynamic pages only, and each one still exists.
+    for (const route of Object.keys(unmappedDynamicPages)) {
+      expect(route).toContain("[");
+      expect(pages, route).toContain(route);
+    }
   });
 
-  it("fails when a registry route stops being reachable", () => {
-    const withoutTeam = sets.map((set) => set.filter((destination) => !destination.href.startsWith("/admin/team")));
-    expect(unreachableRoutes(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/team"]);
-    const withoutImports = sets.map((set) => set.filter((destination) => !destination.href.startsWith("/imports")));
-    expect(unreachableRoutes(rows, withoutImports).map((row) => row.route)).toContain("/imports");
-    expect(unreachableRoutes([...rows, { route: "/planned/feature", oldPlace: "More directory", scope: "Event", destinationPath: "/planned/feature", label: "Planned", group: "Event tools" }], sets).map((row) => row.route)).toEqual(["/planned/feature"]);
+  it("keeps the duplicate-people queue as it was: by address, system administrators only", () => {
+    expect(routeOf("/people/matches")).toMatchObject({ kind: "direct", scope: "System" });
+    expect(read("app/(workspace)/people/matches/page.tsx")).toContain('user.globalRole !== "SYSTEM_ADMIN"');
   });
 });
 
@@ -285,7 +332,7 @@ describe("module states", () => {
   const off = disabledModuleCardKeys(new Set(alwaysOnModuleKeys));
   const stateOf = (entries: ReturnType<typeof moduleDestinationStates>, key: string) => entries.find((entry) => entry.moduleKey === key)?.state;
 
-  it("uses #741's rules: club modules are not applicable to a general event, other off modules can be turned on or requested", () => {
+  it("uses the Event features rule: club modules do not apply to a general event, other off modules can be turned on or requested", () => {
     const general = moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", isSystemAdmin: false, canConfigure: true, eventQuery: "?event=evt_one" });
     expect(stateOf(general, "honors")).toBe("not-applicable");
     expect(stateOf(general, "club-assignments")).toBe("not-applicable");
@@ -296,12 +343,32 @@ describe("module states", () => {
     expect(on.filter((entry) => entry.state === "enabled").map((entry) => entry.moduleKey)).toEqual(eventModuleCatalog.filter((definition) => !definition.alwaysOn).map((definition) => definition.key));
   });
 
-  it("links only the requestable ones, to the real Event features page, and lists nothing for staff who cannot act", () => {
-    const general = moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", isSystemAdmin: true, canConfigure: true, eventQuery: "?event=evt_one" });
-    for (const entry of general) {
-      if (entry.state === "requestable") expect(entry.href).toBe("/more/features?event=evt_one");
-      else expect(entry.href).toBeNull();
+  it("counts data and words it the way the Event features page does", () => {
+    const withData = moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", dataPresent: new Set(["honors"]), isSystemAdmin: true, canConfigure: true, eventQuery: "" });
+    expect(stateOf(withData, "honors")).toBe("requestable");
+    for (const audience of ["GENERAL", "CLUB"] as const) {
+      for (const dataPresent of [new Set<EventModuleKey>(), new Set<EventModuleKey>(["honors"])]) {
+        const featureRows = buildFeatureRows({
+          audience, eventQuery: "", isSystemAdmin: true, permissions: ["CONFIGURE_EVENT"],
+          flags: { waitlistEnabled: false, autoPromoteWaitlist: false, collectsShirtSizes: false, hostedPaymentLinkEnabled: false, checksAdultBackgrounds: false, isPublished: false, showOnCalendar: false },
+          modules: { stored: new Set(), effective: new Set(), dataPresent, dataForced: new Set() },
+          cards: [], generalLink: null, teamsEnabled: false, lodgingSetUp: false, mealsSetUp: false, moduleRequestsEnabled: true,
+        });
+        const entries = moduleDestinationStates({ hiddenCardKeys: off, audience, dataPresent, isSystemAdmin: true, canConfigure: true, eventQuery: "" });
+        for (const entry of entries) {
+          const row = featureRows.find((candidate) => candidate.id === `module:${entry.moduleKey}`)!;
+          expect(row.state === "not-applicable", `${audience} ${entry.moduleKey}`).toBe(entry.state === "not-applicable");
+          if (row.state === "not-applicable") expect(moduleStateLabels[entry.state]).toBe(row.stateLabel);
+        }
+      }
     }
+  });
+
+  it("links only the requestable ones to a real page: Event features for an administrator, the request form for an Event Admin", () => {
+    const admin = moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", isSystemAdmin: true, canConfigure: true, eventQuery: "?event=evt_one" });
+    const eventAdmin = moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", isSystemAdmin: false, canConfigure: true, eventQuery: "?event=evt_one" });
+    for (const entry of admin) expect(entry.href).toBe(entry.state === "requestable" ? "/more/features?event=evt_one" : null);
+    for (const entry of eventAdmin) expect(entry.href).toBe(entry.state === "requestable" ? "/more?event=evt_one#request-a-feature" : null);
     expect(moduleDestinationStates({ hiddenCardKeys: off, audience: "GENERAL", isSystemAdmin: false, canConfigure: false, eventQuery: "" })).toEqual([]);
   });
 
@@ -312,19 +379,107 @@ describe("module states", () => {
 });
 
 describe("unsaved-changes guard", () => {
-  it("runs before the URL, the remembered-event cookie or local context changes", () => {
-    const link = read("components/guarded-link.tsx");
-    expect(link.indexOf("guardedNavigate(")).toBeGreaterThan(0);
-    expect(link.indexOf("guardedNavigate(")).toBeLessThan(link.indexOf("router.push(href)"));
-    expect(link.indexOf("guardedNavigate(")).toBeLessThan(link.indexOf("onNavigate?.()"));
+  type Click = { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; defaultPrevented: boolean; target: unknown; prevented: number; stopped: number; preventDefault(): void; stopPropagation(): void };
+  const link = { target: "", href: "http://localhost/next", hasAttribute: () => false, getAttribute: () => "/next" };
+  const click = (overrides: Partial<Click> = {}): Click => {
+    const event: Click = {
+      button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false,
+      target: { closest: () => link }, prevented: 0, stopped: 0,
+      preventDefault() { event.prevented += 1; event.defaultPrevented = true; },
+      stopPropagation() { event.stopped += 1; },
+      ...overrides,
+    };
+    return event;
+  };
+  /** One click through both layers, in the browser's order: the form's document listener first, then the link. */
+  function clickThrough(event: Click, answer: boolean) {
+    const asks: string[] = [];
+    const confirm = (message: string) => { asks.push(message); return answer; };
+    const listener = createLinkNavigationListener({ message: "Discard changes?", confirm, currentHref: () => "http://localhost/here", isAllowed: () => false });
+    const unregister = registerUnsavedChanges("Discard changes?");
+    const navigated: string[] = [];
+    try {
+      listener(event);
+      const result = handleGuardedLinkClick({
+        event: { get defaultPrevented() { return event.defaultPrevented; }, preventDefault: () => event.preventDefault(), nativeEvent: event },
+        run: () => navigated.push("/next"),
+        guard: (navigate) => guardedNavigate(navigate, confirm),
+      });
+      return { asks, navigated, result };
+    } finally {
+      unregister();
+    }
+  }
+
+  it("asks exactly once for a dirty form and a GuardedLink click, and navigates on Yes", () => {
+    const outcome = clickThrough(click(), true);
+    expect(outcome.asks).toEqual(["Discard changes?"]);
+    expect(outcome.navigated).toEqual(["/next"]);
+    expect(outcome.result).toBe("navigated");
+  });
+
+  it("stays on the page on Cancel, after one question", () => {
+    const event = click();
+    const outcome = clickThrough(event, false);
+    expect(outcome.asks).toHaveLength(1);
+    expect(outcome.navigated).toEqual([]);
+    expect(outcome.result).toBe("ignored");
+    expect(event.prevented).toBeGreaterThan(0);
+  });
+
+  it("does not intercept a modifier click, a new-window link or a download", () => {
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+      const outcome = clickThrough(click(modifier), false);
+      expect(outcome.asks, JSON.stringify(modifier)).toEqual([]);
+      expect(outcome.navigated).toEqual([]);
+      expect(outcome.result).toBe("ignored");
+    }
+    const ignored = (extra: { target?: string; download?: unknown }) => handleGuardedLinkClick({ event: { defaultPrevented: false, preventDefault() {}, nativeEvent: click() }, run: () => { throw new Error("navigated"); }, ...extra });
+    expect(ignored({ target: "_blank" })).toBe("ignored");
+    expect(ignored({ download: "" })).toBe("ignored");
+  });
+
+  it("with no dirty form the link navigates without a question", () => {
+    const asks: string[] = [];
+    const navigated: string[] = [];
+    const result = handleGuardedLinkClick({
+      event: { defaultPrevented: false, preventDefault() {}, nativeEvent: click() },
+      run: () => navigated.push("/next"),
+      guard: (navigate) => guardedNavigate(navigate, (message) => { asks.push(message); return false; }),
+    });
+    expect(result).toBe("navigated");
+    expect(asks).toEqual([]);
+  });
+
+  it("runs the guard before the URL changes, passes replace and scroll on, and covers the shell's context links", () => {
+    const guarded = read("components/guarded-link.tsx");
+    expect(guarded.indexOf("handleGuardedLinkClick")).toBeLessThan(guarded.indexOf("router.push(href"));
+    expect(guarded).toMatch(/router\.replace\(href, \{ scroll \}\)/);
+    expect(guarded).toContain("replace={replace}");
+    expect(read("components/use-unsaved-changes-guard.ts")).toContain("createLinkNavigationListener");
     const menu = read("components/system-phone-menu.tsx");
-    // Every link in the sheet is guarded, and so is the attendee handoff form.
     expect(menu).not.toMatch(/<Link\b/);
     expect(menu).toContain("guardedNavigate(() => form.submit())");
-    const launcher = read("components/more-launcher.tsx");
-    expect(launcher.match(/<GuardedLink/g)?.length).toBeGreaterThanOrEqual(3);
-    // The event picker still goes through the same guard before its cookie and URL change.
+    expect(read("components/more-launcher.tsx").match(/<GuardedLink/g)?.length).toBeGreaterThanOrEqual(3);
     expect(read("components/shell-event-selection.ts")).toMatch(/return guard\(\(\) => \{\s*commit\(eventId\);\s*push\(/);
+    expect(read("components/staff-account-menu.tsx")).not.toMatch(/<Link\b/);
+    expect(read("components/app-shell.tsx")).not.toMatch(/<Link\b/);
+  });
+});
+
+describe("phone search on System pages", () => {
+  it("puts the destination search at the top of the System sheet, over the same authorized destinations", () => {
+    const source = read("components/system-phone-menu.tsx");
+    expect(source.indexOf("<DestinationSearch")).toBeGreaterThan(0);
+    expect(source.indexOf("<DestinationSearch")).toBeLessThan(source.indexOf("groups.map("));
+    expect(source).toContain("escapeBubbles");
+    expect(source).toContain('onNavigated={() => close("navigate")}');
+    expect(read("components/app-shell.tsx")).toContain("destinations={searchDestinations}");
+    expect(source).toMatch(/focusableSelector = "input:not\(\[disabled\]\)/);
+    const admin = buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    expect(searchDestinations(admin, "invite staff").map((entry) => entry.label)).toContain("Team");
+    const other = buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    expect(other.some((entry) => entry.scope === "System")).toBe(false);
   });
 });
 
@@ -347,7 +502,7 @@ describe("styles and wording", () => {
 
   it("never uses the retired screening words", () => {
     const words = ["background", "check"].join(" ");
-    for (const file of ["components/work-context-model.ts", "components/module-destination-states.ts", "components/route-mapping.ts", "components/guarded-link.tsx", "components/system-phone-menu.tsx", "tests/admin-context-1180.test.ts"]) {
+    for (const file of ["components/work-context-model.ts", "components/module-destination-states.ts", "components/route-mapping.ts", "components/link-guard.ts", "components/guarded-link.tsx", "components/system-phone-menu.tsx", "tests/admin-context-1180.test.ts"]) {
       expect(read(file).toLowerCase(), file).not.toContain(words);
     }
   });

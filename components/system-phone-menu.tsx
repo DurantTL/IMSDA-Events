@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LayoutDashboard, ShieldCheck, X } from "lucide-react";
+import { DestinationSearch } from "@/components/destination-search";
+import type { SearchDestination } from "@/components/destination-search-model";
 import { GuardedLink } from "@/components/guarded-link";
 import { desktopBreakpointQuery, nextLauncherIndex } from "@/components/more-launcher-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -27,7 +29,7 @@ import {
  * is open closes it on the next render.
  */
 
-const focusableSelector = "a[href], button:not([disabled])";
+const focusableSelector = "input:not([disabled]), a[href], button:not([disabled])";
 
 /** The page behind the sheet is inert while it is open, as in the More sheet. The bottom bar stays live for the opener. */
 function setBackgroundInert(inert: boolean) {
@@ -40,8 +42,11 @@ export function SystemPhoneMenu({
   isSystemAdmin,
   groups,
   switches,
+  destinations = [],
 }: {
   isSystemAdmin: boolean;
+  /** The scope-aware destination search (#1177), kept at the top of the sheet as in the More sheet. */
+  destinations?: readonly SearchDestination[];
   groups: readonly SystemMenuGroup[];
   /** The other contexts to switch into; get links are guarded, the post handoff submits its form after the guard. */
   switches: readonly WorkContextSwitch[];
@@ -162,6 +167,11 @@ export function SystemPhoneMenu({
               </button>
             </div>
             <div className="system-menu-body">
+              {destinations.length > 0 && (
+                <div className="system-menu-search">
+                  <DestinationSearch destinations={destinations} escapeBubbles onNavigated={() => close("navigate")} />
+                </div>
+              )}
               {groups.map((group) => (
                 <section className="system-menu-group" aria-labelledby={`${sheetId}-${group.key}`} key={group.key}>
                   <h3 id={`${sheetId}-${group.key}`}>{group.label}</h3>

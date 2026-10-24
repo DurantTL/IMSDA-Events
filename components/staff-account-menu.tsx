@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { GuardedLink } from "@/components/guarded-link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -77,21 +77,21 @@ export function StaffAccountMenu({
       {open && (
         <div aria-label="Staff account menu" className="header-popover account-popover" id="staff-account-menu" role="group">
           <strong>{displayName}</strong><p>{email}</p><small>Database-backed staff session</small>
-          <Link className="account-system-link" href={PROFILE_HREF} onClick={close}>
+          <GuardedLink className="account-system-link" href={PROFILE_HREF} onNavigate={close}>
             <UserRound aria-hidden="true" size={17} />
             Edit profile
-          </Link>
+          </GuardedLink>
           {systemAdminContext && (
-            <Link className="account-system-link" href={systemAdminContext.href} onClick={close}>
+            <GuardedLink className="account-system-link" href={systemAdminContext.href} onNavigate={close}>
               <ShieldCheck aria-hidden="true" size={17} />
               {systemAdminContext.label}
-            </Link>
+            </GuardedLink>
           )}
           {createEventHref && (
-            <Link className="account-system-link" href={createEventHref} onClick={close}>
+            <GuardedLink className="account-system-link" href={createEventHref} onNavigate={close}>
               <CalendarPlus aria-hidden="true" size={17} />
               Create event
-            </Link>
+            </GuardedLink>
           )}
           {canSwitchToAttendee && (
             <form action="/api/auth/switch-to-attendee" className="account-switch-form" method="post">
@@ -101,10 +101,10 @@ export function StaffAccountMenu({
               </button>
             </form>
           )}
-          <Link className="account-system-link" href={attendeePreviewHref} onClick={close}>
+          <GuardedLink className="account-system-link" href={attendeePreviewHref} onNavigate={close}>
             <Eye aria-hidden="true" size={17} />
             Preview attendee experience
-          </Link>
+          </GuardedLink>
           <SignOutButton />
         </div>
       )}
