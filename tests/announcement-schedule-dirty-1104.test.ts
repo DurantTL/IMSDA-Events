@@ -121,3 +121,43 @@ describe("schedule editor dirty tracking (#1104)", () => {
     expect(save.indexOf("if (!result?.schedule) return;")).toBeLessThan(save.indexOf("loadEditor(null)"));
   });
 });
+
+describe("review follow-ups (#1104)", () => {
+  it("returns focus to the New schedule button after Cancel and after a successful save", () => {
+    const source = read("components/scheduled-emails-workspace.tsx");
+    expect(source).toContain("ref={newScheduleRef}");
+    expect(source).toContain("window.requestAnimationFrame(() => newScheduleRef.current?.focus())");
+    const cancel = source.slice(source.indexOf("async function cancelEditor"), source.indexOf("function change<"));
+    expect(cancel).toContain("focusNewSchedule()");
+    const save = source.slice(source.indexOf("async function save()"), source.indexOf("async function openApproval"));
+    expect(save.indexOf("focusNewSchedule()")).toBeGreaterThan(save.indexOf("loadEditor(null)"));
+    expect(save).toContain("setNotice(");
+    expect(source).toMatch(/role="status"/);
+  });
+
+  it("shows a failed announcement save once: the page-level alert hides while the dialog is open", () => {
+    const source = read("components/communications-workspace.tsx");
+    expect(source).toContain("{error && !draftOpen && <div");
+    const close = source.slice(source.indexOf("function closeDraftEditor"), source.indexOf("/** Opens the composer"));
+    expect(close).toContain('setError("")');
+    expect(close).toContain("setDraftUploading(false)");
+  });
+
+  it("treats a running upload as unsaved work, holds Save, and drops a late upload after close", () => {
+    const workspace = read("components/communications-workspace.tsx");
+    expect(workspace).toMatch(/draftOpen && \(draftUploading \|\| announcementDraftIsDirty\(/);
+    expect(workspace).toContain("onUploadingChange={setDraftUploading}");
+    expect(workspace).toContain("disabled={saving || draftUploading}");
+    expect(workspace).toContain("if (draftUploading) return;");
+    const field = read("components/message-attachments-field.tsx");
+    expect(field).toContain("onUploadingChange");
+    expect(field).toContain("if (!mountedRef.current) return;");
+    expect(field.indexOf("if (!mountedRef.current) return;")).toBeLessThan(field.indexOf("onChange(next)"));
+  });
+
+  it("reads the input value before the state updater runs", () => {
+    const source = read("components/communications-workspace.tsx");
+    expect(source).toContain('onChange={(event) => setDraftField("title", event.target.value)}');
+    expect(source).not.toMatch(/setDraftValues\(\(current\) => \(\{ \.\.\.current, (title|body|priority): event/);
+  });
+});

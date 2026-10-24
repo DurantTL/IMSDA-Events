@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { FileUp, Paperclip, Trash2 } from "lucide-react";
 import {
   attachmentSetIssue,
@@ -21,6 +21,8 @@ type MessageAttachmentsFieldProps = {
   /** Explains what carries these files, in the field's own help line. */
   help: string;
   disabled?: boolean;
+  /** Tells the form an upload is running, so it can count as unsaved work and hold Save (#1104). */
+  onUploadingChange?: (uploading: boolean) => void;
 };
 
 function typeLabel(contentType: string) {
@@ -33,10 +35,26 @@ function typeLabel(contentType: string) {
  * what the field holds is the list that the form saves with the message. Removing a file here removes it from this
  * message only.
  */
-export function MessageAttachmentsField({ eventId, files, onChange, help, disabled = false }: MessageAttachmentsFieldProps) {
+export function MessageAttachmentsField({ eventId, files, onChange, help, disabled = false, onUploadingChange }: MessageAttachmentsFieldProps) {
   const inputId = useId();
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  // A late upload must not write into an editor that has since closed (#1104).
+  const mountedRef = useRef(true);
+  const uploadingChangeRef = useRef(onUploadingChange);
+  useEffect(() => {
+    uploadingChangeRef.current = onUploadingChange;
+  }, [onUploadingChange]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      uploadingChangeRef.current?.(false);
+    };
+  }, []);
+  useEffect(() => {
+    uploadingChangeRef.current?.(uploading);
+  }, [uploading]);
   const total = files.reduce((sum, file) => sum + file.sizeBytes, 0);
 
   async function addFiles(chosen: File[]) {
@@ -60,13 +78,14 @@ export function MessageAttachmentsField({ eventId, files, onChange, help, disabl
         });
         const result = await response.json().catch(() => ({})) as { file?: MessageFileRecord; message?: string };
         if (!response.ok || !result.file) throw new Error(result.message ?? `${file.name} could not be uploaded.`);
+        if (!mountedRef.current) return;
         next = [...next, result.file];
         onChange(next);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The file could not be uploaded.");
+      if (mountedRef.current) setError(caught instanceof Error ? caught.message : "The file could not be uploaded.");
     } finally {
-      setUploading(false);
+      if (mountedRef.current) setUploading(false);
     }
   }
 

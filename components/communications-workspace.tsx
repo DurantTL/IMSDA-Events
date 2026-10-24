@@ -293,6 +293,8 @@ export function CommunicationsWorkspace({
   const [draftValues, setDraftValues] = useState<AnnouncementDraftValues>(blankAnnouncementValues);
   const [draftBaseline, setDraftBaseline] = useState<AnnouncementDraftBaseline | null>(null);
   const draftReviewingRef = useRef(false);
+  // An attachment upload still running counts as unsaved work: it will add a file to this editor when it lands (#1104).
+  const [draftUploading, setDraftUploading] = useState(false);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [broadcastReview, setBroadcastReview] = useState<{
@@ -436,11 +438,11 @@ export function CommunicationsWorkspace({
   const reminderDirty = reminderConfirmed;
   const shirtSizeDirty = shirtSizeConfirmed;
   const resendDirty = resendConfirmed || resendRecipientEmail.trim().length > 0;
-  const draftDirty = draftOpen && announcementDraftIsDirty(
+  const draftDirty = draftOpen && (draftUploading || announcementDraftIsDirty(
     draftBaseline,
     draftValues,
     draftAttachments.map((file) => file.id),
-  );
+  ));
   const hasUnsavedChanges = templateDirty
     || draftDirty
     || settingsDirty
@@ -484,7 +486,13 @@ export function CommunicationsWorkspace({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
+  function setDraftField(field: keyof AnnouncementDraftValues, value: string) {
+    setDraftValues((current) => ({ ...current, [field]: value }));
+  }
+
   function closeDraftEditor() {
+    setError("");
+    setDraftUploading(false);
     setDraftOpen(false);
     setDraftPrefill(null);
     setDraftBaseline(null);
@@ -622,6 +630,7 @@ export function CommunicationsWorkspace({
 
   async function createDraft(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
+    if (draftUploading) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -1398,7 +1407,7 @@ export function CommunicationsWorkspace({
         </nav>
       )}
 
-      {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
+      {error && !draftOpen && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       {view === "announcements" && (
@@ -2317,18 +2326,19 @@ export function CommunicationsWorkspace({
             )}
             {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error} Your edits are still here.</div>}
             <form className="form-stack" onSubmit={createDraft} key={draftPrefill?.editId ? `edit-${draftPrefill.editId}` : draftPrefill ? "correction" : "new"}>
-              <label>Title<input name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" value={draftValues.title} onChange={(event) => setDraftValues((current) => ({ ...current, title: event.target.value }))} /></label>
-              <label>Message<textarea name="body" minLength={5} maxLength={2000} required rows={6} placeholder="Share the details attendees need…" value={draftValues.body} onChange={(event) => setDraftValues((current) => ({ ...current, body: event.target.value }))} /></label>
-              <label>Priority<select name="priority" value={draftValues.priority} onChange={(event) => setDraftValues((current) => ({ ...current, priority: event.target.value }))}><option value="NORMAL">Normal</option><option value="IMPORTANT">Important</option><option value="URGENT">Urgent</option></select></label>
+              <label>Title<input name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" value={draftValues.title} onChange={(event) => setDraftField("title", event.target.value)} /></label>
+              <label>Message<textarea name="body" minLength={5} maxLength={2000} required rows={6} placeholder="Share the details attendees need…" value={draftValues.body} onChange={(event) => setDraftField("body", event.target.value)} /></label>
+              <label>Priority<select name="priority" value={draftValues.priority} onChange={(event) => setDraftField("priority", event.target.value)}><option value="NORMAL">Normal</option><option value="IMPORTANT">Important</option><option value="URGENT">Urgent</option></select></label>
               <MessageAttachmentsField
                 eventId={eventId}
                 files={draftAttachments}
                 onChange={setDraftAttachments}
+                onUploadingChange={setDraftUploading}
                 disabled={saving}
                 help="Attached to the email when this announcement is sent. They are not shown in the attendee feed."
               />
               <p className="field-help">Shown on the event page and as a banner on attendees&apos; accounts.</p>
-              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void requestDraftClose()} disabled={saving}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : draftPrefill?.editId ? "Save changes" : "Save draft"}</button></div>
+              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void requestDraftClose()} disabled={saving}>Cancel</button><button className="primary-button" type="submit" disabled={saving || draftUploading}>{saving ? "Saving…" : draftPrefill?.editId ? "Save changes" : "Save draft"}</button></div>
             </form>
           </section>
         </div>

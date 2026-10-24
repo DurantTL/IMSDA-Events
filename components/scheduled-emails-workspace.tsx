@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { StaffPageHeader } from "@/components/staff-page-header";
@@ -138,6 +138,11 @@ export function ScheduledEmailsWorkspace({
   // The editor's loaded baseline (a blank new schedule or the saved one being edited), so unsaved edits are told apart from a clean form (#1104).
   const [baseline, setBaseline] = useState<string | null>(() => (startWithForm ? scheduleEditorSnapshot(blankForm()) : null));
   const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const newScheduleRef = useRef<HTMLButtonElement>(null);
+  /** The editor is gone, so focus would fall to the page: put it on the stable "New schedule" button instead. */
+  function focusNewSchedule() {
+    window.requestAnimationFrame(() => newScheduleRef.current?.focus());
+  }
   const dirty = Boolean(form) && scheduleEditorIsDirty(baseline, form!);
   useUnsavedChangesGuard(dirty, "This schedule has unsaved edits. Nothing was saved, approved or sent. Leave and discard them?");
 
@@ -226,6 +231,7 @@ export function ScheduledEmailsWorkspace({
   async function cancelEditor() {
     if (!(await confirmLeaveEditor())) return;
     loadEditor(null);
+    focusNewSchedule();
   }
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -254,6 +260,7 @@ export function ScheduledEmailsWorkspace({
     if (!result?.schedule) return;
     replace(result.schedule);
     loadEditor(null);
+    focusNewSchedule();
     setNotice(`${result.schedule.name} was saved. Nothing will be sent until you review and approve it.`);
   }
 
@@ -292,7 +299,7 @@ export function ScheduledEmailsWorkspace({
       <StaffPageHeader
         description={`Emails that go out later, at a time in ${eventName}'s own time zone (${eventTimezone}). Nothing is sent until a person approves it.`}
         primary={(
-          <button className="primary-button" type="button" onClick={() => void openNew()} disabled={busy}>
+          <button className="primary-button" type="button" ref={newScheduleRef} onClick={() => void openNew()} disabled={busy}>
             <Plus aria-hidden="true" size={17} /> New schedule
           </button>
         )}
