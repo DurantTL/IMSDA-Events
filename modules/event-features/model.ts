@@ -139,6 +139,30 @@ function cardLink(input: FeatureRowsInput, cardKey: string, label = "Settings") 
   return card?.allowed ? { href: card.href, label } : null;
 }
 
+/** What the Event features page and the navigation both say about a module that is off and cannot apply to the event. */
+export const moduleNotApplicableLabel = "Does not apply to this event";
+
+/** Where an Event Admin who cannot turn a module on asks for it. */
+export function moduleRequestHref(eventQuery: string): string {
+  return `/more${eventQuery}#request-a-feature`;
+}
+
+/**
+ * A module's state for an event, the one rule behind the Event features page and the
+ * navigation's module states (#1180): on, off, or not applicable (off and unable to
+ * apply to this audience, counting data that keeps Honors usable). A module with a
+ * stored row that no longer applies still reads `on` so it can be turned off.
+ */
+export function moduleFeatureState(input: {
+  key: EventModuleKey;
+  audience: "GENERAL" | "CLUB";
+  on: boolean;
+  dataPresent: ReadonlySet<EventModuleKey>;
+}): "on" | "off" | "not-applicable" {
+  if (input.on) return "on";
+  return canEnableForEvent(input.key, input.audience, input.dataPresent) ? "off" : "not-applicable";
+}
+
 export function buildFeatureRows(input: FeatureRowsInput): FeatureRow[] {
   const can = (permission: string) => input.permissions.includes(permission);
   const canConfigure = can("CONFIGURE_EVENT");
@@ -165,15 +189,14 @@ export function buildFeatureRows(input: FeatureRowsInput): FeatureRow[] {
     }
     const on = input.modules.effective.has(key);
     const forced = input.modules.dataForced.has(key);
-    const applies = canEnableForEvent(key, input.audience, input.modules.dataPresent);
     // A module with a stored row that no longer applies (a change of audience) can still be turned off.
-    if (!on && !applies) {
+    if (moduleFeatureState({ key, audience: input.audience, on, dataPresent: input.modules.dataPresent }) === "not-applicable") {
       rows.push({
         id: `module:${key}`,
         title: definition.title,
         description: definition.description,
         state: "not-applicable",
-        stateLabel: "Does not apply to this event",
+        stateLabel: moduleNotApplicableLabel,
         control: null,
         action: null,
         settings: null,
@@ -207,7 +230,7 @@ export function buildFeatureRows(input: FeatureRowsInput): FeatureRow[] {
       },
       action: { type: "module", moduleKey: key },
       settings: on ? settings : null,
-      request: asks ? { href: `/more${input.eventQuery}#request-a-feature`, label: "Request this" } : null,
+      request: asks ? { href: moduleRequestHref(input.eventQuery), label: "Request this" } : null,
     });
   }
 

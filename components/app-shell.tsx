@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -16,6 +15,10 @@ import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { DestinationSearch } from "@/components/destination-search";
+import { GuardedLink } from "@/components/guarded-link";
+import { SystemPhoneMenu } from "@/components/system-phone-menu";
+import { moduleDestinationStates } from "@/components/module-destination-states";
+import { activeWorkContext, returnToSystemHref, showsSystemChrome, systemMenuGroups, workContextSwitches } from "@/components/work-context-model";
 import { buildSearchDestinations } from "@/components/destination-search-model";
 import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import {
@@ -36,7 +39,7 @@ import {
 } from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
-import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
+import { alwaysOnModuleKeys, disabledModuleCardKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -78,6 +81,8 @@ type ShellEvent = {
   hiddenCardKeys?: readonly string[];
   /** Module keys a system administrator may turn off for this event (#810), computed server-side with the Event modules page's rule. */
   removableModules?: readonly string[];
+  /** Modules whose data keeps them usable for this event, so the module states match the Event features page (#1180). */
+  dataPresentModules?: readonly string[];
   /** Club forms (#610) are open to system admins and Event Admins of a current event; computed server-side. */
   clubFormsAccess?: boolean;
 };
@@ -252,8 +257,24 @@ export function AppShell({
     setDismissedGroup(open ? { section, pathname } : null);
   }
   // On /admin pages a system administrator's sidebar lists the system groups (#966), not the event workspace's.
-  const showSystemNav = isSystemRoute && isSystemAdmin;
+  const showSystemNav = showsSystemChrome({ isSystemAdmin, pathname });
   const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
+  // Which work context the page is in (#1180): System, the selected event or the account page. A label only; it grants nothing.
+  const workContext = activeWorkContext({ pathname, isSystemAdmin, eventName: selectedEvent?.name });
+  const contextSwitches = workContextSwitches({ isSystemAdmin, attendeeAccountAvailable, selectedEventId, active: workContext.kind });
+  // The phone System menu lists the same destinations as the desktop System sidebar, and nothing without the role.
+  const systemMenu = showSystemNav ? systemMenuGroups({ isSystemAdmin, pathname, selectedEventId }) : [];
+  // Module states (#741 rules) for the selected event, only where the server loaded them.
+  const moduleStates = selectedEvent?.hiddenCardKeys
+    ? moduleDestinationStates({
+      hiddenCardKeys: selectedHiddenCardKeys,
+      dataPresent: new Set((selectedEvent.dataPresentModules ?? []).filter(isEventModuleKey)),
+      audience: selectedEvent.clubEvent ? "CLUB" : "GENERAL",
+      isSystemAdmin,
+      canConfigure: selectedPermissions.has("CONFIGURE_EVENT"),
+      eventQuery,
+    })
+    : [];
   // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
   const mobileNavigation = orderedMobileTabs(visibleNavigation);
   // Find a page (#1177): the destinations this viewer may open, from the same registry and rules as the menus. No event data is searched.
@@ -312,19 +333,19 @@ export function AppShell({
       onKeyDown={(event) => { if (event.key === "Escape" && tooltip) setTooltip(null); }}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
-        <Link className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
+        <GuardedLink className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
           <BrandMark />
           <span><strong>IMSDA</strong><small>Events</small></span>
-        </Link>
+        </GuardedLink>
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
 
         {user.globalRole === "SYSTEM_ADMIN" && (
           <div className="system-navigation">
             <span className="system-navigation-label">Global administration</span>
-            <Link
+            <GuardedLink
               className={isSystemRoute ? "system-navigation-link active" : "system-navigation-link"}
-              href={withCurrentEvent(systemNavigation.href, selectedEventId)}
+              href={returnToSystemHref(selectedEventId)}
               aria-current={isSystemRoute ? "page" : undefined}
               {...tipProps("System management")}
             >
@@ -335,7 +356,7 @@ export function AppShell({
                 <strong>System management</strong>
                 <small>All events and integrations</small>
               </span>
-            </Link>
+            </GuardedLink>
           </div>
         )}
 
@@ -353,7 +374,7 @@ export function AppShell({
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </div>
-          {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
+          {!showSystemNav && <GuardedLink className="event-picker-archived-link" href="/archived-events">Archived events</GuardedLink>}
         </div>}
 
         <div className="sidebar-destination-search">
@@ -373,19 +394,19 @@ export function AppShell({
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
           {showSystemNav && (
             <>
-              <Link className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
+              <GuardedLink className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
                 <LayoutDashboard aria-hidden="true" size={19} strokeWidth={1.9} />
                 <span>Event workspace</span>
-              </Link>
+              </GuardedLink>
               {systemNavGroups.map((group) => {
                 const links = group.items.map((item) => {
                   const { href, icon: Icon, label } = item;
                   const isActive = activeSystemEntry === systemNavEntryKey(group, item);
                   return (
-                    <Link key={href} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
+                    <GuardedLink key={href} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
                       <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
                       <span>{label}</span>
-                    </Link>
+                    </GuardedLink>
                   );
                 });
                 const open = resolveSidebarGroupOpen({
@@ -420,10 +441,10 @@ export function AppShell({
               const { href, icon: Icon, label } = item;
               const isActive = isItemActive(item);
               return (
-                <Link key={label} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
+                <GuardedLink key={label} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
                   <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
                   <span>{label}</span>
-                </Link>
+                </GuardedLink>
               );
             });
             // The daily items: no heading, always visible.
@@ -463,6 +484,7 @@ export function AppShell({
                 href={withCurrentEvent(href, selectedEventId)}
                 isActive={isActive}
                 cards={launcherCards}
+                moduleStates={moduleStates}
                 sidebarHrefs={drawnSidebarHrefs}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
@@ -488,7 +510,18 @@ export function AppShell({
 
       <main className="workspace">
         <header className="workspace-header">
-          <div><p className="eyebrow">Staff workspace</p><h1>{pageTitle}</h1></div>
+          <div>
+            <p className="eyebrow">Staff workspace</p>
+            <h1>{pageTitle}</h1>
+            <p className="work-context" data-context={workContext.kind}>
+              <span className="work-context-kind">{workContext.kindLabel}</span>
+              <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
+              {workContext.kind === "system" && <span className="work-context-detail">{workContext.detail}</span>}
+              {isSystemAdmin && workContext.kind === "event" && (
+                <GuardedLink className="work-context-return" href={returnToSystemHref(selectedEventId)}>Back to System</GuardedLink>
+              )}
+            </p>
+          </div>
           <div className="header-actions">
             {canSwitchToAttendee
               ? (
@@ -505,7 +538,7 @@ export function AppShell({
                 </form>
               )
               : !eventlessProfile && (
-                <Link
+                <GuardedLink
                   aria-label="Attendee experience"
                   className="attendee-preview-switch"
                   href={attendeePreviewHref}
@@ -513,7 +546,7 @@ export function AppShell({
                 >
                   <Eye aria-hidden="true" size={16} />
                   <span>Attendee experience</span>
-                </Link>
+                </GuardedLink>
               )}
             <span className="staff-pill">Staff mode</span>
             {isSystemAdmin && <AdminAttentionBell />}
@@ -548,7 +581,8 @@ export function AppShell({
         </div>
       </main>
 
-      {mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
+      {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
+      {!showSystemNav && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
         {mobileNavigation.map(({ href, icon: Icon, label }) => {
           const isActive = !isProfileRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;
           if (href === "/more") {
@@ -560,6 +594,7 @@ export function AppShell({
                 href={`${href}${eventQuery}`}
                 isActive={isActive}
                 cards={launcherCards}
+                moduleStates={moduleStates}
                 destinations={searchDestinations}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
@@ -573,9 +608,9 @@ export function AppShell({
             );
           }
           return (
-            <Link className={isActive ? "active" : undefined} href={`${href}${eventQuery}`} key={href} aria-current={isActive ? "page" : undefined} {...(mobileNavigationLabels[href] && mobileNavigationLabels[href] !== label ? { "aria-label": label, title: label } : {})}>
+            <GuardedLink className={isActive ? "active" : undefined} href={`${href}${eventQuery}`} key={href} aria-current={isActive ? "page" : undefined} {...(mobileNavigationLabels[href] && mobileNavigationLabels[href] !== label ? { "aria-label": label, title: label } : {})}>
               <Icon aria-hidden="true" size={22} /><span>{mobileNavigationLabels[href] ?? label}</span>
-            </Link>
+            </GuardedLink>
           );
         })}
       </nav>}

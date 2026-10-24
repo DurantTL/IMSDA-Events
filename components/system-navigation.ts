@@ -64,7 +64,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     collapsedByDefault: false,
     items: [
       { href: "/event-setup", label: "Create event", description: "Start a new event, blank or from a template.", icon: CalendarPlus },
-      { href: "/admin/calendar", label: "Set up from calendar", description: "Turn a public calendar item into a registration event.", icon: CalendarCheck },
+      { href: "/admin/calendar", label: "Create event from calendar item", description: "Pick an item on the public calendar and turn it into a registration event.", icon: CalendarCheck },
       { href: "/event-setup/copy", label: "Copy a past event", description: "Start from last year's event settings and forms.", icon: Copy },
       { href: "/admin/event-templates", label: "Event templates", description: "The starting points new events are built from.", icon: LayoutTemplate },
       { href: "/archived-events", label: "Archived events", description: "Events that are finished and put away.", icon: Archive },
@@ -111,7 +111,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/honors", label: "Honor catalog", description: "The honors clubs can earn.", icon: Award },
       { href: "/admin/club-supplies", label: "Club supply catalog", description: "Supplies clubs can order.", icon: Package },
       { href: "/admin/master-award-rules", label: "Master Award rules", description: "What it takes to earn a Master Award.", icon: Trophy },
-      { href: "/admin/calendar", label: "Public calendar", description: "The calendar visitors see.", icon: CalendarDays },
+      { href: "/admin/calendar", label: "Manage public calendar", description: "Add, edit and publish the calendar visitors see. Same page as creating an event from a calendar item.", icon: CalendarDays },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
       { href: "/admin/email", label: "Email", description: "The central sender, paused events, staff alerts, and email health.", icon: Bell, alsoActiveFor: ["/admin/notifications"] },
       { href: "/admin/settings", label: "Platform settings", description: "Sign-in, email and payment settings.", icon: CloudCog },
@@ -128,8 +128,8 @@ function isAtOrBelow(pathname: string, path: string): boolean {
  * The sidebar item a /admin page lights: the longest matching path, so
  * /admin/organizations/background-checks lights Sterling Volunteers and not
  * Clubs and churches. `null` for /admin itself and pages with no item.
- * Set up from calendar and Public calendar are the same page: the first listing
- * (Set up from calendar) is the one that lights.
+ * Create event from calendar item and Manage public calendar are the same page: the
+ * first listing (Create event from calendar item) is the one that lights.
  */
 export function systemNavActiveItem(pathname: string): SystemNavItem | null {
   let best: { item: SystemNavItem; length: number } | null = null;
@@ -153,7 +153,7 @@ export function systemNavEntryKey(group: SystemNavGroup, item: SystemNavItem): s
 export function systemNavActiveEntryKey(pathname: string): string | null {
   const item = systemNavActiveItem(pathname);
   if (!item) return null;
-  // /admin/calendar is both "Set up from calendar" and "Public calendar": light the Events entry only.
+  // /admin/calendar is both "Create event from calendar item" and "Manage public calendar": light the Events entry only.
   const group = systemNavGroups.find((candidate) => candidate.items.includes(item));
   return group ? systemNavEntryKey(group, item) : null;
 }

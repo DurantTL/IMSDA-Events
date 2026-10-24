@@ -12574,6 +12574,45 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .instructor-email-choice input[type="radio"] { flex: 0 0 auto; width: 20px; height: 20px; margin: 2px 0 0; }
 .instructor-email-choice small { display: block; opacity: 0.8; }
 
+/* Work contexts, the phone System menu, guarded links and module states (#1180). New rules only; shared type scale untouched. */
+.work-context { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
+.work-context-kind { flex: none; border-radius: 999px; background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), var(--text-badge)); font-weight: 700; padding: 2px 8px; }
+.work-context[data-context="system"] .work-context-kind { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
+.work-context[data-context="profile"] .work-context-kind { background: var(--imsda-gold-soft); color: var(--ink); }
+@media screen { .work-context-name { min-width: 0; overflow: hidden; color: var(--ink); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; } }
+.work-context-detail { color: var(--muted); }
+.work-context-return { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-purple); font-weight: 700; }
+.work-context-return:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.more-launcher-modules { break-inside: avoid; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.more-launcher-modules ul { margin: 0; padding: 0; list-style: none; }
+.more-launcher-modules .more-launcher-item { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.more-launcher-modules small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); }
+.more-launcher-item-static { color: var(--muted); cursor: default; }
+.mobile-nav-system-trigger small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.62rem); font-weight: 600; }
+.system-menu-scrim { position: fixed; z-index: 65; inset: 0 0 calc(67px + env(safe-area-inset-bottom, 0px)); background: rgba(0, 43, 69, 0.42); }
+@media screen { .system-menu { position: fixed; z-index: 66; inset: auto 0 calc(67px + env(safe-area-inset-bottom, 0px)); display: flex; max-height: min(78vh, calc(100dvh - 96px)); flex-direction: column; overflow: hidden; border-radius: 18px 18px 0 0; background: var(--card); box-shadow: 0 -12px 32px rgba(0, 43, 69, 0.22); } }
+.system-menu:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.system-menu-head { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 14px 16px 10px; }
+.system-menu-head h2 { margin: 0; font-size: 1.05rem; }
+.system-menu-head p { margin: 2px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
+.system-menu-close { display: inline-flex; min-width: 44px; min-height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); cursor: pointer; font: inherit; font-weight: 700; padding: 0 12px; }
+.system-menu-close:focus-visible, .system-menu-item:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+@media screen { .system-menu-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 12px; } }
+.system-menu-search { margin: 8px 8px 4px; }
+.system-menu-search .destination-search-empty { color: var(--muted); }
+.system-menu-group h3 { margin: 12px 8px 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); letter-spacing: 0.08em; text-transform: uppercase; }
+.system-menu-group ul { margin: 0; padding: 0; list-style: none; }
+.system-menu-item { display: flex; width: 100%; min-height: 44px; align-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; overflow-wrap: anywhere; padding: 8px; text-align: left; text-decoration: none; cursor: pointer; }
+.system-menu-item.active { background: var(--imsda-navy-soft); color: var(--imsda-navy); font-weight: 700; }
+@media (max-width: 800px) {
+  .mobile-nav a.mobile-nav-system-trigger { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border: 0; border-radius: 10px; background: transparent; color: #566a75; cursor: pointer; font: inherit; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; }
+  .mobile-nav a.mobile-nav-system-trigger.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
+  .mobile-nav a.mobile-nav-system-trigger:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+}
+@media (min-width: 801px) {
+  .system-menu, .system-menu-scrim { display: none; }
+}
+
 /* Attendee account Overview (#1175): registration cards in a main column, account and help in a secondary one.
    Own classes only; no shared font-size rule is touched. One column on a phone, with the cards first. */
 .account-header-identity {
