@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -340,6 +342,14 @@ describe("screening storage copy is pinned to the domain", () => {
     expect(sterling.detail).toContain("20 October 2026");
     expect(sterling.detail).toMatch(/earlier flags-only rules/);
     expect(screeningBehavior.evidenceNote).toContain("20 October 2026");
+  });
+});
+
+describe("readiness decision links", () => {
+  it("give each decision link a 44px tap target", () => {
+    const css = readFileSync(join(process.cwd(), "components/system-readiness-workspace.module.css"), "utf8");
+    expect(css).toMatch(/\.decisionLink \{[^}]*min-height: 44px;/);
+    expect(readFileSync(join(process.cwd(), "components/system-readiness-workspace.tsx"), "utf8")).toContain("className={styles.decisionLink}");
   });
 });
 

@@ -122,7 +122,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
           {SCREENING_DECISION_LINKS.map((link, index) => (
             <span key={link.href}>
               {index > 0 ? " · " : ""}
-              <a href={link.href} rel="noreferrer" target="_blank">{link.label}</a>
+              <a className={styles.decisionLink} href={link.href} rel="noreferrer" target="_blank">{link.label}</a>
             </span>
           ))}
         </p>
