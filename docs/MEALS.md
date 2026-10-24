@@ -128,7 +128,7 @@ a transaction that holds anything above must not wait for the gate.
 
 ## Camp Meeting 2026 defaults
 
-`modules/meals/camp-meeting.ts`, added by a person with finance access with **Add the Camp Meeting meals** on More > Meals (`POST /api/events/:id/meals/defaults`, only on an event with no meals; no starter template or seed applies it, because a price is a human decision): breakfast Wed to Sat
+`prisma/seed-data/event-content/camp-meeting-meals.json` (seeded by `npm run event-content:sync`, #919), added by a person with finance access with **Add the Camp Meeting meals** on More > Meals (`POST /api/events/:id/meals/defaults`, only on an event with no meals; no starter template or seed applies it, because a price is a human decision): breakfast Wed to Sat
 ($7 adult / $6 child), lunch Wed to Fri ($8 / $7), Saturday lunch donation-only (no ticket), supper Tue to Sat ($8 / $7).
 Day offsets count from the event's first day (a Tuesday). A **conference-paid** plan includes every ticketed meal, with the
 same per-meal rates as the conference billing rate. These are the 2026 prices the form already carried; staff review them

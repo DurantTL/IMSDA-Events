@@ -35,6 +35,12 @@ npm run lodging:sync
 echo "[entrypoint] Syncing form templates (npm run form-templates:sync)..."
 npm run form-templates:sync
 
+# Bring the seeded event content (#919) to this release's version: the Camp
+# Meeting meal preset and cancellation rule preset. It only adds or updates the
+# content rows; no event, meal service, plan or cancellation rule is touched.
+echo "[entrypoint] Syncing seeded event content (npm run event-content:sync)..."
+npm run event-content:sync
+
 if [ "${RUN_DB_SEED}" = "true" ]; then
   echo "[entrypoint] RUN_DB_SEED is no longer supported. Fictitious demo data is local-only;" >&2
   echo "[entrypoint] use 'npm run admin:create' to create a real administrator." >&2

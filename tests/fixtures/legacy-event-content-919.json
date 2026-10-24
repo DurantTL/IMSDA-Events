@@ -1,0 +1,442 @@
+{
+  "note": "Captured from modules/meals/camp-meeting.ts and campMeetingPreset in modules/cancellation-policy/rules.ts before #919 moved them to seeded data. Hashes are sha256 of the canonical JSON (keys sorted, undefined dropped).",
+  "meals": {
+    "sha256": "594d009d735b1253ec50238549aacc25dd74a038744c3e189bc342a0649756a7",
+    "services": 13,
+    "plans": [
+      {
+        "code": "meal-tickets",
+        "prices": 6
+      },
+      {
+        "code": "conference-paid",
+        "prices": 6
+      }
+    ],
+    "meals": {
+      "services": [
+        {
+          "name": "Wednesday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 1,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 2,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 3,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 4,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Wednesday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 1,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 2,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 3,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday lunch (donation)",
+          "mealType": "LUNCH",
+          "dayOffset": 4,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "DONATION_ONLY",
+          "capacity": null
+        },
+        {
+          "name": "Tuesday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 0,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Wednesday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 1,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 2,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 3,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 4,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        }
+      ],
+      "plans": [
+        {
+          "code": "meal-tickets",
+          "name": "Meal tickets",
+          "description": "Tickets bought on the registration form or added by staff. Saturday lunch is donation-only.",
+          "payer": "ATTENDEE",
+          "isDefaultTicketPlan": true,
+          "includesAllServices": true,
+          "defaultEntitlement": "PAID",
+          "services": [],
+          "prices": [
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 600
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            }
+          ]
+        },
+        {
+          "code": "conference-paid",
+          "name": "Conference-paid (staff, pastors, volunteers)",
+          "description": "Every ticketed meal is included. The café's use of each meal is billed to the conference, not the attendee.",
+          "payer": "CONFERENCE",
+          "isDefaultTicketPlan": false,
+          "includesAllServices": true,
+          "defaultEntitlement": "INCLUDED",
+          "services": [],
+          "prices": [
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 600
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cancellation": {
+    "2026-05-25": {
+      "sha256": "e9cbc8db4d551d6338c2521f68cd8aad99fc0c3fff068918c29c1b3d6ae1664d",
+      "rules": {
+        "schema": 1,
+        "windows": [
+          {
+            "id": "before-deadline",
+            "label": "Before the deadline",
+            "endsOn": "2026-05-25",
+            "terms": {
+              "refund": {
+                "kind": "FULL"
+              },
+              "flatWithholdCents": 1000,
+              "flatWithholdLabel": "Processing fee",
+              "depositTreatment": "REFUND",
+              "creditAllowed": false
+            }
+          }
+        ],
+        "afterWindows": {
+          "label": "After the deadline",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "noShow": {
+          "label": "No-show on the first night",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "allowedScopes": [
+          "FULL_REGISTRATION",
+          "ATTENDEE"
+        ],
+        "supportedComponents": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "classifications": [],
+        "nonrefundable": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "cardFeeTreatment": "REFUNDABLE"
+      }
+    },
+    "2026-03-08": {
+      "sha256": "c400cbfdd0123b8acff3db1408f00f1cf6de4860cb88f3a9f76bdd2c707083f1",
+      "rules": {
+        "schema": 1,
+        "windows": [
+          {
+            "id": "before-deadline",
+            "label": "Before the deadline",
+            "endsOn": "2026-03-08",
+            "terms": {
+              "refund": {
+                "kind": "FULL"
+              },
+              "flatWithholdCents": 1000,
+              "flatWithholdLabel": "Processing fee",
+              "depositTreatment": "REFUND",
+              "creditAllowed": false
+            }
+          }
+        ],
+        "afterWindows": {
+          "label": "After the deadline",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "noShow": {
+          "label": "No-show on the first night",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "allowedScopes": [
+          "FULL_REGISTRATION",
+          "ATTENDEE"
+        ],
+        "supportedComponents": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "classifications": [],
+        "nonrefundable": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "cardFeeTreatment": "REFUNDABLE"
+      }
+    },
+    "2026-11-01": {
+      "sha256": "3cb3d706c1b3149e80d0c5ed6d9a81a91cea18e7af23e53e57c2e02b38dda427",
+      "rules": {
+        "schema": 1,
+        "windows": [
+          {
+            "id": "before-deadline",
+            "label": "Before the deadline",
+            "endsOn": "2026-11-01",
+            "terms": {
+              "refund": {
+                "kind": "FULL"
+              },
+              "flatWithholdCents": 1000,
+              "flatWithholdLabel": "Processing fee",
+              "depositTreatment": "REFUND",
+              "creditAllowed": false
+            }
+          }
+        ],
+        "afterWindows": {
+          "label": "After the deadline",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "noShow": {
+          "label": "No-show on the first night",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 0,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "FORFEIT",
+            "creditAllowed": false
+          }
+        },
+        "allowedScopes": [
+          "FULL_REGISTRATION",
+          "ATTENDEE"
+        ],
+        "supportedComponents": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "classifications": [],
+        "nonrefundable": {
+          "categories": [],
+          "fieldKeys": []
+        },
+        "cardFeeTreatment": "REFUNDABLE"
+      }
+    }
+  },
+  "copy": {
+    "mealsTitle": "Start from Camp Meeting",
+    "mealsDescription": "Adds the 2026 Camp Meeting meal services (breakfast Wednesday to Saturday, lunch Wednesday to Friday, Saturday lunch donation-only, supper Tuesday to Saturday), a ticket plan ($7 / $6 breakfast, $8 / $7 lunch and supper) and a conference-paid plan for staff, pastor and volunteer meals. The dates count from this event's first day, which should be a Tuesday. Review the prices before publishing the form.",
+    "mealsButton": "Add the Camp Meeting meals",
+    "mealsNotice": "Camp Meeting meals added.",
+    "mealsConflict": "This event already has meal services or plans. The Camp Meeting meals can only be added to an event that has none.",
+    "mealsAudit": "Added the Camp Meeting meal services and plans.",
+    "cancelDeadlineLabel": "Camp Meeting rule: deadline date",
+    "cancelDescription": "Before the deadline, a full refund minus a $10 processing fee. After it, or for a first-night no-show, the deposit is forfeited and the reservation cancelled. You review everything before it is saved.",
+    "cancelButton": "Start from the Camp Meeting rule"
+  }
+}

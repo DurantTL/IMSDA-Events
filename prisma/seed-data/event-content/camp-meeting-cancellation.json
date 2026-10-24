@@ -1,0 +1,67 @@
+{
+  "key": "camp-meeting-2026",
+  "kind": "CANCELLATION_PRESET",
+  "version": 1,
+  "name": "Camp Meeting 2026 cancellation rule",
+  "content": {
+    "label": "Camp Meeting rule",
+    "description": "Before the deadline, a full refund minus a $10 processing fee. After it, or for a first-night no-show, the deposit is forfeited and the reservation cancelled. You review everything before it is saved.",
+    "rules": {
+      "schema": 1,
+      "windows": [
+        {
+          "id": "before-deadline",
+          "label": "Before the deadline",
+          "endsOn": "{{deadline}}",
+          "terms": {
+            "refund": {
+              "kind": "FULL"
+            },
+            "flatWithholdCents": 1000,
+            "flatWithholdLabel": "Processing fee",
+            "depositTreatment": "REFUND",
+            "creditAllowed": false
+          }
+        }
+      ],
+      "afterWindows": {
+        "label": "After the deadline",
+        "terms": {
+          "refund": {
+            "kind": "FULL"
+          },
+          "flatWithholdCents": 0,
+          "flatWithholdLabel": "Processing fee",
+          "depositTreatment": "FORFEIT",
+          "creditAllowed": false
+        }
+      },
+      "noShow": {
+        "label": "No-show on the first night",
+        "terms": {
+          "refund": {
+            "kind": "FULL"
+          },
+          "flatWithholdCents": 0,
+          "flatWithholdLabel": "Processing fee",
+          "depositTreatment": "FORFEIT",
+          "creditAllowed": false
+        }
+      },
+      "allowedScopes": [
+        "FULL_REGISTRATION",
+        "ATTENDEE"
+      ],
+      "supportedComponents": {
+        "categories": [],
+        "fieldKeys": []
+      },
+      "classifications": [],
+      "nonrefundable": {
+        "categories": [],
+        "fieldKeys": []
+      },
+      "cardFeeTreatment": "REFUNDABLE"
+    }
+  }
+}

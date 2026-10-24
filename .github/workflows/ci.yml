@@ -88,6 +88,8 @@ jobs:
       - run: npm run lodging:sync
       # The form templates (the seeded Women's Retreat, Camp Meeting and Spring Camporee, and the rest of the code's templates) are synced after migrations; a template edited in the app is never overwritten (#153, #1064).
       - run: npm run form-templates:sync
+      # The seeded event content (Camp Meeting meal and cancellation presets) is synced after migrations (#919).
+      - run: npm run event-content:sync
       - run: npm run verify
       # Real-database check that Honors Weekend class seats hold under concurrent saves (#359).
       - if: steps.scope.outputs.full == 'true'

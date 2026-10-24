@@ -12,6 +12,7 @@ import {
   type MealAgeGroupValue,
   type MealTypeValue,
 } from "@/modules/meals/domain";
+import type { MealPresetOption } from "@/modules/event-content/domain";
 import type { MealView } from "@/modules/meals/view-repository";
 
 type Plan = MealView["plans"][number];
@@ -30,8 +31,8 @@ function serviceLabel(service: Service) {
 
 const reasonHint = "Do not enter allergy, medical or other personal details.";
 
-export function MealsWorkspace({ eventId, eventName, initialView, canConfigure, canManageFinance, canExport }: {
-  eventId: string; eventName: string; initialView: MealView; canConfigure: boolean; canManageFinance: boolean; canExport: boolean;
+export function MealsWorkspace({ eventId, eventName, initialView, presets = [], canConfigure, canManageFinance, canExport }: {
+  eventId: string; eventName: string; initialView: MealView; presets?: MealPresetOption[]; canConfigure: boolean; canManageFinance: boolean; canExport: boolean;
 }) {
   const [view, setView] = useState(initialView);
   const [error, setError] = useState("");
@@ -66,11 +67,11 @@ export function MealsWorkspace({ eventId, eventName, initialView, canConfigure, 
       Open the form in the registration builder, save it again to bring the prices up to date, run a test submission, and republish it. Until then registrants are charged the form&apos;s old prices.
     </p>)}
 
-    {view.services.length === 0 && view.plans.length === 0 ? <section className="panel">
-      <h3>Start from Camp Meeting</h3>
-      <p>Adds the 2026 Camp Meeting meal services (breakfast Wednesday to Saturday, lunch Wednesday to Friday, Saturday lunch donation-only, supper Tuesday to Saturday), a ticket plan ($7 / $6 breakfast, $8 / $7 lunch and supper) and a conference-paid plan for staff, pastor and volunteer meals. The dates count from this event&apos;s first day, which should be a Tuesday. Review the prices before publishing the form.</p>
-      {canManageFinance ? <button className="primary-button" type="button" disabled={busy} onClick={() => void run(() => call(`${base}/defaults`, "POST", { preset: "camp-meeting-2026" }), "Camp Meeting meals added.")}>Add the Camp Meeting meals</button> : <p>Only staff who manage finance can add the preset.</p>}
-    </section> : null}
+    {view.services.length === 0 && view.plans.length === 0 ? presets.map((preset) => <section className="panel" key={preset.key}>
+      <h3>Start from {preset.label}</h3>
+      <p>{preset.description}</p>
+      {canManageFinance ? <button className="primary-button" type="button" disabled={busy} onClick={() => void run(() => call(`${base}/defaults`, "POST", { preset: preset.key }), `${preset.label} meals added.`)}>Add the {preset.label} meals</button> : <p>Only staff who manage finance can add the preset.</p>}
+    </section>) : null}
 
     <section className="panel">
       <h3>Meals ordered</h3>

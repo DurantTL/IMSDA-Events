@@ -32,6 +32,7 @@ const approvedPaths = [
   "club-imports/",
   "event-templates/starters.ts",
   "forms/seeded-template-data.ts",
+  "event-content/seeded-data.ts",
 ];
 
 /** Compatibility aliases for pre-#155 names. Remove each entry when its last importer is gone. */
@@ -55,13 +56,12 @@ const compatibilityAliasExports: Record<string, string[]> = {
   ],
 };
 
-/** Pre-existing event-named presets, grandfathered. New entries are not accepted. */
-const grandfathered: Record<string, string[]> = {
-  "meals/camp-meeting.ts": ["campMeetingMeals"],
-  "meals/config-repository.ts": ["applyCampMeetingMealPreset"],
-  "cancellation-policy/rules.ts": ["campMeetingPreset"],
-};
-const grandfatheredFiles = new Set(["meals/camp-meeting.ts"]);
+/**
+ * Pre-existing event-named presets, grandfathered. New entries are not accepted. The meal preset and the cancellation
+ * rule preset left this list when they moved to seeded data (#919).
+ */
+const grandfathered: Record<string, string[]> = {};
+const grandfatheredFiles = new Set<string>();
 
 /**
  * Pre-existing event-specific string literals in shared modules, grandfathered by file (a ratchet:

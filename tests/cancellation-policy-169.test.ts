@@ -11,10 +11,10 @@ import {
 import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
 import { windowClosesAt, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
 import {
-  campMeetingPreset,
   parseCancellationRules,
   type CancellationRulesInput,
 } from "@/modules/cancellation-policy/rules";
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
 
 const TZ = "America/Chicago";
 

@@ -48,7 +48,7 @@ export type ContentionRound = { submissions: number; firstTryFailures: number; e
 
 export async function createContentionHarness() {
   // Dynamic imports so the observed client is installed first.
-  const { applyCampMeetingMealPreset } = await import("@/modules/meals/config-repository");
+  const { applyMealPreset } = await import("@/modules/meals/config-repository");
   const { registrationFormDefinitionSchema } = await import("@/modules/forms/definition");
   const { submitPublicRegistration } = await import("@/modules/forms/public-repository");
   type PublicRegistrationInput = import("@/modules/forms/public-domain").PublicRegistrationInput;
@@ -114,7 +114,7 @@ export async function createContentionHarness() {
         timezone: "America/Chicago", registrationClosesOn: "2027-06-14", attendeeEditPolicy: "TIERED", isPublished: true,
       },
     });
-    await applyCampMeetingMealPreset(eventId, userId);
+    await applyMealPreset(eventId, userId, "camp-meeting-2026");
     if (options.capacity) {
       await prisma.eventMealService.updateMany({ where: { eventId, mealType: options.capacity.mealType }, data: { capacity: options.capacity.capacity } });
     }

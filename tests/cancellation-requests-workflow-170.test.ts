@@ -7,7 +7,8 @@ import {
   type CancellationResult,
   type ChargeEntry,
 } from "@/modules/cancellation-policy/calculator";
-import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
 
 /**
  * #170: the request workflow against an in-memory database. The real calculator produces every outcome; the database,

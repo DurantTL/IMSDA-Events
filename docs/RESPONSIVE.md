@@ -65,7 +65,7 @@ have `permissions: contents: read`. The label is created in the repository
 
 ```bash
 npm i --no-save playwright-core@1.56.1
-npm run db:deploy && npm run db:seed && npm run club-forms:sync && npm run lodging:sync && npm run form-templates:sync
+npm run db:deploy && npm run db:seed && npm run club-forms:sync && npm run lodging:sync && npm run form-templates:sync && npm run event-content:sync
 npm run build && npm run start          # production mode; note the port
 MOBILE_LAYOUT_BROWSER=/path/to/chromium MOBILE_LAYOUT_OUT_DIR=/tmp/mobile-layout \
   npm run test:mobile-layout

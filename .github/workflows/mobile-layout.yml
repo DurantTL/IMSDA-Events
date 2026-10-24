@@ -81,6 +81,7 @@ jobs:
       - run: npm run club-forms:sync
       - run: npm run lodging:sync
       - run: npm run form-templates:sync
+      - run: npm run event-content:sync
       - run: npm run build
       - run: npm i --no-save playwright-core@1.56.1
       # Fictitious CI-only values for production mode. Keep this block identical
