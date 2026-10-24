@@ -57,7 +57,7 @@ describe("destination registry per role", () => {
     const expected = systemNavGroups.flatMap((group) => group.items.map((item) => item.label));
     expect(system.map((destination) => destination.label)).toEqual(expected);
     expect(system.filter((destination) => destination.href.startsWith("/admin/calendar")).map((destination) => destination.label))
-      .toEqual(["Set up from calendar", "Public calendar"]);
+      .toEqual(["Create event from calendar item", "Manage public calendar"]);
   });
 
   it("gives limited event staff only their own event destinations and their profile", () => {

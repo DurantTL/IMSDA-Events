@@ -24,6 +24,8 @@ import {
   type LauncherCloseReason,
 } from "@/components/more-launcher-model";
 import { DestinationSearch } from "@/components/destination-search";
+import { GuardedLink } from "@/components/guarded-link";
+import { moduleStateLabels, type ModuleDestinationEntry } from "@/components/module-destination-states";
 import type { SearchDestination } from "@/components/destination-search-model";
 import type { MoreDirectoryCard } from "@/components/staff-navigation";
 import { eventModuleDefinition, moduleForCard } from "@/modules/event-modules/catalog";
@@ -56,6 +58,7 @@ function setBackgroundInert(inert: boolean) {
 
 export function MoreLauncherPanel({
   cards,
+  moduleStates,
   destinations,
   sidebarHrefs,
   isSystemAdmin,
@@ -70,6 +73,8 @@ export function MoreLauncherPanel({
   style,
 }: {
   cards: readonly MoreDirectoryCard[];
+  /** Module states for the selected event (#1180, #741 rules): off modules are listed apart from the cards, as a real link or as plain text. */
+  moduleStates?: readonly ModuleDestinationEntry[];
   /** The phone sheet carries the destination search (#1177); the desktop sidebar has its own. */
   destinations?: readonly SearchDestination[];
   /** Sidebar hrefs drawn for this viewer: cards for them are left out of the desktop popover (#967). The phone sheet passes none. */
@@ -98,6 +103,8 @@ export function MoreLauncherPanel({
   const listed = omitSidebarDuplicates(cards, variant === "sidebar" ? sidebarHrefs : undefined);
   const matched = filterLauncherCards(listed, search);
   const groups = launcherGroups(matched);
+  // Off modules only (the enabled ones are the cards above); a search narrows cards, not this list.
+  const offModules = (moduleStates ?? []).filter((entry) => entry.state !== "enabled");
   const matchCount = groups.reduce((total, entry) => total + entry.cards.length, 0);
   const router = useRouter();
   const footer = omitSidebarFooterLinks(launcherFooterLinks({ isSystemAdmin, canRequestFeature, eventQuery }), variant === "sidebar" ? sidebarHrefs : undefined);
@@ -235,10 +242,10 @@ export function MoreLauncherPanel({
                 const switchable = definition && !definition.alwaysOn && removable.has(definition.key) ? definition : undefined;
                 return (
                   <li key={card.key} className={switchable ? "more-launcher-row" : undefined}>
-                    <Link className="more-launcher-item" href={card.href} onClick={() => onNavigate?.({ key: card.key, href: card.href })} data-card={card.key}>
+                    <GuardedLink className="more-launcher-item" href={card.href} onNavigate={() => onNavigate?.({ key: card.key, href: card.href })} data-card={card.key}>
                       <card.icon aria-hidden="true" size={18} strokeWidth={1.9} />
                       <span>{card.title}</span>
-                    </Link>
+                    </GuardedLink>
                     {switchable && (
                       <button
                         className="more-launcher-toggle"
@@ -256,6 +263,28 @@ export function MoreLauncherPanel({
             </ul>
           </section>
         ))}
+        {offModules.length > 0 && (
+          <section className="more-launcher-modules" aria-label="Features not turned on">
+            <h2 className="more-launcher-group-label">Not turned on</h2>
+            <ul>
+              {offModules.map((entry) => (
+                <li key={entry.moduleKey}>
+                  {entry.href ? (
+                    <GuardedLink className="more-launcher-item" href={entry.href} onNavigate={() => onNavigate?.()} data-module-state={entry.state}>
+                      <span>{entry.title}</span>
+                      <small>{moduleStateLabels[entry.state]}</small>
+                    </GuardedLink>
+                  ) : (
+                    <span className="more-launcher-item more-launcher-item-static" data-module-state={entry.state}>
+                      <span>{entry.title}</span>
+                      <small>{moduleStateLabels[entry.state]}</small>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
       {confirming && (
         <div
@@ -279,9 +308,9 @@ export function MoreLauncherPanel({
       {footer.length > 0 && (
         <div className="more-launcher-footer" inert={confirming ? true : undefined}>
           {footer.map((link) => (
-            <Link className="more-launcher-item more-launcher-footer-link" href={link.href} key={link.key} onClick={() => onNavigate?.()} data-footer={link.key}>
+            <GuardedLink className="more-launcher-item more-launcher-footer-link" href={link.href} key={link.key} onNavigate={() => onNavigate?.()} data-footer={link.key}>
               {link.label}
-            </Link>
+            </GuardedLink>
           ))}
         </div>
       )}
@@ -295,6 +324,7 @@ export function MoreLauncher({
   className,
   isActive,
   cards,
+  moduleStates,
   destinations,
   sidebarHrefs,
   isSystemAdmin,
@@ -312,6 +342,7 @@ export function MoreLauncher({
   className?: string;
   isActive: boolean;
   cards: readonly MoreDirectoryCard[];
+  moduleStates?: readonly ModuleDestinationEntry[];
   /** Phone sheet only: the destination search (#1177) sits at the top of the sheet. */
   destinations?: readonly SearchDestination[];
   /** The sidebar hrefs drawn for this viewer (desktop popover only), so cards the sidebar already has are not repeated (#967). */
@@ -446,6 +477,7 @@ export function MoreLauncher({
           <div className="more-launcher-region" onKeyDown={onPanelKeyDown}>
             <MoreLauncherPanel
               cards={cards}
+              moduleStates={moduleStates}
               destinations={destinations}
               sidebarHrefs={sidebarHrefs}
               eventQuery={eventQuery}
