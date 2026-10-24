@@ -38,7 +38,7 @@ import {
   rosterColumns,
   rosterDetailsNeededItems,
   rosterDetailsSummary,
-  rosterNeedsDetails,
+  rosterDetailsNeeded,
   rosterPersonLabel,
   rosterRowTools,
   duplicateRosterNameKeys,
@@ -81,6 +81,7 @@ export function ClubRosterWorkspace({
   honorsHref,
   classHistoryBase,
   complianceFilter: initialComplianceFilter = null,
+  detailsNeededFirst = false,
   headingActions,
   healthTab,
   healthEntryOnly,
@@ -122,6 +123,8 @@ export function ClubRosterWorkspace({
   classHistoryBase?: string;
   /** `?compliance=` from the What's next reminder link (#479): narrows the list to that one flag. */
   complianceFilter?: ComplianceFilterValue | null;
+  /** `?filter=details-needed` (#1167): open with the Details needed list already on. Search and filters are never saved. */
+  detailsNeededFirst?: boolean;
   /** Extra actions beside "Add to roster", such as "Request a transfer" (#489). */
   headingActions?: React.ReactNode;
   /**
@@ -161,7 +164,7 @@ export function ClubRosterWorkspace({
   const [complianceFilter, setComplianceFilter] = useState(initialComplianceFilter);
   /** Name search, the "Details needed" list and the optional extra columns (#1167). None of them is saved or sent anywhere. */
   const [query, setQuery] = useState("");
-  const [detailsOnly, setDetailsOnly] = useState(false);
+  const [detailsOnly, setDetailsOnly] = useState(detailsNeededFirst);
   const [moreColumns, setMoreColumns] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -285,11 +288,9 @@ export function ClubRosterWorkspace({
   const afterComplianceFilter = complianceFilter && complianceStatuses
     ? population.filter((member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
     : population;
-  /** Only a viewer who is shown emergency contacts is asked to fill them in. */
-  const emergencyContactMissing = (member: RosterMemberRecord) => canEditGuardians && guardianMap !== undefined && !(guardianMap[member.id]?.length);
-  const needDetailsCount = population.filter((member) => rosterNeedsDetails(member, emergencyContactMissing(member))).length;
+  const needDetailsCount = population.filter((member) => rosterDetailsNeeded(member)).length;
   const visible = afterComplianceFilter.filter((member) =>
-    matchesRosterSearch(member, query) && (!detailsOnly || rosterNeedsDetails(member, emergencyContactMissing(member))));
+    matchesRosterSearch(member, query) && (!detailsOnly || rosterDetailsNeeded(member)));
   const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
   function clearFilters() {
     setQuery("");
@@ -551,7 +552,7 @@ export function ClubRosterWorkspace({
             </div>
           </div>
           <p className="field-help" id="roster-details-help">
-            Details needed lists people missing a gender, current class, role, type, birth date{canEditGuardians ? " or emergency contact" : ""}. Each row says what to add.
+            Details needed lists people missing a gender, current class, role or type. Each row says what to add.
           </p>
           <div className="roster-result-line">
             <p aria-live="polite" role="status">
@@ -663,8 +664,8 @@ export function ClubRosterWorkspace({
                     ) : (
                       section.people.map((member) => {
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
-                        // names only what else is missing (#1004). The Details needed list adds it, so no row is listed without a reason.
-                        const needs = rosterDetailsNeededItems(member, { includeBirthDate: detailsOnly, emergencyContactMissing: emergencyContactMissing(member) });
+                        // names only what else is missing (#1004); the Details needed list follows the same rule.
+                        const needs = rosterDetailsNeededItems(member);
                         const label = rosterPersonLabel({ ...member, typeLabel: clubRosterAttendeeTypeLabels[member.attendeeType] }, duplicateNames);
                         const healthOnFile = Boolean(healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE"));
                         const tools = rosterRowTools({

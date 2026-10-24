@@ -11,6 +11,7 @@ import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
+import { ROSTER_DETAILS_NEEDED_FILTER } from "@/modules/club-rosters/roster-view";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
@@ -31,9 +32,9 @@ export default async function ClubRosterPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ compliance?: string; year?: string | string[]; returnTo?: string | string[] }>;
+  searchParams: Promise<{ compliance?: string; filter?: string | string[]; year?: string | string[]; returnTo?: string | string[] }>;
 }) {
-  const [{ organizationId }, { compliance: complianceParam, year: yearParam, returnTo: returnToParam }] = await Promise.all([params, searchParams]);
+  const [{ organizationId }, { compliance: complianceParam, filter: filterParam, year: yearParam, returnTo: returnToParam }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return null;
   // The previous or next club year can be opened with ?year= (#541), read-only:
@@ -99,6 +100,8 @@ export default async function ClubRosterPage({
         canSeeBirthDates={access.capabilities.seeBirthDates && !readOnly}
         clubYear={clubYear}
         complianceFilter={complianceFilterFrom(complianceParam)}
+        // `?filter=details-needed` (the club Home "Review roster" task) opens the roster already on that list; anything else is the whole roster (#1167).
+        detailsNeededFirst={filterParam === ROSTER_DETAILS_NEEDED_FILTER}
         complianceStatuses={complianceStatuses}
         headingActions={canTransfer ? <RequestTransferButton clubOptions={clubOptions} organizationId={organizationId} /> : undefined}
         guardians={guardians}

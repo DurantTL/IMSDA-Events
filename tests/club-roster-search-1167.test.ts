@@ -6,16 +6,17 @@ import { describe, expect, it } from "vitest";
 import { ClubRosterWorkspace, type RosterComplianceInfo } from "@/components/club-roster-workspace";
 import {
   duplicateRosterNameKeys,
-  EMERGENCY_CONTACT_ITEM,
+  ROSTER_DETAILS_NEEDED_FILTER,
   matchesRosterSearch,
   normalizeRosterSearch,
   rosterColumns,
   rosterDetailsNeededItems,
   rosterDetailsSummary,
-  rosterNeedsDetails,
+  rosterDetailsNeeded,
   rosterPersonLabel,
   rosterRowTools,
 } from "@/modules/club-rosters/roster-view";
+import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
 /**
@@ -86,29 +87,27 @@ describe("name search (#1167)", () => {
 describe("Details needed (#1167)", () => {
   it("lists what is missing and names it on the row, leaving an active person's birth date to the banner", () => {
     const needy = member("n", { gender: null, classLevel: null, birthDateNeeded: true });
-    expect(rosterDetailsNeededItems(needy, { includeBirthDate: false, emergencyContactMissing: false })).toEqual(["Gender", "Current class"]);
-    expect(rosterDetailsNeededItems(needy, { includeBirthDate: true, emergencyContactMissing: false })).toEqual(["Birth date", "Gender", "Current class"]);
+    expect(rosterDetailsNeededItems(needy)).toEqual(["Gender", "Current class"]);
     expect(rosterDetailsSummary(["Gender", "Current class"])).toBe("Needs gender, current class");
     expect(rosterDetailsSummary([])).toBe("");
   });
 
-  it("asks for an emergency contact only where the viewer is shown emergency contacts", () => {
-    const complete = member("c");
-    expect(rosterNeedsDetails(complete, false)).toBe(false);
-    expect(rosterNeedsDetails(complete, true)).toBe(true);
-    expect(rosterDetailsNeededItems(complete, { includeBirthDate: false, emergencyContactMissing: true })).toEqual([EMERGENCY_CONTACT_ITEM]);
-  });
-
-  it("puts a person who is only missing a birth date in the list, with that named", () => {
-    const birthOnly = member("b", { birthDateNeeded: true });
-    expect(rosterNeedsDetails(birthOnly, false)).toBe(true);
-    expect(rosterDetailsNeededItems(birthOnly, { includeBirthDate: true, emergencyContactMissing: false })).toEqual(["Birth date"]);
+  it("is the roster's own missing-detail rule, so a Home count and the filtered roster agree", () => {
+    const cases = [
+      member("ok"),
+      member("birth", { birthDateNeeded: true }),
+      member("inactive-birth", { birthDateNeeded: true, status: "INACTIVE" }),
+      member("gender", { gender: null }),
+      member("adult", { attendeeType: "ADULT", role: "", classLevel: null }),
+    ];
+    for (const person of cases) expect(rosterDetailsNeeded(person)).toBe(rosterRowMissingFields(person).length > 0);
+    expect(cases.filter(rosterDetailsNeeded).map((person) => person.id)).toEqual(["inactive-birth", "gender"]);
   });
 
   it("applies the same rules to the count and to the rows (one population)", () => {
     const people = [member("1"), member("2", { gender: null }), member("3", { classLevel: null }), member("4", { attendeeType: "ADULT", role: "", classLevel: null })];
-    const count = people.filter((person) => rosterNeedsDetails(person, false)).length;
-    const rows = people.filter((person) => matchesRosterSearch(person, "") && rosterNeedsDetails(person, false));
+    const count = people.filter((person) => rosterDetailsNeeded(person)).length;
+    const rows = people.filter((person) => matchesRosterSearch(person, "") && rosterDetailsNeeded(person));
     expect(rows).toHaveLength(count);
     expect(count).toBe(2);
   });
@@ -197,13 +196,6 @@ describe("row tools per role (#1167)", () => {
     expect(out).toContain('aria-label="Emergency contacts for Sam Fixture-a"');
     expect(out).not.toContain("Remove Sam");
     expect(out).not.toContain("Actions for");
-    // Nobody has a contact yet, so each row says what it needs.
-    expect(out).toContain("Needs emergency contact");
-  });
-
-  it("never says Needs emergency contact to a viewer who is not shown contacts", () => {
-    expect(html({ guardians: undefined })).not.toContain("emergency contact");
-    expect(html({ guardians: { a: [{ position: 1, name: "Pat Parent", relationship: "Parent", email: "", phone: "" }] } })).toContain("Needs gender, current class, emergency contact");
   });
 
   it("puts Health in the Actions menu with its status, and the registrar's on-file note there as text", () => {
@@ -332,5 +324,25 @@ describe("Remove, the editor and the shared menu are reused, not rebuilt (#1167)
 
   it("does not add a birth date column to the default table or restore birthday pills", () => {
     expect(source).not.toMatch(/birthday/i);
+  });
+});
+
+describe("?filter=details-needed opens the filtered roster (#1167)", () => {
+  it("renders only the people who need details, with the filter on and a reset offered", () => {
+    const out = html({
+      detailsNeededFirst: true,
+      initialMembers: [member("done"), member("needy", { gender: null })],
+    });
+    expect(out).toContain("Fixture-needy");
+    expect(out).not.toContain("Fixture-done");
+    expect(out).toContain('aria-pressed="true"');
+    expect(out).toContain("<strong>1 of 2</strong>");
+    expect(out).toContain("Clear filters");
+  });
+
+  it("is wired from the page's single filter value and nothing else", () => {
+    const page = readFileSync(path.join(process.cwd(), "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx"), "utf8");
+    expect(page).toContain("detailsNeededFirst={filterParam === ROSTER_DETAILS_NEEDED_FILTER}");
+    expect(ROSTER_DETAILS_NEEDED_FILTER).toBe("details-needed");
   });
 });

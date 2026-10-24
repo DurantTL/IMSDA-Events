@@ -1,4 +1,4 @@
-import { missingRosterFields, rosterRowMissingFields } from "@/modules/club-rosters/domain";
+import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
 
 /**
  * The roster page's search, "Details needed" filter, columns and row actions (#1167). All pure: the workspace
@@ -32,27 +32,23 @@ export function matchesRosterSearch(member: NamedMember, query: string): boolean
   return words.every((word) => haystack.includes(word));
 }
 
-type DetailsMember = Parameters<typeof missingRosterFields>[0] & { status?: string };
+type DetailsMember = Parameters<typeof rosterRowMissingFields>[0];
 
-export const EMERGENCY_CONTACT_ITEM = "Emergency contact";
+/** The `?filter=` value that opens the roster on the Details needed list. */
+export const ROSTER_DETAILS_NEEDED_FILTER = "details-needed";
 
 /**
- * What a person still needs, as the names of the details. The birth date is left out of an active person's
- * row (#1004: the banner says it once); the "Details needed" filter asks for it because that list is the
- * explicit task, and then names it on the row so no row is in the list without a reason.
- * `emergencyContactMissing` is passed only to a viewer who may see emergency contacts.
+ * What a person still needs: the roster's own missing-detail flags (`rosterRowMissingFields`). An active person's missing
+ * birth date is left out, as on the row, because the birth-date banner says it once (#1004). One rule for the row, the
+ * "Details needed" count and the filter, so a Home count and the filtered roster always agree.
  */
-export function rosterDetailsNeededItems(
-  member: DetailsMember,
-  options: { includeBirthDate: boolean; emergencyContactMissing: boolean },
-): string[] {
-  const items = options.includeBirthDate ? missingRosterFields(member) : rosterRowMissingFields(member);
-  return options.emergencyContactMissing ? [...items, EMERGENCY_CONTACT_ITEM] : items;
+export function rosterDetailsNeededItems(member: DetailsMember): string[] {
+  return rosterRowMissingFields(member);
 }
 
 /** Whether a person belongs in the "Details needed" list. */
-export function rosterNeedsDetails(member: DetailsMember, emergencyContactMissing: boolean): boolean {
-  return rosterDetailsNeededItems(member, { includeBirthDate: true, emergencyContactMissing }).length > 0;
+export function rosterDetailsNeeded(member: DetailsMember): boolean {
+  return rosterDetailsNeededItems(member).length > 0;
 }
 
 /** What the row says it needs, in one short phrase: "Needs gender, current class". Empty when nothing is missing. */
