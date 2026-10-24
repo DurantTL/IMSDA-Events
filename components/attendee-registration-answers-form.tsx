@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, ListChecks, Save } from "lucide-react";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
-import { inlineFieldProblem, inputAttributesFor, valueTypeForFieldType } from "@/lib/field-validation";
+import { inlineFieldProblem, inputAttributesFor, isUnchangedEmail, isUnchangedFromStored, isUnchangedPhone, valueTypeForFieldType } from "@/lib/field-validation";
+import { dateFieldProblem } from "@/modules/forms/definition";
 import type { EditableAttendeeField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { formatAddressDisplay, isPlainAddressObject, type AddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, type RuleCondition } from "@/modules/forms/visibility-rule";
@@ -88,14 +89,18 @@ export function AttendeeRegistrationAnswersForm({
   const typedProblem = (field: EditableAttendeeField, attendee: EditableAttendee) => {
     const type = valueTypeForFieldType(field.type);
     if (!type) return { message: "", blocking: false };
-    return inlineFieldProblem(
-      field.label,
-      type,
-      attendee.responses[field.key],
-      storedAnswer(attendee.attendeeId, field.key),
-      attempted || Boolean(touched[`${attendee.attendeeId}:${field.key}`]),
-      type === "number" ? numberRules : {},
-    );
+    const value = attendee.responses[field.key];
+    const stored = storedAnswer(attendee.attendeeId, field.key);
+    const shown = attempted || Boolean(touched[`${attendee.attendeeId}:${field.key}`]);
+    // The server's own comparisons (#871): a phone only re-spaced, or an email only re-cased, is still the saved one.
+    const unchanged = (field.type === "PHONE" && isUnchangedPhone(value, stored)) || (field.type === "EMAIL" && isUnchangedEmail(value, stored));
+    const problem = inlineFieldProblem(field.label, type, value, unchanged ? value : stored, shown, type === "number" ? numberRules : {});
+    if (problem.message || field.type !== "DATE" || typeof value !== "string" || value === "") return problem;
+    // The same date rule as the server (no date before 1900, no future birth date); an old saved date is flagged, never blocked.
+    const dateProblem = dateFieldProblem({ type: field.type, key: field.key, label: field.label }, value);
+    if (!dateProblem) return problem;
+    if (isUnchangedFromStored(value, stored)) return { message: `${dateProblem} This saved answer needs correcting.`, blocking: false };
+    return { message: shown ? dateProblem : "", blocking: true };
   };
   const dirty = useMemo(() => !valuesEqual(saved, attendees), [attendees, saved]);
   const endpoint = answerEndpoint

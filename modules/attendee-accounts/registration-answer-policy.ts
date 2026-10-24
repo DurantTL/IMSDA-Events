@@ -1,7 +1,9 @@
 import { isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer } from "@/lib/field-validation";
+import { isSensitiveField } from "@/modules/forms/sensitive-fields";
 import { sanitizeAddressInput } from "@/modules/forms/address";
 import {
   getAvailabilityMode,
+  isBirthDateField,
   isFieldVisible,
   validateTestResponses,
   type RegistrationFormDefinition,
@@ -22,6 +24,12 @@ const editableFieldTypes = new Set<RegistrationFormField["type"]>([
   "EMAIL",
   "DATE",
 ]);
+
+// The new types (#1198) also honour the shared sensitive-field list (physician, clinic, insurance, immunization, parent, DOB ...),
+// which is stricter than `sensitiveFieldPattern`. The older types stay on today's rule so nothing already editable becomes locked.
+const newTypedFieldTypes = new Set<RegistrationFormField["type"]>(["PHONE", "EMAIL", "DATE"]);
+// Family contacts the shared stems do not name ("Mother's cell"): a phone or email for someone else's family is staff-managed too.
+const familyContactPattern = /\b(?:mother|father|mom|mum|dad|stepparent|grandparent|relative|next\s*of\s*kin)/i;
 
 const protectedAttendeeKeys = new Set([
   "first_name",
@@ -93,6 +101,11 @@ export function isTieredAttendeeFieldEditable(field: RegistrationFormField) {
     || !editableFieldTypes.has(field.type)
     || protectedAttendeeKeys.has(field.key)
     || isProtectedAnswerField(field)
+    // A birth date keyed dob or birthdate is never self-service: it sets adult or minor status (#1198).
+    || isBirthDateField(field)
+    // A date filled in with today's date is not the attendee's answer to change.
+    || field.autoDate
+    || (newTypedFieldTypes.has(field.type) && (isSensitiveField(field) || familyContactPattern.test(fieldSemantics(field))))
   ) {
     return false;
   }

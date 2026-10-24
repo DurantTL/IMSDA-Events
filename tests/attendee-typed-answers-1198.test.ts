@@ -110,3 +110,65 @@ describe("attendee self-service phone, email and date answers (#1198)", () => {
     expect(html).toContain('type="date"');
   });
 });
+
+describe("stricter lock for the new types (#1198 review)", () => {
+  const specs: Array<[string, string, string]> = [
+    ["dob", "DOB", "DATE"],
+    ["birthdate", "Birthdate", "DATE"],
+    ["bday", "Birthday", "DATE"],
+    ["birthday", "Birthday", "DATE"],
+    ["physician_phone", "Physician's phone", "PHONE"],
+    ["clinic_phone", "Clinic phone", "PHONE"],
+    ["insurance_phone", "Insurance company phone", "PHONE"],
+    ["parent_email", "Parent email", "EMAIL"],
+    ["mother_cell", "Mother's cell", "PHONE"],
+    ["last_tetanus", "Date of last tetanus shot", "DATE"],
+    ["immunization_date", "Immunization date", "DATE"],
+    ["phone", "Phone", "PHONE"],
+    ["arrival", "Arrival date", "DATE"],
+  ];
+  const locked = specs.slice(0, 11).map(([key]) => key);
+  const strict = registrationFormDefinitionSchema.parse({
+    title: "Strict fixture",
+    description: "Fictitious.",
+    confirmationMessage: "Done.",
+    sections: [{
+      id: "strict_section",
+      title: "Details",
+      description: "",
+      fields: [
+        ...specs.map(([key, label, type]) => field(key, label, type)),
+        { ...field("auto_filled", "Signed on", "DATE"), autoDate: "TODAY" },
+        // An older type keeps today's rule, so a plain choice about a parent is not newly locked.
+        { ...field("parent_meal", "Meal", "SELECT"), options: ["A", "B"] },
+      ],
+    }],
+  });
+
+  it("locks medical, insurance, parent and birth-date fields and leaves plain ones editable", () => {
+    const keys = editableAttendeeFields(strict, "TIERED").map((item) => item.key);
+    for (const key of locked) expect(keys).not.toContain(key);
+    expect(keys).toEqual(["phone", "arrival", "parent_meal"]);
+  });
+
+  it("refuses to change a birth date keyed dob or birthdate", () => {
+    for (const key of ["dob", "birthdate"]) {
+      expect(() => prepareTieredAttendeeAnswerUpdate({ definition: strict, policy: "TIERED", registrationResponses: {}, currentResponses: {}, changes: { [key]: "2000-01-01" } })).toThrow(/cannot be changed/);
+    }
+  });
+
+  it("keeps an auto-dated field out of self-service editing", () => {
+    expect(editableAttendeeFields(strict, "TIERED").map((item) => item.key)).not.toContain("auto_filled");
+  });
+
+  it("shows the server's date floor in the browser too", () => {
+    const fields = editableAttendeeFields(strict, "TIERED");
+    const html = renderToStaticMarkup(createElement(AttendeeRegistrationAnswersForm, {
+      registrationId: "reg_1",
+      initialExpectedUpdatedAt: "2026-10-24T00:00:00.000Z",
+      fields,
+      initialAttendees: [{ attendeeId: "a1", name: "Test Person", responses: { arrival: "1850-01-01" } }],
+    }));
+    expect(html).toContain("Arrival date can&#x27;t be before 1900.");
+  });
+});
