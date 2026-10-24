@@ -261,6 +261,7 @@ export function PeopleWorkspace({
   canEdit,
   canEmail,
   canImport = false,
+  canReviewPeopleMatches = false,
   initialFilter = "ALL",
   initialRegistrationId,
   backgroundFlaggedAttendeeIds = [],
@@ -283,6 +284,8 @@ export function PeopleWorkspace({
   canEmail: boolean;
   /** MANAGE_IMPORTS: shows the Imports link, which left the sidebar (#964). */
   canImport?: boolean;
+  /** System administrators only: the cross-event queue of possible duplicate people (#126). */
+  canReviewPeopleMatches?: boolean;
   initialFilter?: string;
   initialRegistrationId?: string;
   /** Adults at a youth or children's event without a current check (#388). */
@@ -781,6 +784,8 @@ export function PeopleWorkspace({
             <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
             {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
             <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
+            {/* The cross-event identity queue lives beside the event's own duplicate finder, never in a menu; the page checks the role again. */}
+            {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
             {/* Same permission the review page itself requires (MANAGE_REGISTRATION). */}
             {canEdit && <li><a href={`/people/directory-review?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Directory review</a></li>}
             {/* Teams registered through the general registration link that wait for a club (#931); the same permission. */}

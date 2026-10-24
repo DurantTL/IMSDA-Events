@@ -37,7 +37,7 @@ export const metadata: Metadata = { title: staffPageTitles.registrations };
 export default async function PeoplePage({ searchParams }: { searchParams: Promise<{ event?: string; filter?: string; registration?: string; location?: string; answerQuestion?: string; answerValue?: string; [key: string]: string | string[] | undefined }> }) {
   const rawParams = await searchParams;
   const { event: requested, filter, registration, location: requestedLocation, [CHOICE_FILTER_QUESTION_PARAM]: answerQuestion, [CHOICE_FILTER_VALUE_PARAM]: answerValue } = rawParams as { event?: string; filter?: string; registration?: string; location?: string; answerQuestion?: string; answerValue?: string };
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
     return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, contact details, or registration records." />;
   }
@@ -61,6 +61,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const offPageRegistrationId = searchResult && registration && !searchResult.registrationIds.includes(registration) ? [registration] : [];
   // Teams from the general registration link that wait for a club (#931): said at the top, for someone who can resolve them.
   const pendingTeamCount = permissions.includes("MANAGE_REGISTRATION") ? await countPendingTeams(event.id) : 0;
+  // The cross-event duplicate-people queue is for system administrators only, the same rule its page applies.
+  const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN";
   const [loaded, flagged, responsibleByAttendee, optOutRows, suppressionMarks] = await Promise.all([
     searchResult
       ? ([...searchResult.registrationIds, ...offPageRegistrationId].length > 0 ? listRegistrations(event.id, { registrationIds: [...searchResult.registrationIds, ...offPageRegistrationId] }) : Promise.resolve([]))
@@ -112,6 +114,6 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} resultOrderText={searchResult ? describeSearchOrder(searchResult) : undefined} pendingTeamCount={pendingTeamCount} />
+    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} resultOrderText={searchResult ? describeSearchOrder(searchResult) : undefined} pendingTeamCount={pendingTeamCount} canReviewPeopleMatches={canReviewPeopleMatches} />
   </>;
 }

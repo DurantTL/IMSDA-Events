@@ -332,9 +332,11 @@ describe("old to new route mapping", () => {
     }
   });
 
-  it("keeps the duplicate-people queue as it was: by address, system administrators only", () => {
-    expect(routeOf("/people/matches")).toMatchObject({ kind: "direct", scope: "System" });
+  it("reaches the duplicate-people queue from the People page, for system administrators only, with no menu entry", () => {
+    expect(routeOf("/people/matches")).toMatchObject({ kind: "reached", destinationPath: "/people" });
     expect(read("app/(workspace)/people/matches/page.tsx")).toContain('user.globalRole !== "SYSTEM_ADMIN"');
+    expect(read("app/(workspace)/people/page.tsx")).toContain('const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN";');
+    expect(read("components/people-workspace.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
   });
 });
 
