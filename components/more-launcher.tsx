@@ -23,6 +23,8 @@ import {
   returnsFocusToTrigger,
   type LauncherCloseReason,
 } from "@/components/more-launcher-model";
+import { DestinationSearch } from "@/components/destination-search";
+import type { SearchDestination } from "@/components/destination-search-model";
 import type { MoreDirectoryCard } from "@/components/staff-navigation";
 import { eventModuleDefinition, moduleForCard } from "@/modules/event-modules/catalog";
 
@@ -54,6 +56,7 @@ function setBackgroundInert(inert: boolean) {
 
 export function MoreLauncherPanel({
   cards,
+  destinations,
   sidebarHrefs,
   isSystemAdmin,
   canRequestFeature = false,
@@ -67,6 +70,8 @@ export function MoreLauncherPanel({
   style,
 }: {
   cards: readonly MoreDirectoryCard[];
+  /** The phone sheet carries the destination search (#1177); the desktop sidebar has its own. */
+  destinations?: readonly SearchDestination[];
   /** Sidebar hrefs drawn for this viewer: cards for them are left out of the desktop popover (#967). The phone sheet passes none. */
   sidebarHrefs?: ReadonlySet<string>;
   isSystemAdmin: boolean;
@@ -196,6 +201,11 @@ export function MoreLauncherPanel({
       tabIndex={-1}
     >
       {/* While the confirm is open the rest of the panel is inert, to match aria-modal. */}
+      {variant === "tab" && destinations && destinations.length > 0 && (
+        <div className="more-launcher-destination-search" inert={Boolean(confirming) || undefined}>
+          <DestinationSearch destinations={destinations} escapeBubbles onNavigated={() => onNavigate?.()} />
+        </div>
+      )}
       <div className="more-launcher-search" role="search" inert={confirming ? true : undefined}>
         <label className="search-field" htmlFor={searchId}>
           <Search aria-hidden="true" size={16} />
@@ -285,6 +295,7 @@ export function MoreLauncher({
   className,
   isActive,
   cards,
+  destinations,
   sidebarHrefs,
   isSystemAdmin,
   canRequestFeature = false,
@@ -301,6 +312,8 @@ export function MoreLauncher({
   className?: string;
   isActive: boolean;
   cards: readonly MoreDirectoryCard[];
+  /** Phone sheet only: the destination search (#1177) sits at the top of the sheet. */
+  destinations?: readonly SearchDestination[];
   /** The sidebar hrefs drawn for this viewer (desktop popover only), so cards the sidebar already has are not repeated (#967). */
   sidebarHrefs?: ReadonlySet<string>;
   isSystemAdmin: boolean;
@@ -386,7 +399,7 @@ export function MoreLauncher({
       close("escape");
       return;
     }
-    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
     const current = items.indexOf(document.activeElement as HTMLElement);
     // In the search box the caret keys and Home/End edit the text; only Up, Down and Tab leave it.
     if (document.activeElement instanceof HTMLInputElement && !["ArrowDown", "ArrowUp", "Tab"].includes(event.key)) return;
@@ -433,6 +446,7 @@ export function MoreLauncher({
           <div className="more-launcher-region" onKeyDown={onPanelKeyDown}>
             <MoreLauncherPanel
               cards={cards}
+              destinations={destinations}
               sidebarHrefs={sidebarHrefs}
               eventQuery={eventQuery}
               eventId={eventId}

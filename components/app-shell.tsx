@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Eye,
+  Search,
   LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
@@ -14,6 +15,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { DestinationSearch } from "@/components/destination-search";
+import { buildSearchDestinations } from "@/components/destination-search-model";
 import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import {
   applySidebarAttribute,
@@ -80,6 +83,8 @@ type ShellEvent = {
 };
 type ShellUser = { id?: string; displayName: string; email: string; globalRole?: "SYSTEM_ADMIN" | null };
 
+const destinationSearchInputId = "destination-search-input";
+
 export function AppShell({
   attendeeAccountAvailable = false,
   autoSelected = false,
@@ -109,6 +114,12 @@ export function AppShell({
   const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
   // Keep <html> in step with the choice, for the stylesheet (and when the inline script did not run).
   useEffect(() => { applySidebarAttribute(collapsed); }, [collapsed]);
+  function openSearch() {
+    setTooltip(null);
+    setSidebarCollapsed(false);
+    // The field is shown again on the next frame; focus it then.
+    window.requestAnimationFrame(() => document.getElementById(destinationSearchInputId)?.focus());
+  }
   function toggleCollapsed() {
     setTooltip(null);
     setSidebarCollapsed(!collapsed);
@@ -245,6 +256,16 @@ export function AppShell({
   const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
   // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
   const mobileNavigation = orderedMobileTabs(visibleNavigation);
+  // Find a page (#1177): the destinations this viewer may open, from the same registry and rules as the menus. No event data is searched.
+  const searchDestinations = buildSearchDestinations({
+    isSystemAdmin,
+    selectedEventId: eventlessProfile ? "" : selectedEventId,
+    permissions: [...selectedPermissions],
+    clubOversight: Boolean(selectedEvent?.clubOversight),
+    clubEvent: Boolean(selectedEvent?.clubEvent),
+    clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
+    hiddenCardKeys: selectedHiddenCardKeys,
+  });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
     : "/account";
@@ -334,6 +355,20 @@ export function AppShell({
           </div>
           {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
         </div>}
+
+        <div className="sidebar-destination-search">
+          <DestinationSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
+          {/* The collapsed sidebar has no room for the field: this button opens it and moves focus into the field. */}
+          <button
+            type="button"
+            className="sidebar-search-button"
+            aria-label="Find a page or task"
+            onClick={openSearch}
+            {...tipProps("Find a page or task")}
+          >
+            <Search aria-hidden="true" size={19} strokeWidth={1.9} />
+          </button>
+        </div>
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
           {showSystemNav && (
@@ -525,6 +560,7 @@ export function AppShell({
                 href={`${href}${eventQuery}`}
                 isActive={isActive}
                 cards={launcherCards}
+                destinations={searchDestinations}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
                 eventQuery={eventQuery}
