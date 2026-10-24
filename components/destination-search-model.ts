@@ -118,6 +118,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/more/meals": ["food", "cafe", "dining", "tickets"],
   "/more/kitchen-report/counts": ["kitchen", "meals", "food counts"],
   "/more/merchandise": ["shirts", "products", "store", "shop"],
+  "/information-forms": ["survey", "interest form", "questionnaire", "answers only", "no payment"],
   "/more/club-forms": ["membership", "permission slip", "passenger list"],
   "/more/clubs": ["churches", "directors", "rosters"],
   "/more/event-content": ["public page", "speakers", "schedule", "downloads"],
@@ -240,7 +241,6 @@ const synonymGroups: readonly (readonly string[])[] = [
   ["account", "profile", "password", "login"],
   ["attendee", "guest", "registration", "registrant"],
   ["discount", "coupon", "promo"],
-  ["help", "support", "guide"],
 ];
 
 /** Lowercase word stem: letters and digits only, a plural `s` dropped. */
@@ -322,4 +322,80 @@ export function nextDestinationIndex(current: number, count: number, key: string
   if (key === "ArrowDown") return current < 0 ? 0 : (current + 1) % count;
   if (key === "ArrowUp") return current <= 0 ? count - 1 : current - 1;
   return null;
+}
+
+/** Whether the list is showing: asked open, something typed, and at least one result. */
+export function listExpanded(open: boolean, query: string, count: number): boolean {
+  return open && query.trim() !== "" && count > 0;
+}
+
+/** The active index kept inside the results: -1 (none) when there are none or it fell off the end. */
+export function clampActiveIndex(active: number, count: number): number {
+  if (count <= 0 || active < 0) return -1;
+  return active >= count ? count - 1 : active;
+}
+
+/** The option the combobox points at (`aria-activedescendant`); undefined while closed or nothing is active. */
+export function activeDescendantId(expanded: boolean, active: number, optionId: (index: number) => string): string | undefined {
+  return expanded && active >= 0 ? optionId(active) : undefined;
+}
+
+export type DestinationKeyAction =
+  | { type: "move"; index: number }
+  | { type: "choose"; index: number }
+  | { type: "close" }
+  /** Clears the words and hands focus back (to where it was, else the field or the page, never the body). */
+  | { type: "clear" }
+  | { type: "restore-focus" }
+  | { type: "none" };
+
+/**
+ * What a key does in the field. Enter acts only on a showing list (it opens the
+ * active result, else the first); Escape closes the list, then clears the words
+ * and returns focus, then (nothing left to undo) just returns focus. An IME
+ * composition is never acted on.
+ */
+export function destinationKeyAction(input: {
+  key: string;
+  composing: boolean;
+  open: boolean;
+  query: string;
+  count: number;
+  active: number;
+}): DestinationKeyAction {
+  if (input.composing) return { type: "none" };
+  const expanded = listExpanded(input.open, input.query, input.count);
+  const active = clampActiveIndex(input.active, input.count);
+  switch (input.key) {
+    case "ArrowDown":
+    case "ArrowUp": {
+      if (input.count <= 0 || input.query.trim() === "") return { type: "none" };
+      const next = nextDestinationIndex(expanded ? active : -1, input.count, input.key);
+      return next === null ? { type: "none" } : { type: "move", index: next };
+    }
+    case "Enter":
+      return expanded ? { type: "choose", index: active >= 0 ? active : 0 } : { type: "none" };
+    case "Escape":
+      if (expanded) return { type: "close" };
+      return input.query !== "" ? { type: "clear" } : { type: "restore-focus" };
+    default:
+      return { type: "none" };
+  }
+}
+
+/**
+ * Opens a result through the unsaved-changes guard (#647): `guard` runs `go`
+ * at once when nothing is dirty, or only after the person confirms. On Cancel
+ * nothing runs, so the page, the typed words and the list are untouched.
+ */
+export function selectDestination(input: {
+  destination: Pick<SearchDestination, "href">;
+  guard: (navigate: () => void) => boolean;
+  reset: () => void;
+  navigate: (href: string) => void;
+}): boolean {
+  return input.guard(() => {
+    input.reset();
+    input.navigate(input.destination.href);
+  });
 }

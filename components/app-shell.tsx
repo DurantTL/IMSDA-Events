@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Eye,
+  Search,
   LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
@@ -82,6 +83,8 @@ type ShellEvent = {
 };
 type ShellUser = { id?: string; displayName: string; email: string; globalRole?: "SYSTEM_ADMIN" | null };
 
+const destinationSearchInputId = "destination-search-input";
+
 export function AppShell({
   attendeeAccountAvailable = false,
   autoSelected = false,
@@ -111,6 +114,12 @@ export function AppShell({
   const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
   // Keep <html> in step with the choice, for the stylesheet (and when the inline script did not run).
   useEffect(() => { applySidebarAttribute(collapsed); }, [collapsed]);
+  function openSearch() {
+    setTooltip(null);
+    setSidebarCollapsed(false);
+    // The field is shown again on the next frame; focus it then.
+    window.requestAnimationFrame(() => document.getElementById(destinationSearchInputId)?.focus());
+  }
   function toggleCollapsed() {
     setTooltip(null);
     setSidebarCollapsed(!collapsed);
@@ -347,6 +356,20 @@ export function AppShell({
           {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
         </div>}
 
+        <div className="sidebar-destination-search">
+          <DestinationSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
+          {/* The collapsed sidebar has no room for the field: this button opens it and moves focus into the field. */}
+          <button
+            type="button"
+            className="sidebar-search-button"
+            aria-label="Find a page or task"
+            onClick={openSearch}
+            {...tipProps("Find a page or task")}
+          >
+            <Search aria-hidden="true" size={19} strokeWidth={1.9} />
+          </button>
+        </div>
+
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
           {showSystemNav && (
             <>
@@ -515,7 +538,6 @@ export function AppShell({
           )}
         </header>
         <div className="workspace-content" id="workspace-content">
-          <DestinationSearch destinations={searchDestinations} />
           {showAutoSelectNotice && defaultEvent && (
             <EventAutoSelectNotice
               eventName={defaultEvent.name}
@@ -538,6 +560,7 @@ export function AppShell({
                 href={`${href}${eventQuery}`}
                 isActive={isActive}
                 cards={launcherCards}
+                destinations={searchDestinations}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
                 eventQuery={eventQuery}

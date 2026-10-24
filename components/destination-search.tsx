@@ -4,11 +4,15 @@ import { useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import {
+  activeDescendantId,
+  clampActiveIndex,
+  destinationKeyAction,
   destinationScopeDescription,
   destinationScopeLabels,
   destinationSearchStatus,
-  nextDestinationIndex,
+  listExpanded,
   searchDestinations,
+  selectDestination,
   type SearchDestination,
 } from "@/components/destination-search-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -19,23 +23,35 @@ import { guardedNavigate } from "@/components/unsaved-changes-registry";
  * from the canonical registry (`buildSearchDestinations`), so a destination the
  * viewer cannot open is never here. Choosing one runs the unsaved-changes guard
  * (#647) before navigating; Cancel leaves the page and the typed words alone.
- * Nothing is sent anywhere as the person types.
+ * Nothing is sent anywhere as the person types. The key and selection rules are
+ * pure functions in `destination-search-model.ts`, where they are unit tested.
  */
-export function DestinationSearch({ destinations }: { destinations: readonly SearchDestination[] }) {
+export function DestinationSearch({
+  destinations,
+  inputId: inputIdProp,
+  onNavigated,
+}: {
+  destinations: readonly SearchDestination[];
+  /** A fixed id, so the collapsed sidebar's button can focus the field. */
+  inputId?: string;
+  /** Called after a result is opened (the phone launcher closes itself). */
+  onNavigated?: () => void;
+}) {
   const router = useRouter();
   const baseId = useId();
-  const inputId = `${baseId}-input`;
+  const inputId = inputIdProp ?? `${baseId}-input`;
   const listId = `${baseId}-list`;
-  const statusId = `${baseId}-status`;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
+  const [activeRaw, setActive] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
   // Where focus was before the field took it, so Escape can hand it back.
   const returnFocus = useRef<HTMLElement | null>(null);
 
   const results = useMemo(() => searchDestinations(destinations, query), [destinations, query]);
+  const active = clampActiveIndex(activeRaw, results.length);
+  const expanded = listExpanded(open, query, results.length);
   const hasQuery = query.trim() !== "";
-  const expanded = open && hasQuery && results.length > 0;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
   function reset() {
@@ -44,37 +60,56 @@ export function DestinationSearch({ destinations }: { destinations: readonly Sea
     setActive(-1);
   }
 
+  function giveFocusBack() {
+    const back = returnFocus.current;
+    // Never the body: the previous owner if it is still there, else the field keeps focus.
+    if (back && back.isConnected && !back.closest(".destination-search")) back.focus();
+    else inputRef.current?.focus();
+  }
+
   function choose(destination: SearchDestination) {
-    // Cancel at the unsaved-changes prompt changes nothing.
-    guardedNavigate(() => {
-      reset();
-      router.push(destination.href);
+    selectDestination({
+      destination,
+      guard: guardedNavigate,
+      reset,
+      navigate: (href) => {
+        router.push(href);
+        onNavigated?.();
+      },
     });
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      if (results.length === 0) return;
-      event.preventDefault();
-      setOpen(true);
-      setActive((current) => nextDestinationIndex(open ? current : -1, results.length, event.key) ?? current);
-    } else if (event.key === "Enter") {
-      if (!hasQuery) return;
-      event.preventDefault();
-      const target = results[active] ?? results[0];
-      if (target) choose(target);
-    } else if (event.key === "Escape") {
-      if (open || hasQuery) {
-        // First Escape closes the list, the next clears the words.
-        event.preventDefault();
-        if (expanded) setOpen(false);
-        else reset();
-        return;
-      }
-      const back = returnFocus.current;
-      if (back && back.isConnected) back.focus();
-      else event.currentTarget.blur();
+    const action = destinationKeyAction({
+      key: event.key,
+      composing: event.nativeEvent.isComposing,
+      open,
+      query,
+      count: results.length,
+      active: activeRaw,
+    });
+    if (action.type === "none") return;
+    // The More launcher around the phone field also reads these keys; they are handled here.
+    event.preventDefault();
+    event.stopPropagation();
+    switch (action.type) {
+      case "move":
+        setOpen(true);
+        setActive(action.index);
+        break;
+      case "choose":
+        choose(results[action.index]);
+        break;
+      case "close":
+        setOpen(false);
+        break;
+      case "clear":
+        reset();
+        giveFocusBack();
+        break;
+      case "restore-focus":
+        giveFocusBack();
+        break;
     }
   }
 
@@ -84,10 +119,9 @@ export function DestinationSearch({ destinations }: { destinations: readonly Sea
         <Search aria-hidden="true" size={16} />
         <span className="sr-only">Find a page or task</span>
         <input
-          aria-activedescendant={expanded && active >= 0 ? optionId(active) : undefined}
+          aria-activedescendant={activeDescendantId(expanded, active, optionId)}
           aria-autocomplete="list"
           aria-controls={listId}
-          aria-describedby={statusId}
           aria-expanded={expanded}
           autoComplete="off"
           autoCapitalize="off"
@@ -103,18 +137,19 @@ export function DestinationSearch({ destinations }: { destinations: readonly Sea
           }}
           onFocus={(event) => {
             const from = event.relatedTarget;
-            returnFocus.current = from instanceof HTMLElement ? from : null;
+            if (from instanceof HTMLElement) returnFocus.current = from;
             if (hasQuery) setOpen(true);
           }}
           onKeyDown={onKeyDown}
           placeholder="Find a page or task"
+          ref={inputRef}
           role="combobox"
           spellCheck={false}
           type="text"
           value={query}
         />
       </label>
-      <p aria-live="polite" className="sr-only" id={statusId} role="status">
+      <p aria-live="polite" className="sr-only" role="status">
         {destinationSearchStatus(query, results.length)}
       </p>
       <ul

@@ -10,10 +10,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AppShell } from "@/components/app-shell";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { MoreLauncherPanel } from "@/components/more-launcher";
 import { DestinationOption, DestinationSearch } from "@/components/destination-search";
 import {
+  activeDescendantId,
   buildSearchDestinations,
+  clampActiveIndex,
+  destinationKeyAction,
   destinationSearchStatus,
+  listExpanded,
+  selectDestination,
   nextDestinationIndex,
   searchDestinations,
   type DestinationSearchContext,
@@ -193,6 +201,7 @@ describe("combobox markup", () => {
     expect(markup).toContain("Find a page or task");
     expect(markup).toMatch(/role="status"/);
     expect(markup).toMatch(/aria-live="polite"/);
+    expect(markup).not.toContain("aria-describedby");
     expect(markup).toMatch(/autoComplete="off"|autocomplete="off"/);
   });
 
@@ -202,19 +211,130 @@ describe("combobox markup", () => {
   });
 });
 
+describe("key and selection behaviour", () => {
+  const key = (overrides: Partial<Parameters<typeof destinationKeyAction>[0]>) => destinationKeyAction({
+    key: "Enter", composing: false, open: true, query: "team", count: 3, active: -1, ...overrides,
+  });
+
+  it("opens the active result on Enter, else the first", () => {
+    expect(key({ active: 2 })).toEqual({ type: "choose", index: 2 });
+    expect(key({ active: -1 })).toEqual({ type: "choose", index: 0 });
+  });
+
+  it("ignores Enter while the list is closed, empty, or composing", () => {
+    expect(key({ open: false })).toEqual({ type: "none" });
+    expect(key({ query: "" })).toEqual({ type: "none" });
+    expect(key({ count: 0 })).toEqual({ type: "none" });
+    expect(key({ composing: true })).toEqual({ type: "none" });
+  });
+
+  it("moves with the arrows, opening a closed list at the first or last result", () => {
+    expect(key({ key: "ArrowDown", active: 0 })).toEqual({ type: "move", index: 1 });
+    expect(key({ key: "ArrowDown", active: 2 })).toEqual({ type: "move", index: 0 });
+    expect(key({ key: "ArrowUp", active: 0 })).toEqual({ type: "move", index: 2 });
+    expect(key({ key: "ArrowDown", open: false, active: 2 })).toEqual({ type: "move", index: 0 });
+    expect(key({ key: "ArrowDown", count: 0 })).toEqual({ type: "none" });
+    expect(key({ key: "ArrowDown", query: "" })).toEqual({ type: "none" });
+    expect(key({ key: "a" })).toEqual({ type: "none" });
+  });
+
+  it("orders Escape: close the list, then clear and return focus, then just return focus", () => {
+    expect(key({ key: "Escape" })).toEqual({ type: "close" });
+    expect(key({ key: "Escape", open: false })).toEqual({ type: "clear" });
+    expect(key({ key: "Escape", open: false, query: "" })).toEqual({ type: "restore-focus" });
+    expect(key({ key: "Escape", query: "zzz", count: 0 })).toEqual({ type: "clear" });
+  });
+
+  it("points aria-activedescendant at the active option only while the list shows", () => {
+    const id = (index: number) => `opt-${index}`;
+    expect(activeDescendantId(true, 1, id)).toBe("opt-1");
+    expect(activeDescendantId(true, -1, id)).toBeUndefined();
+    expect(activeDescendantId(false, 1, id)).toBeUndefined();
+    expect(listExpanded(true, "team", 2)).toBe(true);
+    expect(listExpanded(true, "team", 0)).toBe(false);
+    expect(listExpanded(false, "team", 2)).toBe(false);
+    expect(listExpanded(true, "  ", 2)).toBe(false);
+  });
+
+  it("clamps the active index when results shrink", () => {
+    expect(clampActiveIndex(5, 3)).toBe(2);
+    expect(clampActiveIndex(1, 3)).toBe(1);
+    expect(clampActiveIndex(1, 0)).toBe(-1);
+    expect(clampActiveIndex(-1, 3)).toBe(-1);
+  });
+
+  it("runs the guard, then resets and navigates on Enter", () => {
+    const calls: string[] = [];
+    const ran = selectDestination({
+      destination: { href: "/admin/team?event=evt_synthetic" },
+      guard: (navigate) => { calls.push("guard"); navigate(); return true; },
+      reset: () => calls.push("reset"),
+      navigate: (href) => calls.push(`go ${href}`),
+    });
+    expect(ran).toBe(true);
+    expect(calls).toEqual(["guard", "reset", "go /admin/team?event=evt_synthetic"]);
+  });
+
+  it("leaves the page and the query alone when the guard is cancelled", () => {
+    const calls: string[] = [];
+    const ran = selectDestination({
+      destination: { href: "/admin/team" },
+      guard: () => { calls.push("guard"); return false; },
+      reset: () => calls.push("reset"),
+      navigate: () => calls.push("go"),
+    });
+    expect(ran).toBe(false);
+    expect(calls).toEqual(["guard"]);
+  });
+});
+
+describe("print and placement", () => {
+  const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+
+  it("hides the search on every printout, beside the workspace header", () => {
+    const hideLists = [...css.matchAll(/@media print\s*\{[\s\S]*?([^{}]*\.workspace-header[^{}]*)\{\s*display:\s*none\s*!important;?\s*\}/g)].map((match) => match[1]);
+    expect(hideLists.length).toBeGreaterThan(0);
+    expect(hideLists.some((list) => list.includes(".destination-search"))).toBe(true);
+  });
+
+  it("hides the sidebar copy when the sidebar is collapsed, leaving an icon button", () => {
+    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.sidebar \.destination-search \{ display: none; \}/);
+    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.sidebar-search-button \{ display: flex;/);
+  });
+});
+
 describe("shell wiring", () => {
   const AppShellElement = AppShell as ComponentType<Omit<Parameters<typeof AppShell>[0], "children">>;
-  const render = (user: { displayName: string; email: string; globalRole: "SYSTEM_ADMIN" | null }) => renderToStaticMarkup(
+  const render = (user: { displayName: string; email: string; globalRole: "SYSTEM_ADMIN" | null }, permissions: readonly EventPermission[] = ["MANAGE_CHECK_IN"]) => renderToStaticMarkup(
     createElement(AppShellElement, {
-      events: [{ id: "evt_one", slug: "one", name: "Synthetic Event", permissions: ["MANAGE_CHECK_IN"] as const }],
+      events: [{ id: "evt_one", slug: "one", name: "Synthetic Event", permissions }],
       user,
       defaultEventId: "evt_one",
     }, createElement("p", null, "content")),
   );
+  const staff = { displayName: "Synthetic Staff", email: "staff@imsda-events.test", globalRole: null };
 
-  it("draws one search for staff, above the page content", () => {
-    const markup = render({ displayName: "Synthetic Staff", email: "staff@imsda-events.test", globalRole: null });
+  it("draws the search in the sidebar above the navigation, not in the page content", () => {
+    const markup = render(staff);
     expect(markup.match(/role="combobox"/g)).toHaveLength(1);
-    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf("<p>content</p>"));
+    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf('<nav class="primary-nav"'));
+    expect(markup.indexOf('role="search"')).toBeGreaterThan(markup.indexOf('<aside class="sidebar"'));
+    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf("</aside>"));
+    expect(markup.slice(markup.indexOf('id="workspace-content"'))).not.toContain("destination-search");
+  });
+
+  it("gives the collapsed sidebar a labelled button that reaches the field", () => {
+    const markup = render(staff);
+    expect(markup).toMatch(/<button[^>]*class="sidebar-search-button"[^>]*aria-label="Find a page or task"|<button[^>]*aria-label="Find a page or task"[^>]*class="sidebar-search-button"/);
+    expect(markup).toContain('id="destination-search-input"');
+  });
+
+  it("puts the search in the phone More sheet only, not in the desktop popover", () => {
+    const destinations = buildSearchDestinations(admin);
+    const panel = (variant: "tab" | "sidebar") => renderToStaticMarkup(createElement(MoreLauncherPanel, {
+      cards: [], destinations, eventQuery: "", isSystemAdmin: true, variant,
+    }));
+    expect(panel("tab")).toContain("destination-search-input");
+    expect(panel("sidebar")).not.toContain("destination-search-input");
   });
 });
