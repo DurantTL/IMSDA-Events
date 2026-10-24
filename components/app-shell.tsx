@@ -14,6 +14,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { DestinationSearch } from "@/components/destination-search";
+import { buildSearchDestinations } from "@/components/destination-search-model";
 import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import {
   applySidebarAttribute,
@@ -245,6 +247,16 @@ export function AppShell({
   const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
   // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
   const mobileNavigation = orderedMobileTabs(visibleNavigation);
+  // Find a page (#1177): the destinations this viewer may open, from the same registry and rules as the menus. No event data is searched.
+  const searchDestinations = buildSearchDestinations({
+    isSystemAdmin,
+    selectedEventId: eventlessProfile ? "" : selectedEventId,
+    permissions: [...selectedPermissions],
+    clubOversight: Boolean(selectedEvent?.clubOversight),
+    clubEvent: Boolean(selectedEvent?.clubEvent),
+    clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
+    hiddenCardKeys: selectedHiddenCardKeys,
+  });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
     : "/account";
@@ -503,6 +515,7 @@ export function AppShell({
           )}
         </header>
         <div className="workspace-content" id="workspace-content">
+          <DestinationSearch destinations={searchDestinations} />
           {showAutoSelectNotice && defaultEvent && (
             <EventAutoSelectNotice
               eventName={defaultEvent.name}
