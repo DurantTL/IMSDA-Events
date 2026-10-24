@@ -100,7 +100,6 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
             <li className={styles.row} key={kind.key} data-kind={kind.key}>
               <p className={styles.title}>{kind.title}</p>
               <p className={styles.detail}>{kind.text}</p>
-              
             </li>
           ))}
         </ul>

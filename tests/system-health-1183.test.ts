@@ -287,7 +287,9 @@ describe("readiness wording against the delivered #874 contract", () => {
 
   it("never describes #874 as pending, approved-but-unbuilt, flags-only or nothing blocked", () => {
     // The dated notes may say an earlier tick recorded the "earlier flags-only rules"; that is history, not the current rules.
-    const text = [sterling.detail, screeningBehavior.intro, ...screeningBehavior.points, screeningBehavior.evidenceNote].join("\n").replaceAll("earlier flags-only rules", "");
+    // Only the dated history sentence is removed, and only from the two notes that carry it; the behavior points are scanned whole.
+    const history = /recorded the earlier flags-only rules, not these/g;
+    const text = [sterling.detail.replace(history, ""), screeningBehavior.intro, ...screeningBehavior.points, screeningBehavior.evidenceNote.replace(history, "")].join("\n");
     expect(text).not.toMatch(/flags only|flags-only|nothing blocked|not yet built|unbuilt|will be built|once built|when built/i);
     expect(text).not.toMatch(/background[ -]check/i);
   });
@@ -358,6 +360,12 @@ describe("failing sweep and delivery counts", () => {
     const days = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-20T16:00:00.000Z") } }), "email-sweep");
     expect(days.when).toContain("Oct 20, 2026, 4:00 PM UTC");
     expect(days.detail).toContain("4 days ago");
+  });
+
+  it("dates a failure from the previous evening, under a day old, so it never reads as later today", () => {
+    // Read at 6:00 PM UTC; the failure was 7:00 PM UTC the day before.
+    const lastNight = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-23T19:00:00.000Z") } }), "email-sweep");
+    expect(lastNight.when).toContain("Oct 23, 2026, 7:00 PM UTC");
   });
 
   it("adds the date to a stale success older than a day", () => {

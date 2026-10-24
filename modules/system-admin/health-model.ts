@@ -76,13 +76,13 @@ export function agoLabel(ms: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-/** The time of a reading, with its date once it is more than a day older than the page read (`readAt`). */
+/** The time of a reading, with its date whenever it falls on an earlier (UTC) day than the page read (`readAt`), so 7 PM yesterday never reads as later today. */
 function timeWithDate(iso: string | null, readAt: string): string | null {
   const time = readTimeLabel(iso);
   if (!iso || !time) return null;
-  const age = new Date(readAt).getTime() - new Date(iso).getTime();
-  if (!(age > 24 * 60 * 60 * 1000)) return time;
-  const date = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
+  const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
+  const date = day.format(new Date(iso));
+  if (date === day.format(new Date(readAt))) return time;
   return `${date}, ${time}`;
 }
 
