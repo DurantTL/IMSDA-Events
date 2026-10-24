@@ -14,8 +14,8 @@ const mocks = vi.hoisted(() => ({
   listClubEvents: vi.fn(),
   getClubReportYear: vi.fn(),
   clubPortalComplianceReminderCounts: vi.fn(),
-  listClubHonorsPage: vi.fn(),
   listUpcomingDeadlines: vi.fn(),
+  listSubmissionsForViewer: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,12 +30,12 @@ vi.mock("@/modules/club-registrations/repository", async () => {
 });
 vi.mock("@/modules/club-reports/repository", () => ({ getClubReportYear: mocks.getClubReportYear }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceReminderCounts: mocks.clubPortalComplianceReminderCounts }));
-vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
+vi.mock("@/modules/club-forms/submissions", () => ({ listSubmissionsForViewer: mocks.listSubmissionsForViewer }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
 import { ClubNextTaskCard } from "@/components/club-next-task";
-import { ClubYearTiles } from "@/components/club-year-tiles";
+import { ClubHomeEvents, ClubHomeRoster, ClubHomeSummary, ClubHomeTasks } from "@/components/club-home";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { pickClubNextTask } from "@/modules/club-rosters/home-next-task";
 import { areaClubPortalNavItems, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
@@ -52,29 +52,22 @@ function componentElements(node: ReactNode, found: ReactElement<AnyProps>[] = []
   return found;
 }
 
-function allElements(node: ReactNode, found: ReactElement<AnyProps>[] = []) {
-  if (Array.isArray(node)) {
-    for (const child of node) allElements(child, found);
-    return found;
-  }
-  if (!isValidElement<AnyProps>(node)) return found;
-  found.push(node);
-  allElements(node.props.children as ReactNode, found);
-  return found;
-}
-
 const director = {
   state: "OPEN",
   club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
-  capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true },
+  capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true, guardians: true },
   actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
 };
 const openEvent = {
   id: "event-open", name: "Fall Camporee", startsAt: "2026-10-10T00:00:00.000Z", endsAt: "2026-10-12T00:00:00.000Z",
   timezone: "America/Chicago", location: "Camp Fixture", phase: "OPEN", registrationClosesOn: "2026-12-01",
-  available: true, problem: null, registration: null, draft: null,
+  available: true, problem: null, registration: null, draft: null, billingMode: "DEFERRED_ORGANIZATION_INVOICE", multipleTeams: false, teams: [], drafts: [],
 };
-const activeMember = { id: "member-1", status: "ACTIVE", attendeeType: "YOUTH", classLevel: "FRIEND" };
+// Complete on purpose: no blank roster field, so no roster task unless a test removes the roster.
+const activeMember = {
+  id: "member-1", firstName: "Pat", lastName: "Sample", status: "ACTIVE", attendeeType: "YOUTH", role: "Member", classLevel: "FRIEND",
+  gender: "F", age: 12, reportedAge: null, birthDateNeeded: false,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,18 +78,23 @@ beforeEach(() => {
   mocks.listDirectedClubs.mockResolvedValue([]);
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
   mocks.clubPortalComplianceReminderCounts.mockResolvedValue(null);
-  mocks.listClubHonorsPage.mockResolvedValue([]);
+  mocks.listSubmissionsForViewer.mockResolvedValue([]);
   mocks.listUpcomingDeadlines.mockResolvedValue([]);
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-15T18:00:00.000Z"));
 });
 
-describe("Club home shows the next task and its deadline before the statistics", () => {
-  it("renders the Next task card before the year tiles, with the one filled button", async () => {
+const home = async () => renderToStaticMarkup(await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) }));
+
+describe("Club home shows the first task and its deadline before the roster and event cards (#743, #1166)", () => {
+  it("renders Continue club work after the summary and before the roster and event card", async () => {
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
     const order = componentElements(tree).map((element) => element.type);
-    expect(order.indexOf(ClubNextTaskCard)).toBeGreaterThanOrEqual(0);
-    expect(order.indexOf(ClubNextTaskCard)).toBeLessThan(order.indexOf(ClubYearTiles));
+    expect(order.indexOf(ClubHomeSummary)).toBeLessThan(order.indexOf(ClubHomeTasks));
+    expect(order.indexOf(ClubHomeTasks)).toBeLessThan(order.indexOf(ClubHomeRoster));
+    expect(order.indexOf(ClubHomeRoster)).toBeLessThan(order.indexOf(ClubHomeEvents));
+    // The old Next task card and year tiles are gone from Home.
+    expect(order).not.toContain(ClubNextTaskCard);
   });
 
   it("names the first task and its deadline: a report due date, then an event closing date", async () => {
@@ -104,12 +102,11 @@ describe("Club home shows the next task and its deadline before the statistics",
     mocks.getClubReportYear.mockResolvedValue({ reports: [], registrationOnTime: false });
     vi.setSystemTime(new Date("2026-10-05T18:00:00.000Z"));
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const card = componentElements(tree).find((element) => element.type === ClubNextTaskCard)!;
-    const next = card.props.next as ReturnType<typeof pickClubNextTask>;
-    expect(next?.step.key).toBe("report-2026-09");
-    expect(next?.deadline).toBe("Due October 10");
-    const html = renderToStaticMarkup(ClubNextTaskCard({ next }) as ReactElement);
-    expect(html).toContain("Next task");
+    const tasks = componentElements(tree).find((element) => element.type === ClubHomeTasks)!;
+    const steps = tasks.props.steps as Array<{ key: string }>;
+    expect(steps.map((step) => step.key)).toEqual(["report-2026-09", "event-open"]);
+    expect(tasks.props.deadlines).toMatchObject({ "report-2026-09": "Due October 10", "event-open": "Register by December 1, 2026" });
+    const html = await home();
     expect(html).toContain("Due October 10");
     expect(html).toContain("Open report");
     expect(html.match(/class="primary-button/g)).toHaveLength(1);
@@ -117,10 +114,9 @@ describe("Club home shows the next task and its deadline before the statistics",
 
   it("falls to the event closing date when nothing else is due", async () => {
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const card = componentElements(tree).find((element) => element.type === ClubNextTaskCard)!;
-    const next = card.props.next as ReturnType<typeof pickClubNextTask>;
-    expect(next?.step.key).toBe("event-open");
-    expect(next?.deadline).toBe("Register by December 1, 2026");
+    const tasks = componentElements(tree).find((element) => element.type === ClubHomeTasks)!;
+    expect((tasks.props.steps as Array<{ key: string }>).map((step) => step.key)).toEqual(["event-open"]);
+    expect(tasks.props.deadlines).toMatchObject({ "event-open": "Register by December 1, 2026" });
   });
 
   it("picks the first step, says No deadline when it has none, and keeps the rest for the list", () => {
@@ -137,38 +133,34 @@ describe("Club home shows the next task and its deadline before the statistics",
     expect(renderToStaticMarkup(ClubNextTaskCard({ next: null }) as ReactElement)).toContain("all caught up");
   });
 
-  it("leaves only secondary buttons in the To do list, so the page keeps one filled button", async () => {
+  it("gives the first task the one filled button and every later action an outline, so the page keeps one filled button", async () => {
     mocks.listRoster.mockResolvedValue([]);
-    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const actions = allElements(tree).filter((element) => String(element.props.className ?? "").includes("club-event-action"));
-    expect(actions.length).toBeGreaterThan(0);
-    expect(actions.some((element) => String(element.props.className).includes("primary-button"))).toBe(false);
+    const html = await home();
+    expect(html.match(/class="primary-button club-event-action"/g)).toHaveLength(1);
+    expect(html).toMatch(/class="primary-button club-event-action" href="\/account\/clubs\/club-1\/roster">Add people/);
+    expect(html).toMatch(/class="secondary-button club-event-action" href="\/account\/clubs\/club-1\/events\/event-open">Register/);
   });
 });
 
-describe("Next task picks from every step, and the list does not repeat it", () => {
-  it("lets a red background-check item be the next task when it is the only step", async () => {
+describe("Home tasks pick from every step, in order, without repeating one", () => {
+  it("lets a red background-check item be the first task when it is the only step", async () => {
     mocks.listClubEvents.mockResolvedValue([]);
     mocks.clubPortalComplianceReminderCounts.mockResolvedValue({ notInCompliance: 1, expiringSoon: 0, missing: 0 });
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const card = componentElements(tree).find((element) => element.type === ClubNextTaskCard)!;
-    const next = card.props.next as NonNullable<ReturnType<typeof pickClubNextTask>>;
-    expect(next.step.danger).toBe(true);
-    expect(next.others).toEqual([]);
-    const html = renderToStaticMarkup(ClubNextTaskCard({ next }) as ReactElement);
+    const tasks = componentElements(tree).find((element) => element.type === ClubHomeTasks)!;
+    const steps = tasks.props.steps as Array<{ key: string; danger?: boolean }>;
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.danger).toBe(true);
+    const html = await home();
     expect(html).toContain("club-step-danger");
-    expect(html).not.toContain("all caught up");
-    // Nothing else is due, so there is no To do list repeating it.
-    expect(allElements(tree).some((element) => element.type === "li" && element.props.className === "club-step-danger")).toBe(false);
+    expect(html.match(/class="primary-button/g)).toHaveLength(1);
   });
 
-  it("lists only the steps after the next task", async () => {
+  it("lists the roster step, then the event step", async () => {
     mocks.listRoster.mockResolvedValue([]);
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const card = componentElements(tree).find((element) => element.type === ClubNextTaskCard)!;
-    const next = card.props.next as NonNullable<ReturnType<typeof pickClubNextTask>>;
-    expect(next.step.key).toBe("roster");
-    expect(next.others.map((step) => step.key)).toEqual(["event-open"]);
+    const tasks = componentElements(tree).find((element) => element.type === ClubHomeTasks)!;
+    expect((tasks.props.steps as Array<{ key: string }>).map((step) => step.key)).toEqual(["roster", "event-open"]);
   });
 });
 
@@ -189,13 +181,13 @@ describe("the club menu order is unchanged", () => {
 describe("Upcoming deadlines on the club home (#910)", () => {
   const deadline = { key: "d1", title: "Spring Camporee Registration Due", dueOn: "2026-12-05", href: null, postponed: false, label: "Due in 20 days", overdue: false };
 
-  it("shows the conference's deadlines to a director, after the year tiles", async () => {
+  it("shows the conference's deadlines to a director, after the roster and event cards", async () => {
     mocks.listUpcomingDeadlines.mockResolvedValue([deadline]);
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
     const order = componentElements(tree).map((element) => element.type);
     const list = componentElements(tree).find((element) => element.type === UpcomingDeadlines)!;
     expect(list.props.deadlines).toEqual([deadline]);
-    expect(order.indexOf(ClubYearTiles)).toBeLessThan(order.indexOf(UpcomingDeadlines));
+    expect(order.indexOf(ClubHomeEvents)).toBeLessThan(order.indexOf(UpcomingDeadlines));
     expect(mocks.listUpcomingDeadlines).toHaveBeenCalledTimes(1);
   });
 
@@ -204,6 +196,7 @@ describe("Upcoming deadlines on the club home (#910)", () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({
       state: "NO_ROSTER",
       club: { organizationId: "club-1", name: "Test Pathfinders", role: "REPORTER", sponsoringChurch: null },
+      capabilities: { roster: false, registerForEvents: false, seeBirthDates: false, manageTeam: false, editProfile: false, submitReports: true, guardians: false },
     });
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
     expect(componentElements(tree).find((element) => element.type === UpcomingDeadlines)?.props.deadlines).toEqual([deadline]);

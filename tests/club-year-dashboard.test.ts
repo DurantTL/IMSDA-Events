@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   listClubTeam: vi.fn(),
   listClubHonorsPage: vi.fn(),
   listUpcomingDeadlines: vi.fn(),
+  listSubmissionsForViewer: vi.fn(),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
 }));
 
@@ -46,6 +47,7 @@ vi.mock("@/modules/background-checks/repository", () => ({
 }));
 vi.mock("@/modules/organizations/director-grants-repository", () => ({ listClubTeam: mocks.listClubTeam }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
+vi.mock("@/modules/club-forms/submissions", () => ({ listSubmissionsForViewer: mocks.listSubmissionsForViewer }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
@@ -67,17 +69,6 @@ function componentElements(node: ReactNode, found: ReactElement<AnyProps>[] = []
   return found;
 }
 
-/** Every element (host tags included), for checking plain markup like the "What's next" heading stays. */
-function allElements(node: ReactNode, found: ReactElement<AnyProps>[] = []) {
-  if (Array.isArray(node)) {
-    for (const child of node) allElements(child, found);
-    return found;
-  }
-  if (!isValidElement<AnyProps>(node)) return found;
-  found.push(node);
-  allElements(node.props.children as ReactNode, found);
-  return found;
-}
 
 function tilesProps(tree: ReactNode) {
   const tiles = componentElements(tree).find((element) => element.type === ClubYearTiles);
@@ -103,7 +94,7 @@ const members = [
 const openEvent = {
   id: "event-open", name: "Fall Camporee", startsAt: "2026-10-10T00:00:00.000Z", endsAt: "2026-10-12T00:00:00.000Z",
   timezone: "America/Chicago", location: "Camp Kulaqua", phase: "OPEN", registrationClosesOn: null,
-  available: true, problem: null, registration: null, draft: null,
+  available: true, problem: null, registration: null, draft: null, billingMode: "DEFERRED_ORGANIZATION_INVOICE", multipleTeams: false, teams: [], drafts: [],
 };
 const registeredEvent = {
   ...openEvent, id: "event-registered", name: "Winter Retreat", phase: "CLOSED",
@@ -150,110 +141,73 @@ beforeEach(() => {
   mocks.clubComplianceReminderCounts.mockResolvedValue({ notInCompliance: 0, expiringSoon: 0, missing: 1 });
   mocks.listClubHonorsPage.mockResolvedValue(honorRows);
   mocks.listUpcomingDeadlines.mockResolvedValue([]);
+  mocks.listSubmissionsForViewer.mockResolvedValue([]);
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-15T18:00:00.000Z"));
 });
 
-describe("the club home page builds the director's tiles (#488)", () => {
-  it("gives a director the roster breakdown, background-check counts, events, and reports, linking to each page", async () => {
-    mocks.getRosterAccessStateForPage.mockResolvedValue({
-      state: "OPEN",
-      club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
-      capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true },
-      actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
-    });
-    mocks.clubPortalComplianceReminderCounts.mockResolvedValue({ notInCompliance: 1, expiringSoon: 0, missing: 2 });
+const directorAccess = {
+  state: "OPEN",
+  club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
+  capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true, guardians: true },
+  actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
+};
+const homeHtml = async () => renderToStaticMarkup(await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) }));
 
-    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const props = tilesProps(tree);
-
-    expect(props.roster).toEqual({
-      active: 3, staff: 1, members: 2,
-      byClass: [{ classLevel: "FRIEND", label: "Friend", count: 1 }, { classLevel: "RANGER", label: "Ranger", count: 1 }],
-    });
-    // No background-check tile on club home (#644): those problems are red to-dos instead.
-    expect(props.compliance).toBeNull();
-    // One in-progress honor, and one of two completed honors falls inside this club year (started 2026-09-01).
-    expect(props.honors).toEqual({ inProgress: 1, completedThisYear: 1 });
-    expect(props.events).toEqual({ open: 1, registered: 1 });
-    // September is filed. October is past its own Nov 10 due date, so it's missing; November
-    // (the current month, due Dec 10) isn't missing yet — it's "due soon" instead (review fix).
-    expect(props.reports).toEqual({ filed: 1, missing: 1, dueSoon: { count: 1, dueDate: "2026-12-10" } });
-    expect(props.rosterHref).toBe("/account/clubs/club-1/roster");
-    expect(props.eventsHref).toBe("/account/clubs/club-1/events");
-    expect(props.reportsHref).toBe("/account/clubs/club-1/records");
-    expect(props.honorsHref).toBe("/account/clubs/club-1/honors");
-
-    // The existing "What's next" list stays.
-    const headings = allElements(tree).filter((element) => element.type === "h2").map((element) => element.props.children);
-    expect(headings).toContain("To do");
-  });
-
-  it("shows background-check problems only as red to-dos, and nothing when none are due (#644)", async () => {
-    mocks.getRosterAccessStateForPage.mockResolvedValue({
-      state: "OPEN",
-      club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
-      capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true },
-      actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
-    });
-    const dangerItems = (tree: ReactNode) => allElements(tree).filter((element) => element.type === "li" && element.props.className === "club-step-danger");
+/** The club home keeps the same real sources the old tiles read (#488); its layout is the task-first Home (#1166, tests/club-home-1166.test.ts). */
+describe("the club home page still reads only the selected club's own data (#488)", () => {
+  it("lists background-check problems only as red to-dos, and nothing when none are due (#644)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(directorAccess);
+    const dangerItems = (html: string) => html.match(/<li class="club-step-danger">/g) ?? [];
 
     mocks.clubPortalComplianceReminderCounts.mockResolvedValue({ notInCompliance: 1, expiringSoon: 0, missing: 2 });
-    const withProblems = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    expect(dangerItems(withProblems)).toHaveLength(2);
-    expect(tilesProps(withProblems).compliance).toBeNull();
+    expect(dangerItems(await homeHtml())).toHaveLength(2);
 
     mocks.clubPortalComplianceReminderCounts.mockResolvedValue({ notInCompliance: 0, expiringSoon: 0, missing: 0 });
-    const clean = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    expect(dangerItems(clean)).toHaveLength(0);
+    expect(dangerItems(await homeHtml())).toHaveLength(0);
   });
 
-  it("doesn't call an unfiled month missing before it's due — matching 'What's next' on the same page (review fix)", async () => {
-    mocks.getRosterAccessStateForPage.mockResolvedValue({
-      state: "OPEN",
-      club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
-      capabilities: { roster: true, registerForEvents: true, seeBirthDates: true, manageTeam: true, editProfile: true, submitReports: true },
-      actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
-    });
+  it("asks only for the selected club's roster, events and reports in the current club year", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(directorAccess);
+    mocks.clubPortalComplianceReminderCounts.mockResolvedValue(null);
+    await homeHtml();
+    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27");
+    expect(mocks.listClubEvents).toHaveBeenCalledWith("club-1");
+    expect(mocks.getClubReportYear).toHaveBeenCalledWith("club-1", "2026-27");
+  });
+
+  it("doesn't call an unfiled month due before it's due, matching the Monthly Records page (review fix)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(directorAccess);
     mocks.clubPortalComplianceReminderCounts.mockResolvedValue(null);
     // Nothing filed yet, and no report is even due until October 10 for September.
     mocks.getClubReportYear.mockResolvedValue(reportYear([]));
     vi.setSystemTime(new Date("2026-09-28T18:00:00.000Z"));
-
-    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const props = tilesProps(tree);
-    expect(props.reports).toEqual({ filed: 0, missing: 0, dueSoon: { count: 1, dueDate: "2026-10-10" } });
+    expect(await homeHtml()).not.toContain("Monthly Record is due");
   });
 
-  it("hides the background-check and reports tiles for a registrar, who doesn't get either (#375)", async () => {
+  it("gives a registrar the roster and events but no reports lookup (#375)", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({
       state: "OPEN",
       club: { organizationId: "club-1", name: "Test Pathfinders", role: "REGISTRAR", sponsoringChurch: null },
-      capabilities: { roster: true, registerForEvents: true, seeBirthDates: false, manageTeam: false, editProfile: false, submitReports: false },
+      capabilities: { roster: true, registerForEvents: true, seeBirthDates: false, manageTeam: false, editProfile: false, submitReports: false, guardians: false },
       actor: { kind: "ATTENDEE", accountId: "account-2", sessionId: "session-2" },
     });
     mocks.clubPortalComplianceReminderCounts.mockResolvedValue(null);
-
-    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    const props = tilesProps(tree);
-    expect(props.compliance).toBeNull();
-    expect(props.reports).toBeNull();
-    // The roster, honors, and events tiles are unaffected by the registrar's narrower access:
-    // honors (#486) are visible to anyone who can view the roster, which a registrar can.
-    expect(props.roster.active).toBe(3);
-    expect(props.honors).toEqual({ inProgress: 1, completedThisYear: 1 });
-    expect(props.honorsHref).toBe("/account/clubs/club-1/honors");
-    expect(props.events).toEqual({ open: 1, registered: 1 });
+    await homeHtml();
+    expect(mocks.getClubReportYear).not.toHaveBeenCalled();
+    expect(mocks.listRoster).toHaveBeenCalled();
   });
 
-  it("shows a reporter no roster or tiles at all, only monthly reports (#375)", async () => {
+  it("shows a reporter no roster or events at all, only monthly reports (#375)", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({
       state: "NO_ROSTER",
       club: { organizationId: "club-1", name: "Test Pathfinders", role: "REPORTER", sponsoringChurch: null },
-      capabilities: { roster: false, registerForEvents: false, seeBirthDates: false, manageTeam: false, editProfile: false, submitReports: true },
+      capabilities: { roster: false, registerForEvents: false, seeBirthDates: false, manageTeam: false, editProfile: false, submitReports: true, guardians: false },
     });
-    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    expect(componentElements(tree).some((element) => element.type === ClubYearTiles)).toBe(false);
+    const html = await homeHtml();
+    expect(mocks.listRoster).not.toHaveBeenCalled();
+    expect(mocks.listClubEvents).not.toHaveBeenCalled();
+    expect(html).toContain("Open Monthly Records");
   });
 });
 

@@ -10509,6 +10509,41 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .club-next-task.club-step-danger .club-next-task-deadline { color: #a3271b; }
 @media (max-width: 480px) { .club-next-task-row .primary-button { width: 100%; min-height: 44px; } }
 
+/* --- Club home (#1166): summary, club work, roster preview, club event ------- */
+.club-home-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 12px 0 0; }
+.club-home-count { display: grid; gap: 2px; align-content: start; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.club-home-count dt { margin: 0; color: var(--imsda-navy); font-size: var(--text-helper-min); font-weight: 800; }
+.club-home-count dd { margin: 0; }
+.club-home-count-value { font-size: 1.5rem; font-weight: 800; line-height: 1.15; color: var(--ink); }
+.club-home-count-definition { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-readonly { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.club-home-readonly a { display: inline-flex; align-items: center; min-height: 44px; }
+.club-home-task-list li { flex-wrap: wrap; align-items: center; }
+.club-home-task-list li > span { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.club-home-task-list small { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-task-list .club-home-deadline { color: var(--ink); font-weight: 700; }
+.club-home-roster-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-roster-list li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 4px 12px; align-items: baseline; border-top: 1px solid var(--line); padding: 10px 0; overflow-wrap: anywhere; }
+.club-home-roster-list li:first-child { border-top: 0; }
+.club-home-roster-list span { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-link { margin-top: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+.club-home-event-list { display: grid; gap: 12px; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-event { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.club-home-event h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.club-home-event dl { display: grid; gap: 6px; margin: 0; }
+.club-home-event dl > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 8px; }
+.club-home-event dt { color: var(--muted); font-size: var(--text-helper-min); font-weight: 700; }
+.club-home-event dd { margin: 0; overflow-wrap: anywhere; }
+.club-home-useful-list { display: grid; gap: 4px; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-useful-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.club-home-useful-list a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
+.club-home-useful-list span { color: var(--muted); font-size: var(--text-helper-min); }
+@media (max-width: 640px) {
+  .club-home-roster-list li { grid-template-columns: 1fr; }
+  .club-home-event dl > div { grid-template-columns: 1fr; gap: 0; }
+  .club-home-task-list .club-event-action, .club-home-link { width: 100%; }
+}
+
 /* --- Dashboard: the setup checklist ------------------------------------------ */
 .setup-checklist { border-left: 5px solid var(--imsda-gold); }
 .setup-checklist-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }

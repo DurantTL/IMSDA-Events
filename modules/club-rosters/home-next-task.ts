@@ -5,7 +5,15 @@
  * words its deadline. Nothing here reads data or changes the club menu.
  */
 
-export type ClubHomeStep = { key: string; text: string; href: string; action: string; danger?: boolean };
+export type ClubHomeStep = {
+  key: string;
+  text: string;
+  /** One line of explanation under the task (what is saved, what is blank); never invented requiredness. */
+  detail?: string;
+  href: string;
+  action: string;
+  danger?: boolean;
+};
 
 export type ClubNextTask = {
   step: ClubHomeStep;
