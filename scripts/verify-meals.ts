@@ -36,10 +36,10 @@ import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { createRegistrationFormFromDefinitionInTransaction, getRegistrationForm, updateRegistrationForm } from "@/modules/forms/repository";
 import { getPublicRegistrationExperience, submitPublicRegistration } from "@/modules/forms/public-repository";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
-import { campMeetingMeals } from "@/modules/meals/camp-meeting";
+import { campMeetingMeals } from "../tests/support/camp-meeting-seeds";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { createMealDefinitions } from "@/modules/meals/clone-repository";
-import { applyCampMeetingMealPreset, createMealPlan, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
+import { applyMealPreset, createMealPlan, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
 import { MealError } from "@/modules/meals/errors";
 import {
   cancelMealSelection,
@@ -175,9 +175,9 @@ async function main() {
   const staffType = await prisma.eventAttendeeType.create({ data: { eventId, code: "STAFF", label: "Staff" } });
 
   // ---- Definitions (the Camp Meeting meals) -------------------------------------------------------------------
-  const created = await applyCampMeetingMealPreset(eventId, userId);
+  const created = await applyMealPreset(eventId, userId, "camp-meeting-2026");
   assert(created.services === 13 && created.plans === 2 && created.prices === 12, `Camp Meeting meals created (${JSON.stringify(created)})`);
-  await expectMealError(applyCampMeetingMealPreset(eventId, userId), "CONFLICT", "applying the preset twice");
+  await expectMealError(applyMealPreset(eventId, userId, "camp-meeting-2026"), "CONFLICT", "applying the preset twice");
   // A template payload carries the same definitions (dates as offsets): it creates them on an event that has none.
   const templateEvent = `${P}_ev_tpl`;
   await prisma.event.create({ data: { id: templateEvent, slug: slugOf(templateEvent), name: `Meal template ${P}`, startsAt: new Date("2027-06-15T15:00:00Z"), endsAt: new Date("2027-06-19T15:00:00Z"), timezone: "America/Chicago" } });

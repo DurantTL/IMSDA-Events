@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateCancellation, type CalculationFacts } from "@/modules/cancellation-policy/calculator";
-import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
 import {
   canonicalState,
   canTransition,

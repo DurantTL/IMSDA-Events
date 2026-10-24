@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   rejectCrossOriginRequest: vi.fn(),
   config: {
     createMealService: vi.fn(), updateMealService: vi.fn(), reinstateMealService: vi.fn(), createMealPlan: vi.fn(), updateMealPlan: vi.fn(),
-    setMealPlanServices: vi.fn(), setMealPrice: vi.fn(), removeMealPrice: vi.fn(), applyCampMeetingMealPreset: vi.fn(), loadTicketPrices: vi.fn(),
+    setMealPlanServices: vi.fn(), setMealPrice: vi.fn(), removeMealPrice: vi.fn(), applyMealPreset: vi.fn(), loadTicketPrices: vi.fn(),
   },
   selection: {
     cancelMealService: vi.fn(), createMealOrder: vi.fn(), changeMealQuantity: vi.fn(), cancelMealSelection: vi.fn(), changeMealPlan: vi.fn(),
@@ -54,7 +54,7 @@ const cases: Case[] = [
   { name: "POST selection quantity", load: () => import("@/app/api/events/[eventId]/meals/selections/[selectionId]/route"), method: "POST", params: { selectionId: "sel-1" }, body: { action: "quantity", quantity: 2, reason: "Two guests" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.selection.changeMealQuantity },
   { name: "POST selection cancel", load: () => import("@/app/api/events/[eventId]/meals/selections/[selectionId]/route"), method: "POST", params: { selectionId: "sel-1" }, body: { action: "cancel", reason: "Not coming" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.selection.cancelMealSelection },
   { name: "POST entitlements", load: () => import("@/app/api/events/[eventId]/meals/entitlements/route"), method: "POST", body: {}, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.selection.entitleAttendeeToPlan },
-  { name: "POST defaults", load: () => import("@/app/api/events/[eventId]/meals/defaults/route"), method: "POST", body: { preset: "camp-meeting-2026" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.config.applyCampMeetingMealPreset },
+  { name: "POST defaults", load: () => import("@/app/api/events/[eventId]/meals/defaults/route"), method: "POST", body: { preset: "camp-meeting-2026" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.config.applyMealPreset },
   { name: "GET registration meals", load: () => import("@/app/api/events/[eventId]/meals/registrations/[registrationId]/route"), method: "GET", params: { registrationId: "r1" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: false, work: () => mocks.view.loadRegistrationMeals },
   { name: "GET meal tickets CSV", load: () => import("@/app/api/events/[eventId]/exports/meal-tickets/route"), method: "GET", allowed: "FINANCE_MANAGER", denied: "CHECK_IN_STAFF", mutates: false, work: () => mocks.view.mealTicketsCsv },
   { name: "GET meal ticket summary CSV", load: () => import("@/app/api/events/[eventId]/exports/meal-ticket-summary/route"), method: "GET", allowed: "FINANCE_MANAGER", denied: "CHECK_IN_STAFF", mutates: false, work: () => mocks.view.mealTicketSummaryCsv },

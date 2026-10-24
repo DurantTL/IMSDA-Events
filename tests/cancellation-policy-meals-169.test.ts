@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { adjustmentCharge, adjustmentCharges, mealFieldKeySet, type AdjustmentRow } from "@/modules/cancellation-policy/adjustment-charge";
 import { calculateCancellation, type CalculationFacts, type CancellationSelection, type ChargeEntry, type PolicyVersionRecord } from "@/modules/cancellation-policy/calculator";
-import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
 
 function charge(partial: Partial<ChargeEntry> & Pick<ChargeEntry, "id" | "amountCents">): ChargeEntry {
   return { source: "PRICING_LINE", label: partial.id, category: "REGISTRATION", fieldKey: partial.id, attendeeId: null, ...partial };

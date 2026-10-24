@@ -16,7 +16,7 @@ import {
   type MealTypeValue,
 } from "@/modules/meals/domain";
 import { MealError } from "@/modules/meals/errors";
-import { campMeetingMeals } from "@/modules/meals/camp-meeting";
+import { loadEventContent } from "@/modules/event-content/repository";
 import { createMealDefinitions } from "@/modules/meals/clone-repository";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
@@ -267,27 +267,31 @@ export async function listMealPlanPrices(eventId: string): Promise<Record<string
 export { isDatabaseRefusal };
 
 // ---------------------------------------------------------------------------
-// Preset: the Camp Meeting 2026 meals, applied by a person
+// Preset: seeded meal services and plans (#919), applied by a person
 // ---------------------------------------------------------------------------
 
 /**
- * Adds the Camp Meeting 2026 services and plans (`modules/meals/camp-meeting.ts`) to an event that has no meal services
- * or plans yet, dated from the event's first day (a Tuesday). A person with finance access chooses it; nothing seeds or
- * applies it by itself, because a price is a human decision. The 2026 prices are the ones the form template already
- * charges, so applying it moves no registration total; staff review them on the Meals screen before publishing.
+ * Adds a seeded meal preset's services and plans (`SeededEventContent` kind MEAL_PRESET, from
+ * `prisma/seed-data/event-content/`, for example Camp Meeting 2026) to an event that has no meal services or plans yet,
+ * dated from the event's first day. A person with finance access chooses it; nothing seeds or applies it by itself,
+ * because a price is a human decision. The values are copied into the event: a later version of the seeded content never
+ * reaches an event that already has its own. Staff review the prices on the Meals screen before publishing.
  */
-export async function applyCampMeetingMealPreset(eventId: string, actorUserId: string) {
+export async function applyMealPreset(eventId: string, actorUserId: string, presetKey: string) {
   return getPrisma().$transaction(async (tx) => {
+    const preset = await loadEventContent(tx, "MEAL_PRESET", presetKey);
+    if (!preset) throw new MealError("INVALID", "That meal preset does not exist.");
     const event = await tx.event.findUnique({ where: { id: eventId }, select: { startsAt: true, timezone: true } });
     if (!event) throw new MealError("EVENT_NOT_FOUND", "That event does not exist.");
+    const { label, meals } = preset.content;
     if ((await tx.eventMealService.count({ where: { eventId } })) > 0 || (await tx.eventMealPlan.count({ where: { eventId } })) > 0) {
-      throw new MealError("CONFLICT", "This event already has meal services or plans. The Camp Meeting meals can only be added to an event that has none.");
+      throw new MealError("CONFLICT", `This event already has meal services or plans. The ${label} meals can only be added to an event that has none.`);
     }
     const firstDay = calendarDateInEventTimeZone(event.startsAt, event.timezone);
-    const created = await createMealDefinitions(tx, eventId, mealDefinitionsFromTemplate(campMeetingMeals, firstDay), actorUserId);
+    const created = await createMealDefinitions(tx, eventId, mealDefinitionsFromTemplate(meals, firstDay), actorUserId);
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_PRESET_APPLIED", entityType: "Event", entityId: eventId,
-      summary: "Added the Camp Meeting meal services and plans.", metadata: { preset: "camp-meeting-2026", firstDay, ...created },
+      summary: `Added the ${label} meal services and plans.`, metadata: { preset: presetKey, firstDay, ...created },
     }, tx);
     return created;
   });

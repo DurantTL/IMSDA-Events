@@ -1485,3 +1485,12 @@ the code's version is newer, never changes a template whose latest version a
 system administrator saved in the app, and never changes an existing event,
 registration form or published form version. Until it has run the app builds new
 forms from the code's copy of the same templates.
+
+`event-content:sync` stores the seeded event content (#919): the Camp Meeting
+meal preset and cancellation rule preset (versions in
+`prisma/seed-data/event-content/`). The container entrypoint runs it after the
+migrations. It is safe to run any number of times and writes a row only when it
+is missing or the code's version is newer. It never changes an existing event,
+its meals, its cancellation rules, its lodging or its messages. Until it has
+run the app offers the code's copy of the same presets. See
+`docs/EVENT-TEMPLATE-CONTENT.md`.

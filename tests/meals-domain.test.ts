@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { campMeetingMeals } from "@/modules/meals/camp-meeting";
+import { campMeetingMeals } from "./support/camp-meeting-seeds";
 import { mealDefinitionsFromTemplate, mealPriceCount, shiftMealDefinitions, templateMealsSchema } from "@/modules/meals/clone-domain";
 import {
   applyMealPricesToDefinition,

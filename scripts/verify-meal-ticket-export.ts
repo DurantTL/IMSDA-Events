@@ -21,7 +21,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { createContentionHarness } from "./support/meal-submit-contention";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
-import { applyCampMeetingMealPreset } from "@/modules/meals/config-repository";
+import { applyMealPreset } from "@/modules/meals/config-repository";
 import { cancelMealSelection, changeMealQuantity, createMealOrder, entitleAttendeeToPlan, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { loadScannerTickets, mealTicketSummaryCsv, mealTicketsCsv } from "@/modules/meals/view-repository";
 import { scannerTicketCsvHeader } from "@/modules/meals/domain";
@@ -106,7 +106,7 @@ async function main() {
   await prisma.event.create({
     data: { id: eventId, slug: `${eventId}-slug`, name: `Ticket export ${P}`, startsAt: new Date("2027-06-16T05:00:00Z"), endsAt: new Date("2027-06-20T05:00:00Z"), timezone: "America/Los_Angeles", isPublished: true },
   });
-  await applyCampMeetingMealPreset(eventId, userId);
+  await applyMealPreset(eventId, userId, "camp-meeting-2026");
   const services = await prisma.eventMealService.findMany({ where: { eventId } });
   const service = (name: string) => services.find((row) => row.name === name)!;
   const wedBreakfast = service("Wednesday breakfast");
