@@ -37,7 +37,7 @@ export function ClubHomeSummary({ clubYear, summary }: { clubYear: string; summa
   );
 }
 
-/** Shown on a past year: the page is history, so there are no tasks and no edit actions. */
+/** Shown on a read-only past or next year: there are no tasks and no edit actions on Home. */
 export function ClubHomeReadOnlyNotice({
   clubYear,
   currentHref,

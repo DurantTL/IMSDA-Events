@@ -280,7 +280,7 @@ function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Pris
     // A viewer who can't see drafts only ever gets submitted forms, and asking them for drafts matches nothing.
     ...(viewerSeesDrafts(viewer)
       ? (filter.status ? { status: filter.status } : {})
-      : filter.status === "DRAFT" ? { id: { in: [] as string[] } } : { status: "SUBMITTED" as const }),
+      : filter.status === "DRAFT" ? { status: "SUBMITTED" as const, id: { in: [] as string[] } } : { status: "SUBMITTED" as const }),
   };
 }
 
