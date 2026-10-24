@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { TeamPermissionPanel } from "@/components/team-permission-panel";
+import { logError } from "@/lib/logger";
+import { TEAM_APPROVALS_STAFF_TEXT } from "@/modules/club-reports/coordinator-destinations-domain";
 import { ageLimitText, teamPermissionsIntro, type TeamAgeRule } from "@/modules/club-teams/permission-domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
@@ -17,7 +20,21 @@ export const dynamic = "force-dynamic";
 export default async function TeamPermissionsPage() {
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const account = await currentAreaCoordinator();
-  const rows = account ? await listCoordinatorTeamPermissions(account.id) : [];
+  // A failed read is "unavailable" with a retry, never an empty list that reads as "nothing to decide" (#1187).
+  const loaded = account
+    ? await listCoordinatorTeamPermissions(account.id).catch((error: unknown) => {
+        logError("Coordinator team approvals read failed", error);
+        return null;
+      })
+    : [];
+  if (loaded === null) {
+    return (
+      <section className="page-stack">
+        <CoordinatorUnavailable what="Team approvals" />
+      </section>
+    );
+  }
+  const rows = loaded;
   // The age limit is each event's own team setting, never a fixed number: one rule per event that has a row here.
   const eventNames = new Map(rows.map((row) => [row.eventId, row.eventName]));
   const ageRules: TeamAgeRule[] = await Promise.all(
@@ -77,7 +94,18 @@ export default async function TeamPermissionsPage() {
         </dl>
         <p className="field-help">{teamPermissionsIntro.footer}</p>
       </div>
-      <TeamPermissionPanel canDecide={account !== null} endpointBase="/api/attendee/area-clubs/team-permissions" rows={rows} showEvent />
+      <TeamPermissionPanel
+        canDecide={account !== null}
+        emptyText={
+          account === null
+            ? "This staff act-as view does not read any coordinator's requests, so none are shown here."
+            : "No team members of 18 or older are on teams at your event locations."
+        }
+        endpointBase="/api/attendee/area-clubs/team-permissions"
+        rows={rows}
+        showEvent
+        viewOnlyNote={TEAM_APPROVALS_STAFF_TEXT}
+      />
     </section>
   );
 }

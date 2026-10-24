@@ -45,7 +45,7 @@ export function CoordinatorUnavailable({ what = "The club overview" }: { what?: 
   return (
     <section aria-labelledby="coordinator-unavailable-title" className="coordinator-unavailable" role="alert">
       <h3 id="coordinator-unavailable-title">{what} is unavailable</h3>
-      <p>The club information could not be read just now, so no counts or record statuses are shown. Nothing here means a club has no records.</p>
+      <p>This information could not be read just now, so no counts, statuses or empty lists are shown. Nothing here means a club has no records or that nothing needs attention.</p>
       <CoordinatorRetryButton />
     </section>
   );

@@ -197,7 +197,8 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
           {application.status === "DECLINED" && application.declineReason && <div><dt>Reason given</dt><dd translate="no">{application.declineReason}</dd></div>}
           {application.decidedAt && <div><dt>Decided</dt><dd>{formatDate(application.decidedAt)}{application.decidedByName ? ` by ${application.decidedByName}` : ""}</dd></div>}
           {application.createdOrganizationId && (
-            <div><dt>Club</dt><dd><a href={`/admin/organizations/${encodeURIComponent(application.createdOrganizationId)}/profile`}>Open the new club</a></dd></div>
+            // A coordinator has no admin pages: their link opens the club's view-only workspace (#1187).
+            <div><dt>Club</dt><dd><a href={canDecide ? `/admin/organizations/${encodeURIComponent(application.createdOrganizationId)}/profile` : `/account/area/${encodeURIComponent(application.createdOrganizationId)}`}>Open the new club</a></dd></div>
           )}
         </dl>
 

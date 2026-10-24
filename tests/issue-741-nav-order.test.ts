@@ -425,7 +425,8 @@ describe("club portal and coordinator menus are unchanged (#741 slice 4)", () =>
       "People:Roster", "People:Honors",
       "Events:Events", "Events:Club forms",
       "Records:Monthly Records",
-      "Orders:Earned awards",
+      // #1187 moved Earned awards from the "Orders" group to "Records": the coordinator's menu names no director tool, even as a hidden group heading.
+      "Records:Earned awards",
     ]);
   });
 });

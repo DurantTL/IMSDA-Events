@@ -12,12 +12,16 @@ const statusText: Record<PermissionStatus, string> = { PENDING: "Waiting for a d
  * first and are called out; the Area Coordinator (on their own page) and staff who manage registrations can grant or
  * decline. A declined person has to become a coach or leave the team, which the director sees on their team page.
  */
-export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, showEvent = false }: {
+export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, showEvent = false, emptyText = "No team has a team member of 18 or older.", viewOnlyNote }: {
   rows: TeamPermissionRow[];
   /** The route that records a decision; the request id is added to it. */
   endpointBase: string;
   canDecide: boolean;
   showEvent?: boolean;
+  /** What an empty list says (the coordinator's own page names whose requests these are). */
+  emptyText?: string;
+  /** Said when the viewer cannot decide (a staff act-as): it explains why there are no Approve or Decline buttons. */
+  viewOnlyNote?: string;
 }) {
   const [rows, setRows] = useState(initial);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -49,8 +53,9 @@ export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, sh
         <p className="public-registration-eyebrow">Area Coordinator approval</p>
         <h2 id="team-permission-heading"><ShieldAlert size={20} aria-hidden="true" /> Team members 18 and over</h2>
       </div>
+      {!canDecide && viewOnlyNote && <p className="inline-notice" role="status">{viewOnlyNote}</p>}
       {rows.length === 0 ? (
-        <p className="field-help">No team has a team member of 18 or older.</p>
+        <p className="field-help">{emptyText}</p>
       ) : (
         <>
           {pending > 0 && <p className="inline-notice warning" role="status"><strong>{pending} {pending === 1 ? "person is" : "people are"} waiting for approval.</strong> The teams are registered either way.</p>}
