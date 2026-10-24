@@ -91,7 +91,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/honors": ["honor", "honors catalog"],
   "/admin/club-supplies": ["supply", "ordering", "store"],
   "/admin/master-award-rules": ["master award", "award rules"],
-  "/admin/organizations/background-checks": ["sterling", "screening", "background check", "volunteer screening"],
+  "/admin/organizations/background-checks": ["sterling", "screening", "volunteer screening", "clearance"],
   "/admin/email": ["mail", "sender", "notification", "paused events", "staff alerts", "email health"],
   "/admin/settings": ["platform", "configuration", "preferences", "options", "sign-in settings", "payment settings"],
   "/admin/readiness": ["ready", "checklist", "go live", "launch"],
