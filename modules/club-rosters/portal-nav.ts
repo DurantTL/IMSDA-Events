@@ -99,6 +99,7 @@ export function areaClubPortalNavItems({ organizationId }: { organizationId: str
     { href: `${base}/forms`, label: "Club forms", matchChildren: true, group: "Events", hideGroupLabel: true },
     { href: `${base}#open-club-reports`, label: "Monthly Records", alsoMatchPrefix: `${base}/reports`, group: "Records", hideGroupLabel: true },
     // No Orders entry (#918): club Orders are not an Area Coordinator's to see, and the server refuses them.
-    { href: `${base}/awards`, label: "Earned awards", group: "Orders", hideGroupLabel: true },
+    // Grouped with Records, never under a group named "Orders" (#1187): the menu names no director tool, not even as a hidden heading.
+    { href: `${base}/awards`, label: "Earned awards", group: "Records", hideGroupLabel: true },
   ];
 }

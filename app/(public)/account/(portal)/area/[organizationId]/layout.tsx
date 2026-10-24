@@ -43,7 +43,8 @@ export default async function AreaClubLayout({
         <AccountSectionNav items={areaClubPortalNavItems({ organizationId })} label="Club" variant="secondary" />
         <p className="inline-notice" role="status">
           <Eye aria-hidden="true" size={14} /> View only. You see what the club&apos;s director sees, with ages instead of
-          birth dates, plus each adult&apos;s Sterling Volunteers status and note. The club makes changes.
+          birth dates, plus each adult&apos;s Sterling Volunteers status and note. The club&apos;s director maintains the
+          roster and the club&apos;s settings, so ask the director for any change.
         </p>
         {children}
       </div>

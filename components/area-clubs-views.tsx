@@ -12,6 +12,7 @@ import {
   type LeaderboardSort,
 } from "@/modules/club-reports/area-summary-domain";
 import type { AreaClubEvent } from "@/modules/club-reports/area-summary-repository";
+import { supportingRecordMonths } from "@/modules/club-reports/coordinator-destinations-domain";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
@@ -138,7 +139,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clu
  * description, the bars are hidden from assistive tech, and the data table
  * right below it carries every number. One row per club, so it reads on a phone.
  */
-export function AreaPointsChart({ clubs, clubYear, sort, basePath, query }: { clubs: AreaClubSummary[]; clubYear: string; sort: LeaderboardSort; basePath: string; query?: string }) {
+export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links }: { clubs: AreaClubSummary[]; clubYear: string; sort: LeaderboardSort; basePath: string; query?: string; links?: AreaLinks }) {
   // Rank and the bar scale come from every club; a search only narrows the rows shown (#791).
   const ranked = sortLeaderboard(clubs, sort);
   const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
@@ -170,7 +171,11 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query }: { cl
               ))}
             </ul>
           </figure>
-          <div className="report-table-wrap">
+          {/* With `links` (the coordinator's view, #1187) each row also lists the submitted records the points rest on, and the grid sits in a labelled scroll region. */}
+          <div
+            {...(links ? { "aria-label": `Points by club for ${clubYear}. Scroll sideways to see every column.`, role: "region", tabIndex: 0, "data-scroll-cue": true } : {})}
+            className={links ? "report-table-wrap scroll-cue coordinator-scroll" : "report-table-wrap"}
+          >
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Total points per club for {clubYear}, in chart order</caption>
               <thead role="rowgroup">
@@ -180,6 +185,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query }: { cl
                   <th role="columnheader" scope="col">Report points</th>
                   <th role="columnheader" scope="col">Yearly registration</th>
                   <th role="columnheader" scope="col">Total points</th>
+                  {links && <th role="columnheader" scope="col">Supporting records</th>}
                 </tr>
               </thead>
               <tbody role="rowgroup">
@@ -190,6 +196,19 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query }: { cl
                     <td {...cardCell("Report points")}>{formatNumber(club.reportPoints)}</td>
                     <td {...cardCell("Yearly registration")}>{formatNumber(club.totalPoints - club.reportPoints)}</td>
                     <td {...cardCell("Total points")}><strong>{formatNumber(club.totalPoints)}</strong></td>
+                    {links && (
+                      <td {...cardCell("Supporting records")}>
+                        <span className="coordinator-record-links">
+                          {supportingRecordMonths(club).map((record) => (
+                            <Link key={record.month} href={links.reportHref(club.id, record.month)}>
+                              {record.short}<span className="sr-only">: {club.name}, {record.label} record, view only</span>
+                            </Link>
+                          ))}
+                          {supportingRecordMonths(club).length === 0 && <span>No submitted records</span>}
+                          <Link href={links.clubHref(club.id)}>Open club<span className="sr-only">: {club.name}</span></Link>
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
