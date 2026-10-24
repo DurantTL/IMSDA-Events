@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   ChevronDown,
   CircleAlert,
+  Archive,
   Map as MapIcon,
   MailCheck,
   RefreshCw,
@@ -21,6 +22,16 @@ import {
 } from "lucide-react";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getSystemAdminDashboard, getSystemHealth } from "@/modules/system-admin/repository";
+import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
+import { listAlertFeed } from "@/modules/notifications/feed";
+import { logError } from "@/lib/logger";
+import {
+  buildHomeValues,
+  buildWorkList,
+  commonTaskHrefs,
+  groupWorkRows,
+  readTimeLabel,
+} from "@/modules/system-admin/home-model";
 import type { SetupWarningKind } from "@/modules/system-admin/dashboard";
 import { ActionsMenu } from "@/components/actions-menu";
 import { ModuleRequestQueue } from "@/components/module-request-queue";
@@ -105,6 +116,27 @@ const healthClass = {
   unknown: styles.healthUnknown,
 };
 
+type Settled<T> = { ok: true; value: T } | { ok: false };
+
+/** Runs one panel's read; a failure is logged (never shown) and becomes "unavailable" for that panel only. */
+async function settle<T>(panel: string, read: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, value: await read };
+  } catch (error) {
+    logError(`System home panel could not load: ${panel}`, error);
+    return { ok: false };
+  }
+}
+
+function Unavailable({ what }: { what: string }) {
+  return (
+    <p className={styles.unavailable} role="status">
+      <CircleAlert aria-hidden="true" size={16} />
+      <span><strong>Unavailable.</strong> {what} could not be read just now. This is not zero and not &ldquo;all clear&rdquo;. Reload to try again.</span>
+    </p>
+  );
+}
+
 export default async function SystemAdminPage({
   searchParams,
 }: {
@@ -118,16 +150,37 @@ export default async function SystemAdminPage({
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
 
-  const [dashboard, health, moduleRequests] = await Promise.all([
-    getSystemAdminDashboard(),
-    getSystemHealth(),
-    listPendingModuleRequests(),
+  // Each panel reads on its own (#1182): a failed read leaves that panel "unavailable" and the others keep their data.
+  const [dashboardRead, healthRead, requestsRead, attentionRead, feedRead] = await Promise.all([
+    settle("events", getSystemAdminDashboard()),
+    settle("system health", getSystemHealth()),
+    settle("feature requests", listPendingModuleRequests()),
+    settle("attention", getAdminAttentionSummary()),
+    settle("alert feed", listAlertFeed(user.id)),
   ]);
-  const currentEvents = dashboard.events.filter((event) => event.timing !== "PAST");
-  const pastEvents = dashboard.events.filter((event) => event.timing === "PAST");
+  const dashboard = dashboardRead.ok ? dashboardRead.value : null;
+  const health = healthRead.ok ? healthRead.value : null;
+  const moduleRequests = requestsRead.ok ? requestsRead.value : null;
+  const attention = attentionRead.ok ? attentionRead.value : null;
+  const unreadFeed = feedRead.ok ? feedRead.value.unreadCount : null;
+  const currentEvents = dashboard ? dashboard.events.filter((event) => event.timing !== "PAST") : [];
+  const pastEvents = dashboard ? dashboard.events.filter((event) => event.timing === "PAST") : [];
+  const homeValues = buildHomeValues({
+    events: dashboard ? { upcomingEventCount: dashboard.summary.upcomingEventCount, generatedAt: dashboard.generatedAt } : null,
+    attention,
+  });
+  const work = buildWorkList(attention, moduleRequests ? moduleRequests.length : null);
+  const workGroups = groupWorkRows(work.rows);
+  const navItems = systemNavGroups.flatMap((group) => group.items);
+  // The Archived events destination comes from the shared System navigation, which lists it once.
+  const archivedEventsHref = navItems.find((item) => item.label === "Archived events")?.href ?? "/archived-events";
+  const commonTasks = commonTaskHrefs.flatMap(({ href, heading }) => {
+    const item = navItems.find((candidate) => candidate.href === href);
+    return item ? [{ heading, item }] : [];
+  });
   const release = getReleaseIdentity();
 
-  const { sweep, outbox, alerts } = health;
+  const { sweep, outbox, alerts } = health ?? { sweep: null, outbox: null, alerts: null };
   const healthRows: HealthRow[] = [
     {
       name: "Email sweep",
@@ -160,7 +213,7 @@ export default async function SystemAdminPage({
           ? { state: "ok" as const, label: "None", detail: "Nothing the alert scan is still reporting." }
           : {
               state: "bad" as const,
-              label: `${dashboard.summary.unresolvedAlertCount} open`,
+              label: dashboard ? `${dashboard.summary.unresolvedAlertCount} open` : `${alerts.length}${alerts.length >= 5 ? "+" : ""} open`,
               detail: "Cleared automatically once the condition is fixed.",
               extra: (
                 <ul className={styles.alertList}>
@@ -171,6 +224,11 @@ export default async function SystemAdminPage({
     },
   ];
 
+
+  const directoryReview = attention ? attention.groups.flatMap((group) => group.items).find((item) => item.key === "directory-review") : undefined;
+  const directoryReviewCount = !attention || attention.unreadable.includes("directory-review") ? null : directoryReview?.count ?? 0;
+  const display = (value: number | null) => (value === null ? "Unavailable" : String(value));
+
   return (
     <section className={`page-stack ${styles.workspace}`}>
       {unavailable && (
@@ -178,90 +236,126 @@ export default async function SystemAdminPage({
           <span>That event isn&rsquo;t available. It may not exist, or this account may not have access to it. Choose an event below to continue.</span>
         </div>
       )}
-      <section className={styles.hero}>
+      <section className={styles.hero} aria-labelledby="system-home-heading">
         <div>
           <span className={styles.adminBadge}><ShieldCheck aria-hidden="true" size={16} /> System administrator</span>
-          <p className="eyebrow">One IMSDA operations platform</p>
-          <h2>System command center</h2>
-          <p>Every event, the system&rsquo;s health, and the exceptions that need someone. Each link opens the event workspace that can change the record.</p>
+          <p className="eyebrow">All events</p>
+          <h2 id="system-home-heading">System administration</h2>
+          <p>What is waiting for someone across every event, then the events themselves. Each link opens the page that can change the record; nothing on this page approves or changes anything.</p>
+        </div>
+        <p className={styles.identity} data-testid="signed-in-identity">
+          Signed in as <strong>{user.displayName}</strong>
+          <small>{user.email}</small>
+        </p>
+      </section>
+
+      <section aria-labelledby="summary-heading" className={styles.summarySection}>
+        <h2 id="summary-heading" className={styles.visuallyHidden}>Summary</h2>
+        <div className={styles.metrics} data-testid="home-summary">
+          {homeValues.map((item) => {
+            const readAt = readTimeLabel(item.readAt);
+            return (
+              <article key={item.key} data-value-key={item.key} data-unavailable={item.value === null ? "true" : undefined}>
+                <span className={styles.metricIcon}>
+                  {item.key === "upcoming-events" ? <TentTree aria-hidden="true" size={20} /> : item.key === "failed-email" ? <MailCheck aria-hidden="true" size={20} /> : <UsersRound aria-hidden="true" size={20} />}
+                </span>
+                <strong>{display(item.value)}</strong>
+                <p>{item.label}</p>
+                <small>{item.value === null ? `${item.unit}: could not be read just now.` : `${item.unit}. ${item.scope}`}{readAt ? ` Read at ${readAt}.` : ""}</small>
+                <small><Link href={item.href}>{item.linkLabel}</Link></small>
+              </article>
+            );
+          })}
+        </div>
+        <div className={styles.totals} aria-label="Totals across all non-archived events, including past events">
+          <p>All non-archived events, including past ones:</p>
+          {dashboard ? (
+            <ul>
+              <li><strong>{dashboard.summary.attendeeCount}</strong> expected attendees</li>
+              <li><strong>{dashboard.summary.registrationCount}</strong> active registrations</li>
+              <li><strong>{dashboard.summary.operationalIssueCount}</strong> operational exceptions <small>({dashboard.summary.unresolvedAlertCount} open system alerts, failed or rejected imports, and email delivery issues)</small></li>
+              <li><strong>{dashboard.summary.activeUserCount}</strong> active staff accounts <small>({dashboard.summary.pendingUserCount} pending, {dashboard.summary.systemAdminCount} system admins)</small></li>
+            </ul>
+          ) : <Unavailable what="The event totals" />}
         </div>
       </section>
 
-      <section className={styles.metrics} aria-label="System summary">
-        <article><span className={styles.metricIcon}><TentTree aria-hidden="true" size={20} /></span><strong>{dashboard.summary.currentEventCount}</strong><p>Current events</p><small>{dashboard.summary.publishedEventCount} published across {dashboard.summary.eventCount} total</small></article>
-        <article><span className={styles.metricIcon}><UsersRound aria-hidden="true" size={20} /></span><strong>{dashboard.summary.attendeeCount}</strong><p>Expected attendees</p><small>{dashboard.summary.registrationCount} active registrations</small></article>
-        <article className={dashboard.summary.operationalIssueCount > 0 ? styles.needsAttention : undefined}><span className={styles.metricIcon}><CircleAlert aria-hidden="true" size={20} /></span><strong>{dashboard.summary.operationalIssueCount}</strong><p>Operational exceptions</p><small>{dashboard.summary.unresolvedAlertCount} open system alerts · failed imports and email</small></article>
-        <article><span className={styles.metricIcon}><ShieldCheck aria-hidden="true" size={20} /></span><strong>{dashboard.summary.activeUserCount}</strong><p>Active staff accounts</p><small>{dashboard.summary.pendingUserCount} pending · {dashboard.summary.systemAdminCount} system admins</small></article>
+      <section className={`panel ${styles.workPanel}`} id="platform-work" aria-labelledby="platform-work-heading">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className="eyebrow">Across all events</p>
+            <h2 id="platform-work-heading">Work across the platform</h2>
+            <p>Separate workflows, each with its own count and its own reviewers. These are not added together: one record can appear in more than one row, and a row is not a number of people.</p>
+          </div>
+          {attention && <span>Read at {readTimeLabel(attention.generatedAt)}</span>}
+        </div>
+        {work.attentionFailed && <Unavailable what="The waiting-work checks (applications, approvals, email and scheduled-email problems)" />}
+        {!work.attentionFailed && work.unavailable.length > 0 && (
+          <p className={styles.unavailable} role="status">
+            <CircleAlert aria-hidden="true" size={16} />
+            <span><strong>Unavailable:</strong> {work.unavailable.join(", ")}. A check that is missing here may still have work waiting, so do not read its absence as none.</span>
+          </p>
+        )}
+        {work.truncated && <p className="quiet-copy">Directory review reads only the most recent events, so that list may be longer than shown.</p>}
+        {workGroups.map((group) => (
+          <section key={group.title} className={styles.workGroup} aria-label={group.title}>
+            <h3>{group.title}</h3>
+            <ul className={styles.workList}>
+              {group.rows.map((row) => (
+                <li key={row.key} className={styles.workRow} data-work-key={row.key}>
+                  <span className={styles.rowCount}>{row.count === null ? "Unavailable" : `${row.atLeast ? "At least " : ""}${row.count}`}</span>
+                  <span className={styles.rowLabel}>
+                    {row.label}
+                    {row.reviewOnly && <small>Review list only: not counted in the notification badge.</small>}
+                  </span>
+                  <Link className={styles.rowLink} href={row.href}>{row.linkLabel}<ArrowRight aria-hidden="true" size={14} /></Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+        {!work.attentionFailed && work.unavailable.length === 0 && work.rows.length === 0 && (
+          <p className="quiet-copy">Nothing is waiting in the checks above. Directory review, the email queue and the other checks are listed on the health panel and in Notifications.</p>
+        )}
+        <details className={styles.distinct}>
+          <summary>How these numbers differ</summary>
+          <p>Each is its own quantity with its own definition. None of them is a total of the others.</p>
+          <dl>
+            <div><dt>Operational exceptions</dt><dd>{dashboard ? dashboard.summary.operationalIssueCount : "Unavailable"}: failed or rejected import runs and email delivery issues on all non-archived events, plus open system alerts.</dd></div>
+            <div><dt>Notification list items</dt><dd>{attention && attention.unreadable.length === 0 ? attention.total : attention ? `${attention.total} (some checks unavailable)` : "Unavailable"}: the waiting, email and health items above, without the review-only directory list.</dd></div>
+            <div><dt>Directory entries to review</dt><dd>{display(directoryReviewCount)}: a review list for recent events, not an alert.</dd></div>
+            <div><dt>Unread alerts in your feed</dt><dd>{display(unreadFeed)}: alert-feed items you have not read, shown only to you.</dd></div>
+          </dl>
+        </details>
       </section>
-
-      <nav className={styles.tasks} aria-label="System management tasks">
-        {systemNavGroups.map((group) => {
-          const cards = group.items.map(({ href, label, description, icon: Icon }) => (
-            <Link className={styles.taskCard} href={href} key={href}>
-              <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
-              <span className={styles.taskText}><strong>{label}</strong><small>{description}</small></span>
-            </Link>
-          ));
-          // The grid is sized to the group's tile count so a short group never strands one tile (see the stylesheet).
-          const grid = <div className={styles.taskGrid} data-count={group.items.length}>{cards}</div>;
-          // Catalogs and settings start closed; a disclosure needs no script, so it also works before hydration.
-          return group.collapsedByDefault ? (
-            <details className={styles.taskGroup} key={group.key} data-testid={`task-group-${group.key}`}>
-              <summary><h2>{group.label}</h2><ChevronDown aria-hidden="true" size={16} /></summary>
-              {grid}
-            </details>
-          ) : (
-            <section className={styles.taskGroup} key={group.key} aria-labelledby={`task-group-${group.key}`} data-testid={`task-group-${group.key}`}>
-              <h2 id={`task-group-${group.key}`}>{group.label}</h2>
-              {grid}
-            </section>
-          );
-        })}
-      </nav>
 
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Feature requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason.</p></div>
-          <span>{moduleRequests.length} waiting</span>
+          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Feature requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
+          <span>{moduleRequests ? `${moduleRequests.length} waiting` : "Unavailable"}</span>
         </div>
-        {moduleRequests.length === 0
-          ? <p className="quiet-copy">No requests are waiting.</p>
-          : <ModuleRequestQueue requests={moduleRequests.map((request) => ({
-              id: request.id,
-              eventId: request.eventId,
-              eventName: request.eventName,
-              moduleTitle: request.moduleTitle,
-              requesterName: request.requesterName,
-              reason: request.reason,
-              createdLabel: formatRequestDate(request.createdAt),
-            }))} />}
+        {moduleRequests === null
+          ? <Unavailable what="The feature-request list" />
+          : moduleRequests.length === 0
+            ? <p className="quiet-copy">No requests are waiting.</p>
+            : <ModuleRequestQueue requests={moduleRequests.map((request) => ({
+                id: request.id,
+                eventId: request.eventId,
+                eventName: request.eventName,
+                moduleTitle: request.moduleTitle,
+                requesterName: request.requesterName,
+                reason: request.reason,
+                createdLabel: formatRequestDate(request.createdAt),
+              }))} />}
       </section>
 
-      <section className={styles.health} id="system-health" aria-labelledby="system-health-heading">
+      <section className={styles.primaryColumn} id="upcoming-events" aria-labelledby="upcoming-events-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Live</p><h2 id="system-health-heading">System health</h2><p>The unattended jobs nobody watches until they stop. Read when this page loaded.</p></div>
-        </div>
-        <div className={styles.healthGrid}>
-          {healthRows.map(({ name, state, label, detail, icon: Icon, extra }) => (
-            <article key={name}>
-              <div className={styles.healthHead}>
-                <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
-                <strong>{name}</strong>
-                <em className={healthClass[state]}>{label}</em>
-              </div>
-              <small>{detail}</small>
-              {extra}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.primaryColumn}>
-        <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Across all events</p><h2>Event operations</h2><p>Open the event workspace that owns the underlying record or exception.</p></div>
-          <span>{currentEvents.length} current</span>
+          <div><p className="eyebrow">Not archived, not ended</p><h2 id="upcoming-events-heading">Upcoming events</h2><p>Events in progress or still to come, from all non-archived events. Open the event workspace that owns the underlying record.</p></div>
+          <span>{dashboard ? `${currentEvents.length} upcoming` : "Unavailable"}</span>
         </div>
 
+        {!dashboard && <Unavailable what="The event list" />}
         <div className={styles.eventList}>
           {currentEvents.map((event) => {
             const query = `event=${encodeURIComponent(event.id)}`;
@@ -319,29 +413,102 @@ export default async function SystemAdminPage({
               </article>
             );
           })}
-          {currentEvents.length === 0 && (
-            <div className={styles.emptyState}>
+          {dashboard && currentEvents.length === 0 && (
+            <div className={styles.emptyState} data-testid="starter-state">
               <CalendarPlus aria-hidden="true" size={24} />
-              <strong>No current events</strong>
-              <p>Create the next event to begin registration setup.</p>
+              <strong>No upcoming events</strong>
+              <p>Start by creating an event, or copy a past one. This page does not show email, payment or readiness as set up: check Email, Platform settings and System readiness for that.</p>
+              <p className={styles.starterLinks}>
+                <Link className="primary-button" href="/event-setup">Create event</Link>
+                <Link href="/event-setup/copy">Copy a past event</Link>
+                <Link href="/admin/form-templates">Form templates</Link>
+              </p>
             </div>
           )}
         </div>
 
-        {pastEvents.length > 0 && (
-          <details className={styles.pastEvents}>
-            <summary>{pastEvents.length} past {pastEvents.length === 1 ? "event" : "events"}</summary>
-            <div>
-              {pastEvents.map((event) => (
-                <Link href={`/overview?event=${encodeURIComponent(event.id)}`} key={event.id}>
-                  <span><strong>{event.name}</strong><small>{dateRange(event.startsAt, event.endsAt, event.timezone)}</small></span>
-                  <ArrowRight aria-hidden="true" size={15} />
-                </Link>
-              ))}
-            </div>
-          </details>
+        {dashboard && (
+          <div className={styles.allEvents}>
+            <Link href={archivedEventsHref}><Archive aria-hidden="true" size={14} /> Archived events</Link>
+            {pastEvents.length > 0 && (
+              <details className={styles.pastEvents}>
+                <summary>{pastEvents.length} past {pastEvents.length === 1 ? "event" : "events"} (not archived)</summary>
+                <div>
+                  {pastEvents.map((event) => (
+                    <Link href={`/overview?event=${encodeURIComponent(event.id)}`} key={event.id}>
+                      <span><strong>{event.name}</strong><small>{dateRange(event.startsAt, event.endsAt, event.timezone)}</small></span>
+                      <ArrowRight aria-hidden="true" size={15} />
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
         )}
       </section>
+
+      <section className={`panel ${styles.commonTasks}`} aria-labelledby="common-tasks-heading" data-testid="common-tasks">
+        <div className={styles.sectionHeading}>
+          <div><p className="eyebrow">Common tasks</p><h2 id="common-tasks-heading">Set up and manage</h2></div>
+        </div>
+        <div className={styles.commonGrid}>
+          {[...new Set(commonTasks.map((task) => task.heading))].map((heading) => (
+            <div key={heading}>
+              <h3>{heading}</h3>
+              <ul>
+                {commonTasks.filter((task) => task.heading === heading).map(({ item }) => (
+                  <li key={item.href}><Link href={item.href}>{item.label}</Link><small>{item.description}</small></li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.health} id="system-health" aria-labelledby="system-health-heading">
+        <div className={styles.sectionHeading}>
+          <div><p className="eyebrow">Live</p><h2 id="system-health-heading">System health</h2><p>The unattended jobs nobody watches until they stop. Read when this page loaded.</p></div>
+        </div>
+        {!health && <Unavailable what="System health" />}
+        <div className={styles.healthGrid}>
+          {healthRows.map(({ name, state, label, detail, icon: Icon, extra }) => (
+            <article key={name}>
+              <div className={styles.healthHead}>
+                <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
+                <strong>{name}</strong>
+                <em className={healthClass[state]}>{label}</em>
+              </div>
+              <small>{detail}</small>
+              {extra}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <nav className={styles.tasks} aria-label="System management tasks (full directory)">
+        {systemNavGroups.map((group) => {
+          const cards = group.items.map(({ href, label, description, icon: Icon }) => (
+            <Link className={styles.taskCard} href={href} key={href}>
+              <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
+              <span className={styles.taskText}><strong>{label}</strong><small>{description}</small></span>
+            </Link>
+          ));
+          // The grid is sized to the group's tile count so a short group never strands one tile (see the stylesheet).
+          const grid = <div className={styles.taskGrid} data-count={group.items.length}>{cards}</div>;
+          // Catalogs and settings start closed; a disclosure needs no script, so it also works before hydration.
+          return group.collapsedByDefault ? (
+            <details className={styles.taskGroup} key={group.key} data-testid={`task-group-${group.key}`}>
+              <summary><h2>{group.label}</h2><ChevronDown aria-hidden="true" size={16} /></summary>
+              {grid}
+            </details>
+          ) : (
+            <section className={styles.taskGroup} key={group.key} aria-labelledby={`task-group-${group.key}`} data-testid={`task-group-${group.key}`}>
+              <h2 id={`task-group-${group.key}`}>{group.label}</h2>
+              {grid}
+            </section>
+          );
+        })}
+      </nav>
 
       <div className={styles.footerCards}>
         <section className={styles.scope}>

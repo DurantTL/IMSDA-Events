@@ -640,8 +640,250 @@ details.taskGroup[open] .taskGrid {
   text-underline-offset: 3px;
 }
 
+/* ---- System home (#1182): identity, scoped values, work across the platform, common tasks ---- */
+.identity {
+  align-self: flex-end;
+  display: grid;
+  gap: 2px;
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: break-word;
+  color: #d6e5ec;
+}
+
+.identity strong {
+  color: white;
+}
+
+.identity small {
+  color: #b8d2de;
+  font-size: max(var(--type-floor, 0px), 0.62rem);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.summarySection {
+  display: grid;
+  gap: 10px;
+}
+
+.metrics article[data-unavailable="true"] {
+  border-style: dashed;
+}
+
+.metrics article small a {
+  color: var(--imsda-navy);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.totals {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.66rem);
+}
+
+.totals p {
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.totals ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.totals strong {
+  color: var(--imsda-navy);
+}
+
+.workPanel {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.workGroup h3,
+.commonGrid h3 {
+  margin: 0 0 6px;
+  color: var(--imsda-navy);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.workList,
+.commonGrid ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workRow {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  padding: 8px 12px;
+}
+
+.rowCount {
+  color: var(--imsda-navy);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.rowLabel {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: break-word;
+  color: var(--ink);
+  font-size: max(var(--type-body-floor, 0px), 0.7rem);
+}
+
+.rowLabel small {
+  color: var(--muted);
+  font-size: max(var(--type-floor, 0px), 0.6rem);
+}
+
+.rowLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-body-floor, 0px), 0.7rem);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.unavailable {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  border: 1px dashed #c9a24b;
+  border-radius: 12px;
+  background: var(--imsda-gold-soft);
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: max(var(--type-body-floor, 0px), 0.7rem);
+  line-height: 1.5;
+}
+
+.unavailable svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.distinct {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.66rem);
+}
+
+.distinct summary {
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+.distinct dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.distinct dt {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.distinct dd {
+  margin: 0;
+}
+
+.starterLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+}
+
+.allEvents {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.allEvents > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+.commonTasks {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.commonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.commonGrid li {
+  display: grid;
+  gap: 1px;
+}
+
+.commonGrid li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+.commonGrid small {
+  color: var(--muted);
+  font-size: max(var(--type-floor, 0px), 0.6rem);
+}
+
 /* ---- Tablet ---- */
 @media (max-width: 1080px) {
+  .commonGrid {
+    grid-template-columns: 1fr;
+  }
+
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -796,5 +1038,23 @@ details.taskGroup[open] .taskGrid {
 
   .eventWarnings a {
     min-height: 44px;
+  }
+
+  .identity {
+    align-self: stretch;
+  }
+
+  .workRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .workPanel,
+  .commonTasks {
+    padding: 14px;
+  }
+
+  .totals ul {
+    display: grid;
   }
 }

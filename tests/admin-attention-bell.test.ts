@@ -205,6 +205,9 @@ describe("admin notification bell counts (#1032)", () => {
     const result = await loadAttentionSignals(now);
     expect(result.clubApplicationsWaiting).toBe(0);
     expect(result.unreadableChecks).toBe(1);
+    // The failed check is named (#1182), so a page can show it as unavailable instead of as zero.
+    expect(result.unreadableKeys).toEqual(["club-applications"]);
+    expect(buildAttentionSummary(result).unreadable).toEqual(["club-applications"]);
     expect(result.pendingTeams.total).toBe(5);
     expect(mocks.logError).toHaveBeenCalled();
   });
@@ -249,7 +252,9 @@ describe("admin notification bell counts (#1032)", () => {
     const prisma = fakePrisma();
     mocks.getPrisma.mockReturnValue(prisma);
     mocks.listDirectoryReviewEntries.mockRejectedValueOnce(new Error("scan failed"));
-    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(1);
+    const result = await loadAttentionSignals(now);
+    expect(result.unreadableChecks).toBe(1);
+    expect(result.unreadableKeys).toEqual(["directory-review"]);
   });
 
   it("still caches a truncated answer for the full window", async () => {

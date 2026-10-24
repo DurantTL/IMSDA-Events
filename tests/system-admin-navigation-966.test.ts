@@ -219,9 +219,9 @@ describe("/admin dashboard page", () => {
     expect(stylesheet.slice(stylesheet.lastIndexOf(".eventStats {"))).toMatch(/^\.eventStats \{\s*display: none;/);
   });
 
-  it("orders the page: hero, summary, task groups, health, then event operations and the footer cards (#989)", () => {
+  it("orders the page: header, summary, work across the platform, upcoming events, common tasks, health, the task directory and the footer cards (#1182)", () => {
     const at = (text: string) => source.indexOf(text);
-    const order = ["styles.hero", "styles.metrics", "styles.tasks", "styles.health}", "styles.primaryColumn", "styles.footerCards"].map(at);
+    const order = ["styles.hero", "styles.metrics", "styles.workPanel", "styles.primaryColumn", "styles.commonTasks", "styles.health}", "styles.tasks", "styles.footerCards"].map(at);
     expect(order.every((position) => position > -1)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
     // Tiles are equal height with a two-line description, and the grid is sized to the group's tile count.
@@ -235,6 +235,6 @@ describe("/admin dashboard page", () => {
   });
 
   it("keeps the event operations, health and version panels", () => {
-    for (const text of ["Event operations", "System health", "System version", "Feature requests"]) expect(source).toContain(text);
+    for (const text of ["Upcoming events", "System health", "System version", "Feature requests"]) expect(source).toContain(text);
   });
 });
