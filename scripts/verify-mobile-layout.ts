@@ -156,7 +156,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -211,6 +211,7 @@ const pages: PageSpec[] = [
   { name: "public-event-page-all-blocks", path: `/events/${blocksEventSlug}`, role: "visitor" },
   // Club portal (a director of two clubs).
   { name: "account-overview", path: "/account", role: "director" },
+  { name: "account-overview-attendee", path: "/account", role: "attendee" },
   { name: "account-registrations", path: "/account/registrations", role: "director" },
   { name: "account-profile", path: "/account/profile", role: "director" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },
@@ -1046,7 +1047,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 /** MOBILE_LAYOUT_CLEANUP=1: deletes every row the audit created, children before parents. */
 async function cleanupSynthetic(prisma: PrismaClient) {
   const orgs = { organizationId: { in: [clubA, clubB] } };
-  const accountIds = [`${P}_account_director`, `${P}_account_area`];
+  const accountIds = [`${P}_account_director`, `${P}_account_area`, `${P}_account_attendee`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
@@ -1147,6 +1148,8 @@ async function seedSynthetic(prisma: PrismaClient) {
   const accounts = [
     { id: `${P}_account_director`, email: `${P}.director@example.test`, displayName: "Dana Mobilecheck-Directorsson", firstName: "Dana", lastName: "Mobilecheck-Directorsson" },
     { id: `${P}_account_area`, email: `${P}.area@example.test`, displayName: "Avery Mobilecheck-Coordinator", firstName: "Avery", lastName: "Mobilecheck-Coordinator" },
+    // A plain attendee (#1175): no club, coordinator or staff grant and no registrations, so the Overview shows its empty state.
+    { id: `${P}_account_attendee`, email: `${P}.attendee@example.test`, displayName: "Taylor Mobilecheck-Lane", firstName: "Taylor", lastName: "Mobilecheck-Lane" },
   ];
   for (const account of accounts) {
     await prisma.attendeeAccount.upsert({
@@ -1649,8 +1652,8 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
   const cookie = async (role: SignedInRole) => {
-    if (role === "director" || role === "area") {
-      const accountId = role === "director" ? `${P}_account_director` : `${P}_account_area`;
+    if (role === "director" || role === "area" || role === "attendee") {
+      const accountId = role === "director" ? `${P}_account_director` : role === "area" ? `${P}_account_area` : `${P}_account_attendee`;
       const session = await attendeeSession.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
       tokens.attendee.push(session.token);
       return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
@@ -1668,6 +1671,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
     kitchen: await cookie("kitchen"),
     director: await cookie("director"),
     area: await cookie("area"),
+    attendee: await cookie("attendee"),
   };
   return cookies;
 }
@@ -3898,7 +3902,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "event-admin", "system-admin", "kitchen"] as Role[]) {
+      for (const role of ["visitor", "director", "area", "attendee", "event-admin", "system-admin", "kitchen"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

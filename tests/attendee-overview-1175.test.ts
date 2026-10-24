@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   registrations: [] as unknown[],
   registrationsFail: false,
   mfaActive: false,
+  acting: null as null | { role: string },
+  secondStep: "OK",
+  invites: [] as unknown[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -38,7 +41,7 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
     sessionId: "a1",
   }),
 }));
-vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => "OK" }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => mocks.secondStep }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: async () => undefined }));
 vi.mock("@/modules/attendee-accounts/mfa-service", () => ({
   getAttendeeMfaStatus: async () => ({ status: mocks.mfaActive ? "ACTIVE" : "NONE" }),
@@ -49,7 +52,7 @@ vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
     return mocks.registrations;
   },
 }));
-vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: async () => [] }));
+vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: async () => mocks.invites }));
 vi.mock("@/modules/honors/instructor-repository", () => ({
   accountIsInstructor: async () => false,
   listInstructorInvitesForAccount: async () => [],
@@ -59,12 +62,14 @@ vi.mock("@/modules/organizations/area-coordinators", () => ({
   currentAreaCoordinator: async () => null,
 }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: async () => mocks.clubs }));
-vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => null }));
+vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => mocks.acting }));
 vi.mock("@/components/area-coordinator-card", () => ({
   AreaCoordinatorCardSection: () => null,
   AreaCoordinatorCardSkeleton: () => null,
 }));
-vi.mock("@/components/club-invite-accept", () => ({ ClubInviteAccept: () => null }));
+vi.mock("@/components/club-invite-accept", () => ({
+  ClubInviteAccept: () => createElement("button", { className: "primary-button" }, "Accept invite"),
+}));
 vi.mock("@/components/instructor-invite-accept", () => ({ InstructorInviteAccept: () => null }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 
@@ -134,6 +139,9 @@ beforeEach(() => {
   mocks.registrations = [];
   mocks.registrationsFail = false;
   mocks.mfaActive = false;
+  mocks.acting = null;
+  mocks.secondStep = "OK";
+  mocks.invites = [];
 });
 
 describe("registration state wording (#1175)", () => {
@@ -276,6 +284,21 @@ describe("account header and tabs (#1175)", () => {
     expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile", "My club"]);
   });
 
+  it("shows no attendee name while a staff member is acting as a club role, even with an attendee cookie present", async () => {
+    mocks.acting = { role: "CLUB_DIRECTOR" };
+    const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    expect(html).not.toContain("Taylor Lane");
+    expect(html).not.toContain("account-header-identity");
+  });
+
+  it("shows no attendee name while a second step is still pending", async () => {
+    mocks.secondStep = "REQUIRED";
+    mocks.acting = { role: "CLUB_DIRECTOR" };
+    const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    expect(html).not.toContain("Taylor Lane");
+    expect(mocks.navItems.map((item) => item.label)).not.toContain("Overview");
+  });
+
   it("shows the staff link only when the browser has a live staff session (today's rule)", async () => {
     mocks.staffUser = { globalRole: "EVENT_ADMIN" };
     const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
@@ -298,7 +321,7 @@ describe("Overview page (#1175)", () => {
     expect(html.indexOf("Soon Event")).toBeLessThan(html.indexOf("Later Event"));
     expect(html.indexOf("Later Event")).toBeLessThan(html.indexOf("Your registration account"));
     expect(html.match(/primary-button/g)).toHaveLength(1);
-    expect(html).toContain("taylor@imsda-events.test");
+    expect(html.replace(/<[^>]*>/g, "")).toContain("taylor@imsda-events.test");
     expect(html).not.toMatch(/Staff workspace|\/admin|Your other roles/);
   });
 
@@ -342,6 +365,73 @@ describe("Overview page (#1175)", () => {
     expect(html).toContain("We could not load your registrations");
     expect(html).toContain('href="/account"');
     expect(html).not.toContain("No registrations yet");
+  });
+
+  it("keeps the amount due visible with no cards, and links it when it counts a past registration", async () => {
+    mocks.registrations = [
+      registration("ended", "CONFIRMED", { eventName: "Ended Owed Event", startsAt: "2026-01-05T15:00:00.000Z", endsAt: "2026-01-06T15:00:00.000Z" }),
+    ];
+    const html = await render();
+    expect(html).toContain("Nothing coming up");
+    expect(html).toContain("$40.00");
+    expect(html).toContain("still due for Ended Owed Event, including past registrations");
+    expect(html).toContain('href="/account/registrations"');
+  });
+
+  it("words the due line as including past registrations when an ended one is owed beside an upcoming card", async () => {
+    mocks.registrations = [
+      registration("ended", "CONFIRMED", { eventName: "Ended Owed Event", startsAt: "2026-01-05T15:00:00.000Z", endsAt: "2026-01-06T15:00:00.000Z" }),
+      registration("next", "CONFIRMED", { eventName: "Upcoming Event" }),
+    ];
+    const html = await render();
+    expect(html).toContain("$80.00");
+    expect(html).toContain("across 2 registrations, including past registrations");
+    expect(html).toContain("See my registrations");
+  });
+
+  it("states the due line plainly when every registration it counts has a card", async () => {
+    mocks.registrations = [registration("next", "CONFIRMED", { eventName: "Upcoming Event" })];
+    const html = await render();
+    expect(html).toContain("still due for Upcoming Event");
+    expect(html).not.toContain("including past registrations");
+  });
+
+  it("keeps exactly one filled primary: an invite's Accept takes it from the first card", async () => {
+    mocks.invites = [{ id: "inv-1" }];
+    mocks.registrations = [registration("a", "CONFIRMED")];
+    const html = await render();
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    expect(html).toContain("Accept invite");
+    expect(html).toMatch(/secondary-button attendee-ov-action/);
+  });
+
+  it("makes Find events the one filled primary in the empty state, and not while an invite is showing", async () => {
+    let html = await render();
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    expect(html).toMatch(/class="primary-button"[^>]*href="\/events"/);
+    mocks.invites = [{ id: "inv-1" }];
+    html = await render();
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    expect(html).toMatch(/class="secondary-button"[^>]*href="\/events"/);
+  });
+
+  it("keeps the authenticator label for a director without one, filling it only when nothing else is primary", async () => {
+    mocks.clubs = [{ organizationId: "club-1", name: "Synthetic Club", role: "DIRECTOR" }];
+    mocks.registrations = [registration("a", "CONFIRMED")];
+    let html = await render();
+    expect(html).toContain("Set up an authenticator");
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    mocks.registrationsFail = true;
+    html = await render();
+    expect(html).toContain("Set up an authenticator");
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    expect(html).toMatch(/class="primary-button account-overview-link"/);
+  });
+
+  it("shows the email in a paragraph with break points before the at sign and dots", async () => {
+    const html = await render();
+    expect(html).toMatch(/<p class="attendee-ov-email"[^>]*>taylor<span><wbr\/>@imsda-events<\/span><span><wbr\/>\.test<\/span><\/p>/);
+    expect(html).not.toMatch(/<h2[^>]*>taylor@/);
   });
 
   it("shows a club link only for a real director grant, never as a second filled primary", async () => {

@@ -98,7 +98,7 @@ export default async function AccountPortalLayout({ children }: { children: Reac
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
           <AccountHeaderActions
-            identity={chromeAccount?.displayName}
+            identity={acting ? undefined : chromeAccount?.displayName}
             contexts={workspaceContexts}
             signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
           />

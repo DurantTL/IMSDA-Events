@@ -28,6 +28,11 @@ export const metadata: Metadata = {
 
 const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
+/** An email address with a break opportunity before "@" and each ".", so a long one wraps at a natural place. */
+function emailWithBreaks(email: string) {
+  return email.split(/(?=[@.])/).map((part, index) => (index === 0 ? part : <span key={index}><wbr />{part}</span>));
+}
+
 /**
  * The account's front page (#1175): a personal greeting, the registrations coming up with one next action each, and a
  * secondary column for the account and help. Everything it shows comes from the existing verified-email match and the
@@ -62,9 +67,28 @@ export default async function AttendeeAccountOverviewPage() {
   const amountDue = accountAmountDue(registrations);
   const authenticatorOn = mfaStatus.status === "ACTIVE";
   const hasWorkspaceCards = Boolean(areaCoordinator) || clubs.length > 0 || isInstructor;
-  // One filled primary per screen: the first registration's View registration. With no registration card, a club
-  // director's authenticator prompt keeps its filled button instead.
-  const authenticatorPrimary = !authenticatorOn && clubs.length > 0 && upcoming.length === 0;
+  // Exactly one filled primary per screen, in this order: an invite's Accept (when one is showing), else the first
+  // card's View registration, else Find events in the empty states, else (registrations failed to load) a club
+  // director's authenticator prompt. The prompt's wording never changes; only its fill does.
+  const inviteShowing = invites.length > 0 || instructorInvites.length > 0;
+  const needsAuthenticator = !authenticatorOn && clubs.length > 0;
+  const cardPrimary = !inviteShowing && upcoming.length > 0;
+  const findEventsPrimary = !inviteShowing && registrationsResult.ok && upcoming.length === 0;
+  const authenticatorPrimary = needsAuthenticator && !inviteShowing && !registrationsResult.ok;
+  // Payable balances count registrations that may have no card here (an ended event still owed): then the line says
+  // so and links to the full list, so it never reads as belonging to the cards above it.
+  const uncardedDue = registrations.some(
+    (registration) => registration.payment.paymentEligible && registration.balanceCents > 0 && !upcoming.includes(registration),
+  );
+  const dueAmount = <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span>;
+  const dueLine = amountDue.totalCents > 0 && (
+    <p className="account-overview-alert attendee-ov-due">
+      <CircleDollarSign size={16} aria-hidden="true" />{" "}
+      {uncardedDue
+        ? <span>{dueAmount} still due {amountDue.scope}, including past registrations. <Link className="empty-state-link" href="/account/registrations">See my registrations</Link></span>
+        : <span>{dueAmount} still due {amountDue.scope}</span>}
+    </p>
+  );
   const helpSlug = upcoming[0]?.event.slug;
 
   return (
@@ -95,33 +119,32 @@ export default async function AttendeeAccountOverviewPage() {
               </div>
             ) : upcoming.length > 0 ? (
               <>
-                {amountDue.totalCents > 0 && (
-                  <p className="account-overview-alert attendee-ov-due">
-                    <CircleDollarSign size={16} aria-hidden="true" /> <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span> still due {amountDue.scope}
-                  </p>
-                )}
+                {dueLine}
                 <ul className="attendee-ov-cards">
                   {upcoming.map((registration, index) => (
-                    <AccountRegistrationCard key={registration.id} registration={registration} primary={index === 0} />
+                    <AccountRegistrationCard key={registration.id} registration={registration} primary={cardPrimary && index === 0} />
                   ))}
                 </ul>
               </>
             ) : (
+              <>
+              {dueLine}
               <div className="attendee-ov-empty">
                 <Inbox size={22} aria-hidden="true" />
                 <div>
                   <h3>{registrations.length === 0 ? "No registrations yet" : "Nothing coming up"}</h3>
                   <p>
                     {registrations.length === 0
-                      ? `Registrations made with ${account.verifiedEmail} show up here.`
+                      ? <>Registrations made with <span translate="no">{emailWithBreaks(account.verifiedEmail)}</span> show up here.</>
                       : "Your past and cancelled registrations are still listed under My registrations."}
                   </p>
                   <p className="attendee-ov-empty-links">
-                    <Link className="secondary-button" href="/events">Find events</Link>
+                    <Link className={findEventsPrimary ? "primary-button" : "secondary-button"} href="/events">Find events</Link>
                     <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>
                   </p>
                 </div>
               </div>
+              </>
             )}
             {registrationsResult.ok && registrations.length > 0 && (
               <p className="attendee-ov-all">
@@ -183,7 +206,7 @@ export default async function AttendeeAccountOverviewPage() {
             <p className="public-registration-eyebrow">
               {authenticatorOn ? <ShieldCheck size={15} aria-hidden="true" /> : <ShieldAlert size={15} aria-hidden="true" />} Your registration account
             </p>
-            <h2 className="attendee-ov-email" translate="no">{account.verifiedEmail}</h2>
+            <p className="attendee-ov-email" translate="no">{emailWithBreaks(account.verifiedEmail)}</p>
             <p className="field-help">
               Registrations connected to this verified email appear here.{" "}
               {authenticatorOn
@@ -193,7 +216,7 @@ export default async function AttendeeAccountOverviewPage() {
                   : "Two-step sign-in is off. Add an authenticator app for extra protection."}
             </p>
             <Link className={`${authenticatorPrimary ? "primary-button" : "secondary-button"} account-overview-link`} href="/account/profile">
-              <UserRound size={14} aria-hidden="true" /> {authenticatorPrimary ? "Set up an authenticator" : "Profile and security"} <ArrowRight size={14} aria-hidden="true" />
+              <UserRound size={14} aria-hidden="true" /> {needsAuthenticator ? "Set up an authenticator" : "Profile and security"} <ArrowRight size={14} aria-hidden="true" />
             </Link>
           </section>
 
