@@ -32,10 +32,10 @@ export function EmailRegistrationsButton({
   const limited = selection.omittedCount > 0;
   return (
     <>
-      <button className="secondary-button report-download" onClick={() => setOpen(true)} type="button">
+      <button aria-describedby={limited ? "email-registrations-limit-note" : undefined} className="secondary-button report-download" onClick={() => setOpen(true)} type="button">
         <Mail aria-hidden="true" size={15} /> {label}{limited ? ` (first ${selection.selectedCount} of ${selection.matchedCount})` : ""}
       </button>
-      {limited && <small className="choice-filter-note" role="note">{selectionLimitSummary(selection)}</small>}
+      {limited && <small className="choice-filter-note report-email-limit-note" id="email-registrations-limit-note" role="note">{selectionLimitSummary(selection)}</small>}
       {open && (
         <SelectedAudienceDialog
           eventId={eventId}

@@ -204,7 +204,7 @@ export function SelectedAudienceDialog({
         ) : (
           <div className="detail-stack">
             {omittedCount > 0 && (
-              <div className="inline-notice" role="note">
+              <div className="inline-notice" id="selected-audience-limit-note" role="note">
                 <TriangleAlert aria-hidden="true" size={16} /> {limitSummary}
               </div>
             )}
@@ -339,7 +339,7 @@ export function SelectedAudienceDialog({
 
             {omittedCount > 0 && (
               <label className="checkbox-label selected-audience-limit-ack">
-                <input checked={limitAcknowledged} disabled={sending} onChange={(changeEvent) => setLimitAcknowledged(changeEvent.target.checked)} type="checkbox" />
+                <input aria-describedby="selected-audience-limit-note" checked={limitAcknowledged} disabled={sending} onChange={(changeEvent) => setLimitAcknowledged(changeEvent.target.checked)} type="checkbox" />
                 I understand only the first {registrationIds.length} will be contacted, not all {registrationIds.length + omittedCount}.
               </label>
             )}

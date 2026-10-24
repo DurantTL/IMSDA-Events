@@ -60,4 +60,24 @@ describe("report email selection limit (#1103)", () => {
     expect(dialog).toContain("!limitReady");
     expect(dialog).toContain("previewFingerprint: preview.fingerprint");
   });
+
+  it("shows no acknowledgement and keeps the plain eyebrow at exactly 250", () => {
+    const dialog = readFileSync("components/selected-audience-dialog.tsx", "utf8");
+    const exact = boundRegistrationSelection(ids(250));
+    expect(exact.omittedCount).toBe(0);
+    // The checkbox, the notice and the reduced eyebrow all hang on omittedCount > 0.
+    expect(dialog).toContain("omittedCount > 0 && (\n              <label");
+    expect(dialog).toContain("`${registrationIds.length} selected registration${registrationIds.length === 1 ? \"\" : \"s\"}`");
+    expect(dialog).toContain("omittedCount === 0 || limitAcknowledged");
+  });
+
+  it("links the notices to their controls and uses one shared limit", () => {
+    const dialog = readFileSync("components/selected-audience-dialog.tsx", "utf8");
+    const button = readFileSync("components/email-registrations-button.tsx", "utf8");
+    expect(dialog).toContain('id="selected-audience-limit-note"');
+    expect(dialog).toContain('aria-describedby="selected-audience-limit-note"');
+    expect(button).toContain('id="email-registrations-limit-note"');
+    expect(button).toContain('"email-registrations-limit-note" : undefined');
+    expect(readFileSync("modules/communications/selected-audience.ts", "utf8")).toContain("max(SELECTED_AUDIENCE_MAX_REGISTRATIONS)");
+  });
 });
