@@ -346,7 +346,7 @@ describe("one filled primary per screen (#743)", () => {
 
   const clubEvent = (id: string, over: Partial<ClubEventSummary> = {}): ClubEventSummary => ({
     id, name: `Synthetic event ${id}`, startsAt: "2026-11-06T15:00:00.000Z", endsAt: "2026-11-08T20:00:00.000Z", timezone: "America/Chicago",
-    location: "Camp", phase: "OPEN", registrationClosesOn: null, available: true, problem: null, registration: null, draft: null,
+    location: "Camp", billingMode: "DEFERRED_ORGANIZATION_INVOICE", phase: "OPEN", registrationClosesOn: null, available: true, problem: null, registration: null, draft: null,
     registeredLocation: null, hasLocations: false, multipleTeams: false, teams: [], drafts: [], ...over,
   });
 
@@ -365,11 +365,11 @@ describe("one filled primary per screen (#743)", () => {
     expect(markup).toMatch(/class="secondary-button club-event-action" href="\/account\/clubs\/org-1\/events\/a"/);
   });
 
-  it("club home: the Next task card holds the one filled button; the To do list is outlined (first screens)", () => {
-    const source = read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx");
-    expect(source).toContain('<Link className="secondary-button club-event-action" href={step.href}>');
-    expect(source).not.toContain('"primary-button"');
-    expect(read("components/club-next-task.tsx")).toContain('className="primary-button club-event-action"');
+  it("club home: the first task holds the one filled button; later tasks, the roster and the event card are outlined (#1166)", () => {
+    const source = read("components/club-home.tsx");
+    expect(source).toContain('${index === 0 ? "primary-button" : "secondary-button"} club-event-action');
+    expect(source.match(/primary-button/g)).toHaveLength(1);
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).not.toContain('"primary-button club-event-action"');
   });
 
   it("registrations: Start registration is the filled action and Email selected sits in the outlined Actions menu", () => {
