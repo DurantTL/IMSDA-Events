@@ -265,7 +265,7 @@ export function useOfflineCheckInQueue({
       return {
         status: retryLater ? "QUEUED" : "CONFLICT",
         message: retryLater
-          ? "Not confirmed. It stays saved on this device and retries on its own; tap Retry to try now."
+          ? "Saved on this device, not confirmed by the server yet. It retries on its own; tap Retry to try now."
           : payload?.message ?? "This saved check-in needs staff review.",
       };
     } catch {

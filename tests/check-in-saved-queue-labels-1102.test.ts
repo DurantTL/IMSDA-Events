@@ -19,3 +19,18 @@ describe("saved-queue labels and screening guidance (#1102)", () => {
     expect(report).toContain("can override with a recorded reason");
   });
 });
+
+describe("phone visibility and first-attempt wording (#1102 review)", () => {
+  it("keeps the queue-state label visible on phones without changing the plain-time rule", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toContain(".arrival-time { display: none; }");
+    expect(css).toContain(".arrival-time.is-queue-state { display: block; }");
+    expect(readFileSync("components/check-in-workspace.tsx", "utf8")).toContain("is-queue-state");
+  });
+
+  it("says Confirming on the first attempt and Retrying after a failure", () => {
+    const src = readFileSync("components/check-in-workspace.tsx", "utf8");
+    expect(src).toContain("attempts === 0 ? \"Confirming…\" : \"Retrying…\"");
+    expect(src).toContain("retry automatically while online");
+  });
+});

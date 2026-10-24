@@ -558,7 +558,7 @@ export function CheckInWorkspace({
               ? "Saved actions will appear here after this page loads."
               : online
                 ? queue.length > 0
-                  ? "Check-ins saved on this device can now be retried and retry automatically after reconnection. They are not confirmed until the server accepts them."
+                  ? "Check-ins saved on this device can now be retried and retry automatically while online. They are not confirmed until the server accepts them."
                   : "New check-ins are confirmed with the server immediately."
                 : "New check-ins are saved on this device only and are queued, not confirmed. Undo is unavailable."}
           </span>
@@ -685,7 +685,7 @@ export function CheckInWorkspace({
                         className={processing ? "is-spinning" : ""}
                         size={15}
                       />
-                      {processing ? "Retrying…" : "Retry"}
+                      {processing ? (item.attempts === 0 ? "Confirming…" : "Retrying…") : "Retry"}
                     </button>
                     <button
                       className="text-button danger-text"
@@ -759,7 +759,7 @@ export function CheckInWorkspace({
                   </small>
                 )}
               </span>
-              <span className="arrival-time">
+              <span className={`arrival-time${!arrival.checkedInAt && savedItem ? " is-queue-state" : ""}`}>
                 {arrival.checkedInAt
                   ? new Date(arrival.checkedInAt).toLocaleTimeString([], {
                       hour: "numeric",
@@ -768,7 +768,7 @@ export function CheckInWorkspace({
                   : savedItem?.state === "CONFLICT"
                     ? "Needs review"
                     : savedItem
-                      ? (processing ? "Retrying…" : "Queued — not confirmed")
+                      ? (processing ? (savedItem.attempts === 0 ? "Confirming…" : "Retrying…") : "Queued — not confirmed")
                       : AWAITING_ARRIVAL_LABEL}
               </span>
               {!arrival.checkedIn && sterlingHeldIds.includes(arrival.id) ? (
@@ -812,11 +812,11 @@ export function CheckInWorkspace({
                 {undoPendingId === arrival.id
                   ? "Saving…"
                   : processing
-                    ? "Retrying…"
+                    ? (savedItem && savedItem.attempts === 0 ? "Confirming…" : "Retrying…")
                     : arrival.checkedIn
                       ? online ? "Undo" : "Reconnect to undo"
                       : savedItem?.state === "CONFLICT"
-                        ? "Retry check-in"
+                        ? "Review and retry"
                         : savedItem
                           ? "Retry saved check-in"
                           : "Check in"}
