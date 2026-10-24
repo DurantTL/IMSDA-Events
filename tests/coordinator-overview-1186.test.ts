@@ -124,6 +124,8 @@ describe("overview numbers come from the clubs the owning query returned (#1186)
     ["the 11th of November", "2026-11-11T15:00:00Z", "2026-10"],
     ["the last day of October", "2026-10-31T15:00:00Z", "2026-09"],
     ["January across the year end", "2027-01-05T15:00:00Z", "2026-12"],
+    // Still October 31 in Chicago, where club months are counted, though it is November 1 in UTC.
+    ["the evening of October 31 in Chicago (November 1 UTC)", "2026-11-01T03:00:00Z", "2026-09"],
   ])("names the previous month on %s", (_label, when, month) => {
     expect(overviewMonth(clubYear, new Date(when))).toBe(month);
   });
@@ -443,13 +445,13 @@ describe("coordinator shell header wiring (#1186, #442)", () => {
   });
 
   it.each([
-    ["Area Coordinator", { role: "AREA_COORDINATOR" }],
-    ["club director", { role: "CLUB_DIRECTOR", organizationId: "club-1" }],
-  ])("shows no identity, My account or Waitlists during a staff act-as as %s", async (_label, acting) => {
+    ["Area Coordinator", { role: "AREA_COORDINATOR" }, "Acting as Area Coordinator"],
+    ["club director", { role: "CLUB_DIRECTOR", organizationId: "club-1" }, "Acting as club director"],
+  ])("shows no identity, My account or Waitlists during a staff act-as as %s, and names that role", async (_label, acting, expectedLabel) => {
     mocks.currentStaffActingContext.mockResolvedValue(acting);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", globalRole: "SYSTEM_ADMIN" } });
     const out = await html();
-    expect(out).toContain("Acting as Area Coordinator");
+    expect(out).toContain(expectedLabel);
     expect(out).not.toContain("Sample Coordinator");
     expect(out).not.toContain("My account");
     expect(out).not.toContain("Waitlists");

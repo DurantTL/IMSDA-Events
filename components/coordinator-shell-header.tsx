@@ -27,6 +27,7 @@ export async function CoordinatorShellHeader({ children }: { children?: React.Re
     account,
     secondStepPending,
     actingAs,
+    actingRole: acting?.role ?? null,
     isCoordinator,
     signOut: accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) }),
   });

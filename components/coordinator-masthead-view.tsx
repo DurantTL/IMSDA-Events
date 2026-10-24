@@ -26,12 +26,17 @@ export function coordinatorMastheadModel(input: {
   account: { displayName: string } | null;
   secondStepPending: boolean;
   actingAs: boolean;
+  /** The role the staff member is acting as, so the label never names a role they are not acting as. */
+  actingRole?: string | null;
   /** The account's own current Area Coordinator grant. */
   isCoordinator: boolean;
   signOut: AccountSignOutMode;
 }): CoordinatorMastheadModel {
   if (input.actingAs) {
-    return { identity: null, actingLabel: "Acting as Area Coordinator", showMyAccount: false, showWaitlists: false, signOut: "none" };
+    const actingLabel = input.actingRole === "AREA_COORDINATOR" || input.actingRole == null
+      ? "Acting as Area Coordinator"
+      : input.actingRole === "CLUB_DIRECTOR" ? "Acting as club director" : "Staff act-as";
+    return { identity: null, actingLabel, showMyAccount: false, showWaitlists: false, signOut: "none" };
   }
   const chromeAccount = input.secondStepPending ? null : input.account;
   return {
