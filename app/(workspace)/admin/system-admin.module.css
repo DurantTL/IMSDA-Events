@@ -308,7 +308,7 @@ details.taskGroup[open] .taskGrid {
 /* ---- System health: its own full-width row, so no text breaks mid-word ---- */
 .healthGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 14px;
 }
@@ -383,6 +383,44 @@ details.taskGroup[open] .taskGrid {
 .healthUnknown {
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
+}
+
+.healthFacts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.healthFacts div {
+  display: grid;
+  gap: 1px;
+}
+
+.healthFacts dt {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-floor, 0px), 0.6rem);
+  font-weight: 800;
+}
+
+.healthFacts dd {
+  margin: 0;
+  overflow-wrap: break-word;
+  color: var(--muted);
+  font-size: max(var(--type-floor, 0px), 0.6rem);
+  line-height: 1.5;
+}
+
+.healthNote,
+.healthScope {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.65rem);
+  line-height: 1.55;
+}
+
+.healthNote {
+  border-left: 3px solid var(--imsda-gold);
+  padding-left: 10px;
 }
 
 .alertList {

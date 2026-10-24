@@ -2,6 +2,14 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
+import Link from "next/link";
+import {
+  SCREENING_DECISION_LINKS,
+  TICK_RECORD_NOTE,
+  buildRemainingSetup,
+  readinessKinds,
+  screeningBehavior,
+} from "@/modules/system-admin/readiness-copy";
 import type { SystemReadiness, ManualReadinessRow } from "@/modules/system-admin/readiness-repository";
 import styles from "./system-readiness-workspace.module.css";
 
@@ -55,6 +63,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
   }
 
   const { summary } = readiness;
+  const remaining = buildRemainingSetup(readiness);
 
   return (
     <section className="page-stack">
@@ -79,6 +88,67 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
+      <section className="panel" aria-labelledby="readiness-kinds" data-testid="readiness-kinds">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">How to read this page</p>
+            <h2 id="readiness-kinds">Four different things</h2>
+          </div>
+        </div>
+        <ul className={styles.list}>
+          {readinessKinds.map((kind) => (
+            <li className={styles.row} key={kind.key} data-kind={kind.key}>
+              <p className={styles.title}>{kind.title}</p>
+              <p className={styles.detail}>{kind.text}</p>
+              {kind.key === "health" && <p className={styles.meta}><Link href="/admin#system-health">Open System health</Link></p>}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="panel" aria-labelledby="readiness-behavior" data-testid="readiness-behavior">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Implemented behavior</p>
+            <h2 id="readiness-behavior">{screeningBehavior.title}</h2>
+          </div>
+        </div>
+        <p className={styles.detail}>{screeningBehavior.intro}</p>
+        <ul className={styles.bullets}>
+          {screeningBehavior.points.map((point) => <li key={point}>{point}</li>)}
+        </ul>
+        <p className={styles.meta}>
+          Decision:{" "}
+          {SCREENING_DECISION_LINKS.map((link, index) => (
+            <span key={link.href}>
+              {index > 0 ? " · " : ""}
+              <a href={link.href} rel="noreferrer" target="_blank">{link.label}</a>
+            </span>
+          ))}
+        </p>
+        <p className={styles.meta}>{screeningBehavior.evidenceNote}</p>
+      </section>
+
+      <section className="panel" aria-labelledby="readiness-remaining" data-testid="readiness-remaining">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Remaining setup</p>
+            <h2 id="readiness-remaining">What is still to do</h2>
+          </div>
+        </div>
+        {remaining.needsAttention.length + remaining.unreadable.length + remaining.unticked.length === 0 && !remaining.ticksUnknown ? (
+          <p className={styles.detail}>Every automatic check passed and every manual item is ticked. That is a record of evidence, not a live health reading.</p>
+        ) : (
+          <ul className={styles.bullets}>
+            {remaining.needsAttention.map((title) => <li key={`a-${title}`}>Needs attention: {title}</li>)}
+            {remaining.unreadable.map((title) => <li key={`u-${title}`}>Could not be checked, so not counted as done: {title}</li>)}
+            {remaining.ticksUnknown
+              ? <li>Manual ticks could not be read, so which items are still open is not known.</li>
+              : remaining.unticked.map((title) => <li key={`m-${title}`}>Not ticked yet: {title}</li>)}
+          </ul>
+        )}
+      </section>
+
       <section className="panel" aria-labelledby="readiness-automatic">
         <div className="section-heading">
           <div>
@@ -102,7 +172,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
             </li>
           ))}
         </ul>
-        <p className={styles.meta}>Checked {formatDate(readiness.generatedAt)}. Reload the page to check again.</p>
+        <p className={styles.meta}>Checked {formatDate(readiness.generatedAt)}. Reload the page to check again. A check that could not be read says so; it is never shown as OK.</p>
       </section>
 
       {readiness.groups.map((group) => (
@@ -143,6 +213,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                   </div>
                   <p className={styles.detail}>{item.detail}</p>
                   <p className={styles.meta}>{item.reference}</p>
+                  <p className={styles.meta}>{TICK_RECORD_NOTE}</p>
                   {item.tick && (
                     <p className={styles.meta}>
                       Ticked by {item.tick.tickedByName} on {formatDate(item.tick.tickedAt)}

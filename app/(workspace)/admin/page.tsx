@@ -1,10 +1,8 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import {
-  Activity,
   ArrowRight,
   BellRing,
   CalendarPlus,
@@ -15,6 +13,7 @@ import {
   Map as MapIcon,
   MailCheck,
   RefreshCw,
+  MailWarning,
   ShieldCheck,
   TentTree,
   Timer,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getSystemAdminDashboard, getSystemHealth } from "@/modules/system-admin/repository";
+import { buildHealthSignals, healthPanelNote } from "@/modules/system-admin/health-model";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { listAlertFeed } from "@/modules/notifications/feed";
 import { logError } from "@/lib/logger";
@@ -79,15 +79,6 @@ function countdown(timing: string, daysUntilStart: number | null) {
   return `Starts in ${daysUntilStart} days`;
 }
 
-function ago(ms: number) {
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 1) return "less than a minute ago";
-  if (minutes < 90) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} hours ago`;
-  return `${Math.round(hours / 24)} days ago`;
-}
-
 const warningHref: Record<SetupWarningKind, string> = {
   UNPUBLISHED: "/more/event-settings",
   NO_PUBLISHED_FORM: "/registration-builder",
@@ -99,15 +90,6 @@ const warningHref: Record<SetupWarningKind, string> = {
 function withEvent(href: string, eventQuery: string) {
   return `${href}${href.includes("?") ? "&" : "?"}${eventQuery}`;
 }
-
-type HealthRow = {
-  name: string;
-  state: "ok" | "warn" | "bad" | "unknown";
-  label: string;
-  detail: string;
-  icon: typeof Activity;
-  extra?: ReactNode;
-};
 
 const healthClass = {
   ok: styles.healthOk,
@@ -180,50 +162,15 @@ export default async function SystemAdminPage({
   });
   const release = getReleaseIdentity();
 
-  const { sweep, outbox, alerts } = health ?? { sweep: null, outbox: null, alerts: null };
-  const healthRows: HealthRow[] = [
-    {
-      name: "Email sweep",
-      icon: Timer,
-      ...(!sweep
-        ? { state: "unknown" as const, label: "Unknown", detail: "The last sweep time could not be read." }
-        : sweep.status === "ok"
-          ? { state: "ok" as const, label: "Running", detail: `Last ran ${ago(sweep.ageMs ?? 0)}. Retries email, raises alerts, and prunes community content.` }
-          : sweep.status === "stale"
-            ? { state: "bad" as const, label: "Stopped?", detail: `Last ran ${ago(sweep.ageMs ?? 0)}. Failed email is not being retried and no alerts are raised until it runs again. Check the five-minute script on the server.` }
-            : sweep.status === "failing"
-              ? { state: "bad" as const, label: "Failing", detail: "The latest sweep reached the app but failed. Check the app logs for “Outbox sweep failed”." }
-              : { state: "warn" as const, label: "Not seen", detail: "No sweep has reported yet. Make sure the five-minute script posts to /api/internal/outbox/sweep." }),
-    },
-    {
-      name: "Email queue",
-      icon: MailCheck,
-      ...(!outbox
-        ? { state: "unknown" as const, label: "Unknown", detail: "The email queue could not be read." }
-        : outbox.status === "ok"
-          ? { state: "ok" as const, label: "Flowing", detail: `${outbox.pending} waiting · ${outbox.failed} gave up after retries.` }
-          : { state: "warn" as const, label: "Backing up", detail: `${outbox.reasons.join(". ")}. A large announcement can cause this briefly.` }),
-    },
-    {
-      name: "Open alerts",
-      icon: BellRing,
-      ...(!alerts
-        ? { state: "unknown" as const, label: "Unknown", detail: "Open alerts could not be read." }
-        : alerts.length === 0
-          ? { state: "ok" as const, label: "None", detail: "Nothing the alert scan is still reporting." }
-          : {
-              state: "bad" as const,
-              label: dashboard ? `${dashboard.summary.unresolvedAlertCount} open` : `${alerts.length}${alerts.length >= 5 ? "+" : ""} open`,
-              detail: "Cleared automatically once the condition is fixed.",
-              extra: (
-                <ul className={styles.alertList}>
-                  {alerts.map((alert) => <li key={alert.key}>{alert.summary}</li>)}
-                </ul>
-              ),
-            }),
-    },
-  ];
-
+  const healthReadAt = new Date().toISOString();
+  const healthSignals = buildHealthSignals({
+    health,
+    unresolvedAlertCount: dashboard ? dashboard.summary.unresolvedAlertCount : null,
+    attention,
+    readAt: healthReadAt,
+  });
+  const healthNote = healthPanelNote(healthSignals);
+  const healthIcons = { "email-sweep": Timer, "email-queue": MailCheck, "open-alerts": BellRing, "email-delivery": MailWarning } as const;
 
   const directoryReview = attention ? attention.groups.flatMap((group) => group.items).find((item) => item.key === "directory-review") : undefined;
   const directoryReviewCount = !attention || attention.unreadable.includes("directory-review") ? null : directoryReview?.count ?? 0;
@@ -469,22 +416,42 @@ export default async function SystemAdminPage({
 
       <section className={styles.health} id="system-health" aria-labelledby="system-health-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Live</p><h2 id="system-health-heading">System health</h2><p>The unattended jobs nobody watches until they stop. Read when this page loaded.</p></div>
+          <div>
+            <p className="eyebrow">Live</p>
+            <h2 id="system-health-heading">System health</h2>
+            <p>Only what was measured: each signal says what was checked, when, and what it found. A reading that could not be made is shown as unavailable, never as healthy or zero.</p>
+          </div>
         </div>
         {!health && <Unavailable what="System health" />}
-        <div className={styles.healthGrid}>
-          {healthRows.map(({ name, state, label, detail, icon: Icon, extra }) => (
-            <article key={name}>
-              <div className={styles.healthHead}>
-                <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
-                <strong>{name}</strong>
-                <em className={healthClass[state]}>{label}</em>
-              </div>
-              <small>{detail}</small>
-              {extra}
-            </article>
-          ))}
+        {healthNote && <p className={styles.healthNote} role="status" data-testid="health-note">{healthNote}</p>}
+        <div className={styles.healthGrid} data-testid="health-signals">
+          {healthSignals.map(({ key, name, checked, state, label, detail, freshness, when, items }) => {
+            const Icon = healthIcons[key];
+            return (
+              <article key={key} data-signal={key} data-freshness={freshness}>
+                <div className={styles.healthHead}>
+                  <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
+                  <strong>{name}</strong>
+                  <em className={healthClass[state]}>{label}</em>
+                </div>
+                <dl className={styles.healthFacts}>
+                  <div><dt>Checked</dt><dd>{checked}</dd></div>
+                  <div><dt>Result</dt><dd>{detail}</dd></div>
+                  <div><dt>When</dt><dd>{when}</dd></div>
+                </dl>
+                {items && (
+                  <ul className={styles.alertList}>
+                    {items.map((summary, index) => <li key={`${index}-${summary}`}>{summary}</li>)}
+                  </ul>
+                )}
+              </article>
+            );
+          })}
         </div>
+        <p className={styles.healthScope}>
+          This is live health only. The implemented Sterling Volunteers check-in rules, go-live sign-offs and any setup still to do are on{" "}
+          <Link href="/admin/readiness">System readiness</Link>. Ticks there are records of what a person did; they are not health readings.
+        </p>
       </section>
 
       <nav className={styles.tasks} aria-label="System management tasks (full directory)">
