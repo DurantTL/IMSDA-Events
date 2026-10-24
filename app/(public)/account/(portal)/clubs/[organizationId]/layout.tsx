@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { AccountSectionNav } from "@/components/account-section-nav";
 import Link from "next/link";
 import { BackToTopButton } from "@/components/back-to-top-button";
 import { ClubAccessGate } from "@/components/club-access-gate";
 import { ClubGateSlot, ClubRecordsHint } from "@/components/club-gate-slot";
+import { ClubPortalMasthead } from "@/components/club-portal-masthead";
+import { ClubPortalNav } from "@/components/club-portal-nav";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
-import { clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
+import { clubPortalNavItems, clubReporterNavItems, clubShellNavigation } from "@/modules/club-rosters/portal-nav";
 import { clubCapabilities, clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 
 // Every page under a club's portal is an authenticated leader/director
@@ -18,9 +19,11 @@ import { clubCapabilities, clubDirectorRoleLabels } from "@/modules/organization
 export const metadata: Metadata = { robots: { index: false, follow: false, nocache: true } };
 
 /**
- * Every club screen shares the club's name, its tabs, and the authenticator
- * gate. Pages check access again before they load anything: a layout is not
- * a security boundary.
+ * Every club screen shares the club shell (#1165): the Club portal masthead,
+ * the club banner (club, sponsoring church, actual role, club year), the
+ * Home / Roster / Forms / Club events / More navigation, and the
+ * authenticator gate. Pages check access again before they load anything: a
+ * layout is not a security boundary, and the navigation only hides links.
  */
 export default async function ClubLayout({
   children,
@@ -39,55 +42,54 @@ export default async function ClubLayout({
   if (!(access.state === "OPEN" && access.actor.kind === "STAFF_ACTING")) await requireAttendeeSecondStep();
   const base = `/account/clubs/${organizationId}`;
 
+  // While the roster gate is up (set up or unlock two-step, own sign-in) Monthly Records still opens, so a role that can
+  // submit reports keeps Home and Monthly Records. Every list comes from portal-nav.ts and is only regrouped for the shell.
+  const navItems = access.state === "OPEN"
+    ? clubPortalNavItems({ base, role: access.club.role, capabilities: access.capabilities })
+    : access.state === "NO_ROSTER"
+      ? clubReporterNavItems({ base, capabilities: access.capabilities })
+      : "club" in access && clubCapabilities(access.club.role).submitReports
+        ? clubReporterNavItems({ base, capabilities: clubCapabilities(access.club.role) })
+        : [];
+  const shellNav = clubShellNavigation(navItems);
+  const gated = access.state !== "OPEN" && access.state !== "NO_ROSTER";
+
   return (
-    <>
-      <section className="public-registration-hero public-manage-hero account-page-hero club-hero">
-        <div>
-          <p className="public-registration-eyebrow">
-            {clubDirectorRoleLabels[access.club.role]} · Club year {clubYearFor(new Date())}
+    <div className="club-shell">
+      {/* This masthead stands in for the account header on club pages (globals.css hides that one here). */}
+      <ClubPortalMasthead role={access.club.role} />
+      <section aria-label="Club" className="club-banner">
+        <div className="club-banner-inner">
+          <div className="club-banner-identity">
+            <h1 title={access.club.name} translate="no">{access.club.name}</h1>
+            <p>
+              {access.club.sponsoringChurch && <span translate="no">{access.club.sponsoringChurch} · </span>}
+              {clubDirectorRoleLabels[access.club.role]}
+            </p>
+          </div>
+          <p className="club-banner-year">
+            <span>Current club year</span>
+            <strong>{clubYearFor(new Date()).replace("-", "–")}</strong>
           </p>
-          <h1 title={access.club.name} translate="no">{access.club.name}</h1>
-          {access.club.sponsoringChurch && <p translate="no">{access.club.sponsoringChurch}</p>}
         </div>
       </section>
+      {shellNav.primary.length > 0 && <ClubPortalNav more={shellNav.more} primary={shellNav.primary} />}
       <div className="club-roster-layout">
-        {access.state === "OPEN" ? (
-          <AccountSectionNav
-            items={clubPortalNavItems({ base, role: access.club.role, capabilities: access.capabilities })}
-            label="Club"
-            variant="secondary"
-          />
-        ) : access.state === "NO_ROSTER" ? (
-          <AccountSectionNav
-            items={clubReporterNavItems({ base, capabilities: access.capabilities })}
-            label="Club"
-            variant="secondary"
-          />
-        ) : (
-          <>
-            {/* Gated (set up or unlock two-step, own sign-in): Monthly Records still opens, so keep the way back Home. */}
+        {gated && (
+          <ClubGateSlot>
+            <ClubAccessGate access={access} />
             {"club" in access && clubCapabilities(access.club.role).submitReports && (
-              <AccountSectionNav
-                items={clubReporterNavItems({ base, capabilities: clubCapabilities(access.club.role) })}
-                label="Club"
-                variant="secondary"
-              />
+              <ClubRecordsHint>
+                <p className="field-help club-gate-reports">
+                  Monthly Records open without this step, except the attendance check-off: <Link href={`${base}/records`}>open Monthly Records</Link>.
+                </p>
+              </ClubRecordsHint>
             )}
-            <ClubGateSlot>
-              <ClubAccessGate access={access} />
-              {"club" in access && clubCapabilities(access.club.role).submitReports && (
-                <ClubRecordsHint>
-                  <p className="field-help club-gate-reports">
-                    Monthly Records open without this step, except the attendance check-off: <Link href={`${base}/records`}>open Monthly Records</Link>.
-                  </p>
-                </ClubRecordsHint>
-              )}
-            </ClubGateSlot>
-          </>
+          </ClubGateSlot>
         )}
         {children}
       </div>
       <BackToTopButton />
-    </>
+    </div>
   );
 }

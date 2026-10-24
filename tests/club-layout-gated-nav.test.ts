@@ -16,7 +16,8 @@ vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttend
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({ attendeeSignInRedirectPath: vi.fn() }));
 
 import ClubLayout from "@/app/(public)/account/(portal)/clubs/[organizationId]/layout";
-import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
+import type { AccountNavItem } from "@/components/account-section-nav";
+import { ClubPortalNav } from "@/components/club-portal-nav";
 
 type AnyProps = Record<string, unknown>;
 
@@ -26,7 +27,7 @@ function navs(node: ReactNode, found: ReactElement<AnyProps>[] = []) {
     return found;
   }
   if (!isValidElement<AnyProps>(node)) return found;
-  if (node.type === AccountSectionNav) found.push(node);
+  if (node.type === ClubPortalNav) found.push(node);
   navs(node.props.children as ReactNode, found);
   return found;
 }
@@ -36,7 +37,7 @@ const club = (role: string) => ({ organizationId: "club-1", name: "Fixture Pathf
 async function navLabels(access: unknown) {
   mocks.getRosterAccessStateForPage.mockResolvedValue(access);
   const tree = await ClubLayout({ children: null, params: Promise.resolve({ organizationId: "club-1" }) });
-  return navs(tree).map((nav) => (nav.props.items as AccountNavItem[]).map((item) => item.label));
+  return navs(tree).map((nav) => [...(nav.props.primary as AccountNavItem[]), ...(nav.props.more as AccountNavItem[])].map((item) => item.label));
 }
 
 beforeEach(() => vi.clearAllMocks());
