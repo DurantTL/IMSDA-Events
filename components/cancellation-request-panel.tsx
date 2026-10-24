@@ -38,7 +38,7 @@ export function CancellationRequestPanel({
 }: {
   endpoint: string;
   initialView: RegistrantRequestView;
-  headingLevel?: 2 | 3;
+  headingLevel?: 2 | 3 | 4 | 5;
 }) {
   const uid = useId();
   const [view, setView] = useState(initialView);
@@ -55,7 +55,7 @@ export function CancellationRequestPanel({
   const [confirmingWithdraw, setConfirmingWithdraw] = useState<string | null>(null);
   const idempotencyKey = useRef(newKey());
   const messageRef = useRef<HTMLDivElement>(null);
-  const Heading = headingLevel === 2 ? "h2" : "h3";
+  const Heading = `h${headingLevel}` as const;
 
   const selection = {
     scope,

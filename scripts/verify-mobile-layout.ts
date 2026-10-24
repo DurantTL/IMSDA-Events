@@ -214,6 +214,8 @@ const pages: PageSpec[] = [
   { name: "account-overview-attendee", path: "/account", role: "attendee" },
   { name: "account-registrations", path: "/account/registrations", role: "director" },
   { name: "account-profile", path: "/account/profile", role: "director" },
+  { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
+  { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },
   club("home", ""),
   club("roster", "/roster"),

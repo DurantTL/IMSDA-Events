@@ -5,6 +5,7 @@ import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { MfaManager } from "@/components/mfa-manager";
 import { SessionManager } from "@/components/session-manager";
 import { SignOutButton } from "@/components/sign-out-button";
+import { VerifiedEmailExplainer } from "@/components/verified-email-explainer";
 import { StaffPasskeyManager } from "@/components/staff-passkey-manager";
 import type { ProfileData } from "@/modules/account-profile/load-profile";
 
@@ -62,7 +63,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
   const backLinks = attendeeAccount
     ? (
       <nav aria-label="Registration account links" className="profile-back-links">
-        <Link className="secondary-button" href="/account">My registrations</Link>
+        <Link className="secondary-button" href="/account/registrations">My registrations</Link>
         {clubs.length === 1 && (
           <Link className="secondary-button" href={`/account/clubs/${encodeURIComponent(clubs[0].organizationId)}`}>
             {clubs[0].name}
@@ -109,6 +110,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
                 Signed in as <strong>{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
               </p>
             )}
+            {!secondStepPending && attendeeAccount.verifiedEmail && <VerifiedEmailExplainer email={attendeeAccount.verifiedEmail} />}
             {backLinks}
             {secondStepPending
               ? secondStepNotice
@@ -148,6 +150,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
                   Signed in as <strong>{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
                 </p>
               )}
+              {!secondStepPending && attendeeAccount.verifiedEmail && <VerifiedEmailExplainer email={attendeeAccount.verifiedEmail} />}
             </div>
           </div>
           {secondStepPending
