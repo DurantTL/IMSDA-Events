@@ -100,10 +100,11 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
             <li className={styles.row} key={kind.key} data-kind={kind.key}>
               <p className={styles.title}>{kind.title}</p>
               <p className={styles.detail}>{kind.text}</p>
-              {kind.key === "health" && <p className={styles.meta}><Link href="/admin#system-health">Open System health</Link></p>}
+              
             </li>
           ))}
         </ul>
+        <p className={styles.detail}>Live health readings are on the <Link href="/admin#system-health">System health panel</Link>, not on this page.</p>
       </section>
 
       <section className="panel" aria-labelledby="readiness-behavior" data-testid="readiness-behavior">

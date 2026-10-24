@@ -11,7 +11,7 @@
  * A zero is only ever shown when the read succeeded and counted none. Health is live evidence only: the implemented
  * screening behavior (#874), human sign-offs (#870) and remaining setup live on the System readiness page.
  */
-import type { SweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
+import { SWEEP_STALE_AFTER_MS, type SweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import type { AttentionSummary } from "@/modules/system-admin/attention-model";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
 import { attentionValue, readTimeLabel } from "@/modules/system-admin/home-model";
@@ -76,9 +76,20 @@ export function agoLabel(ms: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
+/** The time of a reading, with its date once it is more than a day older than the page read (`readAt`). */
+function timeWithDate(iso: string | null, readAt: string): string | null {
+  const time = readTimeLabel(iso);
+  if (!iso || !time) return null;
+  const age = new Date(readAt).getTime() - new Date(iso).getTime();
+  if (!(age > 24 * 60 * 60 * 1000)) return time;
+  const date = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
+  return `${date}, ${time}`;
+}
+
+/** The attention summary is cached for a short time, so its read time can be earlier than the page load: say when it was read. */
 function readWhen(iso: string | null): string {
   const time = readTimeLabel(iso);
-  return time ? `Read at ${time}, when this page loaded.` : "Read when this page loaded.";
+  return time ? `Read at ${time}.` : "Read time unknown.";
 }
 
 const NO_READING = "No reading was made, so this is not shown as healthy or as zero.";
@@ -104,7 +115,7 @@ function sweepSignal(sweep: SweepHeartbeat | null | undefined, health: SystemHea
   if (!health) return unavailable(key, name, checked, "System health could not be read just now.");
   if (!sweep) return unavailable(key, name, checked, "The last sweep time could not be read.");
   const last = sweep.lastSucceededAt;
-  const lastTime = readTimeLabel(last);
+  const lastTime = timeWithDate(last, readAt);
   if (sweep.status === "ok") {
     return {
       key, name, checked, state: "ok", label: "Running", freshness: "current", observedAt: last,
@@ -120,10 +131,16 @@ function sweepSignal(sweep: SweepHeartbeat | null | undefined, health: SystemHea
     };
   }
   if (sweep.status === "failing") {
+    const failedAt = sweep.lastFailedAt;
+    const failedMs = failedAt ? Math.max(0, new Date(readAt).getTime() - new Date(failedAt).getTime()) : 0;
+    const failedTime = timeWithDate(failedAt, readAt);
+    const old = failedMs > SWEEP_STALE_AFTER_MS;
     return {
-      key, name, checked, state: "bad", label: "Failing", freshness: "current", observedAt: sweep.lastFailedAt,
-      detail: "The latest sweep reached the app but failed. Check the app logs for “Outbox sweep failed”.",
-      when: `Latest failure ${readTimeLabel(sweep.lastFailedAt) ?? "at an unknown time"}. ${readWhen(readAt)}`,
+      key, name, checked, state: "bad", label: old ? "Failing (old reading)" : "Failing", freshness: old ? "stale" : "current", observedAt: failedAt,
+      detail: `The latest sweep failed ${agoLabel(failedMs)}. Check the app logs for \u201cOutbox sweep failed\u201d.`,
+      when: old
+        ? `Stale. Latest failure ${failedTime ?? "at an unknown time"}, more than 15 minutes before this page loaded. It does not show whether the job is failing now.`
+        : `Latest failure ${failedTime ?? "at an unknown time"}. ${readWhen(readAt)}`,
     };
   }
   return {

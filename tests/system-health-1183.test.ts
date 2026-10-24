@@ -47,6 +47,8 @@ import {
   readinessKinds,
   screeningBehavior,
 } from "@/modules/system-admin/readiness-copy";
+import { backgroundCheckState } from "@/modules/background-checks/domain";
+import { STERLING_CHECK_NEEDED_MESSAGE } from "@/modules/checkin/domain";
 import { manualReadinessItems } from "@/modules/system-admin/readiness-items";
 import type { SystemReadiness } from "@/modules/system-admin/readiness-repository";
 
@@ -284,7 +286,8 @@ describe("readiness wording against the delivered #874 contract", () => {
   });
 
   it("never describes #874 as pending, approved-but-unbuilt, flags-only or nothing blocked", () => {
-    const text = [sterling.detail, screeningBehavior.intro, ...screeningBehavior.points, screeningBehavior.evidenceNote].join("\n");
+    // The dated notes may say an earlier tick recorded the "earlier flags-only rules"; that is history, not the current rules.
+    const text = [sterling.detail, screeningBehavior.intro, ...screeningBehavior.points, screeningBehavior.evidenceNote].join("\n").replaceAll("earlier flags-only rules", "");
     expect(text).not.toMatch(/flags only|flags-only|nothing blocked|not yet built|unbuilt|will be built|once built|when built/i);
     expect(text).not.toMatch(/background[ -]check/i);
   });
@@ -313,6 +316,64 @@ describe("readiness wording against the delivered #874 contract", () => {
   });
 });
 
+describe("screening storage copy is pinned to the domain", () => {
+  const copy = screeningBehavior.points.join("\n");
+  const sterling = manualReadinessItems.find((item) => item.key === "sterling-rules-signed-off")!;
+
+  it("holds a roster Not in compliance mark at check-in, and the copy says roster marks are kept", () => {
+    expect(backgroundCheckState({ expiresOn: null, complianceStatus: "NOT_COMPLIANT" }, "2026-10-24")).toBe("NOT_COMPLIANT");
+    expect(backgroundCheckState({ expiresOn: null, complianceStatus: "FLAGGED" }, "2026-10-24")).toBe("CURRENT");
+    for (const text of [copy, sterling.detail]) {
+      expect(text).toMatch(/roster compliance upload keeps its mark/i);
+      expect(text).toMatch(/Not in compliance|Not_compliant/i);
+      expect(text).toMatch(/issues note/);
+      expect(text).toMatch(/Sterling CSV (records|stores) only clear checks/);
+    }
+    expect(copy).not.toMatch(/non-clear statuses are never stored/i);
+    expect(sterling.detail).not.toMatch(/never stored/i);
+  });
+
+  it("uses the check-in message from the check-in domain and dates the delivery", () => {
+    expect(copy).toContain(STERLING_CHECK_NEEDED_MESSAGE);
+    expect(sterling.detail).toContain("20 October 2026");
+    expect(sterling.detail).toMatch(/earlier flags-only rules/);
+    expect(screeningBehavior.evidenceNote).toContain("20 October 2026");
+  });
+});
+
+describe("failing sweep and delivery counts", () => {
+  const failing = (lastFailedAt: string) => ({ status: "failing" as const, lastSucceededAt: null, lastFailedAt, ageMs: null });
+
+  it("treats a recent failure as current, with its age", () => {
+    const signal = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-24T17:50:00.000Z") } }), "email-sweep");
+    expect(signal).toMatchObject({ label: "Failing", freshness: "current" });
+    expect(signal.detail).toContain("10 minutes ago");
+  });
+
+  it("treats a failure older than the stale threshold as stale and adds the date after a day", () => {
+    const hour = build({ health: { ...goodHealth, sweep: failing("2026-10-24T16:00:00.000Z") } });
+    expect(byKey(hour, "email-sweep")).toMatchObject({ freshness: "stale" });
+    expect(byKey(hour, "email-sweep").when).toContain("4:00 PM UTC");
+    expect(byKey(hour, "email-sweep").when).not.toContain("2026");
+    const days = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-20T16:00:00.000Z") } }), "email-sweep");
+    expect(days.when).toContain("Oct 20, 2026, 4:00 PM UTC");
+    expect(days.detail).toContain("4 days ago");
+  });
+
+  it("adds the date to a stale success older than a day", () => {
+    const stale = { status: "stale" as const, lastSucceededAt: "2026-10-21T16:30:00.000Z", lastFailedAt: null, ageMs: 3 * 86_400_000 };
+    expect(byKey(build({ health: { ...goodHealth, sweep: stale } }), "email-sweep").when).toContain("Oct 21, 2026, 4:30 PM UTC");
+  });
+
+  it("shows a delivery count above zero and says when it was read", () => {
+    const signal = byKey(build({ attention: attention({ emailFailed: { total: 3, topEventId: null } }) }), "email-delivery");
+    expect(signal).toMatchObject({ state: "bad", label: "3 to look at" });
+    expect(signal.detail).toContain("3 failed, bounced or spam-marked");
+    expect(signal.when).toMatch(/^Read at 6:00 PM UTC\.$/);
+    expect(signal.when).not.toContain("when this page loaded");
+  });
+});
+
 describe("readiness page keeps four kinds apart", () => {
   it("lists live health, implemented behavior, human evidence and remaining setup as separate sections", () => {
     expect(readinessKinds.map((kind) => kind.key)).toEqual(["health", "behavior", "evidence", "setup"]);
@@ -329,7 +390,7 @@ describe("readiness page keeps four kinds apart", () => {
     const html = renderReadiness(readiness());
     expect(html).toContain(TICK_RECORD_NOTE);
     expect(html).toContain("Ticked by Synthetic Admin");
-    expect(html).toContain("It is not re-checked when behavior changes");
+    expect(html).toContain("is not re-checked when behavior changes");
     expect(TICK_RECORD_NOTE).toMatch(/does not perform the action/);
     expect(screeningBehavior.evidenceNote).toMatch(/separate decision/);
   });

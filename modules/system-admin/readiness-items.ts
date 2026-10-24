@@ -101,7 +101,7 @@ export const manualReadinessItems: readonly ManualReadinessItem[] = [
     key: "sterling-rules-signed-off",
     group: "go-live",
     title: "Sterling Volunteers check rules signed off",
-    detail: "A person records that they reviewed the Sterling Volunteers rules as implemented in #874: only dates stored, non-clear statuses never stored; registration and logins are never blocked; at youth and children's events an adult or staff member who isn't current can't be checked in without a reason-required, audited staff override; each event has a follow-up list. The tick records the review as of its date. It does not turn any rule on or off.",
+    detail: "Sign-off for the Sterling Volunteers rules. Delivered 20 October 2026 (#874): registration and logins are never blocked; at youth and children's events an adult or staff member who isn't current can't be checked in without a reason-required, audited staff override; each event has a follow-up list. A Sterling CSV stores only clear checks, as dates; a roster compliance upload keeps its mark (Clear, Flagged or Not in compliance) and a staff-only issues note. A tick dated before 20 October 2026 recorded the earlier flags-only rules, not these. A tick is a dated record and does not turn any rule on or off.",
     reference: "Issue #874 (delivered check-in rules); decision recorded on issue #218",
   },
   {

@@ -347,14 +347,6 @@ details.taskGroup[open] .taskGrid {
   color: var(--imsda-purple);
 }
 
-.healthGrid small {
-  display: block;
-  overflow-wrap: break-word;
-  color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.6rem);
-  line-height: 1.5;
-}
-
 .healthHead em {
   flex: 0 0 auto;
   border-radius: 999px;

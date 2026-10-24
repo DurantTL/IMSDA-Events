@@ -10,6 +10,7 @@
  *
  * Wording rule (#443): screening is always called "Sterling Volunteers".
  */
+import { STERLING_CHECK_NEEDED_MESSAGE } from "@/modules/checkin/domain";
 import type { SystemReadiness } from "./readiness-repository";
 
 export const ISSUE_BASE_URL = "https://github.com/DurantTL/IMSDA-Events/issues";
@@ -55,14 +56,14 @@ export const screeningBehavior = {
   intro: "The app already applies these rules. This section describes them. It does not approve them, and it changes nothing.",
   points: [
     "Registration and login are never blocked by a Sterling Volunteers check. Roster access is not blocked either.",
-    "At youth and children's events, an adult or staff member whose check is not current (none on file, expired, or not in compliance) cannot be checked in. Check-in shows “Sterling Volunteers check needed before check-in” instead of the Check in button.",
+    `At youth and children's events, an adult or staff member whose check is not current (none on file, expired, or not in compliance) cannot be checked in. Check-in shows \u201c${STERLING_CHECK_NEEDED_MESSAGE}\u201d instead of the Check in button.`,
     "A staff member with check-in permission can override with a typed reason. Every override is audited.",
     "Each event has a Sterling Volunteers follow-up list of registered adults and staff who are not current. Directors see their own club’s people, as status only.",
-    "Only dates and statuses from the uploads are stored, and non-clear statuses are never stored.",
+    "What is stored depends on the upload. A Sterling CSV records only clear checks, as dates; a row that is not clear is reported and nothing is stored. A roster compliance upload keeps its mark per person (Clear, Flagged for expiring soon, or Not in compliance) and a staff-only issues note with the check and training dates. Not in compliance holds a person at check-in; Clear and Flagged do not.",
   ],
   /** Why a tick does not certify this by itself. */
   evidenceNote:
-    "The sign-off below is a person’s record, as of the date it was ticked. It is not re-checked when behavior changes, so read its date against when these rules were delivered. Whether an earlier tick should be cleared is a separate decision and is not made here.",
+    "These rules were delivered on 20 October 2026 (#874). A sign-off ticked before that date recorded the earlier flags-only rules, not these. A tick is a person’s record as of its date and is not re-checked when behavior changes. Whether an earlier tick should be cleared is a separate decision and is not made here.",
 } as const;
 
 /** Shown under every manual item: what a tick is. */
