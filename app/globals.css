@@ -12745,6 +12745,41 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .attendee-reg-history-body { padding: 14px 12px 16px; }
 }
 
+/* Coordinator workspace (#1186): "Club coordination" masthead (reuses the club masthead rules), the Overview summary, clubs table,
+   follow-up and help panels. On these pages the shell's masthead replaces the account header and tabs, as on club pages. */
+.account-portal:has(.coordinator-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
+.coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.coordinator-overview { min-width: 0; }
+.coordinator-overview-heading h2 { margin: 0; font-size: 1.4rem; line-height: 1.25; }
+.coordinator-overview-scope { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
+.coordinator-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.coordinator-summary dl > div { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px 14px; }
+.coordinator-summary dt { color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+.coordinator-summary dd { margin: 4px 0 0; color: var(--imsda-navy); font-size: 1.4rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.coordinator-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: 20px; align-items: start; }
+.coordinator-overview-side { display: grid; gap: 16px; min-width: 0; }
+.coordinator-clubs, .coordinator-panel { min-width: 0; }
+.coordinator-clubs h3, .coordinator-panel h3, .coordinator-unavailable h3 { margin: 0 0 8px; font-size: 1.05rem; line-height: 1.3; }
+.coordinator-panel { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; }
+.coordinator-panel p { margin: 0 0 8px; }
+.coordinator-follow-up ul { margin: 0 0 8px; padding-left: 20px; overflow-wrap: anywhere; }
+.coordinator-panel .text-button, .coordinator-clubs .report-empty .text-button { display: inline-flex; min-height: 44px; align-items: center; font-weight: 800; }
+.coordinator-export { display: grid; gap: 6px; margin-bottom: 12px; }
+.coordinator-export .secondary-button { min-height: 44px; height: auto; white-space: normal; text-align: left; }
+.coordinator-count { margin: 8px 0; color: var(--muted); font-size: 0.9rem; }
+.coordinator-club-cell small { display: block; color: var(--muted); font-weight: 400; overflow-wrap: anywhere; }
+.coordinator-club-cell > span { overflow-wrap: anywhere; }
+.coordinator-clubs td .secondary-button { min-height: 44px; }
+.coordinator-unavailable { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 16px; }
+.coordinator-unavailable p { margin: 0 0 12px; }
+.coordinator-unavailable button { min-height: 44px; }
+@media (max-width: 860px) {
+  .coordinator-overview-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .coordinator-summary dl { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

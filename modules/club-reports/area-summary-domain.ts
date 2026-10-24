@@ -27,6 +27,8 @@ export type AreaSummaryInput = {
   church: string;
   directors: string[];
   rosterSize: number;
+  /** Active roster members of type Adult or Staff (#1186). Optional so older callers keep compiling; counts only. */
+  adultCount?: number;
   registrationOnTime: boolean;
   backgroundChecks: { missing: number; notInCompliance: number; expiringSoon: number };
   reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number }>;
@@ -38,6 +40,7 @@ export type AreaClubSummary = {
   church: string;
   directors: string[];
   rosterSize: number;
+  adultCount: number;
   registrationOnTime: boolean;
   backgroundChecks: AreaSummaryInput["backgroundChecks"];
   months: MonthCell[];
@@ -75,6 +78,7 @@ export function summarizeClub(input: AreaSummaryInput, clubYear: string, now: Da
     church: input.church,
     directors: input.directors,
     rosterSize: input.rosterSize,
+    adultCount: input.adultCount ?? 0,
     registrationOnTime: input.registrationOnTime,
     backgroundChecks: input.backgroundChecks,
     months,

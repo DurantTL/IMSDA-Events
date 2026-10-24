@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); }, notFound: vi.fn(), usePathname: () => "/", useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
+// The coordinator shell header (#1186) loads its own signals and has its own tests; here it only wraps the club list.
+vi.mock("@/components/coordinator-shell-header", () => ({ CoordinatorShellHeader: ({ children }: { children?: unknown }) => children }));
 vi.mock("@/modules/reporting/director-exports-repository", () => ({
   loadHonorsExport: mocks.loadHonorsExport,
   listExportMemberOptions: mocks.listExportMemberOptions,

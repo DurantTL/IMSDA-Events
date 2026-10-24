@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Eye } from "lucide-react";
 import { AccountSectionNav } from "@/components/account-section-nav";
 import { BackLink } from "@/components/back-link";
+import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { getPrisma } from "@/lib/prisma";
 import { areaClubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
@@ -28,13 +29,15 @@ export default async function AreaClubLayout({
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero club-hero">
-        <div>
-          <p className="public-registration-eyebrow">Area Coordinator · view only</p>
-          <h1 title={club.name} translate="no">{club.name}</h1>
-          {club.parentOrganization && <p translate="no">{club.parentOrganization.name}</p>}
-        </div>
-      </section>
+      <CoordinatorShellHeader>
+        <section className="public-registration-hero public-manage-hero account-page-hero club-hero">
+          <div>
+            <p className="public-registration-eyebrow">Area Coordinator · view only</p>
+            <h1 title={club.name} translate="no">{club.name}</h1>
+            {club.parentOrganization && <p translate="no">{club.parentOrganization.name}</p>}
+          </div>
+        </section>
+      </CoordinatorShellHeader>
       <div className="club-roster-layout area-club-layout">
         <BackLink href="/account/clubs">All clubs</BackLink>
         <AccountSectionNav items={areaClubPortalNavItems({ organizationId })} label="Club" variant="secondary" />

@@ -167,6 +167,17 @@ describe("area club summary repository (#657)", () => {
     ]));
   });
 
+  it("counts adults (Adult or Staff roster members) separately from the whole roster (#1186)", async () => {
+    mocks.rosterGroupBy.mockReset();
+    mocks.rosterGroupBy
+      .mockResolvedValueOnce([{ organizationId: "club-a", _count: { _all: 12 } }])
+      .mockResolvedValueOnce([{ organizationId: "club-a", _count: { _all: 4 } }]);
+    const [alpha, bravo] = await getAreaClubsSummary("2026-27", now);
+    expect(alpha).toMatchObject({ rosterSize: 12, adultCount: 4 });
+    expect(bravo).toMatchObject({ rosterSize: 0, adultCount: 0 });
+    expect(mocks.rosterGroupBy.mock.calls[1]![0].where).toMatchObject({ clubYear: "2026-27", status: "ACTIVE", attendeeType: { in: ["ADULT", "STAFF"] } });
+  });
+
   it("builds one row per active club from the stored reports, with counts-only Sterling Volunteers", async () => {
     const clubs = await getAreaClubsSummary("2026-27", now);
     expect(clubs.map((club) => club.name)).toEqual(["Alpha Pathfinders", "Bravo Adventurers"]);
