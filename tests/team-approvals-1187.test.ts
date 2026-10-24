@@ -154,7 +154,7 @@ describe("another location, or a flag that no longer applies, is denied (#1187)"
 
 describe("follow-up", () => {
   // Follow-up issue (opened by the coordinator of #1187): decideTeamPermission has no registration-status filter.
-  it.todo("refuses a decision on a flag whose team registration is cancelled, as the list already hides it");
+  it.todo("refuses a decision on a flag whose team registration is cancelled, as the list already hides it (#1191)");
 });
 
 describe("the age rule still decides who needs approval (#1187)", () => {
