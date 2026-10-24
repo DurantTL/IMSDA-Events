@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getAreaClubsSummary: vi.fn(),
   listUpcomingDeadlines: vi.fn(),
   listClubsNewYearStatus: vi.fn(),
+  getCurrentSession: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -31,10 +32,12 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ listClubsNewYearStatus: mocks.listClubsNewYearStatus }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({ getAreaClubsSummary: mocks.getAreaClubsSummary, listAreaClubEvents: vi.fn() }));
 
+import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import OverviewPage from "@/app/(public)/account/(portal)/area-clubs/overview/page";
 import { GET as AREA_EXPORT } from "@/app/api/attendee/area-clubs/export/route";
 import { coordinatorNavItems } from "@/components/area-clubs-subnav";
@@ -62,31 +65,31 @@ function club(id: string, name: string, over: Partial<AreaSummaryInput> = {}): A
 const submitted = (month: string, onTime = 25) => ({ reportMonth: month, status: "SUBMITTED" as const, totalPoints: 100, onTimePoints: onTime });
 
 const six = [
-  club("c1", "Alpha Club", { reports: [submitted("2026-10")] }),
-  club("c2", "Bravo Club", { reports: [submitted("2026-10")] }),
-  club("c3", "Charlie Club", { reports: [submitted("2026-10", 0)] }),
-  club("c4", "Delta Club", { reports: [{ reportMonth: "2026-10", status: "DRAFT", totalPoints: 0, onTimePoints: 0 }] }),
+  club("c1", "Alpha Club", { reports: [submitted("2026-09")] }),
+  club("c2", "Bravo Club", { reports: [submitted("2026-09")] }),
+  club("c3", "Charlie Club", { reports: [submitted("2026-09", 0)] }),
+  club("c4", "Delta Club", { reports: [{ reportMonth: "2026-09", status: "DRAFT", totalPoints: 0, onTimePoints: 0 }] }),
   club("c5", "Echo Club"),
   club("c6", "Foxtrot Club", { directors: [], rosterSize: 9, adultCount: 2 }),
 ];
 
 const ready = (clubs: AreaClubSummary[]): CoordinatorOverviewData => ({ status: "ready", clubs, overview: buildCoordinatorOverview(clubs, clubYear, now) });
-const render = (data: CoordinatorOverviewData, query = "") => renderToStaticMarkup(createElement(CoordinatorOverviewBody, { data, query }));
+const render = (data: CoordinatorOverviewData, query = "") => renderToStaticMarkup(createElement(CoordinatorOverviewBody, { data, now, query }));
 const props = { searchParams: Promise.resolve({}) };
 
 describe("overview numbers come from the clubs the owning query returned (#1186)", () => {
   it("states the month, the denominator and the roster total for several clubs", () => {
     const overview = buildCoordinatorOverview(six, clubYear, now);
-    expect(overview.month).toBe("2026-10");
+    expect(overview.month).toBe("2026-09");
     expect(overview.activeClubs).toBe(6);
-    expect(overview.recordsText).toBe("3 of 6 October records");
+    expect(overview.recordsText).toBe("3 of 6 September records");
     expect(overview.rosterMembers).toBe(10 * 5 + 9);
     expect(overview.followUp.map((entry) => entry.name)).toEqual(["Delta Club", "Echo Club", "Foxtrot Club"]);
   });
 
   it("handles no clubs without inventing records", () => {
     const overview = buildCoordinatorOverview([], clubYear, now);
-    expect(overview).toMatchObject({ activeClubs: 0, submittedCount: 0, recordDenominator: 0, rosterMembers: 0, recordsText: "0 of 0 October records" });
+    expect(overview).toMatchObject({ activeClubs: 0, submittedCount: 0, recordDenominator: 0, rosterMembers: 0, recordsText: "0 of 0 September records" });
     expect(overview.followUp).toEqual([]);
   });
 
@@ -95,29 +98,79 @@ describe("overview numbers come from the clubs the owning query returned (#1186)
     const overview = buildCoordinatorOverview(none, clubYear, now);
     expect(overview.submittedCount).toBe(0);
     expect(overview.followUp).toHaveLength(2);
-    expect(none.map((entry) => clubRecordStatus(entry, "2026-10").label)).toEqual(["Not submitted", "Not submitted"]);
+    expect(none.map((entry) => clubRecordStatus(entry, "2026-09", now).label)).toEqual(["Not submitted", "Not submitted"]);
   });
 
   it("mixes submitted, late, draft and missing months for one month", () => {
-    expect(clubRecordStatus(six[0]!, "2026-10")).toEqual({ state: "SUBMITTED", label: "Submitted", detail: null });
-    expect(clubRecordStatus(six[2]!, "2026-10")).toEqual({ state: "SUBMITTED", label: "Submitted", detail: "late" });
-    expect(clubRecordStatus(six[3]!, "2026-10")).toEqual({ state: "NOT_SUBMITTED", label: "Not submitted", detail: "draft saved" });
+    expect(clubRecordStatus(six[0]!, "2026-09", now)).toEqual({ state: "SUBMITTED", label: "Submitted", detail: null });
+    expect(clubRecordStatus(six[2]!, "2026-09", now)).toEqual({ state: "SUBMITTED", label: "Submitted", detail: "late" });
+    expect(clubRecordStatus(six[3]!, "2026-09", now)).toEqual({ state: "NOT_SUBMITTED", label: "Not submitted", detail: "draft saved" });
     // The same club asked about a different month is judged on that month alone.
-    expect(clubRecordStatus(six[0]!, "2026-09").state).toBe("NOT_SUBMITTED");
+    expect(clubRecordStatus(six[0]!, "2026-08", now).state).toBe("NOT_SUBMITTED");
   });
 
-  it("names the month inside the viewed club year, and clamps outside it", () => {
-    expect(overviewMonth("2026-27", new Date("2026-10-24T12:00:00Z"))).toBe("2026-10");
-    expect(overviewMonth("2025-26", new Date("2026-10-24T12:00:00Z"))).toBe("2026-08");
-    expect(overviewMonth("2027-28", new Date("2026-10-24T12:00:00Z"))).toBe("2027-09");
+  it("shows the most recent month that has ended, with its due date", () => {
+    const overview = buildCoordinatorOverview(six, clubYear, now);
+    expect(overview).toMatchObject({ month: "2026-09", monthNotDue: false, dueText: "October 10" });
+    const out = render(ready(six));
+    expect(out).toContain("September 2026 (due October 10)");
+    expect(out).toContain("Follow-up: September 2026 records (due October 10)");
+    expect(out).not.toMatch(/overdue/i);
   });
 
-  it("lists nothing as missing for a month that is not yet due", () => {
+  it.each([
+    ["the 1st of November", "2026-11-01T15:00:00Z", "2026-10"],
+    ["the 10th of November", "2026-11-10T15:00:00Z", "2026-10"],
+    ["the 11th of November", "2026-11-11T15:00:00Z", "2026-10"],
+    ["the last day of October", "2026-10-31T15:00:00Z", "2026-09"],
+    ["January across the year end", "2027-01-05T15:00:00Z", "2026-12"],
+  ])("names the previous month on %s", (_label, when, month) => {
+    expect(overviewMonth(clubYear, new Date(when))).toBe(month);
+  });
+
+  it("keeps October in view, and listed, through the 1st-10th window of November", () => {
+    const early = new Date("2026-11-05T15:00:00Z");
+    const clubs = [summarizeClub({ id: "a", name: "Alpha Club", church: "", directors: [], rosterSize: 1, registrationOnTime: true, backgroundChecks: noChecks, reports: [] }, clubYear, early)];
+    const overview = buildCoordinatorOverview(clubs, clubYear, early);
+    expect(overview).toMatchObject({ month: "2026-10", monthNotDue: false, dueText: "November 10" });
+    expect(overview.followUp.map((entry) => entry.name)).toEqual(["Alpha Club"]);
+  });
+
+  it("shows the club year's first month as not due yet, never as follow-up, before anything has ended", () => {
+    const early = new Date("2026-09-15T15:00:00Z");
+    const clubs = [summarizeClub({ id: "a", name: "Alpha Club", church: "", directors: [], rosterSize: 1, registrationOnTime: true, backgroundChecks: noChecks, reports: [{ reportMonth: "2026-09", status: "DRAFT", totalPoints: 0, onTimePoints: 0 }] }, clubYear, early)];
+    const overview = buildCoordinatorOverview(clubs, clubYear, early);
+    expect(overview).toMatchObject({ month: "2026-09", monthNotDue: true, recordsText: "Not due yet", dueText: "October 10" });
+    expect(overview.followUp).toEqual([]);
+    expect(clubRecordStatus(clubs[0]!, "2026-09", early)).toMatchObject({ state: "NOT_DUE", label: "Not due yet" });
+    const out = render({ status: "ready", clubs, overview }, "");
+    expect(out).toContain("not due yet (due October 10), so none are listed");
+    expect(out).not.toMatch(/\d+ of \d+ September records/);
+  });
+
+  it("uses the last month for a past club year and lists its missing records", () => {
+    const clubs = [summarizeClub({ id: "a", name: "Alpha Club", church: "", directors: [], rosterSize: 1, registrationOnTime: true, backgroundChecks: noChecks, reports: [] }, "2025-26", now)];
+    const overview = buildCoordinatorOverview(clubs, "2025-26", now);
+    expect(overview).toMatchObject({ month: "2026-08", monthNotDue: false, dueText: "September 10", recordsText: "0 of 1 August records" });
+    expect(overview.followUp).toHaveLength(1);
+  });
+
+  it("says Not due yet for a future club year, with no 0 of N and no follow-up", () => {
     const future = [club("a", "Alpha Club")].map((entry) => summarizeClub({ ...entry, reports: [] }, "2027-28", now));
     const overview = buildCoordinatorOverview(future, "2027-28", now);
-    expect(overview.monthNotDue).toBe(true);
+    expect(overview).toMatchObject({ month: "2027-09", monthNotDue: true, recordsText: "Not due yet" });
     expect(overview.followUp).toEqual([]);
-    expect(render({ status: "ready", clubs: future, overview })).toContain("is not due yet");
+    const out = render({ status: "ready", clubs: future, overview });
+    expect(out).toContain("<dd>Not due yet</dd>");
+    expect(out).not.toMatch(/0 of 1/);
+    expect(out).toContain("not due yet");
+  });
+
+  it("renders no empty list when no follow-up club matches the search", () => {
+    const out = render(ready(six), "bra");
+    expect(out).toContain("0 of 3 listed below match");
+    expect(out).not.toMatch(/coordinator-follow-up[^]*<ul><\/ul>/);
+    expect(out).not.toContain("<ul></ul>");
   });
 });
 
@@ -132,9 +185,9 @@ describe("overview markup (#1186)", () => {
 
   it("shows the summary, the table columns, director names and labelled screening counts", () => {
     const out = render(ready(six));
-    expect(out).toContain("3 of 6 October records");
+    expect(out).toContain("3 of 6 September records");
     expect(out).toContain("Active clubs");
-    for (const column of ["Club / church", "Roster", "Adults", "October 2026 record", "Sterling Volunteers", "Open club"]) expect(out).toContain(column);
+    for (const column of ["Club / church", "Roster", "Adults &amp; staff", "September 2026 record", "Sterling Volunteers", "Open club"]) expect(out).toContain(column);
     expect(out).toContain("Director: Dana Sample");
     expect(out).toContain("Director: none listed");
     expect(out).toContain("0 not in compliance");
@@ -152,8 +205,8 @@ describe("overview markup (#1186)", () => {
     expect(out).toContain("1 of 6 clubs shown");
     expect(out).toContain("Bravo Club");
     expect(out).not.toContain('href="/account/area/c1"');
-    expect(out).toContain("3 of 6 October records");
-    expect(out).toContain("3 of 6 clubs have no submitted October 2026 record");
+    expect(out).toContain("3 of 6 September records");
+    expect(out).toContain("3 of 6 clubs have no submitted September 2026 record");
     expect(out).toContain("0 of 3 listed below match");
     expect(out).not.toContain("Echo Club");
   });
@@ -323,15 +376,8 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     const active = (path: string) => items.filter((item) => isAccountNavItemActive(path, item)).map((item) => item.label);
     expect(active("/account/area-clubs/overview")).toEqual(["Overview"]);
     expect(active("/account/area/club_1")).toEqual(["All clubs"]);
-    expect(active("/account/area/club_1/reports/2026-10")).toEqual(["All clubs"]);
+    expect(active("/account/area/club_1/reports/2026-09")).toEqual(["All clubs"]);
     expect(active("/account/area-clubs/reports")).toEqual(["Monthly Records"]);
-  });
-
-  it("resolves identity from the same act-as and second-step signals as the portal layout", () => {
-    const source = readFileSync("components/coordinator-shell-header.tsx", "utf8");
-    expect(source).toContain("accountNeedsSecondStep");
-    expect(source).toContain("currentStaffActingContext");
-    expect(source).toContain("isAreaCoordinator");
   });
 });
 
@@ -346,5 +392,82 @@ describe("coordinator CSS (#1186)", () => {
     expect(block).not.toContain(":hover");
     expect(block).not.toMatch(/background check/i);
     expect(css).toContain(".account-portal:has(.coordinator-shell)");
+  });
+});
+
+describe("links on the overview resolve to real routes (#1186)", () => {
+  /** Every page.tsx under app/, as a route matcher: route groups drop out and [param] matches one segment. */
+  function routeMatchers(dir = "app", prefix = ""): RegExp[] {
+    const out: RegExp[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const segment = /^\(.*\)$/.test(entry.name) ? "" : `/${entry.name}`;
+        out.push(...routeMatchers(`${dir}/${entry.name}`, prefix + segment));
+      } else if (entry.name === "page.tsx") {
+        out.push(new RegExp(`^${(prefix || "/").replace(/\[[^\]]+\]/g, "[^/]+")}$`));
+      }
+    }
+    return out;
+  }
+
+  it("has no Account help link to a missing page, and every in-app href has a page", () => {
+    const matchers = routeMatchers();
+    const hrefs = (html: string) => [...html.matchAll(/href="(\/[^"#?]*)/g)].map((match) => match[1]!);
+    const out = render(ready(six)) + render(ready([]));
+    expect(out).not.toContain("/account/help");
+    for (const href of hrefs(out).filter((path) => !path.startsWith("/api/"))) {
+      expect(matchers.some((matcher) => matcher.test(href)), href).toBe(true);
+    }
+  });
+});
+
+describe("coordinator shell header wiring (#1186, #442)", () => {
+  const html = async () => renderToStaticMarkup(await CoordinatorShellHeader({}));
+  const account = { id: "account-1", displayName: "Sample Coordinator" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getCurrentAttendee.mockResolvedValue({ account, via: "attendee", sessionId: "s1" });
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null });
+    mocks.accountNeedsSecondStep.mockResolvedValue("OK");
+    mocks.currentStaffActingContext.mockResolvedValue(null);
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+  });
+
+  it("shows the real coordinator's name, role and Waitlists", async () => {
+    const out = await html();
+    expect(out).toContain("Sample Coordinator");
+    expect(out).toContain("Area Coordinator");
+    expect(out).toContain("Waitlists");
+    expect(out).toContain("Overview");
+  });
+
+  it.each([
+    ["Area Coordinator", { role: "AREA_COORDINATOR" }],
+    ["club director", { role: "CLUB_DIRECTOR", organizationId: "club-1" }],
+  ])("shows no identity, My account or Waitlists during a staff act-as as %s", async (_label, acting) => {
+    mocks.currentStaffActingContext.mockResolvedValue(acting);
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", globalRole: "SYSTEM_ADMIN" } });
+    const out = await html();
+    expect(out).toContain("Acting as Area Coordinator");
+    expect(out).not.toContain("Sample Coordinator");
+    expect(out).not.toContain("My account");
+    expect(out).not.toContain("Waitlists");
+    expect(out).not.toContain("Sign out");
+    expect(mocks.areaGrantFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("shows no identity or Waitlists while this session's second step is pending", async () => {
+    mocks.accountNeedsSecondStep.mockResolvedValue("VERIFY");
+    const out = await html();
+    expect(out).not.toContain("Sample Coordinator");
+    expect(out).not.toContain("My account");
+    expect(out).not.toContain("Waitlists");
+  });
+
+  it("offers no Waitlists to an account without a current coordinator grant", async () => {
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: new Date("2026-01-01"), expiresAt: null });
+    const out = await html();
+    expect(out).not.toContain("Waitlists");
   });
 });

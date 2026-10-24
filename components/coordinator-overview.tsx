@@ -61,7 +61,7 @@ export function CoordinatorSummary({ overview }: { overview: CoordinatorOverview
           <dd>{formatNumber(overview.activeClubs)}</dd>
         </div>
         <div>
-          <dt>Submitted records, {overview.monthLabel}</dt>
+          <dt>Submitted records, {overview.monthLabel} (due {overview.dueText})</dt>
           <dd>{overview.recordsText}</dd>
         </div>
         <div>
@@ -79,22 +79,24 @@ export function CoordinatorFollowUp({ overview, clubYear, query = "" }: { overvi
   const recordsHref = `/account/area-clubs/reports?year=${encodeURIComponent(clubYear)}`;
   return (
     <section aria-labelledby="coordinator-follow-up-title" className="coordinator-panel coordinator-follow-up">
-      <h3 id="coordinator-follow-up-title">Follow-up: {overview.monthLabel} records</h3>
+      <h3 id="coordinator-follow-up-title">Follow-up: {overview.monthLabel} records (due {overview.dueText})</h3>
       {overview.activeClubs === 0 ? (
         <p>There are no clubs to follow up on.</p>
       ) : overview.monthNotDue ? (
-        <p>{overview.monthLabel} is not due yet, so no records are listed as missing.</p>
+        <p>{overview.monthLabel} records are not due yet (due {overview.dueText}), so none are listed.</p>
       ) : overview.followUp.length === 0 ? (
         <p>Every club has submitted its {overview.monthLabel} record.</p>
       ) : (
         <>
           <p>{overview.followUp.length} of {overview.recordDenominator} clubs have no submitted {overview.monthLabel} record.</p>
           {query && <p className="field-help">{listed.length} of {overview.followUp.length} listed below match “{query}”.</p>}
-          <ul>
-            {listed.map((club) => (
-              <li key={club.id}><span translate="no">{club.name}</span></li>
-            ))}
-          </ul>
+          {listed.length > 0 && (
+            <ul>
+              {listed.map((club) => (
+                <li key={club.id}><span translate="no">{club.name}</span></li>
+              ))}
+            </ul>
+          )}
         </>
       )}
       <p className="field-help">For information only. This page sets no deadline and sends no messages.</p>
@@ -109,7 +111,6 @@ export function CoordinatorHelp() {
       <h3 id="coordinator-help-title">About this view</h3>
       <p>Your role is read-only. The club director maintains the roster and the club&apos;s settings, so ask the director for any change.</p>
       <p>Screening shows counts only. Open a club to see what your role may view there.</p>
-      <Link className="text-button" href="/account/help">Account help</Link>
     </aside>
   );
 }
@@ -122,10 +123,12 @@ export function CoordinatorClubsAtAGlance({
   clubs,
   overview,
   query,
+  now = new Date(),
 }: {
   clubs: AreaClubSummary[];
   overview: CoordinatorOverview;
   query: string;
+  now?: Date;
 }) {
   const shown = overviewTableClubs(clubs, query);
   const clearHref = `/account/area-clubs/overview?year=${encodeURIComponent(overview.clubYear)}`;
@@ -162,7 +165,7 @@ export function CoordinatorClubsAtAGlance({
                   <tr role="row">
                     <th role="columnheader" scope="col">Club / church</th>
                     <th role="columnheader" scope="col">Roster</th>
-                    <th role="columnheader" scope="col">Adults</th>
+                    <th role="columnheader" scope="col">Adults &amp; staff</th>
                     <th role="columnheader" scope="col">{overview.monthLabel} record</th>
                     <th role="columnheader" scope="col">Sterling Volunteers</th>
                     <th role="columnheader" scope="col">Open club</th>
@@ -170,7 +173,7 @@ export function CoordinatorClubsAtAGlance({
                 </thead>
                 <tbody role="rowgroup">
                   {shown.map((club) => {
-                    const record = clubRecordStatus(club, overview.month);
+                    const record = clubRecordStatus(club, overview.month, now);
                     return (
                       <tr key={club.id} role="row">
                         <th className="coordinator-club-cell" role="rowheader" scope="row">
@@ -179,7 +182,7 @@ export function CoordinatorClubsAtAGlance({
                           <small translate="no">Director: {club.directors.length > 0 ? club.directors.join(", ") : "none listed"}</small>
                         </th>
                         <td {...cardCell("Roster")}>{formatNumber(club.rosterSize)}</td>
-                        <td {...cardCell("Adults")}>{formatNumber(club.adultCount)}</td>
+                        <td {...cardCell("Adults & staff")}>{formatNumber(club.adultCount)}</td>
                         <td {...cardCell(`${overview.monthLabel} record`)}>
                           {record.label}{record.detail && <small> ({record.detail})</small>}
                         </td>
@@ -206,14 +209,14 @@ export function CoordinatorClubsAtAGlance({
 }
 
 /** The whole Overview body for either outcome of the read. */
-export function CoordinatorOverviewBody({ data, query }: { data: CoordinatorOverviewData; query: string }) {
+export function CoordinatorOverviewBody({ data, query, now = new Date() }: { data: CoordinatorOverviewData; query: string; now?: Date }) {
   if (data.status === "unavailable") return <CoordinatorUnavailable />;
   const { clubs, overview } = data;
   return (
     <>
       <CoordinatorSummary overview={overview} />
       <div className="coordinator-overview-layout">
-        <CoordinatorClubsAtAGlance clubs={clubs} overview={overview} query={query} />
+        <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} />
         <div className="coordinator-overview-side">
           <CoordinatorFollowUp clubYear={overview.clubYear} overview={overview} query={query} />
           <CoordinatorHelp />

@@ -40,7 +40,7 @@ export async function getAreaClubsSummary(
       where: { clubYear, status: "ACTIVE", organizationId: { in: clubIds } },
       _count: { _all: true },
     }),
-    // Adults by roster type, the same Adult-or-Staff rule the Sterling Volunteers candidates use (#1186). A count, never names.
+    // Adults and staff by roster type only (Adult or Staff); the age rule the Sterling Volunteers candidates add is not applied here (#1186). A count, never names.
     prisma.clubRosterMember.groupBy({
       by: ["organizationId"],
       where: { clubYear, status: "ACTIVE", attendeeType: { in: ["ADULT", "STAFF"] }, organizationId: { in: clubIds } },

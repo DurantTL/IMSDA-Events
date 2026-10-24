@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CoordinatorOverviewBody, CoordinatorOverviewHeading, type CoordinatorOverviewData } from "@/components/coordinator-overview";
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
+import { logError } from "@/lib/logger";
 import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
@@ -29,7 +30,11 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
   const query = parseClubQuery(params.q);
   const now = new Date();
   const [clubs, deadlines, newYearStatus] = await Promise.all([
-    getAreaClubsSummary(clubYear).catch(() => null),
+    getAreaClubsSummary(clubYear).catch((error: unknown) => {
+      // Logged without club or person data; the page shows "unavailable" instead of any count.
+      logError("Coordinator overview summary read failed", error, { clubYear });
+      return null;
+    }),
     listUpcomingDeadlines(),
     // Which clubs haven't started next year's roster (#414): counts only, August through October.
     carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
@@ -42,7 +47,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
       <UpcomingDeadlines deadlines={deadlines} />
       <section className="public-manage-card page-stack area-overview-page coordinator-overview">
         <CoordinatorOverviewHeading clubYear={clubYear} />
-        <CoordinatorOverviewBody data={data} query={query} />
+        <CoordinatorOverviewBody data={data} now={now} query={query} />
         {clubs && <ClubNewYearStatus clubHref={(id) => `/account/area/${id}`} status={newYearStatus} />}
       </section>
     </>

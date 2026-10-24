@@ -12754,7 +12754,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .coordinator-overview-scope { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
 .coordinator-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .coordinator-summary dl > div { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px 14px; }
-.coordinator-summary dt { color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+.coordinator-summary dt { color: var(--muted); font-size: 0.875rem; font-weight: 700; }
 .coordinator-summary dd { margin: 4px 0 0; color: var(--imsda-navy); font-size: 1.4rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .coordinator-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: 20px; align-items: start; }
 .coordinator-overview-side { display: grid; gap: 16px; min-width: 0; }

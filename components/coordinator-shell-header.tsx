@@ -20,7 +20,7 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  */
 export async function CoordinatorShellHeader({ children }: { children?: React.ReactNode } = {}) {
   const [{ account, via, sessionId }, staffSession, acting] = await Promise.all([getCurrentAttendee(), getCurrentSession(), currentStaffActingContext()]);
-  const actingAs = acting?.role === "AREA_COORDINATOR";
+  const actingAs = Boolean(acting);
   const secondStepPending = Boolean(account && via === "attendee" && (await accountNeedsSecondStep(account.id, sessionId)) !== "OK");
   const isCoordinator = Boolean(account && via === "attendee" && !actingAs && !secondStepPending && (await isAreaCoordinator(account.id)));
   const model = coordinatorMastheadModel({
