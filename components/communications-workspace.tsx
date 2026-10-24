@@ -2334,6 +2334,7 @@ export function CommunicationsWorkspace({
                 files={draftAttachments}
                 onChange={setDraftAttachments}
                 onUploadingChange={setDraftUploading}
+                dropLateUploads
                 disabled={saving}
                 help="Attached to the email when this announcement is sent. They are not shown in the attendee feed."
               />

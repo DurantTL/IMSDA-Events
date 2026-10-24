@@ -23,6 +23,12 @@ type MessageAttachmentsFieldProps = {
   disabled?: boolean;
   /** Tells the form an upload is running, so it can count as unsaved work and hold Save (#1104). */
   onUploadingChange?: (uploading: boolean) => void;
+  /**
+   * Opt in when the files live in the form's own state: an upload that finishes after the field unmounted is then
+   * dropped instead of writing into an editor that has closed (#1104). The template editor keeps workspace-level
+   * state, so it leaves this off and a late upload still lands there.
+   */
+  dropLateUploads?: boolean;
 };
 
 function typeLabel(contentType: string) {
@@ -35,7 +41,7 @@ function typeLabel(contentType: string) {
  * what the field holds is the list that the form saves with the message. Removing a file here removes it from this
  * message only.
  */
-export function MessageAttachmentsField({ eventId, files, onChange, help, disabled = false, onUploadingChange }: MessageAttachmentsFieldProps) {
+export function MessageAttachmentsField({ eventId, files, onChange, help, disabled = false, onUploadingChange, dropLateUploads = false }: MessageAttachmentsFieldProps) {
   const inputId = useId();
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -78,14 +84,14 @@ export function MessageAttachmentsField({ eventId, files, onChange, help, disabl
         });
         const result = await response.json().catch(() => ({})) as { file?: MessageFileRecord; message?: string };
         if (!response.ok || !result.file) throw new Error(result.message ?? `${file.name} could not be uploaded.`);
-        if (!mountedRef.current) return;
+        if (dropLateUploads && !mountedRef.current) return;
         next = [...next, result.file];
         onChange(next);
       }
     } catch (caught) {
-      if (mountedRef.current) setError(caught instanceof Error ? caught.message : "The file could not be uploaded.");
+      if (!dropLateUploads || mountedRef.current) setError(caught instanceof Error ? caught.message : "The file could not be uploaded.");
     } finally {
-      if (mountedRef.current) setUploading(false);
+      if (!dropLateUploads || mountedRef.current) setUploading(false);
     }
   }
 

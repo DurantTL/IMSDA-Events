@@ -126,7 +126,9 @@ describe("review follow-ups (#1104)", () => {
   it("returns focus to the New schedule button after Cancel and after a successful save", () => {
     const source = read("components/scheduled-emails-workspace.tsx");
     expect(source).toContain("ref={newScheduleRef}");
-    expect(source).toContain("window.requestAnimationFrame(() => newScheduleRef.current?.focus())");
+    expect(source).toMatch(/if \(!pendingFocusRef\.current \|\| form \|\| busy\) return;/);
+    expect(source).toContain("newScheduleRef.current?.focus()");
+    expect(source).not.toContain("window.requestAnimationFrame(() => newScheduleRef");
     const cancel = source.slice(source.indexOf("async function cancelEditor"), source.indexOf("function change<"));
     expect(cancel).toContain("focusNewSchedule()");
     const save = source.slice(source.indexOf("async function save()"), source.indexOf("async function openApproval"));
@@ -151,8 +153,10 @@ describe("review follow-ups (#1104)", () => {
     expect(workspace).toContain("if (draftUploading) return;");
     const field = read("components/message-attachments-field.tsx");
     expect(field).toContain("onUploadingChange");
-    expect(field).toContain("if (!mountedRef.current) return;");
-    expect(field.indexOf("if (!mountedRef.current) return;")).toBeLessThan(field.indexOf("onChange(next)"));
+    expect(field).toContain("dropLateUploads");
+    expect(field.indexOf("if (dropLateUploads && !mountedRef.current) return;")).toBeLessThan(field.indexOf("onChange(next)"));
+    // Only the announcement composer opts in; the template editor keeps landing late uploads.
+    expect(workspace.match(/dropLateUploads/g)?.length).toBe(1);
   });
 
   it("reads the input value before the state updater runs", () => {

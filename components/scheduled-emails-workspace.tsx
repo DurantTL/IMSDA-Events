@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { StaffPageHeader } from "@/components/staff-page-header";
@@ -139,10 +139,18 @@ export function ScheduledEmailsWorkspace({
   const [baseline, setBaseline] = useState<string | null>(() => (startWithForm ? scheduleEditorSnapshot(blankForm()) : null));
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const newScheduleRef = useRef<HTMLButtonElement>(null);
-  /** The editor is gone, so focus would fall to the page: put it on the stable "New schedule" button instead. */
+  const pendingFocusRef = useRef(false);
+  /** The editor is gone, so focus would fall to the page: ask for it on the stable "New schedule" button instead. */
   function focusNewSchedule() {
-    window.requestAnimationFrame(() => newScheduleRef.current?.focus());
+    pendingFocusRef.current = true;
   }
+  // Focus lands only once the editor is gone and the button is enabled again (it is disabled while busy),
+  // and after the confirm dialog has returned its own focus.
+  useEffect(() => {
+    if (!pendingFocusRef.current || form || busy) return;
+    pendingFocusRef.current = false;
+    newScheduleRef.current?.focus();
+  }, [form, busy]);
   const dirty = Boolean(form) && scheduleEditorIsDirty(baseline, form!);
   useUnsavedChangesGuard(dirty, "This schedule has unsaved edits. Nothing was saved, approved or sent. Leave and discard them?");
 
