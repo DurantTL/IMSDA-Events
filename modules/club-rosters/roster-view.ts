@@ -60,10 +60,10 @@ export type RosterColumnId = "name" | "age" | "birthDate" | "type" | "class" | "
 
 /**
  * The columns a viewer's table has, in order. Name, Age, Type, Current class and Details lead; Gender joins
- * with "More columns"; the birth date appears only after its separate authorized reveal; screening only where
+ * with "Show gender"; the birth date appears only after its separate authorized reveal; screening only where
  * the role gets it today; the actions column only where the row has something to do.
  */
-export function rosterColumns(options: { birthDatesShown: boolean; moreColumns: boolean; hasScreening: boolean; hasRowActions: boolean }): RosterColumnId[] {
+export function rosterColumns(options: { birthDatesShown: boolean; showGender: boolean; hasScreening: boolean; hasRowActions: boolean }): RosterColumnId[] {
   return [
     "name",
     "age",
@@ -71,7 +71,7 @@ export function rosterColumns(options: { birthDatesShown: boolean; moreColumns: 
     "type",
     "class",
     "details",
-    ...(options.moreColumns ? (["gender"] as const) : []),
+    ...(options.showGender ? (["gender"] as const) : []),
     ...(options.hasScreening ? (["screening"] as const) : []),
     ...(options.hasRowActions ? (["actions"] as const) : []),
   ];
@@ -110,28 +110,70 @@ export function rosterRowTools(options: {
   return { primary: "edit", honorsButton: false, menu };
 }
 
-/** The first-and-last-name keys that more than one person on the list shares. */
-export function duplicateRosterNameKeys(members: readonly NamedMember[]): Set<string> {
-  const seen = new Set<string>();
-  const duplicates = new Set<string>();
+/**
+ * The name each person's controls are announced with, one per person id. A name nobody else shares is just the name.
+ * Two people with one name get the fewest details that tell them apart (age, then current class, role, type), and if
+ * every detail is the same, an ordinal ("2 of 3"), so no two buttons on the page ever share an accessible name.
+ */
+export function rosterPersonLabels<T extends NamedMember & { id: string; age?: number | null; reportedAge?: number | null; role?: string | null }>(
+  members: readonly T[],
+  describe: { typeLabel: (member: T) => string; classLabel: (member: T) => string | null },
+): Map<string, string> {
+  const groups = new Map<string, T[]>();
   for (const member of members) {
     const key = normalizeRosterSearch(`${member.firstName} ${member.lastName}`);
-    if (seen.has(key)) duplicates.add(key);
-    seen.add(key);
+    groups.set(key, [...(groups.get(key) ?? []), member]);
   }
-  return duplicates;
+  const labels = new Map<string, string>();
+  for (const group of groups.values()) {
+    const first = group[0]!;
+    if (group.length === 1) {
+      labels.set(first.id, `${first.firstName} ${first.lastName}`);
+      continue;
+    }
+    const parts = group.map((member) => {
+      const age = member.age ?? member.reportedAge ?? null;
+      return [age !== null ? `age ${age}` : null, describe.classLabel(member), member.role || null, describe.typeLabel(member)].filter((part): part is string => Boolean(part));
+    });
+    const longest = Math.max(...parts.map((list) => list.length));
+    let chosen = longest;
+    for (let size = 1; size <= longest; size += 1) {
+      if (new Set(parts.map((list) => list.slice(0, size).join(", "))).size === group.length) {
+        chosen = size;
+        break;
+      }
+    }
+    const resolved = parts.map((list) => list.slice(0, chosen).join(", "));
+    const unique = new Set(resolved).size === group.length;
+    group.forEach((member, index) => {
+      const detail = resolved[index]!;
+      const own = `${member.firstName} ${member.lastName}`;
+      labels.set(member.id, unique ? `${own}, ${detail}` : `${own}, ${detail ? `${detail}, ` : ""}${index + 1} of ${group.length}`);
+    });
+  }
+  return labels;
 }
 
-/**
- * The name a row's controls are announced with. Two people with the same name get their age (or, with no age,
- * their type) added, so "Edit Sam Rivers, age 12" and "Edit Sam Rivers, age 13" are never the same button.
- */
-export function rosterPersonLabel(
-  member: NamedMember & { age?: number | null; reportedAge?: number | null; typeLabel: string },
-  duplicates: ReadonlySet<string>,
-): string {
+/** What a disambiguated label adds to the plain name, as " (age 12)", or nothing for a name nobody shares. */
+export function rosterLabelDetail(label: string, member: NamedMember): string {
   const name = `${member.firstName} ${member.lastName}`;
-  if (!duplicates.has(normalizeRosterSearch(name))) return name;
-  const age = member.age ?? member.reportedAge ?? null;
-  return `${name}, ${age !== null ? `age ${age}` : member.typeLabel}`;
+  return label.length > name.length ? ` (${label.slice(name.length + 2)})` : "";
+}
+
+/** The population after the compliance filter, then the search and Details needed. The badge counts the former so it matches the rows. */
+export function applyRosterFilters<T extends NamedMember & Parameters<typeof rosterRowMissingFields>[0]>(
+  population: readonly T[],
+  options: { query: string; detailsOnly: boolean; keepForCompliance: ((member: T) => boolean) | null },
+): { afterCompliance: T[]; visible: T[]; needDetailsCount: number } {
+  const afterCompliance = options.keepForCompliance ? population.filter(options.keepForCompliance) : [...population];
+  return {
+    afterCompliance,
+    needDetailsCount: afterCompliance.filter((member) => rosterDetailsNeeded(member)).length,
+    visible: afterCompliance.filter((member) => matchesRosterSearch(member, options.query) && (!options.detailsOnly || rosterDetailsNeeded(member))),
+  };
+}
+
+/** What "Clear filters" resets: the search, Details needed and the `?compliance=` filter, together. */
+export function clearedRosterFilters() {
+  return { query: "", detailsOnly: false, complianceFilter: null } as const;
 }

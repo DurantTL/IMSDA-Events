@@ -34,14 +34,15 @@ import {
 } from "@/modules/club-rosters/guardians-domain";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import {
-  matchesRosterSearch,
+  applyRosterFilters,
+  clearedRosterFilters,
   rosterColumns,
   rosterDetailsNeededItems,
   rosterDetailsSummary,
   rosterDetailsNeeded,
-  rosterPersonLabel,
+  rosterLabelDetail,
+  rosterPersonLabels,
   rosterRowTools,
-  duplicateRosterNameKeys,
 } from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
@@ -68,6 +69,29 @@ function complianceLabel({ state, note }: RosterComplianceInfo) {
   return { CLEAR: "Clear", NOT_COMPLIANT: "Not in compliance", NO_RECORD: "No record" }[state];
 }
 const complianceTone = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "gold" } as const;
+
+/** A value that follows `value` after it has stopped changing for `delay` ms, so a polite status is not re-read on every keystroke. */
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+/** Takes the named filter parameters out of the address (and nothing else, so `?year=` stays), without adding a history entry. */
+function dropFilterParams(...names: string[]) {
+  try {
+    const url = new URL(window.location.href);
+    const present = names.filter((name) => url.searchParams.has(name));
+    if (present.length === 0) return;
+    for (const name of present) url.searchParams.delete(name);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // A page without a usable address bar (a preview) simply keeps its address.
+  }
+}
 
 export function ClubRosterWorkspace({
   canSeeBirthDates,
@@ -165,7 +189,7 @@ export function ClubRosterWorkspace({
   /** Name search, the "Details needed" list and the optional extra columns (#1167). None of them is saved or sent anywhere. */
   const [query, setQuery] = useState("");
   const [detailsOnly, setDetailsOnly] = useState(detailsNeededFirst);
-  const [moreColumns, setMoreColumns] = useState(false);
+  const [showGender, setShowGender] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -285,27 +309,80 @@ export function ClubRosterWorkspace({
   /** The people the page is about: the same authorized club/year list the counts, the filters and the rows all start from. */
   const population = showInactive ? members : active;
   const complianceFilterOn = Boolean(complianceFilter && complianceStatuses);
-  const afterComplianceFilter = complianceFilter && complianceStatuses
-    ? population.filter((member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
-    : population;
-  const needDetailsCount = population.filter((member) => rosterDetailsNeeded(member)).length;
-  const visible = afterComplianceFilter.filter((member) =>
-    matchesRosterSearch(member, query) && (!detailsOnly || rosterDetailsNeeded(member)));
+  const { visible, needDetailsCount } = applyRosterFilters(population, {
+    query,
+    detailsOnly,
+    keepForCompliance: complianceFilter && complianceStatuses
+      ? (member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter]
+      : null,
+  });
   const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
+  const resultText = `${visible.length} of ${population.length} ${population.length === 1 ? "person" : "people"} shown${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
+  const announcedResult = useDebouncedValue(resultText, 300);
   function clearFilters() {
-    setQuery("");
-    setDetailsOnly(false);
-    setComplianceFilter(null);
+    const cleared = clearedRosterFilters();
+    setQuery(cleared.query);
+    setDetailsOnly(cleared.detailsOnly);
+    setComplianceFilter(cleared.complianceFilter);
+    // The address no longer says what the page is not showing.
+    dropFilterParams("filter", "compliance");
   }
-  const duplicateNames = duplicateRosterNameKeys(members);
+  /** Each person's accessible name: just the name, or the name with what tells two people of that name apart. */
+  const personLabels = rosterPersonLabels(members, {
+    typeLabel: (member) => clubRosterAttendeeTypeLabels[member.attendeeType],
+    classLabel: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : null),
+  });
   const sections = [
     { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF"), nameDirection) },
     { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
   ] as const;
+  /** The Health link's words and status; its accessible name starts with exactly these. */
+  const healthLinkText = (id: string) => `${healthEntryOnly ? "Enter health record" : "Health record"}${healthTab?.[id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab?.[id]?.status === "NONE" ? ": none yet" : ""}`;
+  const renderedOrder = sections.flatMap((section) => section.people.map((person) => person.id));
+  /** Where focus goes when the row it was on leaves the list (saved out of the filter, removed): the next row's Edit, else the result line. */
+  const focusRequest = useRef<{ id: string; order: string[] } | null>(null);
+  const [focusTick, setFocusTick] = useState(0);
+  useEffect(() => {
+    const request = focusRequest.current;
+    if (!request || dialogOpen) return;
+    focusRequest.current = null;
+    window.requestAnimationFrame(() => {
+      const at = request.order.indexOf(request.id);
+      const candidates = [...request.order.slice(at + 1), ...request.order.slice(0, Math.max(at, 0)).reverse()];
+      for (const id of candidates) {
+        const edit = document.getElementById(`roster-edit-${id}`);
+        if (edit) {
+          edit.focus();
+          return;
+        }
+      }
+      document.getElementById("roster-result-text")?.focus();
+    });
+  }, [focusTick, dialogOpen]);
+  /** After a change to one person: if they no longer belong in the filtered list, say so and keep focus on the page, not on a row that is gone. */
+  function rowChanged(member: RosterMemberRecord, updated: RosterMemberRecord[] | undefined, lead: string, explain: boolean) {
+    if (!updated) return;
+    const next = updated.find((person) => person.id === member.id);
+    const stillShown = Boolean(next)
+      && (showInactive || next!.status === "ACTIVE")
+      && (!complianceFilter || !complianceStatuses || complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
+      && applyRosterFilters([next!], { query, detailsOnly, keepForCompliance: null }).visible.length === 1;
+    if (stillShown) return;
+    focusRequest.current = { id: member.id, order: renderedOrder };
+    setFocusTick((tick) => tick + 1);
+    if (!explain) return;
+    const name = `${member.firstName} ${member.lastName}`;
+    const reason = next && next.status === "INACTIVE" && !showInactive
+      ? "is now inactive and hidden from this list."
+      : next && detailsOnly && !rosterDetailsNeeded(next)
+        ? "no longer needs details."
+        : "no longer matches the current search or filters.";
+    setNotice(`${lead} ${name} ${reason}`);
+  }
   /** The columns this viewer's table has: only what their role gets today, with the secondary ones opt-in. */
   const columns = rosterColumns({
     birthDatesShown: Boolean(birthDates),
-    moreColumns,
+    showGender,
     hasScreening: Boolean(complianceStatuses),
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
@@ -398,6 +475,7 @@ export function ClubRosterWorkspace({
         ...(birthDate ? { birthDate } : {}),
       }, "Saved.")
       : await call(base, "POST", { ...details, birthDate }, "Added to the roster. Next: they can be chosen when the club registers for an event.");
+    if (editing) rowChanged(editing, result?.members, "Saved.", true);
     if (result) {
       setBirthDates(null);
       formElement.reset();
@@ -455,18 +533,21 @@ export function ClubRosterWorkspace({
     });
     if (!confirmed) return;
     const result = await setStatus(member, next);
+    rowChanged(member, result?.members, next === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.", true);
     if (result) closeDialog();
   }
 
-  async function remove(member: RosterMemberRecord) {
+  async function remove(member: RosterMemberRecord, label: string) {
     const confirmed = await askConfirm({
-      title: `Remove ${member.firstName} ${member.lastName} from the roster`,
+      // Two people can share a name, so the title and the button also carry what tells them apart.
+      title: `Remove ${member.firstName} ${member.lastName} from the roster${rosterLabelDetail(label, member)}`,
       body: <p>Their birth date and details are erased. This can&apos;t be undone. To keep them on file, mark them inactive instead.</p>,
-      confirmLabel: `Remove ${member.firstName} ${member.lastName}`,
+      confirmLabel: `Remove ${label}`,
       destructive: true,
     });
     if (!confirmed) return;
     const result = await call(`${base}/${encodeURIComponent(member.id)}`, "DELETE", { confirm: true }, "Removed and erased.");
+    rowChanged(member, result?.members, "Removed and erased.", false);
     if (result?.nameKept) setNotice("Removed and erased. Their name stays on items already ordered.");
   }
 
@@ -536,18 +617,21 @@ export function ClubRosterWorkspace({
                 aria-describedby="roster-details-help"
                 aria-pressed={detailsOnly}
                 className="secondary-button roster-filter-button"
-                onClick={() => setDetailsOnly((current) => !current)}
+                onClick={() => {
+                  if (detailsOnly) dropFilterParams("filter");
+                  setDetailsOnly((current) => !current);
+                }}
                 type="button"
               >
                 Details needed <span className="count-badge">{needDetailsCount}</span>
               </button>
               <button
-                aria-pressed={moreColumns}
+                aria-pressed={showGender}
                 className="secondary-button roster-filter-button"
-                onClick={() => setMoreColumns((current) => !current)}
+                onClick={() => setShowGender((current) => !current)}
                 type="button"
               >
-                More columns
+                Show gender
               </button>
             </div>
           </div>
@@ -555,10 +639,12 @@ export function ClubRosterWorkspace({
             Details needed lists people missing a gender, current class, role or type. Each row says what to add.
           </p>
           <div className="roster-result-line">
-            <p aria-live="polite" role="status">
+            <p id="roster-result-text" tabIndex={-1}>
               <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
+            {/* The same result for screen readers, announced once typing pauses rather than on every key. */}
+            <p aria-live="polite" className="sr-only" role="status">{announcedResult}</p>
             {filtersActive && (
               <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
             )}
@@ -666,7 +752,7 @@ export function ClubRosterWorkspace({
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
                         // names only what else is missing (#1004); the Details needed list follows the same rule.
                         const needs = rosterDetailsNeededItems(member);
-                        const label = rosterPersonLabel({ ...member, typeLabel: clubRosterAttendeeTypeLabels[member.attendeeType] }, duplicateNames);
+                        const label = personLabels.get(member.id) ?? `${member.firstName} ${member.lastName}`;
                         const healthOnFile = Boolean(healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE"));
                         const tools = rosterRowTools({
                           readOnly,
@@ -706,7 +792,7 @@ export function ClubRosterWorkspace({
                                 case "name": return (
                                   <td className="roster-card-name" data-label="Name" key={column}>
                                     <strong className="roster-member-name" translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className="roster-member-role" translate="no">{member.role}</span>}
+                                    {member.role && <span className="roster-member-role" translate="no">{`Role: ${member.role}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                         Class history<span className="sr-only"> for {label}</span>
@@ -768,12 +854,12 @@ export function ClubRosterWorkspace({
                                   <td className="roster-card-actions roster-row-actions" data-label="Actions" key={column}>
                                     <div className="roster-row-action-set">
                                       {tools.primary === "edit" && (
-                                        <button aria-label={`Edit ${label}`} className="secondary-button roster-edit-button" disabled={saving} onClick={() => openDialog(member)} type="button">
+                                        <button aria-label={`Edit ${label}`} className="secondary-button roster-edit-button" disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
                                           <Pencil aria-hidden="true" size={14} /> Edit
                                         </button>
                                       )}
                                       {tools.primary === "contacts" && (
-                                        <button aria-label={`Emergency contacts for ${label}`} className="secondary-button roster-edit-button" disabled={saving} onClick={() => openDialog(member)} type="button">
+                                        <button aria-label={`Emergency contacts for ${label}`} className="secondary-button roster-edit-button" disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
                                           <Pencil aria-hidden="true" size={14} /> Emergency contacts
                                         </button>
                                       )}
@@ -784,10 +870,10 @@ export function ClubRosterWorkspace({
                                           {tools.menu.includes("health") && healthTab && (
                                             <li>
                                               <a
-                                                aria-label={`Health record for ${label}`}
+                                                aria-label={`${healthLinkText(member.id)}, ${label}`}
                                                 href={`/account/clubs/${encodeURIComponent(organizationId)}/roster/${encodeURIComponent(member.id)}/health`}
                                               >
-                                                {healthEntryOnly ? "Enter health record" : "Health"}{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
+                                                {healthLinkText(member.id)}
                                               </a>
                                             </li>
                                           )}
@@ -796,7 +882,7 @@ export function ClubRosterWorkspace({
                                           )}
                                           {tools.menu.includes("remove") && (
                                             <li className="actions-menu-divider">
-                                              <button aria-label={`Remove ${label}`} className="actions-menu-danger" disabled={saving} onClick={() => remove(member)} type="button">
+                                              <button aria-label={`Remove ${label}`} className="actions-menu-danger" disabled={saving} onClick={() => remove(member, label)} type="button">
                                                 <Trash2 aria-hidden="true" size={14} /> Remove
                                               </button>
                                             </li>

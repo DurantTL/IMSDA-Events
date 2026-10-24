@@ -100,7 +100,8 @@ export default async function ClubRosterPage({
         canSeeBirthDates={access.capabilities.seeBirthDates && !readOnly}
         clubYear={clubYear}
         complianceFilter={complianceFilterFrom(complianceParam)}
-        // `?filter=details-needed` (the club Home "Review roster" task) opens the roster already on that list; anything else is the whole roster (#1167).
+        // The club Home "Review roster" task links to `?filter=details-needed` and counts with `rosterRowMissingFields` (through `rosterDetailsNeeded`),
+        // so the roster opens on the same list that count describes. Any other value shows the whole roster (#1167).
         detailsNeededFirst={filterParam === ROSTER_DETAILS_NEEDED_FILTER}
         complianceStatuses={complianceStatuses}
         headingActions={canTransfer ? <RequestTransferButton clubOptions={clubOptions} organizationId={organizationId} /> : undefined}

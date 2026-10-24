@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ClubRosterWorkspace, type RosterComplianceInfo } from "@/components/club-roster-workspace";
 import {
-  duplicateRosterNameKeys,
+  applyRosterFilters,
+  clearedRosterFilters,
+  rosterLabelDetail,
   ROSTER_DETAILS_NEEDED_FILTER,
   matchesRosterSearch,
   normalizeRosterSearch,
@@ -13,7 +15,7 @@ import {
   rosterDetailsNeededItems,
   rosterDetailsSummary,
   rosterDetailsNeeded,
-  rosterPersonLabel,
+  rosterPersonLabels,
   rosterRowTools,
 } from "@/modules/club-rosters/roster-view";
 import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
@@ -114,14 +116,14 @@ describe("Details needed (#1167)", () => {
 });
 
 describe("columns per role (#1167)", () => {
-  const base = { birthDatesShown: false, moreColumns: false, hasScreening: false, hasRowActions: true };
+  const base = { birthDatesShown: false, showGender: false, hasScreening: false, hasRowActions: true };
 
   it("leads with Name, Age, Type, Current class and Details", () => {
     expect(rosterColumns({ ...base, hasRowActions: false })).toEqual(["name", "age", "type", "class", "details"]);
   });
 
   it("adds Gender only on request, the birth date only after its reveal, screening only where the role has it", () => {
-    expect(rosterColumns({ ...base, moreColumns: true })).toEqual(["name", "age", "type", "class", "details", "gender", "actions"]);
+    expect(rosterColumns({ ...base, showGender: true })).toEqual(["name", "age", "type", "class", "details", "gender", "actions"]);
     expect(rosterColumns({ ...base, birthDatesShown: true, hasScreening: true })).toEqual(["name", "age", "birthDate", "type", "class", "details", "screening", "actions"]);
     expect(rosterColumns(base)).not.toContain("birthDate");
     expect(rosterColumns(base)).not.toContain("screening");
@@ -217,7 +219,7 @@ describe("what a row says (#1167)", () => {
 
   it("keeps a person's role under their name, so a phone card shows name, role, age and Edit", () => {
     const out = html();
-    expect(out).toContain('<span class="roster-member-role" translate="no">Pathfinder</span>');
+    expect(out).toContain('<span class="roster-member-role" translate="no">Role: Pathfinder</span>');
     expect(out).toContain('data-label="Age"');
     expect(out).toContain('aria-label="Edit Sam Fixture-a"');
   });
@@ -279,20 +281,49 @@ describe("search panel (#1167)", () => {
 describe("long and duplicate names (#1167)", () => {
   const people = [member("a", { firstName: "Sam", lastName: "Rivers", age: 12 }), member("b", { firstName: "Sam", lastName: "Rivers", age: 13 }), member("c", { firstName: "Alex", lastName: "Rivers" })];
 
+  const describe = { typeLabel: () => "Pathfinder", classLabel: (person: RosterMemberRecord) => (person.classLevel ? "Friend" : null) };
+
   it("tells two people with one name apart in every control's accessible name", () => {
-    const duplicates = duplicateRosterNameKeys(people);
-    expect(duplicates.size).toBe(1);
-    const labels = people.map((person) => rosterPersonLabel({ ...person, typeLabel: "Pathfinder" }, duplicates));
-    expect(labels).toEqual(["Sam Rivers, age 12", "Sam Rivers, age 13", "Alex Rivers"]);
+    const labels = rosterPersonLabels(people, describe);
+    expect([...labels.values()]).toEqual(["Sam Rivers, age 12", "Sam Rivers, age 13", "Alex Rivers"]);
     const out = html({ initialMembers: people });
     expect(out).toContain('aria-label="Edit Sam Rivers, age 12"');
     expect(out).toContain('aria-label="Edit Sam Rivers, age 13"');
     expect(out).toContain('aria-label="Edit Alex Rivers"');
   });
 
-  it("falls back to the type when a duplicate has no age", () => {
-    const duplicates = duplicateRosterNameKeys([{ firstName: "A", lastName: "B" }, { firstName: "a", lastName: "b" }]);
-    expect(rosterPersonLabel({ firstName: "A", lastName: "B", age: null, reportedAge: null, typeLabel: "Adult" }, duplicates)).toBe("A B, Adult");
+  it("falls back to class, role, type and finally an ordinal when name and age are the same", () => {
+    const twinA = member("a", { firstName: "Sam", lastName: "Rivers", age: 12, classLevel: "FRIEND", role: "Pathfinder" });
+    const twinB = member("b", { firstName: "Sam", lastName: "Rivers", age: 12, classLevel: "EXPLORER", role: "Pathfinder" });
+    const labels = rosterPersonLabels([twinA, twinB], { typeLabel: () => "Pathfinder", classLabel: (person) => person.classLevel });
+    expect(labels.get("a")).toBe("Sam Rivers, age 12, FRIEND");
+    expect(labels.get("b")).toBe("Sam Rivers, age 12, EXPLORER");
+
+    const same = [member("x", { firstName: "Sam", lastName: "Rivers", age: 12 }), member("y", { firstName: "Sam", lastName: "Rivers", age: 12 }), member("z", { firstName: "Sam", lastName: "Rivers", age: 12 })];
+    const ordinals = rosterPersonLabels(same, describe);
+    expect(new Set(ordinals.values()).size).toBe(3);
+    expect(ordinals.get("y")).toBe("Sam Rivers, age 12, Friend, Pathfinder, Pathfinder, 2 of 3");
+
+    const out = html({ initialMembers: same });
+    const names = [...out.matchAll(/aria-label="Edit ([^"]+)"/g)].map((match) => match[1]);
+    expect(names).toHaveLength(3);
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("falls back to the type when a duplicate has no age, and names nobody else shares stay plain", () => {
+    const labels = rosterPersonLabels([member("a", { firstName: "A", lastName: "B", age: null, classLevel: null, role: "" , attendeeType: "ADULT" }), member("b", { firstName: "a", lastName: "b", age: 30, classLevel: null, role: "", attendeeType: "ADULT" })], { typeLabel: () => "Adult", classLabel: () => null });
+    expect(labels.get("a")).toBe("A B, Adult");
+    expect(labels.get("b")).toBe("a b, age 30");
+    expect(rosterPersonLabels([member("solo")], describe).get("solo")).toBe("Sam Fixture-solo");
+  });
+
+  it("uses the same disambiguated name in the Remove confirmation title and button", () => {
+    expect(rosterLabelDetail("Sam Rivers, age 12", { firstName: "Sam", lastName: "Rivers" })).toBe(" (age 12)");
+    expect(rosterLabelDetail("Sam Rivers", { firstName: "Sam", lastName: "Rivers" })).toBe("");
+    const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
+    expect(source).toContain("Remove ${member.firstName} ${member.lastName} from the roster${rosterLabelDetail(label, member)}");
+    expect(source).toContain("confirmLabel: `Remove ${label}`");
+    expect(source).toContain("onClick={() => remove(member, label)}");
   });
 
   it("lets a very long name wrap inside its card instead of widening the page", () => {
@@ -344,5 +375,115 @@ describe("?filter=details-needed opens the filtered roster (#1167)", () => {
     const page = readFileSync(path.join(process.cwd(), "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx"), "utf8");
     expect(page).toContain("detailsNeededFirst={filterParam === ROSTER_DETAILS_NEEDED_FILTER}");
     expect(ROSTER_DETAILS_NEEDED_FILTER).toBe("details-needed");
+  });
+});
+
+describe("filters combine and reset together (#1167 review)", () => {
+  const people = [
+    member("a", { gender: null }),
+    member("b", { gender: null }),
+    member("c"),
+    member("d", { classLevel: null }),
+  ];
+  const statuses: Record<string, RosterComplianceInfo> = {
+    a: { state: "NO_RECORD", note: null },
+    b: { state: "CLEAR", note: null },
+    c: { state: "NO_RECORD", note: null },
+    d: { state: "NO_RECORD", note: null },
+  };
+  const keepNoRecord = (person: RosterMemberRecord) => statuses[person.id]?.state === "NO_RECORD";
+
+  it("counts Details needed from the people left after the compliance filter, so the badge matches the rows", () => {
+    const noFilter = applyRosterFilters(people, { query: "", detailsOnly: false, keepForCompliance: null });
+    expect(noFilter.needDetailsCount).toBe(3);
+    const withCompliance = applyRosterFilters(people, { query: "", detailsOnly: true, keepForCompliance: keepNoRecord });
+    expect(withCompliance.needDetailsCount).toBe(2);
+    expect(withCompliance.visible.map((person) => person.id)).toEqual(["a", "d"]);
+    expect(withCompliance.visible).toHaveLength(withCompliance.needDetailsCount);
+  });
+
+  it("applies compliance, Details needed and search together", () => {
+    const result = applyRosterFilters(people, { query: "fixture-d", detailsOnly: true, keepForCompliance: keepNoRecord });
+    expect(result.visible.map((person) => person.id)).toEqual(["d"]);
+    expect(applyRosterFilters(people, { query: "", detailsOnly: false, keepForCompliance: keepNoRecord }).visible.map((person) => person.id)).toEqual(["a", "c", "d"]);
+  });
+
+  it("opens with ?compliance= and ?filter=details-needed combined, badge matching the rows", () => {
+    const out = html({ initialMembers: people, complianceStatuses: statuses, complianceFilter: "missing", detailsNeededFirst: true });
+    expect(out).toContain("<strong>2 of 4</strong>");
+    expect(out).toMatch(/Details needed <span class="count-badge">2<\/span>/);
+    expect(out).toContain("Fixture-a");
+    expect(out).toContain("Fixture-d");
+    expect(out).not.toContain("Fixture-b<");
+    expect(out).not.toContain("Fixture-c<");
+  });
+
+  it("resets the search, Details needed and the compliance filter together, and takes both out of the address", () => {
+    expect(clearedRosterFilters()).toEqual({ query: "", detailsOnly: false, complianceFilter: null });
+    const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
+    const start = source.indexOf("function clearFilters()");
+    const body = source.slice(start, source.indexOf("\n  }\n", start));
+    expect(body).toContain("setQuery(cleared.query)");
+    expect(body).toContain("setDetailsOnly(cleared.detailsOnly)");
+    expect(body).toContain("setComplianceFilter(cleared.complianceFilter)");
+    expect(body).toContain('dropFilterParams("filter", "compliance")');
+    // Only the filter names leave the address; ?year= stays.
+    expect(source).toContain("url.searchParams.delete(name)");
+    expect(source).toContain("window.history.replaceState(");
+  });
+});
+
+describe("focus, announcements and labels after the review (#1167)", () => {
+  const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
+  const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
+
+  it("moves focus to the next row's Edit, else the result line, when a saved or removed row leaves the list", () => {
+    expect(source).toContain("id={`roster-edit-${member.id}`}");
+    expect(source).toContain('document.getElementById(`roster-edit-${id}`)');
+    expect(source).toContain('document.getElementById("roster-result-text")?.focus()');
+    expect(source).toContain('rowChanged(editing, result?.members, "Saved.", true)');
+    expect(source).toContain('rowChanged(member, result?.members, "Removed and erased.", false)');
+    expect(source).toContain("no longer needs details.");
+    expect(source).toContain("no longer matches the current search or filters.");
+    expect(html()).toContain('id="roster-result-text" tabindex="-1"');
+    expect(html()).toContain('id="roster-edit-a"');
+  });
+
+  it("announces the result politely and only after typing pauses", () => {
+    expect(source).toContain("useDebouncedValue(resultText, 300)");
+    const out = html();
+    expect(out).toMatch(/<p aria-live="polite" class="sr-only" role="status">2 of 2 people shown<\/p>/);
+    // The visible count is not itself a live region, so each key does not re-announce it.
+    expect(out).not.toMatch(/<p[^>]*aria-live[^>]*><strong>/);
+  });
+
+  it("names the Health link with its visible text and status", () => {
+    const out = html({ healthTab: { a: { status: "NEEDS_UPDATE", hasHealthNote: false }, b: { status: "NONE", hasHealthNote: false } } });
+    expect(out).toContain('aria-label="Health record: needs update, Sam Fixture-a"');
+    expect(out).toContain(">Health record: needs update</a>");
+    expect(out).toContain('aria-label="Health record: none yet, Sam Fixture-b"');
+    const registrar = html({ healthTab: { a: { status: "NONE", hasHealthNote: false } }, healthEntryOnly: true });
+    expect(registrar).toContain('aria-label="Enter health record: none yet, Sam Fixture-a"');
+  });
+
+  it("labels the gender toggle plainly and gives a role its visible label on every card", () => {
+    const out = html();
+    expect(out).toContain("Show gender");
+    expect(out).not.toContain("More columns");
+    expect(out).toContain("Role: Pathfinder");
+  });
+
+  it("keeps Edit and the Actions trigger at 44px at every width and opens the menu in the flow", () => {
+    expect(css).toMatch(/\.roster-edit-button \{ min-height: 44px; min-width: 44px;/);
+    expect(css).toMatch(/\.roster-row-action-set \.actions-menu > summary\.actions-menu-trigger \{ width: auto; min-height: 44px;/);
+    // An open menu is in the flow under Edit, so it cannot be clipped, cover a column or widen the page.
+    expect(css).toMatch(/\.roster-row-action-set \.actions-menu-list \{ position: static; width: 100%; min-width: 0;/);
+    expect(css).toContain(".roster-row-action-set .actions-menu[open] { flex-basis: 100%; }");
+    expect(css).not.toContain("padding-bottom: 12rem");
+  });
+
+  it("explains in the page what the Home link and count mean", () => {
+    const page = readFileSync(path.join(process.cwd(), "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx"), "utf8");
+    expect(page).toContain("`?filter=details-needed` and counts with `rosterRowMissingFields`");
   });
 });
