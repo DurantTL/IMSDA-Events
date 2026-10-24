@@ -21,6 +21,11 @@ import {
 const formatNumber = (value: number) => value.toLocaleString("en-US");
 const EXPORT_PATH = "/api/attendee/area-clubs/export";
 
+/** "1 club registered", "3 clubs registered". */
+export function registeredClubsLabel(count: number): string {
+  return `${count} ${count === 1 ? "club" : "clubs"} registered`;
+}
+
 /** Task heading, the club year actually queried, and the honest scope (no ministry or area filter is claimed). */
 export function CoordinatorDestinationHeading({ title, clubYear }: { title: string; clubYear?: string }) {
   return (
@@ -164,7 +169,7 @@ export function CoordinatorClubEvents({
               <h3 id={`coordinator-event-${event.id}`} translate="no">{event.name}</h3>
               <p className="field-help">
                 {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}
-                {" · "}{event.clubs.filter((club) => club.status === "REGISTERED").length} clubs registered · {formatNumber(eventHeadcount(event.clubs))} people
+                {" · "}{registeredClubsLabel(event.clubs.filter((club) => club.status === "REGISTERED").length)} · {formatNumber(eventHeadcount(event.clubs))} people
               </p>
             </div>
             <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>

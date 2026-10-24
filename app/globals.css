@@ -12786,12 +12786,14 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .coordinator-scroll { max-width: 100%; }
 .coordinator-scroll:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .coordinator-scroll td small, .coordinator-scroll th small, .club-reports-grid th.coordinator-club-cell small { font-size: 0.875rem; }
-.coordinator-record-link, .coordinator-record-links a, .coordinator-inline-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 6px; font-weight: 700; }
+.coordinator-record-link, .coordinator-record-links a, .coordinator-inline-link { display: inline-flex; min-height: 44px; min-width: 44px; align-items: center; justify-content: center; padding: 0 6px; font-weight: 700; }
 .coordinator-record-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
 .coordinator-scroll td .secondary-button { min-height: 44px; }
 .coordinator-event { display: grid; gap: 10px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; }
 .coordinator-event-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .coordinator-event-head h3 { margin: 0; font-size: 1.05rem; line-height: 1.3; overflow-wrap: anywhere; }
+/* The shared field-help pulls itself up 9px under a label; under this heading it must sit below it. */
+.coordinator-event-head .field-help { margin: 4px 0 0; }
 .coordinator-event-head .secondary-button { min-height: 44px; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.

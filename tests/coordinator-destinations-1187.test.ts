@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +49,7 @@ import EventsPage from "@/app/(public)/account/(portal)/area-clubs/events/page";
 import TeamApprovalsPage from "@/app/(public)/account/(portal)/area-clubs/team-permissions/page";
 import NewClubsPage from "@/app/(public)/account/(portal)/area-clubs/applications/page";
 import { AreaPointsChart } from "@/components/area-clubs-views";
-import { CoordinatorClubEvents, CoordinatorClubEventsHelp, CoordinatorMonthlyRecords } from "@/components/coordinator-destinations";
+import { CoordinatorClubEvents, CoordinatorClubEventsHelp, CoordinatorMonthlyRecords, registeredClubsLabel } from "@/components/coordinator-destinations";
 import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
 import { summarizeClub, type AreaClubSummary, type AreaSummaryInput } from "@/modules/club-reports/area-summary-domain";
 import type { AreaClubEvent } from "@/modules/club-reports/area-summary-repository";
@@ -238,7 +240,7 @@ describe("Club events (#1187)", () => {
     const html = render();
     expect(html).toContain('href="/account/area-clubs/kitchen/event-1"');
     expect(html).toContain('href="/account/area/c1"');
-    expect(html).toContain("1 clubs registered · 12 people");
+    expect(html).toContain("1 club registered · 12 people");
     expect(html).not.toMatch(/Pay balance|Pay now|Make a payment|<button|<form/i);
     // Said in words too, including for an event a church is billed for.
     expect(html).toContain("You cannot register a club, change a registration or pay a balance, including for an event a church is billed for.");
@@ -358,5 +360,20 @@ describe("New clubs page (#1187)", () => {
     mocks.currentApplicationViewer.mockResolvedValue(null);
     await expect(NewClubsPage()).rejects.toThrow("NOT_FOUND");
     expect(mocks.listNewClubApplications).not.toHaveBeenCalled();
+  });
+});
+
+describe("coordinator destination layout (#1187 phone audit)", () => {
+  const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+  it("keeps each event's date line below its heading, not pulled up under it", () => {
+    expect(css).toContain(".coordinator-event-head .field-help { margin: 4px 0 0; }");
+  });
+  it("gives every record link a 44px by 44px target", () => {
+    expect(css).toMatch(/\.coordinator-record-links a[^{]*\{[^}]*min-height: 44px; min-width: 44px;/);
+  });
+  it("says club or clubs to match the count", () => {
+    expect(registeredClubsLabel(1)).toBe("1 club registered");
+    expect(registeredClubsLabel(0)).toBe("0 clubs registered");
+    expect(registeredClubsLabel(3)).toBe("3 clubs registered");
   });
 });
