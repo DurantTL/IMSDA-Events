@@ -52,7 +52,15 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
     return { headline: "No payment due while waitlisted", detail: history ?? "A place is not confirmed yet.", tone: "calm" };
   }
   if (registration.lifecycle === "CANCELLED") {
-    return { headline: "Nothing due now", detail: history ?? "No payment is due on a cancelled registration.", tone: "calm" };
+    // The original charges stay on the record: the total, what was paid and what was refunded (#1176).
+    // A cancelled registration that never had a charge has no history to keep: only the no-payment-due sentence.
+    if (total === 0 && gross === 0 && refunded === 0) {
+      return { headline: "Nothing due now", detail: "No payment is due on a cancelled registration.", tone: "calm" };
+    }
+    const kept = [`Original total ${formatMoney(total)}`, gross > 0 ? `${formatMoney(gross)} paid` : "nothing paid", refunded > 0 ? `${formatMoney(refunded)} refunded` : null]
+      .filter(Boolean)
+      .join(" \u00b7 ");
+    return { headline: "Nothing due now", detail: `${kept}. No payment is due on a cancelled registration.`, tone: "calm" };
   }
   if (registration.payment.paymentEligible && registration.balanceCents > 0) {
     const paid = registration.paidCents ?? 0;
@@ -80,4 +88,27 @@ export function eventCardDates(event: { startsAt: string; endsAt: string; timezo
     day: part({ day: "numeric" }, event.startsAt),
     range: start === end ? start : `${start} – ${end}`,
   };
+}
+
+/** The registration statuses the event hub (`/account/events/[slug]`) loads. It must match the status filter in event-hub-repository.ts; a test pins them. */
+export const HUB_REGISTRATION_LIFECYCLES = ["SUBMITTED", "CONFIRMED"] as const;
+
+/** The id of a registration's card on the page that lists it, so another page can link straight to it. */
+export const registrationAnchorId = (registrationId: string) => `registration-${registrationId}`;
+
+/**
+ * Where a card's default action goes (#1176): the event hub, and only for the statuses the hub loads, because it 404s for
+ * anything else. A waitlisted or cancelled record has no hub page, so this returns null: on My registrations its details are
+ * already inline. (/account/waitlists is the Area Coordinator's club page and is never a destination here.)
+ */
+export function registrationViewLink(registration: Pick<AttendeeRegistrationSummary, "lifecycle" | "event">): { href: string; label: string } | null {
+  if ((HUB_REGISTRATION_LIFECYCLES as readonly string[]).includes(registration.lifecycle)) {
+    return { href: `/account/events/${encodeURIComponent(registration.event.slug)}`, label: "View registration" };
+  }
+  return null;
+}
+
+/** The Overview's filled card (#1176): the first one that opens its event hub, so a waitlisted card listed earlier never takes the fill. */
+export function overviewPrimaryCardId(registrations: Pick<AttendeeRegistrationSummary, "id" | "lifecycle" | "event">[]): string | undefined {
+  return (registrations.find((registration) => registrationViewLink(registration)) ?? registrations[0])?.id;
 }

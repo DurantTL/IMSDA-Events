@@ -1,30 +1,29 @@
-import { directBalanceCell } from "@/modules/attendee-accounts/account-overview";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  CalendarDays,
-  ArrowRight,
-  CircleDollarSign,
-  CircleHelp,
-  Inbox,
-  MapPin,
-  ShieldCheck,
-  UsersRound,
-} from "lucide-react";
+import { ArrowRight, CircleAlert, CircleHelp, Inbox, ShieldCheck } from "lucide-react";
+import { AccountRegistrationCard } from "@/components/account-registration-card";
 import { AttendeeRegistrationContactForm } from "@/components/attendee-registration-contact-form";
 import { AttendeeRegistrationAnswersForm } from "@/components/attendee-registration-answers-form";
-import { PublicSquarePayment } from "@/components/public-square-payment";
-import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { CancellationRequestPanel } from "@/components/cancellation-request-panel";
+import { PublicSquarePayment } from "@/components/public-square-payment";
+import { RegistrationActionDisclosure } from "@/components/registration-action-disclosure";
 import { getRegistrantRequestViewById } from "@/modules/cancellation-requests/repository";
 import type { RegistrantRequestView } from "@/modules/cancellation-requests/views";
+import { registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import {
+  parseHistoryFilter,
+  registrationActions,
+  splitRegistrationHistory,
+  type HistoryFilter,
+} from "@/modules/attendee-accounts/registration-history";
 import {
   listRegistrationsForVerifiedEmail,
   type AttendeeRegistrationSummary,
 } from "@/modules/attendee-accounts/registrations-repository";
+import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -34,139 +33,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-const moneyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function money(cents: number) {
-  return moneyFormatter.format(cents / 100);
-}
-
-function DirectBalance({ registration }: { registration: AttendeeRegistrationSummary }) {
-  const { main, history } = directBalanceCell(registration);
-  return (
-    <>
-      {main}
-      {history && <><br /><small>{history}</small></>}
-    </>
-  );
-}
-
-function dateLabel(startsAt: string, endsAt: string, timeZone: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone,
-  });
-  const start = formatter.format(new Date(startsAt));
-  const end = formatter.format(new Date(endsAt));
-  return start === end ? start : `${start} – ${end}`;
-}
-
-function RegistrationCard({
-  registration,
-  editable,
-  cancellation,
-}: {
-  registration: AttendeeRegistrationSummary;
-  editable: boolean;
-  /** Cancellation requests (#170) for this registration; null when there is nothing to offer or show. */
-  cancellation: RegistrantRequestView | null;
-}) {
-  return (
-    <section className="public-manage-card attendee-registration-card">
-      <div className="public-manage-card-heading attendee-registration-heading">
-        <div>
-          <p className="public-registration-eyebrow">{registration.event.name}</p>
-          <h2>Confirmation <span translate="no">{registration.confirmationCode}</span></h2>
-        </div>
-        <span className={`attendee-status-pill attendee-status-pill-${registration.status.tone}`}>
-          <ShieldCheck size={15} aria-hidden="true" />
-          {registration.status.label}
-        </span>
-      </div>
-
-      <dl className="public-manage-event-grid">
-        <div>
-          <dt><CalendarDays size={17} aria-hidden="true" /> Dates</dt>
-          <dd>
-            {dateLabel(
-              registration.event.startsAt,
-              registration.event.endsAt,
-              registration.event.timezone,
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt><MapPin size={17} aria-hidden="true" /> Location</dt>
-          <dd>{registration.event.location ?? "Location details coming soon"}</dd>
-        </div>
-        <div>
-          <dt><UsersRound size={17} aria-hidden="true" /> Attendees</dt>
-          <dd>
-            {registration.attendeeNames.length > 0
-              ? registration.attendeeNames.join(", ")
-              : "No attendees recorded"}
-          </dd>
-        </div>
-        <div>
-          <dt><CircleDollarSign size={17} aria-hidden="true" /> {registration.groupBilling ? "Estimated total" : registration.churchBilling ? "Price" : "Balance"}</dt>
-          <dd>
-            {registration.groupBilling
-              ? registration.groupBilling.billed
-                ? <><span translate="no">{money(registration.groupBilling.estimateCents)}</span>. {registration.groupBilling.notice}</>
-                : registration.groupBilling.label
-              : registration.churchBilling
-              ? registration.churchBilling.billed
-                ? <PerPersonPriceNotice price={registration.churchBilling.perPerson} />
-                : registration.churchBilling.label
-              : <DirectBalance registration={registration} />}
-          </dd>
-        </div>
-      </dl>
-
-      <p className="public-manage-readonly-note">
-        {registration.status.detail}
-      </p>
-      <Link
-        className="secondary-button attendee-hub-link"
-        href={`/account/events/${encodeURIComponent(registration.event.slug)}`}
-      >
-        Open attendee hub <ArrowRight size={16} aria-hidden="true" />
-      </Link>
-      {editable && registration.payment.paymentEligible && registration.balanceCents > 0 && (
-        <PublicSquarePayment
-          manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`}
-        />
-      )}
-      {editable && (
-        <AttendeeRegistrationContactForm
-          registrationId={registration.id}
-          initialContact={registration.contact}
-        />
-      )}
-      {cancellation && (
-        <CancellationRequestPanel
-          endpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}/cancellation`}
-          headingLevel={3}
-          initialView={cancellation}
-        />
-      )}
-      {registration.answerEditing.fields.length > 0 && (
-        <AttendeeRegistrationAnswersForm
-          registrationId={registration.id}
-          description={registration.answerEditing.reason}
-          readOnly={!editable || !registration.answerEditing.enabled}
-          initialExpectedUpdatedAt={registration.answerEditing.expectedUpdatedAt}
-          fields={registration.answerEditing.fields}
-          initialAttendees={registration.answerEditing.attendees}
-        />
-      )}
-    </section>
-  );
-}
+const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 /**
  * The request panel for one of the signed-in attendee's own registrations. Only a signed-in attendee (not a staff user
@@ -178,13 +45,148 @@ async function cancellationFor(registration: AttendeeRegistrationSummary, editab
   return view && (view.available || view.requests.length > 0) ? view : null;
 }
 
-export default async function AttendeeRegistrationsPage() {
+/**
+ * The contextual secondary actions of one card (#1176). View registration, the clear default, is on the card itself.
+ * Each action here is the existing service's own panel, shown only where `registrationActions` says it is allowed.
+ */
+function CardActions({
+  registration,
+  editable,
+  cancellation,
+  headingLevel,
+}: {
+  registration: AttendeeRegistrationSummary;
+  editable: boolean;
+  cancellation: RegistrantRequestView | null;
+  headingLevel: 4 | 5;
+}) {
+  const actions = registrationActions(registration, { editable, cancellation });
+  const requestCount = cancellation?.requests.length ?? 0;
+  const hasAny = actions.continuePayment || actions.editContact || actions.cancellation || actions.details;
+  if (!hasAny) {
+    if (!actions.readOnlyHistory) return null;
+    return (
+      <p className="attendee-reg-readonly">
+        {registrationViewLink(registration)
+          ? "This record is read-only history. Open it to see its details."
+          : "This registration is kept as read-only history."}
+      </p>
+    );
+  }
+  return (
+    <div className="attendee-reg-actions" role="group" aria-label={`More for ${registration.event.name}`}>
+      {actions.continuePayment && (
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${moneyFormatter.format(registration.balanceCents / 100)} remaining`}>
+          <PublicSquarePayment manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`} />
+        </RegistrationActionDisclosure>
+      )}
+      {actions.editContact && (
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Update contact details">
+          <AttendeeRegistrationContactForm registrationId={registration.id} initialContact={registration.contact} />
+        </RegistrationActionDisclosure>
+      )}
+      {actions.details && (
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Registration details">
+          <AttendeeRegistrationAnswersForm
+            registrationId={registration.id}
+            description={registration.answerEditing.reason}
+            readOnly={!editable || !registration.answerEditing.enabled || actions.readOnlyHistory}
+            initialExpectedUpdatedAt={registration.answerEditing.expectedUpdatedAt}
+            fields={registration.answerEditing.fields}
+            initialAttendees={registration.answerEditing.attendees}
+          />
+        </RegistrationActionDisclosure>
+      )}
+      {cancellation && actions.cancellation && (
+        <RegistrationActionDisclosure
+          eventName={registration.event.name}
+          label={actions.cancellation === "request" ? "Request cancellation" : "Cancellation requests"}
+          hint={requestCount > 0 ? (requestCount === 1 ? "1 request" : `${requestCount} requests`) : undefined}
+        >
+          <CancellationRequestPanel
+            endpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}/cancellation`}
+            headingLevel={headingLevel}
+            initialView={cancellation}
+          />
+        </RegistrationActionDisclosure>
+      )}
+    </div>
+  );
+}
+
+const filterLabels: Record<HistoryFilter, string> = {
+  all: "All",
+  upcoming: "Upcoming",
+  past: "Past",
+  cancelled: "Cancelled",
+};
+
+const filterEmptyTitle: Record<Exclude<HistoryFilter, "all">, string> = {
+  upcoming: "Nothing upcoming",
+  past: "No past registrations",
+  cancelled: "No cancelled registrations",
+};
+
+export default async function AttendeeRegistrationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ show?: string | string[] }>;
+} = {}) {
   await requireAttendeeSecondStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
+  const filter = parseHistoryFilter((await searchParams)?.show);
+  const editable = via === "attendee";
 
-  const registrations = await listRegistrationsForVerifiedEmail(account.verifiedEmail);
-  const cancellations = await Promise.all(registrations.map((registration) => cancellationFor(registration, via === "attendee")));
+  // A failed load is its own calm state with a retry, not "no registrations" and not a blank page.
+  const loaded = await listRegistrationsForVerifiedEmail(account.verifiedEmail).then(
+    (registrations) => ({ ok: true as const, registrations }),
+    (error: unknown) => {
+      logError("My registrations failed to load", error, { accountId: account.id });
+      return { ok: false as const, registrations: [] as AttendeeRegistrationSummary[] };
+    },
+  );
+  const registrations = loaded.registrations;
+  const cancellations = new Map(
+    await Promise.all(registrations.map(async (registration) => [registration.id, await cancellationFor(registration, editable)] as const)),
+  );
+
+  const { upcoming, past, cancelled } = splitRegistrationHistory(registrations);
+  const counts: Record<HistoryFilter, number> = {
+    all: upcoming.length + past.length + cancelled.length,
+    upcoming: upcoming.length,
+    past: past.length,
+    cancelled: cancelled.length,
+  };
+  const showUpcoming = filter === "all" || filter === "upcoming";
+  const showHistory = filter !== "upcoming";
+  const shownPast = filter === "all" || filter === "past" ? past : [];
+  const shownCancelled = filter === "all" || filter === "cancelled" ? cancelled : [];
+  const historyCount = shownPast.length + shownCancelled.length;
+  // History opens by itself when it is what was asked for or the only thing there; otherwise it stays folded with its counts showing.
+  const historyOpen = filter !== "all" || upcoming.length === 0;
+  const noRegistrations = loaded.ok && counts.all === 0;
+  const filteredEmpty = loaded.ok && counts.all > 0 && counts[filter] === 0;
+  // One filled primary per screen: the first card's View registration, else Find events / Try again in the empty states.
+  // Only a card with a View registration link can carry the fill (a waitlisted or cancelled record has no hub page).
+  const firstCardId = [...(showUpcoming ? upcoming : []), ...(historyOpen ? [...shownPast, ...shownCancelled] : [])].find((registration) => registrationViewLink(registration))?.id;
+
+  const card = (registration: AttendeeRegistrationSummary, level: 3 | 4) => (
+    <AccountRegistrationCard
+      key={registration.id}
+      registration={registration}
+      primary={registration.id === firstCardId}
+      headingLevel={level}
+      showPeople
+    >
+      <CardActions
+        registration={registration}
+        editable={editable}
+        cancellation={cancellations.get(registration.id) ?? null}
+        headingLevel={level === 3 ? 4 : 5}
+      />
+    </AccountRegistrationCard>
+  );
 
   return (
     <>
@@ -192,40 +194,126 @@ export default async function AttendeeRegistrationsPage() {
         <div>
           <h1>My registrations</h1>
           <p>
-            Everything registered with <strong>{account.verifiedEmail}</strong>
+            Everything registered with <strong translate="no">{account.verifiedEmail}</strong>
           </p>
         </div>
       </section>
 
-      <div className="public-manage-layout">
-        <div className="public-manage-main">
-          {registrations.length > 0
-            ? registrations.map((registration, index) => (
-              <RegistrationCard
-                key={registration.id}
-                registration={registration}
-                editable={via === "attendee"}
-                cancellation={cancellations[index] ?? null}
-              />
-            ))
-            : (
-              <section className="public-manage-card">
-                <div className="public-manage-card-heading">
-                  <p className="public-registration-eyebrow">Nothing here yet</p>
-                  <h2>No registrations match this address</h2>
-                </div>
-                <p className="public-manage-empty">
-                  <Inbox size={17} aria-hidden="true" /> A registration appears here when its
-                  contact email is {account.verifiedEmail}. If you registered under a different
-                  address, the event team can correct the one on file — and doing that is what
-                  attaches it to this account. <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>,
-                  or ask the event team.
+      <div className="attendee-ov-layout">
+        <div className="attendee-ov-main">
+          {!loaded.ok ? (
+            <div className="attendee-ov-notice" role="alert">
+              <CircleAlert size={20} aria-hidden="true" />
+              <div>
+                <strong>We could not load your registrations</strong>
+                <p>Nothing has been changed. Try again in a moment, or ask the event team if it keeps happening.</p>
+                <a className="primary-button attendee-ov-retry" href="/account/registrations">Try again</a>
+              </div>
+            </div>
+          ) : noRegistrations ? (
+            <section className="attendee-ov-empty" aria-labelledby="attendee-reg-none">
+              <Inbox size={22} aria-hidden="true" />
+              <div>
+                <h2 id="attendee-reg-none">No registrations match this address</h2>
+                <p>
+                  A registration appears here when its contact email is <span translate="no">{account.verifiedEmail}</span>. If you
+                  registered under a different address, the event team can correct the one on file, and doing that is what attaches
+                  it to this account.
                 </p>
-              </section>
-            )}
+                <p className="attendee-ov-empty-links">
+                  <Link className="primary-button" href="/events">Find events</Link>
+                  <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>
+                </p>
+              </div>
+            </section>
+          ) : (
+            <>
+              <nav className="attendee-reg-filters" aria-label="Show registrations">
+                <ul>
+                  {(Object.keys(filterLabels) as HistoryFilter[]).map((key) => (
+                    <li key={key}>
+                      <Link
+                        aria-current={key === filter ? "true" : undefined}
+                        href={key === "all" ? "/account/registrations" : `/account/registrations?show=${key}`}
+                      >
+                        {filterLabels[key]} <span className="attendee-reg-count">({counts[key]})</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {filteredEmpty && filter !== "all" && (
+                <div className="attendee-ov-empty" role="status">
+                  <Inbox size={22} aria-hidden="true" />
+                  <div>
+                    <h2>{filterEmptyTitle[filter]}</h2>
+                    <p>None of your {counts.all === 1 ? "1 registration" : `${counts.all} registrations`} fit this view.</p>
+                    <p className="attendee-ov-empty-links">
+                      <Link className="secondary-button" href="/account/registrations">Show all my registrations</Link>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {showUpcoming && !filteredEmpty && (
+                <section aria-labelledby="attendee-reg-upcoming">
+                  <h2 className="attendee-ov-heading" id="attendee-reg-upcoming">
+                    Upcoming and active <span className="attendee-reg-count">({upcoming.length})</span>
+                  </h2>
+                  {upcoming.length > 0 ? (
+                    <ul className="attendee-ov-cards">{upcoming.map((registration) => card(registration, 3))}</ul>
+                  ) : (
+                    <div className="attendee-ov-empty">
+                      <Inbox size={22} aria-hidden="true" />
+                      <div>
+                        <h3>Nothing coming up</h3>
+                        <p>Your past and cancelled registrations are listed below.</p>
+                        <p className="attendee-ov-empty-links">
+                          <Link className="secondary-button" href="/events">Find events</Link>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {showHistory && historyCount > 0 && (
+                <section aria-label="Past and cancelled registrations">
+                  <details className="attendee-reg-history" open={historyOpen}>
+                    <summary>
+                      <span className="attendee-reg-history-title">
+                        Past and cancelled <span className="attendee-reg-count">({historyCount})</span>
+                      </span>
+                      <span className="attendee-reg-history-status">
+                        {[
+                          shownPast.length > 0 ? `${shownPast.length} past` : null,
+                          shownCancelled.length > 0 ? `${shownCancelled.length} cancelled` : null,
+                        ].filter(Boolean).join(" · ")}
+                      </span>
+                    </summary>
+                    <div className="attendee-reg-history-body">
+                      {shownPast.length > 0 && (
+                        <section aria-labelledby="attendee-reg-past">
+                          <h3 className="attendee-reg-group" id="attendee-reg-past">Past <span className="attendee-reg-count">({shownPast.length})</span></h3>
+                          <ul className="attendee-ov-cards">{shownPast.map((registration) => card(registration, 4))}</ul>
+                        </section>
+                      )}
+                      {shownCancelled.length > 0 && (
+                        <section aria-labelledby="attendee-reg-cancelled">
+                          <h3 className="attendee-reg-group" id="attendee-reg-cancelled">Cancelled <span className="attendee-reg-count">({shownCancelled.length})</span></h3>
+                          <ul className="attendee-ov-cards">{shownCancelled.map((registration) => card(registration, 4))}</ul>
+                        </section>
+                      )}
+                    </div>
+                  </details>
+                </section>
+              )}
+            </>
+          )}
         </div>
 
-        <aside className="public-manage-side">
+        <aside className="attendee-ov-side" aria-label="Account and help">
           {/* Icon then a single block: this card is a flex row, and two loose
             * paragraphs would sit side by side rather than stack. */}
           <section className="public-manage-security-note">
@@ -238,14 +326,17 @@ export default async function AttendeeRegistrationsPage() {
               </p>
             </div>
           </section>
-          <section className="public-manage-help-card">
-            <span><CircleHelp size={23} aria-hidden="true" /></span>
-            <p className="public-registration-eyebrow">Need to change something?</p>
-            <h2>Contact the event team</h2>
-            <p>
-              Contact details can be updated with a fresh emailed code. Changes to attendance,
-              rooms, activities, cancellations, or transfers still go through the event team.
+          <section className="public-manage-card account-overview-card">
+            <p className="public-registration-eyebrow"><CircleHelp size={15} aria-hidden="true" /> Help</p>
+            <h2>Need to change something?</h2>
+            <p className="field-help">
+              Contact details can be updated with a fresh emailed code. Changes to attendance, rooms,
+              activities, or transfers go through the event team. A cancellation is a request the event
+              team reviews; sending one does not cancel or refund anything.
             </p>
+            <Link className="secondary-button account-overview-link" href="/recover-registration">
+              Find a registration made with another email <ArrowRight size={14} aria-hidden="true" />
+            </Link>
           </section>
         </aside>
       </div>

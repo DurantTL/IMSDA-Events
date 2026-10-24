@@ -11,6 +11,7 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
 import { accountAmountDue, upcomingRegistrations } from "@/modules/attendee-accounts/account-overview";
+import { overviewPrimaryCardId } from "@/modules/attendee-accounts/registration-card";
 import { listRegistrationsForVerifiedEmail } from "@/modules/attendee-accounts/registrations-repository";
 import { listInvitesForAccount } from "@/modules/club-imports/invites";
 import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
@@ -68,11 +69,12 @@ export default async function AttendeeAccountOverviewPage() {
   const authenticatorOn = mfaStatus.status === "ACTIVE";
   const hasWorkspaceCards = Boolean(areaCoordinator) || clubs.length > 0 || isInstructor;
   // Exactly one filled primary per screen, in this order: an invite's Accept (when one is showing), else the first
-  // card's View registration, else Find events in the empty states, else (registrations failed to load) a club
+  // card with a View registration (any card when none has one), else Find events in the empty states, else (registrations failed to load) a club
   // director's authenticator prompt. The prompt's wording never changes; only its fill does.
   const inviteShowing = invites.length > 0 || instructorInvites.length > 0;
   const needsAuthenticator = !authenticatorOn && clubs.length > 0;
   const cardPrimary = !inviteShowing && upcoming.length > 0;
+  const primaryCardId = overviewPrimaryCardId(upcoming);
   const findEventsPrimary = !inviteShowing && registrationsResult.ok && upcoming.length === 0;
   const authenticatorPrimary = needsAuthenticator && !inviteShowing && !registrationsResult.ok;
   const retryPrimary = !inviteShowing && !registrationsResult.ok && !needsAuthenticator;
@@ -125,8 +127,8 @@ export default async function AttendeeAccountOverviewPage() {
               <>
                 {dueLine}
                 <ul className="attendee-ov-cards">
-                  {upcoming.map((registration, index) => (
-                    <AccountRegistrationCard key={registration.id} registration={registration} primary={cardPrimary && index === 0} />
+                  {upcoming.map((registration) => (
+                    <AccountRegistrationCard key={registration.id} registration={registration} primary={cardPrimary && registration.id === primaryCardId} viewFallback />
                   ))}
                 </ul>
               </>

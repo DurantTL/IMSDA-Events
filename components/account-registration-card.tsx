@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
-import { eventCardDates, registrationMoneySummary, registrationStateLabel } from "@/modules/attendee-accounts/registration-card";
+import { eventCardDates, registrationAnchorId, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 export type AccountRegistrationCardData = Pick<
@@ -14,13 +15,37 @@ export type AccountRegistrationCardData = Pick<
  * its money meaning and one next action. The action is View registration, which enters the existing event hub; this
  * card adds no new authority and offers no payment link of its own. `primary` fills the button (one per screen).
  */
-export function AccountRegistrationCard({ registration, primary }: { registration: AccountRegistrationCardData; primary: boolean }) {
+export function AccountRegistrationCard({
+  registration,
+  primary,
+  headingLevel = 3,
+  showPeople = false,
+  viewFallback = false,
+  children,
+}: {
+  registration: AccountRegistrationCardData;
+  primary: boolean;
+  /** 3 on the Overview; 4 where the card sits under a group heading (My registrations history). */
+  headingLevel?: 3 | 4;
+  /** Name the included people (My registrations); the Overview only counts them. */
+  showPeople?: boolean;
+  /**
+   * The Overview only: a record with no hub page (waitlisted) still needs somewhere to go, so it links to its own card on
+   * My registrations. My registrations leaves this off, where that record's details are already inline.
+   */
+  viewFallback?: boolean;
+  /** Contextual secondary actions, below the money block (My registrations, #1176). */
+  children?: ReactNode;
+}) {
+  const Heading = headingLevel === 3 ? "h3" : "h4";
   const dates = eventCardDates(registration.event);
   const money = registrationMoneySummary(registration);
   const people = registration.attendeeNames.length;
+  const hubView = registrationViewLink(registration);
+  const view = hubView ?? (viewFallback ? { href: `/account/registrations#${registrationAnchorId(registration.id)}`, label: "View in My registrations" } : null);
   const headingId = `registration-card-${registration.id}`;
   return (
-    <li>
+    <li id={registrationAnchorId(registration.id)}>
       <article className="attendee-ov-card" aria-labelledby={headingId}>
         <div className="attendee-ov-card-top">
           <div className="attendee-ov-date" aria-hidden="true">
@@ -28,7 +53,7 @@ export function AccountRegistrationCard({ registration, primary }: { registratio
             <strong>{dates.day}</strong>
           </div>
           <div className="attendee-ov-card-title">
-            <h3 id={headingId} translate="no">{registration.event.name}</h3>
+            <Heading id={headingId} translate="no">{registration.event.name}</Heading>
             <span className={`attendee-status-pill attendee-status-pill-${registration.status.tone}`}>
               {registrationStateLabel(registration)}
             </span>
@@ -42,18 +67,21 @@ export function AccountRegistrationCard({ registration, primary }: { registratio
           <span>Registration <span translate="no">#{registration.confirmationCode}</span></span>
           {people > 0 && <span>{people === 1 ? "1 person registered" : `${people} people registered`}</span>}
         </p>
+        {showPeople && people > 0 && (
+          <p className="attendee-ov-people"><span className="attendee-ov-people-label">Included: </span><span translate="no">{registration.attendeeNames.join(", ")}</span></p>
+        )}
         <div className={`attendee-ov-money attendee-ov-money-${money.tone}`}>
           <div>
             <p className="attendee-ov-money-headline">{money.headline}</p>
             {money.detail && <p className="attendee-ov-money-detail">{money.detail}</p>}
           </div>
-          <Link
-            className={`${primary ? "primary-button" : "secondary-button"} attendee-ov-action`}
-            href={`/account/events/${encodeURIComponent(registration.event.slug)}`}
-          >
-            View registration<span className="sr-only"> for {registration.event.name}</span> <ArrowRight size={16} aria-hidden="true" />
-          </Link>
+          {view && (
+            <Link className={`${primary ? "primary-button" : "secondary-button"} attendee-ov-action`} href={view.href}>
+              {view.label}<span className="sr-only"> for {registration.event.name}</span> <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          )}
         </div>
+        {children}
       </article>
     </li>
   );

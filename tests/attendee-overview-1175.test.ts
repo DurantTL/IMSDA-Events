@@ -187,10 +187,10 @@ describe("registration money summary (#1175)", () => {
     const cancelled = registration("a", "CANCELLED", { totalCents: 10000, grossPaidCents: 10000, refundedCents: 10000, balanceCents: 0 });
     expect(registrationMoneySummary(cancelled)).toEqual({
       headline: "Nothing due now",
-      detail: "$100.00 paid · $100.00 refunded.",
+      detail: "Original total $100.00 · $100.00 paid · $100.00 refunded. No payment is due on a cancelled registration.",
       tone: "calm",
     });
-    expect(registrationMoneySummary(registration("b", "CANCELLED")).detail).toBe("No payment is due on a cancelled registration.");
+    expect(registrationMoneySummary(registration("b", "CANCELLED")).detail).toBe("Original total $80.00 · nothing paid. No payment is due on a cancelled registration.");
   });
 
   it("never makes the signed-in person the debtor for a church-billed registration", () => {

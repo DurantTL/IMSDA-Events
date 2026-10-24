@@ -150,7 +150,7 @@ describe("/profile (staff, inside the workspace layout)", () => {
     expect(markup).toContain("Registration account");
     expect(markup).toContain('data-manager="staff-mfa"');
     expect(markup).toContain('data-manager="attendee-settings"');
-    expect(markup).toContain('href="/account"');
+    expect(markup).toContain('href="/account/registrations"');
     expect(markup).toContain("My registrations");
     expect(markup.indexOf('data-manager="staff-mfa"')).toBeLessThan(markup.indexOf("Registration account"));
   });
@@ -249,7 +249,7 @@ describe("/account/profile (attendee, inside the portal layout)", () => {
     expect(markup).toContain("Registration account");
     expect(markup).toContain("pat@imsda-events.test");
     expect(markup).toContain('data-manager="attendee-settings"');
-    expect(markup).toContain('href="/account"');
+    expect(markup).toContain('href="/account/registrations"');
     expect(markup).toContain("My registrations");
     expect(markup).toContain(">Sign out of registration account<");
     expect(markup).not.toContain("Sign out of staff account");
