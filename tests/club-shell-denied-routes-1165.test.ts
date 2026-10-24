@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     listClubFormLinks: vi.fn(),
     getClubProfile: vi.fn(),
     listClubTeam: vi.fn(),
+    listPendingClubTeamInvites: vi.fn(),
   },
 }));
 
@@ -28,6 +29,7 @@ vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.lo
 vi.mock("@/modules/club-forms/links", () => ({ listClubFormLinks: mocks.loaders.listClubFormLinks }));
 vi.mock("@/modules/organizations/club-profile-repository", () => ({ getClubProfile: mocks.loaders.getClubProfile, listSponsorOptions: vi.fn() }));
 vi.mock("@/modules/organizations/director-grants-repository", () => ({ listClubTeam: mocks.loaders.listClubTeam }));
+vi.mock("@/modules/club-imports/invites", () => ({ listPendingClubTeamInvites: mocks.loaders.listPendingClubTeamInvites }));
 
 import ClubFormsPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/forms/page";
 import ClubInfoPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/club-info/page";
@@ -57,6 +59,8 @@ describe("direct requests to routes outside a role's menu (#1165)", () => {
   });
 
   it("renders nothing for a reporter's request for /roster and loads no roster", async () => {
+    // The real capability rule is what turns a reporter into NO_ROSTER (modules/club-rosters/access.ts).
+    expect(clubCapabilities("REPORTER").roster).toBe(false);
     mocks.access.mockResolvedValue({ state: "NO_ROSTER", club: club("REPORTER"), capabilities: clubCapabilities("REPORTER") });
     expect(await ClubRosterPage({ params, searchParams: search })).toBeNull();
     noneLoaded();
