@@ -74,7 +74,7 @@ async function main() {
   const repo = await import("../modules/staff-invitations/repository");
   const { invitationToken } = await import("../modules/staff-invitations/link");
   const { ensureEventMessagingDefaults } = await import("../modules/communications/messaging-repository");
-  const { applyCampMeetingMealPreset } = await import("../modules/meals/config-repository");
+  const { applyMealPreset } = await import("../modules/meals/config-repository");
   const { listRegistrations } = await import("../modules/registrations/repository");
 
   await cleanup();
@@ -88,7 +88,7 @@ async function main() {
   await prisma.event.create({ data: eventData(draftEventId, { isPublished: false }) });
   await ensureEventMessagingDefaults(eventId);
   await prisma.eventMessageSettings.update({ where: { eventId }, data: { internalNotificationEmails: [officeEmail], deliveryPaused: false } });
-  const meals = await applyCampMeetingMealPreset(eventId, userId);
+  const meals = await applyMealPreset(eventId, userId, "camp-meeting-2026");
   assert(meals.plans === 2, "the Camp Meeting meals (with the conference-paid plan) exist");
 
   // ---- The CSV import: a preview creates nothing, confirming creates what was previewed --------------------------------

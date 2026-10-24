@@ -1,0 +1,242 @@
+{
+  "key": "camp-meeting-2026",
+  "kind": "MEAL_PRESET",
+  "version": 1,
+  "name": "Camp Meeting 2026 meals",
+  "content": {
+    "label": "Camp Meeting",
+    "description": "Adds the 2026 Camp Meeting meal services (breakfast Wednesday to Saturday, lunch Wednesday to Friday, Saturday lunch donation-only, supper Tuesday to Saturday), a ticket plan ($7 / $6 breakfast, $8 / $7 lunch and supper) and a conference-paid plan for staff, pastor and volunteer meals. The dates count from this event's first day, which should be a Tuesday. Review the prices before publishing the form.",
+    "meals": {
+      "services": [
+        {
+          "name": "Wednesday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 1,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 2,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 3,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday breakfast",
+          "mealType": "BREAKFAST",
+          "dayOffset": 4,
+          "startTime": "07:30",
+          "endTime": "08:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Wednesday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 1,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 2,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday lunch",
+          "mealType": "LUNCH",
+          "dayOffset": 3,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday lunch (donation)",
+          "mealType": "LUNCH",
+          "dayOffset": 4,
+          "startTime": "12:00",
+          "endTime": "13:00",
+          "location": "Cafeteria",
+          "ticketing": "DONATION_ONLY",
+          "capacity": null
+        },
+        {
+          "name": "Tuesday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 0,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Wednesday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 1,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Thursday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 2,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Friday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 3,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        },
+        {
+          "name": "Saturday supper",
+          "mealType": "SUPPER",
+          "dayOffset": 4,
+          "startTime": "17:30",
+          "endTime": "18:30",
+          "location": "Cafeteria",
+          "ticketing": "TICKETED",
+          "capacity": null
+        }
+      ],
+      "plans": [
+        {
+          "code": "meal-tickets",
+          "name": "Meal tickets",
+          "description": "Tickets bought on the registration form or added by staff. Saturday lunch is donation-only.",
+          "payer": "ATTENDEE",
+          "isDefaultTicketPlan": true,
+          "includesAllServices": true,
+          "defaultEntitlement": "PAID",
+          "services": [],
+          "prices": [
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 600
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            }
+          ]
+        },
+        {
+          "code": "conference-paid",
+          "name": "Conference-paid (staff, pastors, volunteers)",
+          "description": "Every ticketed meal is included. The café's use of each meal is billed to the conference, not the attendee.",
+          "payer": "CONFERENCE",
+          "isDefaultTicketPlan": false,
+          "includesAllServices": true,
+          "defaultEntitlement": "INCLUDED",
+          "services": [],
+          "prices": [
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "BREAKFAST",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 600
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "LUNCH",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "ADULT",
+              "attendeeTypeCode": null,
+              "amountCents": 800
+            },
+            {
+              "mealType": "SUPPER",
+              "ageGroup": "CHILD",
+              "attendeeTypeCode": null,
+              "amountCents": 700
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

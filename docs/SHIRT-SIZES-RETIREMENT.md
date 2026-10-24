@@ -102,7 +102,7 @@ Shared code still carries event-specific names and copy from the 2026 event
 systems. They were left alone on purpose and are tracked here so a pull request
 can name them:
 
-- The Camp Meeting presets (`modules/meals/camp-meeting.ts` and the Camp Meeting
+- The Camp Meeting presets (`prisma/seed-data/event-content/camp-meeting-meals.json` and the Camp Meeting
   defaults in the meals, lodging, cancellation-policy and event-template
   starters).
 - The WR26 importer copy (`modules/imports/wr26-bundle.ts`,

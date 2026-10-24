@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { calculateCancellation, type CalculationFacts, type CancellationSelection, type ChargeEntry, type PolicyVersionRecord } from "@/modules/cancellation-policy/calculator";
 import { adjustmentCharge, adjustmentCharges } from "@/modules/cancellation-policy/adjustment-charge";
-import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { parseCancellationRules } from "@/modules/cancellation-policy/rules";
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
 
 /** A key or item charge (an ASSET adjustment, #214) is a fixed rule: never refunded, not prorated, no attendee, not a component. */
 

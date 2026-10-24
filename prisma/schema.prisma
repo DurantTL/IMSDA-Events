@@ -10232,3 +10232,22 @@ model QuestionLibraryItem {
 
   @@index([archivedAt, name])
 }
+
+/// Seeded event content (#919): starting points for an event's settings whose values are data, not source. A
+/// `MEAL_PRESET` (services, plans and prices) and a `CANCELLATION_PRESET` (a rules template with a deadline
+/// placeholder), each with the words the staff screen shows. The content lives in
+/// `prisma/seed-data/event-content/*.json`; `npm run event-content:sync` brings a row to the file's `version`. A person
+/// applies a preset on an event's own screen, which copies the values into that event, so a later version here never
+/// reaches an event that already has its own meals or cancellation rules. `kind` is text, validated in code.
+model SeededEventContent {
+  id        String   @id @default(cuid())
+  kind      String
+  key       String
+  version   Int
+  name      String
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, key])
+}

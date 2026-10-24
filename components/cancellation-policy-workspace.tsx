@@ -2,13 +2,12 @@
 
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
 import { postJson } from "@/lib/post-json";
 import type { CancellationResult } from "@/modules/cancellation-policy/calculator";
 import { localDateKey, localInstant, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
 import {
-  campMeetingPreset,
   chargeCategories,
   classifiableCategories,
   describeTerms,
@@ -17,6 +16,7 @@ import {
   type CancellationRulesInput,
 } from "@/modules/cancellation-policy/rules";
 import type { PolicyVersionView, RegistrationSummary } from "@/modules/cancellation-policy/repository";
+import { cancellationRulesFromPreset, type CancellationPresetOption } from "@/modules/event-content/domain";
 
 /**
  * Staff screen for cancellation rules and the outcome preview (#169). It only configures rules and shows a proposed
@@ -125,12 +125,15 @@ export function CancellationPolicyWorkspace({
   timezone,
   versions,
   inEffectVersionId,
+  presets = [],
 }: {
   eventId: string;
   eventName: string;
   timezone: string;
   versions: PolicyVersionView[];
   inEffectVersionId: string | null;
+  /** Seeded starting rules (#919), each with its own words. Staff review and save; nothing is saved from here. */
+  presets?: CancellationPresetOption[];
 }) {
   return (
     <section className="page-stack cancel-policy">
@@ -146,7 +149,7 @@ export function CancellationPolicyWorkspace({
         </div>
       </div>
       <VersionHistory timezone={timezone} versions={versions} inEffectVersionId={inEffectVersionId} />
-      <NewVersion eventId={eventId} timezone={timezone} versions={versions} />
+      <NewVersion eventId={eventId} timezone={timezone} versions={versions} presets={presets} />
       <Preview eventId={eventId} timezone={timezone} />
     </section>
   );
@@ -229,10 +232,10 @@ function currentTimeMs() {
   return Date.now();
 }
 
-function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone: string; versions: PolicyVersionView[] }) {
+function NewVersion({ eventId, timezone, versions, presets }: { eventId: string; timezone: string; versions: PolicyVersionView[]; presets: CancellationPresetOption[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [deadline, setDeadline] = useState("");
+  const [deadlines, setDeadlines] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -250,13 +253,18 @@ function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone
               noShow: null, allowedScopes: ["FULL_REGISTRATION", "ATTENDEE", "COMPONENT"], supportedComponents: { categories: [], fieldKeys: [] }, classifications: [], nonrefundable: { categories: [], fieldKeys: [] }, cardFeeTreatment: "REFUNDABLE",
             } satisfies CancellationRulesInput))}>Start blank</button>
           </div>
-          <label>Camp Meeting rule: deadline date
-            <input type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} />
-          </label>
-          <small>Before the deadline, a full refund minus a $10 processing fee. After it, or for a first-night no-show, the deposit is forfeited and the reservation cancelled. You review everything before it is saved.</small>
-          <div className="form-actions cancel-policy-actions">
-            <button className="secondary-button" type="button" disabled={!deadline} onClick={() => setDraft(draftFromRules(campMeetingPreset(deadline)))}>Start from the Camp Meeting rule</button>
-          </div>
+          {presets.map((preset) => {
+            const deadline = deadlines[preset.key] ?? "";
+            return <Fragment key={preset.key}>
+              <label>{preset.label}: deadline date
+                <input type="date" value={deadline} onChange={(event) => setDeadlines({ ...deadlines, [preset.key]: event.target.value })} />
+              </label>
+              <small>{preset.description}</small>
+              <div className="form-actions cancel-policy-actions">
+                <button className="secondary-button" type="button" disabled={!deadline} onClick={() => setDraft(draftFromRules(cancellationRulesFromPreset(preset.content, deadline)))}>Start from the {preset.label}</button>
+              </div>
+            </Fragment>;
+          })}
         </div>
       </section>
     );

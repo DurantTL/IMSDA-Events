@@ -23,8 +23,13 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.imsda.test" }), isServerEnvironmentError: () => false }));
+vi.mock("@/modules/event-content/repository", async () => {
+  const { bundledEventContent } = await import("@/modules/event-content/seeded-data");
+  return {
+    listCancellationPresetOptions: async () => bundledEventContent.flatMap((seed) => seed.kind === "CANCELLATION_PRESET" ? [{ key: seed.key, label: seed.content.label, description: seed.content.description, content: seed.content }] : []),
+  };
+});
 vi.mock("@/modules/cancellation-policy/repository", async () => {
-  const actual = await vi.importActual<typeof import("@/modules/cancellation-policy/rules")>("@/modules/cancellation-policy/rules");
   const { z } = await import("zod");
   class CancellationPolicyError extends Error {
     constructor(public readonly code: string, message: string) { super(message); }
@@ -33,7 +38,6 @@ vi.mock("@/modules/cancellation-policy/repository", async () => {
     CancellationPolicyError,
     createPolicyVersionSchema: z.object({ rules: z.unknown(), effectiveFrom: z.string().optional(), note: z.string().optional() }).strict(),
     previewRequestSchema: z.object({ input: z.object({ kind: z.string() }).passthrough(), selection: z.object({ scope: z.string() }).passthrough(), asOf: z.string().optional() }).strict(),
-    campMeetingPreset: actual.campMeetingPreset,
     ...mocks.service,
   };
 });
@@ -140,6 +144,10 @@ describe("cancellation policy page", () => {
     expect(markup).toContain("Preview an outcome");
     expect(markup).toContain("Nothing here cancels a registration, refunds money or creates credit");
     expect(markup).toContain("No rules have been saved for this event yet");
+    // The Camp Meeting starting rule comes from seeded data (#919), with its own words.
+    expect(markup).toContain("Camp Meeting rule: deadline date");
+    expect(markup).toContain("Start from the Camp Meeting rule");
+    expect(markup).toContain("a full refund minus a $10 processing fee");
     expect(mocks.service.listPolicyVersions).toHaveBeenCalledWith("event-a");
   });
 });

@@ -117,6 +117,7 @@
     "club-forms:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-club-form-templates.ts",
     "lodging:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-lodging-templates.ts",
     "form-templates:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-seeded-form-templates.ts",
+    "event-content:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-event-content.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "admin:reset-mfa": "tsx scripts/reset-mfa.ts",
     "key:restore-check": "tsx --require ./scripts/support/allow-server-only.cjs scripts/backup/verify-key-restore.ts",

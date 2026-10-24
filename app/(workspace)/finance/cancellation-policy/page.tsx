@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
 import { CancellationPolicyWorkspace } from "@/components/cancellation-policy-workspace";
 import { listPolicyVersions } from "@/modules/cancellation-policy/repository";
+import { listCancellationPresetOptions } from "@/modules/event-content/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 
 export const metadata: Metadata = { title: "Cancellation rules" };
@@ -13,6 +14,7 @@ export default async function CancellationPolicyPage({ searchParams }: { searchP
     return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view or change cancellation rules." />;
   }
   const { versions, inEffectVersionId } = await listPolicyVersions(event.id);
+  const presets = await listCancellationPresetOptions();
   return (
     <CancellationPolicyWorkspace
       eventId={event.id}
@@ -20,6 +22,7 @@ export default async function CancellationPolicyPage({ searchParams }: { searchP
       inEffectVersionId={inEffectVersionId}
       timezone={event.timezone}
       versions={versions}
+      presets={presets}
     />
   );
 }

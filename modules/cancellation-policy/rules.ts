@@ -159,37 +159,3 @@ export function describeTerms(terms: CancellationTerms) {
   if (terms.creditAllowed) parts.push("future-event credit may be offered");
   return parts.join(", ");
 }
-
-/**
- * The Camp Meeting 2026 rule (issue #169 comment): before the deadline a full refund minus a $10 processing fee;
- * after it, or for a no-show on the first night, the deposit is forfeited and the reservation cancelled. Offered as a
- * starting point in the staff screen: a human reviews and saves it, and nothing is saved from here.
- *
- * Two readings are chosen and flagged for the owner: only the deposit is forfeited after the deadline (anything paid
- * beyond it stays refundable), and the card fee follows the window.
- */
-export function campMeetingPreset(deadlineDate: string): CancellationRulesInput {
-  const forfeit: CancellationTerms = {
-    refund: { kind: "FULL" },
-    flatWithholdCents: 0,
-    flatWithholdLabel: "Processing fee",
-    depositTreatment: "FORFEIT",
-    creditAllowed: false,
-  };
-  return {
-    schema: RULES_SCHEMA_VERSION,
-    windows: [{
-      id: "before-deadline",
-      label: "Before the deadline",
-      endsOn: deadlineDate,
-      terms: { refund: { kind: "FULL" }, flatWithholdCents: 1000, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: false },
-    }],
-    afterWindows: { label: "After the deadline", terms: forfeit },
-    noShow: { label: "No-show on the first night", terms: forfeit },
-    allowedScopes: ["FULL_REGISTRATION", "ATTENDEE"],
-    supportedComponents: { categories: [], fieldKeys: [] },
-    classifications: [],
-    nonrefundable: { categories: [], fieldKeys: [] },
-    cardFeeTreatment: "REFUNDABLE",
-  };
-}
