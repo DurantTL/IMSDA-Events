@@ -218,7 +218,8 @@ describe("event content storage and sync (#919)", () => {
     revised.label = "Synthetic Revised";
     const fromRow = await loadEventContent(fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { version: 7, content: revised }) }).client as never, "MEAL_PRESET", mealSeed.key);
     expect(fromRow).toMatchObject({ version: 7, content: { label: "Synthetic Revised" } });
-    const unreadable = await loadEventContent(fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { content: { nonsense: true } }) }).client as never, "MEAL_PRESET", mealSeed.key);
+    const unreadable = await loadEventContent(fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { version: mealSeed.version + 1, content: { nonsense: true } }) }).client as never, "MEAL_PRESET", mealSeed.key);
+    // Newer than the bundled copy, so it reaches validation; a malformed row falls back instead of breaking the page.
     expect(unreadable).toEqual(mealSeed);
   });
 });
