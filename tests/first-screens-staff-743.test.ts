@@ -101,7 +101,7 @@ describe("Check-in opens on Search and Scan", () => {
 });
 
 describe("Registrations: search, then Start registration, then Actions", () => {
-  const render = (props: { canEdit: boolean; canEmail: boolean }) => renderToStaticMarkup(createElement(PeopleWorkspace, {
+  const render = (props: { canEdit: boolean; canEmail: boolean; canReviewPeopleMatches?: boolean }) => renderToStaticMarkup(createElement(PeopleWorkspace, {
     eventId: "event-1",
     eventSlug: "synthetic-retreat",
     eventTimezone: "America/Chicago",
@@ -116,6 +116,12 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     expect(before(html, "Start registration", 'class="actions-menu"')).toBe(true);
     // Exactly one filled primary button on the screen.
     expect(html.match(/class="primary-button/g)).toHaveLength(1);
+  });
+
+  it("offers the cross-event duplicate-people queue in the Actions menu to system administrators only", () => {
+    const menuOf = (html: string) => html.slice(html.indexOf('class="actions-menu"'), html.indexOf("</details>", html.indexOf('class="actions-menu"')));
+    expect(menuOf(render({ canEdit: true, canEmail: true }))).not.toContain("/people/matches");
+    expect(menuOf(render({ canEdit: true, canEmail: true, canReviewPeopleMatches: true }))).toContain('href="/people/matches"');
   });
 
   it("groups exports, duplicates, directory review and bulk email under one Actions menu", () => {

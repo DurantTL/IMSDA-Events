@@ -169,7 +169,6 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/team-results", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
   ["/people/directory-review", "/people", "components/people-workspace.tsx"],
   ["/people/duplicates", "/people", "components/people-workspace.tsx"],
-  ["/people/matches", "/people", "components/people-workspace.tsx"],
   ["/people/pending-teams", "/people", "components/people-workspace.tsx"],
   ["/people/responsible-adults", "/people", "components/people-workspace.tsx"],
   ["/people/staff-invitations", "/people", "components/people-workspace.tsx"],
@@ -190,6 +189,11 @@ export function buildRouteMapping(): RouteMappingRow[] {
     rows.push({ route, kind: "reached", oldPlace: "Page link", scope: "Event", destinationPath: parent, label: `Reached from ${parent}`, group: parent, reachedFrom: { parent, linkedIn } });
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
+  rows.push({
+    route: "/people/matches", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Possible duplicate people", group: "/people",
+    reachedFrom: { parent: "/people", linkedIn: "components/people-workspace.tsx" },
+    note: "System administrators only, from the People page's Actions menu; not in the sidebar. Identity merging stays a human decision.",
+  });
   return rows;
 }
 

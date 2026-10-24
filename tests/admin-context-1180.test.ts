@@ -332,8 +332,8 @@ describe("old to new route mapping", () => {
     }
   });
 
-  it("reaches the duplicate-people queue from the People page, for system administrators only, with no menu entry", () => {
-    expect(routeOf("/people/matches")).toMatchObject({ kind: "reached", destinationPath: "/people" });
+  it("reaches the duplicate-people queue from the People page, for system administrators only, not from the sidebar", () => {
+    expect(routeOf("/people/matches")).toMatchObject({ kind: "reached", scope: "System", destinationPath: "/people" });
     expect(read("app/(workspace)/people/matches/page.tsx")).toContain('user.globalRole !== "SYSTEM_ADMIN"');
     expect(read("app/(workspace)/people/page.tsx")).toContain('const canReviewPeopleMatches = user?.globalRole === "SYSTEM_ADMIN";');
     expect(read("components/people-workspace.tsx")).toContain('{canReviewPeopleMatches && <li><a href="/people/matches">');
