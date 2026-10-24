@@ -31,7 +31,19 @@ export function ClubPortalNav({
   const wrapRef = useRef<HTMLLIElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const pointerInside = useRef(false);
   const currentMore = more.find((item) => isAccountNavItemActive(pathname, item));
+
+  // A press that started inside More is over once the pointer is released or cancelled.
+  useEffect(() => {
+    const release = () => { pointerInside.current = false; };
+    document.addEventListener("pointerup", release);
+    document.addEventListener("pointercancel", release);
+    return () => {
+      document.removeEventListener("pointerup", release);
+      document.removeEventListener("pointercancel", release);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +65,10 @@ export function ClubPortalNav({
         {more.length > 0 && (
           <li
             className="club-more"
+            onPointerDown={() => { pointerInside.current = true; }}
             onBlur={(event) => {
+              // Safari gives a pressed link no focus, so the blur has no target: while a pointer is down inside More, closing is left to the click or the outside-pointer handler.
+              if (!event.relatedTarget && pointerInside.current) return;
               if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
             }}
             onKeyDown={(event) => {
@@ -80,7 +95,8 @@ export function ClubPortalNav({
             <ul className="club-more-menu" hidden={!open} id={menuId}>
               {more.map((item) => (
                 <li key={item.href}>
-                  <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={item.href}>{item.label}</Link>
+                  {/* Closes even when the link points at the page already open, where the path does not change. */}
+                  <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={item.href} onClick={() => setOpenFor(null)}>{item.label}</Link>
                 </li>
               ))}
             </ul>

@@ -35,11 +35,10 @@ describe("club shell navigation (#1165)", () => {
     expect(labels(primary)).toEqual(["Home", "Roster", "Club events"]);
     expect(labels(more)).toEqual(["Honors", "Class tracking", "Orders"]);
   });
-
-  it("gives a reporter Home and Monthly Records, and no roster, events or forms", () => {
+  it("shows a reporter Home and Monthly Records directly in the bar (a More of one item is not worth a menu), with no roster, events or forms", () => {
     const { primary, more } = shell("REPORTER");
-    expect(labels(primary)).toEqual(["Home"]);
-    expect(labels(more)).toEqual(["Monthly Records"]);
+    expect(labels(primary)).toEqual(["Home", "Monthly Records"]);
+    expect(more).toEqual([]);
   });
 
   it.each(["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const)("keeps exactly the %s's current destinations, none added and none lost", (role) => {
@@ -112,6 +111,9 @@ describe("the club shell navigation bar (#1165)", () => {
     expect(source).toContain('event.key === "Escape"');
     expect(source).toContain("buttonRef.current?.focus()");
     expect(source).toContain("onBlur");
+    // Safari: a blur with no target while a pointer is down inside More must not close it, and a link click always closes it.
+    expect(source).toContain("!event.relatedTarget && pointerInside.current");
+    expect(source).toContain("onClick={() => setOpenFor(null)}");
     expect(source).toContain("aria-expanded={open}");
     expect(source).toContain("aria-controls={menuId}");
   });
