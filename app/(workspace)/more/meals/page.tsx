@@ -19,8 +19,8 @@ export default async function MealsPage({ searchParams }: { searchParams: Promis
     return <AccessRestricted title="Meals are restricted" detail="Event administrators, finance staff and staff who view reports can open the meals screen for this event." />;
   }
   const view = await loadMealView(event.id);
-  // The seeded meal presets (#919) are only offered to an event with no meals and to someone who may add them.
-  const presets = canManageFinance && view.services.length === 0 && view.plans.length === 0 ? await listMealPresetOptions() : [];
+  // The seeded meal presets (#919) are described to everyone on an event with no meals; only finance staff get the button.
+  const presets = view.services.length === 0 && view.plans.length === 0 ? await listMealPresetOptions() : [];
   return (
     <MealsWorkspace
       eventId={event.id}

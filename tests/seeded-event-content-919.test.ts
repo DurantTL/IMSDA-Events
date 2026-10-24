@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -113,7 +114,17 @@ describe("seeded event content (#919)", () => {
     expect(finance).toContain("Start from Camp Meeting");
     expect(finance).toContain(escaped(fixture.copy.mealsDescription));
     expect(finance).toContain("Add the Camp Meeting meals");
-    expect(render(false)).not.toContain("Add the Camp Meeting meals");
+    // Everyone sees the heading and description; staff without finance access get the message instead of the button.
+    const noFinance = render(false);
+    expect(noFinance).toContain("Start from Camp Meeting");
+    expect(noFinance).toContain(escaped(fixture.copy.mealsDescription));
+    expect(noFinance).toContain("Only staff who manage finance can add the preset.");
+    expect(noFinance).not.toContain("Add the Camp Meeting meals");
+    expect(finance).not.toContain("Only staff who manage finance can add the preset.");
+    // No preset, nothing shown.
+    const none = renderToStaticMarkup(createElement(MealsWorkspace, { eventId: "evt_synthetic", eventName: "Synthetic Camp", initialView: emptyView, presets: [], canConfigure: true, canManageFinance: false, canExport: false }));
+    expect(none).not.toContain("Start from");
+    expect(none).not.toContain("add the preset");
 
     const options = await listCancellationPresetOptions({ seededEventContent: { findUnique: vi.fn().mockResolvedValue(null) } } as never);
     const rules = renderToStaticMarkup(createElement(CancellationPolicyWorkspace, { eventId: "evt_synthetic", eventName: "Synthetic Camp", timezone: "America/Chicago", versions: [], inEffectVersionId: null, presets: options }));
@@ -171,6 +182,35 @@ describe("event content storage and sync (#919)", () => {
     expect(fake.table.create).not.toHaveBeenCalled();
   });
 
+  it("pins each bundled (key, version) to a content hash, so changing content without raising its version fails", () => {
+    const pinned: Record<string, string> = {
+      "MEAL_PRESET:camp-meeting-2026@1": "497eb4bb78f2a2c5b0d1b994d625c552b9801aa96e58b2c3a0a16caef38ab237",
+      "CANCELLATION_PRESET:camp-meeting-2026@1": "4a32a922acf6f1b09469ea7b11d0537461ad7778c1b2cf3dd601d5cad08eaf1c",
+    };
+    const actual = Object.fromEntries(bundledEventContent.map((seed) => [`${seed.kind}:${seed.key}@${seed.version}`, digest({ name: seed.name, content: seed.content })]));
+    expect(actual).toEqual(pinned);
+  });
+
+  it("prefers the bundled copy over a stale or equal stored row, and a stored row only when it is newer", async () => {
+    const stale = structuredClone(mealSeed.content);
+    stale.label = "Stale";
+    const staleRow = fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { version: mealSeed.version, content: stale }) });
+    expect(await loadEventContent(staleRow.client as never, "MEAL_PRESET", mealSeed.key)).toEqual(mealSeed);
+    const olderRow = fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { version: 0, content: stale }) });
+    expect(await loadEventContent(olderRow.client as never, "MEAL_PRESET", mealSeed.key)).toEqual(mealSeed);
+    const newerRow = fakeClient({ [`MEAL_PRESET:${mealSeed.key}`]: stored(mealSeed, { version: mealSeed.version + 1, content: stale }) });
+    expect(await loadEventContent(newerRow.client as never, "MEAL_PRESET", mealSeed.key)).toMatchObject({ version: mealSeed.version + 1, content: { label: "Stale" } });
+  });
+
+  it("falls back to the bundled copy when the table does not exist yet (P2021), and rethrows other database errors", async () => {
+    const missing = new Prisma.PrismaClientKnownRequestError("table missing", { code: "P2021", clientVersion: "test" });
+    const noTable = { seededEventContent: { findUnique: vi.fn().mockRejectedValue(missing) } };
+    expect(await loadEventContent(noTable as never, "MEAL_PRESET", mealSeed.key)).toEqual(mealSeed);
+    expect((await listMealPresetOptions(noTable as never)).map((option) => option.key)).toEqual([mealSeed.key]);
+    const other = { seededEventContent: { findUnique: vi.fn().mockRejectedValue(new Error("connection lost")) } };
+    await expect(loadEventContent(other as never, "MEAL_PRESET", mealSeed.key)).rejects.toThrow("connection lost");
+  });
+
   it("reads the stored row when it reads, and the bundled seed when there is none or the row is unreadable", async () => {
     expect(await loadEventContent(fakeClient({}).client as never, "MEAL_PRESET", mealSeed.key)).toEqual(mealSeed);
     expect(await loadEventContent(fakeClient({}).client as never, "MEAL_PRESET", "no-such-preset")).toBeNull();
@@ -212,6 +252,7 @@ describe("applying the meal preset to an event (#919)", () => {
   it("still refuses an event that already has meals, with the same message, and an unknown preset", async () => {
     database({ existing: 1 });
     await expect(applyMealPreset("evt_synthetic", "user_synthetic", mealSeed.key)).rejects.toMatchObject({ code: "CONFLICT", message: fixture.copy.mealsConflict });
+    await expect(applyMealPreset("evt_synthetic", "user_synthetic", "no-such-preset")).rejects.toMatchObject({ code: "INVALID" });
     await expect(applyMealPreset("evt_synthetic", "user_synthetic", "no-such-preset")).rejects.toBeInstanceOf(MealError);
     expect(mocks.createMealDefinitions).not.toHaveBeenCalled();
   });

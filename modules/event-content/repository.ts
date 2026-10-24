@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
 import {
@@ -65,14 +65,24 @@ export async function syncSeededEventContent(
 }
 
 /**
- * One piece of seeded content: the stored row when there is one and it reads, otherwise the bundled seed (a deploy that
+ * One piece of seeded content: the bundled seed, unless a stored row is newer (a code rollback) and reads; the seed also covers no row or a missing table (a deploy that
  * has not run `event-content:sync` yet still works). Null for a key that does not exist. One unreadable stored row must
  * not take down the screen, so this logs the kind and key only, never the stored content.
  */
 export async function loadEventContent<K extends EventContentKind>(client: Client, kind: K, key: string): Promise<SeededEventContent<K> | null> {
   const bundled = bundledEventContent.find((seed) => seed.kind === kind && seed.key === key) as SeededEventContent<K> | undefined;
-  const row = await client.seededEventContent.findUnique({ where: { kind_key: { kind, key } } });
+  let row;
+  try {
+    row = await client.seededEventContent.findUnique({ where: { kind_key: { kind, key } } });
+  } catch (error) {
+    // P2021: the table is not there yet (code deployed before the migration). Same as "no row".
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021") return bundled ?? null;
+    throw error;
+  }
   if (!row) return bundled ?? null;
+  // A row older than or equal to the code's copy never wins: a stale row (the sync has not run since a deploy) must not
+  // hide newer bundled content. The row wins only when it is newer, which happens only after a code rollback.
+  if (bundled && bundled.version >= row.version) return bundled;
   const content = eventContentSchemas[kind].safeParse(row.content);
   if (!content.success) {
     logWarn(`Seeded event content row failed validation; ${bundled ? "using the code's copy" : "it is not available"}`, { kind, key, storedVersion: row.version });

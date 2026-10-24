@@ -97,6 +97,18 @@ beforeEach(() => {
   mocks.selection.entitleAttendeeToPlan.mockResolvedValue([]);
 });
 
+describe("meal preset route (#919)", () => {
+  it("answers an unknown preset with 400 INVALID", async () => {
+    asRole("FINANCE_MANAGER");
+    mocks.config.applyMealPreset.mockRejectedValue(new MealError("INVALID", "That meal preset does not exist."));
+    const testCase = cases.find((entry) => entry.name === "POST defaults")!;
+    const response = await call({ ...testCase, body: { preset: "no-such-preset" } }, await testCase.load());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "INVALID" });
+    expect(mocks.config.applyMealPreset).toHaveBeenCalledWith("event-1", "user-1", "no-such-preset");
+  });
+});
+
 describe("meal routes (#210)", () => {
   for (const testCase of cases) {
     describe(testCase.name, () => {

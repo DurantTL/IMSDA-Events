@@ -36,7 +36,7 @@ import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { createRegistrationFormFromDefinitionInTransaction, getRegistrationForm, updateRegistrationForm } from "@/modules/forms/repository";
 import { getPublicRegistrationExperience, submitPublicRegistration } from "@/modules/forms/public-repository";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
-import { campMeetingMeals } from "../tests/support/camp-meeting-seeds";
+import { bundledEventContent } from "@/modules/event-content/seeded-data";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { createMealDefinitions } from "@/modules/meals/clone-repository";
 import { applyMealPreset, createMealPlan, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
@@ -181,7 +181,12 @@ async function main() {
   // A template payload carries the same definitions (dates as offsets): it creates them on an event that has none.
   const templateEvent = `${P}_ev_tpl`;
   await prisma.event.create({ data: { id: templateEvent, slug: slugOf(templateEvent), name: `Meal template ${P}`, startsAt: new Date("2027-06-15T15:00:00Z"), endsAt: new Date("2027-06-19T15:00:00Z"), timezone: "America/Chicago" } });
-  const fromTemplate = await prisma.$transaction((tx) => createMealDefinitions(tx, templateEvent, mealDefinitionsFromTemplate(campMeetingMeals, "2027-06-15"), userId));
+  const campMeetingMeals = () => {
+    const seed = bundledEventContent.find((entry) => entry.kind === "MEAL_PRESET" && entry.key === "camp-meeting-2026");
+    if (seed?.kind !== "MEAL_PRESET") throw new Error("The Camp Meeting meal preset is missing.");
+    return seed.content.meals;
+  };
+  const fromTemplate = await prisma.$transaction((tx) => createMealDefinitions(tx, templateEvent, mealDefinitionsFromTemplate(campMeetingMeals(), "2027-06-15"), userId));
   assert(fromTemplate.services === 13 && fromTemplate.prices === 12, "a template creates the same definitions");
   assert((await prisma.eventMealSelection.count({ where: { eventId: templateEvent } })) === 0, "a template never creates an order");
   const services = await prisma.eventMealService.findMany({ where: { eventId }, orderBy: [{ serviceDate: "asc" }, { startTime: "asc" }] });

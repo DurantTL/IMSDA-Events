@@ -67,11 +67,11 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
       Open the form in the registration builder, save it again to bring the prices up to date, run a test submission, and republish it. Until then registrants are charged the form&apos;s old prices.
     </p>)}
 
-    {view.services.length === 0 && view.plans.length === 0 ? (canManageFinance ? presets.map((preset) => <section className="panel" key={preset.key}>
+    {view.services.length === 0 && view.plans.length === 0 ? presets.map((preset) => <section className="panel" key={preset.key}>
       <h3>Start from {preset.label}</h3>
       <p>{preset.description}</p>
-      <button className="primary-button" type="button" disabled={busy} onClick={() => void run(() => call(`${base}/defaults`, "POST", { preset: preset.key }), `${preset.label} meals added.`)}>Add the {preset.label} meals</button>
-    </section>) : <section className="panel"><p>Only staff who manage finance can add the preset.</p></section>) : null}
+      {canManageFinance ? <button className="primary-button" type="button" disabled={busy} onClick={() => void run(() => call(`${base}/defaults`, "POST", { preset: preset.key }), `${preset.label} meals added.`)}>Add the {preset.label} meals</button> : <p>Only staff who manage finance can add the preset.</p>}
+    </section>) : null}
 
     <section className="panel">
       <h3>Meals ordered</h3>
