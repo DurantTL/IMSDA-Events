@@ -428,10 +428,11 @@ function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
         // Before the late date the engine charges the field price once, however many
         // choices are picked; from the late date each priced choice is charged (#680).
         const lines: FeeLine[] = [
-          { label: `${field.label} (one charge, however many are chosen)`, unit: null, tiers: tiersFor(field.priceCents!, { startsOn: latePricing.startsOn, cents: null }) },
+          { label: `${field.label} (one charge, however many are chosen)`, unit: unitFor(field.scope, field.type), tiers: tiersFor(field.priceCents!, { startsOn: latePricing.startsOn, cents: null }) },
           ...choices.flatMap((option): FeeLine[] => {
             const cents = chargedIn(field, true, option);
-            return cents === null ? [] : [{ label: field.optionLabels?.[option] ?? option, unit: null, tiers: [{ amountCents: cents, note: `from ${formatCardDate(latePricing.startsOn)}` }] }];
+            // A choice with no late price is charged nothing from the late date, as the engine does.
+            return [{ label: field.optionLabels?.[option] ?? option, unit: null, tiers: [{ amountCents: cents ?? 0, note: `from ${formatCardDate(latePricing.startsOn)}` }] }];
           }),
         ];
         const key = `choice:${field.label}:${JSON.stringify(lines)}`;

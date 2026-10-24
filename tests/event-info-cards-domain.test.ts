@@ -11,7 +11,7 @@ import {
   type InfoCardOffering,
   type InfoCardsInput,
 } from "@/modules/event-info-cards/domain";
-import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { calculateFormTotal, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
 const definition = registrationFormDefinitionSchema.parse({
   title: "Honors Weekend club registration",
@@ -310,6 +310,23 @@ describe("event info card edge cases", () => {
       expect(lines.map((line) => [line.label, line.tiers])).toEqual([
         ["Registration fee (one charge, however many are chosen)", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
         ["A", [{ amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", [{ amountCents: 0, note: "from Aug 24, 2026" }]],
+      ]);
+    });
+
+    it("agrees with the engine for a multi-select with a field price before and after the late date (#680)", () => {
+      const definition = feeForm([field({ key: "pick", type: "MULTISELECT", scope: "REGISTRATION", priceCents: 900, options: ["A", "B"], latePricing: { startsOn: "2026-08-24", label: "Late", choicePricesCents: { A: 1500 } } })]).definition;
+      // Before the late date: one charge of the field price, however many are chosen.
+      expect(calculateFormTotal(definition, { pick: ["A", "B"] }, "2026-08-23").subtotalCents).toBe(900);
+      expect(calculateFormTotal(definition, { pick: ["A"] }, "2026-08-23").subtotalCents).toBe(900);
+      // From the late date: A is 1500, B (no late price) is free.
+      expect(calculateFormTotal(definition, { pick: ["A", "B"] }, "2026-08-24").subtotalCents).toBe(1500);
+      expect(calculateFormTotal(definition, { pick: ["B"] }, "2026-08-24").subtotalCents).toBe(0);
+      const lines = buildFeesCard({ ...input, forms: [{ title: "Club registration", definition }] })!.sections[0]!.groups[0]!.lines;
+      expect(lines.map((line) => [line.label, line.unit, line.tiers])).toEqual([
+        ["Registration fee (one charge, however many are chosen)", "per registration", [{ amountCents: 900, note: "through Aug 23, 2026" }]],
+        ["A", null, [{ amountCents: 1500, note: "from Aug 24, 2026" }]],
+        ["B", null, [{ amountCents: 0, note: "from Aug 24, 2026" }]],
       ]);
     });
 

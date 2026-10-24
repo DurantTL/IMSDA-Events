@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hiddenPricePatchForType, hidesFieldPrice } from "@/modules/forms/choice-type-pricing";
+import { hiddenPricePatchForType, hidesFieldPrice, pricingPatchForTypeChange } from "@/modules/forms/choice-type-pricing";
 import { calculateFormTotal, registrationFormDefinitionSchema, resolveFieldPrices, type RegistrationFormField } from "@/modules/forms/definition";
 
 // Synthetic fields only (#680): an empty choice-price map must never make a
@@ -81,16 +81,32 @@ describe("empty choice-price maps (#680)", () => {
     expect(hiddenPricePatchForType("NUMBER", "ADDRESS")).toEqual(cleared);
     expect(hiddenPricePatchForType("SELECT", "CHECKBOX")).toEqual({});
     expect(hiddenPricePatchForType("CHECKBOX", "NUMBER")).toEqual({});
-    // Choice to choice, and choice to address, keep what is stored: the pricing kind did not change.
+    // Choice to choice keeps what is stored (an ADDRESS always clears, above): the pricing kind did not change.
     expect(hiddenPricePatchForType("SELECT", "RADIO")).toEqual({});
     expect(hiddenPricePatchForType("MULTISELECT", "SELECT")).toEqual({});
-    expect(hiddenPricePatchForType("SELECT", "ADDRESS")).toEqual({});
+    expect(hiddenPricePatchForType("SELECT", "ADDRESS")).toEqual(cleared);
+    expect(hiddenPricePatchForType("ADDRESS", "ADDRESS")).toEqual(cleared);
     expect(hidesFieldPrice("ADDRESS")).toBe(true);
     expect(hidesFieldPrice("SELECT")).toBe(true);
     expect(hidesFieldPrice("CHECKBOX")).toBe(false);
     // A $9 checkbox switched to a select, merged like the builder does, charges nothing until a choice price is set.
     const asSelect = { priceCents: 900, ...hiddenPricePatchForType("CHECKBOX", "SELECT") };
     expect(total(asSelect, "2026-10-01")).toBe(0);
+  });
+
+  it("the builder's merged type-change patch lets the hidden-price patch win over the carried late pricing", () => {
+    const late = { startsOn: "2026-11-01", label: "Late", priceCents: 1400 };
+    // Non-choice to ADDRESS: price and late pricing both cleared, even though latePricing is carried by default.
+    const toAddress = pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "ADDRESS");
+    expect(toAddress).toEqual({ latePricing: undefined, priceCents: undefined });
+    expect({ priceCents: 900, latePricing: late, ...toAddress }).toEqual({ priceCents: undefined, latePricing: undefined });
+    // A leftover $9 on a SELECT changed to ADDRESS is cleared too, so it cannot be charged on a filled address.
+    const patched = { priceCents: 900, ...pricingPatchForTypeChange({ type: "SELECT", latePricing: undefined }, "ADDRESS") };
+    expect(patched.priceCents).toBeUndefined();
+    // Between two non-hidden types the late pricing is carried.
+    expect(pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "NUMBER")).toEqual({ latePricing: late });
+    // Choice to choice carries late pricing and keeps the price.
+    expect(pricingPatchForTypeChange({ type: "SELECT", latePricing: late }, "RADIO")).toEqual({ latePricing: late });
   });
 
   it("applies base prices after the late date when the late map is empty", () => {
