@@ -250,7 +250,7 @@ export default async function SystemAdminPage({
       </section>
 
       <section aria-labelledby="summary-heading" className={styles.summarySection}>
-        <h2 id="summary-heading" className={styles.visuallyHidden}>Summary</h2>
+        <h2 id="summary-heading" className="sr-only">Summary</h2>
         <div className={styles.metrics} data-testid="home-summary">
           {homeValues.map((item) => {
             const readAt = readTimeLabel(item.readAt);

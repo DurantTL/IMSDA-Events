@@ -481,6 +481,12 @@ describe("System home page", () => {
 describe("System home layout rules", () => {
   const css = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
 
+  it("keeps the work and task group headings at the 14px staff floor, and hides the Summary heading with the shared sr-only class", () => {
+    expect(css).toMatch(/\.workGroup h3,\s*\.commonGrid h3 \{[^}]*font-size: max\(var\(--type-staff-floor, 0px\), 0\.875rem\);/);
+    const page = readFileSync(join(process.cwd(), "app/(workspace)/admin/page.tsx"), "utf8");
+    expect(page).toContain('<h2 id="summary-heading" className="sr-only">Summary</h2>');
+  });
+
   it("keeps every summary card's text and link out of the icon column", () => {
     expect(css).toMatch(/\.metrics article > \.metricIcon \{\s*grid-column: 1;\s*grid-row: 1 \/ 6;/);
     expect(css).toMatch(/\.metrics article > :not\(\.metricIcon\) \{\s*grid-column: 2;/);

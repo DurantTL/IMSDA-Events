@@ -661,15 +661,6 @@ details.taskGroup[open] .taskGrid {
   font-size: max(var(--type-floor, 0px), 0.62rem);
 }
 
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .summarySection {
   display: grid;
   gap: 10px;
@@ -742,7 +733,7 @@ details.taskGroup[open] .taskGrid {
 .commonGrid h3 {
   margin: 0 0 6px;
   color: var(--imsda-navy);
-  font-size: 0.85rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   font-weight: 700;
 }
 
