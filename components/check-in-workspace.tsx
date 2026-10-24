@@ -816,7 +816,7 @@ export function CheckInWorkspace({
                     : arrival.checkedIn
                       ? online ? "Undo" : "Reconnect to undo"
                       : savedItem?.state === "CONFLICT"
-                        ? "Review and retry"
+                        ? "Retry check-in"
                         : savedItem
                           ? "Retry saved check-in"
                           : "Check in"}
