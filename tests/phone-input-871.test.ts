@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -44,6 +45,33 @@ describe("PhoneInput", () => {
     const html = render({ value: "555-0100", stored: undefined, showNow: true });
     expect(html).toContain('role="alert"');
     expect(html).not.toContain("needs correcting");
+  });
+});
+
+describe("how the message looks", () => {
+  it("styles a blocking problem as an error and a legacy notice differently", () => {
+    const error = render({ value: "idk 911", showNow: true });
+    expect(error).toContain("field-error-message");
+    expect(error).toContain("is-error");
+    expect(error).not.toContain("is-notice");
+    const notice = render({ value: "555-0100", stored: "555-0100" });
+    expect(notice).toContain("is-notice");
+    expect(notice).not.toContain("is-error");
+    expect(notice).not.toContain("field-error");
+  });
+
+  it("has rules that beat the generic label help-text rules, at 14px or more, before the builder markers", () => {
+    const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+    for (const state of ["is-error", "is-notice"]) {
+      expect(css).toContain(`.public-registration-field > small.phone-input-message.${state}`);
+      expect(css).toContain(`.app-shell .form-stack label > small.phone-input-message.${state}`);
+    }
+    const errorRule = css.slice(css.indexOf(".phone-input-message.is-error"));
+    expect(errorRule.slice(0, errorRule.indexOf("}"))).toContain("var(--danger");
+    const base = css.slice(css.indexOf(".phone-input-message,"));
+    expect(base.slice(0, base.indexOf("}"))).toContain("0.875rem");
+    expect(css.indexOf(".phone-input-message")).toBeLessThan(css.indexOf("/* Registration form builder editor shell (#1132)"));
+    expect(css.indexOf(".phone-input-message")).toBeLessThan(css.indexOf("/* Form settings tab"));
   });
 });
 

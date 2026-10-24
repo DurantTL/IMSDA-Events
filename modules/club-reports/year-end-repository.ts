@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { phoneToStore } from "@/lib/field-validation";
+import { emailToStore, phoneToStore } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { ClubReportError, type ClubReportActor } from "@/modules/club-reports/repository";
@@ -228,13 +228,14 @@ export async function saveYearEndReport(
       if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
       const existing = await tx.clubYearEndReport.findUnique({
         where: { organizationId_reportYear: { organizationId, reportYear } },
-        select: { id: true, status: true, firstSubmittedAt: true, submittedAt: true, contactWorkPhone: true, contactHomePhone: true, contactCellPhone: true },
+        select: { id: true, status: true, firstSubmittedAt: true, submittedAt: true, contactWorkPhone: true, contactHomePhone: true, contactCellPhone: true, contactEmail: true },
       });
       if (existing && isYearEndLockedForClub(existing.status)) {
         throw new ClubReportError("CLUB_REPORT_LOCKED", "This report was submitted. Ask the conference office to reopen it if something needs to change.");
       }
       // Each phone is checked against the one saved on this report (#871): a changed phone must pass the shared
       // check and is stored normalised; a saved one, even an old unusable number, may stay.
+      const contactEmail = emailToStore(["contactEmail"], input.contactEmail, existing?.contactEmail);
       const phones = {
         contactWorkPhone: phoneToStore(["contactWorkPhone"], input.contactWorkPhone, existing?.contactWorkPhone),
         contactHomePhone: phoneToStore(["contactHomePhone"], input.contactHomePhone, existing?.contactHomePhone),
@@ -245,7 +246,7 @@ export async function saveYearEndReport(
       const data = {
         contactName: input.contactName,
         ...phones,
-        contactEmail: input.contactEmail,
+        contactEmail,
         prefill: prefill.values,
         overrides,
         manual,

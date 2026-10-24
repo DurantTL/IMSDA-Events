@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   PHONE_FIELD_MESSAGE,
   emailAddressSchema,
+  emailToStore,
+  isUnchangedEmail,
   inlinePhoneProblem,
   isUnchangedPhone,
   newPhoneSchema,
@@ -86,6 +88,45 @@ describe("resolvePhoneChange and phoneToStore", () => {
   it("keeps an unchanged old unusable phone exactly as stored", () => {
     expect(resolvePhoneChange(OLD_BAD, OLD_BAD)).toEqual({ ok: true, value: OLD_BAD });
     expect(resolvePhoneChange("555 0100", OLD_BAD)).toEqual({ ok: true, value: OLD_BAD });
+  });
+});
+
+describe("an untouched valid phone is kept exactly as stored", () => {
+  it("does not rewrite an unformatted stored number, so nothing records a change", () => {
+    expect(resolvePhoneChange("515-555-0134", "515-555-0134")).toEqual({ ok: true, value: "515-555-0134" });
+    expect(resolvePhoneChange("515.555.0134", "515-555-0134")).toEqual({ ok: true, value: "515-555-0134" });
+    expect(phoneToStore(["phone"], "(515) 555-0134", "5155550134")).toBe("5155550134");
+  });
+});
+
+describe("emailToStore: the stored email decides", () => {
+  const longEmail = `${"a".repeat(60)}@${"b".repeat(60)}.${"c".repeat(60)}.test`;
+
+  it("keeps an unchanged stored email as stored, even over the shared length cap", () => {
+    expect(longEmail.length).toBeGreaterThan(160);
+    expect(isUnchangedEmail(` ${longEmail.toUpperCase()} `, longEmail)).toBe(true);
+    expect(emailToStore(["contactEmail"], longEmail, longEmail)).toBe(longEmail);
+  });
+
+  it("holds a changed email to the shared check, and the error never carries it", () => {
+    expect(emailToStore(["contactEmail"], " New@Example.Test ", "old@example.test")).toBe("New@Example.Test");
+    expect(emailToStore(["contactEmail"], "", "old@example.test")).toBe("");
+    for (const bad of ["not-an-email", longEmail]) {
+      try {
+        emailToStore(["contactEmail"], bad, "old@example.test");
+        throw new Error("should have thrown");
+      } catch (error) {
+        expect(JSON.stringify((error as { issues: unknown }).issues)).not.toContain(bad.slice(0, 20));
+      }
+    }
+    expect(isUnchangedEmail("a@example.test", "")).toBe(false);
+    expect(isUnchangedEmail("a@example.test", null)).toBe(false);
+  });
+
+  it("gives an over-long email a plain message that does not echo it", () => {
+    const result = emailAddressSchema.safeParse(`${"a".repeat(170)}@example.test`);
+    expect(messagesOf(result)).toEqual(["Email must be 160 characters or fewer."]);
+    expect(JSON.stringify(result)).not.toContain("aaaaaaaaaa");
   });
 });
 

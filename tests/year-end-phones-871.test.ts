@@ -94,4 +94,31 @@ describe("year-end report phones (#871)", () => {
     await expect(saveYearEndReport("club-1", "2026-27", input({ contactWorkPhone: "555-0100", contactHomePhone: "555-0100" }), actor, NOW)).rejects.toThrow();
     expect(mocks.reportUpdate).not.toHaveBeenCalled();
   });
+
+  describe("the contact email", () => {
+    const longEmail = `${"a".repeat(60)}@${"b".repeat(60)}.${"c".repeat(60)}.test`;
+    const saved = (email: string) => mocks.reportFindUnique.mockResolvedValue({
+      id: "report-1", status: "DRAFT", firstSubmittedAt: null, submittedAt: null,
+      contactWorkPhone: "", contactHomePhone: "", contactCellPhone: "", contactEmail: email,
+    });
+
+    it("lets a saved email over the shared length cap stay on a resave", async () => {
+      expect(longEmail.length).toBeGreaterThan(160);
+      saved(longEmail);
+      await saveYearEndReport("club-1", "2026-27", input({ contactEmail: longEmail, contactName: "Pat Changed" }), actor, NOW);
+      expect(mocks.reportUpdate.mock.calls[0]![0].data).toMatchObject({ contactEmail: longEmail, contactName: "Pat Changed" });
+    });
+
+    it("holds a changed over-long email to the cap, without echoing it, and writes nothing", async () => {
+      saved("pat@example.test");
+      const error = await saveYearEndReport("club-1", "2026-27", input({ contactEmail: longEmail }), actor, NOW).catch((caught: unknown) => caught) as { issues: Array<{ path: string[] }>; message: string };
+      expect(error.issues[0]!.path).toEqual(["contactEmail"]);
+      expect(JSON.stringify(error.issues)).not.toContain("aaaaaaaaaa");
+      expect(mocks.reportUpdate).not.toHaveBeenCalled();
+    });
+
+    it("still rejects a malformed email in the schema", () => {
+      expect(() => input({ contactEmail: "not-an-email" })).toThrow(/valid email/i);
+    });
+  });
 });

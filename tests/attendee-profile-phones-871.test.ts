@@ -77,6 +77,14 @@ describe("profile phones use the shared validator (#871)", () => {
     expect(dataSaved()).toMatchObject({ phone: "555-0100", shirtSize: "L" });
   });
 
+  it("keeps an untouched valid but unformatted phone exactly, so the audit records no change", async () => {
+    attendeeAccount.findUniqueOrThrow.mockResolvedValue({ ...stored, phone: "515-555-0134" });
+    attendeeAccount.update.mockResolvedValue({ ...stored, phone: "515-555-0134" });
+    await updateAttendeeProfile("acct-1", { ...input, phone: "515-555-0134" });
+    expect(dataSaved().phone).toBe("515-555-0134");
+    expect(dependencies.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("lets the old unusable phone stay on an exact resave", async () => {
     await updateAttendeeProfile("acct-1", input);
     expect(dataSaved().phone).toBe("555-0100");

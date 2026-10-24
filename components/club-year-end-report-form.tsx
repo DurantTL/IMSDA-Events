@@ -29,7 +29,7 @@ type PrefillMeta = {
   undatedHonorCompletions?: number;
 } | null;
 
-type SaveResponse = { report?: YearEndReportRecord; message?: string; issues?: Array<{ message?: string }> };
+type SaveResponse = { report?: YearEndReportRecord; message?: string; issues?: Array<{ message?: string; path?: Array<string | number> }> };
 
 const sectionOrder: YearEndSection[] = [
   "membership", "staff", "tlts", "youthBaptisms", "adultBaptisms", "invested", "honors", "honorMasters", "leadershipAward", "instructorAward",
@@ -47,6 +47,15 @@ const phoneFields = [
   ["contactHomePhone", "Home phone"],
   ["contactCellPhone", "Cell phone"],
 ] as const;
+
+/** The first server problem, with the contact field it is about named (#871), so a failed phone says which one. */
+function serverProblem(result: SaveResponse) {
+  const issue = result.issues?.[0];
+  const key = typeof issue?.path?.[0] === "string" ? issue.path[0] : "";
+  const label = key === "contactEmail" ? "Email" : phoneFields.find(([field]) => field === key)?.[1];
+  if (issue?.message) return label ? `${label}: ${issue.message}` : issue.message;
+  return result.message ?? "The report could not be saved.";
+}
 
 const toCount = (value: string) => {
   if (value.trim() === "") return null;
@@ -137,7 +146,7 @@ export function ClubYearEndReportForm({
       });
       const result = await response.json().catch(() => ({})) as SaveResponse;
       if (!response.ok || !result.report) {
-        setError(result.issues?.[0]?.message ?? result.message ?? "The report could not be saved.");
+        setError(serverProblem(result));
         return;
       }
       const savedPhones = {

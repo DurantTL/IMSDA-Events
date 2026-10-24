@@ -168,16 +168,15 @@ export function isUnchangedPhone(submitted: unknown, stored: unknown): boolean {
 /**
  * The phone to store for a submitted one, and the check that goes with it (#871). Blank is allowed (a "required"
  * rule is the caller's) and stores as "". A changed phone has to pass and is stored normalised. A phone that is the
- * stored one (see `isUnchangedPhone`) is kept as stored, valid or not, so saving a record never fails on a number
+ * stored one (see `isUnchangedPhone`) is kept exactly as stored, valid or not, so saving a record never fails on a number
  * nobody touched. `stored` must come from the database, never from the request.
  */
 export function resolvePhoneChange(submitted: string, stored: string | null | undefined): { ok: true; value: string } | { ok: false; message: string } {
   const text = submitted.trim();
   if (text === "") return { ok: true, value: "" };
   if (isUnchangedPhone(text, stored)) {
-    const was = (stored ?? "").trim();
-    const check = validatePhone(was);
-    return { ok: true, value: check.ok ? check.value : was };
+    // Kept exactly as stored, valid or not, so an untouched number is never rewritten and never recorded as a change.
+    return { ok: true, value: (stored ?? "").trim() };
   }
   const check = validatePhone(text);
   return check.ok ? { ok: true, value: check.value } : { ok: false, message: PHONE_FIELD_MESSAGE };
@@ -188,6 +187,27 @@ export function phoneToStore(path: Array<string | number>, submitted: string, st
   const result = resolvePhoneChange(submitted, stored);
   if (!result.ok) throw new z.ZodError([{ code: "custom", path, message: result.message }]);
   return result.value;
+}
+
+/** Whether a submitted email is the stored one (#871): the same address, ignoring case and surrounding spaces. Decided from the stored value. */
+export function isUnchangedEmail(submitted: unknown, stored: unknown): boolean {
+  if (typeof submitted !== "string" || typeof stored !== "string") return false;
+  const was = stored.trim().toLowerCase();
+  return was !== "" && was === submitted.trim().toLowerCase();
+}
+
+/**
+ * The email to store for a submitted one (#871), for a field that keeps the address as typed. Blank stores as "".
+ * A changed email has to pass the shared check. The stored one, even an old one over the shared length cap, may stay,
+ * exactly as stored. The ZodError never carries the address.
+ */
+export function emailToStore(path: Array<string | number>, submitted: string, stored: string | null | undefined): string {
+  const text = submitted.trim();
+  if (text === "") return "";
+  if (isUnchangedEmail(text, stored)) return (stored ?? "").trim();
+  const check = validateEmail(text);
+  if (!check.ok) throw new z.ZodError([{ code: "custom", path, message: EMAIL_FIELD_MESSAGE }]);
+  return check.value;
 }
 
 /** The browser message for a phone field (#871): a changed bad phone blocks once `shown`; an old one left alone only warns. */
@@ -206,7 +226,7 @@ export function inlinePhoneProblem(
 }
 
 /** A new phone (nothing stored to compare with): blank passes, anything else must be valid. Stored normalised. */
-export const newPhoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).transform((value, context) => {
+export const newPhoneSchema = z.string().trim().max(MAX_PHONE_LENGTH, PHONE_FIELD_MESSAGE).transform((value, context) => {
   const check = validateByType("phone", value);
   if (!check.ok) {
     context.addIssue({ code: "custom", message: PHONE_FIELD_MESSAGE });
@@ -216,7 +236,7 @@ export const newPhoneSchema = z.string().trim().max(MAX_PHONE_LENGTH).transform(
 });
 
 /** An email through the shared check, lower-cased. Blank passes; a caller that requires one says so itself. */
-export const emailAddressSchema = z.string().trim().max(MAX_EMAIL_LENGTH).transform((value, context) => {
+export const emailAddressSchema = z.string().trim().max(MAX_EMAIL_LENGTH, `Email must be ${MAX_EMAIL_LENGTH} characters or fewer.`).transform((value, context) => {
   const check = validateByType("email", value);
   if (!check.ok) {
     context.addIssue({ code: "custom", message: EMAIL_FIELD_MESSAGE });

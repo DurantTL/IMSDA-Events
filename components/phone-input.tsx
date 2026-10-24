@@ -49,7 +49,7 @@ export function PhoneInput({ label, stored, value, defaultValue = "", onValueCha
         type={attributes.type}
         value={current}
       />
-      {problem.message ? <small className={problem.blocking ? "field-error phone-input-message" : "phone-input-message is-notice"} id={messageId} role={problem.blocking ? "alert" : "status"}>{problem.message}</small> : null}
+      {problem.message ? <small className={problem.blocking ? "field-error field-error-message phone-input-message is-error" : "phone-input-message is-notice"} id={messageId} role={problem.blocking ? "alert" : "status"}>{problem.message}</small> : null}
     </>
   );
 }

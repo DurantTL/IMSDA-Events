@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { validateEmail } from "@/lib/field-validation";
 import { yearEndFieldKeys } from "@/modules/club-reports/year-end-domain";
 
 const count = z.number().int().min(0, "Counts can't be negative.").max(9999).nullable();
@@ -19,11 +18,12 @@ export const yearEndReportInputSchema = z.object({
   contactWorkPhone: z.string().trim().max(40).default(""),
   contactHomePhone: z.string().trim().max(40).default(""),
   contactCellPhone: z.string().trim().max(40).default(""),
+  // The email's format is checked here; its length against the shared cap, and the saved one's grandfathering, in `saveYearEndReport` (#871).
   contactEmail: z.string().trim().max(200).default(""),
   values: z.object(valuesShape).strict(),
   status: z.enum(["DRAFT", "SUBMITTED"]),
 }).strict().superRefine((report, context) => {
-  if (report.contactEmail && !validateEmail(report.contactEmail).ok) {
+  if (report.contactEmail && !z.email().safeParse(report.contactEmail).success) {
     context.addIssue({ code: "custom", path: ["contactEmail"], message: "Enter a valid email address." });
   }
   if (report.status !== "SUBMITTED") return;

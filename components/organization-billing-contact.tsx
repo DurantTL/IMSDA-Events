@@ -92,7 +92,7 @@ export function OrganizationBillingContact({
         <label htmlFor={`${base}-role`}>Role</label>
         <input id={`${base}-role`} maxLength={80} onChange={(event) => setRoleLabel(event.target.value)} required value={roleLabel} />
         <label htmlFor={`${base}-email`}>Email</label>
-        <input autoComplete="off" id={`${base}-email`} maxLength={254} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
+        <input autoComplete="off" id={`${base}-email`} maxLength={160} onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
         <label htmlFor={`${base}-phone`}>Phone (optional)</label>
         <PhoneInput autoComplete="off" id={`${base}-phone`} label="Phone" onValueChange={setPhone} showNow={attempted} value={phone} />
         {active && <small>The current contact is ended and kept in the history. The new one starts unverified.</small>}
