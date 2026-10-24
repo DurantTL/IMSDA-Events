@@ -30,7 +30,8 @@ export type HomeValue = {
   readAt: string | null;
   /** The action link. It is a link to a workflow, never to a filtered copy of this count. */
   linkLabel: string;
-  href: string;
+  /** `null` when there is no page that works without more context; the card then shows no link. */
+  href: string | null;
 };
 
 export type HomeValueInput = {
@@ -55,11 +56,13 @@ export function attentionValue(attention: AttentionSummary | null, key: Attentio
  *
  * - Upcoming events: events, not archived and not ended (`endsAt >= now`), in progress included, drafts included.
  *   Link: the list below on this page, which uses the same predicate.
- * - New club applications waiting: applications, every one with status PENDING, in any year. Not scoped to an event.
+ * - New club applications waiting: applications, every one with status PENDING, in any year. Not scoped to an event
+ *   (an application belongs to no event).
  * - Failed email: messages that failed, bounced or were marked as spam in the last 7 days and were not later resent
  *   successfully, across all events and account email. This is the bell's "email failed" item, not the all-time
  *   delivery-issue count on each event card.
- * - Waiting invites: staff registrations whose approval is WAITING, across all events.
+ * - Staff registrations waiting for approval: approval is WAITING, across all events. The link exists only while some
+ *   are waiting, because the approvals page needs an event and the bell link supplies one.
  */
 export function buildHomeValues({ events, attention }: HomeValueInput): HomeValue[] {
   const attentionAt = attention?.generatedAt ?? null;
@@ -79,7 +82,7 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
       label: "New club applications waiting",
       value: attentionValue(attention, "club-applications"),
       unit: "applications",
-      scope: "Every application still waiting for a decision, across all events.",
+      scope: "Every pending application, any year.",
       readAt: attentionAt,
       linkLabel: "Open club applications",
       href: "/admin/clubs/applications",
@@ -89,20 +92,21 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
       label: "Failed messages",
       value: attentionValue(attention, "email-failed"),
       unit: "messages",
-      scope: "Failed, bounced or marked as spam in the last 7 days and not resent, across all events.",
+      scope: "Failed, bounced or marked as spam in the last 7 days and not resent, across all events and account email.",
       readAt: attentionAt,
       linkLabel: "Open email problems",
       href: attentionHref(attention, "email-failed") ?? "/admin/email",
     },
     {
       key: "waiting-invites",
-      label: "Staff invites waiting",
+      label: "Staff registrations waiting for approval",
       value: attentionValue(attention, "staff-invitation-approvals"),
       unit: "staff registrations",
       scope: "Staff registrations waiting for approval, across all events.",
       readAt: attentionAt,
       linkLabel: "Open staff approvals",
-      href: attentionHref(attention, "staff-invitation-approvals") ?? "/people/staff-invitations/approvals",
+      // No event-less fallback: that page needs an event, so with none waiting (or unreadable) there is no link.
+      href: attentionHref(attention, "staff-invitation-approvals"),
     },
   ];
 }

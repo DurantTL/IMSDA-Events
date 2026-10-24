@@ -198,7 +198,23 @@ describe("home values", () => {
     expect(values.map((item) => item.value)).toEqual([null, null, null, null]);
     for (const item of values) expect(item.linkLabel).toMatch(/^(Open|Go to)/);
     // Only the upcoming list is the same predicate on the same page.
-    expect(values.filter((item) => item.href.startsWith("#")).map((item) => item.key)).toEqual(["upcoming-events"]);
+    expect(values.filter((item) => item.href?.startsWith("#")).map((item) => item.key)).toEqual(["upcoming-events"]);
+  });
+
+  it("words each scope to match its query", () => {
+    const byKey = Object.fromEntries(buildHomeValues({ events: null, attention: null }).map((item) => [item.key, item]));
+    expect(byKey["failed-email"].scope).toContain("all events and account email");
+    expect(byKey["club-applications"].scope).toBe("Every pending application, any year.");
+    expect(byKey["club-applications"].scope).not.toContain("all events");
+    expect(byKey["waiting-invites"].label).toBe("Staff registrations waiting for approval");
+  });
+
+  it("links staff approvals only when the bell supplies an event, never to an event-less page", () => {
+    const find = (summary: AttentionSummary | null) => buildHomeValues({ events: null, attention: summary }).find((item) => item.key === "waiting-invites");
+    expect(find(attention())?.href).toBeNull();
+    expect(find(null)?.href).toBeNull();
+    expect(find(attention({ unreadableChecks: 1, unreadableKeys: ["staff-invitation-approvals"] }))?.href).toBeNull();
+    expect(find(attention({ staffInvitationApprovals: { total: 2, topEventId: "e1" } }))?.href).toBe("/people/staff-invitations/approvals?event=e1");
   });
 
   it("formats a read time in UTC and ignores a bad one", () => {
@@ -356,6 +372,52 @@ describe("System home page", () => {
     expect(html).not.toContain("Nothing is waiting");
   });
 
+  it("shows the staff-account line as platform-wide, outside the all-events heading", async () => {
+    const html = await renderHome();
+    const totals = html.slice(html.indexOf('aria-labelledby="totals-heading"'));
+    const heading = totals.slice(0, totals.indexOf("</h3>"));
+    expect(heading).toContain("All non-archived events, including past ones");
+    const list = totals.slice(totals.indexOf("<ul>"), totals.indexOf("</ul>"));
+    expect(list).not.toContain("staff accounts");
+    expect(totals).toContain("Platform-wide, not per event");
+  });
+
+  it("explains what the bell badge adds, and shows a floor for a truncated directory list", async () => {
+    loadAll({ attentionSummary: attention({ directoryReview: { total: 6, topEventId: "e1" }, directoryReviewTruncated: true }) });
+    const html = await renderHome();
+    expect(html).toContain("The notification bell badge adds Notification list items and Unread alerts.");
+    expect(html).toContain("except feature requests and the review-only directory list");
+    expect(html).toContain("At least 6");
+  });
+
+  it("shows a failed health read and a failed feed read as unavailable", async () => {
+    mocks.getSystemHealth.mockRejectedValue(new Error("health down"));
+    let html = await renderHome();
+    expect(html).toContain("System health could not be read just now");
+    expect(html).toContain("Synthetic Family Retreat");
+    expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("system health"), expect.any(Error));
+
+    vi.clearAllMocks();
+    loadAll();
+    mocks.listAlertFeed.mockRejectedValue(new Error("feed down"));
+    html = await renderHome();
+    expect(html).toMatch(/Unread alerts in your feed<\/dt><dd>Unavailable:/);
+    expect(html).toContain("Synthetic Family Retreat");
+    expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("alert feed"), expect.any(Error));
+  });
+
+  it("reads the feed for the signed-in user only, and not at all on denial", async () => {
+    await renderHome();
+    expect(mocks.listAlertFeed).toHaveBeenCalledTimes(1);
+    expect(mocks.listAlertFeed).toHaveBeenCalledWith("user-1");
+    vi.clearAllMocks();
+    mocks.getCurrentSession.mockResolvedValue({ user: { ...admin, globalRole: null } });
+    await expect(renderHome()).rejects.toThrow("redirect:/no-access");
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    await expect(renderHome()).rejects.toThrow("redirect:/login");
+    expect(mocks.listAlertFeed).not.toHaveBeenCalled();
+  });
+
   it("says nothing is waiting only when every check was read", async () => {
     const html = await renderHome();
     expect(html).toContain("Nothing is waiting in the checks above");
@@ -405,6 +467,24 @@ describe("System home page", () => {
     expect(mocks.getSystemAdminDashboard).not.toHaveBeenCalled();
     expect(mocks.getAdminAttentionSummary).not.toHaveBeenCalled();
     expect(mocks.listPendingModuleRequests).not.toHaveBeenCalled();
+  });
+});
+
+describe("System home layout rules", () => {
+  const css = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
+
+  it("keeps every summary card's text and link out of the icon column", () => {
+    expect(css).toMatch(/\.metrics article > \.metricIcon \{\s*grid-column: 1;\s*grid-row: 1 \/ 6;/);
+    expect(css).toMatch(/\.metrics article > :not\(\.metricIcon\) \{\s*grid-column: 2;/);
+    // On a phone the card is one column, so the text returns to it.
+    const phone = css.slice(css.indexOf("@media (max-width: 700px) {"));
+    expect(phone).toMatch(/\.metrics article > :not\(\.metricIcon\) \{\s*grid-column: 1;/);
+  });
+
+  it("gives the summary and starter links 44px targets and lets the identity wrap", () => {
+    expect(css).toMatch(/\.metrics article small a \{[^}]*min-height: 44px;/);
+    expect(css).toMatch(/\.starterLinks a \{[^}]*min-height: 44px;/);
+    expect(css).toMatch(/\.identity \{[^}]*min-width: 0;[^}]*overflow-wrap: break-word;/);
   });
 });
 

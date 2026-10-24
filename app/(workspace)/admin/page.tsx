@@ -262,22 +262,24 @@ export default async function SystemAdminPage({
                 <strong>{display(item.value)}</strong>
                 <p>{item.label}</p>
                 <small>{item.value === null ? `${item.unit}: could not be read just now.` : `${item.unit}. ${item.scope}`}{readAt ? ` Read at ${readAt}.` : ""}</small>
-                <small><Link href={item.href}>{item.linkLabel}</Link></small>
+                {item.href && <small><Link href={item.href}>{item.linkLabel}</Link></small>}
               </article>
             );
           })}
         </div>
-        <div className={styles.totals} aria-label="Totals across all non-archived events, including past events">
-          <p>All non-archived events, including past ones:</p>
+        <section className={styles.totals} aria-labelledby="totals-heading">
+          <h3 id="totals-heading">All non-archived events, including past ones</h3>
           {dashboard ? (
-            <ul>
-              <li><strong>{dashboard.summary.attendeeCount}</strong> expected attendees</li>
-              <li><strong>{dashboard.summary.registrationCount}</strong> active registrations</li>
-              <li><strong>{dashboard.summary.operationalIssueCount}</strong> operational exceptions <small>({dashboard.summary.unresolvedAlertCount} open system alerts, failed or rejected imports, and email delivery issues)</small></li>
-              <li><strong>{dashboard.summary.activeUserCount}</strong> active staff accounts <small>({dashboard.summary.pendingUserCount} pending, {dashboard.summary.systemAdminCount} system admins)</small></li>
-            </ul>
+            <>
+              <ul>
+                <li><strong>{dashboard.summary.attendeeCount}</strong> expected attendees</li>
+                <li><strong>{dashboard.summary.registrationCount}</strong> active registrations</li>
+                <li><strong>{dashboard.summary.operationalIssueCount}</strong> operational exceptions <small>({dashboard.summary.unresolvedAlertCount} open system alerts, failed or rejected imports, and email delivery issues)</small></li>
+              </ul>
+              <p><strong>Platform-wide, not per event:</strong> {dashboard.summary.activeUserCount} active staff accounts ({dashboard.summary.pendingUserCount} pending, {dashboard.summary.systemAdminCount} system admins).</p>
+            </>
           ) : <Unavailable what="The event totals" />}
-        </div>
+        </section>
       </section>
 
       <section className={`panel ${styles.workPanel}`} id="platform-work" aria-labelledby="platform-work-heading">
@@ -319,11 +321,11 @@ export default async function SystemAdminPage({
         )}
         <details className={styles.distinct}>
           <summary>How these numbers differ</summary>
-          <p>Each is its own quantity with its own definition. None of them is a total of the others.</p>
+          <p>Each is its own quantity with its own definition. None of them is a total of the others. The notification bell badge adds Notification list items and Unread alerts.</p>
           <dl>
             <div><dt>Operational exceptions</dt><dd>{dashboard ? dashboard.summary.operationalIssueCount : "Unavailable"}: failed or rejected import runs and email delivery issues on all non-archived events, plus open system alerts.</dd></div>
-            <div><dt>Notification list items</dt><dd>{attention && attention.unreadable.length === 0 ? attention.total : attention ? `${attention.total} (some checks unavailable)` : "Unavailable"}: the waiting, email and health items above, without the review-only directory list.</dd></div>
-            <div><dt>Directory entries to review</dt><dd>{display(directoryReviewCount)}: a review list for recent events, not an alert.</dd></div>
+            <div><dt>Notification list items</dt><dd>{attention && attention.unreadable.length === 0 ? attention.total : attention ? `${attention.total} (some checks unavailable)` : "Unavailable"}: the waiting, email and health items above, except feature requests and the review-only directory list.</dd></div>
+            <div><dt>Directory entries to review</dt><dd>{directoryReviewCount !== null && attention?.truncated ? `At least ${directoryReviewCount}` : display(directoryReviewCount)}: a review list for recent events, not an alert.</dd></div>
             <div><dt>Unread alerts in your feed</dt><dd>{display(unreadFeed)}: alert-feed items you have not read, shown only to you.</dd></div>
           </dl>
         </details>

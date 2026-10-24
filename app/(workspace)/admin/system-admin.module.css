@@ -643,6 +643,7 @@ details.taskGroup[open] .taskGrid {
 /* ---- System home (#1182): identity, scoped values, work across the platform, common tasks ---- */
 .identity {
   align-self: flex-end;
+  min-width: 0;
   display: grid;
   gap: 2px;
   max-width: 100%;
@@ -674,11 +675,24 @@ details.taskGroup[open] .taskGrid {
   gap: 10px;
 }
 
+/* The icon takes the first column over every row; all text, links included, stays in the second (#1182). */
+.metrics article > .metricIcon {
+  grid-column: 1;
+  grid-row: 1 / 6;
+}
+
+.metrics article > :not(.metricIcon) {
+  grid-column: 2;
+}
+
 .metrics article[data-unavailable="true"] {
   border-style: dashed;
 }
 
 .metrics article small a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--imsda-navy);
   font-weight: 700;
   text-decoration: underline;
@@ -694,9 +708,15 @@ details.taskGroup[open] .taskGrid {
   font-size: max(var(--type-body-floor, 0px), 0.66rem);
 }
 
-.totals p {
+.totals h3 {
   margin: 0 0 4px;
+  color: var(--ink);
+  font-size: max(var(--type-body-floor, 0px), 0.66rem);
   font-weight: 700;
+}
+
+.totals p {
+  margin: 6px 0 0;
 }
 
 .totals ul {
@@ -823,6 +843,13 @@ details.taskGroup[open] .taskGrid {
 
 .distinct dd {
   margin: 0;
+}
+
+.starterLinks a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
 }
 
 .starterLinks {
@@ -983,6 +1010,11 @@ details.taskGroup[open] .taskGrid {
 
   .metricIcon {
     display: none;
+  }
+
+  /* One column on a phone, so the text sits in the first. */
+  .metrics article > :not(.metricIcon) {
+    grid-column: 1;
   }
 
   .primaryColumn,
