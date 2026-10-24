@@ -126,7 +126,7 @@ export default async function AttendeeAccountOverviewPage() {
                 {dueLine}
                 <ul className="attendee-ov-cards">
                   {upcoming.map((registration, index) => (
-                    <AccountRegistrationCard key={registration.id} registration={registration} primary={cardPrimary && index === 0} />
+                    <AccountRegistrationCard key={registration.id} registration={registration} primary={cardPrimary && index === 0} viewFallback />
                   ))}
                 </ul>
               </>

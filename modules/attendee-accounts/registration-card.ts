@@ -53,6 +53,10 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
   }
   if (registration.lifecycle === "CANCELLED") {
     // The original charges stay on the record: the total, what was paid and what was refunded (#1176).
+    // A cancelled registration that never had a charge has no history to keep: only the no-payment-due sentence.
+    if (total === 0 && gross === 0 && refunded === 0) {
+      return { headline: "Nothing due now", detail: "No payment is due on a cancelled registration.", tone: "calm" };
+    }
     const kept = [`Original total ${formatMoney(total)}`, gross > 0 ? `${formatMoney(gross)} paid` : "nothing paid", refunded > 0 ? `${formatMoney(refunded)} refunded` : null]
       .filter(Boolean)
       .join(" \u00b7 ");
@@ -89,14 +93,17 @@ export function eventCardDates(event: { startsAt: string; endsAt: string; timezo
 /** The registration statuses the event hub (`/account/events/[slug]`) loads. It must match the status filter in event-hub-repository.ts; a test pins them. */
 export const HUB_REGISTRATION_LIFECYCLES = ["SUBMITTED", "CONFIRMED"] as const;
 
+/** The id of a registration's card on the page that lists it, so another page can link straight to it. */
+export const registrationAnchorId = (registrationId: string) => `registration-${registrationId}`;
+
 /**
- * Where a card's default action goes (#1176). The hub 404s for anything it does not load, so a cancelled record gets no
- * link (its details stay inline on My registrations) and a waitlisted one goes to the waitlist page instead.
+ * Where a card's default action goes (#1176): the event hub, and only for the statuses the hub loads, because it 404s for
+ * anything else. A waitlisted or cancelled record has no hub page, so this returns null: on My registrations its details are
+ * already inline. (/account/waitlists is the Area Coordinator's club page and is never a destination here.)
  */
 export function registrationViewLink(registration: Pick<AttendeeRegistrationSummary, "lifecycle" | "event">): { href: string; label: string } | null {
   if ((HUB_REGISTRATION_LIFECYCLES as readonly string[]).includes(registration.lifecycle)) {
     return { href: `/account/events/${encodeURIComponent(registration.event.slug)}`, label: "View registration" };
   }
-  if (registration.lifecycle === "WAITLISTED") return { href: "/account/waitlists", label: "View waitlist" };
   return null;
 }

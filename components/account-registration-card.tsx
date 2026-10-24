@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
-import { eventCardDates, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
+import { eventCardDates, registrationAnchorId, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 export type AccountRegistrationCardData = Pick<
@@ -20,6 +20,7 @@ export function AccountRegistrationCard({
   primary,
   headingLevel = 3,
   showPeople = false,
+  viewFallback = false,
   children,
 }: {
   registration: AccountRegistrationCardData;
@@ -28,6 +29,11 @@ export function AccountRegistrationCard({
   headingLevel?: 3 | 4;
   /** Name the included people (My registrations); the Overview only counts them. */
   showPeople?: boolean;
+  /**
+   * The Overview only: a record with no hub page (waitlisted) still needs somewhere to go, so it links to its own card on
+   * My registrations. My registrations leaves this off, where that record's details are already inline.
+   */
+  viewFallback?: boolean;
   /** Contextual secondary actions, below the money block (My registrations, #1176). */
   children?: ReactNode;
 }) {
@@ -35,10 +41,11 @@ export function AccountRegistrationCard({
   const dates = eventCardDates(registration.event);
   const money = registrationMoneySummary(registration);
   const people = registration.attendeeNames.length;
-  const view = registrationViewLink(registration);
+  const hubView = registrationViewLink(registration);
+  const view = hubView ?? (viewFallback ? { href: `/account/registrations#${registrationAnchorId(registration.id)}`, label: "View in My registrations" } : null);
   const headingId = `registration-card-${registration.id}`;
   return (
-    <li>
+    <li id={registrationAnchorId(registration.id)}>
       <article className="attendee-ov-card" aria-labelledby={headingId}>
         <div className="attendee-ov-card-top">
           <div className="attendee-ov-date" aria-hidden="true">

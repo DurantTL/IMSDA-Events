@@ -10,6 +10,7 @@ import { PublicSquarePayment } from "@/components/public-square-payment";
 import { RegistrationActionDisclosure } from "@/components/registration-action-disclosure";
 import { getRegistrantRequestViewById } from "@/modules/cancellation-requests/repository";
 import type { RegistrantRequestView } from "@/modules/cancellation-requests/views";
+import { registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import {
@@ -66,9 +67,9 @@ function CardActions({
     if (!actions.readOnlyHistory) return null;
     return (
       <p className="attendee-reg-readonly">
-        {registration.lifecycle === "CANCELLED"
-          ? "This cancelled registration is kept as read-only history."
-          : "This record is read-only history. Open it to see its details."}
+        {registrationViewLink(registration)
+          ? "This record is read-only history. Open it to see its details."
+          : "This registration is kept as read-only history."}
       </p>
     );
   }
@@ -167,7 +168,8 @@ export default async function AttendeeRegistrationsPage({
   const noRegistrations = loaded.ok && counts.all === 0;
   const filteredEmpty = loaded.ok && counts.all > 0 && counts[filter] === 0;
   // One filled primary per screen: the first card's View registration, else Find events / Try again in the empty states.
-  const firstCardId = (showUpcoming ? upcoming[0] : undefined)?.id ?? (historyOpen ? (shownPast[0] ?? shownCancelled[0])?.id : undefined);
+  // Only a card with a View registration link can carry the fill (a waitlisted or cancelled record has no hub page).
+  const firstCardId = [...(showUpcoming ? upcoming : []), ...(historyOpen ? [...shownPast, ...shownCancelled] : [])].find((registration) => registrationViewLink(registration))?.id;
 
   const card = (registration: AttendeeRegistrationSummary, level: 3 | 4) => (
     <AccountRegistrationCard
