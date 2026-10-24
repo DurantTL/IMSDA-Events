@@ -210,6 +210,7 @@ const pages: PageSpec[] = [
   // The public event page with one of each content block (#816), signed out.
   { name: "public-event-page-all-blocks", path: `/events/${blocksEventSlug}`, role: "visitor" },
   // Club portal (a director of two clubs).
+  { name: "account-overview", path: "/account", role: "director" },
   { name: "account-registrations", path: "/account/registrations", role: "director" },
   { name: "account-profile", path: "/account/profile", role: "director" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },

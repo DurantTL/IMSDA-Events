@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { ArrowRight, CalendarDays, CircleDollarSign, GraduationCap, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { ArrowRight, CircleAlert, CircleDollarSign, CircleHelp, GraduationCap, Inbox, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { AccountRegistrationCard } from "@/components/account-registration-card";
 import { AreaCoordinatorCardSection, AreaCoordinatorCardSkeleton } from "@/components/area-coordinator-card";
 import { ClubInviteAccept } from "@/components/club-invite-accept";
 import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
@@ -16,6 +17,7 @@ import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
+import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -26,19 +28,25 @@ export const metadata: Metadata = {
 
 const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-function eventDate(startsAt: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone })
-    .format(new Date(startsAt));
-}
-
-/** The account's front page: where things stand, and a way into each area. */
+/**
+ * The account's front page (#1175): a personal greeting, the registrations coming up with one next action each, and a
+ * secondary column for the account and help. Everything it shows comes from the existing verified-email match and the
+ * existing grants; it adds no new authority.
+ */
 export default async function AttendeeAccountOverviewPage() {
   await requireAttendeeSecondStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 
-  const [registrations, mfaStatus, clubs, invites, areaCoordinator, instructorInvites, isInstructor] = await Promise.all([
-    listRegistrationsForVerifiedEmail(account.verifiedEmail),
+  const [registrationsResult, mfaStatus, clubs, invites, areaCoordinator, instructorInvites, isInstructor] = await Promise.all([
+    // A failed load is its own calm state with a retry: not "no registrations", and not a blank page.
+    listRegistrationsForVerifiedEmail(account.verifiedEmail).then(
+      (registrations) => ({ ok: true as const, registrations }),
+      (error: unknown) => {
+        logError("Account overview registrations failed to load", error, { accountId: account.id });
+        return { ok: false as const, registrations: [] };
+      },
+    ),
     getAttendeeMfaStatus(account.id),
     listDirectedClubs(account.id),
     // Only the person themselves may accept, so staff viewing an account don't see them.
@@ -49,10 +57,15 @@ export default async function AttendeeAccountOverviewPage() {
     via === "attendee" ? listInstructorInvitesForAccount(account.verifiedEmail) : Promise.resolve([]),
     via === "attendee" ? accountIsInstructor(account.id) : Promise.resolve(false),
   ]);
+  const registrations = registrationsResult.registrations;
   const upcoming = upcomingRegistrations(registrations);
-  const next = upcoming[0];
   const amountDue = accountAmountDue(registrations);
   const authenticatorOn = mfaStatus.status === "ACTIVE";
+  const hasWorkspaceCards = Boolean(areaCoordinator) || clubs.length > 0 || isInstructor;
+  // One filled primary per screen: the first registration's View registration. With no registration card, a club
+  // director's authenticator prompt keeps its filled button instead.
+  const authenticatorPrimary = !authenticatorOn && clubs.length > 0 && upcoming.length === 0;
+  const helpSlug = upcoming[0]?.event.slug;
 
   return (
     <>
@@ -60,104 +73,146 @@ export default async function AttendeeAccountOverviewPage() {
         <div>
           <p className="public-registration-eyebrow">Your account</p>
           <h1>Hello, <span translate="no">{account.displayName}</span></h1>
-          <p>Signed in as <strong>{account.verifiedEmail}</strong></p>
+          <p>Here are your event plans and anything you need to finish.</p>
         </div>
       </section>
 
       {invites.length > 0 && <ClubInviteAccept invites={invites} />}
       {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} />}
 
-      <div className="account-overview-grid">
-        <section className="public-manage-card account-overview-card">
-          <p className="public-registration-eyebrow"><CalendarDays size={15} aria-hidden="true" /> My registrations</p>
-          {next ? (
-            <>
-              <h2>{next.event.name}</h2>
-              <p>{eventDate(next.event.startsAt, next.event.timezone)}{next.event.location ? ` · ${next.event.location}` : ""}</p>
-              {next.lifecycle === "WAITLISTED" && (
-                <p className="field-help"><strong>{next.status.label}.</strong> A place is not confirmed yet, and no payment is due while you wait.</p>
-              )}
-              <p className="field-help">
-                {upcoming.length === 1 ? "Your next event." : `Your next of ${upcoming.length} upcoming events.`}
+      <div className="attendee-ov-layout">
+        <div className="attendee-ov-main">
+          <section aria-labelledby="attendee-ov-upcoming">
+            <h2 className="attendee-ov-heading" id="attendee-ov-upcoming">Coming up for you</h2>
+            {!registrationsResult.ok ? (
+              <div className="attendee-ov-notice" role="alert">
+                <CircleAlert size={20} aria-hidden="true" />
+                <div>
+                  <strong>We could not load your registrations</strong>
+                  <p>Nothing has been changed. Try again in a moment, or ask the event team if it keeps happening.</p>
+                  <a className="secondary-button attendee-ov-retry" href="/account">Try again</a>
+                </div>
+              </div>
+            ) : upcoming.length > 0 ? (
+              <>
+                {amountDue.totalCents > 0 && (
+                  <p className="account-overview-alert attendee-ov-due">
+                    <CircleDollarSign size={16} aria-hidden="true" /> <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span> still due {amountDue.scope}
+                  </p>
+                )}
+                <ul className="attendee-ov-cards">
+                  {upcoming.map((registration, index) => (
+                    <AccountRegistrationCard key={registration.id} registration={registration} primary={index === 0} />
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <div className="attendee-ov-empty">
+                <Inbox size={22} aria-hidden="true" />
+                <div>
+                  <h3>{registrations.length === 0 ? "No registrations yet" : "Nothing coming up"}</h3>
+                  <p>
+                    {registrations.length === 0
+                      ? `Registrations made with ${account.verifiedEmail} show up here.`
+                      : "Your past and cancelled registrations are still listed under My registrations."}
+                  </p>
+                  <p className="attendee-ov-empty-links">
+                    <Link className="secondary-button" href="/events">Find events</Link>
+                    <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>
+                  </p>
+                </div>
+              </div>
+            )}
+            {registrationsResult.ok && registrations.length > 0 && (
+              <p className="attendee-ov-all">
+                <Link className="text-button" href="/account/registrations">
+                  {registrations.length > upcoming.length && upcoming.length > 0
+                    ? `All my registrations (${registrations.length}), including past and cancelled`
+                    : "All my registrations"}
+                  {" "}<ArrowRight size={14} aria-hidden="true" />
+                </Link>
               </p>
-            </>
-          ) : (
-            <>
-              <h2>{registrations.length === 0 ? "No registrations yet" : "Nothing coming up"}</h2>
-              {registrations.length > 0 && <p className="field-help">Past and cancelled registrations are still listed under My registrations.</p>}
-              <p className="field-help">Registrations made with {account.verifiedEmail} show up here. <Link className="empty-state-link" href="/recover-registration">Find a registration made with another email</Link>, or ask the event team.</p>
-            </>
-          )}
-          {amountDue.totalCents > 0 && (
-            <p className="account-overview-alert">
-              <CircleDollarSign size={16} aria-hidden="true" /> <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span> still due {amountDue.scope}
-            </p>
-          )}
-          <Link className="secondary-button account-overview-link" href="/account/registrations">
-            View my registrations <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </section>
-
-        {areaCoordinator && (
-          <Suspense fallback={<AreaCoordinatorCardSkeleton />}>
-            <AreaCoordinatorCardSection account={areaCoordinator} />
-          </Suspense>
-        )}
-
-        {clubs.length > 0 && (
-          <section className="public-manage-card account-overview-card">
-            <p className="public-registration-eyebrow"><UsersRound size={15} aria-hidden="true" /> {clubs.length === 1 ? "My club" : "My clubs"}</p>
-            <ul className="account-overview-list">
-              {clubs.map((club) => (
-                <li key={club.organizationId}>
-                  <Link href={`/account/clubs/${club.organizationId}`}>
-                    <strong translate="no">{club.name}</strong>
-                    <small>{clubDirectorRoleLabels[club.role]}</small>
-                    <ArrowRight size={15} aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <p className="field-help">Roster, club event registration, and class choices.</p>
+            )}
           </section>
-        )}
 
-        {isInstructor && (
+          {hasWorkspaceCards && (
+            <section aria-labelledby="attendee-ov-roles">
+              <h2 className="attendee-ov-heading" id="attendee-ov-roles">Your other roles</h2>
+              <div className="attendee-ov-roles">
+                {areaCoordinator && (
+                  <Suspense fallback={<AreaCoordinatorCardSkeleton />}>
+                    <AreaCoordinatorCardSection account={areaCoordinator} />
+                  </Suspense>
+                )}
+
+                {clubs.length > 0 && (
+                  <section className="public-manage-card account-overview-card">
+                    <p className="public-registration-eyebrow"><UsersRound size={15} aria-hidden="true" /> {clubs.length === 1 ? "My club" : "My clubs"}</p>
+                    <ul className="account-overview-list">
+                      {clubs.map((club) => (
+                        <li key={club.organizationId}>
+                          <Link href={`/account/clubs/${club.organizationId}`}>
+                            <strong translate="no">{club.name}</strong>
+                            <small>{clubDirectorRoleLabels[club.role]}</small>
+                            <ArrowRight size={15} aria-hidden="true" />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="field-help">Roster, club event registration, and class choices.</p>
+                  </section>
+                )}
+
+                {isInstructor && (
+                  <section className="public-manage-card account-overview-card">
+                    <p className="public-registration-eyebrow"><GraduationCap size={15} aria-hidden="true" /> Honors Weekend</p>
+                    <h3>Your classes</h3>
+                    <p className="field-help">Class rosters and marking attendance and completion for the classes you teach.</p>
+                    <Link className="secondary-button account-overview-link" href="/account/instructor">
+                      Open your classes <ArrowRight size={14} aria-hidden="true" />
+                    </Link>
+                  </section>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <aside className="attendee-ov-side" aria-label="Account and help">
           <section className="public-manage-card account-overview-card">
-            <p className="public-registration-eyebrow"><GraduationCap size={15} aria-hidden="true" /> Honors Weekend</p>
-            <h2>Your classes</h2>
-            <p className="field-help">Class rosters and marking attendance and completion for the classes you teach.</p>
-            <Link className="secondary-button account-overview-link" href="/account/instructor">
-              Open your classes <ArrowRight size={14} aria-hidden="true" />
+            <p className="public-registration-eyebrow">
+              {authenticatorOn ? <ShieldCheck size={15} aria-hidden="true" /> : <ShieldAlert size={15} aria-hidden="true" />} Your registration account
+            </p>
+            <h2 className="attendee-ov-email" translate="no">{account.verifiedEmail}</h2>
+            <p className="field-help">
+              Registrations connected to this verified email appear here.{" "}
+              {authenticatorOn
+                ? "Two-step sign-in is on."
+                : clubs.length > 0
+                  ? "Club rosters hold young people's birth dates, so they need an authenticator. Set one up to open your club."
+                  : "Two-step sign-in is off. Add an authenticator app for extra protection."}
+            </p>
+            <Link className={`${authenticatorPrimary ? "primary-button" : "secondary-button"} account-overview-link`} href="/account/profile">
+              <UserRound size={14} aria-hidden="true" /> {authenticatorPrimary ? "Set up an authenticator" : "Profile and security"} <ArrowRight size={14} aria-hidden="true" />
             </Link>
           </section>
-        )}
 
-        <section className="public-manage-card account-overview-card">
-          <p className="public-registration-eyebrow">
-            {authenticatorOn ? <ShieldCheck size={15} aria-hidden="true" /> : <ShieldAlert size={15} aria-hidden="true" />} Sign-in &amp; security
-          </p>
-          <h2>{authenticatorOn ? "Two-step sign-in is on" : "Two-step sign-in is off"}</h2>
-          <p className="field-help">
-            {authenticatorOn
-              ? "Your authenticator protects club rosters and account changes."
-              : clubs.length > 0
-                ? "Club rosters hold young people's birth dates, so they need an authenticator. Set one up to open your club."
-                : "Add an authenticator app for extra protection."}
-          </p>
-          <Link className={`${!authenticatorOn && clubs.length > 0 ? "primary-button" : "secondary-button"} account-overview-link`} href="/account/profile">
-            {authenticatorOn ? "Manage sign-in" : "Set up an authenticator"} <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </section>
-
-        <section className="public-manage-card account-overview-card">
-          <p className="public-registration-eyebrow"><UserRound size={15} aria-hidden="true" /> Profile</p>
-          <h2>Your details</h2>
-          <p className="field-help">Saved details fill in new registration forms for you, so you don&apos;t retype them.</p>
-          <Link className="secondary-button account-overview-link" href="/account/profile">
-            Edit profile <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </section>
+          <section className="public-manage-card account-overview-card">
+            <p className="public-registration-eyebrow"><CircleHelp size={15} aria-hidden="true" /> Help</p>
+            <h2>A question about your event?</h2>
+            <p className="field-help">
+              {helpSlug
+                ? "Open a registration to find its event team, arrangements and anything that needs a change."
+                : "Registered with a different email, or not sure where your registration is? We can help you find it."}
+            </p>
+            <Link
+              className="secondary-button account-overview-link"
+              href={helpSlug ? `/account/events/${encodeURIComponent(helpSlug)}` : "/recover-registration"}
+            >
+              {helpSlug ? "Get event help" : "Find my registration"} <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </section>
+        </aside>
       </div>
     </>
   );

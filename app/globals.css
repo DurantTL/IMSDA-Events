@@ -12908,3 +12908,80 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-shell:not([data-phone]) .fb-body, .fb-shell:not([data-phone]) .fb-topbar > .fb-btn:not(.primary), .fb-shell:not([data-phone]) .fb-topbar > .fb-icon-button[aria-controls] { visibility: hidden; }
   .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }
+
+/* Attendee account Overview (#1175): registration cards in a main column, account and help in a secondary one.
+   Own classes only; no shared font-size rule is touched. One column on a phone, with the cards first. */
+.account-header-identity {
+  min-width: 0; max-width: 18ch; overflow: hidden; color: var(--muted); font-size: 0.875rem; font-weight: 700;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.attendee-ov-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 24px;
+  max-width: 1180px; margin: 0 auto 48px;
+}
+.attendee-ov-main, .attendee-ov-side { display: grid; min-width: 0; gap: 20px; }
+.attendee-ov-heading { margin: 0 0 12px; color: var(--imsda-navy); font-size: 1.35rem; line-height: 1.25; }
+.attendee-ov-cards { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.attendee-ov-card {
+  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff;
+  padding: 0 0 18px;
+}
+.attendee-ov-card-top {
+  display: flex; align-items: center; gap: 14px; background: var(--imsda-navy); color: #fff; padding: 16px 20px;
+}
+.attendee-ov-date {
+  display: grid; flex: none; justify-items: center; min-width: 56px; border-radius: 12px; background: var(--imsda-gold-soft);
+  color: var(--imsda-navy); padding: 6px 8px; line-height: 1.1; text-transform: uppercase;
+}
+.attendee-ov-date span { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; }
+.attendee-ov-date strong { font-size: 1.5rem; }
+.attendee-ov-card-title { display: grid; min-width: 0; justify-items: start; gap: 8px; }
+.attendee-ov-card-title h3 { margin: 0; color: #fff; font-size: 1.2rem; line-height: 1.25; overflow-wrap: anywhere; }
+.attendee-ov-card .attendee-status-pill { font-size: 0.875rem; }
+.attendee-ov-facts { display: grid; gap: 6px; margin: 14px 20px 0; padding: 0; list-style: none; color: var(--ink); font-size: 0.95rem; }
+.attendee-ov-facts li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.attendee-ov-facts svg { flex: none; margin-top: 3px; color: var(--muted); }
+.attendee-ov-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 12px 20px 0; color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.attendee-ov-money {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px;
+  margin: 16px 20px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--imsda-navy-soft); padding: 14px 16px;
+}
+.attendee-ov-money-due { border-color: #d9c8ec; background: var(--imsda-purple-soft); }
+.attendee-ov-money > div { min-width: 0; flex: 1 1 200px; }
+.attendee-ov-money p { margin: 0; overflow-wrap: anywhere; }
+.attendee-ov-money-headline { color: var(--imsda-navy); font-size: 1.05rem; font-weight: 800; }
+.attendee-ov-money-due .attendee-ov-money-headline { color: var(--imsda-purple); }
+.attendee-ov-money-detail { margin-top: 2px !important; color: var(--muted); font-size: 0.9rem; }
+.attendee-ov-action { min-height: 44px; flex: none; padding: 10px 16px; font-size: 0.95rem; text-decoration: none; }
+.attendee-ov-action:focus-visible, .attendee-ov-retry:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.attendee-ov-due { margin: 0 0 12px !important; font-size: 0.9rem; }
+.attendee-ov-all { margin: 14px 0 0; }
+.attendee-ov-all .text-button { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; }
+.attendee-ov-empty, .attendee-ov-notice {
+  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px;
+}
+.attendee-ov-notice { border-color: #f0c9c2; background: #fff8f6; }
+.attendee-ov-empty > svg, .attendee-ov-notice > svg { flex: none; margin-top: 2px; color: var(--imsda-navy); }
+.attendee-ov-empty > div, .attendee-ov-notice > div { min-width: 0; }
+.attendee-ov-empty h3 { margin: 0 0 4px; font-size: 1.15rem; }
+.attendee-ov-empty p, .attendee-ov-notice p { margin: 0 0 10px; overflow-wrap: anywhere; }
+.attendee-ov-empty-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.attendee-ov-empty-links a { display: inline-flex; min-height: 44px; align-items: center; }
+.attendee-ov-roles { display: grid; gap: 16px; }
+.attendee-ov-side .account-overview-card h2 { font-size: 1.1rem; }
+.attendee-ov-email { overflow-wrap: anywhere; font-size: 1rem !important; }
+.attendee-ov-side .account-overview-link, .attendee-ov-roles .account-overview-link { min-height: 44px; }
+@media (max-width: 1228px) {
+  .attendee-ov-layout { margin-right: 24px; margin-left: 24px; }
+}
+@media (max-width: 900px) {
+  .attendee-ov-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 580px) {
+  .attendee-ov-layout { gap: 16px; margin-right: 12px; margin-left: 12px; }
+  .attendee-ov-card-top { padding: 14px 16px; }
+  .attendee-ov-facts, .attendee-ov-meta, .attendee-ov-money { margin-right: 16px; margin-left: 16px; }
+  .attendee-ov-money { padding: 12px; }
+  .attendee-ov-action { width: 100%; }
+  .attendee-ov-empty, .attendee-ov-notice { padding: 16px; }
+}
