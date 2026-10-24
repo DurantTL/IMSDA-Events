@@ -98,15 +98,17 @@ describe("empty choice-price maps (#680)", () => {
     const late = { startsOn: "2026-11-01", label: "Late", priceCents: 1400 };
     // Non-choice to ADDRESS: price and late pricing both cleared, even though latePricing is carried by default.
     const toAddress = pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "ADDRESS");
-    expect(toAddress).toEqual({ latePricing: undefined, priceCents: undefined });
+    expect(toAddress).toStrictEqual({ latePricing: undefined, priceCents: undefined });
     expect({ priceCents: 900, latePricing: late, ...toAddress }).toEqual({ priceCents: undefined, latePricing: undefined });
     // A leftover $9 on a SELECT changed to ADDRESS is cleared too, so it cannot be charged on a filled address.
     const patched = { priceCents: 900, ...pricingPatchForTypeChange({ type: "SELECT", latePricing: undefined }, "ADDRESS") };
     expect(patched.priceCents).toBeUndefined();
     // Between two non-hidden types the late pricing is carried.
-    expect(pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "NUMBER")).toEqual({ latePricing: late });
+    expect(pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "NUMBER")).toStrictEqual({ latePricing: late });
+    expect({ priceCents: 900, ...pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "NUMBER") }.priceCents).toBe(900);
     // Choice to choice carries late pricing and keeps the price.
-    expect(pricingPatchForTypeChange({ type: "SELECT", latePricing: late }, "RADIO")).toEqual({ latePricing: late });
+    expect(pricingPatchForTypeChange({ type: "SELECT", latePricing: late }, "RADIO")).toStrictEqual({ latePricing: late });
+    expect({ priceCents: 900, ...pricingPatchForTypeChange({ type: "SELECT", latePricing: late }, "RADIO") }.priceCents).toBe(900);
   });
 
   it("applies base prices after the late date when the late map is empty", () => {
