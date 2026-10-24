@@ -10172,7 +10172,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-primary-nav a:focus-visible, .club-more-button:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
 .club-more-button { flex-direction: column; align-items: flex-end; justify-content: center; gap: 0; }
 .club-more-label { display: inline-flex; align-items: center; gap: 4px; }
-.club-more-current { position: relative; max-width: 11ch; overflow: hidden; color: var(--imsda-purple); font-size: 0.75rem; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.club-more-current { position: relative; max-width: 12ch; overflow: hidden; color: var(--imsda-purple); font-size: 0.75rem; line-height: 1.15; overflow-wrap: anywhere; text-align: right; }
 .club-more-menu {
   position: absolute; top: 100%; right: 0; z-index: 30; display: grid; width: 15rem; max-width: calc(100vw - 24px); margin: 0; padding: 6px; list-style: none;
   border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 12px 28px rgba(0, 44, 69, 0.18);

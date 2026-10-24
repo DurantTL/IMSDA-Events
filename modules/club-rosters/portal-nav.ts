@@ -63,6 +63,8 @@ export function clubShellNavigation(items: AccountNavItem[]): { primary: Account
       const rb = rank(SHELL_MORE_ORDER, b.label);
       return (ra < 0 ? SHELL_MORE_ORDER.length : ra) - (rb < 0 ? SHELL_MORE_ORDER.length : rb);
     });
+  // A bar that would hold only Home next to a More with one item (a reporter) shows that item directly: a menu of one hides it for nothing.
+  if (primary.length === 1 && more.length === 1) return { primary: [...primary, ...more], more: [] };
   return { primary, more };
 }
 

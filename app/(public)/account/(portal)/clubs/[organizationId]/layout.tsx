@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BackToTopButton } from "@/components/back-to-top-button";
 import { ClubAccessGate } from "@/components/club-access-gate";
 import { ClubGateSlot, ClubRecordsHint } from "@/components/club-gate-slot";
+import { ClubBannerYear } from "@/components/club-banner-year";
 import { ClubPortalMasthead } from "@/components/club-portal-masthead";
 import { ClubPortalNav } from "@/components/club-portal-nav";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -57,7 +58,7 @@ export default async function ClubLayout({
   return (
     <div className="club-shell">
       {/* This masthead stands in for the account header on club pages (globals.css hides that one here). */}
-      <ClubPortalMasthead role={access.club.role} />
+      <ClubPortalMasthead actingAs={access.state === "OPEN" && access.actor.kind === "STAFF_ACTING"} role={access.club.role} />
       <section aria-label="Club" className="club-banner">
         <div className="club-banner-inner">
           <div className="club-banner-identity">
@@ -67,10 +68,7 @@ export default async function ClubLayout({
               {clubDirectorRoleLabels[access.club.role]}
             </p>
           </div>
-          <p className="club-banner-year">
-            <span>Current club year</span>
-            <strong>{clubYearFor(new Date()).replace("-", "–")}</strong>
-          </p>
+          <ClubBannerYear currentYear={clubYearFor(new Date())} />
         </div>
       </section>
       {shellNav.primary.length > 0 && <ClubPortalNav more={shellNav.more} primary={shellNav.primary} />}
