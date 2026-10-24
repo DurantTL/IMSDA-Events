@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
-import { eventCardDates, registrationMoneySummary, registrationStateLabel } from "@/modules/attendee-accounts/registration-card";
+import { eventCardDates, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 export type AccountRegistrationCardData = Pick<
@@ -35,6 +35,7 @@ export function AccountRegistrationCard({
   const dates = eventCardDates(registration.event);
   const money = registrationMoneySummary(registration);
   const people = registration.attendeeNames.length;
+  const view = registrationViewLink(registration);
   const headingId = `registration-card-${registration.id}`;
   return (
     <li>
@@ -67,12 +68,11 @@ export function AccountRegistrationCard({
             <p className="attendee-ov-money-headline">{money.headline}</p>
             {money.detail && <p className="attendee-ov-money-detail">{money.detail}</p>}
           </div>
-          <Link
-            className={`${primary ? "primary-button" : "secondary-button"} attendee-ov-action`}
-            href={`/account/events/${encodeURIComponent(registration.event.slug)}`}
-          >
-            View registration<span className="sr-only"> for {registration.event.name}</span> <ArrowRight size={16} aria-hidden="true" />
-          </Link>
+          {view && (
+            <Link className={`${primary ? "primary-button" : "secondary-button"} attendee-ov-action`} href={view.href}>
+              {view.label}<span className="sr-only"> for {registration.event.name}</span> <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          )}
         </div>
         {children}
       </article>

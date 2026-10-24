@@ -23,7 +23,7 @@ export function VerifiedEmailExplainer({ email }: { email: string }) {
         </li>
         <li>
           Changing your usual details below only prefills new registrations. It never changes a registration you already submitted. Contact
-          details on a submitted registration are updated from My registrations, with an emailed code.
+          details on an upcoming registration are updated from My registrations, with an emailed code.
         </li>
       </ul>
       <p className="attendee-verified-links">

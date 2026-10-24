@@ -52,6 +52,7 @@ import AttendeeRegistrationsPage from "@/app/(public)/account/(portal)/registrat
 import { ProfileView } from "@/components/profile-view";
 import { RegistrationActionDisclosure } from "@/components/registration-action-disclosure";
 import { VerifiedEmailExplainer } from "@/components/verified-email-explainer";
+import { HUB_REGISTRATION_LIFECYCLES, registrationMoneySummary, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import { parseHistoryFilter, registrationActions, splitRegistrationHistory } from "@/modules/attendee-accounts/registration-history";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
@@ -245,7 +246,7 @@ describe("My registrations page (#1176)", () => {
     mocks.cancellations = { c: requestedOnly };
     const html = await render();
     expect(html).toContain("Nothing due now");
-    expect(html).toContain("$100.00 paid · $100.00 refunded.");
+    expect(html).toContain("Original total $100.00 · $100.00 paid · $100.00 refunded. No payment is due on a cancelled registration.");
     expect(html).toContain("Cancellation requests");
     expect(html).not.toMatch(/Continue payment|Update contact details|Request cancellation/);
   });
@@ -319,7 +320,62 @@ describe("My registrations page (#1176)", () => {
   });
 });
 
+describe("View link rule against the event hub (#1176)", () => {
+  it("only links to the hub for the statuses the hub loads, and pins them to its filter", () => {
+    const hub = readFileSync(path.join(process.cwd(), "modules/attendee-accounts/event-hub-repository.ts"), "utf8");
+    const filter = hub.match(/status: \{ in: \[([^\]]*)\] \}/);
+    expect(filter?.[1]?.split(",").map((value) => value.trim().replaceAll('"', ""))).toEqual([...HUB_REGISTRATION_LIFECYCLES]);
+    for (const lifecycle of ["DRAFT", "SUBMITTED", "CONFIRMED", "WAITLISTED", "CANCELLED"] as const) {
+      const link = registrationViewLink(registration("x", lifecycle));
+      if ((HUB_REGISTRATION_LIFECYCLES as readonly string[]).includes(lifecycle)) expect(link?.href).toBe("/account/events/synthetic-event-x");
+      else expect(link?.href ?? "").not.toContain("/account/events/");
+    }
+  });
+
+  it("sends a waitlisted card to the waitlist page and gives a cancelled card no link", async () => {
+    expect(registrationViewLink(registration("w", "WAITLISTED"))).toEqual({ href: "/account/waitlists", label: "View waitlist" });
+    expect(registrationViewLink(registration("c", "CANCELLED"))).toBeNull();
+    mocks.registrations = [registration("w", "WAITLISTED"), registration("c", "CANCELLED")];
+    const html = await render();
+    expect(html).toContain('href="/account/waitlists"');
+    expect(html).not.toContain("/account/events/synthetic-event-w");
+    expect(html).not.toContain("/account/events/synthetic-event-c");
+    expect(html).not.toContain("Open it to see its details");
+    expect(html).toContain("kept as read-only history");
+  });
+
+  it("keeps a cancelled registration's answers viewable inline, read-only", async () => {
+    const fields = [{ key: "meal" }] as never;
+    expect(registrationActions(registration("c", "CANCELLED", { answerEditing: { enabled: true, reason: "", expectedUpdatedAt: "x", fields, attendees: [] } }), { editable: true, cancellation: null }).details).toBe(true);
+    mocks.registrations = [registration("c", "CANCELLED", { answerEditing: { enabled: true, reason: "", expectedUpdatedAt: "x", fields, attendees: [] } })];
+    expect(await render()).toContain("Registration details");
+  });
+});
+
+describe("cancelled card keeps its original charges (#1176)", () => {
+  it("shows the original total with what was paid and refunded", () => {
+    expect(registrationMoneySummary(registration("c", "CANCELLED", { totalCents: 12000, grossPaidCents: 7000, refundedCents: 2000 })).detail)
+      .toBe("Original total $120.00 · $70.00 paid · $20.00 refunded. No payment is due on a cancelled registration.");
+  });
+
+  it("shows the original total when nothing was paid", async () => {
+    mocks.registrations = [registration("c", "CANCELLED", { totalCents: 8000, grossPaidCents: 0, refundedCents: 0 })];
+    const html = await render();
+    expect(html).toContain("Original total $80.00 · nothing paid. No payment is due on a cancelled registration.");
+    expect(html).toContain("Nothing due now");
+  });
+});
+
 describe("action disclosure and keyboard access (#1176)", () => {
+  it("names the event after each action for screen readers", async () => {
+    mocks.registrations = [registration("sub", "SUBMITTED", { eventName: "Family Retreat 2099" })];
+    mocks.cancellations = { sub: openRequests };
+    const html = await render();
+    for (const label of ["Continue payment", "Update contact details", "Request cancellation"]) {
+      expect(html).toContain(`${label}<span class="sr-only"> for Family Retreat 2099</span>`);
+    }
+  });
+
   it("is a native details with a summary, so Enter and Space work and the state is announced", () => {
     const html = renderToStaticMarkup(createElement(RegistrationActionDisclosure, { label: "Continue payment", hint: "$5.00 remaining" } as never, createElement("p", null, "inside")));
     expect(html).toContain("<details");
@@ -377,6 +433,7 @@ describe("Profile verified-email meaning (#1176)", () => {
     expect(html).toContain("never on a name");
     expect(html).toContain("does not by itself give staff, club or admin access");
     expect(html).toContain("never changes a registration you already submitted");
+    expect(html).toContain("details on an upcoming registration are updated from My registrations");
     expect(html).toContain('href="#profile-security"');
     expect(html).toContain('href="/account/registrations"');
   });

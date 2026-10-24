@@ -50,7 +50,7 @@ export type RegistrationActions = {
   editContact: boolean;
   /** The existing cancellation request panel (a request for the event team, never a cancellation or refund). */
   cancellation: "request" | "status" | null;
-  /** The registration's answers (read-only unless the existing policy lets this session edit) on a live registration. */
+  /** The registration's answers: editable only where the existing policy allows, and read-only inline on a cancelled record (it has no hub page). */
   details: boolean;
   /** Past and cancelled records are read-only history. */
   readOnlyHistory: boolean;
@@ -81,7 +81,7 @@ export function registrationActions(
     continuePayment: context.editable && registration.payment.paymentEligible && registration.balanceCents > 0,
     editContact: context.editable && live,
     cancellation: context.editable ? cancellation : null,
-    details: live && registration.answerEditing.fields.length > 0,
+    details: (live || registration.lifecycle === "CANCELLED") && registration.answerEditing.fields.length > 0,
     readOnlyHistory: !live,
   };
 }

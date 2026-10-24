@@ -63,28 +63,33 @@ function CardActions({
   const requestCount = cancellation?.requests.length ?? 0;
   const hasAny = actions.continuePayment || actions.editContact || actions.cancellation || actions.details;
   if (!hasAny) {
-    return actions.readOnlyHistory
-      ? <p className="attendee-reg-readonly">This record is read-only history. Open it to see its details.</p>
-      : null;
+    if (!actions.readOnlyHistory) return null;
+    return (
+      <p className="attendee-reg-readonly">
+        {registration.lifecycle === "CANCELLED"
+          ? "This cancelled registration is kept as read-only history."
+          : "This record is read-only history. Open it to see its details."}
+      </p>
+    );
   }
   return (
     <div className="attendee-reg-actions" role="group" aria-label={`More for ${registration.event.name}`}>
       {actions.continuePayment && (
-        <RegistrationActionDisclosure label="Continue payment" hint={`${moneyFormatter.format(registration.balanceCents / 100)} remaining`}>
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${moneyFormatter.format(registration.balanceCents / 100)} remaining`}>
           <PublicSquarePayment manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`} />
         </RegistrationActionDisclosure>
       )}
       {actions.editContact && (
-        <RegistrationActionDisclosure label="Update contact details">
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Update contact details">
           <AttendeeRegistrationContactForm registrationId={registration.id} initialContact={registration.contact} />
         </RegistrationActionDisclosure>
       )}
       {actions.details && (
-        <RegistrationActionDisclosure label="Registration details">
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Registration details">
           <AttendeeRegistrationAnswersForm
             registrationId={registration.id}
             description={registration.answerEditing.reason}
-            readOnly={!editable || !registration.answerEditing.enabled}
+            readOnly={!editable || !registration.answerEditing.enabled || actions.readOnlyHistory}
             initialExpectedUpdatedAt={registration.answerEditing.expectedUpdatedAt}
             fields={registration.answerEditing.fields}
             initialAttendees={registration.answerEditing.attendees}
@@ -93,6 +98,7 @@ function CardActions({
       )}
       {cancellation && actions.cancellation && (
         <RegistrationActionDisclosure
+          eventName={registration.event.name}
           label={actions.cancellation === "request" ? "Request cancellation" : "Cancellation requests"}
           hint={requestCount > 0 ? (requestCount === 1 ? "1 request" : `${requestCount} requests`) : undefined}
         >

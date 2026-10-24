@@ -52,7 +52,11 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
     return { headline: "No payment due while waitlisted", detail: history ?? "A place is not confirmed yet.", tone: "calm" };
   }
   if (registration.lifecycle === "CANCELLED") {
-    return { headline: "Nothing due now", detail: history ?? "No payment is due on a cancelled registration.", tone: "calm" };
+    // The original charges stay on the record: the total, what was paid and what was refunded (#1176).
+    const kept = [`Original total ${formatMoney(total)}`, gross > 0 ? `${formatMoney(gross)} paid` : "nothing paid", refunded > 0 ? `${formatMoney(refunded)} refunded` : null]
+      .filter(Boolean)
+      .join(" \u00b7 ");
+    return { headline: "Nothing due now", detail: `${kept}. No payment is due on a cancelled registration.`, tone: "calm" };
   }
   if (registration.payment.paymentEligible && registration.balanceCents > 0) {
     const paid = registration.paidCents ?? 0;
@@ -80,4 +84,19 @@ export function eventCardDates(event: { startsAt: string; endsAt: string; timezo
     day: part({ day: "numeric" }, event.startsAt),
     range: start === end ? start : `${start} – ${end}`,
   };
+}
+
+/** The registration statuses the event hub (`/account/events/[slug]`) loads. It must match the status filter in event-hub-repository.ts; a test pins them. */
+export const HUB_REGISTRATION_LIFECYCLES = ["SUBMITTED", "CONFIRMED"] as const;
+
+/**
+ * Where a card's default action goes (#1176). The hub 404s for anything it does not load, so a cancelled record gets no
+ * link (its details stay inline on My registrations) and a waitlisted one goes to the waitlist page instead.
+ */
+export function registrationViewLink(registration: Pick<AttendeeRegistrationSummary, "lifecycle" | "event">): { href: string; label: string } | null {
+  if ((HUB_REGISTRATION_LIFECYCLES as readonly string[]).includes(registration.lifecycle)) {
+    return { href: `/account/events/${encodeURIComponent(registration.event.slug)}`, label: "View registration" };
+  }
+  if (registration.lifecycle === "WAITLISTED") return { href: "/account/waitlists", label: "View waitlist" };
+  return null;
 }
