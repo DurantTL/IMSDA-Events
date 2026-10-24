@@ -12,9 +12,9 @@ describe("portal labels (#742)", () => {
     expect(read(`${portal}/registrations/page.tsx`)).toContain("<h1>My registrations</h1>");
   });
 
-  it("keeps the account tab order: Overview, My registrations, club, Waitlists, Profile", () => {
+  it("keeps the account tab order: Overview, My registrations, Profile, then any club or Waitlists tab (#1111)", () => {
     const layout = read(`${portal}/layout.tsx`);
-    const order = ['label: "Overview"', 'label: "My registrations"', '"Waitlists"', 'label: "Profile"'].map((text) => layout.indexOf(text));
+    const order = ['label: "Overview"', 'label: "My registrations"', 'label: "Profile"', '"Waitlists"'].map((text) => layout.indexOf(text));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });

@@ -6,7 +6,11 @@ import { Check, Mail } from "lucide-react";
 type Invite = { id: string; eventName: string; classNames: string[] };
 
 /** Instructor invites waiting on this account (#833), each with an Accept button. */
-export function InstructorInviteAccept({ invites }: { invites: Invite[] }) {
+export function InstructorInviteAccept({ invites, fill = "all" }: {
+  invites: Invite[];
+  /** Which Accept buttons are filled primaries: all (default), only the first, or none (another invite card above holds the page's one primary). */
+  fill?: "all" | "first" | "none";
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -36,13 +40,13 @@ export function InstructorInviteAccept({ invites }: { invites: Invite[] }) {
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ul className="public-manage-club-list">
-        {invites.map((invite) => (
+        {invites.map((invite, index) => (
           <li key={invite.id}>
             <span>
               <strong translate="no">{invite.eventName}</strong>
               <small translate="no">{invite.classNames.join(", ")}</small>
             </span>
-            <button className="primary-button" disabled={busy !== null} onClick={() => accept(invite)} type="button">
+            <button className={fill === "all" || (fill === "first" && index === 0) ? "primary-button" : "secondary-button"} disabled={busy !== null} onClick={() => accept(invite)} type="button">
               <Check aria-hidden="true" size={14} /> {busy === invite.id ? "Accepting…" : "Accept"}
             </button>
           </li>

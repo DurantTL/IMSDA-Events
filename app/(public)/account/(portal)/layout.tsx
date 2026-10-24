@@ -68,8 +68,16 @@ export default async function AccountPortalLayout({ children }: { children: Reac
   const actingAsAreaCoordinator = acting?.role === "AREA_COORDINATOR";
   const actingAsDirector = acting?.role === "CLUB_DIRECTOR";
 
+  // The attendee's own tabs come first and in the same order for everyone (#1175); a workspace tab follows only
+  // when the existing grant (director, Area Coordinator) is real, so an ordinary attendee sees just these three.
   const items: AccountNavItem[] = [
-    ...(chromeAccount ? [{ href: "/account", label: "Overview" }, { href: "/account/registrations", label: "My registrations" }] : []),
+    ...(chromeAccount
+      ? [
+        { href: "/account", label: "Overview" },
+        { href: "/account/registrations", label: "My registrations" },
+        { href: "/account/profile", label: "Profile" },
+      ]
+      : []),
     // Area Coordinators see every club (#387), so the tab is just "Clubs".
     ...(areaCoordinator || actingAsAreaCoordinator
       ? [{ href: "/account/clubs", label: "Clubs", matchChildren: true, alsoMatchPrefix: "/account/area" }]
@@ -78,7 +86,6 @@ export default async function AccountPortalLayout({ children }: { children: Reac
         : []),
     // An Area Coordinator sees the clubs waitlisted at the locations they coordinate (#599).
     ...(areaCoordinator ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
-    ...(chromeAccount ? [{ href: "/account/profile", label: "Profile" }] : []),
   ];
 
   return (
@@ -91,6 +98,7 @@ export default async function AccountPortalLayout({ children }: { children: Reac
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
           <AccountHeaderActions
+            identity={acting ? undefined : chromeAccount?.displayName}
             contexts={workspaceContexts}
             signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
           />
