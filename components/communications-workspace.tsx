@@ -36,6 +36,15 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MessageAttachmentsField } from "@/components/message-attachments-field";
 import { MessageBodyEditor } from "@/components/message-body-editor";
+import {
+  announcementDiscardPrompt,
+  announcementDraftBaseline,
+  announcementDraftIsDirty,
+  blankAnnouncementValues,
+  editorCloseDecision,
+  type AnnouncementDraftBaseline,
+  type AnnouncementDraftValues,
+} from "@/components/announcement-draft-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { renderEmailHtmlDocument } from "@/modules/communications/email-html";
@@ -280,12 +289,11 @@ export function CommunicationsWorkspace({
   const [discardTarget, setDiscardTarget] = useState<AnnouncementRecord | null>(null);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState("");
-  const draftDialogRef = useAccessibleDialog<HTMLElement>(
-    draftOpen,
-    () => {
-      if (!saving) { setDraftOpen(false); setDraftPrefill(null); }
-    },
-  );
+  // The composer's text is held here (not left in the DOM) so a failed save, or a dismissal the person backs out of, keeps it (#1104).
+  const [draftValues, setDraftValues] = useState<AnnouncementDraftValues>(blankAnnouncementValues);
+  const [draftBaseline, setDraftBaseline] = useState<AnnouncementDraftBaseline | null>(null);
+  const draftReviewingRef = useRef(false);
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [broadcastReview, setBroadcastReview] = useState<{
     announcement: AnnouncementRecord;
@@ -428,7 +436,13 @@ export function CommunicationsWorkspace({
   const reminderDirty = reminderConfirmed;
   const shirtSizeDirty = shirtSizeConfirmed;
   const resendDirty = resendConfirmed || resendRecipientEmail.trim().length > 0;
+  const draftDirty = draftOpen && announcementDraftIsDirty(
+    draftBaseline,
+    draftValues,
+    draftAttachments.map((file) => file.id),
+  );
   const hasUnsavedChanges = templateDirty
+    || draftDirty
     || settingsDirty
     || reminderDirty
     || shirtSizeDirty
@@ -469,6 +483,56 @@ export function CommunicationsWorkspace({
     if (resource?.status && resource.status !== "ALL") params.set("status", resource.status);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
+
+  function closeDraftEditor() {
+    setDraftOpen(false);
+    setDraftPrefill(null);
+    setDraftBaseline(null);
+    setDraftValues(blankAnnouncementValues);
+    setDraftAttachments([]);
+  }
+
+  /** Opens the composer on a loaded baseline: blank, the saved draft being edited, or the correction's prefill. */
+  function openDraftEditor(
+    values: AnnouncementDraftValues,
+    attachments: MessageFileRecord[],
+    prefill: { title: string; body: string; priority: string; editId?: string } | null,
+  ) {
+    setError("");
+    setNotice("");
+    setDraftPrefill(prefill);
+    setDraftValues(values);
+    setDraftAttachments(attachments);
+    setDraftBaseline(announcementDraftBaseline(values, attachments.map((file) => file.id)));
+    setDraftOpen(true);
+  }
+
+  /**
+   * Close, Cancel, Escape and the backdrop all come here: clean closes at once,
+   * dirty asks Keep editing / Discard changes, saving waits (#1104). Closing
+   * never saves, publishes or sends anything.
+   */
+  async function requestDraftClose() {
+    const decision = editorCloseDecision({ saving, reviewing: draftReviewingRef.current, dirty: draftDirty });
+    if (decision === "ignore") return;
+    if (decision === "confirm") {
+      const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      draftReviewingRef.current = true;
+      const discard = await askConfirm({ ...announcementDiscardPrompt, body: <p>{announcementDiscardPrompt.body}</p> });
+      draftReviewingRef.current = false;
+      if (!discard) {
+        // Keep editing: focus returns to the field it was on, else the dialog.
+        window.requestAnimationFrame(() => {
+          const dialog = document.querySelector<HTMLElement>("[role='dialog'][aria-labelledby='draft-title']");
+          if (previous && dialog?.contains(previous) && previous.isConnected) previous.focus();
+          else dialog?.focus();
+        });
+        return;
+      }
+    }
+    closeDraftEditor();
+  }
+  const draftDialogRef = useAccessibleDialog<HTMLElement>(draftOpen, () => { void requestDraftClose(); });
 
   function resetEditorDrafts() {
     setTemplateSubject(selectedTemplate?.activeVersion?.subjectTemplate ?? "");
@@ -583,9 +647,8 @@ export function CommunicationsWorkspace({
       } else {
         setAnnouncements((current) => [result.announcement!, ...current]);
       }
-      setDraftOpen(false);
-      setDraftPrefill(null);
-      setNotice(editId ? "Announcement draft saved. Nothing was sent." : "Announcement draft created.");
+      closeDraftEditor();
+      setNotice(editId ? "Announcement draft saved. Nothing was published or sent." : "Announcement draft created. Nothing was published or sent.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create the draft.");
     } finally {
@@ -598,16 +661,11 @@ export function CommunicationsWorkspace({
    * Saving updates the draft in place; it never publishes or sends anything.
    */
   function startDraftEdit(announcement: AnnouncementRecord) {
-    setError("");
-    setNotice("");
-    setDraftPrefill({
-      title: announcement.title,
-      body: announcement.body,
-      priority: announcement.priority,
-      editId: announcement.id,
-    });
-    setDraftAttachments(announcement.attachments ?? []);
-    setDraftOpen(true);
+    openDraftEditor(
+      { title: announcement.title, body: announcement.body, priority: announcement.priority },
+      announcement.attachments ?? [],
+      { title: announcement.title, body: announcement.body, priority: announcement.priority, editId: announcement.id },
+    );
   }
 
   function cancelDiscard() {
@@ -815,15 +873,12 @@ export function CommunicationsWorkspace({
    * priority, which then needs its own publish and its own send review.
    */
   function startCorrection(announcement: AnnouncementRecord) {
-    setError("");
-    setNotice("");
-    setDraftPrefill({
+    const prefill = {
       title: `Correction: ${announcement.title}`,
       body: announcement.body,
       priority: announcement.priority,
-    });
-    setDraftAttachments([]);
-    setDraftOpen(true);
+    };
+    openDraftEditor({ title: prefill.title, body: prefill.body, priority: prefill.priority }, [], prefill);
   }
 
   async function publishTemplate(submitEvent: React.FormEvent<HTMLFormElement>) {
@@ -1305,7 +1360,6 @@ export function CommunicationsWorkspace({
     ? { loading: broadcastReviewLoading, error: broadcastReviewError, preview: broadcastReview.preview }
     : null);
 
-  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack communications-workspace">
       {confirmDialog}
@@ -1319,7 +1373,7 @@ export function CommunicationsWorkspace({
           </p>
         </div>
         {canManage && view === "announcements" && (
-          <button className="primary-button" type="button" onClick={() => { setError(""); setNotice(""); setDraftAttachments([]); setDraftOpen(true); }}>
+          <button className="primary-button" type="button" onClick={() => openDraftEditor(blankAnnouncementValues, [], null)}>
             <Plus aria-hidden="true" size={17} /> New announcement
           </button>
         )}
@@ -2246,11 +2300,11 @@ export function CommunicationsWorkspace({
       )}
 
       {draftOpen && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) { setDraftOpen(false); setDraftPrefill(null); } }}>
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) void requestDraftClose(); }}>
           <section className="modal-card" ref={draftDialogRef} role="dialog" aria-modal="true" aria-labelledby="draft-title" tabIndex={-1}>
             <div className="modal-head">
               <div><p className="eyebrow">Attendee event feed</p><h2 id="draft-title">{draftPrefill?.editId ? "Edit announcement draft" : draftPrefill ? "Send a correction" : "Create an announcement"}</h2></div>
-              <button className="icon-button modal-close-button" type="button" onClick={() => { setDraftOpen(false); setDraftPrefill(null); }} aria-label="Close dialog"><X aria-hidden="true" size={18} /></button>
+              <button className="icon-button modal-close-button" type="button" onClick={() => void requestDraftClose()} aria-label="Close dialog"><X aria-hidden="true" size={18} /></button>
             </div>
             {draftPrefill?.editId && (
               <p className="quiet-copy">Saving updates this draft only. Nothing is published or sent.</p>
@@ -2258,10 +2312,14 @@ export function CommunicationsWorkspace({
             {draftPrefill && !draftPrefill.editId && (
               <p className="quiet-copy">This creates a new draft for the same audience — all attendees. Nothing is sent yet: publish the draft, then review and send it like any announcement. The original announcement stays unchanged.</p>
             )}
+            {!draftPrefill && (
+              <p className="quiet-copy">Saving creates a draft only. Nothing is published to the feed or sent.</p>
+            )}
+            {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error} Your edits are still here.</div>}
             <form className="form-stack" onSubmit={createDraft} key={draftPrefill?.editId ? `edit-${draftPrefill.editId}` : draftPrefill ? "correction" : "new"}>
-              <label>Title<input name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" defaultValue={draftPrefill?.title ?? ""} /></label>
-              <label>Message<textarea name="body" minLength={5} maxLength={2000} required rows={6} placeholder="Share the details attendees need…" defaultValue={draftPrefill?.body ?? ""} /></label>
-              <label>Priority<select name="priority" defaultValue={draftPrefill?.priority ?? "NORMAL"}><option value="NORMAL">Normal</option><option value="IMPORTANT">Important</option><option value="URGENT">Urgent</option></select></label>
+              <label>Title<input name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" value={draftValues.title} onChange={(event) => setDraftValues((current) => ({ ...current, title: event.target.value }))} /></label>
+              <label>Message<textarea name="body" minLength={5} maxLength={2000} required rows={6} placeholder="Share the details attendees need…" value={draftValues.body} onChange={(event) => setDraftValues((current) => ({ ...current, body: event.target.value }))} /></label>
+              <label>Priority<select name="priority" value={draftValues.priority} onChange={(event) => setDraftValues((current) => ({ ...current, priority: event.target.value }))}><option value="NORMAL">Normal</option><option value="IMPORTANT">Important</option><option value="URGENT">Urgent</option></select></label>
               <MessageAttachmentsField
                 eventId={eventId}
                 files={draftAttachments}
@@ -2270,7 +2328,7 @@ export function CommunicationsWorkspace({
                 help="Attached to the email when this announcement is sent. They are not shown in the attendee feed."
               />
               <p className="field-help">Shown on the event page and as a banner on attendees&apos; accounts.</p>
-              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setDraftOpen(false); setDraftPrefill(null); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : draftPrefill?.editId ? "Save changes" : "Save draft"}</button></div>
+              <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void requestDraftClose()} disabled={saving}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : draftPrefill?.editId ? "Save changes" : "Save draft"}</button></div>
             </form>
           </section>
         </div>
