@@ -190,8 +190,9 @@ export function buildRouteMapping(): RouteMappingRow[] {
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
   rows.push({
-    route: "/people/matches", kind: "direct", oldPlace: "Page link", scope: "System", destinationPath: "/people/matches", label: "Possible duplicate people", group: "Identity",
-    note: "System administrators only, by address; no menu entry today. Kept as it was. Identity merging stays a human decision.",
+    route: "/people/matches", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Possible duplicate people", group: "/people",
+    reachedFrom: { parent: "/people", linkedIn: "components/people-workspace.tsx" },
+    note: "System administrators only, from the People page's Actions menu; not in the sidebar. Identity merging stays a human decision.",
   });
   return rows;
 }
