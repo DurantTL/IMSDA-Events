@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Download, ListFilter, X } from "lucide-react";
 import { EmailRegistrationsButton } from "@/components/email-registrations-button";
 import {
-  CHOICE_EMAIL_MAX_REGISTRATIONS,
   choiceEmailDraft,
   choiceEmailRegistrationIds,
 } from "@/modules/registrations/choice-answer-email";
@@ -154,9 +153,6 @@ export function ChoiceAnswerFilter({
                   />
                 )}
               </div>
-              {canEmail && emailRegistrationIds.length > CHOICE_EMAIL_MAX_REGISTRATIONS && (
-                <p className="choice-filter-note">Email these people covers the first {CHOICE_EMAIL_MAX_REGISTRATIONS} of {emailRegistrationIds.length} registrations; one batch holds at most that many.</p>
-              )}
               {selected.matches.length === 0 ? <p className="choice-filter-note">{emptyText}</p> : (
                 <ul className="choice-filter-list">
                   {selected.matches.map((match) => (
