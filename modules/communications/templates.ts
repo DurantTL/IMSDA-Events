@@ -1196,6 +1196,15 @@ export function validateMessageTemplate(input: {
           message: `{{${token}}} is not an allowed message token.`,
           token,
         });
+      } else if (field === "preheader" && MARKDOWN_MESSAGE_TEMPLATE_TOKENS.has(token as MessageTemplateToken)) {
+        // A link, a picture or a generated block is internal placeholder text or Markdown in an inbox preview.
+        unknownTokens.push(token);
+        issues.push({
+          field,
+          code: "UNKNOWN_TOKEN",
+          message: `{{${token}}} cannot be used in the inbox preview line, which is plain text. Use a name, date or place token.`,
+          token,
+        });
       } else if (input.allowedTokens && !input.allowedTokens.has(token)) {
         unknownTokens.push(token);
         issues.push({

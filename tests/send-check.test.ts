@@ -273,6 +273,24 @@ describe("send check (#836): an announcement as the reader will get it", () => {
     expect(none.suggestions).toEqual([expect.objectContaining({ code: "PREHEADER_MISSING", anchor: "announcement-preheader" })]);
   });
 
+  it("treats a token typed in the announcement text as printed text, not as template source", () => {
+    const base = { ...template, anchors: ANNOUNCEMENT_CHECK_ANCHORS };
+    const link = runSendCheck(announcementSendCheckInput({ ...base, announcement: { title: "Arrival", body: "Doors open at four on Friday afternoon. [Open your pass]({{checkin_qr_url}})" } }));
+    expect(link.errors).toEqual([expect.objectContaining({ code: "LINK_SCHEME", field: "body" })]);
+    const unknown = runSendCheck(announcementSendCheckInput({ ...base, announcement: { title: "Arrival", body: "Bring your {{favorite}} snack to the lodge on Friday afternoon." } }));
+    expect(unknown.errors).toEqual([]);
+    const image = runSendCheck(announcementSendCheckInput({ ...base, announcement: { title: "Arrival", body: "Doors open at four on Friday afternoon. ![Pass]({{checkin_qr_image}})" } }));
+    expect(image.errors.map((finding) => finding.code)).toEqual(["IMAGE_SOURCE"]);
+    // The template's own token is still a token.
+    expect(runSendCheck(announcementSendCheckInput({ ...base, templateBody: "{{announcement_body}} [Open]({{portal_url}})", announcement: { title: "Arrival", body: "Doors open at four on Friday afternoon." } })).errors).toEqual([]);
+  });
+
+  it("measures the subject with the event's name when given", () => {
+    const input = { ...template, announcement: { title: "Hello", body: "Doors open at four on Friday afternoon." } };
+    const long = runSendCheck(announcementSendCheckInput({ ...input, templateSubject: "{{event_name}}", eventName: "E".repeat(90) }));
+    expect(long.warnings.map((finding) => finding.code)).toEqual(["SUBJECT_LONG"]);
+  });
+
   it("is inert when the template has no announcement body token", () => {
     const input = announcementSendCheckInput({ templateSubject: "Update", templateBody: GOOD_BODY, announcement: { title: "A title", body: "[x](javascript:a)" } });
     expect(runSendCheck(input).errors).toEqual([]);

@@ -17,7 +17,7 @@ const inputSchema = z.strictObject({
   // 409 below rather than a generic 400.
   previewFingerprint: z.string().trim().max(128).optional(),
   // The send check's warnings staff acknowledged in the review (#836).
-  acknowledgedWarningIds: z.array(z.string().trim().min(1).max(64)).max(50).optional(),
+  acknowledgedWarningIds: z.array(z.string().trim().min(1).max(64)).max(200).optional(),
 });
 type Context = {
   params: Promise<{ eventId: string; announcementId: string }>;

@@ -243,6 +243,11 @@ export function runSendCheck(input: SendCheckInput): SendCheckResult {
   return { errors, warnings, suggestions, hasErrors: errors.length > 0, hasWarnings: warnings.length > 0 };
 }
 
+/** Text that is printed as written: `{{` is split so no rule reads it as a token. */
+function literalText(value: string) {
+  return value.replaceAll("{{", "{\u200B{");
+}
+
 /**
  * The announcement's effective email: the template's subject with the announcement's title, the template's body with
  * the announcement's text where `{{announcement_body}}` stands, and the announcement's own preview line (the
@@ -254,8 +259,12 @@ export function announcementSendCheckInput(input: {
   templatePreheader?: string | null;
   announcement: { title: string; body: string; preheader?: string | null };
   anchors?: SendCheckInput["anchors"];
+  /** The event's name, for measuring the subject; the sample name is used when none is given. */
+  eventName?: string;
 }): SendCheckInput {
-  const announcementBody = input.announcement.body;
+  // The announcement's title and text are token *values* at send time: a `{{token}}` inside them is never expanded.
+  // They are checked as that literal text, so the braces are broken up before they reach the token and link rules.
+  const announcementBody = literalText(input.announcement.body);
   const body = unescapeTokenUnderscores(input.templateBody).replace(
     /\{\{\s*announcement_body\s*\}\}/g,
     () => announcementBody,
@@ -266,6 +275,7 @@ export function announcementSendCheckInput(input: {
     preheader: input.announcement.preheader?.trim() ? input.announcement.preheader : input.templatePreheader ?? null,
     anchors: input.anchors,
     context: {
+      ...(input.eventName ? { event_name: input.eventName } : {}),
       announcement_title: input.announcement.title.trim() || "Event update",
       announcement_body: announcementBody,
     },

@@ -75,7 +75,7 @@ async function loadAnnouncementBroadcastState(
       "Publish the announcement to the attendee feed before emailing it.",
     );
   }
-  const [registrations, settings, template, announcementFiles] = await Promise.all([
+  const [registrations, settings, template, announcementFiles, eventRow] = await Promise.all([
     client.registration.findMany({
       where: { eventId: input.eventId, status: { in: ["SUBMITTED", "CONFIRMED"] } },
       orderBy: [{ submittedAt: "asc" }, { id: "asc" }],
@@ -109,6 +109,7 @@ async function loadAnnouncementBroadcastState(
       orderBy: { position: "asc" },
       select: { file: { select: { id: true, filename: true, sizeBytes: true } } },
     }),
+    client.event.findUnique({ where: { id: input.eventId }, select: { name: true } }),
   ]);
   // The announcement's own files first, then the template version's, each once.
   const attachments: Array<{ id: string; filename: string; sizeBytes: number }> = [];
@@ -142,6 +143,7 @@ async function loadAnnouncementBroadcastState(
     templatePreheader: publishedVersion?.preheaderTemplate ?? null,
     announcement,
     anchors: ANNOUNCEMENT_CHECK_ANCHORS,
+    eventName: eventRow?.name,
   }));
   const candidates = registrations.map((registration) => ({
     registrationId: registration.id,

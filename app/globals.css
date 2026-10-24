@@ -12810,7 +12810,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .send-check-group li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; font-size: 0.875rem; line-height: 1.5; color: var(--ink); }
 .send-check-message { flex: 1 1 18rem; min-width: 0; overflow-wrap: anywhere; }
 .send-check-jump { flex: 0 0 auto; min-height: 44px; border: 1px solid var(--field-border); border-radius: 10px; background: var(--card); color: var(--imsda-navy); padding: 0 12px; font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
-.send-check-acknowledge { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; border: 1px solid var(--imsda-gold); border-radius: 10px; background: var(--imsda-gold-soft); padding: 10px 12px; font-size: 0.875rem; line-height: 1.5; color: var(--ink); }
+.send-check-acknowledge { display: flex; align-items: center; min-height: 44px; gap: 10px; margin-top: 10px; border: 1px solid var(--imsda-gold); border-radius: 10px; background: var(--imsda-gold-soft); padding: 10px 12px; font-size: 0.875rem; line-height: 1.5; color: var(--ink); }
 .send-check-acknowledge input { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.

@@ -8,6 +8,7 @@ import {
   type EffectiveDeliveryMode,
 } from "@/modules/communications/effective-delivery";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
+import { assertAnnouncementTextSendable } from "@/modules/communications/announcement-send-check";
 import { describeSendCheckErrors, runSendCheck } from "@/modules/communications/send-check";
 import { MessagingError } from "@/modules/communications/messaging-error";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
@@ -4051,6 +4052,11 @@ export async function enqueueSelectedAudienceBatch(
             state.preview.attachmentProblem,
             { selectedAudiencePreview: state.preview },
           );
+        }
+
+        // The typed announcement text gets the send check's errors (#836), as the broadcast review does.
+        if (input.templateKey === "EVENT_ANNOUNCEMENT") {
+          await assertAnnouncementTextSendable(tx, eventId, { title: input.announcementTitle, body: input.announcementBody });
         }
 
         // Seminar choices for every recipient in a few queries, and only when a template that will be sent uses the

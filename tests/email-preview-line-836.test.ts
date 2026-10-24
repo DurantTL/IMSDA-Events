@@ -331,6 +331,7 @@ describe("an announcement send runs the send check on the server (#836)", () => 
   const goodTemplate = { id: "version-1", subjectTemplate: "{{announcement_title}}", bodyTemplate: "{{announcement_body}}\n\n[Open my registration]({{portal_url}})", preheaderTemplate: null, files: [] };
   const goodAnnouncement = { id: "announcement-1", title: "Friday arrival information", body: "Check-in opens at 4:00 PM in the main lodge, with parking by the lake.", preheader: "Where to park.", status: "PUBLISHED", publishedAt: new Date("2026-10-08T12:00:00.000Z"), isEssential: false };
 
+  let eventName = "Women's Retreat 2026";
   function useClient(announcement: Record<string, unknown>, version: Record<string, unknown> | null = goodTemplate) {
     const fake = {
       announcement: { findFirst: vi.fn(async () => announcement) },
@@ -339,6 +340,7 @@ describe("an announcement send runs the send check on the server (#836)", () => 
       eventMessageTemplate: { findUnique: vi.fn(async () => ({ isEnabled: true, versions: version ? [version] : [] })) },
       announcementFile: { findMany: vi.fn(async () => []) },
       messageFile: { findMany: vi.fn(async () => []) },
+      event: { findUnique: vi.fn(async () => ({ name: eventName })) },
       auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
       $queryRaw: vi.fn(async () => []),
     };
@@ -373,6 +375,23 @@ describe("an announcement send runs the send check on the server (#836)", () => 
     expect(none.preheader).toBeNull();
     expect(none.sendCheck.suggestions.map((finding) => finding.code)).toEqual(["PREHEADER_MISSING"]);
     expect(none.sendCheck.hasErrors || none.sendCheck.hasWarnings).toBe(false);
+  });
+
+  it("measures the subject with the event's real name", async () => {
+    eventName = "N".repeat(80);
+    useClient(goodAnnouncement, { ...goodTemplate, subjectTemplate: "{{event_name}}: {{announcement_title}}" });
+    expect((await review()).sendCheck.warnings.map((finding) => finding.code)).toEqual(["SUBJECT_LONG"]);
+    eventName = "Women's Retreat 2026";
+  });
+
+  it("checks the announcement text as the literal value it is: a token typed in it is never expanded", async () => {
+    useClient({ ...goodAnnouncement, body: "Open [your pass]({{checkin_qr_url}}) at the lodge, and bring your {{favorite}} snack for everyone." });
+    const preview = await review();
+    // The link would send as plain text; the unknown token would just print its braces, so it is no error.
+    expect(preview.sendCheck.errors.map((finding) => finding.code)).toEqual(["LINK_SCHEME"]);
+    const error = await send(preview.fingerprint).catch((caught) => caught);
+    expect(error.code).toBe("SEND_CHECK_FAILED");
+    expect(mocks.enqueue).not.toHaveBeenCalled();
   });
 
   it("refuses to send an announcement whose text holds an error, and queues nothing", async () => {
@@ -426,5 +445,52 @@ describe("the review's own bookkeeping (#836)", () => {
 
   it("has the error class the route maps to a 409", () => {
     expect(new AnnouncementBroadcastError("SEND_CHECK_FAILED", "x").code).toBe("SEND_CHECK_FAILED");
+  });
+});
+
+describe("the errors-only check for scheduled and selected announcements (#836)", () => {
+  function clientWith(version: Record<string, unknown> | null) {
+    return { eventMessageTemplate: { findUnique: vi.fn(async () => ({ versions: version ? [version] : [] })) } } as never;
+  }
+  const template = { subjectTemplate: "{{announcement_title}}", bodyTemplate: "{{announcement_body}}", preheaderTemplate: null };
+
+  it("accepts a clean announcement, and one with only warnings", async () => {
+    const { assertAnnouncementTextSendable } = await import("@/modules/communications/announcement-send-check");
+    await expect(assertAnnouncementTextSendable(clientWith(template), "event-1", { title: "Friday arrival", body: "Doors open at four on Friday, with parking by the lake." })).resolves.toBeUndefined();
+    await expect(assertAnnouncementTextSendable(clientWith(null), "event-1", { title: "T".repeat(90), body: "Doors open at four on Friday, with parking by the lake." })).resolves.toBeUndefined();
+  });
+
+  it("refuses an announcement with a link that would render as text, and one whose link target is a token", async () => {
+    const { assertAnnouncementTextSendable } = await import("@/modules/communications/announcement-send-check");
+    for (const body of ["Read [the map](javascript:alert) before you come on Friday afternoon.", "Open [your pass]({{checkin_qr_url}}) before you come on Friday."]) {
+      const error = await assertAnnouncementTextSendable(clientWith(template), "event-1", { title: "Arrival", body }).catch((caught) => caught);
+      expect(error).toBeInstanceOf(MessagingError);
+      expect(error.code).toBe("INVALID_TEMPLATE");
+      expect(error.details.findings).toEqual([expect.objectContaining({ code: "LINK_SCHEME" })]);
+    }
+  });
+});
+
+describe("applying an event template runs the content errors (#836)", () => {
+  it("refuses a default message with an unsendable link or picture, and keeps a clean one", async () => {
+    const { templateMessageDefaultSchema } = await import("@/modules/event-templates/domain");
+    const base = { key: "EVENT_ANNOUNCEMENT", subjectTemplate: "Hello", bodyTemplate: "Welcome to the retreat, we are glad you are coming." };
+    expect(templateMessageDefaultSchema.safeParse(base).success).toBe(true);
+    expect(templateMessageDefaultSchema.safeParse({ ...base, bodyTemplate: `${base.bodyTemplate} [Map](javascript:x)` }).success).toBe(false);
+    expect(templateMessageDefaultSchema.safeParse({ ...base, bodyTemplate: `${base.bodyTemplate} ![Map](http://cdn.example.test/a.png)` }).success).toBe(false);
+  });
+});
+
+describe("tokens that make no sense in a preview line (#836)", () => {
+  it.each(["portal_url", "checkin_qr_url", "checkin_qr_image", "checkin_qr_images", "announcement_body", "seminar_preferences", "hotel_information", "payment_status_block", "checkin_block", "club_assignments_block"])("refuses {{%s}} in validation, the schemas and the send check", (token) => {
+    const preheader = `Hi {{${token}}}`;
+    expect(validateMessageTemplate({ subject: "S", body: "B", preheader }).issues).toEqual([expect.objectContaining({ field: "preheader", code: "UNKNOWN_TOKEN", token })]);
+    expect(messageTemplateInputSchema.safeParse({ subjectTemplate: "S", bodyTemplate: "A body that is long enough.", isEnabled: true, preheaderTemplate: preheader }).success).toBe(false);
+    expect(announcementPreheaderField.safeParse(preheader).success).toBe(false);
+    expect(runSendCheck({ subject: "S", body: "A body that is long enough.", preheader }).errors).toEqual([expect.objectContaining({ code: "UNKNOWN_TOKEN", field: "preheader" })]);
+  });
+
+  it("still allows the same tokens in the body, and a name, date or place in the line", () => {
+    expect(validateMessageTemplate({ subject: "S", body: "[Open]({{portal_url}})", preheader: "{{event_name}} on {{event_dates}} at {{event_location}}" }).isValid).toBe(true);
   });
 });

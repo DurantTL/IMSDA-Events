@@ -395,8 +395,9 @@ export function CommunicationsWorkspace({
     body: templateBody,
     preheader: templatePreheader,
     anchors: TEMPLATE_CHECK_ANCHORS,
+    context: { event_name: eventName },
     ...(isCustomTemplate ? { allowedTokens: new Set<string>(CUSTOM_MESSAGE_TOKEN_KEYS) } : {}),
-  }), [templateSubject, templateBody, templatePreheader, isCustomTemplate]);
+  }), [templateSubject, templateBody, templatePreheader, isCustomTemplate, eventName]);
   // The announcement composer's check runs on the email as it will go out: the event announcement template around this text.
   const announcementTemplateVersion = messaging?.templates.find((template) => template.key === "EVENT_ANNOUNCEMENT")?.activeVersion ?? null;
   const [broadcastWarningsAcknowledged, setBroadcastWarningsAcknowledged] = useState(false);
@@ -408,8 +409,9 @@ export function CommunicationsWorkspace({
       templatePreheader: announcementTemplateVersion?.preheaderTemplate ?? null,
       announcement: { title: draftValues.title, body: draftValues.body, preheader: draftValues.preheader },
       anchors: ANNOUNCEMENT_CHECK_ANCHORS,
+      eventName,
     }));
-  }, [announcementTemplateVersion, draftValues.title, draftValues.body, draftValues.preheader]);
+  }, [announcementTemplateVersion, draftValues.title, draftValues.body, draftValues.preheader, eventName]);
   const libraryImages = useMemo(() => {
     const known = new Set<string>();
     return [...uploadedImages, ...(messaging?.inlineImages ?? [])].filter((image) => {
