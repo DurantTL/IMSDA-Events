@@ -1,4 +1,4 @@
-import { normalizePhoneAnswer } from "@/lib/field-validation";
+import { isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer } from "@/lib/field-validation";
 import { sanitizeAddressInput } from "@/modules/forms/address";
 import {
   getAvailabilityMode,
@@ -17,6 +17,10 @@ const editableFieldTypes = new Set<RegistrationFormField["type"]>([
   "CHECKBOX",
   "NUMBER",
   "ADDRESS",
+  // Phone, email and date answers are self-service editable (#1198); the protected keys, the sensitive-field pattern, visibility rules, pricing and capacity checks below still apply to them.
+  "PHONE",
+  "EMAIL",
+  "DATE",
 ]);
 
 const protectedAttendeeKeys = new Set([
@@ -40,7 +44,6 @@ export type EditableAttendeeField = {
   key: string;
   label: string;
   helpText: string;
-  /** PHONE, EMAIL and DATE are not self-service editable today (see `editableFieldTypes`); the form checks them if they ever are. */
   type: "SELECT" | "RADIO" | "MULTISELECT" | "RANKED_CHOICE" | "CHECKBOX" | "NUMBER" | "ADDRESS" | "PHONE" | "EMAIL" | "DATE";
   required: boolean;
   options: string[];
@@ -184,13 +187,23 @@ export function prepareTieredAttendeeAnswerUpdate(input: {
   }
 
   const editableByKey = new Map(editable.map((field) => [field.key, field]));
+  // The stored answer, read by the caller in this same request: grandfathering is never decided from anything the browser sends (#1198).
+  const stored = { ...input.registrationResponses, ...input.currentResponses };
+  const valueToKeep = (key: string, value: unknown) => {
+    const type = editableByKey.get(key)?.type;
+    if (type === "ADDRESS") return sanitizeAddressInput(value);
+    const trimmed = normalizedValue(value);
+    if (type === "PHONE") {
+      // A number left alone stays exactly as stored; a changed one is stored normalised (or left as typed for the validator to refuse).
+      return isUnchangedPhone(trimmed, stored[key]) ? String(stored[key]).trim() : normalizePhoneAnswer(trimmed);
+    }
+    if (type === "EMAIL" && isUnchangedEmail(trimmed, stored[key])) return String(stored[key]).trim();
+    return trimmed;
+  };
   const responses = {
     ...input.currentResponses,
     ...Object.fromEntries(
-      Object.entries(input.changes).map(([key, value]) => [
-        key,
-        editableByKey.get(key)?.type === "ADDRESS" ? sanitizeAddressInput(value) : editableByKey.get(key)?.type === "PHONE" ? normalizePhoneAnswer(normalizedValue(value)) : normalizedValue(value),
-      ]),
+      Object.entries(input.changes).map(([key, value]) => [key, valueToKeep(key, value)]),
     ),
   };
   const merged = { ...input.registrationResponses, ...responses };
