@@ -12904,3 +12904,56 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-shell:not([data-phone]) .fb-body, .fb-shell:not([data-phone]) .fb-topbar > .fb-btn:not(.primary), .fb-shell:not([data-phone]) .fb-topbar > .fb-icon-button[aria-controls] { visibility: hidden; }
   .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }
+
+/* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
+.roster-search-panel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.roster-search-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.roster-search-field { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
+.roster-search-input { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
+.roster-search-input:focus-within { outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
+.roster-search-input svg { flex: 0 0 auto; }
+.roster-search-input input { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent; padding: 0; box-shadow: none; outline: 0; font-weight: 500; }
+.roster-filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.roster-filter-button { min-height: 44px; }
+.roster-filter-button[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }
+.roster-search-panel .field-help { margin: 0; }
+.roster-result-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.roster-result-line p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.roster-result-line .text-button { min-height: 44px; }
+.roster-member-name { overflow-wrap: anywhere; }
+.roster-member-role { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
+.roster-needs-details { white-space: normal; }
+.roster-card-table td.roster-card-flags { min-width: 10rem; }
+.roster-row-action-set { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.roster-row-action-set .actions-menu { display: inline-block; width: auto; }
+.roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: auto; min-height: 40px; white-space: nowrap; }
+.roster-row-action-set .actions-menu-list { position: absolute; right: 0; left: auto; min-width: min(15rem, 80vw); margin-top: 0; box-shadow: var(--shadow); }
+.actions-menu-list .actions-menu-note { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
+.roster-edit-button { min-height: 40px; white-space: nowrap; }
+/* The Actions menu drops below the last row. The wrap keeps its own scrolling (so the page never scrolls sideways) and makes room for the open list. */
+.report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { padding-bottom: 12rem; }
+/* Phone and narrow cards: the name takes the full card width and the labelled actions sit on the card's last row, at 44px. */
+@media (max-width: 720px) {
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1 / -1; }
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions.roster-row-actions { grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; margin-top: 8px; }
+  .roster-card-table .roster-row-action-set > .secondary-button,
+  .roster-card-table .roster-row-action-set .actions-menu { flex: 1 1 8rem; }
+  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: 100%; justify-content: center; }
+  .roster-card-table .roster-row-action-set > .secondary-button { justify-content: center; }
+  .roster-card-table td.roster-card-actions.roster-row-actions { justify-content: flex-start; }
+  .roster-card-table .roster-row-action-set { width: 100%; }
+  .roster-card-table .roster-row-action-set > .secondary-button,
+  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+  .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
+  .roster-row-action-set .actions-menu-list { right: auto; left: 0; }
+}
+@media (min-width: 721px) {
+  @container (max-width: 640px) {
+    .roster-card-table td.roster-card-name[data-label] { padding-right: 0; }
+    .roster-card-table td.roster-card-actions.roster-row-actions { position: static; grid-column: 1 / -1; justify-content: flex-start; }
+    .roster-card-table .roster-row-action-set > .secondary-button,
+    .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+    .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
+    .roster-row-action-set .actions-menu-list { right: auto; left: 0; }
+  }
+}

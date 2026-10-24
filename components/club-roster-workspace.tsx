@@ -3,7 +3,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Award, Eye, Pencil, Plus, Power, Save, Trash2, UsersRound, X } from "lucide-react";
+import { Award, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
+import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
@@ -23,7 +24,6 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  rosterRowMissingFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
 import {
@@ -33,6 +33,16 @@ import {
   type GuardianRecord,
 } from "@/modules/club-rosters/guardians-domain";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
+import {
+  matchesRosterSearch,
+  rosterColumns,
+  rosterDetailsNeededItems,
+  rosterDetailsSummary,
+  rosterNeedsDetails,
+  rosterPersonLabel,
+  rosterRowTools,
+  duplicateRosterNameKeys,
+} from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
 type RosterResponse = {
@@ -149,6 +159,10 @@ export function ClubRosterWorkspace({
   const [birthDates, setBirthDates] = useState<Record<string, string> | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const [complianceFilter, setComplianceFilter] = useState(initialComplianceFilter);
+  /** Name search, the "Details needed" list and the optional extra columns (#1167). None of them is saved or sent anywhere. */
+  const [query, setQuery] = useState("");
+  const [detailsOnly, setDetailsOnly] = useState(false);
+  const [moreColumns, setMoreColumns] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -265,16 +279,36 @@ export function ClubRosterWorkspace({
   const expiringSoon = complianceStatuses
     ? active.filter((member) => complianceStatuses[member.id]?.state === "FLAGGED").length
     : 0;
-  const beforeComplianceFilter = showInactive ? members : active;
-  const visible = complianceFilter && complianceStatuses
-    ? beforeComplianceFilter.filter((member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
-    : beforeComplianceFilter;
+  /** The people the page is about: the same authorized club/year list the counts, the filters and the rows all start from. */
+  const population = showInactive ? members : active;
+  const complianceFilterOn = Boolean(complianceFilter && complianceStatuses);
+  const afterComplianceFilter = complianceFilter && complianceStatuses
+    ? population.filter((member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
+    : population;
+  /** Only a viewer who is shown emergency contacts is asked to fill them in. */
+  const emergencyContactMissing = (member: RosterMemberRecord) => canEditGuardians && guardianMap !== undefined && !(guardianMap[member.id]?.length);
+  const needDetailsCount = population.filter((member) => rosterNeedsDetails(member, emergencyContactMissing(member))).length;
+  const visible = afterComplianceFilter.filter((member) =>
+    matchesRosterSearch(member, query) && (!detailsOnly || rosterNeedsDetails(member, emergencyContactMissing(member))));
+  const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
+  function clearFilters() {
+    setQuery("");
+    setDetailsOnly(false);
+    setComplianceFilter(null);
+  }
+  const duplicateNames = duplicateRosterNameKeys(members);
   const sections = [
-    { key: "STAFF", title: "Staff", empty: "No staff on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF"), nameDirection) },
-    { key: "MEMBERS", title: "Members", empty: "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
+    { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF"), nameDirection) },
+    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
   ] as const;
-  /** Name, Age, Type, Current class, Role, Gender, Flags — plus every optional column, for the section-title row's colSpan. */
-  const rosterColumnCount = 7 + (birthDates ? 1 : 0) + (complianceStatuses ? 1 : 0) + (showHonors ? 1 : 0) + (!readOnly || canEditGuardians ? 1 : 0);
+  /** The columns this viewer's table has: only what their role gets today, with the secondary ones opt-in. */
+  const columns = rosterColumns({
+    birthDatesShown: Boolean(birthDates),
+    moreColumns,
+    hasScreening: Boolean(complianceStatuses),
+    hasRowActions: !readOnly || canEditGuardians || showHonors,
+  });
+  const rosterColumnCount = columns.length;
 
   async function call(url: string, method: string, body: unknown, success: string) {
     setSaving(true);
@@ -480,6 +514,55 @@ export function ClubRosterWorkspace({
             <button className="text-button" onClick={() => setComplianceFilter(null)} type="button">Clear filter</button>
           </p>
         )}
+        <div className="roster-search-panel">
+          <div className="roster-search-row">
+            <label className="roster-search-field" htmlFor="roster-search">
+              Search roster
+              <span className="roster-search-input">
+                <Search aria-hidden="true" size={16} />
+                <input
+                  autoComplete="off"
+                  id="roster-search"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Find a person by name"
+                  type="search"
+                  value={query}
+                />
+              </span>
+            </label>
+            <div className="roster-filter-buttons">
+              <button
+                aria-describedby="roster-details-help"
+                aria-pressed={detailsOnly}
+                className="secondary-button roster-filter-button"
+                onClick={() => setDetailsOnly((current) => !current)}
+                type="button"
+              >
+                Details needed <span className="count-badge">{needDetailsCount}</span>
+              </button>
+              <button
+                aria-pressed={moreColumns}
+                className="secondary-button roster-filter-button"
+                onClick={() => setMoreColumns((current) => !current)}
+                type="button"
+              >
+                More columns
+              </button>
+            </div>
+          </div>
+          <p className="field-help" id="roster-details-help">
+            Details needed lists people missing a gender, current class, role, type, birth date{canEditGuardians ? " or emergency contact" : ""}. Each row says what to add.
+          </p>
+          <div className="roster-result-line">
+            <p aria-live="polite" role="status">
+              <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
+              {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
+            </p>
+            {filtersActive && (
+              <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
+            )}
+          </div>
+        </div>
         <div className="club-roster-tools club-roster-toolbar">
           <label className="checkbox-label">
             <input checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} type="checkbox" />
@@ -507,21 +590,33 @@ export function ClubRosterWorkspace({
             </button>
           )}
         </div>
-        {visible.length === 0 ? (
+        {population.length === 0 ? (
           <EmptyState
             action={{ label: "Add to roster", onClick: () => openDialog(null) }}
             actionClass="secondary-button"
-            canCreate={!readOnly && !(complianceFilter && complianceStatuses)}
+            canCreate={!readOnly}
             className="empty-state public-manage-empty"
             hint={readOnly ? "A club director adds people to the roster." : undefined}
             icon={<UsersRound size={17} aria-hidden="true" />}
-            title={complianceFilter && complianceStatuses ? "No one matches this filter" : "No one is on the roster yet"}
+            title="No one is on the roster yet"
           >
-            {complianceFilter && complianceStatuses
-              ? "Choose a different Sterling Volunteers filter to see the rest of the roster."
-              : readOnly
-                ? "This club's roster has no one on it yet."
-                : "Add regular members one at a time or import a CSV. You can add event-only guests when registering."}
+            {readOnly
+              ? "This club's roster has no one on it yet."
+              : "Add regular members one at a time or import a CSV. You can add event-only guests when registering."}
+          </EmptyState>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            action={{ label: "Clear filters", onClick: clearFilters }}
+            actionClass="secondary-button"
+            announce={false}
+            canCreate
+            className="empty-state public-manage-empty"
+            icon={<Search size={17} aria-hidden="true" />}
+            title={complianceFilterOn && !query.trim() && !detailsOnly ? "No one matches this filter" : "No one matches these filters"}
+          >
+            {complianceFilterOn
+              ? "Clear the filters, or choose a different Sterling Volunteers filter, to see the rest of the roster."
+              : "Check the spelling, or clear the filters to see everyone on the roster."}
           </EmptyState>
         ) : (
           <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
@@ -531,24 +626,26 @@ export function ClubRosterWorkspace({
               table's columns drift out of step with the Members table's even
               though the headings match. A single table with a full-width
               section-title row keeps every column the same width all the way
-              down, and the "Missing info" flag moves out of the Name cell
-              (which was stretching that column unevenly) into its own column.
+              down. What a person still needs sits in its own Details column
+              rather than the Name cell (which was stretching that column unevenly).
             */}
             <SortOrderNote>{`${sortOrderText(nameSortLabel, nameDirection)} Staff and Members are listed separately.`}</SortOrderNote>
             <table aria-labelledby="club-roster-heading" className="report-table roster-card-table">
               <thead>
                 <tr>
-                  <SortableHeader active direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />
-                  <th>Age</th>
-                  {birthDates && <th>Birth date</th>}
-                  <th>Type</th>
-                  <th>Current class</th>
-                  <th>Role</th>
-                  <th>Gender</th>
-                  <th>Flags</th>
-                  {complianceStatuses && <th>Sterling Volunteers</th>}
-                  {showHonors && <th>Honors</th>}
-                  {(!readOnly || canEditGuardians) && <th><span className="sr-only">Actions</span></th>}
+                  {columns.map((column) => {
+                    switch (column) {
+                      case "name": return <SortableHeader active direction={nameDirection} key={column} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
+                      case "age": return <th key={column}>Age</th>;
+                      case "birthDate": return <th key={column}>Birth date</th>;
+                      case "type": return <th key={column}>Type</th>;
+                      case "class": return <th key={column}>Current class</th>;
+                      case "details": return <th key={column}>Details</th>;
+                      case "gender": return <th key={column}>Gender</th>;
+                      case "screening": return <th key={column}>Sterling Volunteers</th>;
+                      case "actions": return <th key={column}>Actions</th>;
+                    }
+                  })}
                 </tr>
               </thead>
               {/* One row group per section, so each section heading covers only its own rows. */}
@@ -566,115 +663,150 @@ export function ClubRosterWorkspace({
                     ) : (
                       section.people.map((member) => {
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
-                        // names only what else is missing (#1004).
-                        const missing = rosterRowMissingFields(member);
+                        // names only what else is missing (#1004). The Details needed list adds it, so no row is listed without a reason.
+                        const needs = rosterDetailsNeededItems(member, { includeBirthDate: detailsOnly, emergencyContactMissing: emergencyContactMissing(member) });
+                        const label = rosterPersonLabel({ ...member, typeLabel: clubRosterAttendeeTypeLabels[member.attendeeType] }, duplicateNames);
+                        const healthOnFile = Boolean(healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE"));
+                        const tools = rosterRowTools({
+                          readOnly,
+                          canEditContacts: canEditGuardians,
+                          hasHonors: showHonors,
+                          hasHealthLink: Boolean(healthTab) && !healthOnFile,
+                          hasHealthOnFileNote: healthOnFile,
+                        });
+                        const honorsControl = (
+                          <>
+                            {honorsHref && !honorsPopup && (
+                              <a
+                                aria-label={`Honors for ${label}`}
+                                className={tools.honorsButton ? "secondary-button roster-honors-button" : undefined}
+                                href={honorsHref}
+                              >
+                                <Award aria-hidden="true" size={14} /> Honors
+                              </a>
+                            )}
+                            {honorsPopup && (
+                              <button
+                                aria-haspopup="dialog"
+                                aria-label={`Honors for ${label}`}
+                                className={tools.honorsButton ? "secondary-button roster-honors-button" : undefined}
+                                onClick={() => setHonorsFor(member)}
+                                type="button"
+                              >
+                                <Award aria-hidden="true" size={14} /> Honors
+                              </button>
+                            )}
+                          </>
+                        );
                         return (
                           <tr id={`member-${member.id}`} key={member.id}>
-                            <td className="roster-card-name" data-label="Name">
-                              <strong className="roster-member-name" translate="no">{member.lastName}, {member.firstName}</strong>
-                              {classHistoryBase && member.personId && (
-                                <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
-                                  Class history<span className="sr-only"> for {member.firstName} {member.lastName}</span>
-                                </Link>
-                              )}
-                            </td>
-                            <td data-label="Age" translate="no">
-                              {member.age ?? (member.reportedAge !== null ? `${member.reportedAge} (reported)` : "—")}
-                            </td>
-                            {birthDates && <td data-label="Birth date" translate="no">{birthDates[member.id] ?? "—"}</td>}
-                            <td data-label="Type">{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>
-                            <td data-label="Current class">{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>
-                            <td data-label="Role">{member.role || "—"}</td>
-                            <td data-label="Gender">{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>
-                            <td className="roster-card-flags" data-label="Flags">
-                              {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
-                              <div className="roster-flag-list">
-                              {member.status === "INACTIVE" && (
-                                <span className="status-chip gold">{clubRosterStatusLabels.INACTIVE}</span>
-                              )}
-                              {missing.length > 0 && (
-                                <span className="status-chip gold roster-missing-info" title={`Missing: ${missing.join(", ")}`}>
-                                  Missing info: {missing.join(", ")}
-                                </span>
-                              )}
-                              {member.status === "ACTIVE" && missing.length === 0 && "—"}
-                              </div>
-                            </td>
-                            {complianceStatuses && (
-                              <td data-label="Sterling Volunteers">
-                                {complianceStatuses[member.id] ? (
-                                  <>
-                                    <span className={`status-chip ${complianceTone[complianceStatuses[member.id]!.state]}`}>
-                                      {complianceLabel(complianceStatuses[member.id]!)}
-                                    </span>
-                                    {complianceStatuses[member.id]!.note && (
-                                      <small className="quiet-copy background-check-note"> {complianceStatuses[member.id]!.note}</small>
+                            {columns.map((column) => {
+                              switch (column) {
+                                case "name": return (
+                                  <td className="roster-card-name" data-label="Name" key={column}>
+                                    <strong className="roster-member-name" translate="no">{member.lastName}, {member.firstName}</strong>
+                                    {member.role && <span className="roster-member-role" translate="no">{member.role}</span>}
+                                    {classHistoryBase && member.personId && (
+                                      <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
+                                        Class history<span className="sr-only"> for {label}</span>
+                                      </Link>
                                     )}
-                                    {(complianceStatuses[member.id]!.reasons ?? []).length > 0 && (
-                                      <small className="quiet-copy background-check-note">
-                                        <br />{complianceStatuses[member.id]!.reasons!.join("; ")}
-                                      </small>
-                                    )}
-                                  </>
-                                ) : "—"}
-                              </td>
-                            )}
-                            {showHonors && (
-                              <td className="roster-honors-cell" data-label="Honors">
-                                {honorsHref && !honorsPopup && (
-                                  <a
-                                    aria-label={`Honors for ${member.firstName} ${member.lastName}`}
-                                    className="secondary-button roster-honors-button"
-                                    href={honorsHref}
-                                  >
-                                    <Award aria-hidden="true" size={13} /> Honors
-                                  </a>
-                                )}
-                                {honorsPopup && (
-                                  <button
-                                    aria-haspopup="dialog"
-                                    aria-label={`Honors for ${member.firstName} ${member.lastName}`}
-                                    className="secondary-button roster-honors-button"
-                                    onClick={() => setHonorsFor(member)}
-                                    type="button"
-                                  >
-                                    <Award aria-hidden="true" size={13} /> Honors
-                                  </button>
-                                )}
-                              </td>
-                            )}
-                            {readOnly && canEditGuardians && <td className="roster-card-actions" data-label="Actions">
-                              <div className="honor-row-actions">
-                                <button aria-label={`Emergency contacts for ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => openDialog(member)} type="button">
-                                  <Pencil aria-hidden="true" size={13} /> Emergency contacts
-                                </button>
-                              </div>
-                            </td>}
-                            {!readOnly && <td className="roster-card-actions" data-label="Actions">
-                              <div className="honor-row-actions">
-                              {healthRecordFlags?.[member.id] && (
-                                <span className="status-chip">Has a health record</span>
-                              )}
-                              {healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE") && (
-                                <span className="status-chip">A health record is on file; the director or a deputy can update it.</span>
-                              )}
-                              {healthTab && !(healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE")) && (
-                                <a
-                                  aria-label={`Health record for ${member.firstName} ${member.lastName}`}
-                                  className="secondary-button"
-                                  href={`/account/clubs/${encodeURIComponent(organizationId)}/roster/${encodeURIComponent(member.id)}/health`}
-                                >
-                                  {healthEntryOnly ? "Enter health record" : "Health"}{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
-                                </a>
-                              )}
-                              <button aria-label={`Edit ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => openDialog(member)} type="button">
-                                <Pencil aria-hidden="true" size={13} />
-                              </button>
-                              <button aria-label={`Remove ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => remove(member)} type="button">
-                                <Trash2 aria-hidden="true" size={13} />
-                              </button>
-                              </div>
-                            </td>}
+                                  </td>
+                                );
+                                case "age": return (
+                                  <td data-label="Age" key={column} translate="no">
+                                    {member.age ?? (member.reportedAge !== null ? `${member.reportedAge} (reported)` : "—")}
+                                  </td>
+                                );
+                                case "birthDate": return <td data-label="Birth date" key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
+                                case "type": return <td data-label="Type" key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
+                                case "class": return <td data-label="Current class" key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
+                                case "details": return (
+                                  <td className="roster-card-flags" data-label="Details" key={column}>
+                                    {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
+                                    <div className="roster-flag-list">
+                                      {member.status === "INACTIVE" && (
+                                        <span className="status-chip gold">{clubRosterStatusLabels.INACTIVE}</span>
+                                      )}
+                                      {needs.length > 0 && (
+                                        <span className="status-chip gold roster-needs-details">{rosterDetailsSummary(needs)}</span>
+                                      )}
+                                      {healthRecordFlags?.[member.id] && (
+                                        <span className="status-chip">Has a health record</span>
+                                      )}
+                                      {member.status === "ACTIVE" && needs.length === 0 && !healthRecordFlags?.[member.id] && (
+                                        <>
+                                          <span aria-hidden="true">—</span>
+                                          <span className="sr-only">Nothing needed</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                                case "gender": return <td data-label="Gender" key={column}>{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>;
+                                case "screening": return (
+                                  <td data-label="Sterling Volunteers" key={column}>
+                                    {complianceStatuses?.[member.id] ? (
+                                      <>
+                                        <span className={`status-chip ${complianceTone[complianceStatuses[member.id]!.state]}`}>
+                                          {complianceLabel(complianceStatuses[member.id]!)}
+                                        </span>
+                                        {complianceStatuses[member.id]!.note && (
+                                          <small className="quiet-copy background-check-note"> {complianceStatuses[member.id]!.note}</small>
+                                        )}
+                                        {(complianceStatuses[member.id]!.reasons ?? []).length > 0 && (
+                                          <small className="quiet-copy background-check-note">
+                                            <br />{complianceStatuses[member.id]!.reasons!.join("; ")}
+                                          </small>
+                                        )}
+                                      </>
+                                    ) : "—"}
+                                  </td>
+                                );
+                                case "actions": return (
+                                  <td className="roster-card-actions roster-row-actions" data-label="Actions" key={column}>
+                                    <div className="roster-row-action-set">
+                                      {tools.primary === "edit" && (
+                                        <button aria-label={`Edit ${label}`} className="secondary-button roster-edit-button" disabled={saving} onClick={() => openDialog(member)} type="button">
+                                          <Pencil aria-hidden="true" size={14} /> Edit
+                                        </button>
+                                      )}
+                                      {tools.primary === "contacts" && (
+                                        <button aria-label={`Emergency contacts for ${label}`} className="secondary-button roster-edit-button" disabled={saving} onClick={() => openDialog(member)} type="button">
+                                          <Pencil aria-hidden="true" size={14} /> Emergency contacts
+                                        </button>
+                                      )}
+                                      {tools.honorsButton && honorsControl}
+                                      {tools.menu.length > 0 && (
+                                        <ActionsMenu ariaLabel={`Actions for ${label}`}>
+                                          {tools.menu.includes("honors") && <li>{honorsControl}</li>}
+                                          {tools.menu.includes("health") && healthTab && (
+                                            <li>
+                                              <a
+                                                aria-label={`Health record for ${label}`}
+                                                href={`/account/clubs/${encodeURIComponent(organizationId)}/roster/${encodeURIComponent(member.id)}/health`}
+                                              >
+                                                {healthEntryOnly ? "Enter health record" : "Health"}{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
+                                              </a>
+                                            </li>
+                                          )}
+                                          {tools.menu.includes("healthOnFile") && (
+                                            <li className="actions-menu-note">A health record is on file; the director or a deputy can update it.</li>
+                                          )}
+                                          {tools.menu.includes("remove") && (
+                                            <li className="actions-menu-divider">
+                                              <button aria-label={`Remove ${label}`} className="actions-menu-danger" disabled={saving} onClick={() => remove(member)} type="button">
+                                                <Trash2 aria-hidden="true" size={14} /> Remove
+                                              </button>
+                                            </li>
+                                          )}
+                                        </ActionsMenu>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              }
+                            })}
                           </tr>
                         );
                       })
