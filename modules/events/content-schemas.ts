@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { checkAgainstStored, MAX_PHONE_LENGTH } from "@/lib/field-validation";
 import { embedProviders, isValidEmbedId } from "@/modules/events/content-embeds";
 
 /**
@@ -271,13 +272,17 @@ export const speakersDataSchema = z.object({
   speakers: z.array(speakerSchema).min(1, "Add at least one speaker.").max(40),
 }).strict();
 
-const phoneSchema = z.string().trim().max(30)
-  .refine((value) => value === "" || /^\+?[0-9(][0-9 ().-]{5,24}[0-9]$/.test(value), "Enter a phone number such as (555) 010-0100.");
+/**
+ * Reading a contact's phone is lenient on purpose (#1193): `parseBlockData` uses this schema too, and a phone saved before the
+ * shared check existed must not hide the block on the public page. The phone is judged when the page is saved, against what
+ * is stored: see `checkContactBlockData`.
+ */
+const phoneSchema = z.string().trim().max(MAX_PHONE_LENGTH);
 export const contactDataSchema = z.object({
   contacts: z.array(z.object({
     name: requiredText(80, "Give each contact a name."),
     role: plainText(100),
-    email: z.union([z.literal(""), z.email().max(200)]).default(""),
+    email: z.union([z.literal(""), z.email("Enter a valid email address.").max(200)]).default(""),
     phone: phoneSchema.default(""),
   }).strict().superRefine((contact, context) => {
     if (!contact.email && !contact.phone) {
@@ -289,6 +294,35 @@ export const contactDataSchema = z.object({
     }
   })).min(1, "Add at least one contact.").max(12),
 }).strict();
+
+/**
+ * The save-time check for a CONTACT block's phones (#855, #1193). A phone must pass the shared check unless the event already
+ * stores that same phone for a contact with the same name, so re-saving the page never fails on an old contact it did not
+ * touch. Compared with what is stored, never with anything the browser says. Valid phones come back in the stored form,
+ * "(515) 555-0134". The message names the contact's position, not the value.
+ */
+export function checkContactBlockData(
+  data: ContactData,
+  storedBlocks: readonly unknown[],
+): { ok: true; data: ContactData } | { ok: false; message: string } {
+  const key = (name: string) => name.trim().toLowerCase();
+  const stored = new Map<string, Set<string>>();
+  for (const block of storedBlocks) {
+    const parsed = contactDataSchema.safeParse(block ?? {});
+    if (!parsed.success) continue;
+    for (const contact of parsed.data.contacts) {
+      if (contact.phone === "") continue;
+      stored.set(key(contact.name), (stored.get(key(contact.name)) ?? new Set()).add(contact.phone));
+    }
+  }
+  const contacts: ContactData["contacts"] = [];
+  for (const [index, contact] of data.contacts.entries()) {
+    const check = checkAgainstStored(`Phone for contact ${index + 1}`, "phone", contact.phone, stored.get(key(contact.name))?.has(contact.phone) ? contact.phone : undefined);
+    if (!check.ok) return { ok: false, message: check.message };
+    contacts.push({ ...contact, phone: check.value });
+  }
+  return { ok: true, data: { contacts } };
+}
 
 export const countdownDataSchema = z.object({
   target: z.enum(["EVENT_START", "CUSTOM"]).default("EVENT_START"),

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { inlineFieldProblem } from "@/lib/field-validation";
 import type { PastorContactEntry } from "@/modules/organizations/contacts-repository";
 
 function date(value: string) {
@@ -17,6 +18,9 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const base = useId();
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  // The same phone check the server runs (#1193). The form starts blank, so a typed phone is always a new value.
+  const phoneProblem = inlineFieldProblem("Phone", "phone", phone, undefined, phoneTouched);
 
   async function send(body: Record<string, unknown>) {
     setBusy(true);
@@ -57,6 +61,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
         className="billing-contact-form"
         onSubmit={(event) => {
           event.preventDefault();
+          setPhoneTouched(true);
+          if (phoneProblem.blocking) return;
           void send({ action: "set", contact: { name, email: email || undefined, phone: phone || undefined } }).then((ok) => {
             if (ok) { setName(""); setEmail(""); setPhone(""); }
           });
@@ -68,7 +74,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
         <label htmlFor={`${base}-email`}>Email (optional)</label>
         <input autoComplete="off" id={`${base}-email`} maxLength={254} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
         <label htmlFor={`${base}-phone`}>Phone (optional)</label>
-        <input autoComplete="off" id={`${base}-phone`} maxLength={40} onChange={(event) => setPhone(event.target.value)} type="tel" value={phone} />
+        <input aria-describedby={phoneProblem.message ? `${base}-phone-error` : undefined} aria-invalid={phoneProblem.message ? true : undefined} autoComplete="off" id={`${base}-phone`} inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} onChange={(event) => setPhone(event.target.value)} type="tel" value={phone} />
+        {phoneProblem.message && <small className="field-error" id={`${base}-phone-error`} role="alert">{phoneProblem.message}</small>}
         {active && <small>The current pastor is ended and kept in the history.</small>}
         <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save pastor"}</button>
       </form>

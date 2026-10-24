@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizePhoneAnswer, validatePhone } from "@/lib/field-validation";
+import { normalizePhoneAnswer, validateEmail, validatePhone } from "@/lib/field-validation";
 
 const GUARDIAN_PHONE_MESSAGE = "Enter a phone number like (515) 555-0134.";
 
@@ -44,13 +44,11 @@ export type GuardianRecord = GuardianValues & { position: number };
 
 export const EMPTY_GUARDIAN: GuardianValues = { name: "", relationship: "", email: "", phone: "" };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Light check, not a deliverability test: something@something.tld. */
+/** The shared email check (#855, #1193); not a deliverability test. */
 export function guardianEmailProblem(value: string): string | null {
   const email = value.trim();
   if (!email) return null;
-  return EMAIL_PATTERN.test(email) && email.length <= 254 ? null : "Enter an email like name@example.com.";
+  return validateEmail(email).ok ? null : "Enter an email like name@example.com.";
 }
 
 /** The shared phone check (#855): a US number or an international one starting with +, optional extension. */

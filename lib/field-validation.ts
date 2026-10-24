@@ -137,6 +137,26 @@ export function isUnchangedFromStored(submitted: unknown, stored: unknown) {
   return typeof submitted === typeof stored && String(submitted).trim() === String(stored).trim();
 }
 
+/**
+ * The server rule for one typed value against what is stored (#855, #1193). A blank value passes (required is the
+ * caller's rule). A value equal to the stored one is an old answer left alone, so it passes as it was, even if it would
+ * fail today. Anything else must pass its type's check and comes back normalised. The decision is made here, from the
+ * stored value, and never from a flag the browser sent. `message` never echoes the value.
+ */
+export function checkAgainstStored(
+  label: string,
+  type: FieldValueType,
+  submitted: string,
+  stored: unknown,
+  rules: NumberRules = {},
+): { ok: true; value: string } | { ok: false; message: string } {
+  const text = submitted.trim();
+  if (text === "") return { ok: true, value: "" };
+  if (isUnchangedFromStored(text, stored)) return { ok: true, value: text };
+  const check = validateByType(type, text, rules);
+  return check.ok ? { ok: true, value: check.value } : { ok: false, message: problemMessage(label, check.problem) };
+}
+
 /** The value type a form field type is checked as, or null for text and choice fields. */
 export function valueTypeForFieldType(fieldType: string): FieldValueType | null {
   switch (fieldType) {
