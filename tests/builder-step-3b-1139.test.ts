@@ -109,7 +109,7 @@ describe("settings another module owns (#1139)", () => {
     expect(advanced).toContain("Not priced in Meals yet — this form&apos;s price is used.");
     expect(advanced).toContain("{!ownedPrice && !hasCredit(field)");
     // Late pricing never applies to meal tickets, priced in Meals or not: the server clears it once a plan price exists.
-    expect(advanced).toContain('{!isMealTicketField(field) && !hasCredit(field) && !isChoiceFieldType(field.type) && field.type !== "ADDRESS" && field.type !== "ACKNOWLEDGMENT" && <div className="field-full late-pricing-controls">');
+    expect(advanced).toContain('{!isMealTicketField(field) && !hasCredit(field) && !hidesFieldPrice(field.type) && field.type !== "ACKNOWLEDGMENT" && <div className="field-full late-pricing-controls">');
     expect(advanced).toContain('{isMealTicketField(field) && <small className="field-full">Late pricing is not used for meal tickets.</small>}');
     // The page loads the event's plan prices server-side, for the event it already authorized, and hands them to the builder.
     const page = read("app/(workspace)/registration-builder/page.tsx");
