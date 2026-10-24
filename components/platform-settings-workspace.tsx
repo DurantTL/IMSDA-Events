@@ -5,7 +5,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
-import { inlineFieldProblem } from "@/lib/field-validation";
+import { inlinePhoneProblem } from "@/lib/field-validation";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
 
 type Draft = {
@@ -119,7 +119,7 @@ export function PlatformSettingsWorkspace({
 
   // The invoice phone gets the shared check inline (#1193); the saved phone is the one already stored, which is flagged but never blocks.
   const [phoneTouched, setPhoneTouched] = useState(false);
-  const phoneProblem = inlineFieldProblem("Phone", "phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
+  const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(settings));
 
   function field(key: keyof Draft) {

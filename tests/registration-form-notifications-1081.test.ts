@@ -847,7 +847,7 @@ describe("saving a form's notifications (#1081)", () => {
       database({ existing: [row({ id: "existing-1", recipients: ["old@odd-domain"] })] });
       const error = await replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [notification] }).catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(FormNotificationError);
-      expect((error as Error).message).toMatch(/Address 1 is not a valid email address/);
+      expect((error as Error).message).toMatch(/Address 1: Enter a valid email address/);
       expect((error as Error).message).not.toMatch(/odd-domain|not an email/);
     }
   });
@@ -883,7 +883,7 @@ describe("saving a form's notifications (#1081)", () => {
 
   it("checks everything on the server: addresses, limits, the condition, locations and sections", async () => {
     await fails({ ...valid, recipients: [] }, /at least one email/);
-    await fails({ ...valid, recipients: ["nope"] }, /not a valid email/);
+    await fails({ ...valid, recipients: ["nope"] }, /Enter a valid email address/);
     await fails({ ...valid, recipients: Array.from({ length: 11 }, (_, index) => `p${index}@example.test`) }, /at most 10/);
     await fails({ ...valid, condition: { fieldKey: "medical_or_accessibility_need", operator: "EQUALS", value: "Yes" } }, /choose a question from the list/);
     await fails({ ...valid, condition: { fieldKey: LOCATION_CONDITION_KEY, operator: "EQUALS", value: "loc-elsewhere" } }, /event's locations/);

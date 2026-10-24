@@ -1,4 +1,4 @@
-import { validateEmail } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, validateEmail } from "@/lib/field-validation";
 
 /**
  * The addresses emailed when a club form is submitted (#1017). Pure, with no server-only import, so the settings
@@ -18,12 +18,11 @@ export type AlertRecipientsResult =
  */
 export function parseAlertRecipients(raw: string | string[], stored: readonly string[] = []): AlertRecipientsResult {
   const parts = (Array.isArray(raw) ? raw : raw.split(/[\n\r,;]+/)).map((part) => part.trim()).filter(Boolean);
-  const saved = new Set(stored.map((email) => email.trim().toLowerCase()));
   const emails: string[] = [];
   for (const [index, part] of parts.entries()) {
     const email = part.toLowerCase();
-    if (!saved.has(email) && !validateEmail(email).ok) {
-      return { ok: false, message: `Address ${index + 1} is not a valid email address.`, reason: "ADDRESS" };
+    if (!stored.some((saved) => isUnchangedEmail(email, saved)) && !validateEmail(email).ok) {
+      return { ok: false, message: `Address ${index + 1}: ${EMAIL_FIELD_MESSAGE}`, reason: "ADDRESS" };
     }
     if (!emails.includes(email)) emails.push(email);
   }

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { inlineFieldProblem } from "@/lib/field-validation";
+import { inlineFieldProblem, inlinePhoneProblem } from "@/lib/field-validation";
 import type { PastorContactEntry } from "@/modules/organizations/contacts-repository";
 
 function date(value: string) {
@@ -20,7 +20,7 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   const base = useId();
   const [phoneTouched, setPhoneTouched] = useState(false);
   // The same phone check the server runs (#1193). The form starts blank, so a typed phone is always a new value.
-  const phoneProblem = inlineFieldProblem("Phone", "phone", phone, undefined, phoneTouched);
+  const phoneProblem = inlinePhoneProblem("Phone", phone, undefined, phoneTouched);
   const [emailTouched, setEmailTouched] = useState(false);
   const emailProblem = inlineFieldProblem("Email", "email", email, undefined, emailTouched);
 

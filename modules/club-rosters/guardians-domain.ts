@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { normalizePhoneAnswer, validateEmail, validatePhone } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer, PHONE_FIELD_MESSAGE, validateEmail, validatePhone } from "@/lib/field-validation";
 
-const GUARDIAN_PHONE_MESSAGE = "Enter a phone number like (515) 555-0134.";
 
 /**
  * Guardian contacts on club roster members (#510). Pure rules: the shape, light
@@ -48,8 +47,8 @@ export const EMPTY_GUARDIAN: GuardianValues = { name: "", relationship: "", emai
 export function guardianEmailProblem(value: string, stored?: string): string | null {
   const email = value.trim();
   if (!email) return null;
-  if (stored !== undefined && stored.trim() !== "" && stored.trim() === email) return null;
-  return validateEmail(email).ok ? null : "Enter an email like name@example.com.";
+  if (isUnchangedEmail(email, stored)) return null;
+  return validateEmail(email).ok ? null : EMAIL_FIELD_MESSAGE;
 }
 
 /** The shared phone check (#855): a US number or an international one starting with +, optional extension. */
@@ -57,8 +56,8 @@ export function guardianPhoneProblem(value: string, stored?: string): string | n
   const phone = value.trim();
   if (!phone) return null;
   // An old saved phone left alone is not held against the edit (#855).
-  if (stored !== undefined && stored.trim() !== "" && stored.trim() === phone) return null;
-  return validatePhone(phone).ok ? null : GUARDIAN_PHONE_MESSAGE;
+  if (isUnchangedPhone(phone, stored)) return null;
+  return validatePhone(phone).ok ? null : PHONE_FIELD_MESSAGE;
 }
 
 /** The first problem with a guardian set's phones, slot by slot against what is stored in that slot, or null. */
@@ -90,8 +89,8 @@ const text = (max: number) => z.string().trim().max(max, `Keep this under ${max}
 export const guardianInputSchema = z.object({
   name: text(120),
   relationship: text(60),
-  email: text(254).refine((value) => guardianEmailProblem(value) === null, { message: "Enter an email like name@example.com." }),
-  phone: text(40).refine((value) => guardianPhoneProblem(value) === null, { message: GUARDIAN_PHONE_MESSAGE }),
+  email: text(254).refine((value) => guardianEmailProblem(value) === null, { message: EMAIL_FIELD_MESSAGE }),
+  phone: text(40).refine((value) => guardianPhoneProblem(value) === null, { message: PHONE_FIELD_MESSAGE }),
 }).strict();
 
 /**

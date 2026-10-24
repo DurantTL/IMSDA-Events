@@ -76,7 +76,7 @@ describe("pastor contact phone (#1193)", () => {
   it("rejects a new bad phone without echoing it, and writes nothing", async () => {
     const error = await set(BAD_PHONE).catch((caught: unknown) => caught);
     expect(error).toMatchObject({ code: "INVALID_CONTACT" });
-    expect((error as Error).message).toMatch(/^Phone must be a 10-digit US number/);
+    expect((error as Error).message).toContain("Enter a 10-digit US number");
     expect((error as Error).message).not.toContain(BAD_PHONE);
     expect(mocks.contactCreate).not.toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe("event contact block save (#1193)", () => {
   it("rejects a new bad phone, names the contact's position and not the value, and writes nothing", async () => {
     const error = await save({ name: "Sam Example", phone: BAD_PHONE }).catch((caught: unknown) => caught);
     expect(error).toMatchObject({ code: "INVALID_CONTACT" });
-    expect((error as Error).message).toMatch(/^Phone for contact 1 must be/);
+    expect((error as Error).message).toMatch(/^Contact 1: Enter a 10-digit US number/);
     expect(JSON.stringify(error)).not.toContain(BAD_PHONE);
     expect(mocks.sectionDelete).not.toHaveBeenCalled();
     expect(mocks.sectionCreate).not.toHaveBeenCalled();

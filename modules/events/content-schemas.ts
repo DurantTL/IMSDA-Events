@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { checkAgainstStored, MAX_PHONE_LENGTH } from "@/lib/field-validation";
+import { isUnchangedPhone, MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { embedProviders, isValidEmbedId } from "@/modules/events/content-embeds";
 
 /**
@@ -313,19 +313,20 @@ export function checkContactBlockData(
     const parsed = contactDataSchema.safeParse(block ?? {});
     return parsed.success ? parsed.data.contacts : [];
   };
-  const byName = new Map<string, Set<string>>();
+  const byName = new Map<string, string[]>();
   for (const block of storedBlocks) {
     for (const contact of contactsOf(block)) {
       if (contact.phone === "") continue;
-      byName.set(key(contact.name), (byName.get(key(contact.name)) ?? new Set()).add(contact.phone));
+      byName.set(key(contact.name), [...(byName.get(key(contact.name)) ?? []), contact.phone]);
     }
   }
   const paired = contactsOf(storedBlocks[blockOrdinal]);
   const contacts: ContactData["contacts"] = [];
   for (const [index, contact] of data.contacts.entries()) {
-    const saved = paired[index]?.phone === contact.phone || byName.get(key(contact.name))?.has(contact.phone);
-    const check = checkAgainstStored(`Phone for contact ${index + 1}`, "phone", contact.phone, saved ? contact.phone : undefined);
-    if (!check.ok) return { ok: false, message: check.message };
+    // The stored phone this one is judged against: the one in the same position of the paired block, else one saved under the same name.
+    const stored = [paired[index]?.phone, ...(byName.get(key(contact.name)) ?? [])].find((candidate) => isUnchangedPhone(contact.phone, candidate));
+    const check = resolvePhoneChange(contact.phone, stored);
+    if (!check.ok) return { ok: false, message: `Contact ${index + 1}: ${check.message}` };
     contacts.push({ ...contact, phone: check.value });
   }
   return { ok: true, data: { contacts } };

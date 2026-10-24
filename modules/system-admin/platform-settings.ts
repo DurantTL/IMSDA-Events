@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { checkAgainstStored, MAX_PHONE_LENGTH } from "@/lib/field-validation";
+import { MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { isValidRelyingPartyId } from "@/modules/attendee-accounts/passkey-domain";
 
@@ -172,8 +172,8 @@ export async function updatePlatformSettings(
     // The invoice phone must pass the shared check unless it is the phone already stored (#1193), decided here from the
     // stored row. Valid phones are stored in one form. The message never carries the phone.
     if (input.invoiceHeaderPhone) {
-      const phone = checkAgainstStored("Invoice phone", "phone", input.invoiceHeaderPhone, before?.invoiceHeaderPhone);
-      if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", phone.message);
+      const phone = resolvePhoneChange(input.invoiceHeaderPhone, before?.invoiceHeaderPhone);
+      if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Invoice phone: ${phone.message}`);
       input = { ...input, invoiceHeaderPhone: phone.value };
     }
     // Any change, not only clearing: a passkey is bound to the domain it was

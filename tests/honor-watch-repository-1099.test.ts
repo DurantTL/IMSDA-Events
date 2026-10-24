@@ -109,7 +109,7 @@ describe("saving honor watches (#1099)", () => {
     await replaceHonorWatches("event-1", "admin-1", { watches: [{ ...mine, recipients: ["old@odd-domain", "b@example.test"] }] }, now);
     for (const watch of [{ name: "Fresh", recipients: ["old@odd-domain"], honorIds: ["h2"], offeringIds: [] }, { ...mine, recipients: ["not an email"] }]) {
       const error = await replaceHonorWatches("event-1", "admin-1", { watches: [watch] }, now).catch((caught: unknown) => caught);
-      expect(error).toMatchObject({ code: "INVALID_WATCHES", message: expect.stringContaining("Address 1 is not a valid email address") });
+      expect(error).toMatchObject({ code: "INVALID_WATCHES", message: expect.stringContaining("Address 1: Enter a valid email address") });
       expect((error as Error).message).not.toMatch(/odd-domain|not an email/);
     }
   });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_PHONE_LENGTH, problemMessage, validatePhone } from "@/lib/field-validation";
+import { newPhoneSchema } from "@/lib/field-validation";
 
 /**
  * Personal staff invitations (#804). Pure rules, shared by the server, the pages and the tests.
@@ -191,17 +191,8 @@ const nameField = z.string().transform(cleanName).pipe(z.string().min(1, "Enter 
 export const invitationRegistrationSchema = z.object({
   firstName: nameField,
   lastName: nameField,
-  /**
-   * Optional, and always a new value: the link form starts blank, so there is no stored phone to grandfather (#1193). A valid
-   * phone is stored as "(515) 555-0134". The message never echoes what was typed.
-   */
-  phone: z.string().trim().max(MAX_PHONE_LENGTH).default("").transform((value, context) => {
-    if (value === "") return "";
-    const check = validatePhone(value);
-    if (check.ok) return check.value;
-    context.addIssue({ code: "custom", message: problemMessage("Phone", check.problem) });
-    return z.NEVER;
-  }),
+  /** Optional, and always a new value: the link form starts blank, so there is no stored phone to keep (#1193). Stored normalised. */
+  phone: newPhoneSchema.default(""),
   spouse: z.object({ firstName: nameField, lastName: nameField }).strict().nullable().default(null),
   dependants: z.array(z.object({
     firstName: nameField,

@@ -15,7 +15,7 @@ import { AttendeeRegistrationAnswersForm } from "@/components/attendee-registrat
 import { ChurchPastorContact } from "@/components/church-pastor-contact";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import { StaffInvitationQuestions } from "@/components/staff-invitation-questions";
-import { checkAgainstStored } from "@/lib/field-validation";
+import { PHONE_FIELD_MESSAGE, resolvePhoneChange } from "@/lib/field-validation";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { guardianEmailProblem, guardianInputSchema } from "@/modules/club-rosters/guardians-domain";
 import { checkContactBlockData, parseBlockData } from "@/modules/events/content-schemas";
@@ -33,19 +33,19 @@ const BAD_EMAIL = "not an email";
 const GOOD_PHONE = "515 555 0134";
 const STORED_PHONE = "(515) 555-0134";
 
-describe("checkAgainstStored (the server's grandfathering rule)", () => {
+describe("phone grandfathering with the shared helpers (#871, used by #1193)", () => {
   it("passes a blank, normalises a changed valid phone, and rejects a changed bad one without echoing it", () => {
-    expect(checkAgainstStored("Phone", "phone", "  ", undefined)).toEqual({ ok: true, value: "" });
-    expect(checkAgainstStored("Phone", "phone", GOOD_PHONE, undefined)).toEqual({ ok: true, value: STORED_PHONE });
-    const bad = checkAgainstStored("Phone", "phone", BAD_PHONE, undefined);
+    expect(resolvePhoneChange("  ", undefined)).toEqual({ ok: true, value: "" });
+    expect(resolvePhoneChange(GOOD_PHONE, undefined)).toEqual({ ok: true, value: STORED_PHONE });
+    const bad = resolvePhoneChange(BAD_PHONE, undefined);
     expect(bad).toMatchObject({ ok: false });
     expect(JSON.stringify(bad)).not.toContain(BAD_PHONE);
   });
 
-  it("leaves an unchanged old value alone, decided from the stored value only", () => {
-    expect(checkAgainstStored("Phone", "phone", ` ${BAD_PHONE} `, BAD_PHONE)).toEqual({ ok: true, value: BAD_PHONE });
-    expect(checkAgainstStored("Phone", "phone", BAD_PHONE, "some other stored value")).toMatchObject({ ok: false });
-    expect(checkAgainstStored("Phone", "phone", BAD_PHONE, null)).toMatchObject({ ok: false });
+  it("keeps an unchanged old value exactly as stored, decided from the stored value only", () => {
+    expect(resolvePhoneChange(` ${BAD_PHONE} `, BAD_PHONE)).toEqual({ ok: true, value: BAD_PHONE });
+    expect(resolvePhoneChange(BAD_PHONE, "some other stored value")).toMatchObject({ ok: false });
+    expect(resolvePhoneChange(BAD_PHONE, null)).toMatchObject({ ok: false });
   });
 });
 
@@ -84,8 +84,8 @@ describe("roster emergency contact inputs (#1193)", () => {
 });
 
 describe("church pastor contact (#1193)", () => {
-  it("validates the email with the shared check and stores a valid phone in one form", () => {
-    expect(pastorContactInputSchema.parse({ name: "Pat Pastor", email: "Pastor@Example.test", phone: GOOD_PHONE })).toEqual({ name: "Pat Pastor", email: "pastor@example.test", phone: STORED_PHONE });
+  it("validates the email with the shared check and keeps the phone as typed for the repository to resolve", () => {
+    expect(pastorContactInputSchema.parse({ name: "Pat Pastor", email: "Pastor@Example.test", phone: GOOD_PHONE })).toEqual({ name: "Pat Pastor", email: "pastor@example.test", phone: GOOD_PHONE });
     const bad = pastorContactInputSchema.safeParse({ name: "Pat", email: BAD_EMAIL });
     expect(bad.success).toBe(false);
     expect(JSON.stringify(bad.error?.issues)).not.toContain(BAD_EMAIL);
@@ -97,7 +97,7 @@ describe("church pastor contact (#1193)", () => {
 
   it("shows the phone check inline on the form", () => {
     const source = read("components/church-pastor-contact.tsx");
-    expect(source).toContain('inlineFieldProblem("Phone", "phone"');
+    expect(source).toContain('inlinePhoneProblem("Phone", phone');
     expect(source).toContain('inlineFieldProblem("Email", "email"');
     expect(source).toContain('inputMode="tel"');
     expect(renderToStaticMarkup(createElement(ChurchPastorContact, { organizationId: "church-1", active: null, history: [] }))).toContain('type="tel"');
@@ -112,7 +112,7 @@ describe("staff invitation phone and answers (#1193)", () => {
     expect(invitationRegistrationSchema.parse(person).phone).toBe("");
     const bad = invitationRegistrationSchema.safeParse({ ...person, phone: BAD_PHONE });
     expect(bad.success).toBe(false);
-    expect(bad.error?.issues[0]?.message).toMatch(/^Phone must be a 10-digit US number/);
+    expect(bad.error?.issues[0]?.message).toBe(PHONE_FIELD_MESSAGE);
     expect(JSON.stringify(bad.error?.issues)).not.toContain(BAD_PHONE);
   });
 
@@ -150,7 +150,7 @@ describe("staff invitation phone and answers (#1193)", () => {
     // Nothing is shown before the person leaves the field.
     expect(markup).not.toContain("must be a 10-digit US number");
     expect(read("components/staff-invitation-questions.tsx")).toContain("typedAnswerProblem(field, value)");
-    expect(read("components/staff-invitation-registration.tsx")).toContain('inlineFieldProblem("Phone", "phone", phone');
+    expect(read("components/staff-invitation-registration.tsx")).toContain('inlinePhoneProblem("Phone", phone');
   });
 });
 
@@ -188,7 +188,7 @@ describe("event contact blocks (#1193)", () => {
     const source = read("components/event-block-editors.tsx");
     expect(source).toContain('valueType="phone"');
     expect(source).toContain('valueType="email"');
-    expect(source).toContain("inlineFieldProblem(label, valueType, value, saved, touched)");
+    expect(source).toContain("inlinePhoneProblem(label, value, saved, touched)");
   });
 });
 
@@ -197,7 +197,7 @@ describe("event email settings (#1193)", () => {
 
   it("checks the reply-to and staff alert addresses with the shared validator and never echoes them", () => {
     expect(messagingSettingsInputSchema.parse({ ...base, replyToEmail: " Retreat@Example.test ", internalNotificationEmails: [" Staff@Example.test "] })).toMatchObject({
-      replyToEmail: "Retreat@Example.test",
+      replyToEmail: "retreat@example.test",
       internalNotificationEmails: ["staff@example.test"],
     });
     for (const patch of [{ replyToEmail: BAD_EMAIL }, { internalNotificationEmails: [BAD_EMAIL] }]) {
@@ -220,7 +220,7 @@ describe("event email settings form (#1193)", () => {
 describe("club form alert recipients (#1193)", () => {
   it("rejects a new bad address by its line number, never by the address", () => {
     const result = parseAlertRecipients(`office@imsda-events.test\n${BAD_EMAIL}`);
-    expect(result).toMatchObject({ ok: false, message: "Address 2 is not a valid email address.", reason: "ADDRESS" });
+    expect(result).toMatchObject({ ok: false, message: "Address 2: Enter a valid email address.", reason: "ADDRESS" });
     expect(JSON.stringify(result)).not.toContain(BAD_EMAIL);
   });
 

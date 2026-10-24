@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { inlineFieldProblem, inputAttributesFor, type FieldValueType } from "@/lib/field-validation";
+import { inlineFieldProblem, inlinePhoneProblem, inputAttributesFor, type FieldValueType } from "@/lib/field-validation";
 import type { EventAssetRecord } from "@/modules/events/asset-repository";
 import type { SanitizedHtml } from "@/modules/events/content-html";
 import {
@@ -150,7 +150,9 @@ function TextField({
   // server decides by comparing with what it stored.
   const [saved] = useState(value);
   const [touched, setTouched] = useState(false);
-  const problem = valueType ? inlineFieldProblem(label, valueType, value, saved, touched) : { message: "", blocking: false };
+  const problem = valueType === "phone"
+    ? inlinePhoneProblem(label, value, saved, touched)
+    : valueType ? inlineFieldProblem(label, valueType, value, saved, touched) : { message: "", blocking: false };
   const attributes = valueType ? inputAttributesFor(valueType) : null;
   const errorId = useId();
   return (

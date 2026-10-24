@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { checkAgainstStored, normalizePhoneAnswer } from "@/lib/field-validation";
+import { resolvePhoneChange } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -56,13 +56,12 @@ export async function setPastorContact(input: { organizationId: string; contact:
       });
       // The phone must pass the shared check unless it is the active contact's own saved phone (#1193); the decision is made here
       // from the stored value. The message never carries the phone.
-      const phone = input.contact.phone === null ? { ok: true as const, value: "" } : checkAgainstStored("Phone", "phone", input.contact.phone, current?.phone);
+      const phone = resolvePhoneChange(input.contact.phone ?? "", current?.phone);
       if (!phone.ok) throw new OrganizationContactError(phone.message, "INVALID_CONTACT");
       const contact = { ...input.contact, phone: phone.value || null };
-      if (current && current.name === contact.name && current.email === contact.email
-        // The stored phone is compared in its normalised form too, so re-sending an old-format (but valid) phone is a retry,
-        // not a replacement that ends the contact and writes a duplicate history row (#1193).
-        && (current.phone === contact.phone || (current.phone !== null && contact.phone !== null && normalizePhoneAnswer(current.phone) === contact.phone))) {
+      // An unchanged phone comes back exactly as stored, so re-sending an old-format phone is a retry, not a replacement that
+      // ends the contact and writes a duplicate history row (#1193).
+      if (current && current.name === contact.name && current.email === contact.email && current.phone === contact.phone) {
         return { id: current.id, replaced: false };
       }
       const now = new Date();

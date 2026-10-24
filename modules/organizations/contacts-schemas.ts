@@ -1,22 +1,16 @@
 import { z } from "zod";
-import { MAX_PHONE_LENGTH, normalizePhoneAnswer, validateEmail } from "@/lib/field-validation";
+import { emailAddressSchema, MAX_PHONE_LENGTH, PHONE_FIELD_MESSAGE } from "@/lib/field-validation";
 
 const id = z.string().trim().min(1).max(64);
 
 /** A church's pastor contact (#977). Name is required; email and phone are optional but validated when given. */
 export const pastorContactInputSchema = z.object({
   name: z.string().trim().min(1, "Enter the pastor's name.").max(120),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(254)
-    .refine((value) => value === "" || validateEmail(value).ok, "Enter a valid email address, or leave it blank.")
-    .optional()
-    .transform((value) => value || null),
-  // A phone that passes is stored as "(515) 555-0134". One that does not is left as typed for `setPastorContact` to judge
-  // against the stored contact (#1193), so an old saved phone is not held against a retry.
-  phone: z.string().trim().max(MAX_PHONE_LENGTH).optional().transform((value) => (value ? normalizePhoneAnswer(value) : null)),
+  // The shared email check, lower-cased; blank is none. A new pastor is always typed fresh, so there is no stored email to keep.
+  email: emailAddressSchema.optional().transform((value) => value || null),
+  // Left as typed: `setPastorContact` judges it against the stored contact with `resolvePhoneChange` (#1193), so an old saved
+  // phone is kept exactly as stored and a changed one is checked and stored normalised.
+  phone: z.string().trim().max(MAX_PHONE_LENGTH, PHONE_FIELD_MESSAGE).optional().transform((value) => value || null),
 });
 
 export type PastorContactInput = z.infer<typeof pastorContactInputSchema>;
