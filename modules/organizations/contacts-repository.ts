@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { checkAgainstStored } from "@/lib/field-validation";
+import { checkAgainstStored, normalizePhoneAnswer } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -59,7 +59,10 @@ export async function setPastorContact(input: { organizationId: string; contact:
       const phone = input.contact.phone === null ? { ok: true as const, value: "" } : checkAgainstStored("Phone", "phone", input.contact.phone, current?.phone);
       if (!phone.ok) throw new OrganizationContactError(phone.message, "INVALID_CONTACT");
       const contact = { ...input.contact, phone: phone.value || null };
-      if (current && current.name === contact.name && current.email === contact.email && current.phone === contact.phone) {
+      if (current && current.name === contact.name && current.email === contact.email
+        // The stored phone is compared in its normalised form too, so re-sending an old-format (but valid) phone is a retry,
+        // not a replacement that ends the contact and writes a duplicate history row (#1193).
+        && (current.phone === contact.phone || (current.phone !== null && contact.phone !== null && normalizePhoneAnswer(current.phone) === contact.phone))) {
         return { id: current.id, replaced: false };
       }
       const now = new Date();

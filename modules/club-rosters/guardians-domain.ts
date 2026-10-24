@@ -44,10 +44,11 @@ export type GuardianRecord = GuardianValues & { position: number };
 
 export const EMPTY_GUARDIAN: GuardianValues = { name: "", relationship: "", email: "", phone: "" };
 
-/** The shared email check (#855, #1193); not a deliverability test. */
-export function guardianEmailProblem(value: string): string | null {
+/** The shared email check (#855, #1193); not a deliverability test. An old saved email left alone is not held against the edit. */
+export function guardianEmailProblem(value: string, stored?: string): string | null {
   const email = value.trim();
   if (!email) return null;
+  if (stored !== undefined && stored.trim() !== "" && stored.trim() === email) return null;
   return validateEmail(email).ok ? null : "Enter an email like name@example.com.";
 }
 
@@ -72,6 +73,18 @@ export function guardianSetPhoneProblem(
   return null;
 }
 
+/** The same for emails (#1193): an old saved email in the same slot is left alone, a changed one must pass. */
+export function guardianSetEmailProblem(
+  guardians: readonly Pick<GuardianValues, "email">[],
+  stored: ReadonlyArray<{ position: number; email: string }>,
+): string | null {
+  for (const [index, guardian] of guardians.slice(0, GUARDIAN_SLOTS).entries()) {
+    const problem = guardianEmailProblem(guardian.email, stored.find((record) => record.position === index + 1)?.email);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 const text = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters.`).default("");
 
 export const guardianInputSchema = z.object({
@@ -83,10 +96,10 @@ export const guardianInputSchema = z.object({
 
 /**
  * A guardian in a roster edit: the phone is checked against the stored one for
- * that slot where the member is loaded (#855), not here, so an old saved phone
+ * that slot where the member is loaded (#855, #1193), not here, so an old saved phone or email
  * does not block the edit.
  */
-export const guardianUpdateInputSchema = guardianInputSchema.extend({ phone: text(40) });
+export const guardianUpdateInputSchema = guardianInputSchema.extend({ phone: text(40), email: text(254) });
 export const guardiansUpdateSchema = z.array(guardianUpdateInputSchema).max(GUARDIAN_SLOTS, "A member can have two emergency contacts at most.");
 
 /**
@@ -122,13 +135,14 @@ export type GuardianFormErrors = Partial<Record<`g${1 | 2}${"Email" | "Phone"}`,
 
 export function validateGuardianForm(
   guardians: readonly Pick<GuardianValues, "email" | "phone">[],
-  stored: ReadonlyArray<{ position: number; phone: string }> = [],
+  stored: ReadonlyArray<{ position: number; phone: string; email?: string }> = [],
 ): GuardianFormErrors {
   const errors: GuardianFormErrors = {};
   guardians.slice(0, GUARDIAN_SLOTS).forEach((guardian, index) => {
     const slot = (index + 1) as 1 | 2;
-    const email = guardianEmailProblem(guardian.email);
-    const phone = guardianPhoneProblem(guardian.phone, stored.find((record) => record.position === slot)?.phone);
+    const storedSlot = stored.find((record) => record.position === slot);
+    const email = guardianEmailProblem(guardian.email, storedSlot?.email);
+    const phone = guardianPhoneProblem(guardian.phone, storedSlot?.phone);
     if (email) errors[`g${slot}Email`] = email;
     if (phone) errors[`g${slot}Phone`] = phone;
   });

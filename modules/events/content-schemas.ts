@@ -297,27 +297,34 @@ export const contactDataSchema = z.object({
 
 /**
  * The save-time check for a CONTACT block's phones (#855, #1193). A phone must pass the shared check unless the event already
- * stores that same phone for a contact with the same name, so re-saving the page never fails on an old contact it did not
- * touch. Compared with what is stored, never with anything the browser says. Valid phones come back in the stored form,
+ * stores that same phone for the same contact, so re-saving the page never fails on an old contact it did not touch. "The
+ * same contact" is the one in the same position of the matching stored block (the nth contact block of the page pairs with
+ * the nth stored one), so renaming a contact keeps its phone; or, when contacts were reordered, one with the same name
+ * anywhere. Compared with what is stored, never with anything the browser says. Valid phones come back in the stored form,
  * "(515) 555-0134". The message names the contact's position, not the value.
  */
 export function checkContactBlockData(
   data: ContactData,
   storedBlocks: readonly unknown[],
+  blockOrdinal = 0,
 ): { ok: true; data: ContactData } | { ok: false; message: string } {
   const key = (name: string) => name.trim().toLowerCase();
-  const stored = new Map<string, Set<string>>();
-  for (const block of storedBlocks) {
+  const contactsOf = (block: unknown) => {
     const parsed = contactDataSchema.safeParse(block ?? {});
-    if (!parsed.success) continue;
-    for (const contact of parsed.data.contacts) {
+    return parsed.success ? parsed.data.contacts : [];
+  };
+  const byName = new Map<string, Set<string>>();
+  for (const block of storedBlocks) {
+    for (const contact of contactsOf(block)) {
       if (contact.phone === "") continue;
-      stored.set(key(contact.name), (stored.get(key(contact.name)) ?? new Set()).add(contact.phone));
+      byName.set(key(contact.name), (byName.get(key(contact.name)) ?? new Set()).add(contact.phone));
     }
   }
+  const paired = contactsOf(storedBlocks[blockOrdinal]);
   const contacts: ContactData["contacts"] = [];
   for (const [index, contact] of data.contacts.entries()) {
-    const check = checkAgainstStored(`Phone for contact ${index + 1}`, "phone", contact.phone, stored.get(key(contact.name))?.has(contact.phone) ? contact.phone : undefined);
+    const saved = paired[index]?.phone === contact.phone || byName.get(key(contact.name))?.has(contact.phone);
+    const check = checkAgainstStored(`Phone for contact ${index + 1}`, "phone", contact.phone, saved ? contact.phone : undefined);
     if (!check.ok) return { ok: false, message: check.message };
     contacts.push({ ...contact, phone: check.value });
   }

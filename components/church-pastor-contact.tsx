@@ -21,6 +21,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   const [phoneTouched, setPhoneTouched] = useState(false);
   // The same phone check the server runs (#1193). The form starts blank, so a typed phone is always a new value.
   const phoneProblem = inlineFieldProblem("Phone", "phone", phone, undefined, phoneTouched);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailProblem = inlineFieldProblem("Email", "email", email, undefined, emailTouched);
 
   async function send(body: Record<string, unknown>) {
     setBusy(true);
@@ -62,7 +64,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
         onSubmit={(event) => {
           event.preventDefault();
           setPhoneTouched(true);
-          if (phoneProblem.blocking) return;
+          setEmailTouched(true);
+          if (phoneProblem.blocking || emailProblem.blocking) return;
           void send({ action: "set", contact: { name, email: email || undefined, phone: phone || undefined } }).then((ok) => {
             if (ok) { setName(""); setEmail(""); setPhone(""); }
           });
@@ -72,7 +75,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
         <label htmlFor={`${base}-name`}>Name</label>
         <input autoComplete="off" id={`${base}-name`} maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} />
         <label htmlFor={`${base}-email`}>Email (optional)</label>
-        <input autoComplete="off" id={`${base}-email`} maxLength={254} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
+        <input aria-describedby={emailProblem.message ? `${base}-email-error` : undefined} aria-invalid={emailProblem.message ? true : undefined} autoComplete="off" id={`${base}-email`} inputMode="email" maxLength={254} onBlur={() => setEmailTouched(true)} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
+        {emailProblem.message && <small className="field-error" id={`${base}-email-error`} role="alert">{emailProblem.message}</small>}
         <label htmlFor={`${base}-phone`}>Phone (optional)</label>
         <input aria-describedby={phoneProblem.message ? `${base}-phone-error` : undefined} aria-invalid={phoneProblem.message ? true : undefined} autoComplete="off" id={`${base}-phone`} inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} onChange={(event) => setPhone(event.target.value)} type="tel" value={phone} />
         {phoneProblem.message && <small className="field-error" id={`${base}-phone-error`} role="alert">{phoneProblem.message}</small>}

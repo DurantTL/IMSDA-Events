@@ -92,6 +92,13 @@ describe("pastor contact phone (#1193)", () => {
     await expect(set("also not a phone")).rejects.toMatchObject({ code: "INVALID_CONTACT" });
   });
 
+  it("treats re-sending an old-format but valid phone as a retry, not a replacement with a duplicate history row", async () => {
+    mocks.contacts = [{ id: "pastor-1", name: "Pat Pastor", email: null, phone: "515-555-0134" }];
+    await expect(set(GOOD_PHONE)).resolves.toMatchObject({ id: "pastor-1", replaced: false });
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
+    expect(db.organizationContact.updateMany).not.toHaveBeenCalled();
+  });
+
   it("answers 400 on the real route, with a message that carries no phone", async () => {
     const response = await PASTOR_POST(
       new Request("https://events.imsda.test/x", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set", contact: { name: "Pat", phone: BAD_PHONE } }) }),

@@ -297,6 +297,7 @@ export function AttendeeRegistrationAnswersForm({
                       disabled={locked}
                       required={field.required}
                       value={typeof value === "number" || typeof value === "string" ? value : ""}
+                      aria-describedby={problem.message ? `${attendee.attendeeId}_${field.id}_error` : undefined}
                       aria-invalid={problem.message ? true : undefined}
                       inputMode={attributes.inputMode}
                       autoComplete={attributes.autoComplete}
@@ -304,7 +305,7 @@ export function AttendeeRegistrationAnswersForm({
                       onChange={(event) => updateAnswer(attendee.attendeeId, field.key, event.target.value)}
                     />
                     {field.helpText && <small>{field.helpText}</small>}
-                    {problem.message && <small className="field-error" role="alert">{problem.message}</small>}
+                    {problem.message && <small className="field-error" id={`${attendee.attendeeId}_${field.id}_error`} role="alert">{problem.message}</small>}
                   </label>
                 );
               }

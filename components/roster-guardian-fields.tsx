@@ -46,7 +46,7 @@ export function RosterGuardianFields({ errors: guardianErrors, guardianState, re
               </label>
               <label>
                 {guardianFieldLabels.email}
-                <input aria-describedby={emailError ? `roster-g${slot}Email-error` : undefined} aria-invalid={emailError ? true : undefined} autoComplete="email" defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={254} name={`g${slot}Email`} type="email" />
+                <input aria-describedby={emailError ? `roster-g${slot}Email-error` : undefined} aria-invalid={emailError ? true : undefined} autoComplete="email" defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
                 {emailError && <span className="roster-field-error" id={`roster-g${slot}Email-error`} role="alert">{emailError}</span>}
               </label>
               <label>

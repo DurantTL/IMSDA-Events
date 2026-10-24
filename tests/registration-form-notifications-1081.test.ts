@@ -839,6 +839,19 @@ describe("saving a form's notifications (#1081)", () => {
     await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [notification] })).rejects.toThrow(text);
   }
 
+  it("lets an old saved recipient through on a re-save, but not the same text on another notification or a new bad one (#1193)", async () => {
+    const { tx } = database({ existing: [row({ id: "existing-1", recipients: ["old@odd-domain"] })] });
+    await replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...valid, id: "existing-1", recipients: ["old@odd-domain", "new@example.test"] }] });
+    expect(tx.registrationFormNotification.update).toHaveBeenCalledTimes(1);
+    for (const notification of [{ ...valid, recipients: ["old@odd-domain"] }, { ...valid, id: "existing-1", recipients: ["not an email"] }]) {
+      database({ existing: [row({ id: "existing-1", recipients: ["old@odd-domain"] })] });
+      const error = await replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [notification] }).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(FormNotificationError);
+      expect((error as Error).message).toMatch(/Address 1 is not a valid email address/);
+      expect((error as Error).message).not.toMatch(/odd-domain|not an email/);
+    }
+  });
+
   it("saves, keeps ids, and audits ids and counts only", async () => {
     const { tx } = database();
     await replaceFormNotifications("event-1", "form-1", "user-1", {

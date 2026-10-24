@@ -209,10 +209,12 @@ export async function replaceEventContent(
       // (#1193), so saving the page never fails on an old contact nobody touched. Judged against the stored rows, here, inside
       // the transaction; the browser's own check only guides. Valid phones are stored in one form. No message carries a value.
       if (prepared.some((entry) => entry.section.kind === "CONTACT")) {
-        const storedContacts = await tx.eventContentSection.findMany({ where: { eventId, kind: "CONTACT" }, select: { data: true } });
+        const storedContacts = await tx.eventContentSection.findMany({ where: { eventId, kind: "CONTACT" }, orderBy: { position: "asc" }, select: { data: true } });
+        let ordinal = 0;
         for (const entry of prepared) {
           if (entry.section.kind !== "CONTACT" || !entry.data) continue;
-          const checked = checkContactBlockData(entry.data as ContactData, storedContacts.map((row) => row.data));
+          const checked = checkContactBlockData(entry.data as ContactData, storedContacts.map((row) => row.data), ordinal);
+          ordinal += 1;
           if (!checked.ok) throw new EventContentError("INVALID_CONTACT", checked.message);
           entry.data = checked.data;
         }

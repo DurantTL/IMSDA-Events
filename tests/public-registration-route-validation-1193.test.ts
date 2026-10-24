@@ -2,36 +2,63 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * #855 and #1193: the public registration ROUTE rejects a bad phone, email and number, not only
- * `preparePublicRegistration()`. The real route handler runs: body parsing, the input schema and the
- * error-to-response mapping. The repository is the one stand-in: its `submitPublicRegistration` does only the step the real
- * one does at this point (`preparePublicRegistration` on the saved form, then `INVALID_SUBMISSION` with the issues), and
- * the error class is the real one. No submitted value may appear in the response or in any log. Synthetic data only.
+ * `preparePublicRegistration()`. The real route handler AND the real `submitPublicRegistration` run: body parsing, the input
+ * schema, the form and version lookup, the answer validation and the error-to-response mapping. Only Prisma is mocked, at
+ * the boundary: the form, event and version lookups return a fictitious published form, every other read finds nothing, and
+ * every write method is recorded. A bad answer must answer 422 with no registration created and no write at all. No
+ * submitted value may appear in the response or in any log. Synthetic data only.
  */
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({}) }));
 
-const mocks = vi.hoisted(() => ({
-  logError: vi.fn(),
-  submit: vi.fn(),
+const state = vi.hoisted(() => ({
+  writes: [] as string[],
+  transactions: 0,
+  form: null as unknown,
 }));
 
+vi.mock("@/lib/prisma", () => {
+  const reads = (model: string) => new Proxy({}, {
+    get: (_target, method: string) => async () => {
+      if (/^(create|update|upsert|delete)/.test(method)) {
+        state.writes.push(`${model}.${method}`);
+        return {};
+      }
+      if (model === "registrationForm" && method === "findFirst") return state.form;
+      if (method === "findMany") return [];
+      if (method === "count") return 0;
+      return null;
+    },
+  });
+  const client = (extra: Record<string, unknown>) => new Proxy(extra, {
+    get: (target, property: string) => (property in target ? target[property] : reads(property)),
+  });
+  const tx = client({
+    $executeRaw: async () => { state.writes.push("$executeRaw"); return 0; },
+    $executeRawUnsafe: async () => 0,
+    $queryRaw: async () => [],
+  });
+  const db = client({
+    $transaction: async (work: (client: unknown) => unknown) => {
+      state.transactions += 1;
+      return work(tx);
+    },
+  });
+  return { getPrisma: () => db };
+});
+
+const mocks = vi.hoisted(() => ({ logError: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
-vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn(async () => undefined) }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn(async () => { state.writes.push("auditLog"); }) }));
 vi.mock("@/modules/rate-limit/service", () => ({
   checkPublicRegistrationRateLimit: vi.fn(async () => ({ allowed: true, decisions: [] })),
   checkPublicFormRoommateLookupRateLimit: vi.fn(async () => ({ allowed: true, decisions: [] })),
   publicRequestClientHash: vi.fn(() => "client-hash-1"),
 }));
-vi.mock("@/modules/forms/public-repository", async (importActual) => {
-  const actual = await importActual<typeof import("@/modules/forms/public-repository")>();
-  return { ...actual, submitPublicRegistration: mocks.submit, getPublicRegistrationExperience: vi.fn() };
-});
+vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: async () => false }));
 
 import { POST } from "@/app/api/public/events/[eventSlug]/forms/[formSlug]/registrations/route";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
-import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
-import { PublicRegistrationError } from "@/modules/forms/public-repository";
 
 const definition = registrationFormDefinitionSchema.parse({
   title: "Validation fixture",
@@ -62,31 +89,45 @@ const post = (responses: Record<string, unknown>) => new Request("https://events
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("APP_BASE_URL", "https://events.imsda.test");
-  mocks.submit.mockImplementation(async (_event: string, _form: string, input: PublicRegistrationInput) => {
-    const prepared = preparePublicRegistration(definition, input, { timeZone: "America/Chicago" });
-    if (!prepared.isValid) throw new PublicRegistrationError("INVALID_SUBMISSION", "Review the highlighted fields and submit again.", prepared.issues);
-    return { confirmation: { confirmationCode: "REG-SYNTHETIC", phone: prepared.responses.phone } };
-  });
+  state.writes = [];
+  state.transactions = 0;
+  state.form = {
+    id: "form-1",
+    slug: "attendee",
+    eventId: "event-1",
+    event: {
+      id: "event-1", name: "Synthetic Event", slug: "synthetic-event",
+      startsAt: new Date("2099-06-05T14:00:00Z"), endsAt: new Date("2099-06-07T22:00:00Z"), timezone: "America/Chicago", location: "Synthetic Camp",
+      capacity: null, isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
+      billingMode: "ATTENDEE_PAY", audience: "GENERAL", ageOfMajority: 18, refundPolicy: null, attendeeTypes: [],
+    },
+    versions: [{ id: "version-1", versionNumber: 1, definition, publishedAt: new Date("2026-10-01T00:00:00Z") }],
+  };
 });
 
 describe("public registration route (#855, #1193)", () => {
-  it("accepts good answers and passes the phone on in its stored form", async () => {
-    const response = await POST(post(good), context);
-    expect(response.status).toBe(201);
-    expect(await response.text()).toContain("(515) 555-0134");
-  });
-
   it.each([
     ["phone", { phone: "idk-call-me" }, "Phone must be a 10-digit US number"],
     ["email", { email: "avery at example" }, "Email must be a valid email address"],
     ["number", { party_size: "a few" }, "Party size must be a number"],
-  ])("answers 422 for a bad %s, naming the field and never the value", async (_name, patch, message) => {
+  ])("answers 422 for a bad %s, creates nothing, and never echoes the value", async (_name, patch, message) => {
     const response = await POST(post({ ...good, ...patch }), context);
     expect(response.status).toBe(422);
     const body = await response.text();
     expect(body).toContain("INVALID_SUBMISSION");
     expect(body).toContain(message);
-    for (const value of Object.values(patch)) expect(body).not.toContain(value);
-    for (const call of mocks.logError.mock.calls) for (const value of Object.values(patch)) expect(JSON.stringify(call)).not.toContain(value);
+    // The real repository ran: it opened its transaction, found the form, and stopped at validation.
+    expect(state.transactions).toBeGreaterThan(0);
+    expect(state.writes.filter((write) => write !== "$executeRaw")).toEqual([]);
+    for (const value of Object.values(patch)) {
+      expect(body).not.toContain(value);
+      for (const call of mocks.logError.mock.calls) expect(JSON.stringify(call)).not.toContain(value);
+    }
+  });
+
+  it("gets past validation with good answers, so the rejections above come from the answers", async () => {
+    await POST(post(good), context).catch(() => undefined);
+    // Good answers reach the registration writes (the mocked database then cannot finish, which is not what is tested here).
+    expect(state.writes.some((write) => write.startsWith("registration"))).toBe(true);
   });
 });

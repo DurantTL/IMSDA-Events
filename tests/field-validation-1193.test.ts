@@ -98,6 +98,7 @@ describe("church pastor contact (#1193)", () => {
   it("shows the phone check inline on the form", () => {
     const source = read("components/church-pastor-contact.tsx");
     expect(source).toContain('inlineFieldProblem("Phone", "phone"');
+    expect(source).toContain('inlineFieldProblem("Email", "email"');
     expect(source).toContain('inputMode="tel"');
     expect(renderToStaticMarkup(createElement(ChurchPastorContact, { organizationId: "church-1", active: null, history: [] }))).toContain('type="tel"');
   });
@@ -170,11 +171,14 @@ describe("event contact blocks (#1193)", () => {
     expect(good).toMatchObject({ ok: true, data: { contacts: [{ phone: STORED_PHONE }] } });
   });
 
-  it("leaves an old phone alone only for the same contact, compared with what is stored", () => {
+  it("leaves an old phone alone only for the same contact (same position or name), compared with what is stored", () => {
     const stored = [block({ name: "Sam Example", phone: "555-0100" })];
     const same = parseBlockData("CONTACT", block({ name: " sam example ", phone: "555-0100" }))!;
     expect(checkContactBlockData(same, stored)).toMatchObject({ ok: true, data: { contacts: [{ phone: "555-0100" }] } });
-    const other = parseBlockData("CONTACT", block({ name: "Someone Else", phone: "555-0100" }))!;
+    // Renaming the contact in that position keeps its phone; the same text for a contact in another position does not.
+    const renamed = parseBlockData("CONTACT", block({ name: "Sam Renamed", phone: "555-0100" }))!;
+    expect(checkContactBlockData(renamed, stored)).toMatchObject({ ok: true, data: { contacts: [{ phone: "555-0100" }] } });
+    const other = parseBlockData("CONTACT", block({ name: "Sam Example", phone: "", email: "sam@example.test" }, { name: "Someone Else", phone: "555-0100" }))!;
     expect(checkContactBlockData(other, stored)).toMatchObject({ ok: false });
     const changed = parseBlockData("CONTACT", block({ name: "Sam Example", phone: "555-0199" }))!;
     expect(checkContactBlockData(changed, stored)).toMatchObject({ ok: false });
@@ -201,6 +205,15 @@ describe("event email settings (#1193)", () => {
       expect(result.success).toBe(false);
       expect(JSON.stringify(result.error?.issues)).not.toContain(BAD_EMAIL);
     }
+  });
+});
+
+describe("event email settings form (#1193)", () => {
+  it("checks the reply-to and the recipient list inline with the shared validator, naming the line and never the address", () => {
+    const source = read("components/communications-workspace.tsx");
+    expect(source).toContain('inlineFieldProblem("Reply-to email", "email"');
+    expect(source).toContain("problemMessage(`Recipient ${badRecipientLine + 1}`, EMAIL_PROBLEM)");
+    expect(source).toContain('id="internal-recipients-error"');
   });
 });
 
@@ -279,6 +292,11 @@ describe("attendee answers form checks phone, email and date as well as numbers 
       expect(markup).toContain(`${label} must be`);
     }
     expect(markup.match(/This saved answer needs correcting\./g)?.length).toBe(4);
+    // Each message is tied to its input, so a screen reader reads it with the field.
+    for (const key of ["f_cell", "f_mail", "f_when", "f_extra"]) {
+      expect(markup).toContain(`id="a1_${key}_error"`);
+      expect(markup).toContain(`aria-describedby="a1_${key}_error"`);
+    }
     for (const value of [BAD_PHONE, BAD_EMAIL, "someday", "lots"]) expect(markup.replace(/value="[^"]*"/g, "")).not.toContain(value);
   });
 
