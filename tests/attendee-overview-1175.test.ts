@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   acting: null as null | { role: string },
   secondStep: "OK",
   invites: [] as unknown[],
+  instructorInvites: [] as unknown[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -55,7 +56,7 @@ vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
 vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: async () => mocks.invites }));
 vi.mock("@/modules/honors/instructor-repository", () => ({
   accountIsInstructor: async () => false,
-  listInstructorInvitesForAccount: async () => [],
+  listInstructorInvitesForAccount: async () => mocks.instructorInvites,
 }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({
   isAreaCoordinator: async () => mocks.areaCoordinator,
@@ -67,10 +68,6 @@ vi.mock("@/components/area-coordinator-card", () => ({
   AreaCoordinatorCardSection: () => null,
   AreaCoordinatorCardSkeleton: () => null,
 }));
-vi.mock("@/components/club-invite-accept", () => ({
-  ClubInviteAccept: () => createElement("button", { className: "primary-button" }, "Accept invite"),
-}));
-vi.mock("@/components/instructor-invite-accept", () => ({ InstructorInviteAccept: () => null }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 
 import AccountPortalLayout from "@/app/(public)/account/(portal)/layout";
@@ -128,6 +125,9 @@ function registration(
   };
 }
 
+const clubInvite = (id: string) => ({ id, role: "DIRECTOR", clubId: `club-${id}`, clubName: `Synthetic Club ${id}` });
+const instructorInvite = (id: string) => ({ id, eventName: `Synthetic Honors ${id}`, classNames: ["Synthetic Class"] });
+
 const renderCard = (value: AccountRegistrationCardData, primary = true) =>
   renderToStaticMarkup(createElement("ul", null, createElement(AccountRegistrationCard, { registration: value, primary })));
 
@@ -142,6 +142,7 @@ beforeEach(() => {
   mocks.acting = null;
   mocks.secondStep = "OK";
   mocks.invites = [];
+  mocks.instructorInvites = [];
 });
 
 describe("registration state wording (#1175)", () => {
@@ -374,7 +375,7 @@ describe("Overview page (#1175)", () => {
     const html = await render();
     expect(html).toContain("Nothing coming up");
     expect(html).toContain("$40.00");
-    expect(html).toContain("still due for Ended Owed Event, including past registrations");
+    expect(html).toContain("still due for Ended Owed Event (a past registration)");
     expect(html).toContain('href="/account/registrations"');
   });
 
@@ -397,19 +398,69 @@ describe("Overview page (#1175)", () => {
   });
 
   it("keeps exactly one filled primary: an invite's Accept takes it from the first card", async () => {
-    mocks.invites = [{ id: "inv-1" }];
+    mocks.invites = [clubInvite("inv-1")];
     mocks.registrations = [registration("a", "CONFIRMED")];
     const html = await render();
     expect(html.match(/primary-button/g)).toHaveLength(1);
-    expect(html).toContain("Accept invite");
+    expect(html).toContain("Accept");
     expect(html).toMatch(/secondary-button attendee-ov-action/);
+  });
+
+  it("fills only the first invite's Accept when there are several, and none of the instructor invites after a club invite", async () => {
+    mocks.invites = [clubInvite("one"), clubInvite("two")];
+    mocks.instructorInvites = [instructorInvite("teach")];
+    mocks.registrations = [registration("a", "CONFIRMED")];
+    const html = await render();
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    expect(html.match(/<button class="secondary-button"/g)).toHaveLength(2);
+    mocks.invites = [];
+    mocks.instructorInvites = [instructorInvite("a"), instructorInvite("b")];
+    const instructorOnly = await render();
+    expect(instructorOnly.match(/primary-button/g)).toHaveLength(1);
+  });
+
+  it("makes the retry link the one filled primary when registrations fail for a non-director", async () => {
+    mocks.registrationsFail = true;
+    const html = await render();
+    expect(html).toMatch(/class="primary-button attendee-ov-retry"/);
+    expect(html.match(/primary-button/g)).toHaveLength(1);
+    mocks.invites = [clubInvite("one")];
+    const withInvite = await render();
+    expect(withInvite).toMatch(/class="secondary-button attendee-ov-retry"/);
+    expect(withInvite.match(/primary-button/g)).toHaveLength(1);
+  });
+
+  it("names a lone owed registration without a card as a past registration, and keeps 'including' for mixed totals", async () => {
+    mocks.registrations = [
+      registration("ended", "CONFIRMED", { eventName: "Ended Owed Event", startsAt: "2026-01-05T15:00:00.000Z", endsAt: "2026-01-06T15:00:00.000Z" }),
+    ];
+    let html = await render();
+    expect(html).toContain("still due for Ended Owed Event (a past registration).");
+    expect(html).not.toContain("including past registrations");
+    mocks.registrations = [
+      registration("ended", "CONFIRMED", { eventName: "Ended Owed Event", startsAt: "2026-01-05T15:00:00.000Z", endsAt: "2026-01-06T15:00:00.000Z" }),
+      registration("next", "CONFIRMED", { eventName: "Upcoming Event" }),
+    ];
+    html = await render();
+    expect(html).toContain("including past registrations");
+    expect(html).not.toContain("(a past registration)");
+  });
+
+  it("renders the Overview page with a staff act-as context active, with no attendee name in the header and one primary", async () => {
+    mocks.acting = { role: "CLUB_DIRECTOR" };
+    mocks.registrations = [registration("a", "CONFIRMED")];
+    const layout = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    expect(layout).not.toContain("Taylor Lane");
+    const html = await render();
+    expect(html).toContain("Coming up for you");
+    expect(html.match(/primary-button/g)).toHaveLength(1);
   });
 
   it("makes Find events the one filled primary in the empty state, and not while an invite is showing", async () => {
     let html = await render();
     expect(html.match(/primary-button/g)).toHaveLength(1);
     expect(html).toMatch(/class="primary-button"[^>]*href="\/events"/);
-    mocks.invites = [{ id: "inv-1" }];
+    mocks.invites = [clubInvite("inv-1")];
     html = await render();
     expect(html.match(/primary-button/g)).toHaveLength(1);
     expect(html).toMatch(/class="secondary-button"[^>]*href="\/events"/);

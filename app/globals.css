@@ -12989,6 +12989,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Below about 400px the three attendee tabs must fit without the scroll arrow covering the last one (#1175). */
 @media (max-width: 400px) {
-  .account-nav ul { gap: 0; padding-right: 4px; padding-left: 4px; }
-  .account-nav a { padding-right: 9px; padding-left: 9px; }
+  .account-nav-primary ul { gap: 2px; padding-right: 4px; padding-left: 4px; }
+  .account-nav-primary a { padding-right: 9px; padding-left: 9px; }
 }

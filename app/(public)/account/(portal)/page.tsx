@@ -75,17 +75,21 @@ export default async function AttendeeAccountOverviewPage() {
   const cardPrimary = !inviteShowing && upcoming.length > 0;
   const findEventsPrimary = !inviteShowing && registrationsResult.ok && upcoming.length === 0;
   const authenticatorPrimary = needsAuthenticator && !inviteShowing && !registrationsResult.ok;
+  const retryPrimary = !inviteShowing && !registrationsResult.ok && !needsAuthenticator;
   // Payable balances count registrations that may have no card here (an ended event still owed): then the line says
   // so and links to the full list, so it never reads as belonging to the cards above it.
-  const uncardedDue = registrations.some(
+  const uncardedDueCount = registrations.filter(
     (registration) => registration.payment.paymentEligible && registration.balanceCents > 0 && !upcoming.includes(registration),
-  );
+  ).length;
+  const uncardedDue = uncardedDueCount > 0;
+  // One owing registration and it is the one without a card: name it as past. Any mix says "including".
+  const onlyPastDue = uncardedDueCount === 1 && amountDue.registrationCount === 1;
   const dueAmount = <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span>;
   const dueLine = amountDue.totalCents > 0 && (
     <p className="account-overview-alert attendee-ov-due">
       <CircleDollarSign size={16} aria-hidden="true" />{" "}
       {uncardedDue
-        ? <span>{dueAmount} still due {amountDue.scope}, including past registrations. <Link className="empty-state-link" href="/account/registrations">See my registrations</Link></span>
+        ? <span>{dueAmount} still due {amountDue.scope}{onlyPastDue ? " (a past registration)" : ", including past registrations"}. <Link className="empty-state-link" href="/account/registrations">See my registrations</Link></span>
         : <span>{dueAmount} still due {amountDue.scope}</span>}
     </p>
   );
@@ -101,8 +105,8 @@ export default async function AttendeeAccountOverviewPage() {
         </div>
       </section>
 
-      {invites.length > 0 && <ClubInviteAccept invites={invites} />}
-      {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} />}
+      {invites.length > 0 && <ClubInviteAccept invites={invites} fill="first" />}
+      {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} fill={invites.length > 0 ? "none" : "first"} />}
 
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">
@@ -114,7 +118,7 @@ export default async function AttendeeAccountOverviewPage() {
                 <div>
                   <strong>We could not load your registrations</strong>
                   <p>Nothing has been changed. Try again in a moment, or ask the event team if it keeps happening.</p>
-                  <a className="secondary-button attendee-ov-retry" href="/account">Try again</a>
+                  <a className={`${retryPrimary ? "primary-button" : "secondary-button"} attendee-ov-retry`} href="/account">Try again</a>
                 </div>
               </div>
             ) : upcoming.length > 0 ? (
