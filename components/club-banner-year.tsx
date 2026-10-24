@@ -24,7 +24,9 @@ function YearBox({ label, value }: { label: string; value: string }) {
 }
 
 function YearFromUrl() {
-  const { label, value } = clubBannerYearLabel(useSearchParams().get("year"));
+  // Match the page: rosterYearView only accepts a single year value, so a repeated ?year= means the current year.
+  const years = useSearchParams().getAll("year");
+  const { label, value } = clubBannerYearLabel(years.length === 1 ? years[0]! : null);
   return <YearBox label={label} value={value} />;
 }
 
