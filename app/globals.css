@@ -5945,6 +5945,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 
 .message-template-editor { display: grid; gap: 13px; border-top: 4px solid var(--imsda-navy); }
 .message-template-editor .section-heading { align-items: flex-start; }
+/* Help under a field in the template editor sits below it, clear of the field's focus outline (#836). */
+.message-template-editor > label > .field-help { margin: 2px 0 0; }
 .message-template-editor .section-heading p:not(.eyebrow) { max-width: 570px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.62rem); line-height: 1.5; }
 .message-template-editor > label,
 .message-test-form label,
