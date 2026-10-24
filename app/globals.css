@@ -9844,6 +9844,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .choice-filter-form label { display: block; min-width: 0; flex: 1 1 14rem; }
 .choice-filter-form select { width: 100%; }
 .choice-filter-form select { min-width: 0; max-width: 100%; border: 1px solid var(--field-border); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); padding: 9px 10px; font-size: max(var(--type-body-floor, 0px), 0.72rem); font-weight: 700; }
+.selected-audience-limit-ack { min-height: 44px; }
+.form-stack .selected-audience-limit-ack, .selected-audience-limit-ack { color: var(--ink) !important; font-size: 0.875rem !important; }
+.report-email-limit-note { flex: 1 1 100%; max-width: 100%; overflow-wrap: anywhere; font-size: 0.875rem; }
 .choice-filter-note { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.7rem); }
 .choice-filter-counts,
 .choice-filter-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
