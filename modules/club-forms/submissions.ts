@@ -261,6 +261,9 @@ export type ClubFormListFilter = {
   organizationId?: string;
   templateKey?: string;
   rosterMemberId?: string;
+  /** Narrow in the query, so a long list can't hide a match behind the row cap (#1166). */
+  status?: "DRAFT" | "SUBMITTED";
+  clubYear?: string;
 };
 
 function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Prisma.ClubFormSubmissionWhereInput {
@@ -273,7 +276,11 @@ function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Pris
     ...(filter.rosterMemberId ? { rosterMemberId: filter.rosterMemberId } : {}),
     // A form that has been switched off blocks new fills and links only: past submissions stay readable.
     ...(filter.templateKey ? { template: { key: filter.templateKey } } : {}),
-    ...(viewerSeesDrafts(viewer) ? {} : { status: "SUBMITTED" as const }),
+    ...(filter.clubYear ? { clubYear: filter.clubYear } : {}),
+    // A viewer who can't see drafts only ever gets submitted forms, and asking them for drafts matches nothing.
+    ...(viewerSeesDrafts(viewer)
+      ? (filter.status ? { status: filter.status } : {})
+      : filter.status === "DRAFT" ? { status: "SUBMITTED" as const, id: { in: [] as string[] } } : { status: "SUBMITTED" as const }),
   };
 }
 

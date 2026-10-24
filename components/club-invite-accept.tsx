@@ -7,7 +7,11 @@ import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/d
 type Invite = { id: string; role: ClubRole; clubId: string; clubName: string };
 
 /** Club invites waiting on this account (#376), each with an Accept button. */
-export function ClubInviteAccept({ invites }: { invites: Invite[] }) {
+export function ClubInviteAccept({ invites, fill = "all" }: {
+  invites: Invite[];
+  /** Which Accept buttons are filled primaries: all (default), only the first, or none (another invite card above holds the page's one primary). */
+  fill?: "all" | "first" | "none";
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -37,13 +41,13 @@ export function ClubInviteAccept({ invites }: { invites: Invite[] }) {
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ul className="public-manage-club-list">
-        {invites.map((invite) => (
+        {invites.map((invite, index) => (
           <li key={invite.id}>
             <span>
               <strong translate="no">{invite.clubName}</strong>
               <small>As {clubDirectorRoleLabels[invite.role].toLocaleLowerCase("en-US")}, from the Iowa-Missouri Conference</small>
             </span>
-            <button className="primary-button" disabled={busy !== null} onClick={() => accept(invite)} type="button">
+            <button className={fill === "all" || (fill === "first" && index === 0) ? "primary-button" : "secondary-button"} disabled={busy !== null} onClick={() => accept(invite)} type="button">
               <Check aria-hidden="true" size={14} /> {busy === invite.id ? "Accepting…" : "Accept"}
             </button>
           </li>

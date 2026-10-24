@@ -11,12 +11,16 @@ import type { AccountSignOutMode, WorkspaceContext } from "@/modules/access/work
 export function AccountHeaderActions({
   contexts,
   signOut,
+  identity,
 }: {
   contexts: WorkspaceContext[];
   signOut: AccountSignOutMode;
+  /** The signed-in person's display name (#1175); left out for a staff "act as" session with no attendee account. */
+  identity?: string;
 }) {
   return (
     <div className="public-header-links">
+      {identity && <span className="account-header-identity" translate="no">{identity}</span>}
       {contexts.map((context) => (
         <Link className="text-button" href={context.href} key={context.kind}>
           {context.kind === "system_admin"

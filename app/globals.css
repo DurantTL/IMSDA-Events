@@ -10505,14 +10505,41 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .builder-device-hint li.is-selected small { font-weight: 800; }
 .builder-device-hint li.is-muted { border-style: dashed; }
 
-/* --- Club home: the next task and its deadline, before the statistics -------- */
-.club-next-task { border-left: 5px solid var(--imsda-purple); }
-.club-next-task.is-clear { border-left-color: var(--green); }
-.club-next-task.club-step-danger { border-left-color: #a3271b; }
-.club-next-task-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 12px; }
-.club-next-task-deadline { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: var(--ink); font-weight: 700; }
-.club-next-task.club-step-danger .club-next-task-deadline { color: #a3271b; }
-@media (max-width: 480px) { .club-next-task-row .primary-button { width: 100%; min-height: 44px; } }
+
+/* --- Club home (#1166): summary, club work, roster preview, club event ------- */
+.club-home-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 12px 0 0; }
+.club-home-count { display: grid; gap: 2px; align-content: start; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.club-home-count dt { margin: 0; color: var(--imsda-navy); font-size: var(--text-helper-min); font-weight: 800; }
+.club-home-count dd { margin: 0; }
+.club-home-count-value { font-size: 1.5rem; font-weight: 800; line-height: 1.15; color: var(--ink); }
+.club-home-count-definition { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-readonly { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.club-home-readonly a { display: inline-flex; align-items: center; min-height: 44px; }
+.club-home-task-list li { flex-wrap: wrap; align-items: center; }
+.club-home-task-list li > span { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.club-home-task-list small { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-task-list .club-home-deadline { color: var(--ink); font-weight: 700; }
+.club-home-roster-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-roster-list li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 4px 12px; align-items: baseline; border-top: 1px solid var(--line); padding: 10px 0; overflow-wrap: anywhere; }
+.club-home-roster-list li:first-child { border-top: 0; }
+.club-home-roster-list span { color: var(--muted); font-size: var(--text-helper-min); }
+.club-home-link { margin-top: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+.club-home-event-list { display: grid; gap: 12px; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-event { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; }
+.club-home-event h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+.club-home-event dl { display: grid; gap: 6px; margin: 0; }
+.club-home-event dl > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 8px; }
+.club-home-event dt { color: var(--muted); font-size: var(--text-helper-min); font-weight: 700; }
+.club-home-event dd { margin: 0; overflow-wrap: anywhere; }
+.club-home-useful-list { display: grid; gap: 4px; margin: 12px 0 0; padding: 0; list-style: none; }
+.club-home-useful-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.club-home-useful-list a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
+.club-home-useful-list span { color: var(--muted); font-size: var(--text-helper-min); }
+@media (max-width: 640px) {
+  .club-home-roster-list li { grid-template-columns: 1fr; }
+  .club-home-event dl > div { grid-template-columns: 1fr; gap: 0; }
+  .club-home-task-list .club-event-action, .club-home-link { width: 100%; }
+}
 
 /* --- Dashboard: the setup checklist ------------------------------------------ */
 .setup-checklist { border-left: 5px solid var(--imsda-gold); }
@@ -12584,6 +12611,90 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .system-menu, .system-menu-scrim { display: none; }
 }
 
+/* Attendee account Overview (#1175): registration cards in a main column, account and help in a secondary one.
+   Own classes only; no shared font-size rule is touched. One column on a phone, with the cards first. */
+.account-header-identity {
+  min-width: 0; max-width: 18ch; overflow: hidden; color: var(--muted); font-size: 0.875rem; font-weight: 700;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.attendee-ov-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 24px;
+  max-width: 1180px; margin: 0 auto 48px;
+}
+.attendee-ov-main, .attendee-ov-side { display: grid; min-width: 0; gap: 20px; }
+.attendee-ov-heading { margin: 0 0 12px; color: var(--imsda-navy); font-size: 1.35rem; line-height: 1.25; }
+.attendee-ov-cards { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.attendee-ov-card {
+  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff;
+  padding: 0 0 18px;
+}
+.attendee-ov-card-top {
+  display: flex; align-items: center; gap: 14px; background: var(--imsda-navy); color: #fff; padding: 16px 20px;
+}
+.attendee-ov-date {
+  display: grid; flex: none; justify-items: center; min-width: 56px; border-radius: 12px; background: var(--imsda-gold-soft);
+  color: var(--imsda-navy); padding: 6px 8px; line-height: 1.1; text-transform: uppercase;
+}
+.attendee-ov-date span { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; }
+.attendee-ov-date strong { font-size: 1.5rem; }
+.attendee-ov-card-title { display: grid; min-width: 0; justify-items: start; gap: 8px; }
+.attendee-ov-card-title h3 { margin: 0; color: #fff; font-size: 1.2rem; line-height: 1.25; overflow-wrap: anywhere; }
+.attendee-ov-card .attendee-status-pill { font-size: 0.875rem; }
+.attendee-ov-facts { display: grid; gap: 6px; margin: 14px 20px 0; padding: 0; list-style: none; color: var(--ink); font-size: 0.95rem; }
+.attendee-ov-facts li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.attendee-ov-facts svg { flex: none; margin-top: 3px; color: var(--muted); }
+.attendee-ov-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 12px 20px 0; color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.attendee-ov-money {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px;
+  margin: 16px 20px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--imsda-navy-soft); padding: 14px 16px;
+}
+.attendee-ov-money-due { border-color: #d9c8ec; background: var(--imsda-purple-soft); }
+.attendee-ov-money > div { min-width: 0; flex: 1 1 200px; }
+.attendee-ov-money p { margin: 0; overflow-wrap: anywhere; }
+.attendee-ov-money-headline { color: var(--imsda-navy); font-size: 1.05rem; font-weight: 800; }
+.attendee-ov-money-due .attendee-ov-money-headline { color: var(--imsda-purple); }
+.attendee-ov-money-detail { margin-top: 2px !important; color: var(--muted); font-size: 0.9rem; }
+.attendee-ov-action { min-height: 44px; flex: none; padding: 10px 16px; font-size: 0.95rem; text-decoration: none; }
+.attendee-ov-retry { min-height: 44px; }
+.attendee-ov-action:focus-visible, .attendee-ov-retry:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.attendee-ov-due { margin: 0 0 12px !important; font-size: 0.9rem; }
+.attendee-ov-all { margin: 14px 0 0; }
+.attendee-ov-all .text-button { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; }
+.attendee-ov-empty, .attendee-ov-notice {
+  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px;
+}
+.attendee-ov-notice { border-color: #f0c9c2; background: #fff8f6; }
+.attendee-ov-empty > svg, .attendee-ov-notice > svg { flex: none; margin-top: 2px; color: var(--imsda-navy); }
+.attendee-ov-empty > div, .attendee-ov-notice > div { min-width: 0; }
+.attendee-ov-empty h3 { margin: 0 0 4px; font-size: 1.15rem; }
+.attendee-ov-empty p, .attendee-ov-notice p { margin: 0 0 10px; overflow-wrap: anywhere; }
+.attendee-ov-empty-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.attendee-ov-empty-links a { display: inline-flex; min-height: 44px; align-items: center; }
+.attendee-ov-roles { display: grid; gap: 16px; }
+.attendee-ov-side .account-overview-card h2 { font-size: 1.1rem; }
+.attendee-ov-email { margin: 4px 0 0 !important; color: var(--imsda-navy); font-size: 1rem; font-weight: 800; overflow-wrap: break-word; }
+.attendee-ov-side .account-overview-link, .attendee-ov-roles .account-overview-link { min-height: 44px; }
+@media (max-width: 1228px) {
+  .attendee-ov-layout { margin-right: 24px; margin-left: 24px; }
+}
+@media (max-width: 900px) {
+  .attendee-ov-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 580px) {
+  .attendee-ov-layout { gap: 16px; margin-right: 12px; margin-left: 12px; }
+  .attendee-ov-card-top { padding: 14px 16px; }
+  .attendee-ov-facts, .attendee-ov-meta, .attendee-ov-money { margin-right: 16px; margin-left: 16px; }
+  .attendee-ov-money { padding: 12px; }
+  .attendee-ov-action { width: 100%; }
+  .attendee-ov-empty, .attendee-ov-notice { padding: 16px; }
+}
+
+/* Below about 400px the three attendee tabs must fit without the scroll arrow covering the last one (#1175). */
+@media (max-width: 400px) {
+  .account-nav-primary ul { gap: 2px; padding-right: 4px; padding-left: 4px; }
+  .account-nav-primary a { padding-right: 9px; padding-left: 9px; }
+}
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
@@ -12978,3 +13089,60 @@ html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2
   .fb-shell:not([data-phone]) .fb-body, .fb-shell:not([data-phone]) .fb-topbar > .fb-btn:not(.primary), .fb-shell:not([data-phone]) .fb-topbar > .fb-icon-button[aria-controls] { visibility: hidden; }
   .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }
+
+/* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
+.roster-search-panel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.roster-search-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.roster-search-field { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
+.roster-search-input { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
+.roster-search-input:focus-within { outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
+.roster-search-input svg { flex: 0 0 auto; }
+.roster-search-input input { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent; padding: 0; box-shadow: none; outline: 0; font-weight: 500; }
+.roster-filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.roster-filter-button { min-height: 44px; }
+.roster-filter-button[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }
+.roster-search-panel .field-help { margin: 0; }
+.roster-result-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.roster-result-line p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.roster-result-line .text-button { min-height: 44px; }
+.roster-member-name { overflow-wrap: anywhere; }
+.roster-member-role { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
+.roster-needs-details { white-space: normal; }
+.roster-card-table td.roster-card-flags { min-width: 10rem; }
+.roster-row-action-set { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.roster-row-action-set .actions-menu { display: inline-block; width: auto; }
+.roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: auto; min-height: 44px; min-width: 44px; white-space: nowrap; }
+/* An open menu opens in the flow, under Edit, at the width of its own cell: it can't be clipped by the table's scroll region, cover the next column or push the page sideways. */
+.roster-row-action-set .actions-menu[open] { flex-basis: 100%; }
+.roster-row-action-set .actions-menu-list { position: static; width: 100%; min-width: 0; margin-top: 6px; box-shadow: none; }
+.roster-row-action-set .actions-menu-list :is(a, button) { white-space: normal; }
+.roster-card-table td.roster-row-actions { min-width: 9.5rem; }
+/* The shared rule that lets an open menu out of a table wrap would push this page sideways; the roster's menu is in the flow, so the wrap keeps scrolling. */
+@media screen { .report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { overflow-x: auto; } }
+.actions-menu-list .actions-menu-note { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
+.roster-edit-button { min-height: 44px; min-width: 44px; white-space: nowrap; }
+.roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
+/* Phone and narrow cards: the name takes the full card width and the labelled actions sit on the card's last row, at 44px. */
+@media (max-width: 720px) {
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1 / -1; }
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions.roster-row-actions { grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; margin-top: 8px; }
+  .roster-card-table .roster-row-action-set > .secondary-button,
+  .roster-card-table .roster-row-action-set .actions-menu { flex: 1 1 8rem; }
+  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: 100%; justify-content: center; }
+  .roster-card-table .roster-row-action-set > .secondary-button { justify-content: center; }
+  .roster-card-table td.roster-card-actions.roster-row-actions { justify-content: flex-start; }
+  .roster-card-table .roster-row-action-set { width: 100%; }
+  .roster-card-table .roster-row-action-set > .secondary-button,
+  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+  .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
+}
+@media (min-width: 721px) {
+  @container (max-width: 640px) {
+    .roster-card-table td.roster-card-name[data-label] { padding-right: 0; }
+    .roster-card-table td.roster-card-actions.roster-row-actions { position: static; grid-column: 1 / -1; justify-content: flex-start; }
+    .roster-card-table .roster-row-action-set > .secondary-button,
+    .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+    .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
+    }
+}
+.roster-card-table .roster-row-action-set .actions-menu[open] { flex: 1 1 100%; }

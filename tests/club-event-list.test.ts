@@ -17,6 +17,7 @@ function event(overrides: Partial<ClubEventSummary> & { id: string }): ClubEvent
     endsAt: "2026-11-08T20:00:00.000Z",
     timezone: "America/New_York",
     location: "Camp Fictitious",
+    billingMode: "DEFERRED_ORGANIZATION_INVOICE",
     phase: "OPEN",
     registrationClosesOn: null,
     available: true,

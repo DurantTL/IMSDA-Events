@@ -304,6 +304,8 @@ export async function listClubEvents(organizationId: string, now = new Date()) {
       endsAt: event.endsAt.toISOString(),
       timezone: event.timezone,
       location: event.location,
+      /** Who pays: church-billed events never show a personal payment on the club's pages (#1166). */
+      billingMode: event.billingMode,
       phase: clubPhase(event, event.locations, registeredLocation, now),
       registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
       // The location this club registered at (#413), with its own dates.
