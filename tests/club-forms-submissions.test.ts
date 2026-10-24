@@ -310,6 +310,18 @@ describe("listing submissions (#610)", () => {
     expect(mocks.submissionFindMany.mock.calls[0][0].where).toEqual({ status: "SUBMITTED" });
   });
 
+  it("filters by status and club year in the query for a leader, keeping the club limit (#1166)", async () => {
+    await listSubmissionsForViewer(director, { status: "DRAFT", clubYear: "2026-27" });
+    expect(mocks.submissionFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-a", clubYear: "2026-27", status: "DRAFT" });
+  });
+
+  it("never lets a status filter show a non-leader a draft (#1166)", async () => {
+    await listSubmissionsForViewer(areaCoordinator, { organizationId: "club-b", status: "DRAFT" });
+    expect(mocks.submissionFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-b", id: { in: [] } });
+    await listSubmissionsForViewer(areaCoordinator, { organizationId: "club-b", status: "SUBMITTED", clubYear: "2026-27" });
+    expect(mocks.submissionFindMany.mock.calls[1][0].where).toEqual({ organizationId: "club-b", clubYear: "2026-27", status: "SUBMITTED" });
+  });
+
   it("never selects answers, sealed or plain", async () => {
     await listSubmissionsForViewer(staffSensitive, {});
     const select = mocks.submissionFindMany.mock.calls[0][0].select;

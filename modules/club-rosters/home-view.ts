@@ -8,7 +8,7 @@
  */
 
 import { notBilledLabel, isChurchBilledStatus, type ClubRegistrationStatus } from "@/modules/club-registrations/church-owed";
-import { clubRosterAttendeeTypeLabels, missingRosterFields } from "@/modules/club-rosters/domain";
+import { clubRosterAttendeeTypeLabels, clubYearFor, rosterRowMissingFields } from "@/modules/club-rosters/domain";
 import type { ClubHomeStep } from "@/modules/club-rosters/home-next-task";
 import type { ClubEventSummary } from "@/modules/club-registrations/repository";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -48,6 +48,9 @@ export type ClubHomeSummaryItem = {
   definition: string;
 };
 
+/** A section's data, or the marker that its service failed: the section says so instead of showing zero or crashing the page. */
+export type Loaded<T> = T | "ERROR";
+
 export function yearLabel(clubYear: string) {
   return clubYear.replace("-", "–");
 }
@@ -56,14 +59,33 @@ export function activeMembers<T extends { status: string }>(members: readonly T[
   return members.filter((member) => member.status === "ACTIVE");
 }
 
+type EventRegistrationView = Pick<ClubEventSummary, "registration" | "teams" | "multipleTeams" | "startsAt">;
+
 /** Whether a club event holds a registration for this club (one registration, or at least one team). */
 export function hasClubRegistration(event: Pick<ClubEventSummary, "registration" | "teams">) {
   return Boolean(event.registration) || event.teams.length > 0;
 }
 
+/** The statuses of this club's registrations on the event: its teams on a multi-team event, else its one registration. */
+export function registrationStatuses(event: Pick<ClubEventSummary, "registration" | "teams" | "multipleTeams">): ClubRegistrationStatus[] {
+  if (event.multipleTeams && event.teams.length > 0) return event.teams.map((team) => team.status as ClubRegistrationStatus);
+  return event.registration ? [event.registration.status as ClubRegistrationStatus] : [];
+}
+
+/** The club year an event belongs to: the one its start date falls in. */
+export function eventClubYear(event: Pick<ClubEventSummary, "startsAt">) {
+  return clubYearFor(new Date(event.startsAt));
+}
+
+/** Submitted or confirmed registration(s) on an event that starts in the selected club year. Waitlisted, cancelled and unsubmitted ones do not count. */
+export function countsAsEventRegistration(event: EventRegistrationView, clubYear: string) {
+  return eventClubYear(event) === clubYear && registrationStatuses(event).some((status) => isChurchBilledStatus(status));
+}
+
 /**
  * The compact summary: roster people, saved form drafts, event registrations,
- * each with its definition. `events` is null for a past year: club events are
+ * each with its definition. A section that failed to load shows no number
+ * (value null), never zero. `events` is null for a past year: club events are
  * listed for the current year only, so no number is claimed for another one.
  */
 export function clubHomeSummary({
@@ -73,15 +95,15 @@ export function clubHomeSummary({
   events,
 }: {
   clubYear: string;
-  members: readonly Pick<ClubHomeMember, "status">[];
+  members: Loaded<readonly Pick<ClubHomeMember, "status">[]>;
   formDrafts: ClubHomeFormDrafts;
-  events: readonly ClubEventSummary[] | null;
+  events: Loaded<readonly ClubEventSummary[]> | null;
 }): ClubHomeSummaryItem[] {
   const items: ClubHomeSummaryItem[] = [
     {
       key: "roster",
       label: "Roster people",
-      value: activeMembers(members).length,
+      value: members === "ERROR" ? null : activeMembers(members).length,
       definition: `Active members and staff on the ${yearLabel(clubYear)} club roster.`,
     },
   ];
@@ -97,8 +119,8 @@ export function clubHomeSummary({
     items.push({
       key: "events",
       label: "Event registrations",
-      value: events.filter(hasClubRegistration).length,
-      definition: "Club events your club has registered for, counting a multi-team event once.",
+      value: events === "ERROR" ? null : events.filter((event) => countsAsEventRegistration(event, clubYear)).length,
+      definition: `Club events starting in the ${yearLabel(clubYear)} club year where your club's registration is Submitted or Confirmed, counting a multi-team event once. Waitlisted and cancelled registrations are not counted.`,
     });
   }
   return items;
@@ -132,9 +154,13 @@ export function clubHomeRosterPreview(members: readonly ClubHomeMember[], limit 
   };
 }
 
-/** Active people with at least one roster field still blank (the roster's own "missing" rule, #424). */
+/**
+ * Active people the roster itself would flag as needing details: `rosterRowMissingFields(member).length > 0`, the roster's own
+ * "Missing info" rule (an active person's missing birth date is the birth-date notice's job). The roster slice's
+ * `rosterDetailsNeeded` wraps this same rule, so Home's count and the Details needed filter agree.
+ */
 export function peopleNeedingDetails(members: readonly ClubHomeMember[]) {
-  return activeMembers(members).filter((member) => missingRosterFields(member).length > 0).length;
+  return activeMembers(members).filter((member) => rosterRowMissingFields(member).length > 0).length;
 }
 
 function formatChicagoDate(value: string) {
@@ -150,6 +176,7 @@ export function formDraftSteps(drafts: ClubHomeFormDrafts, base: string): ClubHo
     detail: `Last saved ${formatChicagoDate(draft.updatedAt)}.`,
     href: `${base}/forms/submissions/${draft.id}`,
     action: "Continue form",
+    actionContext: draft.templateName,
   }));
 }
 
@@ -164,7 +191,7 @@ export function rosterSteps(members: readonly ClubHomeMember[], base: string): C
   return [{
     key: "roster-details",
     text: `${needing} ${needing === 1 ? "person needs" : "people need"} details on the roster.`,
-    detail: "A birth date, gender, class, role or type is blank. Review the roster to see who.",
+    detail: "A gender, class, role or type is blank. Review the roster to see who.",
     href: `${base}/roster?${ROSTER_DETAILS_NEEDED_QUERY}`,
     action: "Review roster",
   }];
@@ -235,12 +262,10 @@ function eventDate(event: Pick<ClubEventSummary, "startsAt" | "endsAt" | "timezo
  */
 export function clubHomeEventCards(
   events: readonly ClubEventSummary[],
-  { base, sponsoringChurch }: { base: string; sponsoringChurch: string | null },
+  { base, sponsoringChurch, clubYear }: { base: string; sponsoringChurch: string | null; clubYear: string },
 ): ClubHomeEventCardData[] {
-  return events.filter(hasClubRegistration).map((event) => {
-    const statuses = event.multipleTeams && event.teams.length > 0
-      ? event.teams.map((team) => team.status as ClubRegistrationStatus)
-      : event.registration ? [event.registration.status as ClubRegistrationStatus] : [];
+  return events.filter((event) => hasClubRegistration(event) && eventClubYear(event) === clubYear).map((event) => {
+    const statuses = registrationStatuses(event);
     const people = event.multipleTeams && event.teams.length > 0
       ? event.teams.reduce((sum, team) => sum + team.attendeeCount, 0)
       : event.registration?.attendeeCount ?? 0;
@@ -249,6 +274,8 @@ export function clubHomeEventCards(
     const lifecycle = event.multipleTeams && event.teams.length > 0
       ? `${event.teams.length} ${event.teams.length === 1 ? "team" : "teams"}: ${[...new Set(statuses.map((status) => registrationStatusLabels[status]))].join(", ")}`
       : statuses[0] ? registrationStatusLabels[statuses[0]] : "Registered";
+    // Today `listClubEvents` returns only church-billed events, so the attendee-pay wording below is not reached in
+    // production. It stays so that a future attendee-pay club event can never read as billed to the church (or as owing one).
     const billing = !churchBilled
       ? "Each person pays for their own registration. Nothing is billed to your church."
       : billedStatus

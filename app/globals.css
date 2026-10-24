@@ -10500,14 +10500,6 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .builder-device-hint li.is-selected small { font-weight: 800; }
 .builder-device-hint li.is-muted { border-style: dashed; }
 
-/* --- Club home: the next task and its deadline, before the statistics -------- */
-.club-next-task { border-left: 5px solid var(--imsda-purple); }
-.club-next-task.is-clear { border-left-color: var(--green); }
-.club-next-task.club-step-danger { border-left-color: #a3271b; }
-.club-next-task-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 12px; }
-.club-next-task-deadline { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: var(--ink); font-weight: 700; }
-.club-next-task.club-step-danger .club-next-task-deadline { color: #a3271b; }
-@media (max-width: 480px) { .club-next-task-row .primary-button { width: 100%; min-height: 44px; } }
 
 /* --- Club home (#1166): summary, club work, roster preview, club event ------- */
 .club-home-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 12px 0 0; }

@@ -34,10 +34,8 @@ vi.mock("@/modules/club-forms/submissions", () => ({ listSubmissionsForViewer: m
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
-import { ClubNextTaskCard } from "@/components/club-next-task";
 import { ClubHomeEvents, ClubHomeRoster, ClubHomeSummary, ClubHomeTasks } from "@/components/club-home";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
-import { pickClubNextTask } from "@/modules/club-rosters/home-next-task";
 import { areaClubPortalNavItems, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 
 type AnyProps = Record<string, unknown>;
@@ -93,8 +91,6 @@ describe("Club home shows the first task and its deadline before the roster and 
     expect(order.indexOf(ClubHomeSummary)).toBeLessThan(order.indexOf(ClubHomeTasks));
     expect(order.indexOf(ClubHomeTasks)).toBeLessThan(order.indexOf(ClubHomeRoster));
     expect(order.indexOf(ClubHomeRoster)).toBeLessThan(order.indexOf(ClubHomeEvents));
-    // The old Next task card and year tiles are gone from Home.
-    expect(order).not.toContain(ClubNextTaskCard);
   });
 
   it("names the first task and its deadline: a report due date, then an event closing date", async () => {
@@ -117,20 +113,6 @@ describe("Club home shows the first task and its deadline before the roster and 
     const tasks = componentElements(tree).find((element) => element.type === ClubHomeTasks)!;
     expect((tasks.props.steps as Array<{ key: string }>).map((step) => step.key)).toEqual(["event-open"]);
     expect(tasks.props.deadlines).toMatchObject({ "event-open": "Register by December 1, 2026" });
-  });
-
-  it("picks the first step, says No deadline when it has none, and keeps the rest for the list", () => {
-    const steps = [
-      { key: "roster", text: "Add your club members.", href: "/r", action: "Add people" },
-      { key: "event-1", text: "Register.", href: "/e", action: "Register" },
-    ];
-    const next = pickClubNextTask(steps, { "event-1": "Register by May 1" });
-    expect(next?.step.key).toBe("roster");
-    expect(next?.deadline).toBeNull();
-    expect(next?.others.map((step) => step.key)).toEqual(["event-1"]);
-    expect(renderToStaticMarkup(ClubNextTaskCard({ next }) as ReactElement)).toContain("No deadline");
-    expect(pickClubNextTask([], {})).toBeNull();
-    expect(renderToStaticMarkup(ClubNextTaskCard({ next: null }) as ReactElement)).toContain("all caught up");
   });
 
   it("gives the first task the one filled button and every later action an outline, so the page keeps one filled button", async () => {

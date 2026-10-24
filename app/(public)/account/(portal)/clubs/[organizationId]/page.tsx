@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, FileText } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import {
+  ClubHomeDeadlinesUnavailable,
   ClubHomeEvents,
   ClubHomeReadOnlyNotice,
   ClubHomeRoster,
@@ -28,6 +29,7 @@ import {
   monthlyRecordSteps,
   rosterSteps,
   type ClubHomeFormDrafts,
+  type Loaded,
 } from "@/modules/club-rosters/home-view";
 import type { ClubHomeStep } from "@/modules/club-rosters/home-next-task";
 import { listRoster } from "@/modules/club-rosters/repository";
@@ -52,6 +54,15 @@ async function allMyClubsLink(actor: ClubActor | null) {
   return clubs.length > 1 ? <BackLink href="/account/clubs">All my clubs</BackLink> : null;
 }
 
+/** Runs one source's load so a failure marks only that section unavailable instead of crashing Home. */
+async function load<T>(work: Promise<T>): Promise<Loaded<T>> {
+  try {
+    return await work;
+  } catch {
+    return "ERROR";
+  }
+}
+
 /**
  * Saved club-form drafts for this club and year, as metadata only (no answers).
  * Club forms belong to the director and deputy; a failed load is reported as
@@ -60,9 +71,9 @@ async function allMyClubsLink(actor: ClubActor | null) {
 async function loadFormDrafts(access: Extract<Awaited<ReturnType<typeof getRosterAccessStateForPage>>, { state: "OPEN" }>, clubYear: string): Promise<ClubHomeFormDrafts> {
   if (!isClubFormsRole(access.club.role)) return null;
   try {
-    const rows = await listSubmissionsForViewer(clubLeaderViewerFromAccess(access));
+    // Filtered in the query (not from a capped list), and still limited to this club by the viewer.
+    const rows = await listSubmissionsForViewer(clubLeaderViewerFromAccess(access), { status: "DRAFT", clubYear });
     return rows
-      .filter((row) => row.status === "DRAFT" && row.clubYear === clubYear && row.organizationId === access.club.organizationId)
       .map((row) => ({ id: row.id, templateName: row.templateName, updatedAt: row.updatedAt }));
   } catch {
     return "ERROR";
@@ -85,10 +96,11 @@ export default async function ClubHomePage({
     const base = `/account/clubs/${organizationId}`;
     const clubYear = clubYearFor(now);
     const [reporterDeadlines, reportYear] = await Promise.all([
-      listUpcomingDeadlines(),
-      access.capabilities.submitReports ? getClubReportYear(organizationId, clubYear) : Promise.resolve(null),
+      load(listUpcomingDeadlines()),
+      access.capabilities.submitReports ? load(getClubReportYear(organizationId, clubYear)) : Promise.resolve(null),
     ]);
-    const { steps, deadlines } = reportYear ? monthlyRecordSteps(reportYear.reports, clubYear, base, now) : { steps: [], deadlines: {} };
+    const { steps, deadlines } = reportYear && reportYear !== "ERROR" ? monthlyRecordSteps(reportYear.reports, clubYear, base, now) : { steps: [], deadlines: {} };
+    const reportsFailed = reportYear === "ERROR";
     return (
       <>
         {await allMyClubsLink(null)}
@@ -100,36 +112,42 @@ export default async function ClubHomePage({
           <p className="public-manage-empty">
             <FileText size={17} aria-hidden="true" /> {clubRoleDescriptions[access.club.role]}
           </p>
-          {/* The one filled button is the first due task when there is one; otherwise this link. */}
+          {/* The one filled button is the first due task when there is one; otherwise this link, also when the report year failed to load. */}
           <Link className={`${steps.length > 0 ? "secondary-button" : "primary-button"} club-event-action`} href={`${base}/records`}>
             Open Monthly Records <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </section>
-        {steps.length > 0 && (
-          <ClubHomeTasks deadlines={deadlines} emptyNote="" steps={steps} />
+        {(steps.length > 0 || reportsFailed) && (
+          <ClubHomeTasks
+            deadlines={deadlines}
+            emptyNote="Open Monthly Records to see what is due."
+            steps={steps}
+            unavailable={reportsFailed ? ["Monthly Records"] : []}
+          />
         )}
-        <UpcomingDeadlines deadlines={reporterDeadlines} />
+        {reporterDeadlines === "ERROR" ? <ClubHomeDeadlinesUnavailable /> : <UpcomingDeadlines deadlines={reporterDeadlines} />}
       </>
     );
   }
   if (access.state !== "OPEN") return null;
 
   const base = `/account/clubs/${organizationId}`;
-  const { clubYear, currentClubYear, readOnly } = rosterYearView(query.year, now);
+  const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(query.year, now);
+  // Each source loads on its own: one that fails marks only its own section "unavailable" and never takes the page down.
   const [members, events, reportYear, clubsLink, compliance, deadlineList, formDrafts] = await Promise.all([
-    listRoster(organizationId, clubYear),
-    readOnly ? Promise.resolve(null) : listClubEvents(organizationId),
-    !readOnly && access.capabilities.submitReports ? getClubReportYear(organizationId, clubYear) : Promise.resolve(null),
+    load(listRoster(organizationId, clubYear)),
+    readOnly ? Promise.resolve(null) : load(listClubEvents(organizationId)),
+    !readOnly && access.capabilities.submitReports ? load(getClubReportYear(organizationId, clubYear)) : Promise.resolve(null),
     allMyClubsLink(access.actor),
     // Only for roles that already see the roster's Sterling Volunteers column (#479).
-    readOnly ? Promise.resolve(null) : clubPortalComplianceReminderCounts(organizationId, clubYear, access.capabilities),
+    readOnly ? Promise.resolve(null) : load(clubPortalComplianceReminderCounts(organizationId, clubYear, access.capabilities)),
     // The conference's deadlines (#910): the same list for every club.
-    readOnly ? Promise.resolve([]) : listUpcomingDeadlines(now),
+    readOnly ? Promise.resolve([]) : load(listUpcomingDeadlines(now)),
     loadFormDrafts(access, clubYear),
   ]);
 
   const summary = clubHomeSummary({ clubYear, members, formDrafts, events });
-  const roster = clubHomeRosterPreview(members);
+  const roster = clubHomeRosterPreview(members === "ERROR" ? [] : members);
   const links = clubHomeUsefulLinks({ base, capabilities: access.capabilities, formsRole: isClubFormsRole(access.club.role) });
   // Only what this role can actually have waiting: a registrar has no club forms or Monthly Records to wait for.
   const waitingFor = [
@@ -139,22 +157,31 @@ export default async function ClubHomePage({
   ].join(", ").replace(/, ([^,]*)$/, " or $1").replace(/^./, (letter) => letter.toUpperCase());
   const rosterHref = readOnly ? `${base}/roster?year=${clubYear}` : `${base}/roster`;
 
-  // Tasks exist only for the current year, and only when real data backs them.
+  // Tasks exist only for the current year, and only when real data backs them. A source that failed adds none and is named.
   const steps: ClubHomeStep[] = [];
   const deadlines: Record<string, string> = {};
-  if (!readOnly && events) {
-    steps.push(...formDraftSteps(formDrafts, base), ...rosterSteps(members, base));
-    if (reportYear) {
+  const unavailable: string[] = [];
+  if (!readOnly) {
+    if (formDrafts === "ERROR") unavailable.push("Saved club form drafts");
+    steps.push(...formDraftSteps(formDrafts, base));
+    if (members === "ERROR") unavailable.push("The roster");
+    else steps.push(...rosterSteps(members, base));
+    if (reportYear === "ERROR") unavailable.push("Monthly Records");
+    else if (reportYear) {
       const records = monthlyRecordSteps(reportYear.reports, clubYear, base, now);
       steps.push(...records.steps);
       Object.assign(deadlines, records.deadlines);
     }
-    steps.push(...clubEventRegistrationSteps(events, base));
-    for (const event of events) {
-      if (event.registrationClosesOn) deadlines[event.id] = `Register by ${formatCalendarDate(event.registrationClosesOn)}`;
+    if (events === "ERROR") unavailable.push("Club events");
+    else if (events) {
+      steps.push(...clubEventRegistrationSteps(events, base));
+      for (const event of events) {
+        if (event.registrationClosesOn) deadlines[event.id] = `Register by ${formatCalendarDate(event.registrationClosesOn)}`;
+      }
     }
     // Flags only, never blocks registration (#405, #479).
-    if (compliance) {
+    if (compliance === "ERROR") unavailable.push("Sterling Volunteers reminders");
+    else if (compliance) {
       for (const reminder of complianceReminders(compliance, `${base}/roster`)) {
         steps.push({ key: reminder.key, text: reminder.text, href: reminder.href, action: "Open roster", danger: true });
       }
@@ -164,25 +191,33 @@ export default async function ClubHomePage({
   return (
     <>
       {clubsLink}
-      {readOnly && <ClubHomeReadOnlyNotice clubYear={clubYear} currentClubYear={currentClubYear} currentHref={base} />}
+      {readOnly && (
+        <ClubHomeReadOnlyNotice
+          clubYear={clubYear}
+          contactsEditable={contactsEditable && access.capabilities.guardians}
+          currentClubYear={currentClubYear}
+          currentHref={base}
+        />
+      )}
       <ClubHomeSummary clubYear={clubYear} summary={summary} />
       {!readOnly && (
         <ClubHomeTasks
           deadlines={deadlines}
           emptyNote={`Nothing is saved or due for this club year. ${waitingFor} will appear here.`}
-          formsUnavailable={formDrafts === "ERROR"}
           steps={steps}
+          unavailable={unavailable}
         />
       )}
-      <ClubHomeRoster clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} />
+      <ClubHomeRoster clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
       {events && (
         <ClubHomeEvents
-          cards={clubHomeEventCards(events, { base, sponsoringChurch: access.club.sponsoringChurch })}
+          cards={events === "ERROR" ? [] : clubHomeEventCards(events, { base, sponsoringChurch: access.club.sponsoringChurch, clubYear })}
           eventsHref={`${base}/events`}
-          hasOpenEvents={events.some((event) => event.available && event.phase === "OPEN")}
+          hasOpenEvents={events !== "ERROR" && events.some((event) => event.available && event.phase === "OPEN")}
+          unavailable={events === "ERROR"}
         />
       )}
-      {!readOnly && <UpcomingDeadlines deadlines={deadlineList} />}
+      {!readOnly && (deadlineList === "ERROR" ? <ClubHomeDeadlinesUnavailable /> : <UpcomingDeadlines deadlines={deadlineList} />)}
       <ClubHomeUsefulLinks links={links} />
     </>
   );

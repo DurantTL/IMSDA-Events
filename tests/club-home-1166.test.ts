@@ -34,6 +34,7 @@ vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceR
 vi.mock("@/modules/club-forms/submissions", () => ({ listSubmissionsForViewer: mocks.listSubmissionsForViewer }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
+import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
 import { clubHomeEventCards, clubHomeRosterPreview, clubHomeSummary, clubHomeUsefulLinks, rosterAgeLabel, type ClubHomeMember } from "@/modules/club-rosters/home-view";
 import type { ClubEventSummary } from "@/modules/club-registrations/repository";
@@ -154,7 +155,7 @@ describe("Home club event card: billing semantics", () => {
   });
 
   it("shows an attendee-pay event as each person paying their own registration, never billed to the church", () => {
-    const [card] = clubHomeEventCards([registered("CONFIRMED", { billingMode: "ATTENDEE_PAY" } as Partial<ClubEventSummary>)], { base, sponsoringChurch: "First Synthetic Church" });
+    const [card] = clubHomeEventCards([registered("CONFIRMED", { billingMode: "ATTENDEE_PAY" } as Partial<ClubEventSummary>)], { base, sponsoringChurch: "First Synthetic Church", clubYear: "2026-27" });
     expect(card!.billing).toBe("Each person pays for their own registration. Nothing is billed to your church.");
     expect(card!.billedToChurch).toBe(false);
     expect(JSON.stringify(card)).not.toMatch(/pay now|\$|First Synthetic Church/i);
@@ -162,8 +163,8 @@ describe("Home club event card: billing semantics", () => {
   });
 
   it("keeps a waitlisted or cancelled church-billed registration out of the billed state", () => {
-    const [waitlisted] = clubHomeEventCards([registered("WAITLISTED")], { base, sponsoringChurch: "First Synthetic Church" });
-    const [cancelled] = clubHomeEventCards([registered("CANCELLED")], { base, sponsoringChurch: "First Synthetic Church" });
+    const [waitlisted] = clubHomeEventCards([registered("WAITLISTED")], { base, sponsoringChurch: "First Synthetic Church", clubYear: "2026-27" });
+    const [cancelled] = clubHomeEventCards([registered("CANCELLED")], { base, sponsoringChurch: "First Synthetic Church", clubYear: "2026-27" });
     expect(waitlisted).toMatchObject({ lifecycle: "Waitlisted", billing: "No amount owed while waitlisted", billedToChurch: false });
     expect(cancelled).toMatchObject({ lifecycle: "Cancelled", billing: "Cancelled — nothing owed", billedToChurch: false });
   });
@@ -176,7 +177,7 @@ describe("Home club event card: billing semantics", () => {
         { teamKey: "b", teamName: "B", confirmationCode: "S2", status: "CONFIRMED", attendeeCount: 7, locationName: null },
       ] as ClubEventSummary["teams"],
     });
-    const [card] = clubHomeEventCards([multi], { base, sponsoringChurch: null });
+    const [card] = clubHomeEventCards([multi], { base, sponsoringChurch: null, clubYear: "2026-27" });
     expect(card).toMatchObject({ people: 12, lifecycle: "2 teams: Submitted, Confirmed" });
     expect(card!.billing).toBe("Billed to your sponsoring church after the event. Nothing to pay here.");
   });
@@ -185,13 +186,17 @@ describe("Home club event card: billing semantics", () => {
 describe("Home by role", () => {
   it("director: a saved draft is a Continue form task (the one filled button), the roster and event are outlined", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
-    mocks.listSubmissionsForViewer.mockResolvedValue([draftRow, { ...draftRow, id: "other-year", clubYear: "2025-26" }, { ...draftRow, id: "sent", status: "SUBMITTED" }]);
+    mocks.listSubmissionsForViewer.mockResolvedValue([draftRow]);
     mocks.listClubEvents.mockResolvedValue([registered("SUBMITTED")]);
     const html = await home();
     expect(html).toContain("Annual club information is saved as a draft, not submitted.");
     expect(html).toContain("Continue form");
     expect(html).toContain(`href="${base}/forms/submissions/draft-1"`);
-    expect(html).not.toContain("other-year");
+    // The query itself asks for this club year's drafts only; the page does not filter a capped list.
+    expect(mocks.listSubmissionsForViewer).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "club-1" }), { status: "DRAFT", clubYear: "2026-27" });
+    // Repeated links get distinct names for assistive technology.
+    expect(html).toContain('Continue form<span class="sr-only"> Annual club information</span>');
+    expect(html).toContain('View club registration<span class="sr-only"> for Synthetic Camporee</span>');
     // Exactly one filled primary on the whole screen.
     expect(count(html, "primary-button")).toBe(1);
     expect(html).toMatch(/class="primary-button club-event-action" href="\/account\/clubs\/club-1\/forms\/submissions\/draft-1"/);
@@ -250,11 +255,20 @@ describe("Home by role", () => {
 describe("Home tasks come only from real data", () => {
   it("links 'Review roster' to the details filter when people have blank details, and counts only them", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
-    mocks.listRoster.mockResolvedValue([person("1"), person("2", { gender: null }), person("3", { birthDateNeeded: true })]);
+    mocks.listRoster.mockResolvedValue([person("1"), person("2", { gender: null }), person("3", { classLevel: null }), person("4", { birthDateNeeded: true })]);
     const html = await home();
     expect(html).toContain("2 people need details on the roster.");
     expect(html).toContain("Review roster");
     expect(html).toContain(`href="${base}/roster?filter=details-needed"`);
+  });
+
+  it("does not count a missing birth date, the way the roster's own flag does", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.listRoster.mockResolvedValue([person("1", { birthDateNeeded: true }), person("2", { status: "INACTIVE", gender: null })]);
+    const html = await home();
+    expect(html).not.toContain("Review roster");
+    expect(rosterRowMissingFields(person("1", { birthDateNeeded: true }))).toEqual([]);
+    expect(rosterRowMissingFields(person("1", { gender: null }))).toEqual(["Gender"]);
   });
 
   it("invents nothing for a complete roster: no roster task, no form task, an honest empty note", async () => {
@@ -295,7 +309,7 @@ describe("Home empty, error and read-only states", () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
     mocks.listSubmissionsForViewer.mockRejectedValue(new Error("forms down"));
     const html = await home();
-    expect(html).toContain("Saved club form drafts could not be loaded");
+    expect(html).toContain("Could not load: Saved club form drafts.");
     expect(html).toMatch(/Saved form drafts<\/dt><dd class="club-home-count-value">Unavailable</);
   });
 
@@ -307,6 +321,8 @@ describe("Home empty, error and read-only states", () => {
     expect(mocks.listClubEvents).not.toHaveBeenCalled();
     expect(mocks.getClubReportYear).not.toHaveBeenCalled();
     expect(html).toContain("Showing 2025–26 read-only.");
+    // Static page content, not a live region.
+    expect(html).not.toMatch(/club-home-readonly" role=/);
     expect(html).toContain(`href="${base}"`);
     expect(html).not.toContain("Continue club work");
     expect(html).not.toContain("Continue form");
@@ -341,5 +357,124 @@ describe("Home shortcuts follow capabilities", () => {
     expect(keys("REGISTRAR")).toEqual([]);
     expect(keys("REPORTER")).toEqual(["records"]);
     expect(leaderCapabilities.manageTeam).toBe(true);
+  });
+});
+
+describe("Home event registrations count (#1166 review)", () => {
+  it("counts only Submitted and Confirmed registrations on events starting in the selected club year", () => {
+    const nextYear = { startsAt: "2027-09-10T15:00:00.000Z", endsAt: "2027-09-12T15:00:00.000Z" };
+    const events = [
+      registered("SUBMITTED"),
+      registered("CONFIRMED", { id: "e2" }),
+      registered("CANCELLED", { id: "e3" }),
+      registered("WAITLISTED", { id: "e4" }),
+      registered("DRAFT", { id: "e5" }),
+      registered("SUBMITTED", { id: "e6", ...nextYear }),
+      event({ id: "e7" }),
+    ];
+    const summary = clubHomeSummary({ clubYear: "2026-27", members: [], formDrafts: null, events });
+    const item = summary.find((entry) => entry.key === "events")!;
+    expect(item.value).toBe(2);
+    expect(item.definition).toContain("2026–27 club year");
+    expect(item.definition).toContain("Submitted or Confirmed");
+    expect(item.definition).toContain("Waitlisted and cancelled registrations are not counted");
+    // The next year's event counts for next year.
+    expect(clubHomeSummary({ clubYear: "2027-28", members: [], formDrafts: null, events }).find((entry) => entry.key === "events")!.value).toBe(1);
+  });
+
+  it("counts a multi-team event once when any team is billable, and not when every team is cancelled", () => {
+    const team = (status: string, key: string) => ({ teamKey: key, teamName: key, confirmationCode: key, status, attendeeCount: 3, locationName: null });
+    const some = event({ multipleTeams: true, teams: [team("CANCELLED", "a"), team("CONFIRMED", "b")] as ClubEventSummary["teams"] });
+    const none = event({ id: "e2", multipleTeams: true, teams: [team("CANCELLED", "a"), team("WAITLISTED", "b")] as ClubEventSummary["teams"] });
+    expect(clubHomeSummary({ clubYear: "2026-27", members: [], formDrafts: null, events: [some, none] }).find((entry) => entry.key === "events")!.value).toBe(1);
+  });
+
+  it("shows an event card only for the selected club year", () => {
+    const nextYear = registered("SUBMITTED", { id: "e6", startsAt: "2027-09-10T15:00:00.000Z", endsAt: "2027-09-12T15:00:00.000Z" });
+    const cards = clubHomeEventCards([registered("SUBMITTED"), nextYear], { base, sponsoringChurch: null, clubYear: "2026-27" });
+    expect(cards.map((card) => card.id)).toEqual(["event-1"]);
+  });
+});
+
+describe("Home survives a failed section load (#1166 review)", () => {
+  const expectPage = async () => {
+    const html = await home();
+    expect(html).toContain("Your club this year");
+    return html;
+  };
+
+  it("roster failure: the count is Unavailable, the card says so, and no roster task is invented", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.listRoster.mockRejectedValue(new Error("down"));
+    const html = await expectPage();
+    expect(html).toMatch(/Roster people<\/dt><dd class="club-home-count-value">Unavailable</);
+    expect(html).toContain("The roster could not be loaded.");
+    expect(html).toContain("Could not load: The roster.");
+    expect(html).not.toContain("Add people");
+    expect(html).not.toContain("No one is on this year");
+  });
+
+  it("events failure: the count is Unavailable, the card says so, and the rest of Home still renders", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.listClubEvents.mockRejectedValue(new Error("down"));
+    mocks.listSubmissionsForViewer.mockResolvedValue([draftRow]);
+    const html = await expectPage();
+    expect(html).toMatch(/Event registrations<\/dt><dd class="club-home-count-value">Unavailable</);
+    expect(html).toContain("Club events could not be loaded.");
+    expect(html).toContain("Could not load: Club events.");
+    // The draft task and the roster preview are unaffected by the events failure.
+    expect(html).toContain("Continue form");
+    expect(html).toContain("Pat1 Sample");
+  });
+
+  it("report-year failure for a director: Monthly Records is named unavailable and no record task appears", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.getClubReportYear.mockRejectedValue(new Error("down"));
+    const html = await expectPage();
+    expect(html).toContain("Could not load: Monthly Records.");
+    expect(html).not.toContain("Monthly Record is due");
+  });
+
+  it("report-year failure for a reporter: the notice shows and Monthly Records stays the one filled button", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(reporterAccess);
+    mocks.getClubReportYear.mockRejectedValue(new Error("down"));
+    const html = await home();
+    expect(html).toContain("Could not load: Monthly Records.");
+    expect(count(html, "primary-button")).toBe(1);
+    expect(html).toMatch(/class="primary-button club-event-action" href="\/account\/clubs\/club-1\/records"/);
+  });
+
+  it("deadline failure: a notice replaces the list instead of saying there are none", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.listUpcomingDeadlines.mockRejectedValue(new Error("down"));
+    const html = await expectPage();
+    expect(html).toContain("Deadlines could not be loaded.");
+    expect(html).not.toContain("No deadlines in the next 90 days");
+    mocks.getRosterAccessStateForPage.mockResolvedValue(reporterAccess);
+    const reporter = await home();
+    expect(reporter).toContain("Deadlines could not be loaded.");
+  });
+
+  it("compliance failure is named, never shown as all clear", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.clubPortalComplianceReminderCounts.mockRejectedValue(new Error("down"));
+    const html = await expectPage();
+    expect(html).toContain("Could not load: Sterling Volunteers reminders.");
+  });
+});
+
+describe("Home read-only notice by year (#959)", () => {
+  it("tells a director that next year's emergency contacts can still be edited on the roster", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    const next = await home({ year: "2027-28" });
+    expect(next).toContain("Showing 2027–28 read-only.");
+    expect(next).toContain("A director or deputy can still edit emergency contacts on the roster.");
+    const past = await home({ year: "2025-26" });
+    expect(past).not.toContain("emergency contacts");
+  });
+
+  it("does not offer that to a registrar, who has no guardian access", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("REGISTRAR"));
+    expect(await home({ year: "2027-28" })).not.toContain("emergency contacts");
   });
 });

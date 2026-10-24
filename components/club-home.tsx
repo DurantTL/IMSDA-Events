@@ -38,10 +38,23 @@ export function ClubHomeSummary({ clubYear, summary }: { clubYear: string; summa
 }
 
 /** Shown on a past year: the page is history, so there are no tasks and no edit actions. */
-export function ClubHomeReadOnlyNotice({ clubYear, currentHref, currentClubYear }: { clubYear: string; currentHref: string; currentClubYear: string }) {
+export function ClubHomeReadOnlyNotice({
+  clubYear,
+  currentHref,
+  currentClubYear,
+  contactsEditable = false,
+}: {
+  clubYear: string;
+  currentHref: string;
+  currentClubYear: string;
+  /** Next year's roster still lets a director or deputy update emergency contacts (#959); the roster says the same. */
+  contactsEditable?: boolean;
+}) {
   return (
-    <p className="inline-notice club-home-readonly" role="status">
+    // Static page content, not a live update, so no status role.
+    <p className="inline-notice club-home-readonly">
       <Info size={16} aria-hidden="true" /> Showing {yearLabel(clubYear)} read-only. Tasks and event registrations are for the current year.{" "}
+      {contactsEditable && "A director or deputy can still edit emergency contacts on the roster. "}
       <Link href={currentHref}>Back to {yearLabel(currentClubYear)}</Link>
     </p>
   );
@@ -55,13 +68,13 @@ export function ClubHomeReadOnlyNotice({ clubYear, currentHref, currentClubYear 
 export function ClubHomeTasks({
   steps,
   deadlines,
-  formsUnavailable = false,
+  unavailable = [],
   emptyNote,
 }: {
   steps: ClubHomeStep[];
   deadlines: Readonly<Record<string, string>>;
-  /** The forms service failed: say so instead of implying there is no draft. */
-  formsUnavailable?: boolean;
+  /** Sources that failed to load (for example "Saved club form drafts"): say so instead of implying there is nothing there. */
+  unavailable?: string[];
   emptyNote: string;
 }) {
   return (
@@ -70,9 +83,9 @@ export function ClubHomeTasks({
         <p className="public-registration-eyebrow">Next steps</p>
         <h2 id="club-work-heading">Continue club work</h2>
       </div>
-      {formsUnavailable && (
+      {unavailable.length > 0 && (
         <p className="inline-notice" role="status">
-          <CircleAlert size={16} aria-hidden="true" /> Saved club form drafts could not be loaded, so they are not listed. Reload the page to try again.
+          <CircleAlert size={16} aria-hidden="true" /> Could not load: {unavailable.join(", ")}. Their tasks are not listed. Reload the page to try again.
         </p>
       )}
       {steps.length === 0 ? (
@@ -89,12 +102,26 @@ export function ClubHomeTasks({
                 {deadlines[step.key] && <small className="club-home-deadline">{deadlines[step.key]}</small>}
               </span>
               <Link className={`${index === 0 ? "primary-button" : "secondary-button"} club-event-action`} href={step.href}>
-                {step.action} <ArrowRight size={14} aria-hidden="true" />
+                {step.action}
+                {step.actionContext && <span className="sr-only"> {step.actionContext}</span>} <ArrowRight size={14} aria-hidden="true" />
               </Link>
             </li>
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** The conference deadline list failed to load: say so instead of showing "no deadlines". */
+export function ClubHomeDeadlinesUnavailable() {
+  return (
+    <section aria-labelledby="club-home-deadlines-heading" className="public-manage-card">
+      <div className="public-manage-card-heading">
+        <p className="public-registration-eyebrow">Conference dates</p>
+        <h2 id="club-home-deadlines-heading">Upcoming deadlines</h2>
+      </div>
+      <p className="inline-notice" role="status"><CircleAlert size={16} aria-hidden="true" /> Deadlines could not be loaded. Reload the page to try again.</p>
     </section>
   );
 }
@@ -105,7 +132,9 @@ export function ClubHomeRoster({
   rosterHref,
   readOnly,
   clubYear,
+  unavailable = false,
 }: {
+  unavailable?: boolean;
   preview: ClubHomeRosterPreview;
   rosterHref: string;
   readOnly: boolean;
@@ -117,7 +146,9 @@ export function ClubHomeRoster({
         <p className="public-registration-eyebrow">{yearLabel(clubYear)} roster</p>
         <h2 id="club-home-roster-heading">Roster</h2>
       </div>
-      {preview.rows.length === 0 ? (
+      {unavailable ? (
+        <p className="inline-notice" role="status"><CircleAlert size={16} aria-hidden="true" /> The roster could not be loaded. Reload the page to try again.</p>
+      ) : preview.rows.length === 0 ? (
         <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> {readOnly ? "No one was on this club's roster that year." : "No one is on this year's roster yet."}</p>
       ) : (
         <>
@@ -147,7 +178,9 @@ export function ClubHomeEvents({
   cards,
   hasOpenEvents,
   eventsHref,
+  unavailable = false,
 }: {
+  unavailable?: boolean;
   cards: ClubHomeEventCardData[];
   hasOpenEvents: boolean;
   eventsHref: string;
@@ -158,7 +191,9 @@ export function ClubHomeEvents({
         <p className="public-registration-eyebrow">Club event</p>
         <h2 id="club-home-event-heading">{cards.length > 1 ? "Club events" : "Club event"}</h2>
       </div>
-      {cards.length === 0 ? (
+      {unavailable ? (
+        <p className="inline-notice" role="status"><CircleAlert size={16} aria-hidden="true" /> Club events could not be loaded. Reload the page to try again.</p>
+      ) : cards.length === 0 ? (
         <>
           <p className="public-manage-empty">
             <CalendarDays size={17} aria-hidden="true" />{" "}
@@ -180,7 +215,7 @@ export function ClubHomeEvents({
                 <div><dt>Billing</dt><dd>{card.billing}</dd></div>
               </dl>
               <Link className="secondary-button club-event-action club-home-link" href={card.href}>
-                View club registration <ArrowRight size={14} aria-hidden="true" />
+                View club registration<span className="sr-only"> for {card.name}</span> <ArrowRight size={14} aria-hidden="true" />
               </Link>
             </li>
           ))}
