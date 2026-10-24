@@ -87,7 +87,8 @@ function dropFilterParams(...names: string[]) {
     const present = names.filter((name) => url.searchParams.has(name));
     if (present.length === 0) return;
     for (const name of present) url.searchParams.delete(name);
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // null state lets Next copy its own state and keep useSearchParams in sync with the cleaned URL.
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   } catch {
     // A page without a usable address bar (a preview) simply keeps its address.
   }
@@ -593,7 +594,7 @@ export function ClubRosterWorkspace({
         {complianceFilter && complianceStatuses && (
           <p className="inline-notice roster-compliance-notice" role="status">
             Showing only people {complianceFilterLabels[complianceFilter]}.{" "}
-            <button className="text-button" onClick={() => setComplianceFilter(null)} type="button">Clear filter</button>
+            <button className="text-button" onClick={() => { setComplianceFilter(null); dropFilterParams("compliance"); }} type="button">Clear filter</button>
           </p>
         )}
         <div className="roster-search-panel">

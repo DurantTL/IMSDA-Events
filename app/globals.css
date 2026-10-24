@@ -12933,7 +12933,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .roster-row-action-set .actions-menu-list :is(a, button) { white-space: normal; }
 .roster-card-table td.roster-row-actions { min-width: 9.5rem; }
 /* The shared rule that lets an open menu out of a table wrap would push this page sideways; the roster's menu is in the flow, so the wrap keeps scrolling. */
-.report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { overflow-x: auto; }
+@media screen { .report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { overflow-x: auto; } }
 .actions-menu-list .actions-menu-note { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
 .roster-edit-button { min-height: 44px; min-width: 44px; white-space: nowrap; }
 .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }

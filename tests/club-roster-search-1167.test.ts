@@ -429,7 +429,8 @@ describe("filters combine and reset together (#1167 review)", () => {
     expect(body).toContain('dropFilterParams("filter", "compliance")');
     // Only the filter names leave the address; ?year= stays.
     expect(source).toContain("url.searchParams.delete(name)");
-    expect(source).toContain("window.history.replaceState(");
+    expect(source).toContain('window.history.replaceState(null, "",');
+    expect(source).toContain('dropFilterParams("compliance")');
   });
 });
 
