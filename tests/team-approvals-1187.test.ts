@@ -156,10 +156,13 @@ describe("another location, or a flag that no longer applies, is denied (#1187)"
 describe("a cancelled or draft team cannot be decided (#1191)", () => {
   type Where = { clubEventRegistration?: { registration?: { status?: { in: string[] } } } };
   // A database double that applies only the registration-status part of the decision scope to the team's status.
+  // With no status filter at all the row is found, as the database would before #1191, so a refusal test fails if the filter regresses.
   function databaseWithTeamStatus(teamStatus: string) {
     const db = decideDatabase();
-    db.tx.clubTeamMemberPermission.findFirst.mockImplementation(async ({ where }: { where: Where }) =>
-      (where.clubEventRegistration?.registration?.status?.in.includes(teamStatus) ? found : null));
+    db.tx.clubTeamMemberPermission.findFirst.mockImplementation(async ({ where }: { where: Where }) => {
+      const statuses = where.clubEventRegistration?.registration?.status?.in;
+      return !statuses || statuses.includes(teamStatus) ? found : null;
+    });
     return db;
   }
   const scopes = [
