@@ -18,7 +18,10 @@ export function resolvePublicRegistrationStatus(
   return phase === "OPEN" && !formsListed ? "OPENING_SOON" : phase;
 }
 
-/** True only for open dates with at least one listed form: the only state that may say "Registration open" or show Register. */
+/**
+ * True for open dates with at least one listed form. Capacity, a full event and the waitlist are
+ * handled separately (not part of #1201); this only answers the dates-plus-form question.
+ */
 export function isPublicRegistrationOpen(phase: EventRegistrationPhase, formsListed: boolean) {
   return resolvePublicRegistrationStatus(phase, formsListed) === "OPEN";
 }
@@ -29,6 +32,13 @@ export function isPublicRegistrationOpen(phase: EventRegistrationPhase, formsLis
  * rule, so the two cannot disagree.
  */
 export const publishedFormVersionWhere = { versions: { some: { status: "PUBLISHED" as const } } };
+
+/** The version a public page uses for a form: its latest published one. Shared by the event page and the calendar check. */
+export const latestPublishedVersionArgs = {
+  where: { status: "PUBLISHED" as const },
+  orderBy: { versionNumber: "desc" as const },
+  take: 1,
+};
 
 export function isListablePublishedDefinition(definition: unknown) {
   return registrationFormDefinitionSchema.safeParse(definition).success;

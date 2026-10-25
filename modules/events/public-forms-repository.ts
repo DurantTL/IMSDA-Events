@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { isListablePublishedDefinition, publishedFormVersionWhere } from "@/modules/events/public-registration-status";
+import { isListablePublishedDefinition, latestPublishedVersionArgs, publishedFormVersionWhere } from "@/modules/events/public-registration-status";
 
 /**
  * Which of these events list at least one published registration form on their public page (#1201).
@@ -15,9 +15,7 @@ export async function listEventIdsWithPublishedForms(eventIds: string[]): Promis
     select: {
       eventId: true,
       versions: {
-        where: { status: "PUBLISHED" },
-        orderBy: { versionNumber: "desc" },
-        take: 1,
+        ...latestPublishedVersionArgs,
         select: { definition: true },
       },
     },

@@ -105,11 +105,25 @@ describe("one public registration status for the calendar and the event page (#1
     const open = await calendarFor(events, ["e2"]);
     expect(mocks.formFindMany).toHaveBeenCalledTimes(1);
     expect(mocks.formFindMany.mock.calls[0][0].where.eventId).toEqual({ in: ["e1", "e2"] });
+    const args = mocks.formFindMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({ versions: { some: { status: "PUBLISHED" } } });
+    expect(args.select.versions).toMatchObject({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, take: 1 });
     expect([open.get("event-e1"), open.get("event-e2"), open.get("event-e3")]).toEqual([false, true, false]);
 
     mocks.formFindMany.mockClear();
     await calendarFor([eventRow("e3", { registrationOpensOn: "2027-01-20" })], []);
     expect(mocks.formFindMany).not.toHaveBeenCalled();
+  });
+
+  it("an event with two forms is open when one is published, not when its only published definition is invalid", async () => {
+    mocks.eventFindMany.mockResolvedValue([eventRow("e1"), eventRow("e2")]);
+    mocks.formFindMany.mockResolvedValue([
+      { eventId: "e1", versions: [{ definition: { title: "broken" } }] },
+      { eventId: "e1", versions: [{ definition: validDefinition }] },
+      { eventId: "e2", versions: [{ definition: { title: "broken" } }] },
+    ]);
+    const items = await listPublicCalendarItems("2027-02-01", "2027-02-28", now);
+    expect(items.map((item) => [item.key, item.registrationOpen])).toEqual([["event-e1", true], ["event-e2", false]]);
   });
 
   it("a linked item's Register button follows the same rule", async () => {
