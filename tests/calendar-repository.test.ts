@@ -1,20 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn(), formFindMany: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findMany: mocks.eventFindMany },
     calendarEntry: { findMany: mocks.entryFindMany },
+    registrationForm: { findMany: mocks.formFindMany },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
+
+const publishedDefinition = {
+  title: "Registration",
+  description: "",
+  confirmationMessage: "Saved.",
+  sections: [{
+    id: "registration",
+    title: "Registration",
+    description: "",
+    fields: [{ id: "name", key: "full_name", label: "Full name", helpText: "", type: "TEXT", scope: "REGISTRATION", required: true, options: [] }],
+  }],
+};
 
 import { listPublicCalendarItems } from "@/modules/calendar/repository";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.formFindMany.mockResolvedValue([{ eventId: "event-1", versions: [{ definition: publishedDefinition }] }]);
   mocks.eventFindMany.mockResolvedValue([{
     id: "event-1",
     slug: "mens-convention",

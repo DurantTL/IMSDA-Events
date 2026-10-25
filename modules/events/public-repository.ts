@@ -9,6 +9,7 @@ import {
   publicEventWebsiteLinks,
   summarizePublicRegistrationForm,
 } from "@/modules/events/public-domain";
+import { publishedFormVersionWhere } from "@/modules/events/public-registration-status";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { listPublishedEventContentSections } from "@/modules/events/content-repository";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
@@ -70,9 +71,7 @@ async function loadPublicEventLanding(
         },
       },
       registrationForms: {
-        where: {
-          versions: { some: { status: "PUBLISHED" } },
-        },
+        where: publishedFormVersionWhere,
         orderBy: [{ name: "asc" }, { createdAt: "asc" }],
         select: {
           id: true,

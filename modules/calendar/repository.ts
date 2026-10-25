@@ -21,6 +21,8 @@ import { importedFieldNames } from "@/modules/calendar/ics-import";
 import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarBulkRequest, CalendarEntryInput, CalendarEntryUpdate, CalendarEventSettings, CalendarRepeatInput } from "@/modules/calendar/schemas";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
+import { listEventIdsWithPublishedForms } from "@/modules/events/public-forms-repository";
+import { isPublicRegistrationOpen } from "@/modules/events/public-registration-status";
 
 export { CalendarError };
 
@@ -114,10 +116,17 @@ export async function listPublicCalendarItems(
       select: publicEventWithLinksSelect,
     })).map((event) => [event.id, event]));
   const standalone = entries.filter((entry) => !entry.linkedEventId || !publishedLinked.has(entry.linkedEventId));
+  // One batched check for every event shown: "Registration open" and Register need a published form (#1201).
+  const withForms = await listEventIdsWithPublishedForms([...new Set([
+    ...events.filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
+    ...[...publishedLinked.values()].filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
+  ])]);
+  const registrationOpenFor = (event: PublicEventWithLinks) =>
+    isPublicRegistrationOpen(evaluateEventRegistrationPhase(event, now), withForms.has(event.id));
   const registerItems = entries.flatMap((entry) => {
     const event = entry.linkedEventId ? publishedLinked.get(entry.linkedEventId) : undefined;
     if (!event || !event.showOnCalendar || sharedItemCount(event) < 2 || entry.entryType === "DEADLINE") return [];
-    const registrationOpen = evaluateEventRegistrationPhase(event, now) === "OPEN";
+    const registrationOpen = registrationOpenFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
       : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, registrationOpen });
@@ -136,7 +145,7 @@ export async function listPublicCalendarItems(
       category: event.calendarCategory ?? "",
       href: `/events/${encodeURIComponent(event.slug)}`,
       status: "SCHEDULED" as const,
-      registrationOpen: evaluateEventRegistrationPhase(event, now) === "OPEN",
+      registrationOpen: registrationOpenFor(event),
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
     ...standalone.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),

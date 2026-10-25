@@ -427,6 +427,8 @@ describe("other paths that follow the phase", () => {
       registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       event: { findMany: vi.fn().mockResolvedValue([row]) },
       calendarEntry: { findMany: vi.fn().mockResolvedValue([]) },
+      // The event lists a published form (#1201), so only its dates decide the flag here.
+      registrationForm: { findMany: vi.fn().mockResolvedValue([{ eventId: "event_1", versions: [{ definition }] }]) },
     });
     const flag = async (now: Date) => (
       await listPublicCalendarItems("2026-10-01", "2026-11-30", now)

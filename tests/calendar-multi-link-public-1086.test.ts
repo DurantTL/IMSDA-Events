@@ -2,18 +2,31 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn(), formFindMany: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findMany: mocks.eventFindMany },
     calendarEntry: { findMany: mocks.entryFindMany },
+    registrationForm: { findMany: mocks.formFindMany },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 
 import { buildCalendarIcs } from "@/modules/calendar/domain";
+const publishedDefinition = {
+  title: "Registration",
+  description: "",
+  confirmationMessage: "Saved.",
+  sections: [{
+    id: "registration",
+    title: "Registration",
+    description: "",
+    fields: [{ id: "name", key: "full_name", label: "Full name", helpText: "", type: "TEXT", scope: "REGISTRATION", required: true, options: [] }],
+  }],
+};
+
 import { listPublicCalendarItems } from "@/modules/calendar/repository";
 
 const now = new Date("2027-01-10T12:00:00Z");
@@ -63,7 +76,10 @@ function seed(options: { windowEvents?: unknown[]; linkedEvents?: unknown[]; ent
   mocks.entryFindMany.mockResolvedValue(options.entries ?? []);
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.formFindMany.mockResolvedValue([{ eventId: "event-1", versions: [{ definition: publishedDefinition }] }]);
+});
 
 describe("several linked items on the public calendar (#1086)", () => {
   const three = [
