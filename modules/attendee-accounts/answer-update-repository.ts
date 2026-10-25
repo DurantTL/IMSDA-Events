@@ -111,8 +111,31 @@ export async function updateTieredRegistrationAnswersWithClient(
         "That update request ID was already used for different choices. Refresh and try again.",
       );
     }
+    // Phone, email and date values are never kept in the audit record (#1198): they come back from the current rows.
+    const redactedKeys = Array.isArray(metadata.redactedTypedKeys) ? metadata.redactedTypedKeys.map(String) : [];
+    const storedResponse = metadata.response as {
+      expectedUpdatedAt: string;
+      attendees: Array<{
+        attendeeId: string;
+        name: string;
+        responses: Record<string, unknown>;
+        lockedFieldKeys: string[];
+      }>;
+    };
+    const replayed = {
+      ...storedResponse,
+      attendees: storedResponse.attendees.map((replayAttendee) => {
+        const current = recordFromJson(registration.attendees.find((row) => row.id === replayAttendee.attendeeId)?.formResponses);
+        const responses = { ...replayAttendee.responses };
+        for (const key of redactedKeys) {
+          if (Object.hasOwn(current, key)) responses[key] = current[key];
+          else delete responses[key];
+        }
+        return { ...replayAttendee, responses };
+      }),
+    };
     return {
-      ...(metadata.response as {
+      ...(replayed as {
         expectedUpdatedAt: string;
         attendees: Array<{
           attendeeId: string;
@@ -150,6 +173,9 @@ export async function updateTieredRegistrationAnswersWithClient(
     registration.event.attendeeEditPolicy,
   );
   const editableKeys = new Set(editable.map((field) => field.key));
+  const typedAnswerKeys = editable
+    .filter((field) => field.type === "PHONE" || field.type === "EMAIL" || field.type === "DATE")
+    .map((field) => field.key);
   const seminarFields = definition.sections
     .flatMap((section) => section.fields)
     .filter(isSeminarPreferenceField);
@@ -369,7 +395,18 @@ export async function updateTieredRegistrationAnswersWithClient(
                 ])),
             })),
           invalidatedAssignmentRunCount: invalidated.count,
-          response: result,
+          // PHONE, EMAIL and DATE values stay out of the audit record (#1198); replay rebuilds them from the current rows.
+          redactedTypedKeys: typedAnswerKeys,
+          response: {
+            ...result,
+            attendees: result.attendees.map((resultAttendee, index) => ({
+              ...resultAttendee,
+              responses: Object.fromEntries(Object.entries(resultAttendee.responses).map(([key, value]) => [
+                key,
+                typedAnswerKeys.includes(key) ? (prepared[index]?.changedKeys.includes(key) ? "(changed)" : "(unchanged)") : value,
+              ])),
+            })),
+          },
         } as unknown as Prisma.InputJsonObject,
       },
     });

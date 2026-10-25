@@ -215,13 +215,20 @@ describe("System home health panel", () => {
   });
 
   it("renders stale evidence with its last-observed time", async () => {
-    mocks.getSystemHealth.mockResolvedValue({
-      ...goodHealth,
-      sweep: { status: "stale", lastSucceededAt: "2026-10-24T16:30:00.000Z", lastFailedAt: null, ageMs: 90 * 60_000 },
-    });
-    const html = await renderHome();
-    expect(html).toContain('data-signal="email-sweep" data-freshness="stale"');
-    expect(html).toContain("Last observed 4:30 PM UTC");
+    // The page reads the clock; pin it to the fixture's day so a same-day reading shows its time without a date.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      mocks.getSystemHealth.mockResolvedValue({
+        ...goodHealth,
+        sweep: { status: "stale", lastSucceededAt: "2026-10-24T16:30:00.000Z", lastFailedAt: null, ageMs: 90 * 60_000 },
+      });
+      const html = await renderHome();
+      expect(html).toContain('data-signal="email-sweep" data-freshness="stale"');
+      expect(html).toContain("Last observed 4:30 PM UTC");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders the zero-event, zero-message state as measured zeros without claiming readiness", async () => {

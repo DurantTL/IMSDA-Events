@@ -1,7 +1,9 @@
-import { normalizePhoneAnswer } from "@/lib/field-validation";
+import { isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer } from "@/lib/field-validation";
+import { isSensitiveField } from "@/modules/forms/sensitive-fields";
 import { sanitizeAddressInput } from "@/modules/forms/address";
 import {
   getAvailabilityMode,
+  isBirthDateField,
   isFieldVisible,
   validateTestResponses,
   type RegistrationFormDefinition,
@@ -17,7 +19,18 @@ const editableFieldTypes = new Set<RegistrationFormField["type"]>([
   "CHECKBOX",
   "NUMBER",
   "ADDRESS",
+  // Phone, email and date answers are self-service editable (#1198); the protected keys, the sensitive-field pattern, visibility rules, pricing and capacity checks below still apply to them.
+  "PHONE",
+  "EMAIL",
+  "DATE",
 ]);
+
+// The new types (#1198) also honour the shared sensitive-field list (physician, clinic, insurance, immunization, parent, DOB ...),
+// which is stricter than `sensitiveFieldPattern`. The older types stay on today's rule so nothing already editable becomes locked.
+const newTypedFieldTypes = new Set<RegistrationFormField["type"]>(["PHONE", "EMAIL", "DATE"]);
+// Family contacts and doctors the shared stems do not name ("Mother's cell", "Grandma's phone", "Dr. phone", "Dentist"): a phone or email for someone else's family is staff-managed too.
+// Letter boundaries rather than \b, so keys such as `mother_cell` or `emergency_dad` match while "moment" or "drive" do not.
+const familyContactPattern = /(?<![a-z])(?:(?:grand|step)?(?:mother|father|parent|mom|mum|dad|ma|pa)|relative|next[\s_]*of[\s_]*kin|dr|dentist)(?![a-z])/i;
 
 const protectedAttendeeKeys = new Set([
   "first_name",
@@ -40,7 +53,6 @@ export type EditableAttendeeField = {
   key: string;
   label: string;
   helpText: string;
-  /** PHONE, EMAIL and DATE are not self-service editable today (see `editableFieldTypes`); the form checks them if they ever are. */
   type: "SELECT" | "RADIO" | "MULTISELECT" | "RANKED_CHOICE" | "CHECKBOX" | "NUMBER" | "ADDRESS" | "PHONE" | "EMAIL" | "DATE";
   required: boolean;
   options: string[];
@@ -90,6 +102,11 @@ export function isTieredAttendeeFieldEditable(field: RegistrationFormField) {
     || !editableFieldTypes.has(field.type)
     || protectedAttendeeKeys.has(field.key)
     || isProtectedAnswerField(field)
+    // A birth date keyed dob or birthdate is never self-service: it sets adult or minor status (#1198).
+    || isBirthDateField(field)
+    // A date filled in with today's date is not the attendee's answer to change.
+    || field.autoDate
+    || (newTypedFieldTypes.has(field.type) && (isSensitiveField(field) || familyContactPattern.test(fieldSemantics(field))))
   ) {
     return false;
   }
@@ -184,13 +201,23 @@ export function prepareTieredAttendeeAnswerUpdate(input: {
   }
 
   const editableByKey = new Map(editable.map((field) => [field.key, field]));
+  // The stored answer, read by the caller in this same request: grandfathering is never decided from anything the browser sends (#1198).
+  const stored = { ...input.registrationResponses, ...input.currentResponses };
+  const valueToKeep = (key: string, value: unknown) => {
+    const type = editableByKey.get(key)?.type;
+    if (type === "ADDRESS") return sanitizeAddressInput(value);
+    const trimmed = normalizedValue(value);
+    if (type === "PHONE") {
+      // A number left alone stays exactly as stored; a changed one is stored normalised (or left as typed for the validator to refuse).
+      return isUnchangedPhone(trimmed, stored[key]) ? String(stored[key]).trim() : normalizePhoneAnswer(trimmed);
+    }
+    if (type === "EMAIL" && isUnchangedEmail(trimmed, stored[key])) return String(stored[key]).trim();
+    return trimmed;
+  };
   const responses = {
     ...input.currentResponses,
     ...Object.fromEntries(
-      Object.entries(input.changes).map(([key, value]) => [
-        key,
-        editableByKey.get(key)?.type === "ADDRESS" ? sanitizeAddressInput(value) : editableByKey.get(key)?.type === "PHONE" ? normalizePhoneAnswer(normalizedValue(value)) : normalizedValue(value),
-      ]),
+      Object.entries(input.changes).map(([key, value]) => [key, valueToKeep(key, value)]),
     ),
   };
   const merged = { ...input.registrationResponses, ...responses };
