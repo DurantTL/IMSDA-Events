@@ -124,10 +124,15 @@ describe("stricter lock for the new types (#1198 review)", () => {
     ["mother_cell", "Mother's cell", "PHONE"],
     ["last_tetanus", "Date of last tetanus shot", "DATE"],
     ["immunization_date", "Immunization date", "DATE"],
+    ["grandmother_cell", "Grandmother's cell", "PHONE"],
+    ["grandpa_phone", "Grandpa phone", "PHONE"],
+    ["stepdad_email", "Stepdad email", "EMAIL"],
+    ["dr_phone", "Dr. phone", "PHONE"],
+    ["dentist_phone", "Dentist phone", "PHONE"],
     ["phone", "Phone", "PHONE"],
     ["arrival", "Arrival date", "DATE"],
   ];
-  const locked = specs.slice(0, 11).map(([key]) => key);
+  const locked = specs.slice(0, 16).map(([key]) => key);
   const strict = registrationFormDefinitionSchema.parse({
     title: "Strict fixture",
     description: "Fictitious.",

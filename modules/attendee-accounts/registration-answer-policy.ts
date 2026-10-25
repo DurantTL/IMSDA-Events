@@ -28,8 +28,9 @@ const editableFieldTypes = new Set<RegistrationFormField["type"]>([
 // The new types (#1198) also honour the shared sensitive-field list (physician, clinic, insurance, immunization, parent, DOB ...),
 // which is stricter than `sensitiveFieldPattern`. The older types stay on today's rule so nothing already editable becomes locked.
 const newTypedFieldTypes = new Set<RegistrationFormField["type"]>(["PHONE", "EMAIL", "DATE"]);
-// Family contacts the shared stems do not name ("Mother's cell"): a phone or email for someone else's family is staff-managed too.
-const familyContactPattern = /\b(?:mother|father|mom|mum|dad|stepparent|grandparent|relative|next\s*of\s*kin)/i;
+// Family contacts and doctors the shared stems do not name ("Mother's cell", "Grandma's phone", "Dr. phone", "Dentist"): a phone or email for someone else's family is staff-managed too.
+// Letter boundaries rather than \b, so keys such as `mother_cell` or `emergency_dad` match while "moment" or "drive" do not.
+const familyContactPattern = /(?<![a-z])(?:(?:grand|step)?(?:mother|father|parent|mom|mum|dad|ma|pa)|relative|next[\s_]*of[\s_]*kin|dr|dentist)(?![a-z])/i;
 
 const protectedAttendeeKeys = new Set([
   "first_name",
