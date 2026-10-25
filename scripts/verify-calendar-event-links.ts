@@ -36,6 +36,31 @@ const P = "evlink";
 const userId = `${P}_admin`;
 const feedUrl = "https://calendar.example.test/ical/evlink-synthetic/basic.ics";
 const now = new Date("2026-10-01T12:00:00Z");
+/** A minimal valid published form: Register shows only when an event has one (#1201). */
+const formDefinition = {
+  title: "Evlink registration",
+  description: "Synthetic form.",
+  confirmationMessage: "Received.",
+  sections: [{
+    id: "seminars",
+    title: "Seminars",
+    description: "",
+    fields: [{
+      id: "seminar_field",
+      key: "seminar_preferences",
+      label: "Seminar preferences",
+      helpText: "",
+      type: "RANKED_CHOICE",
+      scope: "ATTENDEE",
+      required: true,
+      options: ["Prayer", "Service", "Music"],
+      minSelections: 2,
+      maxSelections: 2,
+      availabilityMode: "RANKED_INTEREST",
+      choiceLimits: {},
+    }],
+  }],
+};
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAILED: ${message}`);
@@ -153,6 +178,10 @@ async function main() {
   await prisma.event.update({ where: { id: retreatEvent.id }, data: { isPublished: true } });
   const pairKeys = await publicKeys("2026-10-01", "2026-10-31");
   assert(pairKeys.includes(`event-${retreatEvent.id}`) && !pairKeys.includes(`entry-${retreatEntry.id}`), "the published pair shows once, as the event");
+  const formless = (await listPublicCalendarItems("2026-10-01", "2026-10-31", now)).find((item) => item.key === `event-${retreatEvent.id}`);
+  assert(formless?.registrationOpen === false, "with no published form the event's entry carries no Register (#1201)");
+  const form = await prisma.registrationForm.create({ data: { eventId: retreatEvent.id, createdByUserId: userId, name: "Evlink form", slug: `${P}-form`, status: "PUBLISHED" } });
+  await prisma.registrationFormVersion.create({ data: { formId: form.id, createdByUserId: userId, versionNumber: 1, status: "PUBLISHED", definition: formDefinition, publishedAt: now } });
   const pairItems = await listPublicCalendarItems("2026-10-01", "2026-10-31", now);
   const pairEvent = pairItems.find((item) => item.key === `event-${retreatEvent.id}`);
   assert(pairEvent?.registrationOpen === true && pairEvent.href === `/events/${retreatEvent.slug}`, "the event's entry carries Register");
