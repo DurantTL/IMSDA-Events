@@ -6,9 +6,10 @@ vi.mock("@/modules/communications/effective-delivery", async () => (await import
  * at their own event locations, only while their grant is active, only for flags
  * that are still active. A staff act-as, another location, a revoked grant, a
  * flag that no longer applies (a coach, a person who left or is not 18) are
- * refused, and a cancelled team is never listed. Only the list hides a
- * cancelled team: the decide path does not refuse it yet (see the todo below).
- * Synthetic ids only.
+ * refused, and a cancelled or draft team is never listed and never decided
+ * (#1191): the decide path scopes both the coordinator and the staff decision
+ * to submitted, confirmed and waitlisted teams, and answers "not found" as
+ * for any other unknown flag. Synthetic ids only.
  */
 const mocks = vi.hoisted(() => ({
   getPrisma: vi.fn(),
@@ -145,16 +146,67 @@ describe("another location, or a flag that no longer applies, is denied (#1187)"
     const rows = await listCoordinatorTeamPermissions("acct-1");
     const where = findMany.mock.calls[0]![0].where;
     expect(where).toMatchObject({ active: true });
-    // A cancelled team is not listed on this page. (The decide path does not filter by registration status: see the todo.)
+    // A cancelled team is not listed on this page. (The decide path refuses it too: see the #1191 tests.)
     expect(where.clubEventRegistration.registration.status).toEqual({ in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] });
     expect(where.clubEventRegistration.registration.location.is.coordinatorAccountId).toBe("acct-1");
     expect(rows.map((row) => row.id)).toEqual(["p-other-club"]);
   });
 });
 
-describe("follow-up", () => {
-  // Follow-up issue (opened by the coordinator of #1187): decideTeamPermission has no registration-status filter.
-  it.todo("refuses a decision on a flag whose team registration is cancelled, as the list already hides it (#1191)");
+describe("a cancelled or draft team cannot be decided (#1191)", () => {
+  type Where = { clubEventRegistration?: { registration?: { status?: { in: string[] } } } };
+  // A database double that applies only the registration-status part of the decision scope to the team's status.
+  // With no status filter at all the row is found, as the database would before #1191, so a refusal test fails if the filter regresses.
+  function databaseWithTeamStatus(teamStatus: string) {
+    const db = decideDatabase();
+    db.tx.clubTeamMemberPermission.findFirst.mockImplementation(async ({ where }: { where: Where }) => {
+      const statuses = where.clubEventRegistration?.registration?.status?.in;
+      return !statuses || statuses.includes(teamStatus) ? found : null;
+    });
+    return db;
+  }
+  const scopes = [
+    ["coordinator", { coordinatorAccountId: "acct-1" }, { accountId: "acct-1" }],
+    ["staff", { eventId: "event-1" }, { userId: "staff-1" }],
+  ] as const;
+  const cases = (statuses: string[]) => scopes.flatMap(([who, scope, actor]) => statuses.map((status) => [who, status, scope, actor] as const));
+
+  it.each(cases(["CANCELLED", "DRAFT"]))(
+    "refuses a %s decision on a %s team as not found, writing and auditing nothing",
+    async (_who, status, scope, actor) => {
+      const { tx } = databaseWithTeamStatus(status);
+      await expect(decideTeamPermission({ permissionId: "perm-a", decision: "GRANTED", actor, scope })).rejects.toMatchObject({ code: "REGISTRATION_NOT_FOUND", message: "That permission request was not found." });
+      expect(tx.clubTeamMemberPermission.update).not.toHaveBeenCalled();
+      expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(cases(["SUBMITTED", "CONFIRMED", "WAITLISTED"]))(
+    "still records a %s decision on a %s team",
+    async (_who, status, scope, actor) => {
+      const { tx } = databaseWithTeamStatus(status);
+      const row = await decideTeamPermission({ permissionId: "perm-a", decision: "GRANTED", actor, scope });
+      expect(row.status).toBe("GRANTED");
+      expect(tx.clubTeamMemberPermission.update).toHaveBeenCalledTimes(1);
+      expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("answers 404 through the coordinator route for a cancelled team", async () => {
+    const { tx } = databaseWithTeamStatus("CANCELLED");
+    expect((await coordinatorPut(request({ decision: "GRANTED" }), params)).status).toBe(404);
+    expect(tx.clubTeamMemberPermission.update).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("scopes both decisions to the same statuses the lists use", async () => {
+    for (const [, scope, actor] of scopes) {
+      const { tx } = decideDatabase();
+      await decideTeamPermission({ permissionId: "perm-a", decision: "GRANTED", actor, scope });
+      const where = tx.clubTeamMemberPermission.findFirst.mock.calls[0]![0].where as Where;
+      expect(where.clubEventRegistration?.registration?.status).toEqual({ in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] });
+    }
+  });
 });
 
 describe("the age rule still decides who needs approval (#1187)", () => {

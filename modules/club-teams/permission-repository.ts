@@ -4,7 +4,7 @@ import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { createHash, randomUUID } from "node:crypto";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
-import { Prisma } from "@prisma/client";
+import { Prisma, type RegistrationStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getServerEnv } from "@/lib/env";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -288,13 +288,16 @@ function toRow(row: RowShape): TeamPermissionRow {
   };
 }
 
+/** Registrations whose team flags are listed and may be decided; a cancelled or draft team is neither. */
+const LIVE_TEAM_STATUSES: RegistrationStatus[] = ["SUBMITTED", "CONFIRMED", "WAITLISTED"];
+
 const statusOrder: Record<PermissionStatus, number> = { PENDING: 0, DECLINED: 1, GRANTED: 2 };
 const byUrgency = (a: TeamPermissionRow, b: TeamPermissionRow) => statusOrder[a.status] - statusOrder[b.status] || a.teamLabel.localeCompare(b.teamLabel) || a.name.localeCompare(b.name);
 
 /** Every flag on an event's active teams, pending first, for staff who manage registrations. */
 export async function listEventTeamPermissions(eventId: string): Promise<TeamPermissionRow[]> {
   const rows = await getPrisma().clubTeamMemberPermission.findMany({
-    where: { eventId, active: true, clubEventRegistration: { registration: { status: { in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] } } } },
+    where: { eventId, active: true, clubEventRegistration: { registration: { status: { in: LIVE_TEAM_STATUSES } } } },
     select: rowSelect,
   });
   return rows.map(toRow).sort(byUrgency);
@@ -310,7 +313,7 @@ export async function listCoordinatorTeamPermissions(accountId: string, now = ne
       active: true,
       clubEventRegistration: {
         registration: {
-          status: { in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] },
+          status: { in: LIVE_TEAM_STATUSES },
           location: { is: { coordinatorAccountId: accountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } },
         },
       },
@@ -376,8 +379,8 @@ export async function decideTeamPermission(input: {
         id: input.permissionId,
         active: true,
         ...("eventId" in input.scope
-          ? { eventId: input.scope.eventId }
-          : { clubEventRegistration: { registration: { location: { is: { coordinatorAccountId: input.scope.coordinatorAccountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } } } } }),
+          ? { eventId: input.scope.eventId, clubEventRegistration: { registration: { status: { in: LIVE_TEAM_STATUSES } } } }
+          : { clubEventRegistration: { registration: { status: { in: LIVE_TEAM_STATUSES }, location: { is: { coordinatorAccountId: input.scope.coordinatorAccountId, coordinator: { is: { disabledAt: null, areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } } } } } } }),
       },
       select: rowSelect,
     });
