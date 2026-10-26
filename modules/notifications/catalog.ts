@@ -204,7 +204,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "club-form-list" },
     sourceNote: "Set on each club form's settings page, under \"Email these addresses when this form is submitted\". An empty list sends nothing.",
     sentFrom: "modules/club-forms/submission-alert.ts",
-    switchReadIn: ["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"],
+    switchReadIn: ["modules/club-forms/links.ts", "modules/club-forms/open-applications.ts", "modules/club-forms/submissions.ts"],
     built: true,
   },
   {

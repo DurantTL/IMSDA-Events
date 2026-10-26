@@ -355,9 +355,9 @@ describe("opening a submission (#610)", () => {
 
   beforeEach(() => {
     // A fake table that honors the organization filter, like the real query.
-    mocks.submissionFindFirst.mockImplementation(async ({ where }: { where: { organizationId?: string } }) => {
+    mocks.submissionFindFirst.mockImplementation(async ({ where }: { where: { organizationId?: string | { not: null } } }) => {
       const found = row();
-      return where.organizationId && where.organizationId !== found.organizationId ? null : found;
+      return typeof where.organizationId === "string" && where.organizationId !== found.organizationId ? null : found;
     });
   });
 

@@ -5,11 +5,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
+import { ClubFormFillMode } from "@/components/club-form-fill-mode";
 import { ClubFormTemplateToggle } from "@/components/club-forms-actions";
 import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { getServerEnv } from "@/lib/env";
+import { listClosedOpenApplicationKeys } from "@/modules/club-forms/open-applications";
+import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
+import { clubYearFor } from "@/modules/club-rosters/domain";
 
 export const metadata: Metadata = { title: "Club forms" };
 export const dynamic = "force-dynamic";
@@ -25,6 +30,9 @@ export default async function AdminClubFormsPage() {
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const templates = await listClubFormTemplatesForAdmin();
+  const closedKeys = await listClosedOpenApplicationKeys();
+  const clubYear = clubYearFor(new Date());
+  const baseUrl = getServerEnv().APP_BASE_URL;
 
   return (
     <section className="page-stack">
@@ -40,13 +48,28 @@ export default async function AdminClubFormsPage() {
           <table role="table" className="report-table table-cards">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
               {templates.map((template) => (
                 <tr role="row" key={template.key}>
                   <th role="rowheader" scope="row">{template.name}<small className="quiet-copy"> · {template.description}</small></th>
                   <td {...cardCell("Status")}>{template.enabled ? "On" : "Off"}{template.needsSync && <small className="club-report-problem"> · Needs sync: use Sync templates above</small>}</td>
+                  <td {...cardCell("Who fills it in")}>
+                    {template.version > 0
+                      ? (
+                        <ClubFormFillMode
+                          applicationUrl={openApplicationUrl(baseUrl, template.key)}
+                          clubYear={clubYear}
+                          closed={closedKeys.has(template.key)}
+                          fillMode={template.fillMode}
+                          key={`${template.key}-${template.fillMode}-${closedKeys.has(template.key)}`}
+                          name={template.name}
+                          templateKey={template.key}
+                        />
+                      )
+                      : <small className="quiet-copy">Sync first</small>}
+                  </td>
                   <td {...cardCell("Filled in")}>{template.submissionCount}</td>
                   <td {...cardCell("Version")}>
                     {template.version}

@@ -12967,6 +12967,21 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 @media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-pill { flex: 1 1 auto; justify-content: center; } }
 
+/* Club form groups and open applications (#1229) */
+.club-form-group { display: grid; gap: 10px; }
+.club-form-group > p.field-help { margin: 4px 0 0; }
+.club-form-group > h2 { margin: 8px 0 0; font-size: max(var(--type-staff-floor, 0px), 1.25rem); font-weight: 700; line-height: 1.3; }
+.club-form-group h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.0625rem); }
+.copy-application-link { display: grid; gap: 6px; min-width: 0; }
+.copy-application-link code { display: block; overflow-wrap: anywhere; word-break: break-all; padding: 8px 10px; border-radius: 8px; background: var(--surface-muted, #f3f5f4); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.copy-application-link .field-help { margin: 4px 0 0; }
+.club-form-fill-mode { display: grid; gap: 8px; min-width: 0; }
+.club-form-fill-mode select { min-height: 44px; width: 100%; min-width: 0; max-width: 100%; }
+.club-form-fill-mode .field-help { margin: 4px 0 0; }
+/* In the table layout the cell gets enough room for the choice, the copy button and the address (cards on phones). */
+@media (min-width: 601px) { .club-form-fill-mode { min-width: 13rem; } }
+.club-form-apply-club { display: grid; gap: 10px; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { formatClubFormAnswer, type ClubFormsViewer } from "@/modules/club-forms/domain";
+import { clubFormClubLabel, formatClubFormAnswer, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { getClubFormTemplateForStaff } from "@/modules/club-forms/templates";
 import { exportColumnsAcrossVersions, listClubFormTemplateVersions } from "@/modules/club-forms/versions";
@@ -43,6 +43,7 @@ export async function buildClubFormsCsv(
       submittedAt: true,
       enteredVia: true,
       answers: true,
+      unlistedClubName: true,
       organization: { select: { name: true } },
     },
   });
@@ -52,12 +53,12 @@ export async function buildClubFormsCsv(
     const answers = row.answers as Record<string, unknown>;
     return [
       template.name,
-      row.organization.name,
+      clubFormClubLabel(row.organization?.name, row.unlistedClubName),
       row.clubYear,
       row.subjectName,
       row.status,
       row.submittedAt?.toISOString() ?? "",
-      row.enteredVia === "LINK" ? "Private link" : "Club director",
+      row.enteredVia === "LINK" ? "Private link" : row.enteredVia === "OPEN_APPLICATION" ? "Open application" : "Club director",
       ...columns.map((column) => formatClubFormAnswer(column.byVersion.get(row.templateVersion) ?? column.latest, answers[column.key])),
     ];
   });

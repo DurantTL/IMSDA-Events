@@ -6838,6 +6838,8 @@ enum ClubFormEntryChannel {
   ATTENDEE
   STAFF_ACTING
   LINK
+  /// A public open application (#1229): no link and no account.
+  OPEN_APPLICATION
 }
 
 /// OPEN links can still be used (until `expiresAt`); USED links submitted once
@@ -6896,6 +6898,12 @@ model ClubFormTemplate {
   enabled            Boolean   @default(false)
   enabledAt          DateTime?
   enabledByUserId    String?
+  /// Who fills the form in (#1229): "FAMILY", "CLUB" or "OPEN_APPLICATION". Null means the code seed's default
+  /// (`effectiveClubFormFillMode`). A setting, not part of the definition: not versioned, and `club-forms:sync`
+  /// writes the seed's value only while `fillModeChangedAt` is null.
+  fillMode             String?
+  fillModeChangedAt    DateTime?
+  fillModeChangedByUserId String?
   /// Set the first time the template is edited or created in the app (#712).
   /// `club-forms:sync` never overwrites a customized template.
   customizedAt       DateTime?
@@ -6914,6 +6922,22 @@ model ClubFormTemplate {
   submissions ClubFormSubmission[]
   links       ClubFormLink[]
   versions    ClubFormTemplateVersion[]
+  openLinkYears ClubFormOpenLinkYear[]
+}
+
+/// The per-club-year state of an open application's public link (#1229). No row, or a null `closedAt`, means open.
+model ClubFormOpenLinkYear {
+  id             String    @id @default(cuid())
+  templateId     String
+  clubYear       String
+  closedAt       DateTime?
+  closedByUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  template ClubFormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, clubYear])
 }
 
 /// A frozen copy of one published version of a club form template (#712), so a
@@ -6947,7 +6971,12 @@ model ClubFormTemplateVersion {
 model ClubFormSubmission {
   id                     String                   @id @default(cuid())
   templateId             String
-  organizationId         String
+  /// Null only for an open application from a club that is "Not listed" (#1229): conference staff alone see it.
+  organizationId         String?
+  /// The club name the applicant typed when "Not listed" (#1229); empty otherwise.
+  unlistedClubName       String?
+  /// The public open application's idempotency key (#1229): the same key twice returns the first submission.
+  idempotencyKey         String?                  @unique
   clubYear               String
   rosterMemberId         String?
   /// A display label for lists ("by member"): the roster member's name, or
@@ -6975,7 +7004,7 @@ model ClubFormSubmission {
 
   template         ClubFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
   rosterActionMember ClubRosterMember? @relation("ClubFormSubmissionRosterAction", fields: [rosterActionMemberId], references: [id], onDelete: SetNull)
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   rosterMember     ClubRosterMember? @relation(fields: [rosterMemberId], references: [id], onDelete: SetNull)
   enteredByAccount AttendeeAccount?  @relation("ClubFormSubmissionEnteredByAccount", fields: [enteredByAccountId], references: [id], onDelete: SetNull)
   enteredByUser    User?             @relation("ClubFormSubmissionEnteredByUser", fields: [enteredByUserId], references: [id], onDelete: SetNull)

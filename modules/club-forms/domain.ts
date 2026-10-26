@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
+import { clubFormTemplateSeeds, type ClubFormFillMode } from "@/modules/club-forms/definitions";
 import { parseRosterMapping, rosterMappingProblems, type RosterMapping } from "@/modules/club-forms/roster-mapping";
 import { formatAddressDisplay, isPlainAddressObject, sanitizeAddressInput } from "@/modules/forms/address";
 import {
@@ -26,6 +26,12 @@ export const CLUB_FORM_LINK_MAX_DAYS = 30;
 export const RESTRICTED_LABEL = "Restricted";
 /** The largest answers payload accepted, in bytes of JSON. */
 export const CLUB_FORM_MAX_ANSWERS_BYTES = 200_000;
+
+/** The stored value if it is a valid fill mode, else the code seed's default, else "FAMILY" (a template made in the app). */
+export function effectiveClubFormFillMode(stored: string | null | undefined, key: string): ClubFormFillMode {
+  if (stored === "FAMILY" || stored === "CLUB" || stored === "OPEN_APPLICATION") return stored;
+  return clubFormTemplateSeeds.find((seed) => seed.key === key)?.fillMode ?? "FAMILY";
+}
 
 export const clubFormPrintLayouts = ["STANDARD", "PASSENGER_LIST"] as const;
 export type ClubFormPrintLayout = typeof clubFormPrintLayouts[number];
@@ -61,6 +67,8 @@ export type ClubFormTemplateRecord = {
    */
   rosterMapping: RosterMapping | null;
   enabled: boolean;
+  /** Who fills it in (#1229): the stored setting, or the code seed's default. */
+  fillMode: ClubFormFillMode;
   /** Edited or created in the app (#712): `club-forms:sync` leaves it alone. */
   customized: boolean;
 };
@@ -138,6 +146,7 @@ export function parseClubFormTemplate(row: {
   hiddenFieldKeys?: string[];
   printLayout: string;
   rosterMapping?: unknown;
+  fillMode?: string | null;
   enabled: boolean;
   customizedAt?: Date | null;
 }): ClubFormTemplateRecord {
@@ -161,6 +170,7 @@ export function parseClubFormTemplate(row: {
     // parse reads as none, so a damaged value can only turn the feature off.
     rosterMapping: parseRosterMapping(row.rosterMapping) ?? seed?.rosterMapping ?? null,
     enabled: row.enabled,
+    fillMode: effectiveClubFormFillMode(row.fillMode, row.key),
     customized: Boolean(row.customizedAt),
   };
 }
@@ -352,7 +362,12 @@ export type ClubFormsViewer =
   | { kind: "AREA_COORDINATOR"; actor: ClubFormActor }
   | { kind: "STAFF"; userId: string; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean };
 
-export function viewerCanSeeClub(viewer: ClubFormsViewer, organizationId: string) {
+/**
+ * A submission with no club (a "Not listed" open application, #1229) is conference staff's alone: `organizationId`
+ * is null there, and neither a club leader nor an Area Coordinator may see it.
+ */
+export function viewerCanSeeClub(viewer: ClubFormsViewer, organizationId: string | null) {
+  if (organizationId === null) return viewer.kind === "STAFF";
   return viewer.kind !== "CLUB_LEADER" || viewer.organizationId === organizationId;
 }
 
@@ -379,16 +394,23 @@ export function viewerSeesDrafts(viewer: ClubFormsViewer) {
   return viewer.kind === "CLUB_LEADER";
 }
 
+/** The club name shown for a submission: the club's own, or "Not listed: <typed name>" for an open application from an unlisted club (#1229). */
+export function clubFormClubLabel(organizationName: string | null | undefined, unlistedClubName: string | null | undefined) {
+  if (organizationName) return organizationName;
+  const typed = (unlistedClubName ?? "").trim();
+  return typed ? `Not listed: ${typed}` : "Not listed";
+}
+
 /** Health, conduct, physician and emergency-contact answers (not birth dates). */
-export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string) {
-  if (viewer.kind === "CLUB_LEADER") return viewer.organizationId === organizationId;
+export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string | null) {
+  if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
   // A Clubs Administrator alone does not read these (#1225): system administrators and current Event Admins do.
   return viewer.kind === "STAFF" && viewer.sensitiveAnswers;
 }
 
 /** Full birth dates (ADR 0005 Addendum A): the club's own leaders, system administrators and Clubs Administrators. */
-export function viewerCanRevealBirthDates(viewer: ClubFormsViewer, organizationId: string) {
-  if (viewer.kind === "CLUB_LEADER") return viewer.organizationId === organizationId;
+export function viewerCanRevealBirthDates(viewer: ClubFormsViewer, organizationId: string | null) {
+  if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
   return viewer.kind === "STAFF" && (viewer.systemAdmin || viewer.clubsAdministrator);
 }
 
@@ -398,7 +420,7 @@ export function viewerCanRevealBirthDates(viewer: ClubFormsViewer, organizationI
  */
 export function restrictedFieldKeys(
   viewer: ClubFormsViewer,
-  organizationId: string,
+  organizationId: string | null,
   template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys">,
 ) {
   const birth = new Set(template.birthDateFieldKeys);

@@ -26,12 +26,18 @@ import { buildYearNominationTemplate, tltApplicationTemplate, type FormTemplate,
  * Word forms before a system administrator enables that template.
  */
 
+/** Who fills a form in (#1229): families and individuals through a private link, the club itself, or anyone through one public link. */
+export const CLUB_FORM_FILL_MODES = ["FAMILY", "CLUB", "OPEN_APPLICATION"] as const;
+export type ClubFormFillMode = (typeof CLUB_FORM_FILL_MODES)[number];
+
 export type ClubFormTemplateSeed = {
   key: string;
   name: string;
   description: string;
   version: number;
   sortOrder: number;
+  /** The default "Who fills it in" (#1229); staff can change it in Admin and sync then leaves it alone. */
+  fillMode: ClubFormFillMode;
   definition: RegistrationFormDefinition;
   sectionNotes: Record<string, string[]>;
   sensitiveFieldKeys: string[];
@@ -101,6 +107,7 @@ const membershipApplication: ClubFormTemplateSeed = {
   description: "An applicant's membership application with the parent or guardian's approval, waiver and signatures.",
   version: 3,
   sortOrder: 10,
+  fillMode: "FAMILY",
   printLayout: "STANDARD",
   // #721: the youth roster fields this form knows. The class names match the roster's; the applicant's phone is the
   // family's, so it pre-fills the first guardian's phone (the director can change it on the review screen). The
@@ -218,6 +225,7 @@ const staffForm: ClubFormTemplateSeed = {
   description: "A staff or volunteer's record, health history, experience, honors to teach, conduct disclosure and references.",
   version: 4,
   sortOrder: 20,
+  fillMode: "FAMILY",
   printLayout: "STANDARD",
   // #721: staff are added as staff roster members, from the name and birth date. The health and conduct answers
   // are sensitive and can never be mapped.
@@ -328,6 +336,7 @@ const permissionSlip: ClubFormTemplateSeed = {
   description: "A parent or guardian's permission for a child to take part in one off-premises club activity, with medical and emergency details.",
   version: 2,
   sortOrder: 30,
+  fillMode: "FAMILY",
   printLayout: "STANDARD",
   sensitiveFieldKeys: ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"],
   birthDateFieldKeys: [],
@@ -397,6 +406,7 @@ const passengerList: ClubFormTemplateSeed = {
   description: "A roll-call sheet for one trip: contacts, up to 20 passengers with emergency contacts, and printable roll-call columns 1 to 5.",
   version: 1,
   sortOrder: 40,
+  fillMode: "CLUB",
   printLayout: "PASSENGER_LIST",
   sensitiveFieldKeys: Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`),
   birthDateFieldKeys: [],
@@ -439,7 +449,7 @@ function withoutConfirmationPromise(item: RegistrationFormField): RegistrationFo
 
 function fromEventTemplate(
   template: FormTemplate,
-  seed: Pick<ClubFormTemplateSeed, "key" | "name" | "description" | "sortOrder">,
+  seed: Pick<ClubFormTemplateSeed, "key" | "name" | "description" | "sortOrder" | "fillMode">,
 ): ClubFormTemplateSeed {
   return {
     ...seed,
@@ -471,6 +481,7 @@ const tltApplication = fromEventTemplate(tltApplicationTemplate, {
   name: "TLT Application",
   description: "The Conference TLT application. The director sends the teen a private link; it is also kept in the club's files.",
   sortOrder: 50,
+  fillMode: "OPEN_APPLICATION",
 });
 
 const pathfinderOfTheYear = fromEventTemplate(buildYearNominationTemplate("Pathfinder"), {
@@ -478,6 +489,7 @@ const pathfinderOfTheYear = fromEventTemplate(buildYearNominationTemplate("Pathf
   name: "Pathfinder of the Year nomination",
   description: "The director's nomination: nominee, attendance, classes, Good Conduct Award and five essay questions.",
   sortOrder: 60,
+  fillMode: "CLUB",
 });
 
 const tltOfTheYear = fromEventTemplate(buildYearNominationTemplate("TLT"), {
@@ -485,6 +497,7 @@ const tltOfTheYear = fromEventTemplate(buildYearNominationTemplate("TLT"), {
   name: "TLT of the Year nomination",
   description: "The director's nomination: nominee, attendance, classes, Good Conduct Award and five essay questions.",
   sortOrder: 70,
+  fillMode: "CLUB",
 });
 
 const tltRecommendation: ClubFormTemplateSeed = {
@@ -493,6 +506,7 @@ const tltRecommendation: ClubFormTemplateSeed = {
   description: "A recommendation for a TLT applicant, sent by private link to the person recommending them. Only the club's director, Area Coordinators and conference staff read it; never the applicant.",
   version: 1,
   sortOrder: 80,
+  fillMode: "FAMILY",
   printLayout: "STANDARD",
   sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
@@ -541,6 +555,7 @@ const canCollecting: ClubFormTemplateSeed = {
   description: "The club's report of its can and food collection project: participants, hours, food, cash and baskets.",
   version: 1,
   sortOrder: 90,
+  fillMode: "CLUB",
   printLayout: "STANDARD",
   sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
@@ -577,6 +592,7 @@ const photoRelease: ClubFormTemplateSeed = {
   description: "A parent or guardian's photo and video release for a minor, sent by the director as a private link.",
   version: 1,
   sortOrder: 100,
+  fillMode: "FAMILY",
   printLayout: "STANDARD",
   sensitiveFieldKeys: [],
   birthDateFieldKeys: [],

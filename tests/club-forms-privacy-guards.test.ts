@@ -43,6 +43,7 @@ describe("club forms stay apart from the places sensitive answers must never go 
     // and the coordinator health view (#658, ADR 0005 Addendum C), which audits before it opens two emergency fields.
     expect(readers).toEqual([
       "modules/club-forms/links.ts",
+      "modules/club-forms/open-applications.ts",
       "modules/club-forms/reseal.ts",
       "modules/club-forms/submissions.ts",
       "modules/coordinator-health/repository.ts",

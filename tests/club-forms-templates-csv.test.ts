@@ -20,6 +20,7 @@ const client = {
     findFirst: mocks.templateFindFirst,
     upsert: mocks.templateUpsert,
     update: mocks.templateUpdate,
+    updateMany: vi.fn(async () => ({ count: 1 })),
   },
   clubFormSubmission: { findMany: mocks.submissionFindMany, update: mocks.submissionUpdate },
   clubFormTemplateVersion: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null), createMany: vi.fn(async () => ({ count: 0 })) },
@@ -269,7 +270,7 @@ describe("club form templates are off until a system administrator turns them on
     await listEnabledClubFormTemplates();
     expect(mocks.templateFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { enabled: true },
-      select: { key: true, name: true, description: true },
+      select: { key: true, name: true, description: true, fillMode: true },
     }));
   });
 

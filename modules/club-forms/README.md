@@ -269,3 +269,20 @@ groups with one line on who fills each in. Director items link to
 fixed `clubChooseTargets` allowlist (never a path). Items sent by private link only
 say so; an item whose club form template is off says "Not available yet." with no
 link. The page reads each template's key and `enabled` flag only.
+
+## Who fills it in, and open applications (#1229)
+
+- `ClubFormTemplate.fillMode` is `FAMILY` (a parent, member or recommender through a private link), `CLUB` (the
+  director fills it in) or `OPEN_APPLICATION` (anyone, through one public link). The code seed carries the default;
+  `effectiveClubFormFillMode(stored, key)` is stored, then seed, then `FAMILY`. `club-forms:sync` writes the seed's
+  value only while `fillModeChangedAt` is null (also for templates edited in the app) and never over a system
+  administrator's choice (Admin, Club forms, "Who fills it in", audited).
+- The director's Forms page groups enabled forms by it (`groupClubFormsByFillMode`); an open application sits under
+  club forms with "Copy application link".
+- An open application is `/clubs/forms/apply/<templateKey>` and `/api/public/club-form-applications/<templateKey>`
+  (`open-applications.ts`, rules in `open-applications-domain.ts`). It reuses the private link's answer rules
+  (`public-fill.ts`). The applicant picks an active club (id and name only) or "Not listed" with a typed name; a
+  submission is `enteredVia: OPEN_APPLICATION`, with an idempotency key (the same key returns the first result).
+  Off says "Not available yet."; staff can close the link per club year (`ClubFormOpenLinkYear`).
+- A "Not listed" submission has a null `organizationId`: only conference staff can list or open it, and it can't be
+  added to a roster. Every permission rule in `domain.ts` takes `string | null` so null never matches a club viewer.

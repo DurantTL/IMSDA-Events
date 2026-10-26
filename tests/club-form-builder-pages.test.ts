@@ -36,6 +36,7 @@ vi.mock("@/modules/club-forms/templates", () => ({
   getEnabledClubFormTemplate: mocks.getEnabledClubFormTemplate,
   withLiveDirectory: async (definition: unknown) => definition,
 }));
+vi.mock("@/modules/club-forms/open-applications", () => ({ listClosedOpenApplicationKeys: vi.fn(async () => new Set<string>()) }));
 vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.listRosterChoices }));
 vi.mock("@/modules/club-forms/access", () => ({ clubLeaderViewerFromAccess: vi.fn() }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));

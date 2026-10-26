@@ -15,6 +15,7 @@ import {
   validateClubFormAnswers,
   viewerAuditFields,
   restrictedFieldKeys,
+  clubFormClubLabel,
   viewerCanRevealBirthDates,
   viewerCanRevealSensitive,
   viewerCanSeeClub,
@@ -272,7 +273,10 @@ function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Pris
   }
   const organizationId = viewer.kind === "CLUB_LEADER" ? viewer.organizationId : filter.organizationId;
   return {
-    ...(organizationId ? { organizationId } : {}),
+    ...(organizationId
+      ? { organizationId }
+      // A submission with no club (#1229) is conference staff's alone: an Area Coordinator's unfiltered list leaves it out.
+      : viewer.kind === "STAFF" ? {} : { organizationId: { not: null } }),
     ...(filter.rosterMemberId ? { rosterMemberId: filter.rosterMemberId } : {}),
     // A form that has been switched off blocks new fills and links only: past submissions stay readable.
     ...(filter.templateKey ? { template: { key: filter.templateKey } } : {}),
@@ -301,6 +305,7 @@ export async function listSubmissionsForViewer(viewer: ClubFormsViewer, filter: 
       enteredVia: true,
       hasSensitiveAnswers: true,
       template: { select: { key: true, name: true } },
+      unlistedClubName: true,
       organization: { select: { id: true, name: true } },
     },
   });
@@ -308,8 +313,8 @@ export async function listSubmissionsForViewer(viewer: ClubFormsViewer, filter: 
     id: row.id,
     templateKey: row.template.key,
     templateName: row.template.name,
-    organizationId: row.organization.id,
-    organizationName: row.organization.name,
+    organizationId: row.organization?.id ?? null,
+    organizationName: clubFormClubLabel(row.organization?.name, row.unlistedClubName),
     clubYear: row.clubYear,
     rosterMemberId: row.rosterMemberId,
     subjectName: row.subjectName,
@@ -358,6 +363,7 @@ export async function getSubmissionForViewer(
       rosterActionMemberId: true,
       rosterActionMember: { select: { clubYear: true, status: true } },
       link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } } } },
+      unlistedClubName: true,
       organization: { select: { name: true } },
       template: {
         select: {
@@ -440,7 +446,7 @@ export async function getSubmissionForViewer(
       hiddenFieldKeys: template.hiddenFieldKeys,
       enabled: template.enabled,
     },
-    organization: { id: row.organizationId, name: row.organization.name },
+    organization: { id: row.organizationId, name: clubFormClubLabel(row.organization?.name, row.unlistedClubName) },
     clubYear: row.clubYear,
     rosterMemberId: row.rosterMemberId,
     subjectName: row.subjectName,
