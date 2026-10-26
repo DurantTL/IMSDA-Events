@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   listEnabled: vi.fn(),
   listFillModes: vi.fn(),
+  listClosed: vi.fn(),
   getCurrentAttendee: vi.fn(),
   currentStaffActingContext: vi.fn(),
   attendeeSecondStepPending: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
 }));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
-vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled, listPublicClubFormFillModes: mocks.listFillModes }));
+vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled, listPublicClubFormFillModes: mocks.listFillModes, listPublicClubFormClosedKeys: mocks.listClosed }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.attendeeSecondStepPending }));
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({
@@ -50,7 +51,8 @@ const item = (id: string) => items.find((candidate) => candidate.id === id)!;
 
 const tltOpen = new Map([["club_tlt_application", "OPEN_APPLICATION" as const]]);
 
-async function renderIndex(enabled: string[], fillModes: Map<string, "FAMILY" | "CLUB" | "OPEN_APPLICATION"> = tltOpen) {
+async function renderIndex(enabled: string[], fillModes: Map<string, "FAMILY" | "CLUB" | "OPEN_APPLICATION"> = tltOpen, closed: string[] = []) {
+  mocks.listClosed.mockResolvedValue(new Set(closed));
   mocks.listEnabled.mockResolvedValue(new Set(enabled));
   mocks.listFillModes.mockResolvedValue(fillModes);
   return renderToStaticMarkup(await PublicClubFormsPage());
@@ -153,6 +155,14 @@ describe("an open application on the Club forms page (#1229)", () => {
     expect(publicClubFormView(item("tlt-application"), new Set(), tltOpen)).toMatchObject({ href: null, note: NOT_AVAILABLE_LINE, applicationPath: null });
     const html = await renderIndex(publicClubFormTemplateKeys.filter((key) => key !== "club_tlt_application"));
     expect(html).not.toContain("/clubs/forms/apply/");
+  });
+
+  it("says the year is closed, with no Apply button or copy box, when staff closed the link", async () => {
+    expect(publicClubFormView(item("tlt-application"), allKeys, tltOpen, new Set(["club_tlt_application"]))).toMatchObject({ href: null, note: "Applications are closed for this club year.", applicationPath: null });
+    const html = await renderIndex(publicClubFormTemplateKeys as string[], tltOpen, ["club_tlt_application"]);
+    expect(html).toContain("Applications are closed for this club year.");
+    expect(html).not.toContain("/clubs/forms/apply/");
+    expect(html).not.toContain("Copy link for your website");
   });
 
   it("falls back to the private-link line when staff move the form out of open application", () => {

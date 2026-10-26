@@ -12,6 +12,8 @@ import {
   OPEN_APPLICATION_CLOSED_MESSAGE,
   OPEN_APPLICATION_OFF_MESSAGE,
   openApplicationState,
+  withChosenClubAnswers,
+  withoutClubDirectoryFields,
   type OpenApplicationSubmitInput,
 } from "@/modules/club-forms/open-applications-domain";
 import { prepareFillerAnswers, sealFillerAnswers } from "@/modules/club-forms/public-fill";
@@ -81,7 +83,7 @@ export async function resolveOpenApplication(key: string, now = new Date()) {
   assertClubFormTemplateCurrent(template);
   const prisma = getPrisma();
   // Staff-only (office use) and hidden fields are not the applicant's to see, as on a private link.
-  const definition = await withLiveDirectory(definitionForLink(template), prisma);
+  const definition = await withLiveDirectory(withoutClubDirectoryFields(definitionForLink(template)), prisma);
   const sectionIds = new Set(definition.sections.map((section) => section.id));
   return {
     status: "OPEN" as const,
@@ -129,16 +131,18 @@ export async function submitOpenApplication(key: string, input: OpenApplicationS
 
   let organizationId: string | null = null;
   let unlistedClubName: string | null = null;
+  let clubName: string | null = null;
   if (input.organizationId === NOT_LISTED_CLUB) {
     unlistedClubName = (input.unlistedClubName ?? "").trim().slice(0, 120);
     if (!unlistedClubName) throw new ClubFormError("VALIDATION_FAILED", "Type your club's name.", [{ key: "unlistedClubName", message: "Type your club's name." }]);
   } else {
-    const club = await prisma.organization.findFirst({ where: { id: input.organizationId, type: "CLUB", isActive: true }, select: { id: true } });
+    const club = await prisma.organization.findFirst({ where: { id: input.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } });
     if (!club) throw new ClubFormError("VALIDATION_FAILED", "Choose your club from the list.", [{ key: "organizationId", message: "Choose your club from the list." }]);
     organizationId = club.id;
+    clubName = club.name;
   }
 
-  const answers = await prepareFillerAnswers(template, input.answers, now);
+  const answers = await prepareFillerAnswers(template, withChosenClubAnswers(template.definition, input.answers, clubName !== null ? { name: clubName } : { unlistedName: unlistedClubName ?? "" }), now);
   const submissionId = randomUUID();
   // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
   const alertEnabled = await isNotificationEnabled("CLUB_FORM_SUBMITTED");

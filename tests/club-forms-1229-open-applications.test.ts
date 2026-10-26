@@ -50,6 +50,8 @@ import {
   OPEN_APPLICATION_CLOSED_MESSAGE,
   OPEN_APPLICATION_OFF_MESSAGE,
   openApplicationSubmitSchema,
+  withChosenClubAnswers,
+  withoutClubDirectoryFields,
 } from "@/modules/club-forms/open-applications-domain";
 
 const now = new Date("2026-10-26T15:00:00Z");
@@ -114,7 +116,7 @@ beforeEach(() => {
   mocks.openYearFindUnique.mockResolvedValue(null);
   mocks.submissionCreate.mockResolvedValue({});
   mocks.submissionFindUnique.mockResolvedValue(null);
-  mocks.organizationFindFirst.mockImplementation(async ({ where }: { where: { id: string } }) => (where.id === "club-a" ? { id: "club-a" } : null));
+  mocks.organizationFindFirst.mockImplementation(async ({ where }: { where: { id: string } }) => (where.id === "club-a" ? { id: "club-a", name: "Example Pathfinders" } : null));
   // Honors `select`, like the database: the club list must ask for id and name and nothing else.
   mocks.organizationFindMany.mockImplementation(async ({ select }: { select: Record<string, boolean> }) => {
     const row: Record<string, string> = { id: "club-a", name: "Example Pathfinders", normalizedName: "example pathfinders" };
@@ -218,6 +220,38 @@ describe("submitting an open application (#1229)", () => {
     expect(() => openApplicationSubmitSchema.parse({ organizationId: "club-a", idempotencyKey: "k".repeat(101), answers })).toThrow();
     expect(() => openApplicationSubmitSchema.parse({ organizationId: "club-a", idempotencyKey: "has spaces in it", answers })).toThrow();
     expect(() => openApplicationSubmitSchema.parse({ organizationId: "club-a", idempotencyKey: "key-aaaaaaaa-0001", answers, linkId: "x" })).toThrow();
+  });
+
+  it("sets the form's own club fields from the chosen club, over anything the client sent", async () => {
+    await submitOpenApplication(KEY, input({ answers: { ...answers, club_name: "Sample Valley", club_name_other: "Somewhere Else" } }), now);
+    const data = mocks.submissionCreate.mock.calls[0][0].data;
+    expect(data.answers.club_name).toBe("Example Pathfinders");
+    expect(data.answers).not.toHaveProperty("club_name_other");
+  });
+
+  it("sets Not listed and the typed name in the companion for a club that is not listed", async () => {
+    mocks.organizationFindMany.mockImplementation(async () => [{ id: "club-a", name: "Example Pathfinders", normalizedName: "example pathfinders" }]);
+    await submitOpenApplication(KEY, input({ organizationId: NOT_LISTED_CLUB, unlistedClubName: "Sample Valley Pathfinders", answers: { ...answers, club_name: "Example Pathfinders" } }), now);
+    const data = mocks.submissionCreate.mock.calls[0][0].data;
+    expect(data.answers).toMatchObject({ club_name: "Not listed", club_name_other: "Sample Valley Pathfinders" });
+  });
+
+  it("does not show the form's own club fields to the applicant", async () => {
+    const view = await resolveOpenApplication(KEY, now);
+    if (view.status !== "OPEN") throw new Error("expected open");
+    const keys = view.form.definition.sections.flatMap((section) => section.fields.map((field) => field.key));
+    expect(keys).not.toContain("club_name");
+    expect(keys).not.toContain("club_name_other");
+    expect(keys).toContain("years_in_club");
+    expect(withoutClubDirectoryFields(seed.definition)).not.toBe(seed.definition);
+    expect(withChosenClubAnswers(seed.definition, { club_name: "Other" }, { name: "Mine" })).toMatchObject({ club_name: "Mine" });
+  });
+
+  it("collapses control characters and whitespace in a typed club name, so it cannot add lines to an email", () => {
+    const parsed = openApplicationSubmitSchema.parse({ organizationId: NOT_LISTED_CLUB, unlistedClubName: "  Sample\r\nBcc: x@example.test\t\u2028 Valley  ", idempotencyKey: "key-aaaaaaaa-0001", answers });
+    expect(parsed.unlistedClubName).toBe("Sample Bcc: x@example.test Valley");
+    expect(parsed.unlistedClubName).not.toMatch(/[\r\n\u2028]/);
+    expect(() => openApplicationSubmitSchema.parse({ organizationId: NOT_LISTED_CLUB, unlistedClubName: "\n\t \r", idempotencyKey: "key-aaaaaaaa-0001", answers })).toThrow();
   });
 
   it("applies the same answer rules as a private link", async () => {

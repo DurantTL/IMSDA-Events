@@ -7,7 +7,7 @@ import { PublicHeaderSessionLinks } from "@/components/public-header-session-lin
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { getServerEnv } from "@/lib/env";
 import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
-import { listEnabledPublicClubFormKeys, listPublicClubFormFillModes } from "@/modules/club-forms/public-index";
+import { listEnabledPublicClubFormKeys, listPublicClubFormClosedKeys, listPublicClubFormFillModes } from "@/modules/club-forms/public-index";
 import { publicClubFormGroups, publicClubFormView } from "@/modules/club-forms/public-index-domain";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
  * by private link only say so; an item whose club form is turned off says "Not available yet." with no link.
  */
 export default async function PublicClubFormsPage() {
-  const [enabled, fillModes] = await Promise.all([listEnabledPublicClubFormKeys(), listPublicClubFormFillModes()]);
+  const [enabled, fillModes, closed] = await Promise.all([listEnabledPublicClubFormKeys(), listPublicClubFormFillModes(), listPublicClubFormClosedKeys()]);
   const baseUrl = getServerEnv().APP_BASE_URL;
 
   return (
@@ -57,7 +57,7 @@ export default async function PublicClubFormsPage() {
             <h2 id={`club-forms-${group.id}`}>{group.title}</h2>
             <ul className="club-forms-index-list">
               {group.items.map((item) => {
-                const view = publicClubFormView(item, enabled, fillModes);
+                const view = publicClubFormView(item, enabled, fillModes, closed);
                 return (
                   <li className="club-forms-index-item" key={view.id}>
                     <div className="club-forms-index-text">

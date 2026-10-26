@@ -1,5 +1,5 @@
 import type { ClubFormFillMode } from "@/modules/club-forms/definitions";
-import { openApplicationPath } from "@/modules/club-forms/open-applications-domain";
+import { OPEN_APPLICATION_CLOSED_MESSAGE, openApplicationPath } from "@/modules/club-forms/open-applications-domain";
 import { latestStartedReportYear } from "@/modules/club-reports/year-end-domain";
 
 /**
@@ -120,10 +120,13 @@ export function publicClubFormView(
   item: PublicClubFormItem,
   enabledTemplateKeys: ReadonlySet<string>,
   fillModes: ReadonlyMap<string, ClubFormFillMode> = new Map(),
+  /** Open applications staff closed for the current club year. */
+  closedTemplateKeys: ReadonlySet<string> = new Set(),
 ): PublicClubFormView {
   const base = { id: item.id, name: item.name, who: item.who, applicationPath: null };
   if (item.templateKey && !enabledTemplateKeys.has(item.templateKey)) return { ...base, href: null, note: NOT_AVAILABLE_LINE };
   if (item.templateKey && fillModes.get(item.templateKey) === "OPEN_APPLICATION") {
+    if (closedTemplateKeys.has(item.templateKey)) return { ...base, href: null, note: OPEN_APPLICATION_CLOSED_MESSAGE };
     const path = openApplicationPath(item.templateKey);
     return { ...base, href: path, note: null, applicationPath: path };
   }

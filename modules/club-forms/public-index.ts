@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { listClosedOpenApplicationKeys } from "@/modules/club-forms/open-applications";
 import { effectiveClubFormFillMode } from "@/modules/club-forms/domain";
 import type { ClubFormFillMode } from "@/modules/club-forms/definitions";
 import { publicClubFormTemplateKeys } from "@/modules/club-forms/public-index-domain";
@@ -21,4 +22,9 @@ export async function listPublicClubFormFillModes(): Promise<Map<string, ClubFor
     select: { key: true, fillMode: true },
   });
   return new Map(rows.map((row) => [row.key, effectiveClubFormFillMode(row.fillMode, row.key)]));
+}
+
+/** Open applications staff closed for the current club year (#1229), as template keys. */
+export async function listPublicClubFormClosedKeys(): Promise<Set<string>> {
+  return listClosedOpenApplicationKeys();
 }

@@ -12921,14 +12921,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }
+.club-form-group > p.field-help { margin: 4px 0 0; }
 .club-form-group h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.0625rem); }
-.club-form-group-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.club-form-group-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-.club-form-group-item-text { min-width: 0; flex: 1 1 220px; display: grid; gap: 2px; }
-.club-form-group-item-text strong { font-size: max(var(--type-staff-floor, 0px), 1rem); }
-.club-form-group-item-text small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); line-height: 1.4; }
-.club-form-group-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.club-form-group-actions > * { min-height: 44px; }
 .copy-application-link { display: grid; gap: 6px; min-width: 0; }
 .copy-application-link code { display: block; overflow-wrap: anywhere; word-break: break-all; padding: 8px 10px; border-radius: 8px; background: var(--surface-muted, #f3f5f4); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .copy-application-link .field-help { margin: 4px 0 0; }
