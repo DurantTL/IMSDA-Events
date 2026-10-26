@@ -432,6 +432,11 @@ const passengerList: ClubFormTemplateSeed = {
  * validated by club forms). Only the key and the seed details differ: club
  * form keys must not equal an event template key.
  */
+function withoutConfirmationPromise(item: RegistrationFormField): RegistrationFormField {
+  // Club private-link submissions send no confirmation email, so a help line promising one is cleared.
+  return /confirmation/i.test(item.helpText ?? "") ? { ...item, helpText: "" } : item;
+}
+
 function fromEventTemplate(
   template: FormTemplate,
   seed: Pick<ClubFormTemplateSeed, "key" | "name" | "description" | "sortOrder">,
@@ -451,8 +456,9 @@ function fromEventTemplate(
         fields: candidate.fields.map((item) => {
           // The club form fill-in shows a checkbox's label, not its placeholder (event forms show the placeholder as the
           // statement). So the statement becomes the label; its wording is unchanged.
-          if (item.type !== "CHECKBOX" || !item.placeholder) return item;
-          const { placeholder, ...rest } = item;
+          const plain = withoutConfirmationPromise(item);
+          if (plain.type !== "CHECKBOX" || !plain.placeholder) return plain;
+          const { placeholder, ...rest } = plain;
           return { ...rest, label: placeholder };
         }),
       })),
@@ -504,10 +510,8 @@ const tltRecommendation: ClubFormTemplateSeed = {
     confirmationMessage: "Thank you. Your recommendation has been received.",
     sections: [
       section("sec_applicant", "Applicant information", [
+        // The club is the link's club: it is shown on the page and on the stored form, not typed.
         text("applicant_name", "Applicant's name", true),
-        // Club forms have no way to prefill a field on a private link, so the club is typed, as in the membership
-        // application. The link's page names the club the form was sent for.
-        text("club_name", "Pathfinder club", true),
       ]),
       section("sec_recommender", "Your information", [
         text("recommender_name", "Your name", true),
@@ -547,8 +551,7 @@ const canCollecting: ClubFormTemplateSeed = {
     description: "Report on the club's can collecting project.",
     confirmationMessage: "Thank you. The can collecting report has been received.",
     sections: [
-      section("sec_club", "Club", [
-        text("club_name", "Club", true),
+      section("sec_club", "Club report", [
         text("director_name", "Director", true),
         text("submitted_by", "Person submitting report", true),
         date("report_date", "Date", true),
@@ -596,7 +599,7 @@ const photoRelease: ClubFormTemplateSeed = {
         text("minor_signature", "Minor's typed signature", true, { helpText: "Typing your name here is your signature." }),
         text("guardian_signature", "Parent/guardian typed signature", true, { helpText: "Typing your name here is your signature." }),
         date("release_date", "Date", true, today),
-        field("email", "Your email", "EMAIL", false, { helpText: "For the confirmation." }),
+        field("email", "Your email", "EMAIL", false),
       ]),
     ],
   },

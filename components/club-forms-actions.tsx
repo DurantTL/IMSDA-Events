@@ -1,5 +1,6 @@
 "use client";
 
+import { clubFormLinkRequestBody } from "@/components/club-form-link-body";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
@@ -43,13 +44,7 @@ export function SendClubFormLink({
       const response = await fetch(`${base}/${encodeURIComponent(organizationId)}/forms/links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateKey,
-          recipientEmail: email,
-          rosterMemberId: rosterMemberId || null,
-          subjectName: rosterMemberId ? undefined : subjectName || undefined,
-          expiresInDays: Number(days) || undefined,
-        }),
+        body: JSON.stringify(clubFormLinkRequestBody({ templateKey, recipientEmail: email, rosterMemberId, subjectName, days, asAreaCoordinator })),
       });
       const result = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) {

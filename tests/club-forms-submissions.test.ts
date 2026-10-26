@@ -426,6 +426,18 @@ describe("opening a submission (#610)", () => {
     expect(view.answers).toMatchObject({ child_name: "Riley Sample" });
   });
 
+  it("carries who sent a private link and as what (#1221), and nothing for a form not sent that way", async () => {
+    const link = (createdAs: string | null, named: Record<string, unknown>) => ({ createdAs, createdByAccount: null, createdByUser: null, ...named });
+    mocks.submissionFindFirst.mockImplementation(async () => row({ enteredVia: "LINK", link: link("CLUB_LEADER", { createdByAccount: { displayName: "Dana Deputy" } }) }));
+    expect((await getSubmissionForViewer(director, submissionId)).linkSentBy).toEqual({ role: "CLUB_LEADER", name: "Dana Deputy" });
+    mocks.submissionFindFirst.mockImplementation(async () => row({ enteredVia: "LINK", link: link("AREA_COORDINATOR", { createdByUser: { displayName: "Acting Admin" } }) }));
+    expect((await getSubmissionForViewer(areaCoordinator, submissionId)).linkSentBy).toEqual({ role: "AREA_COORDINATOR", name: "Acting Admin" });
+    mocks.submissionFindFirst.mockImplementation(async () => row({ enteredVia: "LINK", link: link(null, {}) }));
+    expect((await getSubmissionForViewer(director, submissionId)).linkSentBy).toBeNull();
+    mocks.submissionFindFirst.mockImplementation(async () => row({ link: null }));
+    expect((await getSubmissionForViewer(director, submissionId)).linkSentBy).toBeNull();
+  });
+
   it("gives an Event Admin and a system administrator the health, physician and emergency answers", async () => {
     for (const viewer of [staffPlain, staffSensitive]) {
       const view = await getSubmissionForViewer(viewer, submissionId);

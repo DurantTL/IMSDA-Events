@@ -188,10 +188,16 @@ describe("the club chooser (#1221)", () => {
     await expect(render("orders")).rejects.toThrow("REDIRECT /account/two-step");
   });
 
+  it("sends Year End Report to the current Pathfinder year's report", () => {
+    expect(clubChooseDestination("club-1", "year-end-report", new Date("2026-10-26T15:00:00Z"))).toBe("/account/clubs/club-1/reports/year-end/2026-27");
+    expect(clubChooseDestination("club-1", "year-end-report", new Date("2027-03-01T15:00:00Z"))).toBe("/account/clubs/club-1/reports/year-end/2026-27");
+    expect(publicClubFormView(item("year-end-report"), new Set()).href).toBe("/account/clubs/choose?to=year-end-report");
+  });
+
   it("maps every allowlisted key to a club-relative path that stays inside the club's own pages", () => {
     for (const [key, path] of Object.entries(clubChooseTargets)) {
       expect(path, key).toMatch(/^[a-z0-9_/-]+$/);
-      expect(clubChooseDestination("club-1", key)).toBe(`/account/clubs/club-1/${path}`);
+      expect(clubChooseDestination("club-1", key)).toMatch(new RegExp(`^/account/clubs/club-1/${path}`));
     }
     expect(clubChooseDestination("a/../b?x=1", "orders")).toBe("/account/clubs/a%2F..%2Fb%3Fx%3D1/orders");
   });

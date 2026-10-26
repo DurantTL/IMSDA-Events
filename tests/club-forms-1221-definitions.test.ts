@@ -65,7 +65,7 @@ describe("the six new club form templates (#1221)", () => {
     const template = seed("tlt_program_recommendation");
     expect(template.definition.sections.map((section) => section.title)).toEqual(["Applicant information", "Your information", "Questions", "Affirmation"]);
     expect(requiredKeys("tlt_program_recommendation")).toEqual([
-      "applicant_name", "club_name", "recommender_name", "recommender_email",
+      "applicant_name", "recommender_name", "recommender_email",
       "known_how_long", "qualities", "relates_to_people", "responds_to_stress", "honest_evaluation", "signature",
     ]);
     expect(fieldsOf("tlt_program_recommendation").find((field) => field.key === "potential_problems")).toMatchObject({
@@ -82,7 +82,7 @@ describe("the six new club form templates (#1221)", () => {
   it("builds the Can Collecting Report from the issue, with whole-number counts and no mailing or fax line", () => {
     const template = seed("can_collecting_report");
     expect(labels("can_collecting_report")).toEqual(expect.arrayContaining([
-      "Club", "Director", "Person submitting report", "Date", "Church",
+      "Director", "Person submitting report", "Date", "Church",
       "Did you include a picture of your collection and your club?",
       "Number of Pathfinders participating", "Number of staff participating",
       "Total hours spent on the project",
@@ -92,7 +92,7 @@ describe("the six new club form templates (#1221)", () => {
     expect(fieldsOf("can_collecting_report").find((field) => field.key === "included_picture")!.options).toEqual(["Yes", "No"]);
     expect(JSON.stringify(template.definition) + JSON.stringify(template.sectionNotes)).not.toMatch(/fax|mail/i);
     const answers = {
-      club_name: "Example Pathfinders", director_name: "Pat Sample", submitted_by: "Pat Sample", report_date: "2026-10-20",
+      director_name: "Pat Sample", submitted_by: "Pat Sample", report_date: "2026-10-20",
       church: "Not listed", church_other: "Example SDA Church", included_picture: "Yes",
     };
     // The church list is filled in from the directory at run time, so its own check is left out here.
@@ -116,5 +116,16 @@ describe("the six new club form templates (#1221)", () => {
     expect(labels("pathfinder_photo_video_release")).toEqual(["Name of minor", "Minor's typed signature", "Parent/guardian typed signature", "Date", "Your email"]);
     expect(fieldsOf("pathfinder_photo_video_release").find((field) => field.key === "release_date")!.autoDate).toBe("TODAY");
     expect(fieldsOf("pathfinder_photo_video_release").find((field) => field.key === "email")!.type).toBe("EMAIL");
+  });
+
+  it("types no club name (the form belongs to the link's or portal's club) and promises no confirmation email", () => {
+    for (const key of ["tlt_program_recommendation", "can_collecting_report"]) expect(fieldsOf(key).map((field) => field.key), key).not.toContain("club_name");
+    for (const key of newKeys) {
+      for (const field of fieldsOf(key)) expect(field.helpText ?? "", `${key}.${field.key}`).not.toMatch(/confirmation/i);
+    }
+    expect(labels("club_pathfinder_of_the_year")).toContain("Your email");
+    // The event templates keep their own help text.
+    const event = formTemplates.find((template) => template.key === "pathfinder_of_the_year")!;
+    expect(event.definition.sections.flatMap((section) => section.fields).some((field) => /confirmation/i.test(field.helpText ?? ""))).toBe(true);
   });
 });

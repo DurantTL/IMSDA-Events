@@ -99,7 +99,6 @@ function openLink(key: string) {
 
 const recommendationAnswers = {
   applicant_name: "Jordan Sample",
-  club_name: "Example Pathfinders",
   recommender_name: "Casey Sample",
   recommender_email: "casey@example.test",
   known_how_long: "Their camp counselor for three summers.",

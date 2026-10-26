@@ -37,7 +37,7 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
           <span>{submission.enteredVia === "LINK" ? "Filled in through a private link" : "Filled in by the club"}</span>
           {submission.linkSentBy && (
             <span>
-              Link sent by {submission.linkSentBy.role === "AREA_COORDINATOR" ? "an Area Coordinator" : "the club's director"}
+              Link sent by {submission.linkSentBy.role === "AREA_COORDINATOR" ? "an Area Coordinator" : "a club leader"}
               {submission.linkSentBy.name && <> (<span translate="no">{submission.linkSentBy.name}</span>)</>}
             </span>
           )}

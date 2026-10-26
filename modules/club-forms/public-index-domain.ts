@@ -1,3 +1,5 @@
+import { latestStartedReportYear } from "@/modules/club-reports/year-end-domain";
+
 /**
  * The public "Club forms" page (#1221) as data: three groups, each item with one plain line on who fills it in and
  * where it goes. Pure, so the links and the "Not available yet" rule are testable without a database.
@@ -11,6 +13,8 @@
 export const clubChooseTargets = {
   "roster-next-year": "roster/next-year",
   "monthly-records": "records",
+  // The path is completed with the current Pathfinder year in `clubChooseDestination`.
+  "year-end-report": "reports/year-end",
   orders: "orders",
   "pathfinder-of-the-year": "forms/club_pathfinder_of_the_year/new",
   "tlt-of-the-year": "forms/club_tlt_of_the_year/new",
@@ -25,9 +29,10 @@ export function isClubChooseKey(value: unknown): value is ClubChooseKey {
 }
 
 /** The signed-in destination for one club, or null for a key that is not on the allowlist. */
-export function clubChooseDestination(organizationId: string, key: unknown): string | null {
+export function clubChooseDestination(organizationId: string, key: unknown, now = new Date()): string | null {
   if (!isClubChooseKey(key)) return null;
-  return `/account/clubs/${encodeURIComponent(organizationId)}/${clubChooseTargets[key]}`;
+  const path = key === "year-end-report" ? `reports/year-end/${latestStartedReportYear(now)}` : clubChooseTargets[key];
+  return `/account/clubs/${encodeURIComponent(organizationId)}/${path}`;
 }
 
 export type PublicClubFormItem = {
@@ -72,7 +77,7 @@ export const publicClubFormGroups: readonly PublicClubFormGroup[] = [
     items: [
       { id: "pathfinder-of-the-year", name: "Pathfinder of the Year", who: "The club director, to nominate a Pathfinder.", kind: "DIRECTOR", chooseKey: "pathfinder-of-the-year", templateKey: "club_pathfinder_of_the_year" },
       { id: "tlt-of-the-year", name: "TLT of the Year", who: "The club director, to nominate a TLT.", kind: "DIRECTOR", chooseKey: "tlt-of-the-year", templateKey: "club_tlt_of_the_year" },
-      { id: "year-end-report", name: "Year End Report", who: "The club director.", kind: "DIRECTOR", chooseKey: "monthly-records" },
+      { id: "year-end-report", name: "Year End Report", who: "The club director.", kind: "DIRECTOR", chooseKey: "year-end-report" },
     ],
   },
   {
