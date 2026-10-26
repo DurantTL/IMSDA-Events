@@ -140,6 +140,13 @@ describe("calendar tones (#1202, #1203)", () => {
     expect(calendarKeyTone("Unknown", map)).toBe(1);
   });
 
+  it("gives categories that differ only in case one tone without shifting the others", () => {
+    const variant = item("v", "2026-03-02", "2026-03-02", { category: "camps" });
+    const map = calendarToneMap([...entries, variant]);
+    expect(calendarItemTone(variant, map)).toBe(calendarItemTone(entries[1], map));
+    expect([...map.values()]).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
   it("does not change when a category filter is applied, because the map is built from the unfiltered items", () => {
     const map = calendarToneMap(entries);
     const filtered = filterByCategory(entries, "youth");

@@ -181,7 +181,7 @@ export function calendarToneMap(items: Pick<CalendarItem, "kind" | "isClosure" |
   let slots = 0;
   for (const name of calendarCategories(items as CalendarItem[])) {
     const key = categoryKey(name);
-    if (key === closureCategory.toLowerCase()) continue;
+    if (map.has(key) || key === closureCategory.toLowerCase()) continue;
     const inCategory = items.filter((item) => categoryKey(item.category) === key);
     if (inCategory.some((item) => item.kind === "ENTRY" && !item.isClosure)) {
       map.set(key, ((slots % calendarToneCount) + 1) as CalendarTone);
