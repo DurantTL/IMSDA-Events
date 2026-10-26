@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubOrganizationAdministration } from "@/modules/organizations/access";
 import { organizationApiError } from "@/modules/organizations/api-errors";
 import { updateClubProfile } from "@/modules/organizations/club-profile-repository";
 import { clubProfileInputSchema } from "@/modules/organizations/club-profile-schemas";
@@ -10,8 +10,8 @@ async function patchHandler(request: Request, context: { params: Promise<{ organ
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
     const { organizationId } = await context.params;
+    const actor = await requireClubOrganizationAdministration(organizationId);
     const input = clubProfileInputSchema.parse(await request.json());
     return Response.json({ profile: await updateClubProfile(organizationId, input, { userId: actor.id }) });
   } catch (error) {

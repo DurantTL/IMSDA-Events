@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import {
   dedupeListRows,
@@ -66,7 +66,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { csv, confirm, fingerprint } = importSchema.parse(await request.json());
     const format = detectBackgroundCsvFormat(csv);
 

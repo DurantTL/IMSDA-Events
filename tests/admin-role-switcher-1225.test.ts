@@ -43,10 +43,19 @@ describe("AdminRoleSwitcher", () => {
 });
 
 describe("the Clubs sidebar", () => {
-  it("lists only the club areas and lights the most specific page", () => {
+  it("lists only the club areas, with the club management pages opened in #1232, and lights the most specific page", () => {
     expect(clubsAdminNavigation.map((item) => item.href)).toEqual([
-      "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/club-forms",
+      "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end",
+      "/admin/clubs/transfers", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/club-forms",
+      "/admin/honors", "/admin/club-supplies", "/admin/organizations/background-checks",
     ]);
+    // Never a page a Clubs Administrator cannot open.
+    for (const href of clubsAdminNavigation.map((item) => item.href)) {
+      expect(href).not.toMatch(/^\/admin\/(accounts|team|settings|email|organizations$|master-award-rules)/);
+    }
+    expect(clubsAdminNavigation.find((item) => item.href === "/admin/organizations/background-checks")?.label).toBe("Sterling Volunteers");
+    expect(clubsAdminActiveHref("/admin/clubs/invites")).toBe("/admin/clubs/invites");
+    expect(clubsAdminActiveHref("/admin/organizations/background-checks")).toBe("/admin/organizations/background-checks");
     expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
     expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
     expect(clubsAdminActiveHref("/admin/club-forms/some_form")).toBe("/admin/club-forms");

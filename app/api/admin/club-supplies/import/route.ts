@@ -4,7 +4,7 @@ import { clubSupplyApiError } from "@/modules/club-supplies/api-errors";
 import { type ClubSupplyImportPlan, ClubSupplyCsvError, parseClubSupplyCsv } from "@/modules/club-supplies/catalog-csv";
 import { applyClubSupplyImport, previewClubSupplyImport } from "@/modules/club-supplies/repository";
 import { clubSupplyImportSchema } from "@/modules/club-supplies/schemas";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 function publicPlan(plan: ClubSupplyImportPlan) {
   return {
@@ -26,7 +26,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { csv, confirm, fingerprint } = clubSupplyImportSchema.parse(await request.json());
     let rows;
     try {

@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   sessionFindUnique: vi.fn(),
   writeAuditLog: vi.fn(),
   getCurrentSession: vi.fn(),
+  grantFindFirst: vi.fn(),
 }));
 
 const client = {
   staffActAs: { findFirst: mocks.findFirst, updateMany: mocks.updateMany, create: mocks.create, update: mocks.update },
   organization: { findUnique: mocks.orgFindUnique },
   userSession: { findUnique: mocks.sessionFindUnique },
+  clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 
@@ -46,6 +48,7 @@ const validStaffSession = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.findFirst.mockResolvedValue(null);
+  mocks.grantFindFirst.mockResolvedValue(null);
   mocks.updateMany.mockResolvedValue({ count: 0 });
   mocks.create.mockResolvedValue({ id: "act-1" });
   mocks.orgFindUnique.mockResolvedValue({ type: "CLUB", isActive: true, name: "Test Pathfinders" });
@@ -203,12 +206,6 @@ describe("currentStaffActingContext (#442)", () => {
 
   it("ignores the act-as once the user is no longer a system administrator, or is disabled", async () => {
     mocks.findFirst.mockResolvedValue(activeRow());
-    mocks.getCurrentSession.mockResolvedValueOnce({
-      user: { id: "admin-1", email: "admin@example.test", displayName: "Admin", globalRole: null },
-      sessionId: "staff-session-1",
-    });
-    await expect(currentStaffActingContext()).resolves.toBeNull();
-
     // The staff session's own user record says demoted (a stale cached session read is not trusted alone).
     mocks.sessionFindUnique.mockResolvedValueOnce({ ...liveSession(), user: { ...liveSession().user, globalRole: null } });
     await expect(currentStaffActingContext()).resolves.toBeNull();
@@ -221,6 +218,48 @@ describe("currentStaffActingContext (#442)", () => {
 
     // Still fine once all of that is back.
     await expect(currentStaffActingContext()).resolves.toMatchObject({ actAsId: "act-1" });
+  });
+
+  describe("a Clubs Administrator acting as a club director (#1232)", () => {
+    const clubsAdminSession = () => ({ ...liveSession(), user: { ...liveSession().user, globalRole: null } });
+    const asClubsAdmin = () => mocks.getCurrentSession.mockResolvedValue({
+      user: { id: "admin-1", email: "clubs@example.test", displayName: "Clubs", globalRole: null },
+      sessionId: "staff-session-1",
+    });
+
+    it("is active while the grant is active, and the grant is read again on every request", async () => {
+      asClubsAdmin();
+      mocks.findFirst.mockResolvedValue(activeRow());
+      mocks.sessionFindUnique.mockResolvedValue(clubsAdminSession());
+      mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+      await expect(currentStaffActingContext()).resolves.toMatchObject({ actAsId: "act-1", role: "CLUB_DIRECTOR", organizationId: "club-1" });
+
+      // Revoked: the very next read ends it, with no other change.
+      mocks.grantFindFirst.mockResolvedValue(null);
+      await expect(currentStaffActingContext()).resolves.toBeNull();
+      expect(mocks.grantFindFirst).toHaveBeenCalledTimes(2);
+      expect(mocks.grantFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "admin-1", revokedAt: null } }));
+    });
+
+    it("never counts an Area Coordinator act-as, even with an active grant", async () => {
+      asClubsAdmin();
+      mocks.findFirst.mockResolvedValue({ ...activeRow(), role: "AREA_COORDINATOR", organizationId: null });
+      mocks.sessionFindUnique.mockResolvedValue(clubsAdminSession());
+      mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+      await expect(currentStaffActingContext()).resolves.toBeNull();
+    });
+
+    it("records the act-as as a Clubs Administrator's in the audit entry, with the actor as for a system administrator", async () => {
+      await actAsClubDirector({ id: "admin-1", viaClubsAdministrator: true }, "staff-session-1", "club-1", now);
+      expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({
+        action: "ACT_AS_CLUB_DIRECTOR",
+        actorUserId: "admin-1",
+        metadata: { organizationId: "club-1", actorRole: "CLUBS_ADMINISTRATOR" },
+      });
+      mocks.writeAuditLog.mockClear();
+      await actAsClubDirector({ id: "admin-1" }, "staff-session-1", "club-1", now);
+      expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).not.toHaveProperty("actorRole");
+    });
   });
 
   it("is null with no staff session at all", async () => {

@@ -1,6 +1,6 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { actAsActor, requireClubsAdministration } from "@/modules/organizations/access";
 import { stopActingAs, stopActingHref } from "@/modules/organizations/staff-act-as";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { withRequestContext } from "@/lib/request-context";
@@ -16,11 +16,12 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { sessionId } = await getCurrentSession();
-    if (!sessionId) throw new Error("A system administrator session is missing its session id.");
-    const stopped = await stopActingAs(actor, sessionId);
-    return Response.json({ ok: true, stopped: Boolean(stopped), href: stopActingHref(stopped) });
+    if (!sessionId) throw new Error("A staff session is missing its session id.");
+    const staff = actAsActor(actor);
+    const stopped = await stopActingAs(staff, sessionId);
+    return Response.json({ ok: true, stopped: Boolean(stopped), href: stopActingHref(stopped, staff.viaClubsAdministrator ? "/admin/clubs/summary" : undefined) });
   } catch (error) {
     return userAdminApiError(error, "Stopping act-as");
   }

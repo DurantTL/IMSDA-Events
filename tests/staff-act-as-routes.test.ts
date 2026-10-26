@@ -16,11 +16,13 @@ const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
   create: vi.fn(),
   orgFindUnique: vi.fn(),
+  grantFindFirst: vi.fn(),
 }));
 
 const client = {
   staffActAs: { findFirst: mocks.findFirst, updateMany: mocks.updateMany, create: mocks.create },
   organization: { findUnique: mocks.orgFindUnique },
+  clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 
@@ -61,6 +63,7 @@ beforeEach(() => {
   mocks.getServerEnv.mockReturnValue({ APP_BASE_URL: origin });
   mocks.getCurrentSession.mockResolvedValue(admin);
   mocks.findFirst.mockResolvedValue(null);
+  mocks.grantFindFirst.mockResolvedValue(null);
   mocks.updateMany.mockResolvedValue({ count: 0 });
   mocks.create.mockResolvedValue({ id: "act-1" });
   mocks.orgFindUnique.mockResolvedValue({ type: "CLUB", isActive: true, name: "Test Pathfinders" });
@@ -76,7 +79,7 @@ describe.each(routes)("%s (#442)", (_name, call, callFrom) => {
     expect(mocks.updateMany).not.toHaveBeenCalled();
   });
 
-  it("is for system administrators only (403)", async () => {
+  it("is for system administrators and active Clubs Administrators only (403)", async () => {
     mocks.getCurrentSession.mockResolvedValue(staff);
     const response = await call();
     expect(response.status).toBe(403);
@@ -154,5 +157,55 @@ describe("signing out (#442)", () => {
     const response = await logout(post("/api/auth/logout"));
     expect(response.status).toBe(200);
     expect(mocks.revokeDatabaseSession).toHaveBeenCalled();
+  });
+});
+
+describe("act-as routes for a Clubs Administrator (#1232)", () => {
+  const clubsAdmin = { user: { id: "clubs-1", email: "clubs@example.test", displayName: "Clubs", globalRole: null }, sessionId: "staff-session-3" };
+  const grantFor = (userId: string) => mocks.grantFindFirst.mockImplementation(async ({ where }: { where: { userId: string } }) => (where.userId === userId ? { id: "grant-1" } : null));
+
+  beforeEach(() => {
+    mocks.getCurrentSession.mockResolvedValue(clubsAdmin);
+    grantFor("clubs-1");
+  });
+
+  it("starts acting as a club's director, recorded under their own name and role", async () => {
+    const response = await routes[1][1]();
+    expect(response.status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: "clubs-1", staffSessionId: "staff-session-3", role: "CLUB_DIRECTOR", organizationId: "club-1" }),
+    }));
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({
+      action: "ACT_AS_CLUB_DIRECTOR",
+      actorUserId: "clubs-1",
+      metadata: { organizationId: "club-1", actorRole: "CLUBS_ADMINISTRATOR" },
+    });
+  });
+
+  it("refuses a church, school or the conference on the same route, and never starts anything", async () => {
+    mocks.orgFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({ type: "CHURCH", isActive: true, name: "Test Church", id: where.id }));
+    const response = await routes[1][1]();
+    expect(response.status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a revoked grant, read again on this request", async () => {
+    mocks.grantFindFirst.mockResolvedValue(null);
+    expect((await routes[1][1]()).status).toBe(403);
+    expect((await routes[2][1]()).status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("never starts acting as an Area Coordinator: that stays system-administrator only", async () => {
+    expect((await routes[0][1]()).status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("stops acting, and lands on a page a Clubs Administrator can open", async () => {
+    mocks.findFirst.mockResolvedValueOnce({ id: "act-1", role: "CLUB_DIRECTOR", organizationId: "club-1" });
+    mocks.updateMany.mockResolvedValueOnce({ count: 1 });
+    expect(await (await routes[2][1]()).json()).toEqual({ ok: true, stopped: true, href: "/admin/organizations/club-1/club" });
+    mocks.findFirst.mockResolvedValueOnce(null);
+    expect(await (await routes[2][1]()).json()).toEqual({ ok: true, stopped: false, href: "/admin/clubs/summary" });
   });
 });

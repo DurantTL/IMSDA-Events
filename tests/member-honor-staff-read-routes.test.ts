@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.findOrganization } }) }));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator, requireClubsAdministration: mocks.requireSystemAdministrator, requireClubOrganizationAdministration: mocks.requireSystemAdministrator }));
 vi.mock("@/modules/honors/member-honor-repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/honors/member-honor-repository")>("@/modules/honors/member-honor-repository");
   return {

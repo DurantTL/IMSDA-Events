@@ -1,7 +1,7 @@
 import "server-only";
 
 import { actorAttribution, requireRosterAccess, type ClubActor } from "@/modules/club-rosters/access";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 /**
  * Who may work with club member transfers (#489):
@@ -12,7 +12,7 @@ import { requireSystemAdministrator } from "@/modules/organizations/access";
  *   deputies only; a registrar keeps the roster but not this) behind the
  *   same roster gate as everything else that touches a roster row
  *   (`requireRosterAccess`: own attendee session, MFA set up and unlocked).
- * - Conference staff (a system administrator) see the transfer queue and
+ * - Conference staff (a system administrator, or an active Clubs Administrator, #1232) see the transfer queue and
  *   the registration-move approval list, and finish, override, or close
  *   any transfer regardless of club.
  */
@@ -23,7 +23,7 @@ export async function requireClubTransferAccess(organizationId: string, now = ne
 export type StaffTransferActor = { userId: string };
 
 export async function requireStaffTransferAccess(): Promise<StaffTransferActor> {
-  const user = await requireSystemAdministrator();
+  const user = await requireClubsAdministration();
   return { userId: user.id };
 }
 

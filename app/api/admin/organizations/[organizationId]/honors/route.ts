@@ -3,7 +3,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { memberHonorApiError } from "@/modules/honors/member-honor-api-errors";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubOrganizationAdministration } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
@@ -14,8 +14,8 @@ type RouteContext = { params: Promise<{ organizationId: string }> };
  */
 async function getHandler(request: Request, context: RouteContext) {
   try {
-    await requireSystemAdministrator();
     const { organizationId } = await context.params;
+    await requireClubOrganizationAdministration(organizationId);
     const club = await getPrisma().organization.findUnique({
       where: { id: organizationId },
       select: { type: true },

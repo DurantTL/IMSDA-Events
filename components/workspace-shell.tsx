@@ -15,6 +15,7 @@ import { eventsNeedingModuleState } from "@/modules/event-modules/shell-scope";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
 
 /**
  * The staff workspace chrome (sidebar, header, act-as banner), shared by the
@@ -91,7 +92,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
         defaultEventId={defaultEventId}
         events={shellEvents}
         user={user}
-        adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts } : null}
+        adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts, healthImport: healthRecordsEnabled() } : null}
       >
         {children}
       </AppShell>

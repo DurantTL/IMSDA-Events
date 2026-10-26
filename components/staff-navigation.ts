@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowRightLeft,
   Award,
   CheckCircle2,
   ChartNoAxesCombined,
@@ -13,6 +14,7 @@ import {
   ListChecks,
   Megaphone,
   MessagesSquare,
+  Package,
   MoreHorizontal,
   PanelsTopLeft,
   ClipboardPen,
@@ -26,6 +28,7 @@ import {
   ToggleRight,
   Trophy,
   UserCog,
+  UserPlus,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -229,17 +232,28 @@ export const systemNavigation: NavigationItem = {
   icon: ShieldCheck,
 };
 
+/** The health record import (#878) exists only while the Health Record feature is on; the shell drops its link otherwise. */
+export const clubsAdminHealthImportHref = "/admin/clubs/health-import";
+
 /**
- * The Clubs Administrator's sidebar (#1225): the club areas only. Shown when the
- * Clubs Administrator view of the role switcher is active. It is a view, not a
- * permission: each page and route checks the role itself.
+ * The Clubs Administrator's sidebar (#1225): the club areas only, with the club management pages Caleb opened to the
+ * role on 2026-10-26 (#1232): invites, member transfers, club and health record imports, the honor and supply
+ * catalogs and Sterling Volunteers. Shown when the Clubs Administrator view of the role switcher is active. It is a
+ * view, not a permission: each page and route checks the role itself.
  */
 export const clubsAdminNavigation: readonly NavigationItem[] = [
   { href: "/admin/clubs/summary", label: "Clubs summary", icon: Tent },
   { href: "/admin/clubs/applications", label: "New clubs", icon: ClipboardPen },
+  { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
   { href: "/admin/clubs/reports", label: "Monthly records", icon: FileText },
   { href: "/admin/clubs/reports/year-end", label: "Year-end", icon: Trophy },
+  { href: "/admin/clubs/transfers", label: "Member transfers", icon: ArrowRightLeft },
+  { href: "/admin/clubs/import", label: "Import clubs", icon: FileUp },
+  { href: clubsAdminHealthImportHref, label: "Import health records", icon: HeartPulse },
   { href: "/admin/club-forms", label: "Club forms", icon: ListChecks },
+  { href: "/admin/honors", label: "Honor catalog", icon: Award },
+  { href: "/admin/club-supplies", label: "Club supplies", icon: Package },
+  { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", icon: ShieldCheck },
 ];
 
 /** The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. */

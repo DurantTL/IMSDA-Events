@@ -7,6 +7,7 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
 import { cardCell } from "@/components/table-card-labels";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
 
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function BackgroundChecksPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const summary = await backgroundCheckSummary();
   const cards = [
     { label: "Current checks", value: summary.current, detail: "Clear, or a Sterling check good for more than 60 days. Does not include the expiring-soon checks below", tone: "green" },

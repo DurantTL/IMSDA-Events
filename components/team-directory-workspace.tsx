@@ -142,7 +142,7 @@ export function TeamDirectoryWorkspace({
     if (!(await askConfirm({
       title: grant ? `Make ${member.displayName} a Clubs Administrator?` : `Remove Clubs Administrator from ${member.displayName}?`,
       body: <p>{grant
-        ? "They get club reports, points and forms, rosters including birth dates, and new club applications for every club. That includes health records (with the same reasons and recorded access), Sterling Volunteers details and guardian contacts. Not settings, accounts or other events."
+        ? "They get club reports, points and forms, rosters including birth dates, and new club applications for every club. That includes health records (with the same reasons and recorded access) and guardian contacts. They can also import clubs and health records, send club invites, finish member transfers, manage the honor and supply catalogs and honor entries, review Sterling Volunteers, and manage club admins and club profiles. They can act as a club's Director, with their own name recorded. Every change is recorded with their name. They cannot change churches, the conference, settings, accounts, the Team or other events."
         : "They lose access to the club areas on their next page. Nothing they did is undone."}</p>,
       confirmLabel: grant ? `Make ${member.displayName} a Clubs Administrator` : `Remove Clubs Administrator from ${member.displayName}`,
       destructive: !grant,

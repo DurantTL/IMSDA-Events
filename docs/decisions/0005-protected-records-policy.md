@@ -345,11 +345,31 @@ birth dates need their own protection.
    copies, Sterling Volunteers detail for club people, and guardian contacts.
    The role does **not** extend to system or email settings, accounts, Team
    management, events the person is not assigned to, event-scoped coordinator
-   health, or write and admin actions that are not about viewing (health
-   record import, club import, invites and transfers, director grants,
-   act-as-director, the honors catalog, sealed-copy holds); those stay with
-   system administrators. The role is read from the database on every request,
-   so a removal takes effect on the next one.
+   health, sealed-copy holds, or generic organization management (see the
+   2026-10-26 follow-up below for what it does cover). The role is read from
+   the database on every request, so a removal takes effect on the next one.
+
+   **Club management actions** (decided 2026-10-26 by Caleb, #1232; Caleb:
+   "yes they should"): a Clubs Administrator also does the club management
+   work that was first kept for system administrators, through the same server
+   checks, confirmations and audit entries, with the actor recorded as for a
+   system administrator (the audit metadata adds `actorRole:
+   CLUBS_ADMINISTRATOR` where it records the kind of actor):
+   health-record import (preview and apply); club import, invites, member
+   transfers and the club supply catalog; director grants (club admins), the
+   club profile and acting as a club's Director; honors entries and the honor
+   catalog; and Sterling Volunteers review (decisions, rematch, match fixes,
+   import and template). Everything that serves clubs and churches alike is
+   open to a Clubs Administrator **for club organizations only**; the server
+   reads the organization type (`requireClubOrganizationAdministration`) and
+   refuses a church, school or the conference. Acting as a Director is valid
+   for a Clubs Administrator only while the grant is active, re-checked on
+   every request, and only as a club's Director: acting as an Area Coordinator
+   stays with system administrators. Generic organization management (list,
+   create, billing, pastor, location, status, deletion, external identities,
+   directory import), Master Award rules, seat overrides, settings, accounts,
+   the Team, events, sealed-copy holds, club-form alert emails and template
+   sync stay with system administrators.
 
    **Club Registrar and Reporter roles** (decided 2026-09-23, #375): a
    director or deputy may give a club **Registrar** the roster and event
@@ -564,6 +584,15 @@ administrator, a Clubs Administrator also sees the break-glass grants list
 records, placing and lifting sealed-copy holds, and event-scoped coordinator
 health stay with system administrators. The grant is checked on every request,
 so removing it ends access on the next one.
+
+**Health import for Clubs Administrators (decided 2026-10-26, #1232).** Caleb
+decided that a Clubs Administrator may also run the Cognito health record
+import (preview and apply), with the same confirmation, privacy notice and
+audit entries as a system administrator; the audit actor is the person, marked
+`actorRole: CLUBS_ADMINISTRATOR`. The import still refuses anyone acting as a
+club director, club leaders, coordinators and staff who only hold the health
+permission. Sealed-copy holds and event-scoped coordinator health stay with
+system administrators.
 
 ### Decided 2026-10-14 (Communication Director and IT Director, #923)
 
