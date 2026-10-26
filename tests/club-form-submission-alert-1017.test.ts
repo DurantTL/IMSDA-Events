@@ -415,3 +415,17 @@ describe("the email never holds an answer (#1017)", () => {
     expect(content.bodyText).toContain("https://events.imsda.test/more/club-forms/sub-9");
   });
 });
+
+describe("an open application from a club that is not listed (#1229)", () => {
+  it("queues the alert with no club lookup, naming Not listed and the typed club, and never says who", async () => {
+    const { queueClubFormSubmittedEmails } = await import("@/modules/club-forms/submission-alert");
+    const input = { submissionId: "sub-open", templateId: "template-slip", organizationId: null, unlistedClubName: "Sample Valley Pathfinders", openApplication: true, actor: null, submittedAt: now };
+    const ids = await queueClubFormSubmittedEmails(client as never, input, true);
+    expect(ids).toHaveLength(2);
+    expect(mocks.organizationFindUnique).not.toHaveBeenCalled();
+    const body = String(outbox[0].bodyTextSnapshot);
+    expect(body).toContain("Club: Not listed: Sample Valley Pathfinders");
+    expect(body).toContain("an applicant using the public application link");
+    expect(body).toContain("The answers are not in this email.");
+  });
+});

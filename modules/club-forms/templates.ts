@@ -3,8 +3,9 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
+import { clubFormTemplateSeeds, type ClubFormFillMode } from "@/modules/club-forms/definitions";
 import {
+  effectiveClubFormFillMode,
   parseClubFormTemplate,
   templateSpecProblems,
   type ClubFormTemplateRecord,
@@ -40,6 +41,7 @@ const templateSelect = {
   hiddenFieldKeys: true,
   printLayout: true,
   rosterMapping: true,
+  fillMode: true,
   enabled: true,
   customizedAt: true,
 } satisfies Prisma.ClubFormTemplateSelect;
@@ -74,10 +76,12 @@ export async function syncClubFormTemplates(
   // A caller may pass its own arrays (`collect`) to read what was done so far if a later template throws.
   const collected = options.collect ?? emptyCollected();
   const { refused, skipped, staleDrafts, updated, unchanged } = collected;
-  const existing = await client.clubFormTemplate.findMany({ select: { id: true, key: true, version: true, sensitiveFieldKeys: true, birthDateFieldKeys: true, customizedAt: true, draftUpdatedAt: true } });
+  const existing = await client.clubFormTemplate.findMany({ select: { id: true, key: true, version: true, sensitiveFieldKeys: true, birthDateFieldKeys: true, customizedAt: true, draftUpdatedAt: true, fillMode: true, fillModeChangedAt: true } });
   const stored = new Map(existing.map((row) => [row.key, row]));
   for (const seed of clubFormTemplateSeeds) {
     const row = stored.get(seed.key);
+    // A setting, not part of the definition: written even for a template edited in the app, but never over a staff choice (#1229).
+    if (row) await syncFillMode(client, seed, row);
     if (row?.customizedAt) {
       skipped.push({ key: seed.key, reason: "edited in the app" });
       logInfo("Club form sync skipped a template that was edited in the app.", { templateKey: seed.key });
@@ -116,6 +120,18 @@ export async function syncClubFormTemplates(
 }
 
 type Seed = (typeof clubFormTemplateSeeds)[number];
+
+/**
+ * Writes the seed's "Who fills it in" while staff have not changed it (`fillModeChangedAt` null) and it differs.
+ * Re-running changes nothing.
+ */
+async function syncFillMode(client: Client, seed: Seed, row: { id: string; fillMode: string | null; fillModeChangedAt: Date | null }) {
+  if (row.fillModeChangedAt || row.fillMode === seed.fillMode) return;
+  await client.clubFormTemplate.updateMany({
+    where: { id: row.id, fillModeChangedAt: null },
+    data: { fillMode: seed.fillMode },
+  });
+}
 
 /**
  * A customized template ignores the code's definition, but a sensitive or
@@ -182,7 +198,7 @@ async function syncOneTemplate(
   if (!current) {
     const created = await client.clubFormTemplate.upsert({
       where: { key: seed.key },
-      create: { key: seed.key, ...data, enabled: false },
+      create: { key: seed.key, ...data, fillMode: seed.fillMode, enabled: false },
       update: {},
       select: { id: true, version: true },
     });
@@ -244,6 +260,8 @@ export type ClubFormTemplateSummary = {
   submissionCount: number;
   /** Stored version is behind the code (or the form was never synced): use Sync templates on the admin page (or `npm run club-forms:sync`). */
   needsSync: boolean;
+  /** Who fills it in (#1229), stored or the seed's default. */
+  fillMode: ClubFormFillMode;
   /** Edited or created in the app (#712): the code's seed no longer applies. */
   customized: boolean;
   /** An unpublished draft is waiting. */
@@ -275,6 +293,7 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
       customizedAt: true,
       draftUpdatedAt: true,
       draftBaseVersion: true,
+      fillMode: true,
       _count: { select: { submissions: true } },
     },
   });
@@ -290,6 +309,7 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
       version: row.version,
       submissionCount: row._count.submissions,
       needsSync: Boolean(seed && !row.customizedAt && row.version < seed.version),
+      fillMode: effectiveClubFormFillMode(row.fillMode, row.key),
       customized: Boolean(row.customizedAt),
       hasDraft: Boolean(row.draftUpdatedAt),
       draftBaseVersion: row.draftUpdatedAt ? row.draftBaseVersion : null,
@@ -298,7 +318,7 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
   });
   for (const seed of clubFormTemplateSeeds) {
     if (stored.has(seed.key)) continue;
-    listed.push({ key: seed.key, name: seed.name, description: seed.description, enabled: false, enabledAt: null, version: 0, submissionCount: 0, needsSync: true, customized: false, hasDraft: false, draftBaseVersion: null, draftStale: false });
+    listed.push({ key: seed.key, name: seed.name, description: seed.description, enabled: false, enabledAt: null, version: 0, submissionCount: 0, needsSync: true, fillMode: seed.fillMode, customized: false, hasDraft: false, draftBaseVersion: null, draftStale: false });
   }
   return listed;
 }
@@ -423,6 +443,33 @@ export async function setClubFormTemplateEnabled(key: string, enabled: boolean, 
   });
 }
 
+/**
+ * Sets "Who fills it in" (#1229). The caller has already checked for a system administrator. Recorded as a staff
+ * choice (`fillModeChangedAt`), so `club-forms:sync` never writes the seed's value over it. Audited.
+ */
+export async function setClubFormTemplateFillMode(key: string, fillMode: ClubFormFillMode, actorUserId: string, now = new Date()) {
+  return getPrisma().$transaction(async (tx) => {
+    const template = await tx.clubFormTemplate.findUnique({ where: { key }, select: { id: true, fillMode: true } });
+    if (!template) throw new ClubFormError("TEMPLATE_NOT_FOUND", "That form could not be found.");
+    const previous = effectiveClubFormFillMode(template.fillMode, key);
+    await tx.clubFormTemplate.update({
+      where: { id: template.id },
+      data: { fillMode, fillModeChangedAt: now, fillModeChangedByUserId: actorUserId },
+    });
+    if (previous !== fillMode) {
+      await writeAuditLog({
+        actorUserId,
+        action: "CLUB_FORM_FILL_MODE_CHANGED",
+        entityType: "ClubFormTemplate",
+        entityId: template.id,
+        summary: "Changed who fills in a club form.",
+        metadata: { templateKey: key, from: previous, to: fillMode },
+      }, tx);
+    }
+    return { key, fillMode };
+  });
+}
+
 /** Every template's key and name, on or off, for conference staff's filters. Reads only. */
 export async function listClubFormTemplateNames() {
   return getPrisma().clubFormTemplate.findMany({
@@ -431,13 +478,13 @@ export async function listClubFormTemplateNames() {
   });
 }
 
-/** Clubs see only enabled forms, and only their names and descriptions. */
+/** Clubs see only enabled forms, and only their names, descriptions and who fills each in (#1229). */
 export async function listEnabledClubFormTemplates() {
   return getPrisma().clubFormTemplate.findMany({
     where: { enabled: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { key: true, name: true, description: true },
-  });
+    select: { key: true, name: true, description: true, fillMode: true },
+  }).then((rows) => rows.map((row) => ({ key: row.key, name: row.name, description: row.description, fillMode: effectiveClubFormFillMode(row.fillMode, row.key) })));
 }
 
 /** One enabled template, or "not found" for a disabled or unknown one (the same answer either way). */

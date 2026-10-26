@@ -46,6 +46,11 @@ const client = {
       if (data.draft === Prisma.DbNull) row.draft = null;
       return row;
     },
+    updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      const rows = state.templates.filter((candidate) => matches(candidate, where));
+      for (const row of rows) Object.assign(row, data);
+      return { count: rows.length };
+    },
     upsert: async ({ where, create }: { where: Record<string, unknown>; create: Record<string, unknown> }) => {
       const found = state.templates.find((row) => matches(row, where));
       if (found) return found;

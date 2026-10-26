@@ -8,7 +8,7 @@ import { getPrisma } from "@/lib/prisma";
 import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
-import type { ClubFormActor } from "@/modules/club-forms/domain";
+import { clubFormClubLabel, type ClubFormActor } from "@/modules/club-forms/domain";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
 
 /**
@@ -32,7 +32,12 @@ type Client = Pick<Prisma.TransactionClient, "messageOutbox" | "adminAlertFeedIt
 export type ClubFormSubmittedInput = {
   submissionId: string;
   templateId: string;
-  organizationId: string;
+  /** Null for a "Not listed" open application (#1229). */
+  organizationId: string | null;
+  /** The club name an applicant typed when `organizationId` is null. */
+  unlistedClubName?: string | null;
+  /** True for a public open application (#1229): the submitter says so instead of "private link". */
+  openApplication?: boolean;
   /** Null for a private link: the person who filled it in is not known. */
   actor: ClubFormActor | null;
   submittedAt: Date;
@@ -48,7 +53,7 @@ function staffLink(submissionId: string) {
 }
 
 /** What the alert says. Takes names and a time only, so there is nowhere for an answer to get in. */
-export function clubFormSubmittedContent(input: { formName: string; clubName: string; submitterName: string | null; submittedAt: Date; submissionId: string }) {
+export function clubFormSubmittedContent(input: { formName: string; clubName: string; submitterName: string | null; submittedAt: Date; submissionId: string; openApplication?: boolean }) {
   const formName = neutralizePlaceholders(input.formName);
   const clubName = neutralizePlaceholders(input.clubName);
   const when = input.submittedAt.toLocaleString("en-US", {
@@ -63,7 +68,7 @@ export function clubFormSubmittedContent(input: { formName: string; clubName: st
       "",
       `Form: ${formName}`,
       `Club: ${clubName}`,
-      `Submitted by: ${input.submitterName ? neutralizePlaceholders(input.submitterName) : "someone with the club's private link"}`,
+      `Submitted by: ${input.submitterName ? neutralizePlaceholders(input.submitterName) : input.openApplication ? "an applicant using the public application link" : "someone with the club's private link"}`,
       `When: ${when} (Central Time)`,
       "",
       "Open it (sign-in required):",
@@ -99,10 +104,13 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
     if (error instanceof AccountEmailNotConfiguredError) return [];
     throw error;
   }
-  const organization = await client.organization.findUnique({ where: { id: input.organizationId }, select: { name: true } });
+  const organization = input.organizationId
+    ? await client.organization.findUnique({ where: { id: input.organizationId }, select: { name: true } })
+    : null;
   const content = clubFormSubmittedContent({
     formName: template.name,
-    clubName: organization?.name ?? "A club",
+    clubName: input.organizationId ? organization?.name ?? "A club" : clubFormClubLabel(null, input.unlistedClubName),
+    openApplication: input.openApplication,
     submitterName: await submitterName(client, input.actor),
     submittedAt: input.submittedAt,
     submissionId: input.submissionId,
