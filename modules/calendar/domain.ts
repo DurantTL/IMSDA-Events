@@ -145,13 +145,107 @@ export function monthGrid(month: CalendarMonth) {
   return weeks;
 }
 
+function compareCalendarItems(a: CalendarItem, b: CalendarItem) {
+  return a.startsOn.localeCompare(b.startsOn) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
+}
+
 export function sortCalendarItems(items: CalendarItem[]) {
-  return [...items].sort((a, b) =>
-    a.startsOn.localeCompare(b.startsOn) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title));
+  return [...items].sort(compareCalendarItems);
 }
 
 export function itemsOnDate(items: CalendarItem[], date: string) {
   return items.filter((item) => item.startsOn <= date && item.endsOn >= date);
+}
+
+const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "Monday, March 2, 2026": the full date a screen reader hears for a day. */
+export function formatWeekdayDate(date: string) {
+  return `${weekdayNames[toDate(date).getUTCDay()]}, ${formatLongDate(date)}`;
+}
+
+/** The number of distinct category tones (#1202); each has its own fill, edge and text colour in the stylesheet. */
+export const calendarToneCount = 6;
+
+/** A stable tone, 1 to 6, for a category name: the same name has the same colour in every month and under every filter. */
+export function calendarCategoryTone(category: string) {
+  let hash = 0;
+  for (const character of category.trim().toLowerCase()) hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0;
+  return (hash % calendarToneCount) + 1;
+}
+
+export type CalendarTone = "event" | "closure" | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** One colour rule for the grid bars, the phone dots, the day panel and the key: closures striped, IMSDA events navy, else the category's tone. */
+export function calendarItemTone(item: Pick<CalendarItem, "kind" | "isClosure" | "category">): CalendarTone {
+  if (item.isClosure) return "closure";
+  if (item.kind === "EVENT") return "event";
+  return calendarCategoryTone(item.category) as CalendarTone;
+}
+
+/** The tone a category's filter button and key swatch show: the closure category is striped, any other the category's own tone. */
+export function calendarKeyTone(category: string): CalendarTone {
+  return category.trim().toLowerCase() === closureCategory.toLowerCase() ? "closure" : (calendarCategoryTone(category) as CalendarTone);
+}
+
+export type WeekBar = {
+  item: CalendarItem;
+  /** 1 to 7, the grid column the bar starts in. */
+  startCol: number;
+  /** Columns covered inside this week. */
+  span: number;
+  /** 0-based row, below the date row. */
+  row: number;
+  /** The item started before this week: square left edge and a ‹. */
+  continuesBefore: boolean;
+  /** The item runs past this week: square right edge and a ›. */
+  continuesAfter: boolean;
+  /** The first and last dates the bar covers inside this week. */
+  segmentStart: string;
+  segmentEnd: string;
+};
+
+/**
+ * Lays one week's items out as bars (#1202): longest segment first, then earliest, then the calendar's own order. Each bar takes the
+ * first row free across all its columns; an item that fits in no row below `maxRows` is hidden and counted once on each day it covers.
+ */
+export function weekBarLayout(week: string[], items: CalendarItem[], maxRows = 4) {
+  const first = week[0];
+  const last = week[week.length - 1];
+  const segments = items
+    .filter((item) => item.startsOn <= last && item.endsOn >= first)
+    .map((item) => {
+      const segmentStart = item.startsOn < first ? first : item.startsOn;
+      const segmentEnd = item.endsOn > last ? last : item.endsOn;
+      const startCol = week.indexOf(segmentStart) + 1;
+      const endCol = week.indexOf(segmentEnd) + 1;
+      return { item, segmentStart, segmentEnd, startCol, span: endCol - startCol + 1 };
+    })
+    .sort((a, b) => b.span - a.span || a.startCol - b.startCol || compareCalendarItems(a.item, b.item));
+  const occupied: boolean[][] = Array.from({ length: maxRows }, () => Array(week.length).fill(false));
+  const bars: WeekBar[] = [];
+  const hiddenByDay: number[] = Array(week.length).fill(0);
+  for (const segment of segments) {
+    const from = segment.startCol - 1;
+    const to = from + segment.span;
+    const row = occupied.findIndex((cells) => cells.slice(from, to).every((taken) => !taken));
+    if (row === -1) {
+      for (let column = from; column < to; column += 1) hiddenByDay[column] += 1;
+      continue;
+    }
+    for (let column = from; column < to; column += 1) occupied[row][column] = true;
+    bars.push({
+      item: segment.item,
+      startCol: segment.startCol,
+      span: segment.span,
+      row,
+      continuesBefore: segment.item.startsOn < first,
+      continuesAfter: segment.item.endsOn > last,
+      segmentStart: segment.segmentStart,
+      segmentEnd: segment.segmentEnd,
+    });
+  }
+  return { bars, hiddenByDay };
 }
 
 /** The `date` query value: a real calendar date within the month span, else undefined (the day detail is simply not shown). */
