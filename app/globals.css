@@ -12966,6 +12966,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 .admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 @media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-pill { flex: 1 1 auto; justify-content: center; } }
+/* The switcher is navigation, never part of a printed page (badges, rosters, reports). */
+@media print { .admin-role-bar { display: none !important; } }
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }
