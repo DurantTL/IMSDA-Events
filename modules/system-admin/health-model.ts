@@ -180,7 +180,7 @@ function alertsSignal(
 ): HealthSignal {
   const key = "open-alerts" as const;
   const name = "Open alerts";
-  const checked = "Alerts the scheduled scan is still reporting as unresolved.";
+  const checked = "Scan reports: alerts the scheduled scan has raised and is still reporting as unresolved.";
   if (!health) return unavailable(key, name, checked, "System health could not be read just now.");
   if (!alerts) return unavailable(key, name, checked, "Open alerts could not be read.");
   if (alerts.length === 0) {

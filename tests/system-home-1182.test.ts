@@ -206,7 +206,7 @@ describe("home values", () => {
     expect(byKey["failed-email"].scope).toContain("all events and account email");
     expect(byKey["club-applications"].scope).toBe("Every pending application, any year.");
     expect(byKey["club-applications"].scope).not.toContain("all events");
-    expect(byKey["waiting-invites"].label).toBe("Staff registrations waiting for approval");
+    expect(byKey["waiting-invites"].label).toBe("Staff approvals");
   });
 
   it("links staff approvals only when the bell supplies an event, never to an event-less page", () => {
@@ -463,7 +463,7 @@ describe("System home page", () => {
       expect(nav.has(href), href).toBe(true);
       expect(html).toContain(`href="${href}"`);
     }
-    for (const heading of ["People and access", "Forms and templates", "Email and settings"]) expect(html).toContain(heading);
+    for (const heading of ["Events", "Clubs", "Forms", "People", "Settings"]) expect(html).toContain(`<h3>${heading}</h3>`);
   });
 
   it("refuses everyone who is not a signed-in system administrator", async () => {

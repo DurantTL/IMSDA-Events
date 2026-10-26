@@ -178,8 +178,9 @@ describe("account menu Create event", () => {
 describe("/admin dashboard page", () => {
   const source = readFileSync(join(process.cwd(), "app/(workspace)/admin/page.tsx"), "utf8");
 
-  it("draws the grouped task cards from the shared groups, and still gates on system admin", () => {
-    expect(source).toContain("systemNavGroups.map");
+  it("draws the Catalogs and settings cards from the shared groups (the other groups are Common tasks, #1228), and still gates on system admin", () => {
+    expect(source).toContain('systemNavGroups.filter((group) => group.key === "system-catalogs")');
+    expect(source).toContain("catalogGroups.map");
     expect(source).toContain('user.globalRole !== "SYSTEM_ADMIN"');
     expect(source).not.toContain("heroActions");
     expect(source).toContain("group.collapsedByDefault");

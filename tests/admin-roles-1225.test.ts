@@ -90,7 +90,8 @@ describe("the role showing (cookie fallback)", () => {
   it("lands each role on its own home and picks its sidebar", () => {
     expect(adminRoleLanding("CLUBS_ADMIN")).toBe("/admin/clubs/summary");
     expect(adminRoleLanding("SYSTEM_ADMIN")).toBe("/admin");
-    expect(adminRoleLanding("EVENTS_ADMIN")).toBe("/overview");
+    expect(adminRoleLanding("EVENTS_ADMIN")).toBe("/events-admin");
+    expect(adminRoleLanding(null)).toBe("/overview");
     expect(adminRoleSidebarKind("CLUBS_ADMIN")).toBe("clubs");
     expect(adminRoleSidebarKind("EVENTS_ADMIN")).toBe("events");
     expect(adminRoleSidebarKind("SYSTEM_ADMIN")).toBe("default");
@@ -176,7 +177,7 @@ describe("the switch route", () => {
     for (const role of ["SYSTEM_ADMIN", "CLUBS_ADMIN", "whatever"]) {
       const response = await post(role);
       expect(response.status).toBe(303);
-      expect(response.headers.get("location")).toBe("/overview");
+      expect(response.headers.get("location")).toBe("/events-admin");
     }
     expect(mocks.cookieSet).not.toHaveBeenCalled();
   });

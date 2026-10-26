@@ -30,10 +30,14 @@ import {
   buildWorkList,
   commonTaskHrefs,
   groupWorkRows,
+  nextEventNote,
   readTimeLabel,
+  systemHomeTabs,
 } from "@/modules/system-admin/home-model";
 import type { SetupWarningKind } from "@/modules/system-admin/dashboard";
 import { ActionsMenu } from "@/components/actions-menu";
+import { DashboardTabs } from "@/components/dashboard-tabs";
+import { registrationStatusLabel } from "@/modules/events/public-registration-status";
 import { ModuleRequestQueue } from "@/components/module-request-queue";
 import { formatRequestDate } from "@/modules/event-modules/request-domain";
 import { listPendingModuleRequests } from "@/modules/event-modules/requests";
@@ -61,15 +65,6 @@ function dateRange(start: Date, end: Date, timeZone: string) {
     dateStyle: "medium",
     timeZone,
   }).formatRange(start, end);
-}
-
-function phaseLabel(value: string) {
-  return {
-    DRAFT: "Draft",
-    UPCOMING: "Opens soon",
-    OPEN: "Registration open",
-    CLOSED: "Registration closed",
-  }[value] ?? value;
 }
 
 function countdown(timing: string, daysUntilStart: number | null) {
@@ -148,7 +143,7 @@ export default async function SystemAdminPage({
   const currentEvents = dashboard ? dashboard.events.filter((event) => event.timing !== "PAST") : [];
   const pastEvents = dashboard ? dashboard.events.filter((event) => event.timing === "PAST") : [];
   const homeValues = buildHomeValues({
-    events: dashboard ? { upcomingEventCount: dashboard.summary.upcomingEventCount, generatedAt: dashboard.generatedAt } : null,
+    events: dashboard ? { upcomingEventCount: dashboard.summary.upcomingEventCount, generatedAt: dashboard.generatedAt, nextEventNote: nextEventNote(dashboard.events) } : null,
     attention,
   });
   const work = buildWorkList(attention, moduleRequests ? moduleRequests.length : null);
@@ -156,11 +151,13 @@ export default async function SystemAdminPage({
   const navItems = systemNavGroups.flatMap((group) => group.items);
   // The Archived events destination comes from the shared System navigation, which lists it once.
   const archivedEventsHref = navItems.find((item) => item.label === "Archived events")?.href ?? "/archived-events";
-  const commonTasks = commonTaskHrefs.flatMap(({ href, heading }) => {
+  const commonTasks = commonTaskHrefs.flatMap(({ href, heading, label }) => {
     const item = navItems.find((candidate) => candidate.href === href);
-    return item ? [{ heading, item }] : [];
+    return item ? [{ heading, item: label ? { ...item, label } : item }] : [];
   });
   const release = getReleaseIdentity();
+  // Only the Catalogs and settings group stays as a directory: every other group is a Common tasks group above it.
+  const catalogGroups = systemNavGroups.filter((group) => group.key === "system-catalogs");
 
   const healthReadAt = new Date().toISOString();
   const healthSignals = buildHealthSignals({
@@ -176,8 +173,11 @@ export default async function SystemAdminPage({
   const directoryReviewCount = !attention || attention.unreadable.includes("directory-review") ? null : directoryReview?.count ?? 0;
   const display = (value: number | null) => (value === null ? "Unavailable" : String(value));
 
+  const updatedAt = readTimeLabel(dashboard ? dashboard.generatedAt : healthReadAt);
+
   return (
     <section className={`page-stack ${styles.workspace}`}>
+      <DashboardTabs label="System administration sections" tabs={systemHomeTabs} currentKey="overview" />
       {unavailable && (
         <div className="inline-notice error" role="status">
           <span>That event isn&rsquo;t available. It may not exist, or this account may not have access to it. Choose an event below to continue.</span>
@@ -188,7 +188,8 @@ export default async function SystemAdminPage({
           <span className={styles.adminBadge}><ShieldCheck aria-hidden="true" size={16} /> System administrator</span>
           <p className="eyebrow">All events</p>
           <h2 id="system-home-heading">System administration</h2>
-          <p>What is waiting for someone across every event, then the events themselves. Each link opens the page that can change the record; nothing on this page approves or changes anything.</p>
+          <p>Everything waiting across every event. Each link opens the page that can change the record; nothing on this page approves or changes anything.</p>
+          {updatedAt && <p className={styles.updated} data-testid="updated-stamp">Updated {updatedAt}</p>}
         </div>
         <p className={styles.identity} data-testid="signed-in-identity">
           Signed in as <strong>{user.displayName}</strong>
@@ -208,6 +209,7 @@ export default async function SystemAdminPage({
                 </span>
                 <strong>{display(item.value)}</strong>
                 <p>{item.label}</p>
+                {item.note && <small className={styles.metricNote}>{item.note}</small>}
                 <small>{item.value === null ? `${item.unit}: could not be read just now.` : `${item.unit}. ${item.scope}`}{readAt ? ` Read at ${readAt}.` : ""}</small>
                 {item.href && <small><Link href={item.href}>{item.linkLabel}</Link></small>}
               </article>
@@ -314,7 +316,7 @@ export default async function SystemAdminPage({
                 <div className={styles.eventMain}>
                   <div className={styles.eventTitle}>
                     <span className={styles.eventBadges}>
-                      <span className={`${styles.phase} ${event.registrationPhase === "OPEN" ? styles.phaseOpen : ""}`}>{phaseLabel(event.registrationPhase)}</span>
+                      <span className={`${styles.phase} ${event.registrationPhase === "OPEN" && event.publishedFormCount > 0 ? styles.phaseOpen : ""}`}>{registrationStatusLabel(event.registrationPhase, event.publishedFormCount > 0)}</span>
                       {when && <span className={styles.countdown}>{when}</span>}
                     </span>
                     <h3>{event.name}</h3>
@@ -421,6 +423,7 @@ export default async function SystemAdminPage({
             <h2 id="system-health-heading">System health</h2>
             <p>Only what was measured: each signal says what was checked, when, and what it found. A reading that could not be made is shown as unavailable, never as healthy or zero.</p>
           </div>
+          <Link className={styles.fullReport} href="/admin/email">Full health report <ArrowRight aria-hidden="true" size={14} /></Link>
         </div>
         {!health && <Unavailable what="System health" />}
         {healthNote && <p className={styles.healthNote} role="status" data-testid="health-note">{healthNote}</p>}
@@ -454,8 +457,8 @@ export default async function SystemAdminPage({
         </p>
       </section>
 
-      <nav className={styles.tasks} aria-label="System management tasks (full directory)">
-        {systemNavGroups.map((group) => {
+      <nav className={styles.tasks} aria-label="Catalogs and settings">
+        {catalogGroups.map((group) => {
           const cards = group.items.map(({ href, label, description, icon: Icon }) => (
             <Link className={styles.taskCard} href={href} key={href}>
               <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
