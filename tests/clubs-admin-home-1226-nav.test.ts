@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { systemSubpageTitle } from "@/components/system-navigation";
 import { clubsAdminActiveHref, clubsAdminNavigation } from "@/components/staff-navigation";
 import { adminRoleLanding } from "@/modules/access/admin-roles-domain";
 
@@ -18,6 +19,14 @@ describe("Clubs navigation", () => {
     // Pages the sidebar does not list light nothing, as before.
     expect(clubsAdminActiveHref("/admin/clubs/transfers")).toBeNull();
     expect(clubsAdminActiveHref("/admin/accounts")).toBeNull();
+  });
+
+  it("titles the dashboard without shadowing the club subpages", () => {
+    expect(systemSubpageTitle("/admin/clubs")).toBe("Club administration");
+    expect(systemSubpageTitle("/admin/clubs/")).toBe("Club administration");
+    expect(systemSubpageTitle("/admin/clubs/summary")).toBe("Club summary");
+    expect(systemSubpageTitle("/admin/clubs/applications")).toBe("New club applications");
+    expect(systemSubpageTitle("/admin/clubs/transfers")).toBe("Club member transfers");
   });
 
   it("lands a Clubs Administrator on the dashboard", () => {

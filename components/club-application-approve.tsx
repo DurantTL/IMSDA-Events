@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 /**
  * Approve one pending new club application from the Clubs Administrator dashboard (#1226). It posts to the same route
@@ -16,6 +16,26 @@ export async function postApproveDecision(applicationId: string, fetchImpl: type
   });
   const result = await response.json().catch(() => ({})) as { message?: string };
   if (!response.ok) throw new Error(result.message ?? "The decision could not be saved.");
+}
+
+const AnnounceContext = createContext<(message: string) => void>(() => undefined);
+
+/**
+ * Wraps the New clubs section. A refresh after Approve removes the approved row, so the status message lives here, in
+ * a live region that stays, and focus moves to the section heading (`headingId`, tabIndex -1) instead of being lost.
+ */
+export function NewClubsRegion({ headingId, children }: { headingId: string; children: ReactNode }) {
+  const [message, setMessage] = useState("");
+  const announce = (text: string) => {
+    setMessage(text);
+    if (typeof document !== "undefined") document.getElementById(headingId)?.focus();
+  };
+  return (
+    <AnnounceContext.Provider value={announce}>
+      {children}
+      <p className="field-help" role="status" aria-live="polite" data-testid="new-clubs-status" style={{ margin: "4px 0 0" }}>{message}</p>
+    </AnnounceContext.Provider>
+  );
 }
 
 type ViewProps = {
@@ -35,7 +55,7 @@ export function ClubApplicationApproveView({ clubName, directorEmail, confirming
   return (
     <div className="nca-decision">
       {success ? (
-        <p className="inline-notice success" role="status">{success}</p>
+        <p className="inline-notice success">{success}</p>
       ) : confirming ? (
         <>
           <p>
@@ -56,6 +76,7 @@ export function ClubApplicationApproveView({ clubName, directorEmail, confirming
 
 export function ClubApplicationApprove({ applicationId, clubName, directorEmail }: { applicationId: string; clubName: string; directorEmail: string }) {
   const router = useRouter();
+  const announce = useContext(AnnounceContext);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +88,9 @@ export function ClubApplicationApprove({ applicationId, clubName, directorEmail 
     try {
       await postApproveDecision(applicationId);
       setConfirming(false);
-      setSuccess(`${clubName} was approved. The club director invite was emailed.`);
+      const text = `${clubName} was approved. The club director invite was emailed.`;
+      setSuccess(text);
+      announce(text);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The decision could not be saved.");

@@ -84,14 +84,24 @@ describe("next club event", () => {
     ["c1", "REGISTERED", 20], ["c2", "REGISTERED", 11], ["c3", "WAITLISTED", 9], ["c4", "NOT_REGISTERED", null],
   ];
 
-  it("picks the first event on or after the start of today and skips earlier ones", () => {
+  it("picks the first event on or after today (Central) and skips earlier ones", () => {
     const events = [
       event("old", "Old Camporee", "2026-10-25T23:00:00.000Z", rows),
-      event("today", "Today Rally", "2026-10-26T00:00:00.000Z", rows),
+      event("today", "Today Rally", "2026-10-26T15:00:00.000Z", rows),
       event("later", "Later Fest", "2027-03-01T00:00:00.000Z", rows),
     ];
     expect(pickNextEvent(events, now)?.id).toBe("today");
     expect(pickNextEvent([events[0]!], now)).toBeNull();
+  });
+
+  it("compares Central calendar dates: an evening-Central event today still counts, yesterday's does not", () => {
+    // 2026-10-27T02:00Z is 9 pm Central on Oct 26, the same day as "now" (1 pm Central).
+    const evening = event("eve", "Evening Rally", "2026-10-27T02:00:00.000Z");
+    const yesterday = event("yd", "Yesterday", "2026-10-26T04:00:00.000Z");
+    expect(pickNextEvent([yesterday, evening], now)?.id).toBe("eve");
+    // Late evening Central on Oct 26 (UTC already Oct 27): "now" is still the 26th there.
+    expect(pickNextEvent([evening], new Date("2026-10-27T03:30:00.000Z"))?.id).toBe("eve");
+    expect(pickNextEvent([evening], new Date("2026-10-27T06:00:00.000Z"))).toBeNull();
   });
 
   it("shows registered of every active club and the headcount of registered clubs only", () => {
@@ -118,6 +128,13 @@ describe("new clubs", () => {
     expect(home.newClubs[0]).toMatchObject({ boardMembersLabel: "1 board member listed", submittedLabel: "Oct 10, 2026", reviewHref: "/admin/clubs/applications#application-a" });
     expect(home.newClubs[1]!.boardMembersLabel).toBe("3 board members listed");
     expect(home.moreNewClubs).toBe(false);
+  });
+
+  it("lists review-first reasons and none for a clean application", () => {
+    const flagged = application("f", "2026-10-10T15:00:00.000Z", { duplicates: [1], invitedEmailDiffers: true, sterling: "NOT_COMPLIANT", sterlingAmbiguous: true, sterlingNameMismatch: true, church: { name: "C", needsChoice: true } });
+    const home = buildClubsAdminHome({ ...base, applications: [flagged, application("ok", "2026-10-11T15:00:00.000Z", { sterling: "CLEAR", duplicates: [] })], waitingCount: 2 });
+    expect(home.newClubs[0]!.reviewReasons).toHaveLength(6);
+    expect(home.newClubs[1]!.reviewReasons).toEqual([]);
   });
 
   it("omits the board line when none are listed and flags a church that needs a choice", () => {

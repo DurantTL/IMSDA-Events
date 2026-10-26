@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
-import { ClubApplicationApprove, ClubApplicationApproveView, postApproveDecision } from "@/components/club-application-approve";
+import { NewClubsRegion, ClubApplicationApprove, ClubApplicationApproveView, postApproveDecision } from "@/components/club-application-approve";
 
 /** #1226: Approve on the dashboard uses the applications page's own decision route, and only after the confirm step. */
 const noop = () => undefined;
@@ -31,7 +31,7 @@ describe("approve control", () => {
 
   it("shows the route's error as an alert, and a status on success", () => {
     expect(view({ confirming: true, error: "Already decided." })).toMatch(/role="alert">Already decided\.</);
-    expect(view({ success: "Approved." })).toMatch(/role="status">Approved\.</);
+    expect(view({ success: "Approved." })).toContain(">Approved.<");
   });
 
   it("posts only { decision: \"approve\" } to the existing decision route", async () => {
@@ -47,6 +47,12 @@ describe("approve control", () => {
   it("throws the route's message when the decision fails", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ message: "Choose a church." }), { status: 409 }));
     await expect(postApproveDecision("app-1", fetchImpl as unknown as typeof fetch)).rejects.toThrow("Choose a church.");
+  });
+
+  it("keeps a live status region outside the rows, for the message after a refresh", () => {
+    const html = renderToStaticMarkup(createElement(NewClubsRegion, { headingId: "h", children: createElement("ul") }));
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
   });
 
   it("does not post when only rendered", () => {

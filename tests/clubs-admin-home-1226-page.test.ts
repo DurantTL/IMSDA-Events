@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
 
 /** #1226: the page's gate and what it shows to each viewer. Synthetic data only. */
@@ -28,14 +28,14 @@ vi.mock("@/modules/club-applications/repository", () => ({ listNewClubApplicatio
 
 import ClubsAdminPage from "@/app/(workspace)/admin/clubs/page";
 
-const now = new Date();
-const clubYearNow = (() => { const y = now.getUTCFullYear(); const s = now.getUTCMonth() + 1 >= 9 ? y : y - 1; return `${s}-${String((s + 1) % 100).padStart(2, "0")}`; })();
+const now = new Date("2026-10-26T18:00:00.000Z");
+const clubYearNow = "2026-27";
 const synthetic = (id: string, name: string, rosterSize: number) => summarizeClub({
   id, name, church: `${name} Church`, directors: [], rosterSize, registrationOnTime: true,
   backgroundChecks: { missing: 0, notInCompliance: 0, expiringSoon: 0 }, reports: [],
 }, clubYearNow, now);
 
-const nextStart = new Date(Date.now() + 20 * 86_400_000).toISOString();
+const nextStart = "2026-11-14T15:00:00.000Z";
 const render = async (search: { year?: string; q?: string } = {}) => renderToStaticMarkup(await ClubsAdminPage({ searchParams: Promise.resolve(search) }));
 
 const pending = (id: string, needsChoice = false) => ({
@@ -44,6 +44,8 @@ const pending = (id: string, needsChoice = false) => ({
 });
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
   vi.clearAllMocks();
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: null, displayName: "Synthetic Admin", email: "admin@example.test" } });
   mocks.hasClubsAdministration.mockResolvedValue(true);
@@ -56,6 +58,8 @@ beforeEach(() => {
   mocks.listNewClubApplications.mockResolvedValue([pending("app-1"), pending("app-2", true)]);
   mocks.countWaitingNewClubApplications.mockResolvedValue(2);
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("the gate", () => {
   it("sends a signed-out visitor to the staff login", async () => {
@@ -140,8 +144,33 @@ describe("what it shows", () => {
     expect(first).toContain(">Approve<");
     expect(first).toContain("/admin/clubs/applications#application-app-1");
     expect(second).not.toContain(">Approve<");
-    expect(second).toContain("Choose a church first");
+    expect(second).toContain("Review first: choose a church.");
     expect(second).toContain("/admin/clubs/applications#application-app-2");
+  });
+
+  it.each([
+    ["a possible duplicate", { duplicates: [{ kind: "NAME" }] }, "possible duplicate club"],
+    ["an invite email mismatch", { invitedEmailDiffers: true }, "director email differs from the invited address"],
+    ["a Sterling flag", { sterling: "FLAGGED" }, "Sterling Volunteers status needs a look"],
+    ["an ambiguous Sterling match", { sterlingAmbiguous: true }, "director email matches more than one person"],
+    ["a Sterling name mismatch", { sterlingNameMismatch: true }, "director email matched a different name"],
+  ])("shows no Approve for %s, only Review first", async (_label, flags, reason) => {
+    mocks.listNewClubApplications.mockResolvedValue([{ ...pending("app-1"), sterling: "CLEAR", duplicates: [], ...flags }]);
+    mocks.countWaitingNewClubApplications.mockResolvedValue(1);
+    const html = await render();
+    expect(html).not.toContain(">Approve<");
+    expect(html).toContain(`Review first: ${reason}.`);
+    expect(html).toContain("/admin/clubs/applications#application-app-1");
+  });
+
+  it("shows Approve for a clean application and keeps focus and status targets", async () => {
+    mocks.listNewClubApplications.mockResolvedValue([{ ...pending("app-1"), sterling: "CLEAR", duplicates: [], invitedEmailDiffers: false }]);
+    const html = await render();
+    expect(html).toContain(">Approve<");
+    expect(html).toContain('id="new-clubs-heading" tabindex="-1"');
+    expect(html).toContain('data-testid="new-clubs-status"');
+    expect(html).toContain("Search by club or church name");
+    expect(html).toContain("Every active club today; records below are for club year 2026-27");
   });
 
   it("says so when no club event is coming", async () => {

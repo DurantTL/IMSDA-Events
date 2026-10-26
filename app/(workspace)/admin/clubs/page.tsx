@@ -17,7 +17,7 @@ import {
   clubsAdminHrefs,
   clubsAdminTabs,
 } from "@/modules/club-reports/clubs-admin-home-model";
-import { ClubApplicationApprove } from "@/components/club-application-approve";
+import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { cardCell } from "@/components/table-card-labels";
 import styles from "./admin-clubs.module.css";
@@ -82,7 +82,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
             <span className={styles.cardIcon}><Tent aria-hidden="true" size={20} /></span>
             <strong>{counts.activeClubs}</strong>
             <p>Active clubs</p>
-            <small>Active clubs, club year {clubYear}</small>
+            <small>Every active club today; records below are for club year {clubYear}</small>
             <small><Link className={styles.cardLink} href={href.summary}>Go to all clubs</Link></small>
           </article>
           <article data-card="new-applications">
@@ -114,11 +114,12 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         </p>
       </section>
 
+      <NewClubsRegion headingId="new-clubs-heading">
       <section className={`panel ${styles.panel}`} id="new-clubs" aria-labelledby="new-clubs-heading">
         <div className={styles.sectionHeading}>
           <div>
             <p className="eyebrow">Waiting for a decision</p>
-            <h2 id="new-clubs-heading">New clubs</h2>
+            <h2 id="new-clubs-heading" tabIndex={-1}>New clubs</h2>
             <p>{NEW_CLUBS_NOTE}</p>
           </div>
         </div>
@@ -138,8 +139,8 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
                 </p>
                 <div className={styles.applicationActions}>
                   <Link href={application.reviewHref}>Review<span className="sr-only"> {application.clubName}</span> <ArrowRight aria-hidden="true" size={14} /></Link>
-                  {application.needsChurchChoice ? (
-                    <p>Choose a church first. The review page has the church picker.</p>
+                  {application.reviewReasons.length > 0 ? (
+                    <p>Review first: {application.reviewReasons.join("; ")}.</p>
                   ) : (
                     <ClubApplicationApprove applicationId={application.id} clubName={application.clubName} directorEmail={application.directorEmail} />
                   )}
@@ -150,6 +151,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         )}
         {home.moreNewClubs && <Link className={styles.seeAll} href={href.applications}>See all {counts.waitingApplications} waiting</Link>}
       </section>
+      </NewClubsRegion>
 
       <section className={`panel ${styles.panel}`} id="registered-clubs" aria-labelledby="registered-clubs-heading">
         <div className={styles.sectionHeading}>
@@ -162,7 +164,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         <form className={styles.searchForm} method="get" action="/admin/clubs">
           <input type="hidden" name="year" value={clubYear} />
           <label>
-            Search clubs by name, church or city
+            Search by club or church name
             <input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" />
           </label>
           <button className="secondary-button" type="submit">Search</button>

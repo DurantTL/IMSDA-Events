@@ -12,7 +12,7 @@
  *   has no "reviewed" state, so none is claimed. The report month is the current calendar month (Central time) when it
  *   falls in the selected club year, otherwise that club year's last month.
  * - Registered for next event: clubs whose registration for the next club event is REGISTERED, out of every active
- *   club. The next club event is the first event of the club year that starts on or after the start of today (UTC).
+ *   club. The next club event is the first event of the club year whose start date (Central time) is today or later.
  * - People registered: the event's headcount across registered clubs only.
  * - Roster members: active roster members across active clubs, for the selected club year.
  */
@@ -42,6 +42,12 @@ export type ClubsAdminApplicationSource = {
   otherBoardMembers: readonly string[];
   church: { name: string; needsChoice: boolean };
   director: { email: string };
+  /** Flags the applications page shows beside Approve. Any of them means "review first". */
+  duplicates?: readonly unknown[];
+  invitedEmailDiffers?: boolean;
+  sterling?: "CLEAR" | "FLAGGED" | "NOT_COMPLIANT" | "NO_RECORD";
+  sterlingAmbiguous?: boolean;
+  sterlingNameMismatch?: boolean;
 };
 
 export type ClubsAdminTab = { key: string; label: string; href: string };
@@ -55,6 +61,8 @@ export type ClubsAdminNewClub = {
   boardMembersLabel: string | null;
   directorEmail: string;
   needsChurchChoice: boolean;
+  /** Why this one must be opened before approving (church choice, duplicates, Sterling flags, invite mismatch). Empty means Approve may show. */
+  reviewReasons: string[];
   reviewHref: string;
 };
 
@@ -123,10 +131,10 @@ export function chooseReportMonth(clubYear: string, now: Date) {
   return months.includes(current) ? current : months[months.length - 1]!;
 }
 
-/** The first event starting on or after the start of today (UTC), or null. Events come ordered by start; this does not rely on it. */
+/** The first event whose start date (Central time) is today or later, or null. Events come ordered by start; this does not rely on it. */
 export function pickNextEvent<T extends { startsAt: string }>(events: readonly T[], now: Date): T | null {
-  const startOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const upcoming = events.filter((event) => new Date(event.startsAt).getTime() >= startOfToday);
+  const today = calendarDateIn(now);
+  const upcoming = events.filter((event) => calendarDateIn(new Date(event.startsAt)) >= today);
   return upcoming.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())[0] ?? null;
 }
 
@@ -136,6 +144,17 @@ function longDate(iso: string) {
 
 function submittedDate(iso: string) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: CONFERENCE_TIME_ZONE }).format(new Date(iso));
+}
+
+export function applicationReviewReasons(application: ClubsAdminApplicationSource): string[] {
+  const reasons: string[] = [];
+  if (application.church.needsChoice) reasons.push("choose a church");
+  if ((application.duplicates?.length ?? 0) > 0) reasons.push("possible duplicate club");
+  if (application.invitedEmailDiffers) reasons.push("director email differs from the invited address");
+  if (application.sterling && application.sterling !== "CLEAR") reasons.push("Sterling Volunteers status needs a look");
+  if (application.sterlingAmbiguous) reasons.push("director email matches more than one person");
+  if (application.sterlingNameMismatch) reasons.push("director email matched a different name");
+  return reasons;
 }
 
 export function clubsAdminHrefs(clubYear: string) {
@@ -224,6 +243,7 @@ export function buildClubsAdminHome(input: {
         : null,
       directorEmail: application.director.email,
       needsChurchChoice: application.church.needsChoice,
+      reviewReasons: applicationReviewReasons(application),
       reviewHref: `/admin/clubs/applications#application-${application.id}`,
     })),
     moreNewClubs: waiting > NEW_CLUBS_LIMIT,
