@@ -1,65 +1,100 @@
 @AGENTS.md
 
-# Claude Code: delegating to subagents
+# Claude Code only
 
-These rules are for Claude Code only (Codex reads `AGENTS.md`). Delegate by
-these rules without asking first; they count as the user's request to use
+These rules are for Claude Code (Codex reads `AGENTS.md` and `.agents/skills/`).
+Delegate by them without asking first; they count as the user's request to use
 subagents. The agents live in `.claude/agents/`.
 
-- **explorer** (Haiku 5.5, pinned as `claude-haiku-5-5`): broad searches,
-  tracing call paths, digesting long output (CI logs, test failures, issue
-  lists, big diffs), and visual QA: reviewing screenshot folders and running
-  read-only browser crawls that measure pages. Do small, targeted lookups
-  yourself; spawning costs more than one or two searches.
-- **implementer** (Sonnet 5.5, pinned as `claude-sonnet-5-5` because the
-  `sonnet` alias can lag a release): one whole `codex-ready` issue with
-  acceptance criteria, in its own worktree. Never for small edits, design
-  questions, or `needs-decision` / `needs-human` issues.
-- **reviewer** (Opus): before opening or updating any code PR. It is the
-  safety net for everything the cheaper models build, so it always runs on
-  Opus. It reports findings; it never fixes them.
-- **Design decisions, hard debugging, and anything needing this conversation's
-  context stay in the main session.** Subagents start without it.
+## Working with Caleb (repository owner)
 
-**Fixes stay on Sonnet.** Opus reviews and coordinates; it does not write
-fixes. When checks fail, CI is red, or the reviewer reports a blocking
-finding, send the failure output and the reviewer's findings back to an
-**implementer** (resume the original builder when it is still available, so
-it keeps its context), not to an Opus implementer. If the same finding
-survives two Sonnet fix rounds, the main session takes the hard part itself
-(a small, targeted change or a precise plan for the implementer) rather than
-spawning an Opus builder. Unclear requirements don't escalate; they get the
-`needs-decision` label and a question to a human.
+- **Plain language:** short, plain answers. Say what is ready and exactly what
+  Caleb needs to do.
+- **Human-only steps:** Caleb merges PRs and runs production migrations
+  himself. Never merge or deploy.
+- **PRs:** target `main`, open ready for review (not draft), use the repository
+  template, and add the `mobile-check` label when UI changes. Never delete
+  branches.
+- **Two builds at most:** never run more than two builds at once. Keep moving
+  through approved issues without re-asking.
+- **Base branch:** don't merge `main` into an open PR unless there is a real
+  conflict.
+- **No scheduled check-ins:** don't schedule check-ins on PRs. PR event
+  subscriptions are passive and fine.
 
-**Always verify.** Treat a subagent's "done" as a claim. Run the checks
-yourself (`npx eslint . --max-warnings=0`, `npx tsc --noEmit -p .`, the focused
-tests) before pushing.
+## Agents
+
+- **explorer** (Haiku, `claude-haiku-5-5`) for:
+  - broad searches and tracing call paths;
+  - digesting long output (CI logs, issue lists, big diffs);
+  - visual QA (screenshot folders, read-only browser crawls).
+
+  Do one or two targeted lookups yourself; spawning costs more.
+- **implementer** (Sonnet, `claude-sonnet-5-5`): one whole approved issue with
+  acceptance criteria, plus the fix rounds for that issue. Never for design
+  questions or `needs-decision` / `needs-human` issues.
+- **reviewer** (Opus, `claude-opus-5-5`): every code PR before it opens. It
+  reports; it never fixes.
+- **The main session** keeps design decisions, hard debugging, anything that
+  needs this conversation's context, and small edits (a few lines, no new
+  logic).
+
+## Build loop
+
+1. **Worktree:** create it yourself. `isolation: "worktree"` fails in cloud
+   sessions.
+   - `git fetch origin main && git worktree add -b claude/issue-<n>-<slug> .claude/worktrees/issue-<n> origin/main`
+   - then, inside it, `npm ci --ignore-scripts && npx prisma generate`.
+2. **Implementer:** give it the issue number, the worktree path, what you
+   already know (file:line pointers), and the rules below. It commits and does
+   not push.
+3. **Reviewer:** give it the issue and the diff, not your conclusions.
+4. **Fixes:** blocking or medium findings go back to the **same** implementer
+   (resume it with SendMessage so it keeps its context).
+   - Re-review only the fix commit, and only after a blocking or medium
+     finding, or when the fix touches permissions, sensitive data, payments,
+     migrations or a human-only gate.
+   - Low findings and nits go into the PR body or a follow-up issue.
+   - Accessibility and data-correctness findings are never deferred.
+   - If the same finding survives two Sonnet rounds, the main session takes
+     the hard part itself.
+5. **Verify:** treat "done" as a claim. Run eslint, tsc (with the larger heap)
+   and the full `npx vitest run` yourself before pushing.
+6. **Push and open the PR:** push, open the PR, and subscribe to its activity.
+   When CI fails, read the job log, fix the cause, and run the affected
+   `scripts/` checks locally before pushing again.
+7. **Clean up** an idle worktree with `rm -rf node_modules .next`.
+
+Rules to pass to every implementer:
+- Never run the full `npx vitest run`; CI and the main session do. Run only
+  eslint, tsc (`NODE_OPTIONS=--max-old-space-size=8192`) and focused tests.
+- Follow the enforced rules in `AGENTS.md` → Checks.
+- End commits with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
 ## Keeping usage down
 
-These rules keep cost in proportion to the work. They change how work is
-done, never whether it is reviewed or verified.
+- **No Opus for bulk reading:** screenshot reviews, crawls and long reports go
+  to the explorer. Spot-check two or three key screenshots yourself, not
+  whole folders.
+- **Mobile audits:** run them on the affected pages while building and once in
+  full at the end. Run the eight-width set (`360,390,768,861,980,1024,1180,1280`)
+  only for shared layout changes.
+- **Right-size issues:** an implementer should finish one in a round. Split
+  anything with more than about ten separate items.
+- **Explorer prompts:** keep them narrow and ask for a line budget. Run several
+  explorers in parallel only for independent questions.
 
-- **No Opus for bulk reading.** Screenshot reviews, browser crawls and other
-  large read-and-report jobs go to the **explorer**, never to a
-  general-purpose agent, which runs on Opus. The main session spot-checks two
-  or three key screenshots, not whole folders.
-- **Targeted audits while building.** While iterating, run the mobile audit
-  only on the affected pages (`MOBILE_LAYOUT_ONLY=...`). Run one full audit
-  at the four default widths at the end. Run the eight-width audit
-  (`360,390,768,861,980,1024,1180,1280`) only for changes to shared layout
-  (sidebar, page width, tables, shared CSS), once, before the PR.
-- **Right-size issues.** Size an issue so an implementer can finish it in one
-  round. Split an issue with more than about ten separate items before
-  building it.
-- **One review round by default.** The reviewer reviews every code PR before
-  it opens. After the fix round, re-review only the fix commit, and only when
-  the first review found something blocking or medium-severity, or the fixes
-  touch permissions, sensitive data, payments, migrations or a human-only
-  gate. Low-severity findings and nits go to the issue or PR as follow-up
-  notes instead of starting another fix round. Accessibility and
-  data-correctness findings are never deferred.
-- **Fixes still go to Sonnet.** Small edits the main session may make itself
-  (a few lines, no new logic). Reviewer findings beyond that go back to the
-  implementer.
+## Cloud session notes
 
+GitHub goes through a proxy:
+- Use `gh api repos/DurantTL/IMSDA-Events/...` paths.
+- Numeric `repositories/<id>` paths are refused.
+- `--paginate` fails after the first page, so fetch pages with `&page=N`.
+- The search API (`search/issues`) returns 403; list issues and PRs instead.
+- Read CI logs with `gh api repos/DurantTL/IMSDA-Events/actions/jobs/<id>/logs`.
+- Check results with `gh api repos/DurantTL/IMSDA-Events/commits/<sha>/check-runs`.
+
+Local Postgres is not running by default. Start it with
+`sudo service postgresql start`. If the role or database is missing, create
+them from the `DATABASE_URL` in `.env.example`, then run `npm run db:deploy` and
+`npm run db:seed`.
