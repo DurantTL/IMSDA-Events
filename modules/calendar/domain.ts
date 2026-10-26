@@ -167,25 +167,34 @@ export function formatWeekdayDate(date: string) {
 /** The number of distinct category tones (#1202); each has its own fill, edge and text colour in the stylesheet. */
 export const calendarToneCount = 6;
 
-/** A stable tone, 1 to 6, for a category name: the same name has the same colour in every month and under every filter. */
-export function calendarCategoryTone(category: string) {
-  let hash = 0;
-  for (const character of category.trim().toLowerCase()) hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0;
-  return (hash % calendarToneCount) + 1;
-}
-
 export type CalendarTone = "event" | "closure" | 1 | 2 | 3 | 4 | 5 | 6;
 
+const categoryKey = (category: string) => category.trim().toLowerCase();
+
+/**
+ * One tone per category by position, so up to six categories never share a colour: the page's category list (built before the
+ * category filter, so a filter click changes no colour) in order, skipping the closure category, which is always striped.
+ */
+export function calendarToneMap(categories: string[]) {
+  const map = new Map<string, number>();
+  for (const name of categories) {
+    const key = categoryKey(name);
+    if (key === closureCategory.toLowerCase() || map.has(key)) continue;
+    map.set(key, (map.size % calendarToneCount) + 1);
+  }
+  return map;
+}
+
 /** One colour rule for the grid bars, the phone dots, the day panel and the key: closures striped, IMSDA events navy, else the category's tone. */
-export function calendarItemTone(item: Pick<CalendarItem, "kind" | "isClosure" | "category">): CalendarTone {
+export function calendarItemTone(item: Pick<CalendarItem, "kind" | "isClosure" | "category">, toneMap: Map<string, number>): CalendarTone {
   if (item.isClosure) return "closure";
   if (item.kind === "EVENT") return "event";
-  return calendarCategoryTone(item.category) as CalendarTone;
+  return (toneMap.get(categoryKey(item.category)) ?? 1) as CalendarTone;
 }
 
 /** The tone a category's filter button and key swatch show: the closure category is striped, any other the category's own tone. */
-export function calendarKeyTone(category: string): CalendarTone {
-  return category.trim().toLowerCase() === closureCategory.toLowerCase() ? "closure" : (calendarCategoryTone(category) as CalendarTone);
+export function calendarKeyTone(category: string, toneMap: Map<string, number>): CalendarTone {
+  return categoryKey(category) === closureCategory.toLowerCase() ? "closure" : ((toneMap.get(categoryKey(category)) ?? 1) as CalendarTone);
 }
 
 export type WeekBar = {

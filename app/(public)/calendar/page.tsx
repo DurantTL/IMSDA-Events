@@ -14,6 +14,7 @@ import {
   calendarItemTone,
   calendarKeyTone,
   calendarStatusLabels,
+  calendarToneMap,
   closureCategory,
   closureLabel,
   filterByCategory,
@@ -88,6 +89,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const allItems = await listPublicCalendarItems(from, to);
   const categories = calendarCategories(allItems);
   if (category && !categories.some((name) => name.toLowerCase() === category.toLowerCase())) categories.push(category);
+  const toneMap = calendarToneMap(categories);
   const items = filterByCategory(allItems, category);
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);
@@ -158,7 +160,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             {categories.map((name) => (
               <Link
                 aria-current={category?.toLowerCase() === name.toLowerCase() ? "page" : undefined}
-                className={`calendar-tone-${calendarKeyTone(name)}`}
+                className={`calendar-tone-${calendarKeyTone(name, toneMap)}`}
                 href={calendarHref({ ...base, category: name, date: selectedDate })}
                 key={name}
               >
@@ -204,7 +206,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                             <ul className="calendar-dots">
                               {dayItems.slice(0, 3).map((item) => (
                                 <CalendarMonthChip
-                                  className={`calendar-chip calendar-tone-${calendarItemTone(item)} calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}
+                                  className={`calendar-chip calendar-tone-${calendarItemTone(item, toneMap)} calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}
                                   item={item}
                                   key={item.key}
                                 >
@@ -224,7 +226,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                       return (
                         <CalendarDayLink
                           aria-label={`${item.isClosure ? `${closureLabel}: ` : ""}${item.title}, ${dates}${item.status !== "SCHEDULED" ? `, ${calendarStatusLabels[item.status]}` : ""}`}
-                          className={`calendar-bar calendar-tone-${calendarItemTone(item)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
+                          className={`calendar-bar calendar-tone-${calendarItemTone(item, toneMap)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
                           href={dayHrefFor(bar.segmentStart)}
                           key={item.key}
                           style={{ gridColumn: `${bar.startCol} / span ${bar.span}`, gridRow: bar.row + 2 }}
@@ -263,7 +265,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                     : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
                 </p>
                 {selectedItems.length > 0 && (
-                  <ul className="calendar-panel-list">{sortCalendarItems(selectedItems).map((item) => <CalendarPanelItem item={item} key={item.key} />)}</ul>
+                  <ul className="calendar-panel-list">{sortCalendarItems(selectedItems).map((item) => <CalendarPanelItem item={item} key={item.key} toneMap={toneMap} />)}</ul>
                 )}
                 <div className="calendar-day-actions">
                   <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>

@@ -8367,8 +8367,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-month-nav { display: flex; align-items: center; gap: 8px; }
 .calendar-month-nav h2 { min-width: 170px; margin: 0; color: var(--ink); font-size: 1.15rem; text-align: center; }
 .calendar-month-nav .secondary-button { flex: none; width: 42px; min-width: 42px; min-height: 42px; justify-content: center; padding: 0; }
-.calendar-categories { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.calendar-categories::-webkit-scrollbar { display: none; }
+.calendar-categories { display: flex; flex-wrap: wrap; gap: 6px; }
 .calendar-categories a {
   flex: none; display: inline-flex; min-height: 44px; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px;
   background: #fff; padding: 6px 14px; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.72rem); font-weight: 700; text-decoration: none;
@@ -8490,8 +8489,8 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-bar.calendar-tone-closure { border: 1px dashed var(--cal-edge); border-left: 4px dashed var(--cal-edge); background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 6px, #fde4cc 6px, #fde4cc 12px); }
   .calendar-bar.calendar-tone-closure.continues-before { border-left-width: 0; }
   .calendar-bar.calendar-status-cancelled .calendar-bar-title { text-decoration: line-through; }
-  .calendar-bar-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .calendar-bar-dates { flex: 0 3 auto; min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
+  .calendar-bar-title { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .calendar-bar-dates { flex: 0 1 auto; min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
   .calendar-bar-edge { flex: none; font-size: 1.15rem; line-height: 1; }
   .calendar-bar-edge-end { margin-left: auto; }
   .calendar-bar svg { flex: none; }

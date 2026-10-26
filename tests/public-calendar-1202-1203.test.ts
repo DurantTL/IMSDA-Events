@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  calendarCategoryTone,
+  calendarToneMap,
   calendarItemTone,
   calendarKeyTone,
   filterByCategory,
@@ -116,7 +116,7 @@ describe("weekBarLayout (#1202)", () => {
     const closure = item("closed", "2026-03-05", "2026-03-06", { isClosure: true, category: "Office closure" });
     const { bars } = weekBarLayout(week1, [closure]);
     expect(bars[0]).toMatchObject({ startCol: 5, span: 2 });
-    expect(calendarItemTone(closure)).toBe("closure");
+    expect(calendarItemTone(closure, calendarToneMap([]))).toBe("closure");
   });
 
   it("applies the category filter before the layout, so a filtered-out item never gets a bar", () => {
@@ -126,24 +126,30 @@ describe("weekBarLayout (#1202)", () => {
 });
 
 describe("calendar tones (#1202, #1203)", () => {
-  it("is stable for a name, ignores case and spacing, and stays in 1 to 6", () => {
-    const names = ["Youth", "Camps", "Women's ministries", "Pathfinders", "Adventurers", "Office closure", ""];
-    for (const name of names) {
-      const tone = calendarCategoryTone(name);
-      expect(tone).toBeGreaterThanOrEqual(1);
-      expect(tone).toBeLessThanOrEqual(6);
-      expect(calendarCategoryTone(`  ${name.toUpperCase()} `)).toBe(tone);
-    }
-    expect(calendarCategoryTone("Youth")).toBe(calendarCategoryTone("Youth"));
-    expect(new Set(names.map(calendarCategoryTone)).size).toBeGreaterThan(2);
+  it("gives up to six categories six different tones, by position, skipping the closure category", () => {
+    const categories = ["Camps", "Office closure", "Pathfinders", "Women's Ministries", "Youth", "Ministerial", "Adventurers"];
+    const map = calendarToneMap(categories);
+    const tones = ["Camps", "Pathfinders", "Women's Ministries", "Youth", "Ministerial", "Adventurers"].map((name) => calendarKeyTone(name, map));
+    expect(tones).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(calendarKeyTone("Office closure", map)).toBe("closure");
+    expect(calendarKeyTone(" youth ", map)).toBe(4);
+    expect(calendarToneMap([...categories, "Seventh"]).get("seventh")).toBe(1);
   });
 
-  it("makes events navy and closures striped whatever the category, else the category's tone", () => {
-    expect(calendarItemTone({ kind: "EVENT", category: "Youth" })).toBe("event");
-    expect(calendarItemTone({ kind: "EVENT", category: "Youth", isClosure: true })).toBe("closure");
-    expect(calendarItemTone({ kind: "ENTRY", category: "Youth" })).toBe(calendarCategoryTone("Youth"));
-    expect(calendarKeyTone("Office closure")).toBe("closure");
-    expect(calendarKeyTone("Youth")).toBe(calendarCategoryTone("Youth"));
+  it("does not change when a category filter is applied, because the map is built from the unfiltered list", () => {
+    const all = [item("a", "2026-03-02", "2026-03-02", { category: "Camps" }), item("b", "2026-03-02", "2026-03-02", { category: "Youth" })];
+    const names = (items: CalendarItem[]) => [...new Set(items.map((entry) => entry.category))].sort();
+    const map = calendarToneMap(names(all));
+    const filtered = filterByCategory(all, "youth");
+    expect(calendarItemTone(filtered[0], map)).toBe(calendarItemTone(all[1], map));
+    expect(calendarItemTone(all[0], map)).not.toBe(calendarItemTone(all[1], map));
+  });
+
+  it("makes events navy and closures striped whatever the category", () => {
+    const map = calendarToneMap(["Youth"]);
+    expect(calendarItemTone({ kind: "EVENT", category: "Youth" }, map)).toBe("event");
+    expect(calendarItemTone({ kind: "EVENT", category: "Youth", isClosure: true }, map)).toBe("closure");
+    expect(calendarItemTone({ kind: "ENTRY", category: "Youth" }, map)).toBe(1);
   });
 
   it("names a day with its weekday", () => {
@@ -214,7 +220,9 @@ describe("calendar page wiring (#1202, #1203)", () => {
   });
 
   it("shows a colour swatch in each category button and a key for IMSDA events", () => {
-    expect(page).toContain("calendarKeyTone(name)");
+    expect(page).toContain("calendarKeyTone(name, toneMap)");
+    expect(css).toMatch(/\.calendar-categories \{ display: flex; flex-wrap: wrap;/);
+    expect(css).toMatch(/\.calendar-bar-title \{ flex: 0 0 auto; max-width: 100%;/);
     expect(page).toContain('<span aria-hidden="true" className="calendar-swatch" />');
     expect(page).toContain("IMSDA event");
     expect(css).toMatch(/\.calendar-categories a \{\s*flex: none; display: inline-flex; min-height: 44px;/);
