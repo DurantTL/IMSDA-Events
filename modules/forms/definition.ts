@@ -396,7 +396,8 @@ export function fieldRuns<T extends { group?: string }>(fields: readonly T[]) {
 export const formSectionSchema = z.object({
   id: z.string().trim().min(3).max(80),
   title: z.string().trim().min(2, "Every section needs a title.").max(120),
-  description: z.string().trim().max(500).default(""),
+  // 3,000: the Adventurer release text and purpose statement (#1222) are a section's own text, word for word.
+  description: z.string().trim().max(3000).default(""),
   stepLabel: z.string().trim().min(2).max(40).optional(),
   isReviewStep: z.boolean().optional(),
   fields: z.array(formFieldSchema).min(1, "Every section needs at least one field.").max(20),

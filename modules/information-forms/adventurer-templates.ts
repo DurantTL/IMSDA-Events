@@ -1,3 +1,4 @@
+import { ADVENTURER_ANNUAL_INTRO, ADVENTURER_CHILD_PARENT_ACTIVITY_LABEL, ADVENTURER_PARENT_GUARDIAN_NAME_LABEL, ADVENTURER_PARENT_GUARDIAN_SIGNATURE_LABEL, ADVENTURER_PHOTO_RELEASE_TEXT, ADVENTURER_PURPOSE_STATEMENT } from "@/modules/information-forms/verbatim-texts";
 import type { FormTemplate, RegistrationFormField } from "@/modules/forms/definition";
 
 /**
@@ -42,7 +43,7 @@ const adventurerClubApplication: FormTemplate = {
     description: "To be completed one time only by the Adventurer Leader of a NEW CLUB, signed by the church board of the sponsoring church, and submitted to the conference office.",
     confirmationMessage: "Thank you. Your application has been received by the conference office.",
     sections: [
-      { id: "adv_app_club", title: "The club", description: "", fields: [
+      { id: "adv_app_club", title: "The club", description: ADVENTURER_YOUTH_CONTACT, fields: [
         field("app_church", "sponsoring_church", "Sponsoring church", "TEXT", true),
         ...nameFields("pastor", "Pastor", true),
         ...nameFields("leader", "Elected Adventurer leader", true),
@@ -50,7 +51,7 @@ const adventurerClubApplication: FormTemplate = {
         field("app_email", "leader_email", "Email", "EMAIL", true),
         field("app_phone", "leader_phone", "Phone", "PHONE", true),
       ] },
-      { id: "adv_app_signatures", title: "Church board signatures", description: ADVENTURER_YOUTH_CONTACT, fields: [
+      { id: "adv_app_signatures", title: "Purpose and church board signatures", description: ADVENTURER_PURPOSE_STATEMENT, fields: [
         field("app_date", "application_date", "Date", "DATE", true),
         field("app_sig_pastor", "signature_church_pastor", "Church Pastor (type your full name to sign)", "TEXT", true),
         field("app_sig_elder", "signature_head_elder", "Head Elder (type your full name to sign)", "TEXT", true),
@@ -97,7 +98,7 @@ const adventurerMonthlyReport: FormTemplate = {
         field("rep_awards", "working_on_awards", "Working on awards?", "RADIO", false, { options: yesNo, helpText: "One point per award, maximum 3 points." }),
         field("rep_award_list", "awards_list", "Please list the awards", "LONG_TEXT", false, { conditional: { fieldKey: "working_on_awards", operator: "EQUALS", value: "Yes" } }),
         field("rep_trips", "field_trips_or_activities", "Field trips or extra-curricular activities", "LONG_TEXT", false, { helpText: "Describe them. One point possible." }),
-        field("rep_child_activity", "child_family_activity", "Held a child and family activity?", "RADIO", false, { options: yesNo, helpText: "Yes = one point." }),
+        field("rep_child_activity", "child_family_activity", ADVENTURER_CHILD_PARENT_ACTIVITY_LABEL, "RADIO", false, { options: yesNo, helpText: "Yes = one point." }),
         field("rep_family_network", "family_network_meeting", "Held a Family Network Meeting?", "RADIO", false, { options: yesNo, helpText: "Yes = 2 points." }),
         field("rep_family_topics", "family_network_topics", "Please describe topics", "LONG_TEXT", false, { conditional: { fieldKey: "family_network_meeting", operator: "EQUALS", value: "Yes" } }),
       ] },
@@ -123,9 +124,9 @@ const adventurerPhotoRelease: FormTemplate = {
     description: "",
     confirmationMessage: "Thank you. Your release has been received.",
     sections: [
-      { id: "adv_rel_signers", title: "Signatures", description: "", fields: [
-        field("rel_signer", "signer_name", "Name of person signing", "TEXT", true),
-        field("rel_signer_sig", "signer_signature", "Typed signature of person signing", "TEXT", true),
+      { id: "adv_rel_signers", title: "Release and signatures", description: ADVENTURER_PHOTO_RELEASE_TEXT, fields: [
+        field("rel_signer", "signer_name", ADVENTURER_PARENT_GUARDIAN_NAME_LABEL, "TEXT", true),
+        field("rel_signer_sig", "signer_signature", ADVENTURER_PARENT_GUARDIAN_SIGNATURE_LABEL, "TEXT", true),
         field("rel_signer_date", "signer_date", "Date", "DATE", true),
         field("rel_minor", "minor_name", "Name of minor", "TEXT", true),
         field("rel_minor_sig", "minor_signature", "Minor's typed signature", "TEXT", true),
@@ -144,7 +145,7 @@ const adventurerAnnualRegistration: FormTemplate = {
   audience: "Information",
   definition: {
     title: "Annual Adventurer Club Registration",
-    description: "To be completed and submitted to the conference office each school year before October 1 by the Adventurer Leader. This form registers your club with the conference office for the current year, updates contact information for newsletters, and qualifies your club to be invited to conference-wide Adventurer events.",
+    description: ADVENTURER_ANNUAL_INTRO,
     confirmationMessage: "Thank you. Your club's registration has been received.",
     sections: [
       { id: "adv_reg_club", title: "The club", description: "", fields: [

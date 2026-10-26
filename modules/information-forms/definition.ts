@@ -1,5 +1,17 @@
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { isSensitiveField, isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
+import { isVerbatimAllowedText } from "@/modules/information-forms/verbatim-texts";
+
+export * from "@/modules/information-forms/verbatim-texts";
+
+/**
+ * The sensitive-text check for descriptions, section text, labels and help text, with the one narrow exception of #1222:
+ * a text that is exactly an allowlisted string (see `verbatim-texts.ts`) is not read. Anything else, including an edited
+ * copy of an allowlisted text, is checked as before.
+ */
+function sensitiveText(text: string): boolean {
+  return !isVerbatimAllowedText(text) && isSensitiveFieldText(text);
+}
 
 /**
  * An information form gathers answers only (#1148): no prices, payment, roster, meals, lodging or attendee types, and no
@@ -58,7 +70,9 @@ function fieldRefusals(field: RegistrationFormField): string[] {
     reasons.push("information forms cannot ask payment, roster, meal, lodging or attendee-type questions");
   }
   const otherText = [field.placeholder ?? "", ...Object.values(field.optionDescriptions ?? {})];
-  if (field.sensitive === true || isSensitiveField(field) || otherText.some((text) => isSensitiveFieldText(text.replaceAll("_", " ")))) {
+  // An allowlisted label or help text is not read; the key, options and option labels always are.
+  const checked = { ...field, label: isVerbatimAllowedText(field.label) ? "" : field.label, helpText: isVerbatimAllowedText(field.helpText) ? "" : field.helpText };
+  if (field.sensitive === true || isSensitiveField(checked) || otherText.some((text) => isSensitiveFieldText(text.replaceAll("_", " ")))) {
     reasons.push("information forms cannot collect health, medical or other sensitive answers");
   }
   return reasons;
@@ -73,11 +87,11 @@ export function informationFormDefinitionIssues(definition: InformationFormDefin
   if (definition.attendeeRoster) {
     issues.push({ path: ["attendeeRoster"], message: "Information forms cannot have an attendee roster." });
   }
-  if (isSensitiveFieldText(definition.description)) {
+  if (sensitiveText(definition.description)) {
     issues.push({ path: ["description"], message: "The form description is not allowed: information forms cannot collect health, medical or other sensitive answers." });
   }
   definition.sections.forEach((section, sectionIndex) => {
-    if (isSensitiveFieldText(section.title) || isSensitiveFieldText(section.description) || isSensitiveFieldText(section.stepLabel ?? "")) {
+    if (sensitiveText(section.title) || sensitiveText(section.description) || sensitiveText(section.stepLabel ?? "")) {
       issues.push({
         path: ["sections", sectionIndex],
         message: `The section "${section.title}" is not allowed: information forms cannot collect health, medical or other sensitive answers.`,

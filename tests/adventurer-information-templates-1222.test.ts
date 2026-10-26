@@ -3,7 +3,7 @@ import { codeFormTemplates } from "@/modules/forms/form-template-library-domain"
 import { formTemplates, memberListProblems, registrationFormDefinitionSchema, templatesForPicker, validateTestResponses, type RegistrationFormField } from "@/modules/forms/definition";
 import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { adventurerInformationTemplates, ADVENTURER_LEVELS } from "@/modules/information-forms/adventurer-templates";
-import { informationFormDefinitionIssues, informationFormDefinitionSchema, informationFormFields } from "@/modules/information-forms/definition";
+import { ADVENTURER_ANNUAL_INTRO, ADVENTURER_PARENT_GUARDIAN_NAME_LABEL, ADVENTURER_PHOTO_RELEASE_TEXT, ADVENTURER_PURPOSE_STATEMENT, informationFormDefinitionIssues, informationFormDefinitionSchema, informationFormFields } from "@/modules/information-forms/definition";
 
 /** #1222: the four Adventurer club forms as information form templates, and the one narrow member list exception. */
 
@@ -155,5 +155,64 @@ describe("the member list exception (#1222)", () => {
     expect(validateTestResponses(definition, { ...answers, members: [{ name: "Sample Member", age: 6, level: "Busy Bee", birthdate: "x" }] }).isValid).toBe(false);
     definition.sections.flatMap((section) => section.fields).find((field) => field.key === "members")!.required = true;
     expect(validateTestResponses(definition, answers).isValid).toBe(false);
+  });
+});
+
+describe("the word-for-word exception (#1222)", () => {
+  const field = (extra: Record<string, unknown>) => ({ id: "field_extra", key: "extra_question", label: "Extra question", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [], ...extra });
+  const refused = (definition: unknown) => !informationFormDefinitionSchema.safeParse(definition).success;
+
+  it("puts each exact text on the templates and accepts them", () => {
+    const text = (key: string) => JSON.stringify(byKey(key).definition);
+    expect(text("adventurer_club_application")).toContain(JSON.stringify(ADVENTURER_PURPOSE_STATEMENT));
+    expect(text("adventurer_annual_registration")).toContain(JSON.stringify(ADVENTURER_ANNUAL_INTRO));
+    expect(text("adventurer_photo_video_release")).toContain(JSON.stringify(ADVENTURER_PHOTO_RELEASE_TEXT));
+    expect(ADVENTURER_PHOTO_RELEASE_TEXT.endsWith("heirs, assigns and personal representatives.")).toBe(true);
+    expect(ADVENTURER_ANNUAL_INTRO).toContain("added to the conference insurance.");
+    expect(text("adventurer_photo_video_release")).toContain("Parent/Guardian Name");
+    expect(text("adventurer_photo_video_release")).toContain("Parent/Guardian Signature");
+    expect(text("adventurer_monthly_report")).toContain("Held a Child/Parent activity?");
+    for (const template of adventurerInformationTemplates) expect(informationFormDefinitionSchema.safeParse(template.definition).success, template.key).toBe(true);
+  });
+
+  it("accepts an allowlisted text with extra whitespace, as a description, a section text, a label or a help text", () => {
+    const base = annual();
+    expect(informationFormDefinitionSchema.safeParse({ ...base, description: ADVENTURER_ANNUAL_INTRO.replace(". ", ".\n") }).success).toBe(true);
+    const withText = (extra: Record<string, unknown>) => ({ ...base, sections: [{ id: "section_x", title: "Section", description: "", fields: [field(extra)] }] });
+    expect(informationFormDefinitionSchema.safeParse(withText({ label: ADVENTURER_PARENT_GUARDIAN_NAME_LABEL })).success).toBe(true);
+    expect(informationFormDefinitionSchema.safeParse(withText({ helpText: ADVENTURER_PARENT_GUARDIAN_NAME_LABEL })).success).toBe(true);
+  });
+
+  it("refuses an edited copy again, even by one word, anywhere the text sits", () => {
+    const base = annual();
+    const edited = (text: string) => `${text.slice(0, -1)} and medications.`;
+    expect(refused({ ...base, description: edited(ADVENTURER_ANNUAL_INTRO) })).toBe(true);
+    expect(refused({ ...base, description: `${ADVENTURER_ANNUAL_INTRO} Thanks.` })).toBe(true);
+    const section = (description: string) => ({ ...base, description: "", sections: [{ id: "section_x", title: "Section", description, fields: [field({})] }] });
+    expect(refused(section(ADVENTURER_PHOTO_RELEASE_TEXT.replace("and/or", "or")))).toBe(true);
+    expect(refused(section(ADVENTURER_PURPOSE_STATEMENT.replace("pre-school", "preschool")))).toBe(true);
+    expect(refused(section(`${ADVENTURER_PURPOSE_STATEMENT} Please list your parents.`))).toBe(true);
+    const labelled = (label: string) => ({ ...base, sections: [{ id: "section_x", title: "Section", description: "", fields: [field({ label })] }] });
+    expect(refused(labelled("Parent/Guardian Names"))).toBe(true);
+    expect(refused(labelled("Parent/Guardian Name or birth date"))).toBe(true);
+    expect(refused(labelled("Held a Child/Parent activity"))).toBe(true);
+  });
+
+  it("does not exempt keys: an allowlisted label on a sensitive key is still refused", () => {
+    const base = annual();
+    const keyed = (key: string, label: string) => ({ ...base, sections: [{ id: "section_x", title: "Section", description: "", fields: [field({ key, label })] }] });
+    expect(refused(keyed("parent_guardian_name", ADVENTURER_PARENT_GUARDIAN_NAME_LABEL))).toBe(true);
+    expect(refused(keyed("signer_name", ADVENTURER_PARENT_GUARDIAN_NAME_LABEL))).toBe(false);
+  });
+
+  it("still refuses medical, birth-date and health fields on the same form", () => {
+    for (const label of ["Medications", "Date of birth", "Health conditions", "Allergies"]) {
+      const definition = byKey("adventurer_photo_video_release").definition;
+      const withField = { ...structuredClone(definition), sections: [...structuredClone(definition.sections), { id: "section_more", title: "More", description: "", fields: [field({ label })] }] };
+      expect(refused(withField), label).toBe(true);
+    }
+    const sensitiveFlag = structuredClone(byKey("adventurer_photo_video_release").definition);
+    sensitiveFlag.sections[0]!.fields[0]!.sensitive = true;
+    expect(refused(sensitiveFlag)).toBe(true);
   });
 });
