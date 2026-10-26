@@ -359,7 +359,9 @@ birth dates need their own protection.
    transfers and the club supply catalog; director grants (club admins), the
    club profile and acting as a club's Director; honors entries and the honor
    catalog; and Sterling Volunteers review (decisions, rematch, match fixes,
-   import and template). Everything that serves clubs and churches alike is
+   import and template). Event registration-move approvals stay with system
+   administrators: they move registrations and send waitlist offers for events a
+   Clubs Administrator is not assigned to. Everything that serves clubs and churches alike is
    open to a Clubs Administrator **for club organizations only**; the server
    reads the organization type (`requireClubOrganizationAdministration`) and
    refuses a church, school or the conference. Acting as a Director is valid
@@ -581,8 +583,8 @@ the same audit entries. The audit row names the person and, where it records
 the kind of viewer, marks the role as Clubs Administrator. Like a system
 administrator, a Clubs Administrator also sees the break-glass grants list
 (who opened which record, when, and the reason they gave). Importing health
-records, placing and lifting sealed-copy holds, and event-scoped coordinator
-health stay with system administrators. The grant is checked on every request,
+records (import superseded by #1232 below), placing and lifting sealed-copy
+holds, and event-scoped coordinator health stay with system administrators. The grant is checked on every request,
 so removing it ends access on the next one.
 
 **Health import for Clubs Administrators (decided 2026-10-26, #1232).** Caleb

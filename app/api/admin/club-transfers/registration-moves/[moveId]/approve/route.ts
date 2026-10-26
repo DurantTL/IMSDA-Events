@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireStaffTransferAccess } from "@/modules/club-transfers/access";
+import { requireStaffRegistrationMoveAccess } from "@/modules/club-transfers/access";
 import { memberTransferApiError } from "@/modules/club-transfers/api-errors";
 import { approveRegistrationMove } from "@/modules/club-transfers/repository";
 import { approveRegistrationMoveSchema } from "@/modules/club-transfers/schemas";
@@ -15,7 +15,7 @@ async function postHandler(request: Request, context: RouteContext) {
   if (originError) return originError;
   try {
     const { moveId } = await context.params;
-    const actor = await requireStaffTransferAccess();
+    const actor = await requireStaffRegistrationMoveAccess();
     const { note } = approveRegistrationMoveSchema.parse(await request.json().catch(() => ({})));
     const { pendingMessageIds = [], ...result } = await approveRegistrationMove(moveId, note, actor);
     // A seat this move opened at a location may have been offered to its waitlist (#599):

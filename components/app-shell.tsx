@@ -211,6 +211,12 @@ export function AppShell({
   const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname) : null;
   // The health record import page only exists while the Health Record feature is on (#1232).
   const clubsNavItems = clubsAdminNavigation.filter((item) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false);
+  // The phone Clubs bar scrolls sideways (#1232): bring the page's own item into view when the page changes.
+  const clubsMobileNavRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!activeClubsHref) return;
+    clubsMobileNavRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [activeClubsHref]);
   // Event Admins can ask for a module (#741 slice 3); system administrators turn modules on directly.
   const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
   // The other workspaces this staff identity may switch into (#108): the
@@ -611,7 +617,7 @@ export function AppShell({
       </main>
 
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
-      {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation">
+      {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation" ref={clubsMobileNavRef}>
         {clubsNavItems.map(({ href, icon: Icon, label }) => (
           <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={href} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
             <Icon aria-hidden="true" size={22} /><span>{label}</span>

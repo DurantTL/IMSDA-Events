@@ -39,7 +39,7 @@ vi.mock("@/lib/logger", async () => {
 vi.mock("@/modules/rate-limit/service", () => ({ checkClubTransferRequestRateLimit: mocks.checkClubTransferRequestRateLimit }));
 vi.mock("@/modules/club-transfers/access", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-transfers/access")>("@/modules/club-transfers/access");
-  return { ...actual, requireClubTransferAccess: mocks.requireClubTransferAccess, requireStaffTransferAccess: mocks.requireStaffTransferAccess };
+  return { ...actual, requireClubTransferAccess: mocks.requireClubTransferAccess, requireStaffTransferAccess: mocks.requireStaffTransferAccess, requireStaffRegistrationMoveAccess: mocks.requireStaffTransferAccess };
 });
 vi.mock("@/modules/club-transfers/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-transfers/repository")>("@/modules/club-transfers/repository");

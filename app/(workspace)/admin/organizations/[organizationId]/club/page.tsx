@@ -62,25 +62,23 @@ export default async function StaffOpenClubPage({
         ) : (
           <BackLink href="/admin/clubs/summary" variant="staff">Back to Clubs</BackLink>
         )}
-          <>
-            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
-              <UserCog aria-hidden="true" size={14} /> Club admins
-            </Link>
-            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/profile${fromHere}`}>
-              <IdCard aria-hidden="true" size={14} /> Club profile
-            </Link>
-            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/club/honors`}>
-              <Award aria-hidden="true" size={14} /> Honors
-            </Link>
-            <ActAsButton
-              access="Full director powers, attributed to you"
-              club={club.name}
-              endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/act-as-director`}
-              label="Act as Director (2 hours)"
-              resultAction="Open the club portal"
-              role="Director"
-            />
-          </>
+        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
+          <UserCog aria-hidden="true" size={14} /> Club admins
+        </Link>
+        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/profile${fromHere}`}>
+          <IdCard aria-hidden="true" size={14} /> Club profile
+        </Link>
+        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/club/honors`}>
+          <Award aria-hidden="true" size={14} /> Honors
+        </Link>
+        <ActAsButton
+          access="Full director powers, attributed to you"
+          club={club.name}
+          endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/act-as-director`}
+          label="Act as Director (2 hours)"
+          resultAction="Open the club portal"
+          role="Director"
+        />
       </div>
 
       <div className="page-intro">

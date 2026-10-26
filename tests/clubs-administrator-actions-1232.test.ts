@@ -21,6 +21,12 @@ const mocks = vi.hoisted(() => ({
   voidMemberHonorEntryAsStaff: vi.fn(),
   rematchBackgroundCheckList: vi.fn(),
   listStaffTransferQueue: vi.fn(),
+  listRegistrationMoves: vi.fn(),
+  approveRegistrationMove: vi.fn(),
+  skipRegistrationMove: vi.fn(),
+  previewHealthImport: vi.fn(),
+  readHealthImportUpload: vi.fn(),
+  requireRosterAccess: vi.fn(),
 }));
 
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
@@ -45,7 +51,16 @@ vi.mock("@/modules/honors/member-honor-repository", async (importOriginal) => ({
   voidMemberHonorEntryAsStaff: mocks.voidMemberHonorEntryAsStaff,
 }));
 vi.mock("@/modules/background-checks/repository", async (importOriginal) => ({ ...(await importOriginal<object>()), rematchBackgroundCheckList: mocks.rematchBackgroundCheckList }));
-vi.mock("@/modules/club-transfers/repository", async (importOriginal) => ({ ...(await importOriginal<object>()), listStaffTransferQueue: mocks.listStaffTransferQueue }));
+vi.mock("@/modules/club-transfers/repository", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  listStaffTransferQueue: mocks.listStaffTransferQueue,
+  listRegistrationMoves: mocks.listRegistrationMoves,
+  approveRegistrationMove: mocks.approveRegistrationMove,
+  skipRegistrationMove: mocks.skipRegistrationMove,
+}));
+vi.mock("@/modules/health-records/import-repository", () => ({ previewHealthImport: mocks.previewHealthImport, applyHealthImport: vi.fn() }));
+vi.mock("@/modules/health-records/import-upload", () => ({ readHealthImportUpload: mocks.readHealthImportUpload }));
+vi.mock("@/modules/club-rosters/access", async (importOriginal) => ({ ...(await importOriginal<object>()), requireRosterAccess: mocks.requireRosterAccess }));
 vi.mock("@/modules/health-records/flag", () => ({ requireHealthRecordsEnabled: () => undefined, healthRecordsEnabled: () => true }));
 
 import { GET as honorCatalog } from "@/app/api/admin/honors/route";
@@ -54,7 +69,16 @@ import { GET as memberHonors } from "@/app/api/admin/organizations/[organization
 import { POST as voidEntry } from "@/app/api/admin/honor-entries/[entryId]/void/route";
 import { POST as rematch } from "@/app/api/admin/background-checks/rematch/route";
 import { GET as transferQueue } from "@/app/api/admin/club-transfers/route";
-import { requireStaffHealthViewer } from "@/modules/health-records/access";
+import { PATCH as revokeDirectorGrant } from "@/app/api/admin/organizations/[organizationId]/director-grants/[grantId]/route";
+import { POST as createDirectorGrant } from "@/app/api/admin/organizations/[organizationId]/director-grants/route";
+import { PATCH as saveClubProfile } from "@/app/api/admin/organizations/[organizationId]/profile/route";
+import { POST as moveImportYear } from "@/app/api/admin/organizations/[organizationId]/club-import-year/route";
+import { GET as orgHonors } from "@/app/api/admin/organizations/[organizationId]/honors/route";
+import { GET as movesList } from "@/app/api/admin/club-transfers/registration-moves/route";
+import { POST as moveApprove } from "@/app/api/admin/club-transfers/registration-moves/[moveId]/approve/route";
+import { POST as moveSkip } from "@/app/api/admin/club-transfers/registration-moves/[moveId]/skip/route";
+import { POST as healthImportPreview } from "@/app/api/staff/health-import/preview/route";
+import { requireHealthViewerForClub, requireStaffHealthViewer } from "@/modules/health-records/access";
 import { healthAuditActor } from "@/modules/health-records/domain";
 import { requireHealthImporter } from "@/modules/health-records/import-access";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
@@ -95,6 +119,11 @@ beforeEach(() => {
   mocks.voidMemberHonorEntryAsStaff.mockResolvedValue(undefined);
   mocks.rematchBackgroundCheckList.mockResolvedValue(undefined);
   mocks.listStaffTransferQueue.mockResolvedValue([]);
+  mocks.listRegistrationMoves.mockResolvedValue([]);
+  mocks.approveRegistrationMove.mockResolvedValue({});
+  mocks.skipRegistrationMove.mockResolvedValue({});
+  mocks.readHealthImportUpload.mockResolvedValue({ files: [] });
+  mocks.previewHealthImport.mockResolvedValue({ matched: 0 });
 });
 
 type Call = { name: string; call: () => Promise<Response>; effect: () => ReturnType<typeof vi.fn> };
@@ -168,6 +197,29 @@ describe("routes shared with churches: a Clubs Administrator gets clubs only", (
     });
   }
 
+  const churchWrites: Array<[string, () => Promise<Response>]> = [
+    ["assigning a club director", () => createDirectorGrant(json("/api/admin/organizations/church-1/director-grants", "POST", {}), ctx({ organizationId: "church-1" }))],
+    ["revoking a club director", () => revokeDirectorGrant(json("/api/admin/organizations/church-1/director-grants/g-1", "PATCH", {}), ctx({ organizationId: "church-1", grantId: "g-1" }))],
+    ["saving a club profile", () => saveClubProfile(json("/api/admin/organizations/church-1/profile", "PATCH", {}), ctx({ organizationId: "church-1" }))],
+    ["moving a club import's year", () => moveImportYear(json("/api/admin/organizations/church-1/club-import-year", "POST", {}), ctx({ organizationId: "church-1" }))],
+    ["the club honors list", () => orgHonors(json("/api/admin/organizations/church-1/honors", "GET"), ctx({ organizationId: "church-1" }))],
+  ];
+  for (const [name, call] of churchWrites) {
+    it(`${name}: refuses a Clubs Administrator for a church (403) before reading the body`, async () => {
+      signInAs("clubsAdmin");
+      const response = await call();
+      expect(response.status).toBe(403);
+      expect(mocks.createDirectorGrant).not.toHaveBeenCalled();
+    });
+    it(`${name}: refuses a revoked grant and plain staff for a club (403)`, async () => {
+      for (const role of ["revokedClubsAdmin", "plainStaff"] as const) {
+        signInAs(role);
+        const response = await call();
+        expect(response.status).toBe(403);
+      }
+    });
+  }
+
   it("reads the organization type server-side for the page-level check too", async () => {
     expect(await canAdministerClubOrganization(roles.systemAdmin, "church-1")).toBe(true);
     signInAs("clubsAdmin");
@@ -200,5 +252,68 @@ describe("the health record import", () => {
     expect(() => requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-clubs", actAsId: "act-1", viaClubsAdministrator: true })).toThrow(/Clubs Administrator/);
     expect(() => requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-sys", actAsId: "act-1" })).toThrow();
     expect(() => requireHealthImporter({ kind: "HEALTH_ROLE", userId: "u-event", eventIds: ["evt-a"] })).toThrow();
+  });
+});
+
+describe("event registration-move approvals stay system-administrator only", () => {
+  const moveCalls: Array<[string, () => Promise<Response>, () => ReturnType<typeof vi.fn>]> = [
+    ["the pending list", () => movesList(json("/api/admin/club-transfers/registration-moves", "GET")), () => mocks.listRegistrationMoves],
+    ["approving a move", () => moveApprove(json("/api/admin/club-transfers/registration-moves/m-1/approve", "POST", { confirm: true }), ctx({ moveId: "m-1" })), () => mocks.approveRegistrationMove],
+    ["skipping a move", () => moveSkip(json("/api/admin/club-transfers/registration-moves/m-1/skip", "POST", {}), ctx({ moveId: "m-1" })), () => mocks.skipRegistrationMove],
+  ];
+  for (const [name, call, effect] of moveCalls) {
+    it(`${name}: refuses an active Clubs Administrator, a revoked grant and plain staff`, async () => {
+      for (const role of ["clubsAdmin", "revokedClubsAdmin", "plainStaff"] as const) {
+        signInAs(role);
+        expect((await call()).status).toBe(403);
+      }
+      expect(effect()).not.toHaveBeenCalled();
+    });
+    it(`${name}: still lets a system administrator in`, async () => {
+      signInAs("systemAdmin");
+      expect((await call()).status).toBeLessThan(300);
+      expect(effect()).toHaveBeenCalledTimes(1);
+    });
+  }
+});
+
+describe("the health import preview route", () => {
+  const preview = () => healthImportPreview(json("/api/staff/health-import/preview", "POST"));
+
+  it("lets an active Clubs Administrator and a system administrator preview", async () => {
+    for (const role of ["clubsAdmin", "systemAdmin"] as const) {
+      signInAs(role);
+      expect((await preview()).status).toBe(200);
+    }
+    expect(mocks.previewHealthImport).toHaveBeenCalledTimes(2);
+    expect(mocks.previewHealthImport.mock.calls[0]![0]).toMatchObject({ userId: "u-clubs", viaClubsAdministrator: true });
+  });
+
+  it("refuses a revoked grant and plain staff before the upload is read", async () => {
+    for (const role of ["revokedClubsAdmin", "plainStaff"] as const) {
+      signInAs(role);
+      expect((await preview()).status).toBe(403);
+    }
+    expect(mocks.readHealthImportUpload).not.toHaveBeenCalled();
+    expect(mocks.previewHealthImport).not.toHaveBeenCalled();
+  });
+});
+
+describe("a Clubs Administrator acting as a club's Director on a health read", () => {
+  const actingAccess = (viaClubsAdministrator: boolean) => ({
+    state: "OPEN",
+    club: { organizationId: "club-1", name: "Test Pathfinders", role: "DIRECTOR", sponsoringChurch: null },
+    actor: { kind: "STAFF_ACTING", userId: "u-clubs", staffSessionId: "s-1", actAsId: "act-1", organizationId: "club-1", ...(viaClubsAdministrator ? { viaClubsAdministrator: true } : {}) },
+  });
+
+  it("carries actorRole CLUBS_ADMINISTRATOR in the audit actor, and a system administrator's does not", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(actingAccess(true));
+    const viewer = await requireHealthViewerForClub("club-1");
+    expect(viewer).toMatchObject({ kind: "SYSTEM_ADMIN", userId: "u-clubs", actAsId: "act-1", viaClubsAdministrator: true });
+    expect(healthAuditActor(viewer)).toEqual({ actorUserId: "u-clubs", metadata: { viewerKind: "SYSTEM_ADMIN", actAsId: "act-1", actorRole: "CLUBS_ADMINISTRATOR" } });
+
+    mocks.requireRosterAccess.mockResolvedValue(actingAccess(false));
+    const admin = await requireHealthViewerForClub("club-1");
+    expect(healthAuditActor(admin).metadata).not.toHaveProperty("actorRole");
   });
 });

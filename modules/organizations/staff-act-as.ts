@@ -42,6 +42,8 @@ export type ActiveStaffActAs = {
   role: StaffActAsRole;
   organizationId: string | null;
   expiresAt: Date;
+  /** Set when the acting user is an active Clubs Administrator, not a system administrator (#1232), so audit rows say so. */
+  viaClubsAdministrator?: true;
 };
 
 /**
@@ -49,9 +51,14 @@ export type ActiveStaffActAs = {
  * and still a system administrator, or, for a club-director act-as, still an active Clubs Administrator), independent of whether it is expired,
  * revoked, or idle right now — the same rules `getCurrentSession` checks.
  * An act-as is never active once its staff session itself is dead, even
- * before anything writes `endedAt`.
+ * before anything writes `endedAt`. Returns who is acting, or null when the session no longer counts.
  */
-async function staffSessionIsValid(staffSessionId: string, actingUserId: string, role: StaffActAsRole, now: Date) {
+async function staffSessionIsValid(
+  staffSessionId: string,
+  actingUserId: string,
+  role: StaffActAsRole,
+  now: Date,
+): Promise<{ viaClubsAdministrator: boolean } | null> {
   const session = await getPrisma().userSession.findUnique({
     where: { id: staffSessionId },
     select: {
@@ -61,17 +68,18 @@ async function staffSessionIsValid(staffSessionId: string, actingUserId: string,
       user: { select: { id: true, globalRole: true, accountStatus: true, credential: { select: { disabledAt: true } } } },
     },
   });
-  if (!session || session.revokedAt || session.expiresAt <= now) return false;
+  if (!session || session.revokedAt || session.expiresAt <= now) return null;
   // The act-as belongs to this session's own user, who is still a system administrator, or an active Clubs Administrator
   // acting as a club director (never as an Area Coordinator).
-  if (session.user.id !== actingUserId) return false;
-  if (session.user.globalRole !== "SYSTEM_ADMIN") {
-    if (role !== "CLUB_DIRECTOR" || !(await isActiveClubsAdministrator(session.user.id))) return false;
+  if (session.user.id !== actingUserId) return null;
+  const viaClubsAdministrator = session.user.globalRole !== "SYSTEM_ADMIN";
+  if (viaClubsAdministrator) {
+    if (role !== "CLUB_DIRECTOR" || !(await isActiveClubsAdministrator(session.user.id))) return null;
   }
-  if (!session.user.credential || session.user.credential.disabledAt) return false;
-  if (session.user.accountStatus !== "ACTIVE") return false;
-  if (isSessionIdle(session.lastSeenAt, now)) return false;
-  return true;
+  if (!session.user.credential || session.user.credential.disabledAt) return null;
+  if (session.user.accountStatus !== "ACTIVE") return null;
+  if (isSessionIdle(session.lastSeenAt, now)) return null;
+  return { viaClubsAdministrator };
 }
 
 /**
@@ -94,8 +102,9 @@ export async function resolveActiveActAs(staffSessionId: string, now = new Date(
     }).catch(() => {});
     return null;
   }
-  if (!(await staffSessionIsValid(staffSessionId, row.userId, row.role, now))) return null;
-  return row;
+  const valid = await staffSessionIsValid(staffSessionId, row.userId, row.role, now);
+  if (!valid) return null;
+  return valid.viaClubsAdministrator ? { ...row, viaClubsAdministrator: true } : row;
 }
 
 export type StaffActingContext = {
@@ -105,6 +114,8 @@ export type StaffActingContext = {
   role: StaffActAsRole;
   organizationId: string | null;
   expiresAt: Date;
+  /** Set when the acting user is an active Clubs Administrator, not a system administrator (#1232), so audit rows say so. */
+  viaClubsAdministrator?: true;
 };
 
 /**
@@ -124,6 +135,7 @@ export async function currentStaffActingContext(): Promise<StaffActingContext | 
     role: active.role,
     organizationId: active.organizationId,
     expiresAt: active.expiresAt,
+    ...(active.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}),
   };
 }
 

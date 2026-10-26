@@ -196,7 +196,7 @@ describe("a Clubs Administrator acting as club A's director (#1232)", () => {
     asClubsAdmin();
     mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
     await expect(getRosterAccessState("club-a")).resolves.toMatchObject({
-      state: "OPEN", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1", organizationId: "club-a" },
+      state: "OPEN", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1", organizationId: "club-a", viaClubsAdministrator: true },
     });
   });
 

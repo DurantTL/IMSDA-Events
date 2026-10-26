@@ -9,7 +9,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 export const metadata: Metadata = { title: "Club member transfers" };
 export const dynamic = "force-dynamic";
 
-/** Conference staff (#489): the transfer queue and the registration-move approval list. System administrators and Clubs Administrators (#1232). */
+/** Conference staff (#489): the transfer queue and the registration-move approval list. The queue is open to system administrators and Clubs Administrators (#1232); registration-move approvals stay with system administrators. */
 export default async function ClubTransfersAdminPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
@@ -17,7 +17,7 @@ export default async function ClubTransfersAdminPage() {
   return (
     <>
       <ClubTransferQueue />
-      <RegistrationMoveApprovals />
+      {user.globalRole === "SYSTEM_ADMIN" && <RegistrationMoveApprovals />}
     </>
   );
 }

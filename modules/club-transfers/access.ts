@@ -1,7 +1,7 @@
 import "server-only";
 
 import { actorAttribution, requireRosterAccess, type ClubActor } from "@/modules/club-rosters/access";
-import { requireClubsAdministration } from "@/modules/organizations/access";
+import { requireClubsAdministration, requireSystemAdministrator } from "@/modules/organizations/access";
 
 /**
  * Who may work with club member transfers (#489):
@@ -24,6 +24,15 @@ export type StaffTransferActor = { userId: string };
 
 export async function requireStaffTransferAccess(): Promise<StaffTransferActor> {
   const user = await requireClubsAdministration();
+  return { userId: user.id };
+}
+
+/**
+ * Event registration-move approvals (#489) move registrations and send waitlist offers for events a Clubs Administrator
+ * is not assigned to, so they stay system-administrator only (#1232, the transfer queue itself is opened to the role).
+ */
+export async function requireStaffRegistrationMoveAccess(): Promise<StaffTransferActor> {
+  const user = await requireSystemAdministrator("System administrator access is required to approve registration moves.");
   return { userId: user.id };
 }
 

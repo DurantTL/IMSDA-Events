@@ -340,7 +340,7 @@ export function clubFormLinkState(link: { status: "OPEN" | "USED" | "REVOKED"; e
 /** Who is acting, for attribution and audit. Never both an account and a staff user. */
 export type ClubFormActor =
   | { kind: "ATTENDEE"; accountId: string }
-  | { kind: "STAFF_ACTING"; userId: string; actAsId: string };
+  | { kind: "STAFF_ACTING"; userId: string; actAsId: string; viaClubsAdministrator?: true };
 
 /**
  * A resolved viewer. Built server-side from the session (see `access.ts`) and
@@ -437,13 +437,13 @@ export function isClubFormsRole(role: string) {
 /** Audit fields that say who viewed, never what they saw. */
 export function viewerAuditFields(viewer: ClubFormsViewer): {
   actorUserId?: string;
-  metadata: { viewerKind: ClubFormsViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string };
+  metadata: { viewerKind: ClubFormsViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string; actorRole?: "CLUBS_ADMINISTRATOR" };
 } {
   if (viewer.kind === "STAFF") return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
   const { actor } = viewer;
   return actor.kind === "ATTENDEE"
     ? { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: actor.accountId } }
-    : { actorUserId: actor.userId, metadata: { viewerKind: viewer.kind, actAsId: actor.actAsId } };
+    : { actorUserId: actor.userId, metadata: { viewerKind: viewer.kind, actAsId: actor.actAsId, ...(actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" as const } : {}) } };
 }
 
 function unionKeys(stored: readonly string[], seed: readonly string[] = []) {
