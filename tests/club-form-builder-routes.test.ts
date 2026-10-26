@@ -90,7 +90,16 @@ describe("Sync templates is single-flight (#742)", () => {
 
 describe("club form builder routes are for system administrators and Clubs Administrators only (#712, #1225)", () => {
   for (const route of routes) {
-    it(`${route.name}: lets a Clubs Administrator through, and refuses them once the grant is revoked`, async () => {
+    // Alert emails and template sync are system upkeep: they stay system-administrator only.
+    const systemOnly = route.name === "sync templates" || route.name.startsWith("set alert recipients");
+    if (systemOnly) {
+      it(`${route.name}: refuses even an active Clubs Administrator`, async () => {
+        mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
+        mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+        expect((await route.call()).status).toBe(403);
+        expect(route.service()).not.toHaveBeenCalled();
+      });
+    } else it(`${route.name}: lets a Clubs Administrator through, and refuses them once the grant is revoked`, async () => {
       mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
       mocks.isActiveClubsAdministrator.mockResolvedValue(true);
       expect((await route.call()).status).toBeLessThan(400);

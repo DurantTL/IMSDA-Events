@@ -32,7 +32,9 @@ export default async function AdminClubFormsPage() {
         description="Forms clubs fill in for their members or send by private link. Every form starts off. A form that is on shows in each club's Forms tab for its director and deputy. Wording that is drafted from the conference's summaries should be checked against the official forms before you turn a form on."
         primary={<Link className="secondary-button" href="/more/club-forms">See submitted forms</Link>}
       />
-      <ClubFormSync pendingCount={templates.filter((template) => template.needsSync).length} />
+      {user.globalRole === "SYSTEM_ADMIN"
+        ? <ClubFormSync pendingCount={templates.filter((template) => template.needsSync).length} />
+        : <p className="inline-notice" role="status">Bringing form templates up to date with the code is done by a system administrator.</p>}
       <section className="panel">
         <div className="report-table-wrap">
           <table role="table" className="report-table table-cards">

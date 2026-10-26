@@ -25,7 +25,7 @@ export async function requireSystemAdministrator(
  * The one gate for the club areas (#1225): reports, points, monthly and year-end
  * records, club forms, roster birth dates and new club applications. A system
  * administrator, or an active Clubs Administrator. Never used for health
- * records, background checks, system or email settings, accounts or events.
+ * records, Sterling Volunteers details, system or email settings, accounts or events.
  * The role switcher's cookie is never read here.
  */
 export async function requireClubsAdministration(

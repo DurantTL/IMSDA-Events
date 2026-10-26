@@ -350,7 +350,7 @@ export type ClubFormActor =
 export type ClubFormsViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; actor: ClubFormActor }
   | { kind: "AREA_COORDINATOR"; actor: ClubFormActor }
-  | { kind: "STAFF"; userId: string; systemAdmin: boolean; clubsAdministrator: boolean };
+  | { kind: "STAFF"; userId: string; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean };
 
 export function viewerCanSeeClub(viewer: ClubFormsViewer, organizationId: string) {
   return viewer.kind !== "CLUB_LEADER" || viewer.organizationId === organizationId;
@@ -382,7 +382,8 @@ export function viewerSeesDrafts(viewer: ClubFormsViewer) {
 /** Health, conduct, physician and emergency-contact answers (not birth dates). */
 export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string) {
   if (viewer.kind === "CLUB_LEADER") return viewer.organizationId === organizationId;
-  return viewer.kind === "STAFF";
+  // A Clubs Administrator alone does not read these (#1225): system administrators and current Event Admins do.
+  return viewer.kind === "STAFF" && viewer.sensitiveAnswers;
 }
 
 /** Full birth dates (ADR 0005 Addendum A): the club's own leaders, system administrators and Clubs Administrators. */

@@ -55,7 +55,9 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
       ) : view.draftBaseVersion !== null && (view.draft !== null || view.draftUnreadable)
         ? <p className="field-help">This draft was started on version {view.draftBaseVersion}.</p>
         : null}
-      <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
+      {user.globalRole === "SYSTEM_ADMIN"
+        ? <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
+        : <p className="inline-notice" role="status">Who is emailed when this form is submitted is set by a system administrator.</p>}
       <BuilderPhoneNotice backHref="/admin/club-forms" backLabel="Back to club forms" builderName="club form builder" />
       <div className="builder-phone-hidden">
         {view.draftUnreadable ? (

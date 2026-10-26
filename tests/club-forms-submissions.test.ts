@@ -55,8 +55,10 @@ const otherDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "c
 const actingDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1" } };
 const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
 // Conference staff: a system administrator, and an Event Admin of a current event.
-const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false };
-const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false };
+const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
+const clubsAdminOnly: ClubFormsViewer = { kind: "STAFF", userId: "staff-3", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: false };
+const clubsAdminAndEventAdmin: ClubFormsViewer = { kind: "STAFF", userId: "staff-4", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true };
+const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
 
 const SECRET_PHYSICIAN = "Dr. Synthetic Physician";
 const SECRET_PHONE = "(515) 555-0199";
@@ -482,6 +484,21 @@ describe("opening a submission (#610)", () => {
       expect(new Set(view.restrictedKeys)).toEqual(new Set(staffRow().birthDateFieldKeys));
       expect(JSON.stringify(view)).not.toContain(BIRTH);
       expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ metadata: expect.objectContaining({ sensitiveRevealed: true, birthDatesRevealed: false }) });
+    });
+
+    it("shows a Clubs Administrator the birth dates but Restricted for health and every other sensitive answer (#1225)", async () => {
+      const view = await getSubmissionForViewer(clubsAdminOnly, submissionId);
+      expect(view.answers).toMatchObject({ birth_date: BIRTH, child_1_birth_date: "2018-01-01" });
+      expect(view.answers).not.toHaveProperty("health_limitation");
+      expect(view.answers).not.toHaveProperty("health_limitation_how");
+      expect(new Set(view.restrictedKeys)).toEqual(new Set(staffRow().sensitiveFieldKeys.filter((key) => !staffRow().birthDateFieldKeys.includes(key))));
+      expect(JSON.stringify(view)).not.toContain(SECRET_PHYSICIAN);
+    });
+
+    it("shows a Clubs Administrator who is also an Event Admin of a current event the health answers too", async () => {
+      const view = await getSubmissionForViewer(clubsAdminAndEventAdmin, submissionId);
+      expect(view.answers).toMatchObject({ birth_date: BIRTH, health_limitation: "Yes", health_limitation_how: SECRET_PHYSICIAN });
+      expect(view.restrictedKeys).toEqual([]);
     });
 
     it("shows an Area Coordinator Restricted for birth dates and every other sensitive field", async () => {

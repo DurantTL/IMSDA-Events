@@ -21,9 +21,6 @@ import { listEventBackgroundFlags } from "@/modules/background-checks/repository
 import { buildSetupChecklist } from "@/modules/events/setup-checklist";
 import { getSetupChecklistFacts } from "@/modules/events/setup-checklist-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
-import { redirect } from "next/navigation";
-import { resolveAdminRoleView } from "@/modules/access/admin-roles";
-import { adminRoleLanding } from "@/modules/access/admin-roles-domain";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
 
@@ -54,10 +51,6 @@ function registrationSummary(registration: Awaited<ReturnType<typeof listRegistr
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const requested = (await searchParams).event;
-  // The Clubs Administrator view (#1225) has no event dashboard: its home is the Clubs summary, and an account with no
-  // event assignment would otherwise be sent to "no access" here. This only picks the landing; each page checks the role itself.
-  const sessionUser = (await getCurrentSession()).user;
-  if (sessionUser && (await resolveAdminRoleView(sessionUser)).active === "CLUBS_ADMIN") redirect(adminRoleLanding("CLUBS_ADMIN"));
   const { event, permissions } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {

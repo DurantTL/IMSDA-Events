@@ -139,8 +139,8 @@ async function main() {
   const directorB: Viewer = { kind: "CLUB_LEADER", organizationId: clubs.b, actor: { kind: "ATTENDEE", accountId: accounts.b } };
   const area: Viewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: accounts.area } };
   // Conference staff is only an Event Admin of a current event, or a system administrator.
-  const eventAdmin: Viewer = { kind: "STAFF", userId: users.eventAdmin, systemAdmin: false, clubsAdministrator: false };
-  const sysAdmin: Viewer = { kind: "STAFF", userId: users.sysAdmin, systemAdmin: true, clubsAdministrator: false };
+  const eventAdmin: Viewer = { kind: "STAFF", userId: users.eventAdmin, systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
+  const sysAdmin: Viewer = { kind: "STAFF", userId: users.sysAdmin, systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 
   await cleanup();
   await prisma.organization.createMany({

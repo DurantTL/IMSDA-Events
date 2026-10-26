@@ -12,7 +12,7 @@ async function deleteHandler(request: Request, context: { params: Promise<{ invi
     const actor = await requireClubsAdministration();
     const { inviteId } = await context.params;
     await cancelNewClubInvite(actor, inviteId);
-    return Response.json({ ok: true, invites: await listNewClubInvites("SYSTEM_ADMIN") });
+    return Response.json({ ok: true, invites: await listNewClubInvites(actor.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN") });
   } catch (error) {
     return newClubApplicationApiError(error, "Withdrawing a new club application link");
   }

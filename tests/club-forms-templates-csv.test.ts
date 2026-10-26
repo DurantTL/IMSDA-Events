@@ -49,8 +49,8 @@ import {
   listClubFormTemplatesForAdmin,
 } from "@/modules/club-forms/templates";
 
-const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false };
-const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false };
+const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
+const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 
 const slip = clubFormTemplateSeeds.find((seed) => seed.key === "off_premises_permission_slip")!;

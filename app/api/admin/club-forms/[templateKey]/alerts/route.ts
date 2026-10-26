@@ -3,7 +3,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { templateAlertRecipientsSchema } from "@/modules/club-forms/schemas";
 import { setClubFormAlertRecipients } from "@/modules/club-forms/templates";
-import { requireClubsAdministration } from "@/modules/organizations/access";
+import { requireSystemAdministrator } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ templateKey: string }> };
 
@@ -12,7 +12,7 @@ async function putHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireClubsAdministration();
+    const admin = await requireSystemAdministrator();
     const { templateKey } = await context.params;
     const { emails } = templateAlertRecipientsSchema.parse(await readClubFormJson(request));
     return Response.json(await setClubFormAlertRecipients(templateKey, emails, admin.id), {

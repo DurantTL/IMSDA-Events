@@ -76,9 +76,10 @@ export async function requireAreaCoordinatorViewer() {
  * across events), and Event Admins of an event that has not ended. Nobody
  * else, whatever other permissions they hold: not check-in, read-only,
  * communications, registration or finance roles, even with VIEW_SENSITIVE_DATA.
- * Conference staff read the sensitive answers; only a system administrator or
- * a Clubs Administrator reads birth dates (the viewer's `systemAdmin` and
- * `clubsAdministrator` flags decide that). The event model has no archived
+ * System administrators and current Event Admins read the sensitive answers
+ * (`sensitiveAnswers`); a Clubs Administrator alone does not (health is not
+ * theirs to read). Only a system administrator or a Clubs Administrator reads
+ * birth dates (`systemAdmin` / `clubsAdministrator`). The event model has no archived
  * state, so "current" is "has not ended" (`hasEventEnded`).
  */
 export function staffClubFormsAccess(
@@ -89,11 +90,11 @@ export function staffClubFormsAccess(
   }>,
   now = new Date(),
   clubsAdministrator = false,
-): { isStaff: boolean; systemAdmin: boolean; clubsAdministrator: boolean } {
-  if (user.globalRole === "SYSTEM_ADMIN") return { isStaff: true, systemAdmin: true, clubsAdministrator: false };
-  if (clubsAdministrator) return { isStaff: true, systemAdmin: false, clubsAdministrator: true };
-  const isStaff = memberships.some((membership) => membership.role === "EVENT_ADMIN" && !hasEventEnded(membership.event, now));
-  return { isStaff, systemAdmin: false, clubsAdministrator: false };
+): { isStaff: boolean; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean } {
+  if (user.globalRole === "SYSTEM_ADMIN") return { isStaff: true, systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
+  const eventAdmin = memberships.some((membership) => membership.role === "EVENT_ADMIN" && !hasEventEnded(membership.event, now));
+  // A Clubs Administrator reads birth dates but not the health and other sensitive answers unless they are also a current Event Admin.
+  return { isStaff: eventAdmin || clubsAdministrator, systemAdmin: false, clubsAdministrator, sensitiveAnswers: eventAdmin };
 }
 
 /** Conference staff, or null for anyone else (including a signed-out visitor). */
@@ -101,7 +102,7 @@ export async function resolveStaffViewer(now = new Date()): Promise<Extract<Club
   const { user } = await getCurrentSession();
   if (!user) return null;
   const clubsAdministrator = user.globalRole === "SYSTEM_ADMIN" ? false : await isActiveClubsAdministrator(user.id);
-  const memberships = user.globalRole === "SYSTEM_ADMIN" || clubsAdministrator
+  const memberships = user.globalRole === "SYSTEM_ADMIN"
     ? []
     : await getPrisma().eventMembership.findMany({
       where: { userId: user.id, status: "ACTIVE", role: "EVENT_ADMIN" },
@@ -109,7 +110,7 @@ export async function resolveStaffViewer(now = new Date()): Promise<Extract<Club
     });
   const access = staffClubFormsAccess(user, memberships, now, clubsAdministrator);
   return access.isStaff
-    ? { kind: "STAFF", userId: user.id, systemAdmin: access.systemAdmin, clubsAdministrator: access.clubsAdministrator }
+    ? { kind: "STAFF", userId: user.id, systemAdmin: access.systemAdmin, clubsAdministrator: access.clubsAdministrator, sensitiveAnswers: access.sensitiveAnswers }
     : null;
 }
 
@@ -122,9 +123,8 @@ export async function requireStaffViewer() {
   return viewer;
 }
 
-/** The signed-in system administrator or Clubs Administrator (#1225), for the on/off page. Anyone else gets `null`. */
+/** The signed-in system administrator, for the on/off page. Anyone else gets `null`. */
 export async function resolveSystemAdmin() {
   const { user } = await getCurrentSession();
-  if (!user) return null;
-  return user.globalRole === "SYSTEM_ADMIN" || await isActiveClubsAdministrator(user.id) ? user : null;
+  return user && user.globalRole === "SYSTEM_ADMIN" ? user : null;
 }

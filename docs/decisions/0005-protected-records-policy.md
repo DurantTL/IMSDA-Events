@@ -337,7 +337,11 @@ birth dates need their own protection.
    may read sealed club roster birth dates, through the same audited reveal
    a system administrator uses, and the club forms' birth-date answers.
    System administrators still may. The role does **not** extend to health
-   records, the coordinator health view, background-check details, system or
+   records, the coordinator health view, the health, conduct, physician and
+   emergency-contact answers on club forms (those stay with system
+   administrators and Event Admins of a current event; a Clubs Administrator
+   sees them as Restricted unless they also hold that Event Admin role),
+   background-check details, system or
    email settings, accounts, or events the person is not assigned to; those
    stay as decided elsewhere in this ADR. The role is read from the database
    on every request, so a removal takes effect on the next one.

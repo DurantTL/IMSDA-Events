@@ -48,8 +48,10 @@ export default async function StaffClubFormsPage({
           <p className="eyebrow">Conference staff</p>
           <h2 className="duplicate-page-title">{staffPageTitles.clubForms}</h2>
           <p>
-            Submitted forms by club. You can read health, conduct, physician and emergency-contact answers; each time
-            you open a form that has them, it is recorded.{" "}
+            Submitted forms by club.{" "}
+            {viewer.sensitiveAnswers
+              ? "You can read health, conduct, physician and emergency-contact answers; each time you open a form that has them, it is recorded. "
+              : "Health, conduct, physician and emergency-contact answers show as Restricted for a Clubs Administrator. "}
             {viewer.systemAdmin || viewer.clubsAdministrator
               ? `As a ${viewer.systemAdmin ? "system administrator" : "Clubs Administrator"} you can also read birth dates.`
               : "Birth dates show as Restricted: only the club's own director and deputies, system administrators and Clubs Administrators can read them."}

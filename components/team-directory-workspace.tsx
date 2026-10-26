@@ -142,7 +142,7 @@ export function TeamDirectoryWorkspace({
     if (!(await askConfirm({
       title: grant ? `Make ${member.displayName} a Clubs Administrator?` : `Remove Clubs Administrator from ${member.displayName}?`,
       body: <p>{grant
-        ? "They get club reports, points and forms, rosters including birth dates, and new club applications for every club. Not health records, background checks, settings or accounts."
+        ? "They get club reports, points and forms, rosters including birth dates, and new club applications for every club. Not health records, the health and other sensitive answers on club forms, Sterling Volunteers details, settings or accounts."
         : "They lose access to the club areas on their next page. Nothing they did is undone."}</p>,
       confirmLabel: grant ? `Make ${member.displayName} a Clubs Administrator` : `Remove Clubs Administrator from ${member.displayName}`,
       destructive: !grant,

@@ -17,7 +17,7 @@ async function postHandler(request: Request) {
     const actor = await requireClubsAdministration();
     const input = newClubInviteInputSchema.parse(await request.json());
     await createNewClubInvite(actor, input);
-    return Response.json({ ok: true, invites: await listNewClubInvites("SYSTEM_ADMIN") }, { status: 201 });
+    return Response.json({ ok: true, invites: await listNewClubInvites(actor.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN") }, { status: 201 });
   } catch (error) {
     return newClubApplicationApiError(error, "Sending a new club application link");
   }

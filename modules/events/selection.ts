@@ -95,7 +95,8 @@ async function loadSignedInEvents(options: { allowNoEvents?: boolean; anyStaffWi
     && !options.anyStaffWithoutEvents
     && !(options.allowNoEvents && (user.globalRole === "SYSTEM_ADMIN" || await isActiveClubsAdministrator(user.id)))
   ) {
-    redirect("/no-access");
+    // A Clubs Administrator with no event assignment has no event page to land on: their home is the Clubs summary.
+    redirect(await isActiveClubsAdministrator(user.id) ? "/admin/clubs/summary" : "/no-access");
   }
   return { user, events };
 }
