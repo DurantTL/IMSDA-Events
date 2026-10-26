@@ -24,7 +24,7 @@ const AnnounceContext = createContext<(message: string) => void>(() => undefined
  * Wraps the New clubs section. A refresh after Approve removes the approved row, so the status message lives here, in
  * a live region that stays, and focus moves to the section heading (`headingId`, tabIndex -1) instead of being lost.
  */
-export function NewClubsRegion({ headingId, children }: { headingId: string; children: ReactNode }) {
+export function NewClubsRegion({ headingId, children }: { headingId: string; children?: ReactNode }) {
   const [message, setMessage] = useState("");
   const announce = (text: string) => {
     setMessage(text);

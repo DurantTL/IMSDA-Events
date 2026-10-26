@@ -40,7 +40,8 @@ const event = (id: string, name: string, startsAt: string, rows: Array<[string, 
 function application(id: string, submittedAt: string, overrides: Partial<ClubsAdminApplicationSource> = {}): ClubsAdminApplicationSource {
   return {
     id, status: "PENDING", clubName: `Club ${id}`, submittedAt, otherBoardMembers: [],
-    church: { name: `Church ${id}`, needsChoice: false }, director: { email: `${id}@example.test` }, ...overrides,
+    church: { name: `Church ${id}`, needsChoice: false }, director: { email: `${id}@example.test` },
+    duplicates: [], invitedEmailDiffers: false, sterling: "CLEAR", sterlingAmbiguous: false, sterlingNameMismatch: false, ...overrides,
   };
 }
 

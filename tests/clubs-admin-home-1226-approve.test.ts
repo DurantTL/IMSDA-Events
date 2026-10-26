@@ -50,7 +50,7 @@ describe("approve control", () => {
   });
 
   it("keeps a live status region outside the rows, for the message after a refresh", () => {
-    const html = renderToStaticMarkup(createElement(NewClubsRegion, { headingId: "h", children: createElement("ul") }));
+    const html = renderToStaticMarkup(createElement(NewClubsRegion, { headingId: "h" }, createElement("ul")));
     expect(html).toContain('role="status"');
     expect(html).toContain('aria-live="polite"');
   });

@@ -43,11 +43,11 @@ export type ClubsAdminApplicationSource = {
   church: { name: string; needsChoice: boolean };
   director: { email: string };
   /** Flags the applications page shows beside Approve. Any of them means "review first". */
-  duplicates?: readonly unknown[];
-  invitedEmailDiffers?: boolean;
-  sterling?: "CLEAR" | "FLAGGED" | "NOT_COMPLIANT" | "NO_RECORD";
-  sterlingAmbiguous?: boolean;
-  sterlingNameMismatch?: boolean;
+  duplicates: readonly unknown[];
+  invitedEmailDiffers: boolean;
+  sterling: "CLEAR" | "FLAGGED" | "NOT_COMPLIANT" | "NO_RECORD";
+  sterlingAmbiguous: boolean;
+  sterlingNameMismatch: boolean;
 };
 
 export type ClubsAdminTab = { key: string; label: string; href: string };
