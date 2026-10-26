@@ -1394,6 +1394,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedLauncherModule(prisma);
   await seedIssuedAssets(prisma);
   await seedKitchenCounts(prisma);
+  await seedClubsAdministrator(prisma);
   await seedDeadlines(prisma);
   await seedCalendarEventPairs(prisma);
 }
@@ -1464,6 +1465,13 @@ async function seedDeadlines(prisma: PrismaClient) {
  * a facility issue, so the check-out panel and the closeout have every kind of row to lay out. Inserted directly, the
  * way the services write them (an issuance always comes with its history row). Idempotent.
  */
+/** Admin role switcher (#1225): the system administrator also holds Clubs Administrator, so the switcher bar shows more than one role. Idempotent. */
+async function seedClubsAdministrator(prisma: PrismaClient) {
+  const user = await prisma.user.findUnique({ where: { email: "system@imsda-events.test" }, select: { id: true } });
+  if (!user) return;
+  await prisma.clubsAdministratorGrant.upsert({ where: { userId: user.id }, update: { revokedAt: null, revokedByUserId: null }, create: { userId: user.id, grantedByUserId: user.id } });
+}
+
 /** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
 async function seedKitchenCounts(prisma: PrismaClient) {
   const user = await prisma.user.findFirst({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
