@@ -33,8 +33,13 @@ subagents. The agents live in `.claude/agents/`.
 - **implementer** (Sonnet, `claude-sonnet-5-5`): one whole approved issue with
   acceptance criteria, plus the fix rounds for that issue. Never for design
   questions or `needs-decision` / `needs-human` issues.
-- **reviewer** (Opus, `claude-opus-5-5`): every code PR before it opens. It
-  reports; it never fixes.
+- **reviewer**: every code PR before it opens. It reports; it never fixes.
+  - **Opus** (`claude-opus-5-5`, the default) for logic, permissions,
+    sensitive data, payments, migrations or anything near a human-only gate.
+  - **Sonnet** (`model: "sonnet"` on the Agent call) when the change is only
+    layout, styling, copy or page markup with no new data access. Caleb
+    approved this on October 26. If such a review finds anything touching
+    data or permissions, re-run it on Opus.
 - **The main session** keeps design decisions, hard debugging, anything that
   needs this conversation's context, and small edits (a few lines, no new
   logic).
@@ -72,6 +77,12 @@ Rules to pass to every implementer:
 - End commits with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
 ## Keeping usage down
+
+- **One session per job:** almost all of the cost is the main session
+  rereading its own long history. Start each build or batch of work in a
+  fresh session (Claude can open one with a focused prompt), and keep a
+  coordination thread for decisions only. Don't keep a session open for days
+  collecting PR events.
 
 - **No Opus for bulk reading:** screenshot reviews, crawls and long reports go
   to the explorer. Spot-check two or three key screenshots yourself, not
