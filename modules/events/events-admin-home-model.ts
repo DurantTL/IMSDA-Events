@@ -12,7 +12,8 @@
  * - Open balances: active registrations that still owe money (`registrationBalance` > 0), the rule the event overview's
  *   "balances to review" uses. An event billed to churches after the event never has attendee balances, so it counts 0.
  * - Incomplete forms: registrations still in DRAFT.
- * - Messages to review: emails that failed or bounced for that event (`deliveryIssueCount`).
+ * - Failed messages (last 7 days): the System attention rule, per event: failed, bounced or spam-marked in the last 7 days
+ *   and not later resent. It goes down once a resend succeeds and after 7 days.
  * - Need attention: open balances plus incomplete forms. A registration is active or draft, never both, so nobody is
  *   counted twice. The three work rows are NOT added together (messages are not registrations).
  */
@@ -28,6 +29,8 @@ export type EventsAdminEventSource = SystemAdminEventSource & {
   billingMode: string;
   /** Registrations in DRAFT. */
   draftRegistrationCount: number;
+  /** Emails that failed, bounced or were marked spam in the last 7 days and were not later resent (the System attention rule). */
+  failedEmailCount: number;
 };
 
 export type EventsAdminEventCard = {
@@ -149,7 +152,7 @@ export function buildEventsAdminHome(sources: readonly EventsAdminEventSource[],
       openBalanceCount,
       billedToChurches,
       draftCount,
-      messageCount: event.deliveryIssueCount,
+      messageCount: extra.failedEmailCount,
       needAttentionCount: openBalanceCount + draftCount,
       href: eventHref("/overview", event.id),
       kitchenReportHref: eventHref("/more/kitchen-report", event.id),
@@ -181,7 +184,7 @@ export function buildEventsAdminHome(sources: readonly EventsAdminEventSource[],
     workRows: [
       row("open-balances", "Open balances", "registrations that still owe money", "Open payments", (event) => event.openBalanceCount, (event) => eventHref("/finance", event.id, "filter=BALANCE"), (event) => (event.billedToChurches ? "Billed to churches after the event, so no attendee balances." : null)),
       row("incomplete-forms", "Incomplete forms", "draft registrations", "Open registrations", (event) => event.draftCount, (event) => eventHref("/people", event.id, "filter=DRAFT")),
-      row("messages", "Messages to review", "emails that failed or bounced", "Open email deliveries", (event) => event.messageCount, (event) => eventHref("/communications", event.id, "view=deliveries")),
+      row("messages", "Failed messages (last 7 days)", "emails that failed, bounced or were marked spam and were not resent", "Open email deliveries", (event) => event.messageCount, (event) => eventHref("/communications", event.id, "view=deliveries")),
     ],
   };
 }

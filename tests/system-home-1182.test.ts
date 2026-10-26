@@ -263,7 +263,7 @@ describe("work across the platform", () => {
     }
     const hrefs = Object.fromEntries(list.rows.map((row) => [row.key, row.href]));
     expect(hrefs["club-applications"]).toBe("/admin/clubs/applications");
-    expect(hrefs["feature-requests"]).toBe("#module-requests");
+    expect(hrefs["feature-requests"]).toBe("/admin/feature-requests");
     expect(hrefs["outbox-sweep"]).toBe("#system-health");
     expect(hrefs["staff-invitation-approvals"]).toBe("/people/staff-invitations/approvals?event=e1");
   });
@@ -310,7 +310,7 @@ describe("System home page", () => {
     expect(html).toContain("Open club applications");
     expect(html).toContain("Review feature requests");
     expect(html).toContain("Open email problems");
-    expect(html).toContain("1 in queue");
+    expect(html).toContain("1 feature request waiting");
     expect(html).toContain("How these numbers differ");
     expect(html).toContain("Unread alerts in your feed");
     // Existing totals keep a truthful label.

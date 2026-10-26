@@ -38,8 +38,6 @@ import type { SetupWarningKind } from "@/modules/system-admin/dashboard";
 import { ActionsMenu } from "@/components/actions-menu";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { registrationStatusLabel } from "@/modules/events/public-registration-status";
-import { ModuleRequestQueue } from "@/components/module-request-queue";
-import { formatRequestDate } from "@/modules/event-modules/request-domain";
 import { listPendingModuleRequests } from "@/modules/event-modules/requests";
 import { getReleaseIdentity } from "@/lib/release";
 import packageInfo from "@/package.json";
@@ -70,7 +68,7 @@ function dateRange(start: Date, end: Date, timeZone: string) {
 function countdown(timing: string, daysUntilStart: number | null) {
   if (timing === "IN_PROGRESS") return "Happening now";
   if (daysUntilStart === null) return null;
-  if (daysUntilStart <= 1) return "Starts tomorrow";
+  if (daysUntilStart <= 1) return "Starts within a day";
   return `Starts in ${daysUntilStart} days`;
 }
 
@@ -282,22 +280,11 @@ export default async function SystemAdminPage({
 
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Feature requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
-          <span>{moduleRequests ? `${moduleRequests.length} waiting` : "Unavailable"}</span>
+          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading">Feature requests</h2><p>Event admins asking for a feature to be turned on. This page only counts them; deciding a request happens on the review page.</p></div>
+          <span>{moduleRequests ? (moduleRequests.length === 0 ? "Nothing waiting" : `${moduleRequests.length} feature ${moduleRequests.length === 1 ? "request" : "requests"} waiting`) : "Unavailable"}</span>
         </div>
-        {moduleRequests === null
-          ? <Unavailable what="The feature-request list" />
-          : moduleRequests.length === 0
-            ? <p className="quiet-copy">No requests are waiting.</p>
-            : <ModuleRequestQueue requests={moduleRequests.map((request) => ({
-                id: request.id,
-                eventId: request.eventId,
-                eventName: request.eventName,
-                moduleTitle: request.moduleTitle,
-                requesterName: request.requesterName,
-                reason: request.reason,
-                createdLabel: formatRequestDate(request.createdAt),
-              }))} />}
+        {moduleRequests === null && <Unavailable what="The feature-request list" />}
+        <p><Link href="/admin/feature-requests">Review feature requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
       </section>
 
       <section className={styles.primaryColumn} id="upcoming-events" aria-labelledby="upcoming-events-heading">

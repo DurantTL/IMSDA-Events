@@ -24,7 +24,7 @@ function dateRange(start: Date, end: Date, timeZone: string) {
 function countdown(happeningNow: boolean, days: number | null) {
   if (happeningNow) return "Happening now";
   if (days === null) return "";
-  return days <= 1 ? "Starts tomorrow" : `Starts in ${days} days`;
+  return days <= 1 ? "Starts within a day" : `Starts in ${days} days`;
 }
 
 /**

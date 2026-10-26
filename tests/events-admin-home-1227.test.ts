@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * #1227: the Events Administrator dashboard. Scope is the security-critical part: only the signed-in person's own
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   resolveAdminRoles: vi.fn(),
   getEventsAdminEventSources: vi.fn(),
   eventFindMany: vi.fn(),
+  groupBy: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +25,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/admin-roles", () => ({ resolveAdminRoles: mocks.resolveAdminRoles }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findMany: mocks.eventFindMany }, messageOutbox: { groupBy: mocks.groupBy } }) }));
 vi.mock("@/modules/events/events-admin-home-repository", () => ({ getEventsAdminEventSources: mocks.getEventsAdminEventSources }));
 
 import EventsAdminPage from "@/app/(workspace)/events-admin/page";
@@ -64,6 +66,7 @@ function source(overrides: Partial<EventsAdminEventSource> = {}): EventsAdminEve
     deliveryIssueCount: 0,
     billingMode: "ATTENDEE_PAY",
     draftRegistrationCount: 0,
+    failedEmailCount: 0,
     ...overrides,
   };
 }
@@ -87,7 +90,7 @@ describe("the dashboard model", () => {
 
   it("counts a registration that owes money or is a draft once, and keeps the work rows separate", () => {
     const home = buildEventsAdminHome([
-      source({ id: "a", name: "Synthetic A", registrations: [owes(5000), owes(5000, 2000), owes(5000, 5000)], draftRegistrationCount: 2, deliveryIssueCount: 4 }),
+      source({ id: "a", name: "Synthetic A", registrations: [owes(5000), owes(5000, 2000), owes(5000, 5000)], draftRegistrationCount: 2, failedEmailCount: 4 }),
       source({ id: "b", name: "Synthetic B", startsAt: new Date("2026-12-05T15:00:00Z"), endsAt: new Date("2026-12-06T15:00:00Z"), registrations: [owes(100)], draftRegistrationCount: 1 }),
     ], now);
     expect(home.counts.needAttention).toBe(2 + 2 + 1 + 1);
@@ -165,47 +168,59 @@ describe("the dashboard model", () => {
 });
 
 describe("the read's scope", () => {
-  async function load() {
-    vi.resetModules();
-    vi.doUnmock("@/modules/events/events-admin-home-repository");
-    vi.doMock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findMany: mocks.eventFindMany } }) }));
-    return import("@/modules/events/events-admin-home-repository");
-  }
+  let getEventsAdminEventSources: (ids: readonly string[], at: Date) => Promise<EventsAdminEventSource[]>;
+
+  beforeAll(async () => {
+    ({ getEventsAdminEventSources } = await vi.importActual<typeof import("@/modules/events/events-admin-home-repository")>("@/modules/events/events-admin-home-repository"));
+  }, 30_000);
 
   beforeEach(() => {
     mocks.eventFindMany.mockReset();
+    mocks.groupBy.mockReset();
+    mocks.groupBy.mockResolvedValue([]);
   });
 
   it("asks only for the given event ids, never archived, never ended, from the shared select", async () => {
     mocks.eventFindMany.mockResolvedValue([]);
-    const { getEventsAdminEventSources } = await load();
     await getEventsAdminEventSources(["event-a", "event-b"], now);
     expect(mocks.eventFindMany).toHaveBeenCalledTimes(1);
     const args = mocks.eventFindMany.mock.calls[0]![0];
     expect(args.where).toEqual({ archivedAt: null, id: { in: ["event-a", "event-b"] }, endsAt: { gte: now } });
     expect(args.select.registrations).toBeDefined();
-    expect(args.select.messageOutbox).toBeDefined();
   });
 
   it("runs no query and returns no events for an empty id list", async () => {
-    const { getEventsAdminEventSources } = await load();
     await expect(getEventsAdminEventSources([], now)).resolves.toEqual([]);
     expect(mocks.eventFindMany).not.toHaveBeenCalled();
+    expect(mocks.groupBy).not.toHaveBeenCalled();
   });
 
-  it("reads the extras only for the events the first read returned", async () => {
-    mocks.eventFindMany.mockResolvedValueOnce([
-      {
-        id: "event-a", slug: "a", name: "Synthetic A", startsAt: new Date("2026-11-20T15:00:00Z"), endsAt: new Date("2026-11-22T15:00:00Z"), timezone: "America/Chicago",
-        location: null, capacity: null, isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
-        registrations: [], attendees: [], checkIns: [], memberships: [], registrationForms: [], waitlistEntries: [], importRuns: [], messageOutbox: [{ id: "m1" }],
-      },
-    ]).mockResolvedValueOnce([{ id: "event-a", billingMode: "ATTENDEE_PAY", _count: { registrations: 3 } }]);
-    const { getEventsAdminEventSources } = await load();
+  const row = {
+    id: "event-a", slug: "a", name: "Synthetic A", startsAt: new Date("2026-11-20T15:00:00Z"), endsAt: new Date("2026-11-22T15:00:00Z"), timezone: "America/Chicago",
+    location: null, capacity: null, isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
+    registrations: [], attendees: [], checkIns: [], memberships: [], registrationForms: [], waitlistEntries: [], importRuns: [], messageOutbox: [],
+  };
+
+  it("reads the extras and failed messages only for the events the first read returned", async () => {
+    mocks.eventFindMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([{ id: "event-a", billingMode: "ATTENDEE_PAY", _count: { registrations: 3 } }]);
+    mocks.groupBy.mockResolvedValueOnce([{ eventId: "event-a", _count: { _all: 2 } }]).mockResolvedValueOnce([{ eventId: "event-a", _count: { _all: 1 } }]);
     const result = await getEventsAdminEventSources(["event-a", "event-b"], now);
     expect(mocks.eventFindMany.mock.calls[1]![0].where).toEqual({ id: { in: ["event-a"] }, archivedAt: null });
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "event-a", draftRegistrationCount: 3, deliveryIssueCount: 1, billingMode: "ATTENDEE_PAY" });
+    expect(result[0]).toMatchObject({ id: "event-a", draftRegistrationCount: 3, failedEmailCount: 3, billingMode: "ATTENDEE_PAY" });
+  });
+
+  it("counts failed messages by the System rule: last 7 days, not later resent, only the assigned ids", async () => {
+    mocks.eventFindMany.mockResolvedValueOnce([row]).mockResolvedValueOnce([]);
+    await getEventsAdminEventSources(["event-a", "event-b"], now);
+    expect(mocks.groupBy).toHaveBeenCalledTimes(2);
+    const since = new Date("2026-10-19T18:00:00.000Z");
+    const [failed, provider] = mocks.groupBy.mock.calls.map((call) => call[0].where);
+    // Only the returned (assigned) event: another event's failure is never in the where.
+    expect(failed).toEqual({ status: "FAILED", failedAt: { gte: since }, retries: { none: { status: "SENT" } }, eventId: { in: ["event-a"] } });
+    expect(provider).toMatchObject({ providerStatusAt: { gte: since }, retries: { none: { status: "SENT" } }, eventId: { in: ["event-a"] } });
+    // An 8-day-old failure (before `since`) and a recovered one (a retry was SENT) fall outside these filters.
+    expect(new Date(now.getTime() - 8 * 86_400_000).getTime()).toBeLessThan(since.getTime());
   });
 });
 
@@ -218,7 +233,7 @@ describe("the page", () => {
     mocks.getCurrentSession.mockResolvedValue({ user: person });
     mocks.resolveAdminRoles.mockResolvedValue({ systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: ["event-one", "event-two"] });
     mocks.getEventsAdminEventSources.mockResolvedValue([
-      source({ attendeeCount: 40, capacity: 100, registrations: [owes(5000), owes(5000, 5000)], draftRegistrationCount: 2, deliveryIssueCount: 1 }),
+      source({ attendeeCount: 40, capacity: 100, registrations: [owes(5000), owes(5000, 5000)], draftRegistrationCount: 2, failedEmailCount: 1 }),
       source({ id: "event-two", name: "Synthetic Camporee", startsAt: new Date("2026-12-05T15:00:00Z"), endsAt: new Date("2026-12-06T15:00:00Z"), capacity: null, attendeeCount: 12, publishedFormCount: 0 }),
     ]);
   });

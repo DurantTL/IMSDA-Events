@@ -331,6 +331,7 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
+  staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),

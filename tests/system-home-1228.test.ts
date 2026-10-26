@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -135,7 +137,7 @@ describe("count card notes", () => {
     expect(nextEventNote([])).toBeNull();
     expect(nextEventNote([{ timing: "PAST", daysUntilStart: null }])).toBeNull();
     expect(nextEventNote([{ timing: "IN_PROGRESS", daysUntilStart: null }, { timing: "UPCOMING", daysUntilStart: 9 }])).toBe("Happening now");
-    expect(nextEventNote([{ timing: "UPCOMING", daysUntilStart: 1 }])).toBe("Next starts tomorrow");
+    expect(nextEventNote([{ timing: "UPCOMING", daysUntilStart: 1 }])).toBe("Next starts within a day");
     expect(nextEventNote([{ timing: "UPCOMING", daysUntilStart: 25 }])).toBe("Next starts in 25 days");
   });
 });
@@ -226,7 +228,22 @@ describe("the refreshed page", () => {
     for (const signal of ["email-sweep", "email-queue", "open-alerts", "email-delivery"]) expect(health).toContain(`data-signal="${signal}"`);
   });
 
-  it("keeps the feature-request queue, the work list, the Catalogs and settings group, the roadmap and the version", async () => {
+  it("only counts feature requests on the home and links to the review page, which holds the buttons", async () => {
+    mocks.listPendingModuleRequests.mockResolvedValue([{ id: "r1", eventId: "event-one", eventName: "Synthetic", moduleKey: "x", moduleTitle: "Lodging", requesterName: "Synthetic Director", reason: "Needed", createdAt: now }]);
+    const html = await renderHome();
+    expect(html).toContain("1 feature request waiting");
+    expect(html).toMatch(/href="\/admin\/feature-requests">Review feature requests/);
+    expect(html).not.toContain("in queue");
+    expect(html).not.toMatch(/<form|<button/);
+    const source = readFileSync(join(process.cwd(), "app/(workspace)/admin/page.tsx"), "utf8");
+    expect(source).not.toMatch(/ModuleRequestQueue|<form|method="post"|fetch\(|"use server"|<button/i);
+    mocks.listPendingModuleRequests.mockResolvedValue([]);
+    expect(await renderHome()).toContain("Nothing waiting");
+    mocks.listPendingModuleRequests.mockRejectedValue(new Error("down"));
+    expect(await renderHome()).toContain("The feature-request list");
+  });
+
+  it("keeps the work list, the Catalogs and settings group, the roadmap and the version", async () => {
     const html = await renderHome();
     for (const text of ["Feature requests", "Work across the platform", "Catalogs and settings", "Honor catalog", "Build roadmap", "issues/98", "System version"]) expect(html).toContain(text);
   });
@@ -236,7 +253,7 @@ describe("the refreshed page", () => {
     const html = await renderHome();
     const navHrefs = new Set(systemNavGroups.flatMap((group) => group.items.map((item) => item.href)));
     const known = new Set([
-      "/admin", "/overview", "/registration-builder", "/more/event-settings", "/more/features", "/finance", "/finance/square-payments", "/more/promo-codes", "/staff",
+      "/admin", "/admin/feature-requests", "/overview", "/registration-builder", "/more/event-settings", "/more/features", "/finance", "/finance/square-payments", "/more/promo-codes", "/staff",
       "/more/health", "/imports", "/communications", "/people/staff-invitations/approvals", "/admin/readiness",
     ]);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1].replaceAll("&amp;", "&"));

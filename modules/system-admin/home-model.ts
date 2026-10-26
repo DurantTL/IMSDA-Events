@@ -216,14 +216,14 @@ export function buildWorkList(attention: AttentionSummary | null, featureRequest
       });
     }
   }
-  // Feature requests are decided in the review queue on this page; the link only scrolls there and approves nothing.
+  // Feature requests are decided on their own review page; this link only opens it and approves nothing.
   const requestRow: WorkRow = {
     key: "feature-requests",
     groupTitle: "Waiting on staff",
     label: featureRequests === 1 ? "feature request waiting for a decision" : "feature requests waiting for a decision",
     count: featureRequests,
     atLeast: featureRequests !== null && featureRequests >= FEATURE_REQUEST_READ_LIMIT,
-    href: "#module-requests",
+    href: "/admin/feature-requests",
     linkLabel: "Review feature requests",
     reviewOnly: false,
   };
@@ -257,7 +257,7 @@ export function nextEventNote(events: ReadonlyArray<{ timing: "UPCOMING" | "IN_P
   if (!next) return null;
   if (next.timing === "IN_PROGRESS") return "Happening now";
   if (next.daysUntilStart === null) return null;
-  return next.daysUntilStart <= 1 ? "Next starts tomorrow" : `Next starts in ${next.daysUntilStart} days`;
+  return next.daysUntilStart <= 1 ? "Next starts within a day" : `Next starts in ${next.daysUntilStart} days`;
 }
 
 export type HomeTab = { key: string; label: string; href: string };
