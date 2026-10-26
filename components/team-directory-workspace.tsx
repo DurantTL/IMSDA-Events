@@ -292,16 +292,6 @@ export function TeamDirectoryWorkspace({
                       >
                         <Pencil size={14} aria-hidden="true" /> Edit profile
                       </button>
-                      {member.globalRole !== "SYSTEM_ADMIN" && (
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          disabled={busyUserId === member.id}
-                          onClick={() => void changeClubsAdministrator(member)}
-                        >
-                          <ShieldCheck size={14} aria-hidden="true" /> {member.clubsAdministrator ? "Remove Clubs Administrator" : "Make Clubs Administrator"}
-                        </button>
-                      )}
                       <TeamAccountMenu
                         memberName={member.displayName}
                         items={teamMenuItems(member, currentUserId)}
@@ -311,6 +301,7 @@ export function TeamDirectoryWorkspace({
                           changeEmail: () => changeEmail(member),
                           resetTwoStep: () => resetTwoStep(member),
                           toggleSignIn: () => void setDisabled(member.id, member.displayName, !member.signInDisabled),
+                          toggleClubsAdministrator: () => void changeClubsAdministrator(member),
                         })}
                       />
                       {member.id === currentUserId && (
