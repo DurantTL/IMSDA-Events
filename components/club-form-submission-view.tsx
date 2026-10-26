@@ -35,6 +35,12 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
           <span>{statusLabel[submission.status]}{submission.status === "SUBMITTED" ? ` on ${submittedOn(submission.submittedAt)}` : ""}</span>
           {submission.subjectName && <span translate="no">For {submission.subjectName}</span>}
           <span>{submission.enteredVia === "LINK" ? "Filled in through a private link" : "Filled in by the club"}</span>
+          {submission.linkSentBy && (
+            <span>
+              Link sent by {submission.linkSentBy.role === "AREA_COORDINATOR" ? "an Area Coordinator" : "the club's director"}
+              {submission.linkSentBy.name && <> (<span translate="no">{submission.linkSentBy.name}</span>)</>}
+            </span>
+          )}
         </p>
         {restricted.size > 0 && (
           <p className="club-form-restricted-note">

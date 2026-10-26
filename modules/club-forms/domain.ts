@@ -359,6 +359,20 @@ export function viewerCanWriteForClub(viewer: ClubFormsViewer, organizationId: s
   return viewer.kind === "CLUB_LEADER" && viewer.organizationId === organizationId;
 }
 
+/**
+ * Who may send a private link for a club (#1221). A club's own director or deputy, or an Area Coordinator.
+ * Area Coordinators are not assigned to areas yet and the grant is conference-wide, so any active Area Coordinator
+ * may send for any club until #843 decides area assignment; narrow that here, in this one place. "Active" (not
+ * removed, not past an act-as end) is decided when the viewer is resolved (`resolveAreaCoordinatorViewer`).
+ */
+export function viewerCanSendLinkForClub(viewer: ClubFormsViewer, organizationId: string) {
+  if (viewer.kind === "CLUB_LEADER") return viewer.organizationId === organizationId;
+  return viewer.kind === "AREA_COORDINATOR";
+}
+
+/** Recorded on a link when it is created (`ClubFormLink.createdAs`); null on links made before #1221. */
+export type ClubFormLinkCreatedAs = "CLUB_LEADER" | "AREA_COORDINATOR";
+
 /** Only the club's own leaders see drafts; everyone else sees submitted forms. */
 export function viewerSeesDrafts(viewer: ClubFormsViewer) {
   return viewer.kind === "CLUB_LEADER";

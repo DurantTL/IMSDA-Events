@@ -13,12 +13,15 @@ export function SendClubFormLink({
   formName,
   rosterMembers,
   defaultDays,
+  asAreaCoordinator = false,
 }: {
   organizationId: string;
   templateKey: string;
   formName: string;
   rosterMembers: Array<{ id: string; name: string }>;
   defaultDays: number;
+  /** An Area Coordinator sending for a club (#1221): posts to the coordinator's route, with no roster. */
+  asAreaCoordinator?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -36,7 +39,8 @@ export function SendClubFormLink({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/forms/links`, {
+      const base = asAreaCoordinator ? "/api/attendee/area-clubs" : "/api/attendee/clubs";
+      const response = await fetch(`${base}/${encodeURIComponent(organizationId)}/forms/links`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,7 +81,7 @@ export function SendClubFormLink({
   return (
     <form className="club-form-send form-stack" onSubmit={send}>
       <p className="field-help">
-        Email a private link to fill in <strong>{formName}</strong>. It goes to one address, works once, and shows nothing else about your club.
+        Email a private link to fill in <strong>{formName}</strong>. It goes to one address, works once, and shows nothing else about the club.
       </p>
       <div className="form-grid two-column">
         <label>Email address to send it to

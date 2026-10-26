@@ -19,6 +19,7 @@ import {
   splitAnswers,
   validateClubFormAnswers,
   viewerAuditFields,
+  viewerCanSendLinkForClub,
   viewerCanWriteForClub,
   withAutoDates,
   type ClubFormsViewer,
@@ -50,6 +51,14 @@ function unavailable() {
   return new ClubFormError("LINK_UNAVAILABLE", UNAVAILABLE_MESSAGE);
 }
 
+/** The club's director or deputy, or an Area Coordinator (#1221), may send; see `viewerCanSendLinkForClub`. */
+function senderOnly(viewer: ClubFormsViewer, organizationId: string) {
+  if (!viewerCanSendLinkForClub(viewer, organizationId) || (viewer.kind !== "CLUB_LEADER" && viewer.kind !== "AREA_COORDINATOR")) {
+    throw new ClubFormError("FORBIDDEN", "Your role doesn't include sending club forms.");
+  }
+  return viewer;
+}
+
 function leaderOnly(viewer: ClubFormsViewer, organizationId: string) {
   if (!viewerCanWriteForClub(viewer, organizationId) || viewer.kind !== "CLUB_LEADER") {
     throw new ClubFormError("FORBIDDEN", "Your club role doesn't include club forms.");
@@ -67,7 +76,7 @@ export type CreateClubFormLinkInput = {
 };
 
 export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateClubFormLinkInput, now = new Date()) {
-  const leader = leaderOnly(viewer, input.organizationId);
+  const leader = senderOnly(viewer, input.organizationId);
   if (!isAccountEmailConfigured()) {
     throw new ClubFormError("EMAIL_NOT_CONFIGURED", "Email isn't set up on this server, so a link can't be sent yet.");
   }
@@ -109,6 +118,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
         recipientEmail,
         expiresAt,
         ...creator,
+        createdAs: leader.kind,
       },
       select: { id: true },
     });
@@ -146,7 +156,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
   });
 }
 
-/** A club's own recent links: never a token, and never another club's. */
+/** A club's own recent links (director and deputy only): never a token, and never another club's. */
 export async function listClubFormLinks(viewer: ClubFormsViewer, organizationId: string, now = new Date()) {
   leaderOnly(viewer, organizationId);
   const prisma = getPrisma();

@@ -1,8 +1,8 @@
 import type { RosterMapping } from "@/modules/club-forms/roster-mapping";
-import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
+import { buildYearNominationTemplate, tltApplicationTemplate, type FormTemplate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 
 /**
- * The four seeded club form templates (#610, with the field-level specs from
+ * The seeded club form templates (the first four, #610; six more, #1221) (#610, with the field-level specs from
  * #608). Each `definition` uses the registration-form definition schema and
  * field types unchanged; what the schema cannot carry lives beside it:
  *
@@ -422,9 +422,195 @@ const passengerList: ClubFormTemplateSeed = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// 5 to 10. TLT, "of the Year", recommendation, can collecting and photo release (#1221)
+
+/**
+ * The TLT Application and the two "of the Year" nominations reuse the event
+ * templates from #606 as they are (every field type they use, including
+ * ADDRESS, MULTISELECT and the clubs directory, is already filled in and
+ * validated by club forms). Only the key and the seed details differ: club
+ * form keys must not equal an event template key.
+ */
+function fromEventTemplate(
+  template: FormTemplate,
+  seed: Pick<ClubFormTemplateSeed, "key" | "name" | "description" | "sortOrder">,
+): ClubFormTemplateSeed {
+  return {
+    ...seed,
+    version: 1,
+    printLayout: "STANDARD",
+    sectionNotes: {},
+    sensitiveFieldKeys: [],
+    birthDateFieldKeys: [],
+    staffOnlyFieldKeys: [],
+    definition: {
+      ...template.definition,
+      sections: template.definition.sections.map((candidate) => ({
+        ...candidate,
+        fields: candidate.fields.map((item) => {
+          // The club form fill-in shows a checkbox's label, not its placeholder (event forms show the placeholder as the
+          // statement). So the statement becomes the label; its wording is unchanged.
+          if (item.type !== "CHECKBOX" || !item.placeholder) return item;
+          const { placeholder, ...rest } = item;
+          return { ...rest, label: placeholder };
+        }),
+      })),
+    },
+  };
+}
+
+const tltApplication = fromEventTemplate(tltApplicationTemplate, {
+  key: "club_tlt_application",
+  name: "TLT Application",
+  description: "The Conference TLT application. The director sends the teen a private link; it is also kept in the club's files.",
+  sortOrder: 50,
+});
+
+const pathfinderOfTheYear = fromEventTemplate(buildYearNominationTemplate("Pathfinder"), {
+  key: "club_pathfinder_of_the_year",
+  name: "Pathfinder of the Year nomination",
+  description: "The director's nomination: nominee, attendance, classes, Good Conduct Award and five essay questions.",
+  sortOrder: 60,
+});
+
+const tltOfTheYear = fromEventTemplate(buildYearNominationTemplate("TLT"), {
+  key: "club_tlt_of_the_year",
+  name: "TLT of the Year nomination",
+  description: "The director's nomination: nominee, attendance, classes, Good Conduct Award and five essay questions.",
+  sortOrder: 70,
+});
+
+const tltRecommendation: ClubFormTemplateSeed = {
+  key: "tlt_program_recommendation",
+  name: "TLT Program Recommendation",
+  description: "A recommendation for a TLT applicant, sent by private link to the person recommending them. Only the club's director, Area Coordinators and conference staff read it; never the applicant.",
+  version: 1,
+  sortOrder: 80,
+  printLayout: "STANDARD",
+  sensitiveFieldKeys: [],
+  birthDateFieldKeys: [],
+  staffOnlyFieldKeys: [],
+  sectionNotes: {
+    sec_affirmation: ["I affirm that this is my honest evaluation of the applicant, offered in support of their participation in the TLT Program."],
+    sec_applicant: [
+      "Please complete this recommendation on behalf of the applicant named below. Your honest evaluation helps the Iowa-Missouri Conference TLT leadership.",
+      "TLT Pledge: Loving the Lord Jesus, I promise to take an active part in the work of the Teen Leadership Training program, doing what I can to help others and to finish the work of the gospel in all the world.",
+    ],
+  },
+  definition: {
+    title: "TLT Program Recommendation",
+    description: "Recommendation for a Conference TLT applicant.",
+    confirmationMessage: "Thank you. Your recommendation has been received.",
+    sections: [
+      section("sec_applicant", "Applicant information", [
+        text("applicant_name", "Applicant's name", true),
+        // Club forms have no way to prefill a field on a private link, so the club is typed, as in the membership
+        // application. The link's page names the club the form was sent for.
+        text("club_name", "Pathfinder club", true),
+      ]),
+      section("sec_recommender", "Your information", [
+        text("recommender_name", "Your name", true),
+        field("recommender_email", "Your email", "EMAIL", true),
+      ]),
+      section("sec_questions", "Questions", [
+        longText("known_how_long", "How do you know the applicant, and for how long?", true),
+        longText("qualities", "What qualities does the applicant bring to the program?", true),
+        longText("relates_to_people", "How does the applicant relate to people?", true),
+        longText("responds_to_stress", "How does the applicant respond to stress?", true),
+        longText("potential_problems", "Does the applicant have any potential problems that might hinder his/her participation?"),
+      ]),
+      section("sec_affirmation", "Affirmation", [
+        // The statement is over the 120-character label limit, so it is the section's note and the checkbox affirms it.
+        field("honest_evaluation", "I affirm the statement above.", "CHECKBOX", true),
+        text("signature", "Type your full name as your signature", true),
+      ]),
+    ],
+  },
+};
+
+const wholeNumber = { ageBounds: { minimumAge: 0, maximumAge: 100000 } };
+
+const canCollecting: ClubFormTemplateSeed = {
+  key: "can_collecting_report",
+  name: "Can Collecting Report",
+  description: "The club's report of its can and food collection project: participants, hours, food, cash and baskets.",
+  version: 1,
+  sortOrder: 90,
+  printLayout: "STANDARD",
+  sensitiveFieldKeys: [],
+  birthDateFieldKeys: [],
+  staffOnlyFieldKeys: [],
+  sectionNotes: {},
+  definition: {
+    title: "Can Collecting Report",
+    description: "Report on the club's can collecting project.",
+    confirmationMessage: "Thank you. The can collecting report has been received.",
+    sections: [
+      section("sec_club", "Club", [
+        text("club_name", "Club", true),
+        text("director_name", "Director", true),
+        text("submitted_by", "Person submitting report", true),
+        date("report_date", "Date", true),
+        churchField(true),
+        churchOther(),
+      ]),
+      section("sec_report", "Report", [
+        yesNo("included_picture", "Did you include a picture of your collection and your club?", true),
+        field("pathfinders_participating", "Number of Pathfinders participating", "NUMBER", false, wholeNumber),
+        field("staff_participating", "Number of staff participating", "NUMBER", false, wholeNumber),
+        field("total_hours", "Total hours spent on the project", "NUMBER", false, { helpText: "Hours × each participant: for example, 5 participants × 2 hours = 10 hours" }),
+        field("cans_collected", "Total number of cans/food collected", "NUMBER", false, wholeNumber),
+        money("cash_collected", "Total amount of cash collected ($)", { helpText: "Dollars." }),
+        field("baskets_distributed", "Total number of food baskets distributed", "NUMBER", false, wholeNumber),
+      ]),
+    ],
+  },
+};
+
+const photoRelease: ClubFormTemplateSeed = {
+  key: "pathfinder_photo_video_release",
+  name: "Pathfinder Club Photo and Video Release",
+  description: "A parent or guardian's photo and video release for a minor, sent by the director as a private link.",
+  version: 1,
+  sortOrder: 100,
+  printLayout: "STANDARD",
+  sensitiveFieldKeys: [],
+  birthDateFieldKeys: [],
+  staffOnlyFieldKeys: [],
+  sectionNotes: {
+    // Caleb's text, verbatim (issue #1221 comment). It is over the 2,000-character note limit, so it is two notes
+    // split at a sentence break; the two joined with one space are the original text.
+    sec_release: [
+      "I hereby grant permission and authorize the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs the irrevocable right to use, reproduce and publish photographs and videos taken of me and/or the undersigned minor children, and our names, for use for all purposes, in any form, and in any and all media, including, without limitation, printed publications, websites, and outreach purposes, in any manner or in any medium. I understand that such photographs and video recordings of me may be placed on the Internet. I release the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs from any expectation of confidentiality for the undersigned minor children and myself and attest that I am the parent or legal guardian of the children listed below and that I have the authority to consent and allow the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs to use their photographs, videos, and names.",
+      "I acknowledge that since participation is voluntary, neither the minor children nor I will receive any financial compensation. I agree that participation in any publication and website produced by the Iowa-Missouri Conference of Seventhday Adventists and its affiliated Pathfinder Clubs confers no rights of ownership to me whatsoever and I hereby waive the right to approve the final product. I release the Iowa-Missouri Conference of Seventh-day Adventists, its affiliated Pathfinder Clubs, its contractors, and its employees from liability for any claims by me or any third party in connection with my participation or the participation of the undersigned minor children. I agree that all such portraits, pictures, photographs, video and audio recordings, and any reproductions thereof, and all plates, negatives, recording tape and digital files are and shall remain the property of the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs. This release is binding on me and my heirs, assigns and personal representatives."
+    ],
+  },
+  definition: {
+    title: "Pathfinder Club Photo and Video Release",
+    description: "Photo and video release for a minor.",
+    confirmationMessage: "Thank you. The photo and video release has been received.",
+    sections: [
+      section("sec_release", "Release", [
+        text("minor_name", "Name of minor", true, { helpText: "First and last name." }),
+        text("minor_signature", "Minor's typed signature", true, { helpText: "Typing your name here is your signature." }),
+        text("guardian_signature", "Parent/guardian typed signature", true, { helpText: "Typing your name here is your signature." }),
+        date("release_date", "Date", true, today),
+        field("email", "Your email", "EMAIL", false, { helpText: "For the confirmation." }),
+      ]),
+    ],
+  },
+};
+
 export const clubFormTemplateSeeds: readonly ClubFormTemplateSeed[] = [
   membershipApplication,
   staffForm,
   permissionSlip,
   passengerList,
+  tltApplication,
+  pathfinderOfTheYear,
+  tltOfTheYear,
+  tltRecommendation,
+  canCollecting,
+  photoRelease,
 ];

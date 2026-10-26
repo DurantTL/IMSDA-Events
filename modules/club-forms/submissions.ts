@@ -357,6 +357,7 @@ export async function getSubmissionForViewer(
       rosterAction: true,
       rosterActionMemberId: true,
       rosterActionMember: { select: { clubYear: true, status: true } },
+      link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } } } },
       organization: { select: { name: true } },
       template: {
         select: {
@@ -446,6 +447,10 @@ export async function getSubmissionForViewer(
     status: row.status,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     enteredVia: row.enteredVia,
+    /** Who sent the private link (#1221): their role and name; null for a form not filled through a link, or a link from before this was recorded. */
+    linkSentBy: row.link?.createdAs
+      ? { role: row.link.createdAs, name: row.link.createdByAccount?.displayName ?? row.link.createdByUser?.displayName ?? "" }
+      : null,
     hasSensitiveAnswers: row.hasSensitiveAnswers,
     answers,
     /**

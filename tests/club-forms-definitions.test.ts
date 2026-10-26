@@ -29,12 +29,18 @@ const slip = () => seed("off_premises_permission_slip");
 const passengers = () => seed("transportation_passenger_list");
 
 describe("seeded club form templates", () => {
-  it("has exactly the four templates, each valid on the registration form schema", () => {
+  it("has exactly the ten templates, each valid on the registration form schema", () => {
     expect(clubFormTemplateSeeds.map((template) => template.key)).toEqual([
       "pathfinder_membership_application",
       "pathfinder_staff_service_information",
       "off_premises_permission_slip",
       "transportation_passenger_list",
+      "club_tlt_application",
+      "club_pathfinder_of_the_year",
+      "club_tlt_of_the_year",
+      "tlt_program_recommendation",
+      "can_collecting_report",
+      "pathfinder_photo_video_release",
     ]);
     for (const template of clubFormTemplateSeeds) {
       expect(() => registrationFormDefinitionSchema.parse(template.definition), template.key).not.toThrow();
@@ -137,6 +143,12 @@ describe("seeded club form templates", () => {
       pathfinder_staff_service_information: ["signature_date"],
       off_premises_permission_slip: ["parent_signature_date"],
       transportation_passenger_list: [],
+      club_tlt_application: [],
+      club_pathfinder_of_the_year: [],
+      club_tlt_of_the_year: [],
+      tlt_program_recommendation: [],
+      can_collecting_report: [],
+      pathfinder_photo_video_release: ["release_date"],
     });
     // Office-use dates, birth dates and the activity date stay as they were.
     for (const key of ["office_date_received", "office_date_approved", "birth_date", "activity_date"]) {
