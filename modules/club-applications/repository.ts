@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { AccessDeniedError, type AuthenticatedUser } from "@/modules/access/authorization";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { directorBackgroundStatesByEmail } from "@/modules/background-checks/repository";
@@ -55,7 +56,7 @@ import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
  *   note and the decline reason are never put there.
  */
 
-export type ApplicationViewer = "SYSTEM_ADMIN" | "AREA_COORDINATOR";
+export type ApplicationViewer = "SYSTEM_ADMIN" | "CLUBS_ADMIN" | "AREA_COORDINATOR";
 
 export type NewClubApplicationErrorCode =
   | "TOO_QUICK"
@@ -82,16 +83,18 @@ export class NewClubApplicationError extends Error {
 const ATTACHMENT_PARTITION = "new-club-applications";
 
 function requireViewer(viewer: ApplicationViewer | null | undefined): asserts viewer is ApplicationViewer {
-  if (viewer !== "SYSTEM_ADMIN" && viewer !== "AREA_COORDINATOR") {
-    throw new AccessDeniedError("Only a system administrator or an Area Coordinator can see new club applications.", 403, "PERMISSION_DENIED");
+  if (viewer !== "SYSTEM_ADMIN" && viewer !== "CLUBS_ADMIN" && viewer !== "AREA_COORDINATOR") {
+    throw new AccessDeniedError("Only a system administrator, a Clubs Administrator or an Area Coordinator can see new club applications.", 403, "PERMISSION_DENIED");
   }
 }
 
-function requireSystemAdmin(actor: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined): asserts actor is Pick<AuthenticatedUser, "id" | "globalRole"> {
+/** Deciding is for system administrators and Clubs Administrators (#1225); the grant is read now, so a revoke applies at once. */
+async function requireApplicationDecider(actor: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined): Promise<Pick<AuthenticatedUser, "id" | "globalRole">> {
   if (!actor) throw new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED");
-  if (actor.globalRole !== "SYSTEM_ADMIN") {
-    throw new AccessDeniedError("Only a system administrator can approve or decline a new club application.", 403, "PERMISSION_DENIED");
+  if (!(await hasClubsAdministration(actor))) {
+    throw new AccessDeniedError("Only a system administrator or Clubs Administrator can approve or decline a new club application.", 403, "PERMISSION_DENIED");
   }
+  return actor;
 }
 
 // --- Attachment ---------------------------------------------------------
@@ -141,13 +144,13 @@ export async function resolveNewClubInvite(token: string, now = new Date()) {
   return { email: invite.email, name: invite.name };
 }
 
-/** A system administrator sends a private "apply for a new club" link to a prospective director. */
+/** A system administrator or Clubs Administrator sends a private "apply for a new club" link to a prospective director. */
 export async function createNewClubInvite(
-  actor: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
+  actorInput: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
   input: { email: string; name?: string },
   now = new Date(),
 ) {
-  requireSystemAdmin(actor);
+  const actor = await requireApplicationDecider(actorInput);
   if (!isAccountEmailConfigured()) {
     throw new NewClubApplicationError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server, so the link can't be sent yet.");
   }
@@ -191,8 +194,8 @@ export type NewClubInviteRecord = {
 };
 
 export async function listNewClubInvites(viewer: ApplicationViewer | null | undefined, now = new Date()): Promise<NewClubInviteRecord[]> {
-  if (viewer !== "SYSTEM_ADMIN") {
-    throw new AccessDeniedError("Only a system administrator can see the links sent to prospective directors.", 403, "PERMISSION_DENIED");
+  if (viewer !== "SYSTEM_ADMIN" && viewer !== "CLUBS_ADMIN") {
+    throw new AccessDeniedError("Only a system administrator or Clubs Administrator can see the links sent to prospective directors.", 403, "PERMISSION_DENIED");
   }
   const rows = await getPrisma().newClubApplicationInvite.findMany({
     orderBy: { createdAt: "desc" },
@@ -211,11 +214,11 @@ export async function listNewClubInvites(viewer: ApplicationViewer | null | unde
 
 /** Withdraws an unused link. */
 export async function cancelNewClubInvite(
-  actor: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
+  actorInput: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
   inviteId: string,
   now = new Date(),
 ) {
-  requireSystemAdmin(actor);
+  const actor = await requireApplicationDecider(actorInput);
   await getPrisma().$transaction(async (tx) => {
     const cancelled = await tx.newClubApplicationInvite.updateMany({
       where: { id: inviteId, usedAt: null, cancelledAt: null },
@@ -575,12 +578,12 @@ export async function getApplicationAttachment(viewer: ApplicationViewer | null 
  * Declining emails the applicant, with the reason when one was given.
  */
 export async function decideNewClubApplication(
-  actor: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
+  actorInput: Pick<AuthenticatedUser, "id" | "globalRole"> | null | undefined,
   applicationId: string,
   decision: NewClubDecision,
   now = new Date(),
 ): Promise<{ status: "APPROVED" | "DECLINED"; organizationId: string | null }> {
-  requireSystemAdmin(actor);
+  const actor = await requireApplicationDecider(actorInput);
   const declineReason = decision.decision === "decline" ? (decision.declineReason?.trim() || null) : null;
   if (declineReason && declineReason.length > DECLINE_REASON_MAX) {
     throw new NewClubApplicationError("INVALID_REASON", `Keep the reason under ${DECLINE_REASON_MAX} characters.`);

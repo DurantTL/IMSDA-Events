@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
+  isClubsAdmin: vi.fn(),
   getCurrentSession: vi.fn(),
   currentAreaCoordinatorViewerActive: vi.fn(),
   decide: vi.fn(),
@@ -22,6 +23,10 @@ const mocks = vi.hoisted(() => ({
   linkLimit: vi.fn(),
   readAsset: vi.fn(),
   isSameOrigin: vi.fn(),
+}));
+vi.mock("@/modules/access/admin-roles", () => ({
+  isActiveClubsAdministrator: mocks.isClubsAdmin,
+  hasClubsAdministration: async (user: { id: string; globalRole?: string | null }) => user.globalRole === "SYSTEM_ADMIN" || mocks.isClubsAdmin(user.id),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinatorViewerActive: mocks.currentAreaCoordinatorViewerActive }));
@@ -96,6 +101,7 @@ const validData = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.isClubsAdmin.mockResolvedValue(false);
   mocks.getCurrentSession.mockResolvedValue({ user: null });
   mocks.currentAreaCoordinatorViewerActive.mockResolvedValue(false);
   mocks.submitLimit.mockResolvedValue(allowed);
@@ -234,6 +240,17 @@ describe("POST /api/admin/club-applications/[id]/decision", () => {
     mocks.decide.mockResolvedValue({ status: "DECLINED", organizationId: null });
     expect((await post({ decision: "decline", declineReason: "Not this year" })).status).toBe(200);
     expect(mocks.decide).toHaveBeenCalledWith(expect.anything(), "app-1", { decision: "decline", declineReason: "Not this year" });
+  });
+
+  it("lets a Clubs Administrator (#1225) approve, and refuses them once the grant is revoked", async () => {
+    staff(null);
+    mocks.isClubsAdmin.mockResolvedValue(true);
+    expect((await post()).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledWith(expect.objectContaining({ id: "user-1" }), "app-1", { decision: "approve" });
+    mocks.decide.mockClear();
+    mocks.isClubsAdmin.mockResolvedValue(false);
+    expect((await post()).status).toBe(403);
+    expect(mocks.decide).not.toHaveBeenCalled();
   });
 
   it("gives an Area Coordinator, who can read the queue, a 403", async () => {

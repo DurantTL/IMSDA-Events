@@ -11,7 +11,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const staffUser = vi.hoisted(() => ({ current: { id: "u1", globalRole: null as string | null } }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: staffUser.current }) }));
+// The overview page asks which admin role is showing (#1225); these accounts hold none.
+vi.mock("@/modules/access/admin-roles", () => ({ resolveAdminRoleView: async () => ({ roles: { systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: [] }, held: [], active: null }) }));
 vi.mock("next/navigation", () => ({
+  redirect: vi.fn(),
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => "/more",

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const mocks = vi.hoisted(() => ({
+  isClubsAdmin: vi.fn(),
   getCurrentSession: vi.fn(),
   orgFindUnique: vi.fn(),
   listClubImports: vi.fn(),
@@ -18,6 +19,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: mocks.notFound, useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/modules/access/admin-roles", () => ({
+  isActiveClubsAdministrator: mocks.isClubsAdmin,
+  hasClubsAdministration: async (user: { id: string; globalRole?: string | null }) => user.globalRole === "SYSTEM_ADMIN" || mocks.isClubsAdmin(user.id),
+}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.orgFindUnique } }) }));
 vi.mock("@/modules/club-imports/move-year", () => ({ listClubImports: mocks.listClubImports }));
@@ -46,6 +51,7 @@ const open = (year?: string) => StaffOpenClubPage({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.isClubsAdmin.mockResolvedValue(false);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-09-28T15:00:00Z"));
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });

@@ -3,7 +3,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { newClubApplicationApiError } from "@/modules/club-applications/api-errors";
 import { newClubInviteInputSchema } from "@/modules/club-applications/domain";
 import { createNewClubInvite, listNewClubInvites } from "@/modules/club-applications/repository";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 /**
  * A system administrator sends a private "apply for a new club" link to a
@@ -14,7 +14,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const input = newClubInviteInputSchema.parse(await request.json());
     await createNewClubInvite(actor, input);
     return Response.json({ ok: true, invites: await listNewClubInvites("SYSTEM_ADMIN") }, { status: 201 });

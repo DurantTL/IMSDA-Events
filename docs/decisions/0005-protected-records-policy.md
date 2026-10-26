@@ -322,13 +322,25 @@ birth dates need their own protection.
    check-in use the **age on the event date**, computed on the server. Screens
    that do not need the full date never receive it.
 3. **Who sees the full birth date** (decided 2026-09-22):
-   - that club's own directors and deputies with an active grant (H1); and
-   - system administrators.
+   - that club's own directors and deputies with an active grant (H1);
+   - system administrators; and
+   - **Clubs Administrators** (decided 2026-10-26, #1225, below).
 
    No one else sees it, including event staff with `VIEW_SENSITIVE_DATA`
    (registration managers, finance, and check-in staff). They see age only.
    Every reveal or export of full birth dates is audited, without the date
    itself.
+
+   **Clubs Administrator** (decided 2026-10-26 by Caleb Durant, GitHub issue
+   #1225): a conference-wide staff role that a system administrator gives and
+   takes away (each change audited with who and when). A Clubs Administrator
+   may read sealed club roster birth dates, through the same audited reveal
+   a system administrator uses, and the club forms' birth-date answers.
+   System administrators still may. The role does **not** extend to health
+   records, the coordinator health view, background-check details, system or
+   email settings, accounts, or events the person is not assigned to; those
+   stay as decided elsewhere in this ADR. The role is read from the database
+   on every request, so a removal takes effect on the next one.
 
    **Club Registrar and Reporter roles** (decided 2026-09-23, #375): a
    director or deputy may give a club **Registrar** the roster and event

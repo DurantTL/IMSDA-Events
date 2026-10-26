@@ -3,7 +3,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { templateEnabledSchema } from "@/modules/club-forms/schemas";
 import { setClubFormTemplateEnabled } from "@/modules/club-forms/templates";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ templateKey: string }> };
 
@@ -12,7 +12,7 @@ async function patchHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     const { templateKey } = await context.params;
     const { enabled } = templateEnabledSchema.parse(await readClubFormJson(request));
     return Response.json(await setClubFormTemplateEnabled(templateKey, enabled, admin.id), {

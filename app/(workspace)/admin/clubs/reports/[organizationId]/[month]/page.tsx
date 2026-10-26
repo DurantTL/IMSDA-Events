@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubReportForm } from "@/components/club-report-form";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { allowedReturnTo } from "@/lib/return-to";
 import { getPrisma } from "@/lib/prisma";
@@ -29,7 +30,7 @@ export default async function StaffClubReportPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { organizationId, month } = await params;
   const { from } = await searchParams;
   const now = new Date();

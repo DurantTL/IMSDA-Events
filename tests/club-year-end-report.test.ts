@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   listDirectedClubs: vi.fn(),
   rejectCrossOriginRequest: vi.fn(),
   currentStaffActingContext: vi.fn(),
-  requireSystemAdministrator: vi.fn(),
+  requireClubsAdministration: vi.fn(),
 }));
 
 const client = {
@@ -45,7 +45,7 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireClubsAdministration: mocks.requireClubsAdministration }));
 // Synthetic "sealed" birth dates are stored as the plain date for these tests.
 vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (sealed: string) => sealed }));
 
@@ -144,7 +144,7 @@ beforeEach(() => {
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "account-1", verifiedEmail: "r@example.test", displayName: "R" }, via: "attendee", sessionId: "s-1" });
-  mocks.requireSystemAdministrator.mockResolvedValue({ id: "staff-1", globalRole: "SYSTEM_ADMIN" });
+  mocks.requireClubsAdministration.mockResolvedValue({ id: "staff-1", globalRole: "SYSTEM_ADMIN" });
 });
 
 describe("the May 1 to April 30 Pathfinder year", () => {
@@ -602,7 +602,7 @@ describe("who may file, reopen, or export", () => {
     mocks.reportFindUnique.mockResolvedValue({ id: "report-1", status: "SUBMITTED" });
     expect((await REOPEN(post(), ctx)).status).toBe(200);
     mocks.reportUpdate.mockClear();
-    mocks.requireSystemAdministrator.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
+    mocks.requireClubsAdministration.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
     expect((await REOPEN(post(), ctx)).status).toBe(403);
     expect(mocks.reportUpdate).not.toHaveBeenCalled();
   });
@@ -623,7 +623,7 @@ describe("who may file, reopen, or export", () => {
     expect(response.headers.get("content-disposition")).toContain("year-end-reports-2026-27.csv");
     const lines = (await response.text()).trim().split("\r\n");
     expect(lines).toHaveLength(3);
-    mocks.requireSystemAdministrator.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
+    mocks.requireClubsAdministration.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
     expect((await EXPORT(new Request("https://events.imsda.test/api/admin/club-reports/year-end/export"))).status).toBe(403);
   });
 });

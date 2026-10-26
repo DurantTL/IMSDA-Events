@@ -136,6 +136,36 @@ export function TeamDirectoryWorkspace({
     void accountAction(member, { action: "change-email", email });
   }
 
+  /** Give or take away the Clubs Administrator role (#1225), after a confirmation. Audited on the server. */
+  async function changeClubsAdministrator(member: TeamDirectory["members"][number]) {
+    const grant = !member.clubsAdministrator;
+    if (!(await askConfirm({
+      title: grant ? `Make ${member.displayName} a Clubs Administrator?` : `Remove Clubs Administrator from ${member.displayName}?`,
+      body: <p>{grant
+        ? "They get club reports, points and forms, rosters including birth dates, and new club applications for every club. Not health records, background checks, settings or accounts."
+        : "They lose access to the club areas on their next page. Nothing they did is undone."}</p>,
+      confirmLabel: grant ? `Make ${member.displayName} a Clubs Administrator` : `Remove Clubs Administrator from ${member.displayName}`,
+      destructive: !grant,
+    }))) return;
+    setBusyUserId(member.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/admin/users/${member.id}/clubs-administrator`, { method: grant ? "PUT" : "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message ?? "That role could not be changed.");
+      setDirectory((current) => ({
+        ...current,
+        members: current.members.map((row) => row.id === member.id ? { ...row, clubsAdministrator: grant } : row),
+      }));
+      setNotice(grant ? `${member.displayName} is now a Clubs Administrator.` : `${member.displayName} is no longer a Clubs Administrator.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That role could not be changed.");
+    } finally {
+      setBusyUserId("");
+    }
+  }
+
   async function setDisabled(userId: string, displayName: string, disabled: boolean) {
     if (disabled && !(await askConfirm({
       title: `Disable sign-in for ${displayName}`,
@@ -217,6 +247,7 @@ export function TeamDirectoryWorkspace({
                   <td {...cardCell("Name")}>
                     {member.displayName}
                     {member.globalRole === "SYSTEM_ADMIN" && <small>System administrator</small>}
+                    {member.clubsAdministrator && <small>Clubs Administrator</small>}
                     {member.jobTitle && <small>{member.jobTitle}</small>}
                   </td>
                   <td {...cardCell("Email")}>
@@ -261,6 +292,16 @@ export function TeamDirectoryWorkspace({
                       >
                         <Pencil size={14} aria-hidden="true" /> Edit profile
                       </button>
+                      {member.globalRole !== "SYSTEM_ADMIN" && (
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={busyUserId === member.id}
+                          onClick={() => void changeClubsAdministrator(member)}
+                        >
+                          <ShieldCheck size={14} aria-hidden="true" /> {member.clubsAdministrator ? "Remove Clubs Administrator" : "Make Clubs Administrator"}
+                        </button>
+                      )}
                       <TeamAccountMenu
                         memberName={member.displayName}
                         items={teamMenuItems(member, currentUserId)}

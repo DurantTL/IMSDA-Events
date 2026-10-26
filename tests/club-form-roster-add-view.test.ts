@@ -22,7 +22,7 @@ import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 const membership = clubFormTemplateSeeds.find((seed) => seed.key === "pathfinder_membership_application")!;
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
-const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
+const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false };
 
 function row(overrides: Record<string, unknown> = {}, mapping: unknown = { ...membership.rosterMapping!, enabled: true }) {
   return {

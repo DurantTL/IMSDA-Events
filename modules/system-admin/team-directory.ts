@@ -29,6 +29,8 @@ export type TeamDirectoryMember = {
   phone: string;
   bio: string;
   globalRole: string | null;
+  /** An active Clubs Administrator grant (#1225). */
+  clubsAdministrator: boolean;
   accountStatus: string;
   /** Whether sign-in is switched off platform-wide. */
   signInDisabled: boolean;
@@ -68,6 +70,7 @@ export async function getTeamDirectory(): Promise<TeamDirectory> {
       activatedAt: true,
       createdAt: true,
       credential: { select: { disabledAt: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       sessions: {
         orderBy: { createdAt: "desc" },
@@ -93,6 +96,7 @@ export async function getTeamDirectory(): Promise<TeamDirectory> {
     phone: user.phone ?? "",
     bio: user.bio ?? "",
     globalRole: user.globalRole,
+    clubsAdministrator: Boolean(user.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
     accountStatus: user.accountStatus,
     signInDisabled: Boolean(user.credential?.disabledAt),
     activatedAt: user.activatedAt?.toISOString() ?? null,
@@ -121,6 +125,7 @@ export async function getTeamDirectory(): Promise<TeamDirectory> {
     withoutAccessCount: members.filter((member) => (
       !member.signInDisabled
       && member.globalRole === null
+      && !member.clubsAdministrator
       && !member.memberships.some((membership) => membership.status === "ACTIVE")
     )).length,
   };

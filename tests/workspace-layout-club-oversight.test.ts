@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   moduleStatesByEvent: vi.fn(),
   getCurrentSession: vi.fn(),
   findMany: vi.fn(),
+  clubsAdmin: { current: false },
 }));
 
 vi.mock("server-only", () => ({}));
@@ -28,6 +29,17 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
 }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/event-modules/service", () => ({ moduleStatesByEvent: mocks.moduleStatesByEvent }));
+// The shell reads the admin roles (#1225) and the pill counts; none of that is under test here.
+vi.mock("@/modules/access/admin-roles", () => ({
+  isActiveClubsAdministrator: async () => mocks.clubsAdmin.current,
+  resolveAdminRoleView: async (user: { globalRole?: string | null }) => ({
+    roles: { systemAdmin: user.globalRole === "SYSTEM_ADMIN", clubsAdministrator: mocks.clubsAdmin.current, eventAdminEventIds: [] },
+    held: user.globalRole === "SYSTEM_ADMIN" ? ["SYSTEM_ADMIN"] : mocks.clubsAdmin.current ? ["CLUBS_ADMIN"] : [],
+    active: user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : mocks.clubsAdmin.current ? "CLUBS_ADMIN" : null,
+  }),
+}));
+vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: async () => ({ total: 0 }) }));
+vi.mock("@/modules/club-applications/repository", () => ({ countWaitingNewClubApplications: async () => 0 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ eventMembership: { findMany: mocks.findMany } }) }));
 vi.mock("@/components/app-shell", () => ({ AppShell: () => null }));
@@ -54,6 +66,7 @@ function shellEvents(tree: ReactElement): ShellEvent[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.clubsAdmin.current = false;
   mocks.findSwitchableAttendeeAccountForStaff.mockResolvedValue(null);
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.moduleStatesByEvent.mockImplementation(async (ids: string[]) => new Map(ids.map((id) => [id, { stored: new Set(["public-content"]), effective: new Set(["public-content"]) }])));
@@ -192,16 +205,18 @@ describe("WorkspaceShell club oversight (#481)", () => {
 describe("Club forms access agrees between the shell and /more (#741 review)", () => {
   const current = { timezone: "America/Chicago", endsAt: new Date("2099-01-02T00:00:00Z") };
   const past = { timezone: "America/Chicago", endsAt: new Date("2020-01-02T00:00:00Z") };
-  const cases: Array<{ name: string; globalRole: "SYSTEM_ADMIN" | null; roles: Array<[string, "EVENT_ADMIN" | "REGISTRATION_MANAGER"]>; times: Record<string, typeof current> }> = [
+  const cases: Array<{ name: string; globalRole: "SYSTEM_ADMIN" | null; clubsAdmin?: boolean; roles: Array<[string, "EVENT_ADMIN" | "REGISTRATION_MANAGER"]>; times: Record<string, typeof current> }> = [
     { name: "system admin", globalRole: "SYSTEM_ADMIN", roles: [["a", "REGISTRATION_MANAGER"]], times: { a: current } },
     { name: "Event Admin of a current event", globalRole: null, roles: [["a", "EVENT_ADMIN"]], times: { a: current } },
     { name: "Event Admin of an ended event only", globalRole: null, roles: [["a", "EVENT_ADMIN"]], times: { a: past } },
     { name: "Event Admin of an ended and a current event", globalRole: null, roles: [["a", "EVENT_ADMIN"], ["b", "EVENT_ADMIN"]], times: { a: past, b: current } },
+    { name: "Clubs Administrator (#1225) with only another role on an event", globalRole: null, clubsAdmin: true, roles: [["a", "REGISTRATION_MANAGER"]], times: { a: current } },
     { name: "another role on a current event", globalRole: null, roles: [["a", "REGISTRATION_MANAGER"]], times: { a: current } },
   ];
 
   for (const entry of cases) {
     it(`${entry.name}: the shell flag equals what resolveStaffViewer decides`, async () => {
+      mocks.clubsAdmin.current = Boolean(entry.clubsAdmin);
       const user = { id: "usr_x", email: "x@example.test", displayName: "X", globalRole: entry.globalRole };
       const shellEventsInput = entry.roles.map(([id]) => ({ id: `evt_${id}`, slug: id, name: id, audience: "GENERAL", ...entry.times[id] }));
       mocks.loadWorkspaceEventContext.mockResolvedValue({ autoSelected: false, defaultEventId: null, events: shellEventsInput, user });

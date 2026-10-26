@@ -3,6 +3,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listNewClubApplications, listNewClubInvites, listPublicSponsorOptions } from "@/modules/club-applications/repository";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
@@ -11,17 +12,18 @@ export const metadata: Metadata = { title: "New club applications" };
 export const dynamic = "force-dynamic";
 
 /**
- * The new club application queue (#817) for system administrators, who approve
- * and decline. Area Coordinators read the same list, view only, from their
+ * The new club application queue (#817) for system administrators and Clubs Administrators,
+ * who approve and decline. Area Coordinators read the same list, view only, from their
  * Clubs menu.
  */
 export default async function NewClubApplicationsAdminPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
+  const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
   const [applications, invites, churches] = await Promise.all([
-    listNewClubApplications("SYSTEM_ADMIN"),
-    listNewClubInvites("SYSTEM_ADMIN"),
+    listNewClubApplications(viewer),
+    listNewClubInvites(viewer),
     listPublicSponsorOptions(),
   ]);
   return (

@@ -2,13 +2,13 @@ import { clubReportApiError } from "@/modules/club-reports/api-errors";
 import { clubYearReportCsv } from "@/modules/club-reports/csv";
 import { listClubReportsForYear } from "@/modules/club-reports/repository";
 import { clubYearFor } from "@/modules/club-rosters/domain";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { withRequestContext } from "@/lib/request-context";
 
 /** Every club's monthly points for a club year, as CSV (#377). */
 async function getHandler(request: Request) {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     const requested = new URL(request.url).searchParams.get("year") ?? "";
     const clubYear = /^\d{4}-\d{2}$/.test(requested) ? requested : clubYearFor(new Date());
     const csv = clubYearReportCsv(clubYear, await listClubReportsForYear(clubYear), new Date());

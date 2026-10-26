@@ -6,10 +6,11 @@ const mocks = vi.hoisted(() => ({
   requireRosterAccess: vi.fn(),
   currentAreaCoordinator: vi.fn(),
   currentStaffActingContext: vi.fn(),
+  grantFindFirst: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ eventMembership: { findMany: mocks.membershipFindMany } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ eventMembership: { findMany: mocks.membershipFindMany }, clubsAdministratorGrant: { findFirst: mocks.grantFindFirst } }) }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/club-rosters/access", () => ({ requireRosterAccess: mocks.requireRosterAccess }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator }));
@@ -40,11 +41,13 @@ import {
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const actingDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1" } };
 const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
-const systemAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
-const eventAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false };
+const systemAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false };
+const eventAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false };
+const clubsAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-3", systemAdmin: false, clubsAdministrator: true };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.grantFindFirst.mockResolvedValue(null);
 });
 
 describe("club forms role matrix (#610)", () => {
@@ -72,7 +75,10 @@ describe("club forms role matrix (#610)", () => {
     expect(viewerCanRevealSensitive(areaCoordinator, "club-a")).toBe(false);
   });
 
-  it("shows full birth dates only to the club's own leaders and system administrators (ADR 0005 Addendum A)", () => {
+  it("shows full birth dates only to the club's own leaders, system administrators and Clubs Administrators (ADR 0005 Addendum A, #1225)", () => {
+    expect(viewerCanRevealBirthDates(clubsAdminStaff, "club-b")).toBe(true);
+    expect(viewerCanRevealSensitive(clubsAdminStaff, "club-b")).toBe(true);
+    expect(viewerCanWriteForClub(clubsAdminStaff, "club-a")).toBe(false);
     expect(viewerCanRevealBirthDates(director, "club-a")).toBe(true);
     expect(viewerCanRevealBirthDates(director, "club-b")).toBe(false);
     expect(viewerCanRevealBirthDates(actingDirector, "club-a")).toBe(true);
@@ -189,11 +195,26 @@ describe("conference staff: system administrators and Event Admins of a current 
   const roles = ["CHECK_IN_STAFF", "READ_ONLY_STAFF", "COMMUNICATIONS_MANAGER", "REGISTRATION_MANAGER", "FINANCE_MANAGER"];
 
   it("gives a system administrator access, including birth dates, without reading memberships", () => {
-    expect(staffClubFormsAccess(user("SYSTEM_ADMIN"), [], now)).toEqual({ isStaff: true, systemAdmin: true });
+    expect(staffClubFormsAccess(user("SYSTEM_ADMIN"), [], now)).toEqual({ isStaff: true, systemAdmin: true, clubsAdministrator: false });
   });
 
   it("gives an Event Admin of a current event access, without birth dates", () => {
-    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: currentEvent }], now)).toEqual({ isStaff: true, systemAdmin: false });
+    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: currentEvent }], now)).toEqual({ isStaff: true, systemAdmin: false, clubsAdministrator: false });
+  });
+
+  it("gives a Clubs Administrator access and birth dates with no event membership at all (#1225)", () => {
+    expect(staffClubFormsAccess(user(), [], now, true)).toEqual({ isStaff: true, systemAdmin: false, clubsAdministrator: true });
+  });
+
+  it("resolves a Clubs Administrator from the grant, without a membership query, and drops them when the grant is revoked", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: user() });
+    mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: false, clubsAdministrator: true });
+    expect(mocks.membershipFindMany).not.toHaveBeenCalled();
+    mocks.grantFindFirst.mockResolvedValue(null);
+    mocks.membershipFindMany.mockResolvedValue([]);
+    expect(await resolveStaffViewer(now)).toBeNull();
+    await expect(requireStaffViewer()).rejects.toMatchObject({ status: 403 });
   });
 
   it("counts an event through its last calendar day", () => {
@@ -203,7 +224,7 @@ describe("conference staff: system administrators and Event Admins of a current 
   });
 
   it("gives an Event Admin of an ended event nothing", () => {
-    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: endedEvent }], now)).toEqual({ isStaff: false, systemAdmin: false });
+    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: endedEvent }], now)).toEqual({ isStaff: false, systemAdmin: false, clubsAdministrator: false });
   });
 
   it("uses any current event when the person administers several", () => {
@@ -211,23 +232,23 @@ describe("conference staff: system administrators and Event Admins of a current 
   });
 
   it.each(roles)("gives %s nothing, even on a current event", (role) => {
-    expect(staffClubFormsAccess(user(), [{ role, event: currentEvent }], now)).toEqual({ isStaff: false, systemAdmin: false });
+    expect(staffClubFormsAccess(user(), [{ role, event: currentEvent }], now)).toEqual({ isStaff: false, systemAdmin: false, clubsAdministrator: false });
   });
 
   it("gives nothing without an active membership", () => {
-    expect(staffClubFormsAccess(user(), [], now)).toEqual({ isStaff: false, systemAdmin: false });
+    expect(staffClubFormsAccess(user(), [], now)).toEqual({ isStaff: false, systemAdmin: false, clubsAdministrator: false });
   });
 
   it("asks only for active Event Admin memberships, and resolves a current Event Admin", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: user() });
     mocks.membershipFindMany.mockResolvedValue([{ role: "EVENT_ADMIN", event: currentEvent }]);
-    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: false });
+    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: false, clubsAdministrator: false });
     expect(mocks.membershipFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "u-1", status: "ACTIVE", role: "EVENT_ADMIN" } }));
   });
 
   it("resolves a system administrator without a membership query", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: user("SYSTEM_ADMIN") });
-    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: true });
+    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: true, clubsAdministrator: false });
     expect(mocks.membershipFindMany).not.toHaveBeenCalled();
   });
 

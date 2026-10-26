@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const mocks = vi.hoisted(() => ({
+  isClubsAdmin: vi.fn(),
   getCurrentSession: vi.fn(),
   listEventsForUser: vi.fn(),
   findActiveMembership: vi.fn(),
@@ -27,6 +28,7 @@ class RedirectSignal extends Error {
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isClubsAdmin }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({
   listEventsForUser: mocks.listEventsForUser,
@@ -77,6 +79,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  mocks.isClubsAdmin.mockResolvedValue(false);
   // "Nearest event" is measured from now; pin it so the fixtures stay valid.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-09-28T12:00:00.000Z"));
@@ -274,6 +277,22 @@ describe("loadWorkspaceEventContext — the workspace layout never redirects for
     expect(context.defaultEventId).toBeNull();
     // Event-scoped pages still resolve for themselves and send the admin on.
     await expectRedirect("/no-access", () => resolveEventContext(undefined));
+  });
+
+  it("lets a Clubs Administrator with zero events load the layout context for the club pages (#1225), until the grant is revoked", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: staff });
+    mocks.listEventsForUser.mockResolvedValue([]);
+    mocks.isClubsAdmin.mockResolvedValue(true);
+
+    const context = await loadWorkspaceEventContext();
+
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(context.events).toEqual([]);
+    // Event-scoped pages still resolve for themselves: no events means no access to any of them.
+    await expectRedirect("/no-access", () => resolveEventContext(undefined));
+
+    mocks.isClubsAdmin.mockResolvedValue(false);
+    await expectRedirect("/no-access", () => loadWorkspaceEventContext());
   });
 
   it.each([

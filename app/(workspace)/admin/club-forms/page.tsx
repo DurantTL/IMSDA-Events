@@ -7,6 +7,7 @@ import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormTemplateToggle } from "@/components/club-forms-actions";
 import { cardCell } from "@/components/table-card-labels";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
 
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminClubFormsPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const templates = await listClubFormTemplatesForAdmin();
 
   return (

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClubReportsConference } from "@/components/club-reports-conference";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { listClubReportsForYear } from "@/modules/club-reports/repository";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { year } = await searchParams;
   const now = new Date();
   const current = clubYearFor(now);
