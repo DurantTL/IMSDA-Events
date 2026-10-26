@@ -76,10 +76,10 @@ export async function requireAreaCoordinatorViewer() {
  * across events), and Event Admins of an event that has not ended. Nobody
  * else, whatever other permissions they hold: not check-in, read-only,
  * communications, registration or finance roles, even with VIEW_SENSITIVE_DATA.
- * System administrators and current Event Admins read the sensitive answers
- * (`sensitiveAnswers`); a Clubs Administrator alone does not (health is not
- * theirs to read). Only a system administrator or a Clubs Administrator reads
- * birth dates (`systemAdmin` / `clubsAdministrator`). The event model has no archived
+ * System administrators, Clubs Administrators (Caleb, 2026-10-26: they see what
+ * a system administrator sees) and current Event Admins read the sensitive
+ * answers (`sensitiveAnswers`); only a system administrator or a Clubs
+ * Administrator reads birth dates (`systemAdmin` / `clubsAdministrator`). The event model has no archived
  * state, so "current" is "has not ended" (`hasEventEnded`).
  */
 export function staffClubFormsAccess(
@@ -93,8 +93,7 @@ export function staffClubFormsAccess(
 ): { isStaff: boolean; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean } {
   if (user.globalRole === "SYSTEM_ADMIN") return { isStaff: true, systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
   const eventAdmin = memberships.some((membership) => membership.role === "EVENT_ADMIN" && !hasEventEnded(membership.event, now));
-  // A Clubs Administrator reads birth dates but not the health and other sensitive answers unless they are also a current Event Admin.
-  return { isStaff: eventAdmin || clubsAdministrator, systemAdmin: false, clubsAdministrator, sensitiveAnswers: eventAdmin };
+  return { isStaff: eventAdmin || clubsAdministrator, systemAdmin: false, clubsAdministrator, sensitiveAnswers: eventAdmin || clubsAdministrator };
 }
 
 /** Conference staff, or null for anyone else (including a signed-out visitor). */

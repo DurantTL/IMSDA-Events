@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ HEALTH_RECORDS_ENABLED: state.enabled }) }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ eventMembership: { findMany: state.memberships }, attendeeSession: { findUnique: state.sessionFind } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ clubsAdministratorGrant: { findFirst: async () => null }, eventMembership: { findMany: state.memberships }, attendeeSession: { findUnique: state.sessionFind } }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ requireRosterAccess: state.roster, ROSTER_UNLOCK_HOURS: 12 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: state.attendee }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: state.session }));

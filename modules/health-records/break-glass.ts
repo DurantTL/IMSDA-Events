@@ -24,7 +24,7 @@ export const BREAK_GLASS_REQUIRED_MESSAGE = "Reading this health information nee
 export type BreakGlassUseKind = "LIVE_RECORD" | "SEALED_COPIES";
 
 /** The administrator a grant is looked up for. `actAsId` is only for the audit rows. */
-export type BreakGlassActor = { userId: string; actAsId?: string };
+export type BreakGlassActor = { userId: string; actAsId?: string; viaClubsAdministrator?: true };
 
 type Client = Pick<Prisma.TransactionClient, "healthSnapshotBreakGlass">;
 
@@ -78,6 +78,7 @@ export async function auditBreakGlassRefusal(input: {
       metadata: {
         viewerKind: "SYSTEM_ADMIN",
         ...(input.actor.actAsId ? { actAsId: input.actor.actAsId } : {}),
+        ...(input.actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}),
         ...input.metadata,
         reason: "BREAK_GLASS_REQUIRED",
       },

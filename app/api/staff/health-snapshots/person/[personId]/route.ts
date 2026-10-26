@@ -14,7 +14,7 @@ async function getHandler(_request: Request, context: RouteContext) {
   if (disabled) return disabled;
   try {
     const { personId } = await context.params;
-    const viewer = await requireSnapshotAdminViewer("VIEW_SEALED_COPIES", personId);
+    const viewer = await requireSnapshotAdminViewer("VIEW_SEALED_COPIES", personId, { allowClubsAdministrator: true });
     return healthJson(await viewSealedSnapshots(viewer, personId));
   } catch (error) {
     return healthApiError(error, "Opening sealed health copies");

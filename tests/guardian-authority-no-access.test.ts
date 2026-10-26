@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({
-  getPrisma: () => new Proxy({ eventMembership: { findMany: mocks.eventMembershipFindMany } }, {
+  getPrisma: () => new Proxy({ eventMembership: { findMany: mocks.eventMembershipFindMany }, clubsAdministratorGrant: { findFirst: async () => null } }, {
     get(target, property: string) {
       if (property === "guardianAuthority" || property === "guardianAuthorityConflict") {
         mocks.guardianTouched(property);

@@ -1,4 +1,4 @@
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { listNameOnlyBackgroundCheckMatches } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -9,7 +9,7 @@ import { withRequestContext } from "@/lib/request-context";
  */
 async function getHandler() {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     return Response.json({ matches: await listNameOnlyBackgroundCheckMatches() });
   } catch (error) {
     return backgroundCheckApiError(error, "Loading Sterling Volunteers matches made on the name alone");

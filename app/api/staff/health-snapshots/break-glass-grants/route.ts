@@ -9,7 +9,7 @@ import { listSnapshotBreakGlassGrants, requireSnapshotAdminViewer } from "@/modu
  */
 async function getHandler() {
   try {
-    const viewer = await requireSnapshotAdminViewer("LIST_BREAK_GLASS", null, { flagOptional: true });
+    const viewer = await requireSnapshotAdminViewer("LIST_BREAK_GLASS", null, { flagOptional: true, allowClubsAdministrator: true });
     return healthJson({ grants: await listSnapshotBreakGlassGrants(viewer) });
   } catch (error) {
     return healthApiError(error, "Listing break-glass grants on sealed health copies");

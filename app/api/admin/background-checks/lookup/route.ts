@@ -1,4 +1,4 @@
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { lookupBackgroundCheckName } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -11,7 +11,7 @@ import { withRequestContext } from "@/lib/request-context";
  */
 async function getHandler(request: Request) {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     const name = new URL(request.url).searchParams.get("name") ?? "";
     return Response.json({ lookup: await lookupBackgroundCheckName(name) });
   } catch (error) {

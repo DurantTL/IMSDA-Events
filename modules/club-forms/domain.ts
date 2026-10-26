@@ -404,7 +404,7 @@ export function clubFormClubLabel(organizationName: string | null | undefined, u
 /** Health, conduct, physician and emergency-contact answers (not birth dates). */
 export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string | null) {
   if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
-  // A Clubs Administrator alone does not read these (#1225): system administrators and current Event Admins do.
+  // System administrators, Clubs Administrators and current Event Admins read these (#1225).
   return viewer.kind === "STAFF" && viewer.sensitiveAnswers;
 }
 

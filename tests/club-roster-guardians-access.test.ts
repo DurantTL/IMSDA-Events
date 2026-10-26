@@ -49,6 +49,7 @@ beforeEach(() => {
   mocks.writeAuditLog.mockResolvedValue({});
   mocks.getPrisma.mockReturnValue({
     eventMembership: { findMany: mocks.membershipFindMany },
+    clubsAdministratorGrant: { findFirst: async () => null },
     event: { findUnique: mocks.eventFindUnique },
     clubRosterGuardian: { findMany: mocks.guardianFindMany },
     clubRosterMember: { findMany: mocks.memberFindMany },

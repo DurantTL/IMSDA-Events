@@ -43,7 +43,7 @@ const actingDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "
 const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
 const systemAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 const eventAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
-const clubsAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-3", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: false };
+const clubsAdminStaff: ClubFormsViewer = { kind: "STAFF", userId: "staff-3", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -77,9 +77,8 @@ describe("club forms role matrix (#610)", () => {
 
   it("shows full birth dates only to the club's own leaders, system administrators and Clubs Administrators (ADR 0005 Addendum A, #1225)", () => {
     expect(viewerCanRevealBirthDates(clubsAdminStaff, "club-b")).toBe(true);
-    // Health, conduct, physician and emergency answers stay out of a Clubs Administrator's reach (#1225 review).
-    expect(viewerCanRevealSensitive(clubsAdminStaff, "club-b")).toBe(false);
-    expect(viewerCanRevealSensitive({ ...clubsAdminStaff, sensitiveAnswers: true }, "club-b")).toBe(true);
+    // Caleb, 2026-10-26: a Clubs Administrator sees what a system administrator sees, sensitive answers included.
+    expect(viewerCanRevealSensitive(clubsAdminStaff, "club-b")).toBe(true);
     expect(viewerCanWriteForClub(clubsAdminStaff, "club-a")).toBe(false);
     expect(viewerCanRevealBirthDates(director, "club-a")).toBe(true);
     expect(viewerCanRevealBirthDates(director, "club-b")).toBe(false);
@@ -205,17 +204,17 @@ describe("conference staff: system administrators and Event Admins of a current 
   });
 
   it("gives a Clubs Administrator access and birth dates with no event membership at all (#1225)", () => {
-    expect(staffClubFormsAccess(user(), [], now, true)).toEqual({ isStaff: true, systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: false });
+    expect(staffClubFormsAccess(user(), [], now, true)).toEqual({ isStaff: true, systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true });
     // Also a current Event Admin: they keep the sensitive answers that role has always had.
     expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: currentEvent }], now, true)).toEqual({ isStaff: true, systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true });
-    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: endedEvent }], now, true).sensitiveAnswers).toBe(false);
+    expect(staffClubFormsAccess(user(), [{ role: "EVENT_ADMIN", event: endedEvent }], now, true).sensitiveAnswers).toBe(true);
   });
 
   it("resolves a Clubs Administrator from the grant, and drops them when the grant is revoked", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: user() });
     mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
     mocks.membershipFindMany.mockResolvedValue([]);
-    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: false });
+    expect(await resolveStaffViewer(now)).toEqual({ kind: "STAFF", userId: "u-1", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true });
     mocks.membershipFindMany.mockResolvedValue([{ role: "EVENT_ADMIN", event: currentEvent }]);
     expect(await resolveStaffViewer(now)).toMatchObject({ clubsAdministrator: true, sensitiveAnswers: true });
     mocks.grantFindFirst.mockResolvedValue(null);

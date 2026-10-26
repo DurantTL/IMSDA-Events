@@ -17,7 +17,7 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   try {
     // Who is asking comes first: a malformed body from someone who may not do this is refused as unauthorized (and audited).
-    const viewer = await requireSnapshotAdminViewer("BREAK_GLASS_START", null);
+    const viewer = await requireSnapshotAdminViewer("BREAK_GLASS_START", null, { allowClubsAdministrator: true });
     const body = bodySchema.parse(await readHealthJson(request));
     const grant = await startSnapshotBreakGlass(viewer, { personId: body.personId, reason: body.reason });
     return healthJson({ ok: true, grantId: grant.grantId, expiresAt: grant.expiresAt.toISOString(), snapshotCount: grant.snapshotCount, liveRecordCount: grant.liveRecordCount });

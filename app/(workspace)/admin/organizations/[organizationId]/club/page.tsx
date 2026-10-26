@@ -36,8 +36,8 @@ export default async function StaffOpenClubPage({
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
-  // A Clubs Administrator (#1225) opens the club to read the roster and its reports; the rest of the staff-only
-  // tools, and each adult's Sterling Volunteers detail, stay with system administrators.
+  // A Clubs Administrator (#1225) sees what a system administrator sees here (roster, birth dates, Sterling Volunteers
+  // detail, guardians); the staff-only change tools (club admins, profile, honors, act-as, year move) stay with system administrators.
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const view = rosterYearView(query?.year);
@@ -120,8 +120,7 @@ export default async function StaffOpenClubPage({
 
       <ClubOverview
         headingLevel={3}
-        backgroundChecks={isSystemAdmin ? { includeNotes: true } : undefined}
-        complianceCounts={!isSystemAdmin}
+        backgroundChecks={{ includeNotes: true }}
         birthDatesEndpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/roster/birth-dates`}
         organizationId={organizationId}
         staffHonorsHref={isSystemAdmin ? `/admin/organizations/${encodeURIComponent(organizationId)}/club/honors` : undefined}

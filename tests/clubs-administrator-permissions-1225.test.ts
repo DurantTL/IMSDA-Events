@@ -63,7 +63,7 @@ vi.mock("@/modules/system-admin/user-admin", () => ({
 }));
 vi.mock("@/modules/system-admin/team-directory", () => ({ getTeamDirectory: vi.fn(async () => ({ members: [] })) }));
 vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled }));
-vi.mock("@/modules/health-records/flag", () => ({ requireHealthRecordsEnabled: () => undefined }));
+vi.mock("@/modules/health-records/flag", () => ({ requireHealthRecordsEnabled: () => undefined, healthRecordsEnabled: () => true }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/passkeys", () => ({ passkeysConfigured: () => false }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: vi.fn() }));
@@ -77,8 +77,13 @@ import { PATCH as toggleClubForm } from "@/app/api/admin/club-forms/[templateKey
 import { GET as platformSettings } from "@/app/api/admin/platform-settings/route";
 import { POST as accountActions } from "@/app/api/admin/users/[userId]/actions/route";
 import { GET as backgroundReviews } from "@/app/api/admin/background-checks/reviews/route";
+import { POST as rematch } from "@/app/api/admin/background-checks/rematch/route";
 import { GET as eventSettings } from "@/app/api/events/[eventId]/route";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
+import { healthAuditActor } from "@/modules/health-records/domain";
+import { requireHealthImporter } from "@/modules/health-records/import-access";
+import { requireSnapshotAdminViewer } from "@/modules/health-records/snapshot-access-repository";
+import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { requireStaffViewer, resolveStaffViewer } from "@/modules/club-forms/access";
 import { viewerCanRevealBirthDates, viewerCanRevealSensitive } from "@/modules/club-forms/domain";
 
@@ -200,14 +205,45 @@ describe("club forms staff viewer and birth dates", () => {
   });
 });
 
-describe("what a Clubs Administrator can never reach", () => {
-  it("refuses health records: no grant makes someone a health viewer, only a system administrator or the health permission", async () => {
+describe("what a Clubs Administrator sees like a system administrator, and what it can never reach", () => {
+  it("opens health records like a system administrator (view only, same checks), marked as Clubs Administrator in the audit actor, and refuses a revoked grant", async () => {
     signInAs("clubsAdmin");
-    await expect(requireStaffHealthViewer()).rejects.toMatchObject({ code: "FORBIDDEN" });
-    signInAs("eventAdmin");
-    await expect(requireStaffHealthViewer()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const viewer = await requireStaffHealthViewer();
+    expect(viewer).toMatchObject({ kind: "SYSTEM_ADMIN", userId: "u-clubs", viaClubsAdministrator: true });
+    expect(healthAuditActor(viewer)).toEqual({ actorUserId: "u-clubs", metadata: { viewerKind: "SYSTEM_ADMIN", actorRole: "CLUBS_ADMINISTRATOR" } });
     signInAs("systemAdmin");
-    await expect(requireStaffHealthViewer()).resolves.toMatchObject({ kind: "SYSTEM_ADMIN" });
+    const admin = await requireStaffHealthViewer();
+    expect(admin).toEqual({ kind: "SYSTEM_ADMIN", userId: "u-sys" });
+    expect(healthAuditActor(admin).metadata).not.toHaveProperty("actorRole");
+    for (const role of ["revokedClubsAdmin", "eventAdmin", "plainStaff"] as const) {
+      signInAs(role);
+      await expect(requireStaffHealthViewer()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+  });
+
+  it("keeps the health record import system-administrator only", () => {
+    expect(() => requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-clubs", viaClubsAdministrator: true })).toThrow(/system administrator/);
+    expect(requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-sys" })).toMatchObject({ userId: "u-sys" });
+  });
+
+  it("opens sealed copies and break-glass to a Clubs Administrator but not the holds, and refuses a revoked grant", async () => {
+    signInAs("clubsAdmin");
+    for (const attempted of ["VIEW_SEALED_COPIES", "BREAK_GLASS_START", "LIST_BREAK_GLASS"]) {
+      await expect(requireSnapshotAdminViewer(attempted, null, { allowClubsAdministrator: true })).resolves.toMatchObject({ kind: "SYSTEM_ADMIN", viaClubsAdministrator: true });
+    }
+    // Without the route's opt-in (the hold routes), a Clubs Administrator is refused.
+    await expect(requireSnapshotAdminViewer("PLACE_HOLD", null, { flagOptional: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    signInAs("revokedClubsAdmin");
+    await expect(requireSnapshotAdminViewer("BREAK_GLASS_START", null, { allowClubsAdministrator: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    signInAs("systemAdmin");
+    await expect(requireSnapshotAdminViewer("PLACE_HOLD", null, { flagOptional: true })).resolves.toMatchObject({ kind: "SYSTEM_ADMIN" });
+  });
+
+  it("gives a Clubs Administrator guardian contacts like a system administrator, and a revoked one nothing", async () => {
+    signInAs("clubsAdmin");
+    expect(await resolveStaffGuardianViewer()).toEqual({ kind: "STAFF", userId: "u-clubs" });
+    signInAs("revokedClubsAdmin");
+    expect(await resolveStaffGuardianViewer()).toBeNull();
   });
 
   it("refuses system settings", async () => {
@@ -227,12 +263,15 @@ describe("what a Clubs Administrator can never reach", () => {
     expect((await call()).status).toBe(200);
   });
 
-  it("refuses background-check details", async () => {
+  it("opens Sterling Volunteers read routes to a Clubs Administrator, not to a revoked one, and keeps its writes system-only", async () => {
     signInAs("clubsAdmin");
-    expect((await backgroundReviews(json("/api/admin/background-checks/reviews", "GET"))).status).toBe(403);
-    expect(mocks.listBackgroundCheckReviews).not.toHaveBeenCalled();
-    signInAs("systemAdmin");
     expect((await backgroundReviews(json("/api/admin/background-checks/reviews", "GET"))).status).toBe(200);
+    expect(mocks.listBackgroundCheckReviews).toHaveBeenCalledTimes(1);
+    signInAs("revokedClubsAdmin");
+    expect((await backgroundReviews(json("/api/admin/background-checks/reviews", "GET"))).status).toBe(403);
+    expect(mocks.listBackgroundCheckReviews).toHaveBeenCalledTimes(1);
+    signInAs("clubsAdmin");
+    expect((await rematch(json("/api/admin/background-checks/rematch", "POST"))).status).toBe(403);
   });
 
   it("refuses another event's data: a Clubs Administrator or an Event Admin of a different event is not assigned to it", async () => {
