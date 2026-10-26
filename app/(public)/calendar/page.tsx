@@ -89,7 +89,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const allItems = await listPublicCalendarItems(from, to);
   const categories = calendarCategories(allItems);
   if (category && !categories.some((name) => name.toLowerCase() === category.toLowerCase())) categories.push(category);
-  const toneMap = calendarToneMap(categories);
+  const toneMap = calendarToneMap(allItems);
   const items = filterByCategory(allItems, category);
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);

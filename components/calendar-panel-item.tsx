@@ -1,9 +1,9 @@
 import { CalendarDays, DoorClosed } from "lucide-react";
 import { ItemLink } from "@/components/calendar-agenda-item";
-import { calendarItemTone, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
+import { calendarItemTone, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem, type CalendarTone } from "@/modules/calendar/domain";
 
 /** One item in the day panel (#1202, #1203): category with its colour, title, dates and status, linking where the agenda links. */
-export function CalendarPanelItem({ item, toneMap }: { item: CalendarItem; toneMap: Map<string, number> }) {
+export function CalendarPanelItem({ item, toneMap }: { item: CalendarItem; toneMap: Map<string, CalendarTone> }) {
   const tone = calendarItemTone(item, toneMap);
   const label = item.isClosure ? closureLabel : item.category || (item.kind === "EVENT" ? "IMSDA event" : "Conference date");
   return (

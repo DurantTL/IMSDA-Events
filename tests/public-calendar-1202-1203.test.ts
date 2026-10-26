@@ -126,30 +126,48 @@ describe("weekBarLayout (#1202)", () => {
 });
 
 describe("calendar tones (#1202, #1203)", () => {
+  // The categories come sorted by name (calendarCategories), so tones follow that order.
+  const names = ["Adventurers", "Camps", "Ministerial", "Pathfinders", "Women's Ministries", "Youth"];
+  const entries = names.map((name, index) => item(`e${index}`, "2026-03-02", "2026-03-02", { category: name }));
+
   it("gives up to six categories six different tones, by position, skipping the closure category", () => {
-    const categories = ["Camps", "Office closure", "Pathfinders", "Women's Ministries", "Youth", "Ministerial", "Adventurers"];
-    const map = calendarToneMap(categories);
-    const tones = ["Camps", "Pathfinders", "Women's Ministries", "Youth", "Ministerial", "Adventurers"].map((name) => calendarKeyTone(name, map));
-    expect(tones).toEqual([1, 2, 3, 4, 5, 6]);
+    const closure = item("c", "2026-03-03", "2026-03-03", { category: "Office closure", isClosure: true });
+    const map = calendarToneMap([closure, ...entries]);
+    expect(calendarToneMap([closure, ...entries]).get("office closure")).toBeUndefined();
+    expect(names.map((name) => calendarKeyTone(name, map))).toEqual([1, 2, 3, 4, 5, 6]);
     expect(calendarKeyTone("Office closure", map)).toBe("closure");
-    expect(calendarKeyTone(" youth ", map)).toBe(4);
-    expect(calendarToneMap([...categories, "Seventh"]).get("seventh")).toBe(1);
+    expect(calendarKeyTone(" youth ", map)).toBe(6);
+    expect(calendarKeyTone("Unknown", map)).toBe(1);
   });
 
-  it("does not change when a category filter is applied, because the map is built from the unfiltered list", () => {
-    const all = [item("a", "2026-03-02", "2026-03-02", { category: "Camps" }), item("b", "2026-03-02", "2026-03-02", { category: "Youth" })];
-    const names = (items: CalendarItem[]) => [...new Set(items.map((entry) => entry.category))].sort();
-    const map = calendarToneMap(names(all));
-    const filtered = filterByCategory(all, "youth");
-    expect(calendarItemTone(filtered[0], map)).toBe(calendarItemTone(all[1], map));
-    expect(calendarItemTone(all[0], map)).not.toBe(calendarItemTone(all[1], map));
+  it("does not change when a category filter is applied, because the map is built from the unfiltered items", () => {
+    const map = calendarToneMap(entries);
+    const filtered = filterByCategory(entries, "youth");
+    expect(calendarItemTone(filtered[0], map)).toBe(calendarItemTone(entries[5], map));
+    expect(calendarItemTone(entries[0], map)).not.toBe(calendarItemTone(entries[5], map));
   });
 
   it("makes events navy and closures striped whatever the category", () => {
-    const map = calendarToneMap(["Youth"]);
-    expect(calendarItemTone({ kind: "EVENT", category: "Youth" }, map)).toBe("event");
-    expect(calendarItemTone({ kind: "EVENT", category: "Youth", isClosure: true }, map)).toBe("closure");
-    expect(calendarItemTone({ kind: "ENTRY", category: "Youth" }, map)).toBe(1);
+    const map = calendarToneMap(entries);
+    expect(calendarItemTone(item("x", "2026-03-02", "2026-03-02", { kind: "EVENT", category: "Youth" }), map)).toBe("event");
+    expect(calendarItemTone(item("y", "2026-03-02", "2026-03-02", { kind: "EVENT", category: "Youth", isClosure: true }), map)).toBe("closure");
+    expect(calendarItemTone(entries[0], map)).toBe(1);
+  });
+
+  it("shows a category only IMSDA events use as navy in the key and gives it no tone slot", () => {
+    const eventOnly = item("ev", "2026-03-02", "2026-03-02", { kind: "EVENT", category: "Aardvark Retreats" });
+    const map = calendarToneMap([eventOnly, ...entries]);
+    expect(calendarKeyTone("Aardvark Retreats", map)).toBe("event");
+    // It sorts first, yet every entry category keeps the tone it would have had without it.
+    expect(names.map((name) => calendarKeyTone(name, map))).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("keeps the tone of a category used by both an event and an entry", () => {
+    const both = [item("ev", "2026-03-02", "2026-03-02", { kind: "EVENT", category: "Youth" }), item("en", "2026-03-02", "2026-03-02", { category: "Youth" })];
+    const map = calendarToneMap(both);
+    expect(calendarKeyTone("Youth", map)).toBe(1);
+    expect(calendarItemTone(both[0], map)).toBe("event");
+    expect(calendarItemTone(both[1], map)).toBe(1);
   });
 
   it("names a day with its weekday", () => {
@@ -222,6 +240,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
   it("shows a colour swatch in each category button and a key for IMSDA events", () => {
     expect(page).toContain("calendarKeyTone(name, toneMap)");
     expect(css).toMatch(/\.calendar-categories \{ display: flex; flex-wrap: wrap;/);
+    expect(css).toMatch(/\.calendar-day-detail \{ max-height: calc\(100vh - 24px\); overflow-y: auto; overscroll-behavior: contain; \}/);
     expect(css).toMatch(/\.calendar-bar-title \{ flex: 0 0 auto; max-width: 100%;/);
     expect(page).toContain('<span aria-hidden="true" className="calendar-swatch" />');
     expect(page).toContain("IMSDA event");
