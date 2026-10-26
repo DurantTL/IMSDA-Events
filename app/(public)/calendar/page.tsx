@@ -8,8 +8,14 @@ import { AgendaItem } from "@/components/calendar-agenda-item";
 import { CalendarDayLink } from "@/components/calendar-day-link";
 import { CalendarDayFocus } from "@/components/calendar-day-focus";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
+import { CalendarPanelItem } from "@/components/calendar-panel-item";
 import {
   calendarCategories,
+  calendarItemTone,
+  calendarKeyTone,
+  calendarStatusLabels,
+  calendarToneMap,
+  closureCategory,
   closureLabel,
   filterByCategory,
   firstPerSeries,
@@ -22,8 +28,11 @@ import {
   monthLabel,
   parseMonthParam,
   resolveMonthAndDate,
+  formatDateRange,
   formatLongDate,
+  formatWeekdayDate,
   calendarCountLabel,
+  weekBarLayout,
   sortCalendarItems,
   shiftMonth,
   addDays,
@@ -80,11 +89,19 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const allItems = await listPublicCalendarItems(from, to);
   const categories = calendarCategories(allItems);
   if (category && !categories.some((name) => name.toLowerCase() === category.toLowerCase())) categories.push(category);
+  const toneMap = calendarToneMap(allItems);
   const items = filterByCategory(allItems, category);
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);
   const base = { view, month: view === "month" ? params.month : undefined, category };
   const selectedItems = selectedDate ? itemsOnDate(items, selectedDate) : [];
+  // A day (or a bar, or "+N more") opens that day's panel; an adjacent-month day lands on its own month.
+  const dayHrefFor = (date: string) => calendarHref(
+    { view: "month", month: date.slice(0, 7) === currentMonthKey ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), category, date },
+    "calendar-day-detail",
+  );
+  const hasClosures = allItems.some((item) => item.isClosure);
+  const closureListed = categories.some((name) => name.toLowerCase() === closureCategory.toLowerCase());
 
   return (
     <main className="public-registration-page public-calendar-page">
@@ -138,92 +155,130 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
         </div>
 
         {categories.length > 0 && (
-          <nav aria-label="Filter by category" className="calendar-categories">
+          <nav aria-label="Filter by category and colour key" className="calendar-categories">
             <Link aria-current={!category ? "page" : undefined} href={calendarHref({ ...base, category: undefined, date: selectedDate })}>All</Link>
             {categories.map((name) => (
               <Link
                 aria-current={category?.toLowerCase() === name.toLowerCase() ? "page" : undefined}
+                className={`calendar-tone-${calendarKeyTone(name, toneMap)}`}
                 href={calendarHref({ ...base, category: name, date: selectedDate })}
                 key={name}
               >
+                <span aria-hidden="true" className="calendar-swatch" />
                 {name}
               </Link>
             ))}
+            <span className="calendar-key-item calendar-tone-event"><span aria-hidden="true" className="calendar-swatch" />IMSDA event</span>
+            {hasClosures && !closureListed && (
+              <span className="calendar-key-item calendar-tone-closure"><span aria-hidden="true" className="calendar-swatch" />{closureLabel}</span>
+            )}
           </nav>
         )}
 
         {view === "month" && (
-          <div className="calendar-month" role="presentation">
-            {weekdays.map((weekday) => <div className="calendar-weekday" key={weekday}>{weekday}</div>)}
-            {grid.flat().map((date) => {
-              const dayItems = itemsOnDate(items, date);
-              const inMonth = date.slice(0, 7) === currentMonthKey;
-              const dayLabel = `${formatLongDate(date)}, ${calendarCountLabel(dayItems.length)}`;
-              const dayHref = calendarHref(
-                { view: "month", month: inMonth ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), category, date },
-                "calendar-day-detail",
-              );
-              return (
-                <div
-                  id={`calendar-day-${date}`}
-                  className={`calendar-day${inMonth ? "" : " is-outside"}${date === today ? " is-today" : ""}${dayItems.length ? " has-items" : ""}${date === selectedDate ? " is-selected" : ""}`}
-                  key={date}
-                >
-                  {dayItems.length > 0 ? (
-                    <CalendarDayLink aria-current={date === selectedDate ? "true" : date === today ? "date" : undefined} aria-label={`${dayLabel}. View all`} className="calendar-day-number calendar-day-link" href={dayHref}>
-                      {Number(date.slice(8))}
-                    </CalendarDayLink>
-                  ) : (
-                    <span className="calendar-day-number">{Number(date.slice(8))}</span>
-                  )}
-                  {dayItems.length > 0 && (
-                    <ul>
-                      {dayItems.slice(0, 3).map((item) => (
-                        <CalendarMonthChip
-                          className={`calendar-chip calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}
-                          item={item}
-                          key={item.key}
+          <div className="calendar-board">
+            <div className="calendar-month" role="presentation">
+              <div className="calendar-weekdays">
+                {weekdays.map((weekday) => <div className="calendar-weekday" key={weekday}>{weekday}</div>)}
+              </div>
+              {grid.map((week) => {
+                const { bars, hiddenByDay } = weekBarLayout(week, items);
+                return (
+                  <div className="calendar-week" key={week[0]}>
+                    {week.map((date) => {
+                      const dayItems = itemsOnDate(items, date);
+                      const inMonth = date.slice(0, 7) === currentMonthKey;
+                      return (
+                        <div
+                          id={`calendar-day-${date}`}
+                          className={`calendar-day${inMonth ? "" : " is-outside"}${date === today ? " is-today" : ""}${dayItems.length ? " has-items" : ""}${date === selectedDate ? " is-selected" : ""}`}
+                          key={date}
                         >
-                          {item.isClosure && <DoorClosed size={12} aria-hidden="true" />}
-                          {item.isClosure && <span className="sr-only">{closureLabel}: </span>}
-                          {item.title}
-                        </CalendarMonthChip>
-                      ))}
-                      {dayItems.length > 3 && (
-                        <li className="calendar-more">
-                          <CalendarDayLink className="calendar-more-link" href={dayHref}>
-                            View all {dayItems.length}<span className="sr-only"> events for {formatLongDate(date)}</span>
+                          <CalendarDayLink
+                            aria-current={date === selectedDate ? "true" : date === today ? "date" : undefined}
+                            aria-label={`${formatWeekdayDate(date)}, ${calendarCountLabel(dayItems.length)}`}
+                            className="calendar-day-link"
+                            href={dayHrefFor(date)}
+                          >
+                            <span className="calendar-day-number">{Number(date.slice(8))}</span>
                           </CalendarDayLink>
-                        </li>
-                      )}
-                    </ul>
+                          {dayItems.length > 0 && (
+                            <ul className="calendar-dots">
+                              {dayItems.slice(0, 3).map((item) => (
+                                <CalendarMonthChip
+                                  className={`calendar-chip calendar-tone-${calendarItemTone(item, toneMap)} calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}
+                                  item={item}
+                                  key={item.key}
+                                >
+                                  {item.isClosure && <DoorClosed size={12} aria-hidden="true" />}
+                                  {item.isClosure && <span className="sr-only">{closureLabel}: </span>}
+                                  {item.title}
+                                </CalendarMonthChip>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {bars.map((bar) => {
+                      const { item } = bar;
+                      const dates = formatDateRange(item.startsOn, item.endsOn);
+                      return (
+                        <CalendarDayLink
+                          aria-label={`${item.isClosure ? `${closureLabel}: ` : ""}${item.title}, ${dates}${item.status !== "SCHEDULED" ? `, ${calendarStatusLabels[item.status]}` : ""}`}
+                          className={`calendar-bar calendar-tone-${calendarItemTone(item, toneMap)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
+                          href={dayHrefFor(bar.segmentStart)}
+                          key={item.key}
+                          style={{ gridColumn: `${bar.startCol} / span ${bar.span}`, gridRow: bar.row + 2 }}
+                        >
+                          {bar.continuesBefore && <span aria-hidden="true" className="calendar-bar-edge">‹</span>}
+                          {item.isClosure && <DoorClosed size={14} aria-hidden="true" />}
+                          <span className="calendar-bar-title">{item.title}</span>
+                          {bar.span >= 3 && <span className="calendar-bar-dates">{dates}</span>}
+                          {bar.continuesAfter && <span aria-hidden="true" className="calendar-bar-edge calendar-bar-edge-end">›</span>}
+                        </CalendarDayLink>
+                      );
+                    })}
+                    {hiddenByDay.map((hidden, index) => hidden > 0 && (
+                      <CalendarDayLink
+                        aria-label={`${hidden} more ${hidden === 1 ? "event" : "events"} on ${formatWeekdayDate(week[index])}`}
+                        className="calendar-more-link"
+                        href={dayHrefFor(week[index])}
+                        key={`more-${week[index]}`}
+                        style={{ gridColumn: index + 1, gridRow: 6 }}
+                      >
+                        +{hidden} more
+                      </CalendarDayLink>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {selectedDate ? (
+              <section aria-labelledby="calendar-day-heading" className="calendar-day-detail" id="calendar-day-detail">
+                <CalendarDayFocus key={selectedDate} />
+                <h2 id="calendar-day-heading" tabIndex={-1}>Events on {formatLongDate(selectedDate)}</h2>
+                <p className="calendar-day-count">
+                  {selectedItems.length === 0
+                    ? `No events on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`
+                    : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
+                </p>
+                {selectedItems.length > 0 && (
+                  <ul className="calendar-panel-list">{sortCalendarItems(selectedItems).map((item) => <CalendarPanelItem item={item} key={item.key} toneMap={toneMap} />)}</ul>
+                )}
+                <div className="calendar-day-actions">
+                  <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>
+                  <a className="text-button" href="#calendar-agenda-heading">Month agenda</a>
+                  {category && (
+                    <Link className="text-button" href={calendarHref({ view: "month", month: monthKey(month), date: selectedDate })}>Clear category ({category})</Link>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {view === "month" && selectedDate && (
-          <section aria-labelledby="calendar-day-heading" className="calendar-day-detail" id="calendar-day-detail">
-            <CalendarDayFocus key={selectedDate} />
-            <h2 id="calendar-day-heading" tabIndex={-1}>Events on {formatLongDate(selectedDate)}</h2>
-            <p className="calendar-day-count">
-              {selectedItems.length === 0
-                ? `No events on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`
-                : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
-            </p>
-            {selectedItems.length > 0 && (
-              <ul className="calendar-agenda-list">{sortCalendarItems(selectedItems).map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
+              </section>
+            ) : (
+              <p className="calendar-day-prompt">Select a day to see everything on it.</p>
             )}
-            <div className="calendar-day-actions">
-              <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>
-              <a className="text-button" href="#calendar-agenda-heading">Month agenda</a>
-              {category && (
-                <Link className="text-button" href={calendarHref({ view: "month", month: monthKey(month), date: selectedDate })}>Clear category ({category})</Link>
-              )}
-            </div>
-          </section>
+          </div>
         )}
 
         <section aria-labelledby="calendar-agenda-heading" className="calendar-agenda">

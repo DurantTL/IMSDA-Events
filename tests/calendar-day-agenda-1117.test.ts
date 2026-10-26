@@ -78,7 +78,7 @@ describe("calendar page wiring (#1117)", () => {
 
   it("links crowded days and day numbers to the dated agenda with a counted label", () => {
     expect(page).toContain("calendar-more-link");
-    expect(page).toContain("events for {formatLongDate(date)}");
+    expect(page).toContain("more ${hidden === 1 ? \"event\" : \"events\"} on ${formatWeekdayDate(week[index])}");
     expect(page).toContain("calendar-day-detail");
     expect(page).toContain("Clear category");
     expect(page).toContain("Back to {monthLabel(month)}");
