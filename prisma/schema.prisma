@@ -6986,6 +6986,8 @@ model ClubFormLink {
   messageId          String?            @unique
   createdByAccountId String?
   createdByUserId    String?
+  /// Who sent it (#1221): CLUB_LEADER or AREA_COORDINATOR. Null on links made before.
+  createdAs          String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 

@@ -4,8 +4,11 @@ import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { getPrisma } from "@/lib/prisma";
+import { SendClubFormLink } from "@/components/club-forms-actions";
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
+import { CLUB_FORM_LINK_DEFAULT_DAYS, viewerCanSendLinkForClub } from "@/modules/club-forms/domain";
 import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
+import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
 
 export const metadata: Metadata = { title: "Club forms", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -26,9 +29,37 @@ export default async function AreaClubFormsPage({ params }: { params: Promise<{ 
   });
   if (!club || club.type !== "CLUB" || !club.isActive) notFound();
   const submissions = await listSubmissionsForViewer(viewer, { organizationId });
+  // Forms that are turned off are not offered (#1221); the server refuses them too.
+  const sendable = viewerCanSendLinkForClub(viewer, organizationId) ? await listEnabledClubFormTemplates() : [];
 
   return (
     <>
+      {sendable.length > 0 && (
+        <section className="public-manage-card club-forms-intro">
+          <h2>Send a private link for this club</h2>
+          <p className="field-help">
+            Helping <span translate="no">{club.name}</span> with a form, such as the TLT forms. The link goes to one address, works once, and the
+            filled form lands in this club&apos;s records, where its director sees it too.
+          </p>
+          {sendable.map((template) => (
+            <div className="club-form-template" key={template.key}>
+              <div>
+                <h3>{template.name}</h3>
+              </div>
+              <div className="club-form-template-actions">
+                <SendClubFormLink
+                  asAreaCoordinator
+                  defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
+                  formName={template.name}
+                  organizationId={organizationId}
+                  rosterMembers={[]}
+                  templateKey={template.key}
+                />
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
       <p className="field-help">
         Health, conduct, physician, emergency-contact and birth-date answers show as Restricted. Forms the conference has since switched off stay listed.
       </p>

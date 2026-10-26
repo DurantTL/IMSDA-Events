@@ -55,6 +55,7 @@ describe("the passenger list print (#610)", () => {
     status: "SUBMITTED" as const,
     submittedAt: "2026-10-05T15:00:00.000Z",
     enteredVia: "ATTENDEE" as const,
+    linkSentBy: null,
     hasSensitiveAnswers: false,
     answers,
     rosterAdd: null,

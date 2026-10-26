@@ -1356,7 +1356,7 @@ const tltOpportunitiesTemplate: FormTemplate = {
 };
 
 /** The Pathfinder of the Year and TLT of the Year nominations share one shape (#606). */
-function buildYearNominationTemplate(kind: "Pathfinder" | "TLT"): FormTemplate {
+export function buildYearNominationTemplate(kind: "Pathfinder" | "TLT"): FormTemplate {
   const prefix = kind === "Pathfinder" ? "poy" : "toy";
   const classes = ["Friend", "Friend Adv", "Companion", "Companion Adv", "Explorer", "Explorer Adv", ...(kind === "Pathfinder" ? ["Ranger", "Ranger Adv"] : [])];
   const essay = (id: string, key: string, label: string) => templateField(`${prefix}_${id}`, key, label, "LONG_TEXT", true);
@@ -1395,7 +1395,7 @@ function buildYearNominationTemplate(kind: "Pathfinder" | "TLT"): FormTemplate {
   };
 }
 
-const tltApplicationTemplate: FormTemplate = {
+export const tltApplicationTemplate: FormTemplate = {
   key: "tlt_application",
   name: "TLT Application",
   description: "Add-on form: the Conference TLT application with personal and club information, three application questions, and two required acknowledgments. No fees.",

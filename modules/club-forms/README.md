@@ -6,9 +6,13 @@ themselves. Every form is off until a system administrator turns it on.
 
 ## What lives here
 
-- `definitions.ts`: the four seeded templates (Pathfinder Club Membership
+- `definitions.ts`: the ten seeded templates (Pathfinder Club Membership
   Application, Staff/Volunteer Service Information Form, Off-Premises Permission
-  Slip, Transportation Passenger List). Definitions use the registration-form
+  Slip, Transportation Passenger List, then, from #1221: TLT Application, Pathfinder
+  of the Year and TLT of the Year nominations (reused from the event templates of
+  #606, keys `club_tlt_application`, `club_pathfinder_of_the_year`,
+  `club_tlt_of_the_year`), TLT Program Recommendation, Can Collecting Report, and
+  Pathfinder Club Photo and Video Release). All are created off. Definitions use the registration-form
   definition schema (`modules/forms/definition.ts`) and its validator
   unchanged. Text a field label cannot carry (Pledge and Law, approval and
   waiver wording, instructions) is `sectionNotes`. Each template also names its
@@ -32,7 +36,7 @@ themselves. Every form is off until a system administrator turns it on.
 | Director or deputy (or a system administrator acting as the director) of the club | yes | own club, including drafts | shown | shown |
 | Registrar, reporter | no | no | no | no |
 | Another club's director | no | no (not found) | no | no |
-| Area Coordinator (or admin acting as one) | no | every club, submitted only | `Restricted` | `Restricted` |
+| Area Coordinator (or admin acting as one) | send a link for any club (#1221; narrow in `viewerCanSendLinkForClub` once #843 assigns areas), not fill in | every club, submitted only | `Restricted` | `Restricted` |
 | Event Admin of a current event | no | every club, submitted only | shown | `Restricted` |
 | System administrator | no (unless acting as a director) | every club, submitted only | shown | shown |
 
@@ -217,7 +221,11 @@ cross-origin check and `requireSystemAdministrator` on each request.
 
 ## Private links
 
-- One address, typed by the director. The email is queued in the link's own
+- One address, typed by the director, or by an Area Coordinator for any club (#1221,
+  `POST /api/attendee/area-clubs/[organizationId]/forms/links`: same rate limit, expiry
+  and outbox; no roster member). `ClubFormLink.createdAs` records `CLUB_LEADER` or
+  `AREA_COORDINATOR` (null before #1221) and the submission page shows who sent it.
+  The email is queued in the link's own
   transaction and delivered after it commits (`after()` in the route; the
   outbox sweep retries).
 - The email body holds a sentinel. The token is minted when the message is
@@ -252,3 +260,12 @@ blockers (deactivate the club instead); the foreign keys are `Restrict` as well.
   before the template is enabled.
 - If #150 (signature evidence) ships, replace the typed name plus acknowledgment
   with it.
+
+## Public Club forms list (#1221)
+
+`/clubs/forms` (`public-index-domain.ts`, `public-index.ts`) lists the forms in three
+groups with one line on who fills each in. Director items link to
+`/account/clubs/choose?to=<key>`, a signed-in chooser whose `to` must be a key in the
+fixed `clubChooseTargets` allowlist (never a path). Items sent by private link only
+say so; an item whose club form template is off says "Not available yet." with no
+link. The page reads each template's key and `enabled` flag only.

@@ -79,8 +79,14 @@ describe("club form templates are off until a system administrator turns them on
     await syncClubFormTemplates(client as never);
     const created = mocks.templateUpsert.mock.calls.map(([call]) => call);
     expect(created.map((call) => call.create.key).sort()).toEqual([
+      "can_collecting_report",
+      "club_pathfinder_of_the_year",
+      "club_tlt_application",
+      "club_tlt_of_the_year",
       "pathfinder_membership_application",
+      "pathfinder_photo_video_release",
       "pathfinder_staff_service_information",
+      "tlt_program_recommendation",
       "transportation_passenger_list",
     ]);
     for (const call of created) {
@@ -102,7 +108,7 @@ describe("club form templates are off until a system administrator turns them on
   it("updates a definition when the seed version is newer, and never touches the switch", async () => {
     mocks.templateFindMany.mockResolvedValue(storedRows());
     await syncClubFormTemplates(client as never);
-    expect(mocks.templateUpdate).toHaveBeenCalledTimes(4);
+    expect(mocks.templateUpdate).toHaveBeenCalledTimes(clubFormTemplateSeeds.length);
     for (const [call] of mocks.templateUpdate.mock.calls) {
       expect(call.data).not.toHaveProperty("enabled");
       expect(call.data).toHaveProperty("birthDateFieldKeys");
