@@ -6,11 +6,13 @@ import { describe, expect, it } from "vitest";
 // (#1233). These checks keep every script in exactly one shard, so a script
 // added to package.json cannot be silently left out of CI.
 
-const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
+const read = (file: string) =>
+  readFileSync(path.join(process.cwd(), file), "utf8");
 
 const workflow = read(".github/workflows/ci.yml");
 const packageScripts = Object.keys(
-  (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts,
+  (JSON.parse(read("package.json")) as { scripts: Record<string, string> })
+    .scripts,
 ).filter((name) => name.startsWith("test:"));
 
 // package.json scripts that ci.yml does not run, each with where it runs instead.
@@ -43,7 +45,11 @@ function jobs(): Job[] {
 }
 
 const scriptsIn = (lines: string[]) =>
-  lines.flatMap((line) => [...line.matchAll(/npm run (test:[\w:-]+)/g)].map((match) => match[1]));
+  lines
+    .filter((line) => !line.trimStart().startsWith("#"))
+    .flatMap((line) =>
+      [...line.matchAll(/npm run (test:[\w:-]+)/g)].map((match) => match[1]),
+    );
 
 describe("CI database-script shards (#1233)", () => {
   const all = jobs();
@@ -59,7 +65,9 @@ describe("CI database-script shards (#1233)", () => {
       expect(ids, script).toHaveLength(1);
       expect(ids[0], script).toMatch(SHARD_JOB);
     }
-    const expected = packageScripts.filter((name) => !NOT_IN_CI.has(name)).sort();
+    const expected = packageScripts
+      .filter((name) => !NOT_IN_CI.has(name))
+      .sort();
     expect([...placements.keys()].sort()).toEqual(expected);
     expect(expected).toHaveLength(91);
   });
@@ -67,9 +75,13 @@ describe("CI database-script shards (#1233)", () => {
   it("keeps the scripts that need the app in the shard that starts it", () => {
     const http = all.find((job) => job.id === "http-scripts");
     expect(http).toBeDefined();
-    const start = http!.lines.findIndex((line) => line.includes("name: Start the built app"));
+    const start = http!.lines.findIndex((line) =>
+      line.includes("name: Start the built app"),
+    );
     expect(start).toBeGreaterThan(-1);
-    expect(http!.lines.slice(0, start).join("\n")).toContain("- run: npm run build");
+    expect(http!.lines.slice(0, start).join("\n")).toContain(
+      "- run: npm run build",
+    );
     const afterStart = new Set(scriptsIn(http!.lines.slice(start)));
     for (const script of scriptsIn(all.flatMap((job) => job.lines))) {
       if (script.endsWith("-http") || script.startsWith("test:public-")) {
@@ -82,16 +94,28 @@ describe("CI database-script shards (#1233)", () => {
     const verify = all.find((job) => job.id === "verify");
     expect(verify).toBeDefined();
     expect(verify!.lines.some((line) => /^ {4}name:/.test(line))).toBe(false);
-    const needs = /^ {4}needs: \[(.*)\]\s*$/.exec(verify!.lines.find((line) => /^ {4}needs:/.test(line)) ?? "");
+    const needs = /^ {4}needs: \[(.*)\]\s*$/.exec(
+      verify!.lines.find((line) => /^ {4}needs:/.test(line)) ?? "",
+    );
     expect(needs).not.toBeNull();
     const needed = new Set(needs![1].split(",").map((id) => id.trim()));
     for (const job of all) {
-      if (SHARD_JOB.test(job.id) || job.id === "verify-app" || job.id === "scope") {
+      if (
+        SHARD_JOB.test(job.id) ||
+        job.id === "verify-app" ||
+        job.id === "scope"
+      ) {
         expect(needed.has(job.id), job.id).toBe(true);
       }
     }
-    expect(all.filter((job) => SHARD_JOB.test(job.id)).length).toBeGreaterThanOrEqual(2);
+    expect(
+      all.filter((job) => SHARD_JOB.test(job.id)).length,
+    ).toBeGreaterThanOrEqual(2);
     // No job but the aggregate may show up as "verify" in the checks list.
-    expect(all.filter((job) => job.lines.some((line) => /^ {4}name: verify\s*$/.test(line)))).toEqual([]);
+    expect(
+      all.filter((job) =>
+        job.lines.some((line) => /^ {4}name: verify\s*$/.test(line)),
+      ),
+    ).toEqual([]);
   });
 });
