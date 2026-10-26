@@ -75,9 +75,14 @@ function SettingsFields() {
       </section>
       <section className="panel fb-info-alerts" aria-labelledby="fb-info-alerts-title">
         <div className="section-heading"><div><p className="eyebrow">Email</p><h2 id="fb-info-alerts-title">Email when a response arrives</h2></div></div>
+        {!information.canEditRecipients ? (
+          <p className="fb-hint" id="fb-info-alerts-locked">
+            {savedRecipients.length === 0 ? "No one is emailed when a response arrives." : `${savedRecipients.length} address${savedRecipients.length === 1 ? " is" : "es are"} emailed when a response arrives.`} Only a system administrator can change who is emailed.
+          </p>
+        ) : (<>
         <label>Email these addresses when a response arrives
           <textarea
-            name="builder-info-notify-emails" autoComplete="off" spellCheck={false} rows={4} maxLength={2000}
+            name="builder-info-alert-list" autoComplete="off" spellCheck={false} rows={4} maxLength={2000}
             aria-invalid={Boolean(recipientProblem)} aria-describedby={`fb-info-alerts-hint${recipientProblem ? " fb-info-alerts-error" : ""}`}
             disabled={busy !== null} value={recipients}
             onChange={(event) => { setRecipients(event.target.value); setRecipientProblem(""); }}
@@ -88,6 +93,7 @@ function SettingsFields() {
         </p>
         {recipientProblem && <p className="form-error" id="fb-info-alerts-error" role="alert">{recipientProblem}</p>}
         <button className="fb-btn outline" type="button" disabled={busy !== null || recipients.trim() === savedRecipients.join("\n").trim()} onClick={saveRecipients}>{busy === "settings" ? "Saving…" : "Save addresses"}</button>
+        </>)}
       </section>
       <section className="panel fb-info-status" aria-labelledby="fb-info-status-title">
         <div className="section-heading"><div><p className="eyebrow">Open or close</p><h2 id="fb-info-status-title">Accepting answers</h2></div></div>

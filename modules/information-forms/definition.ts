@@ -1,4 +1,4 @@
-import { registrationFormDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { formTemplateDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { isSensitiveField, isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { isVerbatimAllowedText } from "@/modules/information-forms/verbatim-texts";
 
@@ -34,19 +34,20 @@ const REFUSED_LABEL_PATTERN = /\b(?:payment|pay now|credit card|promo(?:tion)? c
  * attendee roster stay refused, and so does every sensitive-field rule.
  */
 export const MEMBER_LIST_ALLOWED_COLUMNS = [
-  { key: "name", type: "TEXT" },
-  { key: "age", type: "NUMBER" },
-  { key: "level", type: "SELECT" },
-  { key: "working_on", type: "TEXT" },
+  { key: "name", type: "TEXT", label: "Name" },
+  { key: "age", type: "NUMBER", label: "Age" },
+  { key: "level", type: "SELECT", label: "Adventurer level" },
+  { key: "working_on", type: "TEXT", label: "Working on this year" },
 ] as const;
 
 function memberListRefusals(field: RegistrationFormField): string[] {
   if (field.type !== "MEMBER_LIST") return [];
   const reasons: string[] = [];
   const columns = field.memberColumns ?? [];
-  const allowed = new Map<string, string>(MEMBER_LIST_ALLOWED_COLUMNS.map((column) => [column.key, column.type]));
-  const extra = columns.filter((column) => allowed.get(column.key) !== column.type);
-  if (extra.length > 0) reasons.push(`a member list may collect only name, age, level and what they are working on, not ${extra.map((column) => `"${column.label}"`).join(", ")}`);
+  // Key, type AND label are pinned: a column that differs in any of them is refused.
+  const allowed = new Map<string, string>(MEMBER_LIST_ALLOWED_COLUMNS.map((column) => [column.key, `${column.type}|${column.label}`]));
+  const extra = columns.filter((column) => allowed.get(column.key) !== `${column.type}|${column.label}`);
+  if (extra.length > 0) reasons.push(`a member list may collect only name, age, level and what they are working on, with their exact labels, not ${extra.map((column) => `"${column.label}"`).join(", ")}`);
   if (MEMBER_LIST_ALLOWED_COLUMNS.some((column) => !columns.some((candidate) => candidate.key === column.key))) {
     reasons.push("a member list must have exactly the name, age, level and working-on columns");
   }
@@ -113,7 +114,7 @@ export function informationFormDefinitionIssues(definition: InformationFormDefin
   return issues;
 }
 
-export const informationFormDefinitionSchema = registrationFormDefinitionSchema.superRefine((definition, context) => {
+export const informationFormDefinitionSchema = formTemplateDefinitionSchema.superRefine((definition, context) => {
   for (const issue of informationFormDefinitionIssues(definition)) {
     context.addIssue({ code: "custom", path: issue.path, message: issue.message });
   }
@@ -125,7 +126,7 @@ export const informationFormDefinitionSchema = registrationFormDefinitionSchema.
  * response is always readable even if the rules tighten later.
  */
 export function parseStoredInformationFormDefinition(input: unknown): InformationFormDefinition {
-  return registrationFormDefinitionSchema.parse(input);
+  return formTemplateDefinitionSchema.parse(input);
 }
 
 /** Parses a definition for storage, throwing a ZodError whose first message names the offending field. */

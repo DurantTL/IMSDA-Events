@@ -1,3 +1,4 @@
+import { getCurrentSession } from "@/modules/access/current-session";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -24,7 +25,8 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   if (!permissions.includes("MANAGE_FORMS")) {
     return <AccessRestricted title="Information form access is restricted" detail="Event administrators and registration managers can create, preview, and publish information forms for an event." />;
   }
-  const config = eventInformationConfig(event);
+  const { user } = await getCurrentSession();
+  const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");
   const target = { scope: "EVENT", eventId: event.id } as const;
 
   if (!formId) {

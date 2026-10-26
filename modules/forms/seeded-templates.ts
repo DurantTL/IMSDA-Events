@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
-import { registrationFormDefinitionSchema, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { formTemplateDefinitionSchema, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { codeFormTemplate, codeFormTemplates, formTemplateSignature, type CodeFormTemplate, type FormTemplateSource } from "@/modules/forms/form-template-library-domain";
 
@@ -44,7 +44,7 @@ export async function syncSeededFormTemplates(
 ): Promise<SeededFormTemplateSyncResult> {
   const result: SeededFormTemplateSyncResult = { created: [], updated: [], unchanged: [], ahead: [], appOwned: [] };
   // Refuse a seed the form builder would refuse, before anything is written.
-  const parsed = seeds.map((seed) => ({ seed, definition: registrationFormDefinitionSchema.parse(structuredClone(seed.definition)) }));
+  const parsed = seeds.map((seed) => ({ seed, definition: formTemplateDefinitionSchema.parse(structuredClone(seed.definition)) }));
   await client.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${formTemplateWriteLockKey}))`;
     for (const { seed } of parsed) {
@@ -130,7 +130,7 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
     : null;
   const row = await client.seededFormTemplate.findUnique({ where: { key } });
   if (!row) return fromCode;
-  const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+  const definition = formTemplateDefinitionSchema.safeParse(row.definition);
   if (!definition.success) {
     logWarn(`Form template row failed validation; ${fromCode ? "using the code's copy" : "it is not available"}`, { templateKey: key, storedVersion: row.version });
     return fromCode;
@@ -157,7 +157,7 @@ export async function loadAllFormTemplates(client: Client): Promise<LoadedFormTe
     const row = rows.find((entry) => entry.key === template.key);
     const copy: LoadedFormTemplate = { key: template.key, name: template.name, description: template.description, audience: template.audience, definition: template.definition, version: template.version, source: "CODE", versionId: null };
     if (!row) return [copy];
-    const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+    const definition = formTemplateDefinitionSchema.safeParse(row.definition);
     if (!definition.success) {
       logWarn("Form template row failed validation; using the code's copy", { templateKey: row.key, storedVersion: row.version });
       return [copy];
@@ -165,7 +165,7 @@ export async function loadAllFormTemplates(client: Client): Promise<LoadedFormTe
     return [loadedRow(row, definition.data)];
   });
   const app = rows.filter((row) => !codeKeys.has(row.key)).flatMap((row): LoadedFormTemplate[] => {
-    const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+    const definition = formTemplateDefinitionSchema.safeParse(row.definition);
     if (!definition.success) {
       logWarn("Form template row failed validation; it is left out of the picker", { templateKey: row.key, storedVersion: row.version });
       return [];

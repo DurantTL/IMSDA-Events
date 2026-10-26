@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { codeFormTemplates } from "@/modules/forms/form-template-library-domain";
-import { formTemplates, memberListProblems, registrationFormDefinitionSchema, templatesForPicker, validateTestResponses, type RegistrationFormField } from "@/modules/forms/definition";
+import { formFieldTypes, formTemplateDefinitionSchema, formTemplates, informationFormFieldTypes, memberListProblems, registrationFormDefinitionSchema, templatesForPicker, validateTestResponses, type RegistrationFormField } from "@/modules/forms/definition";
 import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { adventurerInformationTemplates, ADVENTURER_LEVELS } from "@/modules/information-forms/adventurer-templates";
 import { ADVENTURER_ANNUAL_INTRO, ADVENTURER_PARENT_GUARDIAN_NAME_LABEL, ADVENTURER_PHOTO_RELEASE_TEXT, ADVENTURER_PURPOSE_STATEMENT, informationFormDefinitionIssues, informationFormDefinitionSchema, informationFormFields } from "@/modules/information-forms/definition";
@@ -26,14 +27,14 @@ describe("the four Adventurer templates (#1222)", () => {
       expect(isInformationTemplateAudience(template.audience), template.key).toBe(true);
       expect(formTemplates.some((candidate) => candidate.key === template.key), template.key).toBe(true);
       expect(codeFormTemplates().some((candidate) => candidate.key === template.key), template.key).toBe(true);
-      expect(informationFormDefinitionIssues(registrationFormDefinitionSchema.parse(template.definition)), template.key).toEqual([]);
+      expect(informationFormDefinitionIssues(formTemplateDefinitionSchema.parse(template.definition)), template.key).toEqual([]);
       expect(informationFormDefinitionSchema.safeParse(template.definition).success, template.key).toBe(true);
     }
   });
 
   it("carry no payment, attendee roster, attendee-scope or calculated fields", () => {
     for (const template of adventurerInformationTemplates) {
-      const definition = registrationFormDefinitionSchema.parse(template.definition);
+      const definition = formTemplateDefinitionSchema.parse(template.definition);
       expect(definition.payment).toBeUndefined();
       expect(definition.attendeeRoster).toBeUndefined();
       for (const field of informationFormFields(definition)) {
@@ -86,9 +87,13 @@ describe("the member list exception (#1222)", () => {
   it("refuses a member list with an extra column such as a birth date", () => {
     const definition = annual();
     memberField(definition).memberColumns!.push({ key: "birthdate", label: "Birth date", type: "TEXT", required: false });
-    const messages = informationFormDefinitionIssues(registrationFormDefinitionSchema.parse(definition)).map((issue) => issue.message);
-    expect(messages.join(" ")).toContain("a member list may collect only name, age, level and what they are working on");
+    expect(formTemplateDefinitionSchema.safeParse(definition).success).toBe(false);
     expect(informationFormDefinitionSchema.safeParse(definition).success).toBe(false);
+    // An extra column that is not itself sensitive-sounding is still refused by the allowlist.
+    const school = annual();
+    memberField(school).memberColumns!.push({ key: "school", label: "School", type: "TEXT", required: false });
+    const messages = informationFormDefinitionIssues(formTemplateDefinitionSchema.parse(school)).map((issue) => issue.message);
+    expect(messages.join(" ")).toContain("a member list may collect only name, age, level and what they are working on");
   });
 
   it("refuses an extra column of any other kind, a changed column type, and a missing column", () => {
@@ -149,7 +154,7 @@ describe("the member list exception (#1222)", () => {
   });
 
   it("validates the whole answer, and a required member list needs a row", () => {
-    const definition = registrationFormDefinitionSchema.parse(annual());
+    const definition = formTemplateDefinitionSchema.parse(annual());
     const answers = { club_name: "Sample Club", sponsoring_church: "Sample Church", leader_first_name: "Sample", leader_last_name: "Leader", leader_email: "leader@example.test" };
     expect(validateTestResponses(definition, { ...answers, members: [{ name: "Sample Member", age: 6, level: "Busy Bee" }] }).isValid).toBe(true);
     expect(validateTestResponses(definition, { ...answers, members: [{ name: "Sample Member", age: 6, level: "Busy Bee", birthdate: "x" }] }).isValid).toBe(false);
@@ -214,5 +219,48 @@ describe("the word-for-word exception (#1222)", () => {
     const sensitiveFlag = structuredClone(byKey("adventurer_photo_video_release").definition);
     sensitiveFlag.sections[0]!.fields[0]!.sensitive = true;
     expect(refused(sensitiveFlag)).toBe(true);
+  });
+});
+
+describe("a member list stays inside information forms (#1222)", () => {
+  const registrationLike = () => {
+    const definition = structuredClone(byKey("adventurer_annual_registration").definition);
+    return definition;
+  };
+
+  it("is refused by the registration form definition (save and publish parse it)", () => {
+    const result = registrationFormDefinitionSchema.safeParse(registrationLike());
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain("A member list can only be used in an information form");
+    // The same definition is readable as a template and as an information form.
+    expect(formTemplateDefinitionSchema.safeParse(registrationLike()).success).toBe(true);
+    expect(informationFormDefinitionSchema.safeParse(registrationLike()).success).toBe(true);
+  });
+
+  it("is not one of the shared field types the club form builder and the question library read", () => {
+    expect((formFieldTypes as readonly string[]).includes("MEMBER_LIST")).toBe(false);
+    expect((informationFormFieldTypes as readonly string[]).includes("MEMBER_LIST")).toBe(true);
+    // The club form builder's draft check types a field with `z.enum(formFieldTypes)`.
+    const clubDraftField = z.object({ type: z.enum(formFieldTypes) });
+    expect(clubDraftField.safeParse({ type: "MEMBER_LIST" }).success).toBe(false);
+    expect(clubDraftField.safeParse({ type: "TEXT" }).success).toBe(true);
+  });
+
+  it("refuses sensitive columns wherever a member list parses, not only in an information form", () => {
+    for (const label of ["Date of birth", "Medications", "Health notes"]) {
+      const definition = registrationLike();
+      memberField(definition).memberColumns![3] = { key: "working_on", label, type: "TEXT", required: false };
+      expect(formTemplateDefinitionSchema.safeParse(definition).success, label).toBe(false);
+    }
+    const definition = registrationLike();
+    memberField(definition).memberColumns!.push({ key: "date_of_birth", label: "Birthday", type: "TEXT", required: false });
+    expect(formTemplateDefinitionSchema.safeParse(definition).success).toBe(false);
+  });
+
+  it("pins column labels as well as keys and types", () => {
+    const definition = registrationLike();
+    memberField(definition).memberColumns![2] = { key: "level", label: "Level", type: "SELECT", required: true };
+    expect(formTemplateDefinitionSchema.safeParse(definition).success).toBe(true);
+    expect(informationFormDefinitionSchema.safeParse(definition).success).toBe(false);
   });
 });

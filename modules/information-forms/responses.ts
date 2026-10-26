@@ -188,7 +188,8 @@ export async function buildInformationFormMembersCsv(target: InformationFormTarg
   const rows: Array<Array<string | number>> = [];
   for (const response of responses) {
     const answers = answersOf(response.answers);
-    const club = formatCell(answers.club_name);
+    // The club is the response's `club_name` answer (the Adventurer annual registration's question); a form without one falls back to the form's name.
+    const club = formatCell(answers.club_name) || form.name;
     for (const key of memberKeys) {
       const members = answers[key];
       if (!Array.isArray(members)) continue;

@@ -4,9 +4,16 @@ import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibilityRuleProblems } from "@/modules/forms/visibility-rule";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
+import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
 
-export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS", "MEMBER_LIST"] as const;
+export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
+/**
+ * The types an information form may use: the shared ones plus MEMBER_LIST (#1222). `formFieldTypes` stays without it, so the
+ * club form builder, the question library and the registration builder never offer or accept a member list; the registration
+ * definition schema refuses it explicitly (see `registrationFormDefinitionSchema`).
+ */
+export const informationFormFieldTypes = [...formFieldTypes, "MEMBER_LIST"] as const;
 export const formFieldScopes = ["REGISTRATION", "ATTENDEE"] as const;
 export const choiceFieldTypes = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE"] as const;
 export const conditionOperators = ["EQUALS", "NOT_EQUALS", "INCLUDES", "NOT_EMPTY"] as const;
@@ -196,7 +203,7 @@ export const formFieldSchema = z.object({
   label: z.string().trim().min(2, "Every field needs a label.").max(120),
   helpText: z.string().trim().max(500).default(""),
   placeholder: z.string().trim().max(120).optional(),
-  type: z.enum(formFieldTypes),
+  type: z.enum(informationFormFieldTypes),
   scope: z.enum(formFieldScopes),
   required: z.boolean(),
   options: z.array(z.string().trim().min(1).max(120)).max(200).default([]),
@@ -302,6 +309,12 @@ export const formFieldSchema = z.object({
     const columns = field.memberColumns ?? [];
     if (columns.length === 0) context.addIssue({ code: "custom", path: ["memberColumns"], message: "A member list needs its columns." });
     if (new Set(columns.map((column) => column.key)).size !== columns.length) context.addIssue({ code: "custom", path: ["memberColumns"], message: "Member list columns must have different keys." });
+    // Defense in depth (#1222): a column that reads as a sensitive answer is refused wherever a member list parses, not only by the information form check.
+    for (const column of columns) {
+      if (isSensitiveFieldText(column.label.replaceAll("_", " ")) || isSensitiveFieldText(column.key.replaceAll("_", " "))) {
+        context.addIssue({ code: "custom", path: ["memberColumns"], message: `The member list column "${column.label}" is not allowed: a member list cannot collect health, medical, birth-date or other sensitive answers.` });
+      }
+    }
     if (columns.some((column) => column.type === "SELECT") && field.options.length < 2) context.addIssue({ code: "custom", path: ["options"], message: "A member list level column needs at least two choices." });
   } else if (field.memberColumns) {
     context.addIssue({ code: "custom", path: ["memberColumns"], message: "Only a member list carries columns." });
@@ -423,7 +436,11 @@ export function assertNoReservedChoiceValues(definition: z.infer<typeof registra
   if (issues.length > 0) throw new z.ZodError(issues);
 }
 
-export const registrationFormDefinitionSchema = z.object({
+/**
+ * The structure of a form definition, member list included. Used by form templates and by information forms; every registration
+ * and club form path uses `registrationFormDefinitionSchema` below, which refuses a member list.
+ */
+export const formTemplateDefinitionSchema = z.object({
   title: z.string().trim().min(3, "Form title must be at least 3 characters.").max(120),
   description: z.string().trim().max(500).default(""),
   confirmationMessage: z.string().trim().min(3).max(500),
@@ -581,6 +598,15 @@ export const registrationFormDefinitionSchema = z.object({
       });
     }
   }
+});
+
+/** The registration form definition: the same structure, but a member list is refused (#1222). It belongs to information forms only. */
+export const registrationFormDefinitionSchema = formTemplateDefinitionSchema.superRefine((definition, context) => {
+  definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
+    if (field.type === "MEMBER_LIST") {
+      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "type"], message: "A member list can only be used in an information form." });
+    }
+  }));
 });
 
 /**

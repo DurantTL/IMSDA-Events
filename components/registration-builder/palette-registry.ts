@@ -239,7 +239,7 @@ const typeEntrySpecs: TypeEntrySpec[] = [
     memberColumns: [
       { key: "name", label: "Name", type: "TEXT", required: true },
       { key: "age", label: "Age", type: "NUMBER", required: true },
-      { key: "level", label: "Level", type: "SELECT", required: true },
+      { key: "level", label: "Adventurer level", type: "SELECT", required: true },
       { key: "working_on", label: "Working on this year", type: "TEXT", required: false },
     ],
   }) },

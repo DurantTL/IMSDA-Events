@@ -17,6 +17,8 @@ export type InformationBuilderConfig = {
   eventSlug: string | null;
   /** What the form belongs to, shown in the preview: the event's name, or "General forms". */
   ownerLabel: string;
+  /** Only a system administrator edits the response-alert addresses (#1222). */
+  canEditRecipients: boolean;
 };
 
 export type InformationFillAccess = "ANYONE_WITH_LINK" | "SIGNED_IN";
@@ -58,11 +60,11 @@ export type InformationFormApi = {
 };
 
 export function generalInformationConfig(): InformationBuilderConfig {
-  return { scope: "GENERAL", eventId: null, eventSlug: null, ownerLabel: "General forms" };
+  return { scope: "GENERAL", eventId: null, eventSlug: null, ownerLabel: "General forms", canEditRecipients: true };
 }
 
-export function eventInformationConfig(event: { id: string; slug: string; name: string }): InformationBuilderConfig {
-  return { scope: "EVENT", eventId: event.id, eventSlug: event.slug, ownerLabel: event.name };
+export function eventInformationConfig(event: { id: string; slug: string; name: string }, isSystemAdmin = false): InformationBuilderConfig {
+  return { scope: "EVENT", eventId: event.id, eventSlug: event.slug, ownerLabel: event.name, canEditRecipients: isSystemAdmin };
 }
 
 // ---------------------------------------------------------------------------

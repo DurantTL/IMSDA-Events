@@ -45,6 +45,7 @@ const client = {
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
+vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/lib/prisma-errors", () => ({ isLockTimeoutError: () => false }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.imsda.test" }) }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
@@ -228,10 +229,44 @@ describe("the members CSV (#1222)", () => {
     expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("Sample Member");
   });
 
+  it("falls back to the form name when a response has no club_name answer", async () => {
+    mocks.formFindFirst.mockResolvedValue({ id: "form-1", name: "Annual Adventurer Club Registration", slug: "annual" });
+    mocks.responseCount.mockResolvedValue(1);
+    mocks.versionFindMany.mockResolvedValue([{ definition: annual }]);
+    mocks.responseFindMany.mockResolvedValue([{ answers: { members: [{ name: "Sample Member", age: 6, level: "Busy Bee" }] } }, { answers: {} }]);
+    const file = await buildInformationFormMembersCsv({ scope: "GENERAL" }, "form-1", "user-1");
+    expect(file.rowCount).toBe(1);
+    expect(file.csv.split("\r\n")[1]).toBe('"Annual Adventurer Club Registration","Sample Member","6","Busy Bee",""');
+  });
+
   it("is refused for a form without a member list", async () => {
     mocks.formFindFirst.mockResolvedValue({ id: "form-1", name: "Camp survey", slug: "camp-survey" });
     mocks.responseCount.mockResolvedValue(1);
     mocks.versionFindMany.mockResolvedValue([{ definition: surveyDefinition }]);
     await expect(buildInformationFormMembersCsv({ scope: "GENERAL" }, "form-1", "user-1")).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+  });
+});
+
+describe("only a system administrator sets the recipients (#1222)", () => {
+  async function patch(isSystemAdmin: boolean, body: unknown) {
+    const { informationFormHandlers } = await import("@/modules/information-forms/api");
+    const handlers = informationFormHandlers<{ eventId: string }>(async () => ({ userId: "user-1", isSystemAdmin, target: { scope: "EVENT", eventId: "event-1" } }));
+    const request = new Request("https://events.imsda.test/api/events/event-1/information-forms/form-1/settings", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Origin: "https://events.imsda.test" }, body: JSON.stringify(body),
+    });
+    return handlers.updateSettings(request, { eventId: "event-1", formId: "form-1" });
+  }
+
+  it("refuses event staff who are not system administrators, and leaves the form untouched", async () => {
+    mocks.formFindFirst.mockResolvedValue({ id: "form-1", name: "Camp survey", scope: "EVENT", eventId: "event-1", opensAt: null, closesAt: null, submissionNotifyEmails: [], versions: [] });
+    const response = await patch(false, { submissionNotifyEmails: ["youth@example.test"] });
+    expect(response.status).toBe(403);
+    expect(mocks.formUpdate).not.toHaveBeenCalled();
+  });
+
+  it("lets event staff change the other settings, and a system administrator change the recipients", async () => {
+    mocks.formFindFirst.mockResolvedValue({ id: "form-1", name: "Camp survey", scope: "EVENT", eventId: "event-1", fillAccess: "ANYONE_WITH_LINK", opensAt: null, closesAt: null, submissionNotifyEmails: [], versions: [] });
+    expect((await patch(false, { fillAccess: "SIGNED_IN" })).status).toBe(200);
+    expect((await patch(true, { submissionNotifyEmails: ["youth@example.test"] })).status).toBe(200);
   });
 });

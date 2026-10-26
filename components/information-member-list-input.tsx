@@ -22,7 +22,10 @@ export function InformationMemberListInput({ field, value, onChange, problem }: 
   problem: string;
 }) {
   const columns = field.memberColumns ?? [];
+  const problemId = `${field.id}-problem`;
   const rows: Row[] = Array.isArray(value) && value.length > 0 ? (value as Row[]) : [{}];
+  // A spare blank row must not block the form: a column is required once its row has anything in it (or the whole list is required).
+  const isRequired = (row: Row, columnRequired: boolean) => columnRequired && (field.required || Object.values(row).some((cell) => String(cell ?? "").trim() !== ""));
   const update = (index: number, key: string, cell: string | number) => onChange(rows.map((row, at) => (at === index ? { ...row, [key]: cell } : row)));
   return (
     <fieldset className="club-form-choice club-form-field-wide information-member-list">
@@ -34,14 +37,14 @@ export function InformationMemberListInput({ field, value, onChange, problem }: 
             {columns.map((column) => (
               <label key={column.key}>{column.label}{column.required ? <span aria-hidden="true">{" *"}</span> : null}
                 {column.type === "SELECT" ? (
-                  <select value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value)}>
+                  <select aria-describedby={problem ? problemId : undefined} aria-invalid={problem ? true : undefined} aria-required={isRequired(row, column.required)} required={isRequired(row, column.required)} value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value)}>
                     <option value="">Choose…</option>
                     {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ) : column.type === "NUMBER" ? (
-                  <input inputMode="numeric" max={120} min={0} step={1} type="number" value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value === "" ? "" : Number(event.target.value))} />
+                  <input aria-describedby={problem ? problemId : undefined} aria-invalid={problem ? true : undefined} aria-required={isRequired(row, column.required)} required={isRequired(row, column.required)} inputMode="numeric" max={120} min={0} step={1} type="number" value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value === "" ? "" : Number(event.target.value))} />
                 ) : (
-                  <input autoComplete="off" maxLength={120} type="text" value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value)} />
+                  <input aria-describedby={problem ? problemId : undefined} aria-invalid={problem ? true : undefined} aria-required={isRequired(row, column.required)} required={isRequired(row, column.required)} autoComplete="off" maxLength={120} type="text" value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value)} />
                 )}
               </label>
             ))}
@@ -58,7 +61,7 @@ export function InformationMemberListInput({ field, value, onChange, problem }: 
           <Plus aria-hidden="true" size={16} /> Add another member
         </button>
       )}
-      {problem ? <small className="field-error" role="alert">{problem}</small> : null}
+      {problem ? <small className="field-error" id={problemId} role="alert">{problem}</small> : null}
     </fieldset>
   );
 }
