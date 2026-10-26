@@ -12,7 +12,7 @@ decides. Code: `modules/event-modules/requests.ts`, rules in
   do not ask (the service refuses them with
   `SYSTEM_ADMIN_ENABLES_DIRECTLY`, 403 from the route): they turn modules on directly on `/more`.
 - **Decide:** system administrators only, from the "Feature requests" panel in
-  System management (`/admin#module-requests`).
+  System management (`/admin/feature-requests`).
 
 ## What can be requested
 

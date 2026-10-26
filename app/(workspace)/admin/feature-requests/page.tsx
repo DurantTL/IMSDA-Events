@@ -7,6 +7,7 @@ import { logError } from "@/lib/logger";
 import { ModuleRequestQueue } from "@/components/module-request-queue";
 import { formatRequestDate } from "@/modules/event-modules/request-domain";
 import { listPendingModuleRequests } from "@/modules/event-modules/requests";
+import { FEATURE_REQUEST_READ_LIMIT } from "@/modules/system-admin/home-model";
 import styles from "../system-admin.module.css";
 
 export const metadata: Metadata = { title: "Feature requests" };
@@ -29,7 +30,7 @@ export default async function FeatureRequestsPage() {
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
           <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Feature requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
-          <span>{requests ? `${requests.length} waiting` : "Unavailable"}</span>
+          <span>{requests ? `${requests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : requests.length} waiting` : "Unavailable"}</span>
         </div>
         {requests === null
           ? <p className={styles.unavailable} role="status"><CircleAlert aria-hidden="true" size={16} /><span><strong>Unavailable.</strong> The feature-request list could not be read just now. This is not zero. Reload to try again.</span></p>
