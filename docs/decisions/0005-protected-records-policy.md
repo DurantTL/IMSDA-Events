@@ -558,7 +558,9 @@ Clubs Administrator sees what a system administrator sees: view-only access to
 a club member's health record, with the same one-time privacy notice, the same
 break-glass reason and 24-hour grant for the live record and sealed copies, and
 the same audit entries. The audit row names the person and, where it records
-the kind of viewer, marks the role as Clubs Administrator. Importing health
+the kind of viewer, marks the role as Clubs Administrator. Like a system
+administrator, a Clubs Administrator also sees the break-glass grants list
+(who opened which record, when, and the reason they gave). Importing health
 records, placing and lifting sealed-copy holds, and event-scoped coordinator
 health stay with system administrators. The grant is checked on every request,
 so removing it ends access on the next one.
