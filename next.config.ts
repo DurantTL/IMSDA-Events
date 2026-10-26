@@ -222,6 +222,11 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // A club form's public open application (#1229): a shared page, but its answers are private, so never cached or sent in a referrer.
+        source: "/api/public/club-form-applications/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // A new club application's single-use private link (#817): never cached, never indexed, no referrer.
         source: "/clubs/register/:token",
         headers: privateRegistrationHeaders,

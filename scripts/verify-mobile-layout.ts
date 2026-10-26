@@ -204,6 +204,8 @@ const pages: PageSpec[] = [
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   // The public Club forms list (#1221).
   { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },
+  // The public open application (#1229): the club choice with Not listed, and the form.
+  { name: "public-club-form-apply", path: "/clubs/forms/apply/club_tlt_application", role: "visitor", expectText: /TLT Application/i },
   { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
   { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /unsubscribe link didn.t work/i },
   { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /isn.t available/i },
@@ -1256,6 +1258,8 @@ async function seedSynthetic(prisma: PrismaClient) {
 
   // #1221: the Can Collecting Report is turned on here so its fill-in page can be audited (the sync creates it off).
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { enabled: true } });
+  // #1229: the director's Forms page has both groups (a family form and a club form), the TLT Application as an open application, and its public page is open.
+  await prisma.clubFormTemplate.updateMany({ where: { key: { in: ["off_premises_permission_slip", "club_tlt_application"] } }, data: { enabled: true } });
 
   // New club applications (#817): one waiting at a church that already has a club (a duplicate flag), one typed church, one declined; plus a private link.
   const { hashOpaqueToken } = await import("../modules/access/tokens");

@@ -15,6 +15,7 @@ export function SendClubFormLink({
   rosterMembers,
   defaultDays,
   asAreaCoordinator = false,
+  primary = false,
 }: {
   organizationId: string;
   templateKey: string;
@@ -23,6 +24,8 @@ export function SendClubFormLink({
   defaultDays: number;
   /** An Area Coordinator sending for a club (#1221): posts to the coordinator's route, with no roster. */
   asAreaCoordinator?: boolean;
+  /** The main action of its group (#1229): a filled button labelled "Send link". */
+  primary?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -66,8 +69,8 @@ export function SendClubFormLink({
   if (!open) {
     return (
       <div className="club-form-send">
-        <button className="secondary-button" onClick={() => setOpen(true)} type="button">
-          <Send aria-hidden="true" size={14} /> Send a private link
+        <button className={primary ? "primary-button" : "secondary-button"} onClick={() => setOpen(true)} type="button">
+          <Send aria-hidden="true" size={14} /> {primary ? "Send link" : "Send a private link"}
         </button>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
       </div>

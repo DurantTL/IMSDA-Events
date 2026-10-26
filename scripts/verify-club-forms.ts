@@ -54,6 +54,9 @@ const STAFF_FORM = "pathfinder_staff_service_information";
 const PASSENGERS = "transportation_passenger_list";
 const templateKeys = [SLIP, STAFF_FORM, PASSENGERS, "pathfinder_membership_application"];
 const BUILDER_PREFIX = "cf712_";
+const TLT_APPLICATION = "club_tlt_application";
+const CAN_COLLECTING = "can_collecting_report";
+const applicationKeyPrefix = `${P}-app-`;
 const emailDomain = "clubforms.example.test";
 const SECRET_PHYSICIAN = "Dr. Verify Physician Only";
 // The normalised form: phones are stored as (515) 555-0134 (#855), so the sealed round trip compares that.
@@ -77,17 +80,19 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 async function cleanup() {
   const links = await prisma.clubFormLink.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true, messageId: true } });
   const submissions = await prisma.clubFormSubmission.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true } });
-  const templates = await prisma.clubFormTemplate.findMany({ where: { OR: [{ key: { in: templateKeys } }, { key: { startsWith: BUILDER_PREFIX } }] }, select: { id: true } });
+  const applications = await prisma.clubFormSubmission.findMany({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } }, select: { id: true } });
+  const templates = await prisma.clubFormTemplate.findMany({ where: { OR: [{ key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, { key: { startsWith: BUILDER_PREFIX } }] }, select: { id: true } });
   await prisma.auditLog.deleteMany({
     where: {
       OR: [
-        { entityId: { in: [...links, ...submissions].map((row) => row.id) } },
+        { entityId: { in: [...links, ...submissions, ...applications].map((row) => row.id) } },
         { actorUserId: { in: Object.values(users) } },
         { entityId: { in: templates.map((row) => row.id) }, entityType: "ClubFormTemplate", actorUserId: { in: Object.values(users) } },
       ],
     },
   });
-  await prisma.clubFormSubmission.deleteMany({ where: { organizationId: { in: clubIds } } });
+  await prisma.clubFormSubmission.deleteMany({ where: { OR: [{ organizationId: { in: clubIds } }, { idempotencyKey: { startsWith: applicationKeyPrefix } }] } });
+  await prisma.clubFormOpenLinkYear.deleteMany({ where: { template: { key: TLT_APPLICATION } } });
   await prisma.clubFormLink.deleteMany({ where: { organizationId: { in: clubIds } } });
   await prisma.messageOutbox.deleteMany({ where: { OR: [{ id: { in: links.flatMap((link) => (link.messageId ? [link.messageId] : [])) } }, { recipientEmail: { endsWith: `@${emailDomain}` } }] } });
   await prisma.rateLimitBucket.deleteMany({ where: { policy: { startsWith: "club-form." } } });
@@ -96,7 +101,12 @@ async function cleanup() {
   await prisma.clubFormTemplateVersion.deleteMany({ where: { templateId: { in: builderTemplateIds } } });
   await prisma.clubFormTemplate.deleteMany({ where: { id: { in: builderTemplateIds } } });
   // Templates are shared rows: leave them, but switch every one back off.
-  await prisma.clubFormTemplate.updateMany({ where: { key: { in: templateKeys } }, data: { enabled: false, enabledAt: null, enabledByUserId: null } });
+  await prisma.clubFormTemplate.updateMany({ where: { key: { in: [...templateKeys, TLT_APPLICATION] } }, data: { enabled: false, enabledAt: null, enabledByUserId: null } });
+  // "Who fills it in" is the sync's again: back to the code's default, with no staff change recorded (#1229).
+  const { clubFormTemplateSeeds } = await import("../modules/club-forms/definitions");
+  for (const seed of clubFormTemplateSeeds.filter((candidate) => [TLT_APPLICATION, CAN_COLLECTING].includes(candidate.key))) {
+    await prisma.clubFormTemplate.updateMany({ where: { key: seed.key }, data: { fillMode: seed.fillMode, fillModeChangedAt: null, fillModeChangedByUserId: null } });
+  }
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: clubIds } } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: Object.values(accounts) } } });
@@ -786,6 +796,115 @@ async function main() {
     assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } })).sensitiveFieldKeys.includes("physician_name"), "the stored sensitive keys gained the code's key");
   } finally {
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { name: original.name, version: original.version, customizedAt: original.customizedAt, sensitiveFieldKeys: original.sensitiveFieldKeys, draft: Prisma.DbNull, draftUpdatedAt: null, draftBaseVersion: null } });
+  }
+
+
+  // 12. Who fills it in, and open applications (#1229) ----------------------
+  {
+    const { clubFormTemplateSeeds } = await import("../modules/club-forms/definitions");
+    const openApplications = await import("../modules/club-forms/open-applications");
+    const domain = await import("../modules/club-forms/domain");
+    const rows = await prisma.clubFormTemplate.findMany({ where: { key: { in: clubFormTemplateSeeds.map((seed) => seed.key) } }, select: { key: true, fillMode: true, fillModeChangedAt: true } });
+    assert(rows.length === clubFormTemplateSeeds.length, "every seeded template is stored");
+    for (const seed of clubFormTemplateSeeds) {
+      const row = rows.find((candidate) => candidate.key === seed.key)!;
+      assert(row.fillMode === seed.fillMode && row.fillModeChangedAt === null, `${seed.key}: the sync wrote the default fill mode ${seed.fillMode}`);
+      assert(domain.effectiveClubFormFillMode(row.fillMode, row.key) === seed.fillMode, `${seed.key}: the effective fill mode is the default`);
+    }
+    assert(new Set(clubFormTemplateSeeds.map((seed) => seed.fillMode)).size === 3, "the three fill modes are all in use");
+
+    // Staff changing it sticks, is audited, and survives a sync; a re-run changes nothing.
+    await templates.setClubFormTemplateFillMode(CAN_COLLECTING, "FAMILY", users.sysAdmin);
+    await templates.syncClubFormTemplates();
+    const changed = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } });
+    assert(changed.fillMode === "FAMILY" && changed.fillModeChangedAt && changed.fillModeChangedByUserId === users.sysAdmin, "a staff-changed fill mode survives the sync, with who and when");
+    assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_FILL_MODE_CHANGED", entityId: changed.id, actorUserId: users.sysAdmin } }) === 1, "changing who fills a form in is audited once");
+    await prisma.clubFormTemplate.update({ where: { key: CAN_COLLECTING }, data: { fillMode: "CLUB", fillModeChangedAt: null, fillModeChangedByUserId: null } });
+
+    // The open application: off, then on.
+    await expectCode(openApplications.resolveOpenApplication("pathfinder_membership_application"), "TEMPLATE_NOT_FOUND", "a form that is not an open application is a 404");
+    await expectCode(openApplications.resolveOpenApplication("no_such_form_key"), "TEMPLATE_NOT_FOUND", "an unknown key is a 404");
+    const turnedOff = await openApplications.resolveOpenApplication(TLT_APPLICATION);
+    assert(turnedOff.status === "OFF", "a turned-off open application says it is not available yet");
+    const tltAnswers = {
+      full_name: "Jordan Verify", email: `jordan@${emailDomain}`, grade_coming_school_year: "10",
+      mailing_address: { line1: "7 Example Road", locality: "Exampleville", region: "IA", postalCode: "50001", country: "US" },
+      gender: "Female", club_name: "Verify Forms Club A", years_in_club: 3, club_director_name: "Pat Verify", club_director_email: `pat@${emailDomain}`,
+      meal_preference: "Neither", previous_conference_tlt_years: 0, why_conference_tlt: "To serve.", purpose_of_pathfinders: "To grow.", purpose_of_tlt_program: "To lead.",
+      accuracy_acknowledgment: true, application_approved_acknowledgment: true,
+    };
+    const key = (suffix: string) => `${applicationKeyPrefix}${suffix}`;
+    const apply = async (organizationId: string, suffix: string, unlistedClubName?: string) => openApplications.submitOpenApplication(TLT_APPLICATION, { organizationId, unlistedClubName, idempotencyKey: key(suffix), answers: tltAnswers });
+    await expectCode(apply(clubs.a, "off"), "APPLICATION_OFF", "a turned-off open application refuses a submit");
+    await templates.setClubFormTemplateEnabled(TLT_APPLICATION, true, users.admin);
+    const open = await openApplications.resolveOpenApplication(TLT_APPLICATION);
+    assert(open.status === "OPEN", "a turned-on open application is open");
+    if (open.status !== "OPEN") throw new Error("unreachable");
+    const listedClub = open.clubs.find((club) => club.id === clubs.a);
+    assert(listedClub && Object.keys(listedClub).sort().join() === "id,name", "the club choices are the id and the name only");
+    assert(!open.clubs.some((club) => club.id === `${P}_church`), "a church is not a club choice");
+
+    // Many submissions from the one link, each in the chosen club.
+    await apply(clubs.a, "one");
+    await apply(clubs.a, "two");
+    await apply(clubs.b, "three");
+    const landed = await prisma.clubFormSubmission.findMany({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } }, select: { organizationId: true, enteredVia: true, linkId: true, status: true, clubYear: true } });
+    assert(landed.length === 3 && landed.every((row) => row.enteredVia === "OPEN_APPLICATION" && row.linkId === null && row.status === "SUBMITTED" && row.clubYear === clubYear), "three open applications are saved as submitted, with no link");
+    assert(landed.filter((row) => row.organizationId === clubs.a).length === 2 && landed.filter((row) => row.organizationId === clubs.b).length === 1, "each lands in the chosen club");
+
+    // The same key twice: the first result, no second row. Two at once: one row.
+    const first = await apply(clubs.a, "one");
+    assert(first.replayed === true && await prisma.clubFormSubmission.count({ where: { idempotencyKey: key("one") } }) === 1, "the same idempotency key returns the first result without a second row");
+    const raced = await Promise.all([apply(clubs.a, "race"), apply(clubs.a, "race"), apply(clubs.a, "race")]);
+    assert(await prisma.clubFormSubmission.count({ where: { idempotencyKey: key("race") } }) === 1 && new Set(raced.map((result) => result.submissionId)).size === 1, "three racing submits with one key make one row");
+
+    // An id that is not an active club is refused and nothing is saved.
+    const before = await prisma.clubFormSubmission.count({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } } });
+    await expectCode(apply("no-such-club-id", "unknown"), "VALIDATION_FAILED", "an unknown club id is refused");
+    await expectCode(apply(`${P}_church`, "church"), "VALIDATION_FAILED", "a church is not a club");
+    await prisma.organization.update({ where: { id: clubs.b }, data: { isActive: false } });
+    await expectCode(apply(clubs.b, "inactive"), "VALIDATION_FAILED", "an inactive club is refused");
+    await prisma.organization.update({ where: { id: clubs.b }, data: { isActive: true } });
+    assert(await prisma.clubFormSubmission.count({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } } }) === before, "a refused club saves nothing");
+
+    // "Not listed": no club, the typed name, and staff alone can see it.
+    await expectCode(apply("NOT_LISTED", "nameless"), "VALIDATION_FAILED", "Not listed needs a typed name");
+    const notListed = await apply("NOT_LISTED", "unlisted", "Verify Valley Pathfinders");
+    const unlisted = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: notListed.submissionId } });
+    assert(unlisted.organizationId === null && unlisted.unlistedClubName === "Verify Valley Pathfinders", "a Not listed application has no club and the typed name");
+    const mine = await submissions.listSubmissionsForViewer(directorA, {});
+    assert(mine.filter((row) => row.templateKey === TLT_APPLICATION).length === 3 && !mine.some((row) => row.id === notListed.submissionId), "the director sees the applications to their club, never the Not listed one");
+    assert(!(await submissions.listSubmissionsForViewer(area, {})).some((row) => row.id === notListed.submissionId), "an Area Coordinator's list never has the Not listed one");
+    const staffRow = (await submissions.listSubmissionsForViewer(sysAdmin, { templateKey: TLT_APPLICATION })).find((row) => row.id === notListed.submissionId);
+    assert(staffRow && staffRow.organizationName === "Not listed: Verify Valley Pathfinders" && staffRow.organizationId === null, "conference staff see it, labelled Not listed with the typed name");
+    for (const viewer of [directorA, directorB, area]) {
+      await expectCode(submissions.getSubmissionForViewer(viewer, notListed.submissionId), "SUBMISSION_NOT_FOUND", "a director or an Area Coordinator can't open a Not listed application");
+    }
+    await expectCode(submissions.getSubmissionForViewer(area, notListed.submissionId, "VIEW", clubs.a), "SUBMISSION_NOT_FOUND", "not even by naming a club");
+    assert((await submissions.getSubmissionForViewer(eventAdmin, notListed.submissionId)).organization.name === "Not listed: Verify Valley Pathfinders", "conference staff open it");
+    const exported = await csv.buildClubFormsCsv(sysAdmin, { templateKey: TLT_APPLICATION });
+    assert(exported.csv.includes("Not listed: Verify Valley Pathfinders") && exported.csv.includes("Open application"), "the staff CSV names the Not listed club");
+
+    // The audit rows carry no answers or addresses.
+    const audit = await prisma.auditLog.findMany({ where: { action: "CLUB_FORM_APPLICATION_SUBMITTED", entityId: notListed.submissionId } });
+    assert(audit.length === 1 && !JSON.stringify(audit).includes("Jordan") && !JSON.stringify(audit).includes(emailDomain) && !JSON.stringify(audit).includes("Valley"), "the application's audit row has no answers, address or club name");
+
+    // Staff close the year; the page and the submit say so; reopening restores it.
+    await openApplications.setOpenApplicationClosed(TLT_APPLICATION, true, users.sysAdmin);
+    assert((await openApplications.resolveOpenApplication(TLT_APPLICATION)).status === "CLOSED", "a closed year says so");
+    await expectCode(apply(clubs.a, "closed"), "APPLICATION_CLOSED", "a closed year refuses a submit");
+    assert((await openApplications.listClosedOpenApplicationKeys()).has(TLT_APPLICATION), "the admin page lists the closed form");
+    await openApplications.setOpenApplicationClosed(TLT_APPLICATION, false, users.sysAdmin);
+    await apply(clubs.a, "reopened");
+    assert(await prisma.auditLog.count({ where: { action: { in: ["CLUB_FORM_OPEN_LINK_CLOSED", "CLUB_FORM_OPEN_LINK_REOPENED"] }, actorUserId: users.sysAdmin } }) === 2, "closing and reopening are each audited");
+
+    // Staff move it out of open application: its page is a 404 again.
+    await templates.setClubFormTemplateFillMode(TLT_APPLICATION, "FAMILY", users.sysAdmin);
+    await expectCode(openApplications.resolveOpenApplication(TLT_APPLICATION), "TEMPLATE_NOT_FOUND", "a form moved out of open application is a 404");
+    await templates.syncClubFormTemplates();
+    assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: TLT_APPLICATION } })).fillMode === "FAMILY", "the sync leaves the staff's choice");
+    // A form that is not an open application cannot be filled through the open route.
+    await expectCode(apply(clubs.a, "moved"), "TEMPLATE_NOT_FOUND", "the open route refuses a form that is no longer open");
   }
 
   // Club forms and links block deleting a club.

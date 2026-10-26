@@ -823,6 +823,40 @@ const clubFormLinkBudgets = {
   submit: { client: 20, token: 10, clientToken: 6 },
 } as const;
 
+/**
+ * Budgets for a club form's public open application (#1229), per 15 minutes. The link is shared by anyone, so the
+ * per-form budget is generous (a whole church may apply in one evening) while one client is held to a few submits.
+ */
+const clubFormApplicationBudgets = {
+  read: { client: 60, form: 1500 },
+  submit: { client: 10, form: 300 },
+} as const;
+
+export async function checkClubFormApplicationRateLimit(
+  request: Request,
+  templateKey: string,
+  operation: keyof typeof clubFormApplicationBudgets,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const formHash = hashRateLimitIdentifier("club-form-application", templateKey, configuration);
+  const budget = clubFormApplicationBudgets[operation];
+  return evaluate([
+    {
+      policy: `club-form.application.${operation}.client`,
+      limit: budget.client,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [client],
+    },
+    {
+      policy: `club-form.application.${operation}.form`,
+      limit: budget.form,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [formHash],
+    },
+  ], configuration);
+}
+
 export async function checkClubFormLinkRateLimit(
   request: Request,
   token: string,

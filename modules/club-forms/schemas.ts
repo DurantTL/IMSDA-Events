@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CLUB_FORM_FILL_MODES } from "@/modules/club-forms/definitions";
 import { CLUB_FORM_LINK_MAX_DAYS, CLUB_FORM_LINK_MIN_DAYS } from "@/modules/club-forms/domain";
 import { rosterMemberInputSchema } from "@/modules/club-rosters/schemas";
 
@@ -45,3 +46,9 @@ export const rosterAddSchema = z.discriminatedUnion("action", [
     memberId: z.string().trim().min(1).max(80),
   }).strict(),
 ]);
+
+/** System administrators choose who fills a form in (#1229). */
+export const templateFillModeSchema = z.object({ fillMode: z.enum(CLUB_FORM_FILL_MODES) }).strict();
+
+/** System administrators close or reopen an open application for the current club year (#1229). */
+export const openLinkClosedSchema = z.object({ closed: z.boolean() }).strict();

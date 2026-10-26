@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   setClubFormTemplateEnabled: vi.fn(),
   setClubFormAlertRecipients: vi.fn(),
   runClubFormTemplateSync: vi.fn(),
+  setClubFormTemplateFillMode: vi.fn(),
+  setOpenApplicationClosed: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -23,7 +25,8 @@ vi.mock("@/modules/club-forms/builder", () => ({
   discardClubFormDraft: mocks.discardClubFormDraft,
   publishClubFormDraft: mocks.publishClubFormDraft,
 }));
-vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled, setClubFormAlertRecipients: mocks.setClubFormAlertRecipients, runClubFormTemplateSync: mocks.runClubFormTemplateSync }));
+vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled, setClubFormAlertRecipients: mocks.setClubFormAlertRecipients, runClubFormTemplateSync: mocks.runClubFormTemplateSync, setClubFormTemplateFillMode: mocks.setClubFormTemplateFillMode }));
+vi.mock("@/modules/club-forms/open-applications", () => ({ setOpenApplicationClosed: mocks.setOpenApplicationClosed }));
 vi.mock("@/modules/club-rosters/access", () => ({
   RosterAccessError: class RosterAccessError extends Error {
     constructor(public readonly code: string, public readonly status: number, message: string) {
@@ -39,6 +42,8 @@ vi.mock("@/modules/club-rosters/api-errors", () => ({
 import { PATCH as TOGGLE } from "@/app/api/admin/club-forms/[templateKey]/route";
 import { DELETE as DISCARD, PUT as SAVE } from "@/app/api/admin/club-forms/[templateKey]/draft/route";
 import { PUT as ALERTS } from "@/app/api/admin/club-forms/[templateKey]/alerts/route";
+import { PUT as FILL_MODE } from "@/app/api/admin/club-forms/[templateKey]/fill-mode/route";
+import { PUT as OPEN_LINK } from "@/app/api/admin/club-forms/[templateKey]/open-link/route";
 import { POST as PUBLISH } from "@/app/api/admin/club-forms/[templateKey]/publish/route";
 import { POST as CREATE } from "@/app/api/admin/club-forms/route";
 import { POST as SYNC } from "@/app/api/admin/club-forms/sync/route";
@@ -58,6 +63,8 @@ const routes: Array<{ name: string; call: () => Promise<Response>; service: () =
   { name: "sync templates", call: () => SYNC(json({})), service: () => mocks.runClubFormTemplateSync },
   { name: "enable", call: () => TOGGLE(json({ enabled: true }, "PATCH"), key), service: () => mocks.setClubFormTemplateEnabled },
   { name: "set alert recipients (#1017)", call: () => ALERTS(json({ emails: ["office@imsda-events.test"] }, "PUT"), key), service: () => mocks.setClubFormAlertRecipients },
+  { name: "set who fills it in (#1229)", call: () => FILL_MODE(json({ fillMode: "CLUB" }, "PUT"), key), service: () => mocks.setClubFormTemplateFillMode },
+  { name: "close or reopen an open application (#1229)", call: () => OPEN_LINK(json({ closed: true }, "PUT"), key), service: () => mocks.setOpenApplicationClosed },
 ];
 
 beforeEach(() => {
@@ -70,6 +77,8 @@ beforeEach(() => {
   mocks.publishClubFormDraft.mockResolvedValue({ key: "synthetic_form", version: 2 });
   mocks.setClubFormTemplateEnabled.mockResolvedValue({ key: "synthetic_form", enabled: true });
   mocks.setClubFormAlertRecipients.mockResolvedValue({ key: "synthetic_form", emails: ["office@imsda-events.test"] });
+  mocks.setClubFormTemplateFillMode.mockResolvedValue({ key: "synthetic_form", fillMode: "CLUB" });
+  mocks.setOpenApplicationClosed.mockResolvedValue({ key: "synthetic_form", clubYear: "2026-27", closed: true });
   mocks.runClubFormTemplateSync.mockResolvedValue({ results: [], counts: { updated: 0, created: 0, skipped: 0, unchanged: 0, refused: 0, staleDrafts: 0 } });
 });
 
@@ -109,6 +118,21 @@ describe("club form builder routes are for system administrators only (#712)", (
       expect(route.service()).not.toHaveBeenCalled();
     });
   }
+
+  it("sets who fills a form in, and who closed an open application, as the system administrator (#1229)", async () => {
+    expect((await FILL_MODE(json({ fillMode: "OPEN_APPLICATION" }, "PUT"), key)).status).toBe(200);
+    expect(mocks.setClubFormTemplateFillMode).toHaveBeenCalledWith("synthetic_form", "OPEN_APPLICATION", "admin-1");
+    expect((await OPEN_LINK(json({ closed: true }, "PUT"), key)).status).toBe(200);
+    expect(mocks.setOpenApplicationClosed).toHaveBeenCalledWith("synthetic_form", true, "admin-1");
+  });
+
+  it("refuses a fill mode that is not one of the three, and extra fields (#1229)", async () => {
+    expect((await FILL_MODE(json({ fillMode: "EVERYONE" }, "PUT"), key)).status).toBe(400);
+    expect((await FILL_MODE(json({ fillMode: "CLUB", note: "x" }, "PUT"), key)).status).toBe(400);
+    expect((await OPEN_LINK(json({ closed: "yes" }, "PUT"), key)).status).toBe(400);
+    expect(mocks.setClubFormTemplateFillMode).not.toHaveBeenCalled();
+    expect(mocks.setOpenApplicationClosed).not.toHaveBeenCalled();
+  });
 
   it("creates a form for a system administrator and records who", async () => {
     const response = await CREATE(json({ name: "Synthetic Form", copyFromKey: "off_premises_permission_slip" }));

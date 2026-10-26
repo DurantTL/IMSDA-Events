@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText, Printer } from "lucide-react";
+import { CopyApplicationLink } from "@/components/copy-application-link";
 import { EmptyState } from "@/components/empty-state";
 import { RevokeClubFormLinkButton, SendClubFormLink } from "@/components/club-forms-actions";
+import { getServerEnv } from "@/lib/env";
+import { groupClubFormsByFillMode, openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { listClubFormLinks } from "@/modules/club-forms/links";
@@ -58,6 +61,7 @@ export default async function ClubFormsPage({
     listClubFormLinks(viewer, organizationId),
   ]);
   const base = `/account/clubs/${organizationId}/forms`;
+  const { families, club: clubForms } = groupClubFormsByFillMode(templates);
 
   return (
     <>
@@ -65,35 +69,107 @@ export default async function ClubFormsPage({
         <p className="public-registration-eyebrow">Club forms</p>
         <h2>Forms for your club&apos;s files</h2>
         <p>
-          Fill a form in for a member, or email a private link so a parent or staff person can fill it in
-          themselves. These files can hold health, conduct and contact details, so only your club&apos;s director
+          Send a private link so a parent or staff person can fill a form in themselves, or fill in the club&apos;s own forms
+          directly. These files can hold health, conduct and contact details, so only your club&apos;s director
           and deputy and the conference office can open them.
         </p>
       </section>
 
       {templates.length === 0 ? (
         <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>
-      ) : (
-        templates.map((template) => (
-          <section className="public-manage-card club-form-template" key={template.key}>
-            <div>
-              <h3>{template.name}</h3>
-              <p className="field-help">{template.description}</p>
-            </div>
-            <div className="club-form-template-actions">
-              <Link className="primary-button" href={`${base}/${template.key}/new`}>
-                <FileText aria-hidden="true" size={14} /> Fill in for a member
-              </Link>
-              <SendClubFormLink
-                defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
-                formName={template.name}
-                organizationId={organizationId}
-                rosterMembers={rosterMembers}
-                templateKey={template.key}
-              />
-            </div>
-          </section>
-        ))
+      ) : null}
+
+      {(families.length > 0 || links.length > 0) && (
+        <section aria-labelledby="club-forms-families" className="club-form-group">
+          <h2 id="club-forms-families">Forms for families and individuals: send a link</h2>
+          <p className="field-help">A parent, member, staff member or recommender fills these in through a private link you send. You can fill one in yourself too.</p>
+          {families.map((template) => (
+            <section className="public-manage-card club-form-template" key={template.key}>
+              <div>
+                <h3>{template.name}</h3>
+                <p className="field-help">{template.description}</p>
+              </div>
+              <div className="club-form-template-actions">
+                <SendClubFormLink
+                  defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
+                  formName={template.name}
+                  organizationId={organizationId}
+                  primary
+                  rosterMembers={rosterMembers}
+                  templateKey={template.key}
+                />
+                <Link className="secondary-button" href={`${base}/${template.key}/new`}>
+                  <FileText aria-hidden="true" size={14} /> Fill in
+                </Link>
+              </div>
+            </section>
+          ))}
+          {links.length > 0 && (
+            <section className="public-manage-card">
+              <h3>Private links you sent</h3>
+              <p className="field-help">A link works once. After it is used, the form appears under Filled forms.</p>
+              <div className="report-table-wrap">
+                <table className="report-table">
+                  <caption className="sr-only">Private links</caption>
+                  <thead>
+                    <tr><th scope="col">Form</th><th scope="col">Sent to</th><th scope="col">Status</th><th scope="col">Email</th><th scope="col">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr>
+                  </thead>
+                  <tbody>
+                    {links.map((link) => (
+                      <tr key={link.id}>
+                        <th scope="row">{link.templateName}</th>
+                        <td translate="no">{link.recipientEmail}{link.subjectName ? ` · ${link.subjectName}` : ""}</td>
+                        <td>{linkStateLabel[link.state]}</td>
+                        <td>{emailDeliveryLabel[link.delivery]}</td>
+                        <td>{formatDate(link.expiresAt)}</td>
+                        <td>
+                          {link.state === "OPEN" && <RevokeClubFormLinkButton linkId={link.id} organizationId={organizationId} />}
+                          {link.submissionId && <Link className="text-button" href={`${base}/submissions/${link.submissionId}`}>Open form</Link>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </section>
+      )}
+
+      {clubForms.length > 0 && (
+        <section aria-labelledby="club-forms-club" className="club-form-group">
+          <h2 id="club-forms-club">Club forms: the club fills these in</h2>
+          <p className="field-help">You fill these in directly, whenever they are needed. You can still send a link for one if someone else should fill it in.</p>
+          {clubForms.map((template) => (
+            <section className="public-manage-card club-form-template" key={template.key}>
+              <div>
+                <h3>{template.name}</h3>
+                <p className="field-help">{template.description}</p>
+                {template.fillMode === "OPEN_APPLICATION" && (
+                  <p className="field-help">Anyone with the application link can apply and pick your club. Applications for your club are listed under Filled forms.</p>
+                )}
+              </div>
+              {template.fillMode === "OPEN_APPLICATION" ? (
+                <div className="club-form-template-actions">
+                  <CopyApplicationLink url={openApplicationUrl(getServerEnv().APP_BASE_URL, template.key)} />
+                </div>
+              ) : (
+                <div className="club-form-template-actions">
+                  <Link className="primary-button" href={`${base}/${template.key}/new`}>
+                    <FileText aria-hidden="true" size={14} /> Fill in
+                  </Link>
+                  <SendClubFormLink
+                    defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
+                    formName={template.name}
+                    organizationId={organizationId}
+                    rosterMembers={rosterMembers}
+                    templateKey={template.key}
+                  />
+                </div>
+              )}
+            </section>
+          ))}
+        </section>
       )}
 
       <section className="public-manage-card">
@@ -124,7 +200,7 @@ export default async function ClubFormsPage({
                   <tr key={row.id}>
                     <th scope="row">{row.templateName}</th>
                     <td translate="no">{row.subjectName || "Not named"}</td>
-                    <td>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : ""}</td>
+                    <td>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
                     <td>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
                     <td>
                       <Link className="secondary-button" href={`${base}/submissions/${row.id}`}>
@@ -138,36 +214,6 @@ export default async function ClubFormsPage({
           </div>
         )}
       </section>
-
-      {links.length > 0 && (
-        <section className="public-manage-card">
-          <h3>Private links you sent</h3>
-          <p className="field-help">A link works once. After it is used, the form appears above.</p>
-          <div className="report-table-wrap">
-            <table className="report-table">
-              <caption className="sr-only">Private links</caption>
-              <thead>
-                <tr><th scope="col">Form</th><th scope="col">Sent to</th><th scope="col">Status</th><th scope="col">Email</th><th scope="col">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr>
-              </thead>
-              <tbody>
-                {links.map((link) => (
-                  <tr key={link.id}>
-                    <th scope="row">{link.templateName}</th>
-                    <td translate="no">{link.recipientEmail}{link.subjectName ? ` · ${link.subjectName}` : ""}</td>
-                    <td>{linkStateLabel[link.state]}</td>
-                    <td>{emailDeliveryLabel[link.delivery]}</td>
-                    <td>{formatDate(link.expiresAt)}</td>
-                    <td>
-                      {link.state === "OPEN" && <RevokeClubFormLinkButton linkId={link.id} organizationId={organizationId} />}
-                      {link.submissionId && <Link className="text-button" href={`${base}/submissions/${link.submissionId}`}>Open form</Link>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
     </>
   );
 }

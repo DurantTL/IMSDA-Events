@@ -85,7 +85,8 @@ async function loadAddable(organizationId: string, submissionId: string) {
       template: { select: templateSelect },
     },
   });
-  if (!row) throw new ClubFormError("SUBMISSION_NOT_FOUND", "That form could not be found.");
+  // A form with no club (a "Not listed" open application, #1229) can never be added to a roster.
+  if (!row || !row.organizationId) throw new ClubFormError("SUBMISSION_NOT_FOUND", "That form could not be found.");
   if (row.status !== "SUBMITTED") {
     throw new ClubFormError("ROSTER_ADD_UNAVAILABLE", "Only a submitted form can be added to the roster.");
   }
@@ -100,7 +101,7 @@ async function loadAddable(organizationId: string, submissionId: string) {
   const filedMember = row.rosterMemberId && row.rosterMember && stillOnRoster(row.rosterMember)
     ? { id: row.rosterMember.id, firstName: row.rosterMember.person?.firstName ?? "", lastName: row.rosterMember.person?.lastName ?? "" }
     : null;
-  return { row, template, mapping, filedMember };
+  return { row: { ...row, organizationId: row.organizationId }, template, mapping, filedMember };
 }
 
 type MemberChoice = { id: string; firstName: string; lastName: string; attendeeType: string; status: string };

@@ -4,7 +4,10 @@ import { ArrowRight } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
-import { listEnabledPublicClubFormKeys } from "@/modules/club-forms/public-index";
+import { CopyApplicationLink } from "@/components/copy-application-link";
+import { getServerEnv } from "@/lib/env";
+import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
+import { listEnabledPublicClubFormKeys, listPublicClubFormFillModes } from "@/modules/club-forms/public-index";
 import { publicClubFormGroups, publicClubFormView } from "@/modules/club-forms/public-index-domain";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +25,8 @@ export const metadata: Metadata = {
  * by private link only say so; an item whose club form is turned off says "Not available yet." with no link.
  */
 export default async function PublicClubFormsPage() {
-  const enabled = await listEnabledPublicClubFormKeys();
+  const [enabled, fillModes] = await Promise.all([listEnabledPublicClubFormKeys(), listPublicClubFormFillModes()]);
+  const baseUrl = getServerEnv().APP_BASE_URL;
 
   return (
     <main className="public-registration-page public-calendar-page">
@@ -53,17 +57,18 @@ export default async function PublicClubFormsPage() {
             <h2 id={`club-forms-${group.id}`}>{group.title}</h2>
             <ul className="club-forms-index-list">
               {group.items.map((item) => {
-                const view = publicClubFormView(item, enabled);
+                const view = publicClubFormView(item, enabled, fillModes);
                 return (
                   <li className="club-forms-index-item" key={view.id}>
                     <div className="club-forms-index-text">
                       <h3>{view.name}</h3>
                       <p>{view.who}</p>
                       {view.note && <p className="club-forms-index-note">{view.note}</p>}
+                      {view.applicationPath && <CopyApplicationLink label="Copy link for your website" url={openApplicationUrl(baseUrl, item.templateKey ?? "")} />}
                     </div>
                     {view.href && (
                       <Link className="secondary-button club-forms-index-action" href={view.href}>
-                        Open <ArrowRight aria-hidden="true" size={14} /><span className="sr-only"> {view.name}</span>
+                        {view.applicationPath ? "Apply" : "Open"} <ArrowRight aria-hidden="true" size={14} /><span className="sr-only"> {view.name}</span>
                       </Link>
                     )}
                   </li>

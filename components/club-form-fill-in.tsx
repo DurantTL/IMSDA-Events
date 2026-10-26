@@ -42,9 +42,19 @@ type Props = {
     doneHref: string;
   }
   | { mode: "link"; token: string }
+  /** A public open application (#1229): anyone with the link, who picks their club (id and name only) or "Not listed". */
+  | { mode: "open"; templateKey: string; clubs: Array<{ id: string; name: string }> }
 );
 
 type Issue = { key?: string; message: string };
+
+function newIdempotencyKey() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
 
 function textOf(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -63,7 +73,7 @@ export function ClubFormFillIn(props: Props) {
   const today = props.todayDate ?? todayDateValue();
   const [initialAnswers] = useState<Answers>(() => {
     const cleaned = dropStaleRankedChoices(props.definition, props.initialAnswers ?? {});
-    if (props.mode === "link") return withAutoDateAnswers(props.definition, cleaned, today, true);
+    if (props.mode !== "club") return withAutoDateAnswers(props.definition, cleaned, today, true);
     return props.submissionId ? cleaned : withAutoDateAnswers(props.definition, cleaned, today);
   });
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
@@ -74,6 +84,10 @@ export function ClubFormFillIn(props: Props) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [notice, setNotice] = useState("");
   const [doneMessage, setDoneMessage] = useState("");
+  // Open applications: the club choice, and one key per fill so a repeated submit returns the first result (#1229).
+  const [clubChoice, setClubChoice] = useState("");
+  const [unlistedClubName, setUnlistedClubName] = useState("");
+  const [idempotencyKey] = useState(newIdempotencyKey);
   const [savedId, setSavedId] = useState(props.mode === "club" ? props.submissionId : undefined);
   const sensitive = useMemo(() => new Set(sensitiveFieldKeys), [sensitiveFieldKeys]);
   // Last saved state (#703): the guard is on only while the form differs from it.
@@ -97,7 +111,7 @@ export function ClubFormFillIn(props: Props) {
     return legacy ? `${raw} This saved answer needs correcting.` : raw;
   };
   const blockingProblems = definition.sections.flatMap((section) => section.fields)
-    .filter((field) => isFieldVisible(field, answers) && !(props.mode === "link" && field.autoDate === "TODAY"))
+    .filter((field) => isFieldVisible(field, answers) && !(props.mode !== "club" && field.autoDate === "TODAY"))
     .filter((field) => typedAnswerProblem(field, answers[field.key]) && typedAnswerProblem(field, answers[field.key], initialAnswers[field.key]));
 
   function set(key: string, value: unknown) {
@@ -106,6 +120,11 @@ export function ClubFormFillIn(props: Props) {
 
   async function send(submit: boolean) {
     setAttempted(true);
+    if (props.mode === "open" && (!clubChoice || (clubChoice === "NOT_LISTED" && !unlistedClubName.trim()))) {
+      setError(clubChoice ? "Type your club's name." : "Choose your club, or choose Not listed.");
+      setIssues([]);
+      return;
+    }
     if (blockingProblems.length > 0) {
       setError("Check the highlighted answers and try again.");
       setIssues([]);
@@ -129,11 +148,22 @@ export function ClubFormFillIn(props: Props) {
             submit,
           }),
         })
-        : await fetch(`/api/public/club-forms/${encodeURIComponent(props.token)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ answers }),
-        });
+        : props.mode === "open"
+          ? await fetch(`/api/public/club-form-applications/${encodeURIComponent(props.templateKey)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              organizationId: clubChoice,
+              unlistedClubName: clubChoice === "NOT_LISTED" ? unlistedClubName.trim() : undefined,
+              idempotencyKey,
+              answers,
+            }),
+          })
+          : await fetch(`/api/public/club-forms/${encodeURIComponent(props.token)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ answers }),
+          });
       const result = await response.json().catch(() => ({})) as {
         message?: string;
         issues?: Issue[];
@@ -146,7 +176,7 @@ export function ClubFormFillIn(props: Props) {
         return;
       }
       setSaved(current);
-      if (props.mode === "link") {
+      if (props.mode !== "club") {
         setDoneMessage(result.confirmationMessage ?? "Thank you. Your form has been received.");
         return;
       }
@@ -168,7 +198,7 @@ export function ClubFormFillIn(props: Props) {
     return (
       <div className="inline-notice success club-form-done" role="status">
         <strong>{doneMessage}</strong>
-        <span> This link has now been used and cannot be opened again.</span>
+        {props.mode === "link" && <span> This link has now been used and cannot be opened again.</span>}
       </div>
     );
   }
@@ -203,6 +233,28 @@ export function ClubFormFillIn(props: Props) {
         </fieldset>
       )}
 
+      {props.mode === "open" && (
+        <fieldset className="public-manage-card form-stack" disabled={saving}>
+          <ClubFormSectionTitle>Your club</ClubFormSectionTitle>
+          <div className="club-form-apply-club">
+            <label>
+              Club <span aria-hidden="true">{"\u00a0*"}</span>
+              <select onChange={(event) => setClubChoice(event.target.value)} required value={clubChoice}>
+                <option value="">Choose your club…</option>
+                {props.clubs.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+                <option value="NOT_LISTED">Not listed</option>
+              </select>
+            </label>
+            {clubChoice === "NOT_LISTED" && (
+              <label>
+                Your club&apos;s name <span aria-hidden="true">{"\u00a0*"}</span>
+                <input maxLength={120} onChange={(event) => setUnlistedClubName(event.target.value)} required value={unlistedClubName} />
+              </label>
+            )}
+          </div>
+        </fieldset>
+      )}
+
       {definition.sections.map((section) => {
         const fields = section.fields.filter((field) => isFieldVisible(field, answers));
         if (fields.length === 0) return null;
@@ -218,7 +270,7 @@ export function ClubFormFillIn(props: Props) {
                   field={field}
                   isSensitive={sensitive.has(field.key)}
                   key={field.id}
-                  lockedDate={props.mode === "link" && field.autoDate === "TODAY"}
+                  lockedDate={props.mode !== "club" && field.autoDate === "TODAY"}
                   onBlur={() => setTouched((current) => ({ ...current, [field.key]: true }))}
                   onChange={(value) => set(field.key, value)}
                   problem={problemFor(field)}

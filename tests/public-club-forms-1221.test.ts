@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const mocks = vi.hoisted(() => ({
   listEnabled: vi.fn(),
+  listFillModes: vi.fn(),
   getCurrentAttendee: vi.fn(),
   currentStaffActingContext: vi.fn(),
   attendeeSecondStepPending: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
 }));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
-vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled }));
+vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled, listPublicClubFormFillModes: mocks.listFillModes }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.attendeeSecondStepPending }));
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({
@@ -47,8 +48,11 @@ const allKeys = new Set(publicClubFormTemplateKeys);
 const items = publicClubFormGroups.flatMap((group) => group.items);
 const item = (id: string) => items.find((candidate) => candidate.id === id)!;
 
-async function renderIndex(enabled: string[]) {
+const tltOpen = new Map([["club_tlt_application", "OPEN_APPLICATION" as const]]);
+
+async function renderIndex(enabled: string[], fillModes: Map<string, "FAMILY" | "CLUB" | "OPEN_APPLICATION"> = tltOpen) {
   mocks.listEnabled.mockResolvedValue(new Set(enabled));
+  mocks.listFillModes.mockResolvedValue(fillModes);
   return renderToStaticMarkup(await PublicClubFormsPage());
 }
 
@@ -132,6 +136,27 @@ describe("the Club forms page (#1221)", () => {
     await renderIndex([]);
     expect(mocks.listEnabled).toHaveBeenCalledTimes(1);
     expect(mocks.listEnabled).toHaveBeenCalledWith();
+  });
+});
+
+describe("an open application on the Club forms page (#1229)", () => {
+  it("links the TLT Application to its apply page and shows the copyable address", async () => {
+    const view = publicClubFormView(item("tlt-application"), allKeys, tltOpen);
+    expect(view).toMatchObject({ href: "/clubs/forms/apply/club_tlt_application", note: null, applicationPath: "/clubs/forms/apply/club_tlt_application" });
+    const html = await renderIndex(publicClubFormTemplateKeys as string[]);
+    expect(html).toContain('href="/clubs/forms/apply/club_tlt_application"');
+    expect(html).toContain("/clubs/forms/apply/club_tlt_application</code>");
+    expect(html).toContain("Copy link for your website");
+  });
+
+  it("says Not available yet, with no link and no address, when the open form is off", async () => {
+    expect(publicClubFormView(item("tlt-application"), new Set(), tltOpen)).toMatchObject({ href: null, note: NOT_AVAILABLE_LINE, applicationPath: null });
+    const html = await renderIndex(publicClubFormTemplateKeys.filter((key) => key !== "club_tlt_application"));
+    expect(html).not.toContain("/clubs/forms/apply/");
+  });
+
+  it("falls back to the private-link line when staff move the form out of open application", () => {
+    expect(publicClubFormView(item("tlt-application"), allKeys, new Map([["club_tlt_application", "FAMILY" as const]]))).toMatchObject({ href: null, note: PRIVATE_LINK_LINE });
   });
 });
 

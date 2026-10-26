@@ -3,7 +3,6 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { isSecretEncryptionConfigured } from "@/lib/secret-box";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubYearFor } from "@/modules/club-rosters/domain";
@@ -13,22 +12,17 @@ import {
   clubFormLinkState,
   definitionForLink,
   deriveSubjectName,
-  fillDefinition,
   parseClubFormTemplate,
-  sanitizeClubFormAnswers,
-  splitAnswers,
-  validateClubFormAnswers,
   viewerAuditFields,
   viewerCanSendLinkForClub,
   viewerCanWriteForClub,
-  withAutoDates,
   type ClubFormsViewer,
 } from "@/modules/club-forms/domain";
 import { todayDateValue } from "@/modules/forms/definition";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { CLUB_FORM_LINK_TEMPLATE_KEY, clubFormLinkEmailContent } from "@/modules/club-forms/link-email";
-import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
-import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
+import { prepareFillerAnswers, sealFillerAnswers } from "@/modules/club-forms/public-fill";
+import { assertClubFormTemplateCurrent } from "@/modules/club-forms/template-lock";
 import { assertAnswersSize, resolveRosterMemberName } from "@/modules/club-forms/submissions";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
@@ -303,27 +297,14 @@ export async function submitClubFormViaLink(token: string, rawAnswers: Record<st
   const link = await findUsableLink(token, now);
   const template = parseClubFormTemplate(link.template);
   assertClubFormTemplateCurrent(template);
-  // Fields hidden from new versions (#712) are not offered, so they cannot be written either.
-  const definition = await withLiveDirectory(fillDefinition(template));
-  // Office-use fields are not the filler's to write, even by hand-crafted request.
-  // Signing and application dates are the server's to set (#719): same Chicago day, whatever the client sent.
-  const answers = withAutoDates(definition, sanitizeClubFormAnswers(definition, rawAnswers, template.staffOnlyFieldKeys), template.staffOnlyFieldKeys, now);
-  const issues = validateClubFormAnswers(definition, answers, { excludeKeys: template.staffOnlyFieldKeys });
-  if (issues.length > 0) throw new ClubFormError("VALIDATION_FAILED", issues[0].message, issues);
+  const answers = await prepareFillerAnswers(template, rawAnswers, now);
   const submissionId = randomUUID();
   const tokenHash = hashOpaqueToken(token);
   // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
   const alertEnabled = await isNotificationEnabled("CLUB_FORM_SUBMITTED");
 
   const result = await getPrisma().$transaction(async (tx) => {
-    // Which answers are sensitive is decided under a share lock on the template row, so a concurrent re-seal cannot leave this save in plaintext.
-    const keys = await lockClubFormTemplateForWrite(tx, template);
-    const { plain, sensitive } = splitAnswers({ sensitiveFieldKeys: keys.sensitiveFieldKeys }, answers);
-    const hasSensitive = Object.keys(sensitive).length > 0;
-    if (hasSensitive && !isSecretEncryptionConfigured()) {
-      throw new ClubFormError("ENCRYPTION_NOT_CONFIGURED", "This form can't be saved right now. Please try again later.");
-    }
-    const sealed = hasSensitive ? sealSensitiveAnswers(submissionId, sensitive) : null;
+    const { plain, sealed, hasSensitive } = await sealFillerAnswers(tx, template, submissionId, answers);
     const spent = await tx.clubFormLink.updateMany({
       where: { id: link.id, tokenHash, status: "OPEN", expiresAt: { gt: now } },
       data: { status: "USED", usedAt: now },
