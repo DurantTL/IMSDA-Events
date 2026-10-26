@@ -35,7 +35,7 @@ export function InformationMemberListInput({ field, value, onChange, problem }: 
         <div className="information-member-row" role="group" aria-label={`${field.label}, member ${index + 1}`} key={index}>
           <div className="form-grid two-column">
             {columns.map((column) => (
-              <label key={column.key}>{column.label}{column.required ? <span aria-hidden="true">{" *"}</span> : null}
+              <label key={column.key}><span>{column.label}{column.required ? <span aria-hidden="true">{" *"}</span> : null}</span>
                 {column.type === "SELECT" ? (
                   <select aria-describedby={problem ? problemId : undefined} aria-invalid={problem ? true : undefined} aria-required={isRequired(row, column.required)} required={isRequired(row, column.required)} value={String(row[column.key] ?? "")} onChange={(event) => update(index, column.key, event.target.value)}>
                     <option value="">Choose…</option>

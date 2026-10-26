@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertNoReservedChoiceValues, formTemplates, registrationFormDefinitionSchema, formTemplateDefinitionSchema } from "@/modules/forms/definition";
+import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import {
   CHOICE_FILTER_OTHER,
@@ -200,7 +201,7 @@ describe("choice answer filter", () => {
 
   it("no built-in form template offers a choice value starting with two underscores", () => {
     for (const template of formTemplates) {
-      expect(() => assertNoReservedChoiceValues(formTemplateDefinitionSchema.parse(template.definition))).not.toThrow();
+      expect(() => assertNoReservedChoiceValues((isInformationTemplateAudience(template.audience) ? formTemplateDefinitionSchema : registrationFormDefinitionSchema).parse(template.definition))).not.toThrow();
     }
   });
 
