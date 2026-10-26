@@ -22,6 +22,8 @@ import { assertClubFormTemplateCurrent } from "@/modules/club-forms/template-loc
 import { withLiveDirectory } from "@/modules/club-forms/templates";
 import { todayDateValue } from "@/modules/forms/definition";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { listClubDirectoryNames } from "@/modules/organizations/directory-options";
+import { normalizeOrganizationName } from "@/modules/organizations/domain";
 
 /**
  * Open applications (#1229): one public link per form and club year that anyone can fill in with no account. The
@@ -136,10 +138,13 @@ export async function submitOpenApplication(key: string, input: OpenApplicationS
     unlistedClubName = (input.unlistedClubName ?? "").trim().slice(0, 120);
     if (!unlistedClubName) throw new ClubFormError("VALIDATION_FAILED", "Type your club's name.", [{ key: "unlistedClubName", message: "Type your club's name." }]);
   } else {
-    const club = await prisma.organization.findFirst({ where: { id: input.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } });
+    const club = await prisma.organization.findFirst({ where: { id: input.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true, normalizedName: true } });
     if (!club) throw new ClubFormError("VALIDATION_FAILED", "Choose your club from the list.", [{ key: "organizationId", message: "Choose your club from the list." }]);
     organizationId = club.id;
-    clubName = club.name;
+    // The form's hidden club field takes the directory's own entry for this club (trimmed, one per normalized name), so it
+    // always passes the option check even when two clubs share a normalized name.
+    const key = club.normalizedName || normalizeOrganizationName(club.name.trim());
+    clubName = (await listClubDirectoryNames(prisma)).find((name) => normalizeOrganizationName(name) === key) ?? club.name.trim();
   }
 
   const answers = await prepareFillerAnswers(template, withChosenClubAnswers(template.definition, input.answers, clubName !== null ? { name: clubName } : { unlistedName: unlistedClubName ?? "" }), now);

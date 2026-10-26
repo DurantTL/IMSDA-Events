@@ -229,6 +229,25 @@ describe("submitting an open application (#1229)", () => {
     expect(data.answers).not.toHaveProperty("club_name_other");
   });
 
+  it("uses the directory's own entry for a club whose name the directory trims or shares", async () => {
+    mocks.organizationFindFirst.mockResolvedValue({ id: "club-a", name: "example pathfinders ", normalizedName: "example pathfinders" });
+    await submitOpenApplication(KEY, input(), now);
+    expect(mocks.submissionCreate.mock.calls[0][0].data.answers.club_name).toBe("Example Pathfinders");
+  });
+
+  it("only sets the first club-directory field; a later one stays the applicant's answer", () => {
+    const [first, ...rest] = seed.definition.sections;
+    const clubField = first.fields.find((field) => field.optionSource === "CLUBS_DIRECTORY") ?? rest.flatMap((section) => section.fields).find((field) => field.optionSource === "CLUBS_DIRECTORY");
+    if (!clubField) throw new Error("expected a club field");
+    const partner = { ...clubField, id: "partner", key: "partner_club", required: false };
+    const definition = { ...seed.definition, sections: [...seed.definition.sections, { id: "extra", title: "Extra", fields: [partner] }] } as typeof seed.definition;
+    const next = withChosenClubAnswers(definition, { partner_club: "Other Club" }, { name: "Mine" });
+    expect(next).toMatchObject({ [clubField.key]: "Mine", partner_club: "Other Club" });
+    const keys = withoutClubDirectoryFields(definition).sections.flatMap((section) => section.fields.map((field) => field.key));
+    expect(keys).toContain("partner_club");
+    expect(keys).not.toContain(clubField.key);
+  });
+
   it("sets Not listed and the typed name in the companion for a club that is not listed", async () => {
     mocks.organizationFindMany.mockImplementation(async () => [{ id: "club-a", name: "Example Pathfinders", normalizedName: "example pathfinders" }]);
     await submitOpenApplication(KEY, input({ organizationId: NOT_LISTED_CLUB, unlistedClubName: "Sample Valley Pathfinders", answers: { ...answers, club_name: "Example Pathfinders" } }), now);

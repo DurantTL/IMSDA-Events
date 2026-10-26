@@ -80,10 +80,13 @@ export function groupClubFormsByFillMode<T extends { fillMode: ClubFormFillMode 
 
 type FieldLike = RegistrationFormDefinition["sections"][number]["fields"][number];
 
-/** The club-directory fields of a form, and their "Not listed" companions (#1229). */
+/**
+ * The form's club-directory field that names the applicant's own club, and its "Not listed" companions (#1229). Only
+ * the first one: a later club-directory field (a previous or partner club) is the applicant's to answer.
+ */
 function clubDirectoryFields(definition: RegistrationFormDefinition) {
   const all: FieldLike[] = definition.sections.flatMap((section) => section.fields);
-  const controllers = all.filter((field) => field.optionSource === "CLUBS_DIRECTORY");
+  const controllers = all.filter((field) => field.optionSource === "CLUBS_DIRECTORY").slice(0, 1);
   const companions = controllers.flatMap((controller) => notListedCompanions(all, controller.key).map((companion) => ({ controller, companion })));
   return { controllers, companions };
 }
