@@ -9,6 +9,7 @@ import {
   publicEventWebsiteLinks,
   summarizePublicRegistrationForm,
 } from "@/modules/events/public-domain";
+import { isListablePublishedDefinition, latestPublishedVersionArgs, publishedFormVersionWhere } from "@/modules/events/public-registration-status";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { listPublishedEventContentSections } from "@/modules/events/content-repository";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
@@ -70,9 +71,7 @@ async function loadPublicEventLanding(
         },
       },
       registrationForms: {
-        where: {
-          versions: { some: { status: "PUBLISHED" } },
-        },
+        where: publishedFormVersionWhere,
         orderBy: [{ name: "asc" }, { createdAt: "asc" }],
         select: {
           id: true,
@@ -80,9 +79,7 @@ async function loadPublicEventLanding(
           slug: true,
           createdAt: true,
           versions: {
-            where: { status: "PUBLISHED" },
-            orderBy: { versionNumber: "desc" },
-            take: 1,
+            ...latestPublishedVersionArgs,
             select: {
               id: true,
               versionNumber: true,
@@ -128,15 +125,14 @@ async function loadPublicEventLanding(
   const publicForms = event.registrationForms.flatMap((form) => {
     const version = form.versions[0];
     if (!version) return [];
-    const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
-    if (!parsed.success) {
+    if (!isListablePublishedDefinition(version.definition)) {
       logWarn(
         "A published registration form has an invalid definition and was omitted from the public event page.",
         { formId: form.id },
       );
       return [];
     }
-    const summary = summarizePublicRegistrationForm(parsed.data);
+    const summary = summarizePublicRegistrationForm(registrationFormDefinitionSchema.parse(version.definition));
     const viaClubPortal = portalFormId === form.id;
     return [{
       id: form.id,

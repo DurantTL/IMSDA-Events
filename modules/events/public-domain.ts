@@ -4,6 +4,7 @@ import {
   remainingEventCapacity,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
+import { resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -313,7 +314,7 @@ function presentPublicEventLifecycle(
     : `${spotsPhrase(remainingSpots)} currently remain.`;
   // Open with no forms to choose from yet: say so, rather than "Registration open"
   // beside "Registration forms are being prepared".
-  if (!formsListed) {
+  if (resolvePublicRegistrationStatus("OPEN", formsListed) === "OPENING_SOON") {
     return {
       state: "OPEN",
       statusLabel: "Registration opening soon",
