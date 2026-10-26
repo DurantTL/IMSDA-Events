@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { clubFormDraftSchema, clubFormDraftShapeSchema } from "@/modules/club-forms/builder-domain";
+import { prepareLibraryFragment } from "@/modules/question-library/domain";
 import { codeFormTemplates } from "@/modules/forms/form-template-library-domain";
 import { formFieldTypes, formTemplateDefinitionSchema, formTemplates, informationFormFieldTypes, memberListProblems, registrationFormDefinitionSchema, templatesForPicker, validateTestResponses, type RegistrationFormField } from "@/modules/forms/definition";
 import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
@@ -237,13 +238,20 @@ describe("a member list stays inside information forms (#1222)", () => {
     expect(informationFormDefinitionSchema.safeParse(registrationLike()).success).toBe(true);
   });
 
-  it("is not one of the shared field types the club form builder and the question library read", () => {
+  it("is not one of the shared field types, and the real club form draft schema refuses it", () => {
     expect((formFieldTypes as readonly string[]).includes("MEMBER_LIST")).toBe(false);
     expect((informationFormFieldTypes as readonly string[]).includes("MEMBER_LIST")).toBe(true);
-    // The club form builder's draft check types a field with `z.enum(formFieldTypes)`.
-    const clubDraftField = z.object({ type: z.enum(formFieldTypes) });
-    expect(clubDraftField.safeParse({ type: "MEMBER_LIST" }).success).toBe(false);
-    expect(clubDraftField.safeParse({ type: "TEXT" }).success).toBe(true);
+    const draft = (definition: unknown) => ({ name: "Sample club form", description: "", sortOrder: 0, printLayout: "STANDARD", definition, sectionNotes: {}, sensitiveFieldKeys: [], birthDateFieldKeys: [], staffOnlyFieldKeys: [], hiddenFieldKeys: [], rosterMapping: null });
+    expect(clubFormDraftSchema.safeParse(draft(registrationLike())).success).toBe(false);
+    expect(clubFormDraftShapeSchema.safeParse(draft(registrationLike())).success).toBe(false);
+    const plain = { title: "Sample form", description: "", confirmationMessage: "Thanks.", sections: [{ id: "section_a", title: "Questions", description: "", fields: [{ id: "field_note", key: "note", label: "Note", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] }] }] };
+    expect(clubFormDraftSchema.safeParse(draft(plain)).success).toBe(true);
+  });
+
+  it("is refused by the question library through the real prepareLibraryFragment", () => {
+    const member = memberField(registrationLike());
+    expect(() => prepareLibraryFragment([member])).toThrow(/member list/);
+    expect(() => prepareLibraryFragment([{ id: "field_note", key: "note", label: "Note", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] }])).not.toThrow();
   });
 
   it("refuses sensitive columns wherever a member list parses, not only in an information form", () => {
