@@ -179,7 +179,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
                 <tr role="row">
                   <th role="columnheader" scope="col">Club</th>
                   <th role="columnheader" scope="col">Roster</th>
-                  <th role="columnheader" scope="col">This month&apos;s record</th>
+                  <th role="columnheader" scope="col">{"This month's record"}</th>
                   <th role="columnheader" scope="col">Open club</th>
                 </tr>
               </thead>
