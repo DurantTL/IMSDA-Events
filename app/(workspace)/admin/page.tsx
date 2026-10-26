@@ -285,7 +285,7 @@ export default async function SystemAdminPage({
           <span>{moduleRequests ? (moduleRequests.length === 0 ? "Nothing waiting" : `${moduleRequests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : moduleRequests.length} feature ${moduleRequests.length === 1 ? "request" : "requests"} waiting`) : "Unavailable"}</span>
         </div>
         {moduleRequests === null && <Unavailable what="The feature-request list" />}
-        <p><Link href="/admin/feature-requests">Review feature requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
+        <p><Link className={styles.fullReport} href="/admin/feature-requests">Review feature requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
       </section>
 
       <section className={styles.primaryColumn} id="upcoming-events" aria-labelledby="upcoming-events-heading">
