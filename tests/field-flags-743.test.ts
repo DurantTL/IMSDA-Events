@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { formTemplates, registrationFormDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
+import { formTemplates, registrationFormDefinitionSchema, formTemplateDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
+import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { isHealthTypeField, resolveFieldFlags, resolveFieldOffer, sectionTitleLookup, withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { choiceAnswerCounts, choiceExportRows, listChoiceQuestions, matchesForChoice, resolveChoiceFilter } from "@/modules/registrations/choice-answer-filter";
 import { badgePositionOptions, buildBadgeCsvRows } from "@/modules/checkin/badge-csv";
@@ -433,7 +434,7 @@ describe("field flags: the builder box and the filter share one helper (SF2)", (
     for (const candidate of formTemplates) {
       const definition = candidate.definition as unknown as Record<string, unknown>;
       const offered = new Set(offeredKeys(definition, staff));
-      const parsed = registrationFormDefinitionSchema.parse(definition);
+      const parsed = (isInformationTemplateAudience(candidate.audience) ? formTemplateDefinitionSchema : registrationFormDefinitionSchema).parse(definition);
       const allFields = parsed.sections.flatMap((section) => section.fields);
       for (const entry of allFields) {
         const offer = resolveFieldOffer(entry, { allFields, sectionTitleOf: sectionTitleLookup(parsed.sections), paymentMethodFieldKey: parsed.payment?.paymentMethodFieldKey });

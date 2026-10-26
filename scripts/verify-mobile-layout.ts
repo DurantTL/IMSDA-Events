@@ -903,6 +903,35 @@ async function cleanupStaffInviteEvent(prisma: PrismaClient) {
   ]);
 }
 
+/** A published general information form from the Annual Adventurer Club Registration template (#1222), with its member list. */
+async function seedInformationForm(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { adventurerInformationTemplates } = await import("../modules/information-forms/adventurer-templates");
+  const template = adventurerInformationTemplates.find((item) => item.key === "adventurer_annual_registration")!;
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  const slug = `${P}-adventurer-annual`;
+  if (!(await prisma.informationForm.findFirst({ where: { scopeKey: "GENERAL", slug }, select: { id: true } }))) {
+    await prisma.informationForm.create({
+      data: {
+        scope: "GENERAL", scopeKey: "GENERAL", name: template.name, slug, status: "OPEN", createdByUserId: admin.id,
+        versions: { create: { createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: template.definition } },
+      },
+    });
+  }
+  return [{
+    name: "public-information-form-member-list",
+    path: `/forms/${slug}`,
+    role: "visitor",
+    expectText: /Annual Adventurer Club Registration/i,
+    prepare: async (page) => {
+      await page.getByRole("button", { name: /Add another member/i }).click();
+    },
+  }];
+}
+
+async function cleanupInformationForm(prisma: PrismaClient) {
+  await prisma.informationForm.deleteMany({ where: { scopeKey: "GENERAL", slug: `${P}-adventurer-annual` } });
+}
+
 /** Removes everything seedPbeEvent made, children before parents, including what the link code wrote (registrations, people, mail, audit). */
 async function cleanupPbeEvent(prisma: PrismaClient) {
   const exists = await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } });
@@ -1062,6 +1091,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
+  await cleanupInformationForm(prisma).catch((error: Error) => console.error(`Could not remove the synthetic information form: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
@@ -3903,6 +3933,7 @@ async function main() {
     pages.push(...pbePages(await seedPbeEvent(prisma)));
     pages.push(...await seedCancellationEvent(prisma));
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
+    pages.push(...await seedInformationForm(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
     browser = await chromium.launch({

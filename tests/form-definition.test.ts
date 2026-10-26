@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { calculateRosterTotal, formTemplates, numberFieldBounds, registrationFormDefinitionSchema, resolveBillingContactName, resolveResponsibleOrganization, summarizeChoiceUsage, validateTestResponses } from "@/modules/forms/definition";
+import { calculateRosterTotal, formTemplates, numberFieldBounds, formTemplateDefinitionSchema,
+  registrationFormDefinitionSchema, resolveBillingContactName, resolveResponsibleOrganization, summarizeChoiceUsage, validateTestResponses } from "@/modules/forms/definition";
 import { withDirectoryOptions } from "@/modules/organizations/directory-form-options";
 
 function ageForm(ageBounds?: { minimumAge: number | null; maximumAge: number | null }) {
@@ -24,7 +25,8 @@ function ageForm(ageBounds?: { minimumAge: number | null; maximumAge: number | n
 describe("registration form definitions", () => {
   it("ships valid starter templates", () => {
     expect(new Set(formTemplates.map((template) => template.key)).size).toBe(formTemplates.length);
-    for (const template of formTemplates) expect(registrationFormDefinitionSchema.safeParse(template.definition).success).toBe(true);
+    // Information form templates (#1222) use the shared structure; a registration form never takes a member list.
+    for (const template of formTemplates) expect(formTemplateDefinitionSchema.safeParse(template.definition).success).toBe(true);
   });
 
   it("requires an always-visible required name for every repeatable attendee", () => {

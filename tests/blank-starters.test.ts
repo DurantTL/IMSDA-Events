@@ -1,3 +1,4 @@
+import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dependencies = vi.hoisted(() => ({ getPrisma: vi.fn() }));
@@ -95,7 +96,8 @@ describe("blank form templates (#592)", () => {
     expect(club[0]).toMatchObject({ key: BLANK_CLUB_FORM_KEY, name: "Blank form" });
     expect(general.filter((template) => template.key === BLANK_CLUB_FORM_KEY)).toEqual([]);
     expect(club.filter((template) => template.key === BLANK_FORM_KEY)).toEqual([]);
-    expect(general.length).toBe(formTemplates.length - 1);
+    // Information form templates (#1149, #1222) are never offered for a registration form.
+    expect(general.length).toBe(formTemplates.filter((template) => !isInformationTemplateAudience(template.audience)).length - 1);
   });
 });
 

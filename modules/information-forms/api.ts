@@ -22,7 +22,7 @@ import {
   setInformationFormStatus,
   updateInformationFormSettings,
 } from "@/modules/information-forms/repository";
-import { buildInformationFormResponsesCsv, getInformationFormResponse, listInformationFormResponses } from "@/modules/information-forms/responses";
+import { buildInformationFormMembersCsv, buildInformationFormResponsesCsv, getInformationFormResponse, listInformationFormResponses } from "@/modules/information-forms/responses";
 import { logError } from "@/lib/logger";
 
 /**
@@ -32,7 +32,8 @@ import { logError } from "@/lib/logger";
  * here runs before `authorize` succeeds, and every query is limited to that target.
  */
 
-export type InformationFormAuthorization = { userId: string; target: InformationFormTarget };
+/** `isSystemAdmin` decides who may change the response-alert addresses (#1222): event staff with MANAGE_FORMS may not. */
+export type InformationFormAuthorization = { userId: string; isSystemAdmin: boolean; target: InformationFormTarget };
 
 const noStore = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -101,8 +102,12 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
       const input = informationFormStatusSchema.parse(body);
       return json({ form: await setInformationFormStatus(target, params.formId, userId, input.status) });
     }),
-    updateSettings: (request: Request, params: FormParams) => write(request, params, async ({ userId, target }, body) => {
+    updateSettings: (request: Request, params: FormParams) => write(request, params, async ({ userId, target, isSystemAdmin }, body) => {
       const input = informationFormSettingsSchema.parse(body);
+      // Who is emailed is a system administrator's call, for general and event forms alike (#1222).
+      if (input.submissionNotifyEmails !== undefined && !isSystemAdmin) {
+        throw new AccessDeniedError("Only a system administrator can change who is emailed when a response arrives.", 403, "PERMISSION_DENIED");
+      }
       return json({ form: await updateInformationFormSettings(target, params.formId, userId, input) });
     }),
     listResponses: (request: Request, params: FormParams) => read(params, async ({ target }) => {
@@ -111,7 +116,9 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
     }),
     getResponse: (request: Request, params: ResponseParams) => read(params, async ({ target }) => json({ response: await getInformationFormResponse(target, params.formId, params.responseId) })),
     exportResponses: (request: Request, params: FormParams) => read(params, async ({ userId, target }) => {
-      const file = await buildInformationFormResponsesCsv(target, params.formId, userId);
+      // `?format=members` is one row per member of a form's member list (#1222); otherwise one row per response.
+      const members = new URL(request.url).searchParams.get("format") === "members";
+      const file = members ? await buildInformationFormMembersCsv(target, params.formId, userId) : await buildInformationFormResponsesCsv(target, params.formId, userId);
       return new Response(file.csv, { headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${file.filename}"`,

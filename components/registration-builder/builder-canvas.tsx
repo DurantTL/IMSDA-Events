@@ -57,6 +57,8 @@ export function FieldPreviewControl({ field }: { field: RegistrationFormField })
       return <span className="fb-fee">{field.priceCents === undefined ? "Fee set in the question settings" : `Fee: ${money(field.priceCents)}`}</span>;
     case "ADDRESS":
       return <span className="fb-address"><span className="fb-input">Street address</span><span className="fb-input">City, state, ZIP</span></span>;
+    case "MEMBER_LIST":
+      return <span className="fb-address">{(field.memberColumns ?? []).map((column) => <span className="fb-input" key={column.key}>{column.label}</span>)}<span className="fb-hint">Repeating rows, one per member.</span></span>;
     default:
       return <span className="fb-input">{field.placeholder}</span>;
   }

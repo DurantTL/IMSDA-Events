@@ -14,6 +14,7 @@ import { loadFormTemplate } from "@/modules/forms/seeded-templates";
 import { slugCandidate, slugify } from "@/modules/forms/slug";
 import { blankInformationFormDefinition, parseInformationFormDefinition, type InformationFormDefinition } from "@/modules/information-forms/definition";
 import { scopeKeyFor, scopeWhere, type InformationFormTarget } from "@/modules/information-forms/domain";
+import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { InformationFormError } from "@/modules/information-forms/errors";
 
 /**
@@ -213,7 +214,7 @@ export async function updateInformationFormSettings(
   target: InformationFormTarget,
   formId: string,
   actorUserId: string,
-  input: { fillAccess?: InformationFormFillAccess; opensAt?: Date | null; closesAt?: Date | null },
+  input: { fillAccess?: InformationFormFillAccess; opensAt?: Date | null; closesAt?: Date | null; submissionNotifyEmails?: string[] },
 ) {
   await writeTransaction(target, formId, async (tx) => {
     const form = await tx.informationForm.findFirst({ where: { id: formId, ...scopeWhere(target) } });
@@ -223,12 +224,24 @@ export async function updateInformationFormSettings(
     if (opensAt && closesAt && closesAt.getTime() <= opensAt.getTime()) {
       throw new InformationFormError("INVALID_REQUEST", "The closing time must be after the opening time.");
     }
+    // Judged against the addresses stored now: an old saved address passes, a new one must be valid.
+    let notifyEmails: string[] | undefined;
+    if (input.submissionNotifyEmails !== undefined) {
+      const parsed = parseAlertRecipients(input.submissionNotifyEmails, form.submissionNotifyEmails);
+      if (!parsed.ok) throw new InformationFormError("INVALID_REQUEST", parsed.message, [{ key: "submissionNotifyEmails", message: parsed.message }]);
+      notifyEmails = parsed.emails;
+    }
     await tx.informationForm.update({ where: { id: formId }, data: {
+      ...(notifyEmails !== undefined ? { submissionNotifyEmails: notifyEmails } : {}),
       ...(input.fillAccess !== undefined ? { fillAccess: input.fillAccess } : {}),
       ...(input.opensAt !== undefined ? { opensAt: input.opensAt } : {}),
       ...(input.closesAt !== undefined ? { closesAt: input.closesAt } : {}),
     } });
-    await audit(tx, target, actorUserId, formId, "INFORMATION_FORM_SETTINGS_UPDATED", `Updated the settings of ${form.name}.`, { fields: Object.keys(input) });
+    await audit(tx, target, actorUserId, formId, "INFORMATION_FORM_SETTINGS_UPDATED", `Updated the settings of ${form.name}.`, {
+      fields: Object.keys(input),
+      // Counts only: an address never reaches the audit log.
+      ...(notifyEmails !== undefined ? { previousRecipientCount: form.submissionNotifyEmails.length, newRecipientCount: notifyEmails.length } : {}),
+    });
   });
   return getInformationForm(target, formId);
 }

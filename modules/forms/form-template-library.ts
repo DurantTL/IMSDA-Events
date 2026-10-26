@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
-import { assertNoReservedChoiceValues, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { assertNoReservedChoiceValues, formTemplateDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import {
   assertTemplateHasNoPolicyVersions,
@@ -101,7 +101,7 @@ export async function listFormTemplateLibrary(): Promise<FormTemplateLibraryEntr
       // Not synced yet: the code's copy is what the app uses.
       return { key, name: fromCode!.name, audience: fromCode!.audience, version: fromCode!.version ?? 1, source: "CODE", usedByForms: (counts.get(key) ?? 0), unreadable: false, appCreated: false, updatedAt: null, updatedBy: null };
     }
-    const readable = registrationFormDefinitionSchema.safeParse(row.definition).success;
+    const readable = formTemplateDefinitionSchema.safeParse(row.definition).success;
     const latestApp = row.latestSource === "APP" ? latestAppVersions.find((version) => version.templateId === row.id && version.version === row.version) : undefined;
     return {
       key, name: row.name, audience: row.audience, version: readable ? row.version : null, source: row.latestSource, usedByForms: (counts.get(key) ?? 0),
@@ -138,7 +138,7 @@ export async function getFormTemplateForEditor(key: string): Promise<FormTemplat
   if (!row) {
     return {
       key, name: code!.name, description: code!.description, audience: code!.audience, version: code!.version ?? 1, source: "CODE", appCreated: false,
-      definition: registrationFormDefinitionSchema.parse(structuredClone(code!.definition)), repairingUnreadable: false, usedByForms, versions: [],
+      definition: formTemplateDefinitionSchema.parse(structuredClone(code!.definition)), repairingUnreadable: false, usedByForms, versions: [],
     };
   }
   const names = await authorNames(row.versions.flatMap((version) => (version.createdByUserId ? [version.createdByUserId] : [])));
@@ -146,14 +146,14 @@ export async function getFormTemplateForEditor(key: string): Promise<FormTemplat
     version: version.version, source: version.source, createdAt: version.createdAt.toISOString(),
     createdBy: version.createdByUserId ? names.get(version.createdByUserId) ?? null : null,
   }));
-  const stored = registrationFormDefinitionSchema.safeParse(row.definition);
+  const stored = formTemplateDefinitionSchema.safeParse(row.definition);
   if (stored.success) {
     return { key, name: row.name, description: row.description, audience: row.audience, version: row.version, source: row.latestSource, appCreated: !code, definition: stored.data, repairingUnreadable: false, usedByForms, versions };
   }
   if (!code) throw new FormTemplateError("TEMPLATE_UNREADABLE", "This template's stored definition can no longer be read, so it cannot be opened.");
   return {
     key, name: code.name, description: code.description, audience: code.audience, version: row.version, source: row.latestSource, appCreated: false,
-    definition: registrationFormDefinitionSchema.parse(structuredClone(code.definition)), repairingUnreadable: true, usedByForms, versions,
+    definition: formTemplateDefinitionSchema.parse(structuredClone(code.definition)), repairingUnreadable: true, usedByForms, versions,
   };
 }
 
@@ -163,7 +163,7 @@ export async function getFormTemplateForEditor(key: string): Promise<FormTemplat
  * writes a template runs this.
  */
 function prepareTemplateDefinition(raw: unknown): RegistrationFormDefinition {
-  const parsed = registrationFormDefinitionSchema.safeParse(raw);
+  const parsed = formTemplateDefinitionSchema.safeParse(raw);
   if (!parsed.success) throw new FormTemplateError("INVALID_TEMPLATE", parsed.error.issues[0]?.message ?? "The form definition is not valid.");
   const definition = withExplicitSensitiveFlags(parsed.data);
   assertTemplateHasNoPolicyVersions(definition);
@@ -300,7 +300,7 @@ export async function saveFormAsTemplate(input: SaveFormAsTemplateInput, actorUs
         select: { id: true, definition: true },
       });
       if (!version) throw new FormTemplateError("FORM_NOT_FOUND", "That registration form version was not found.");
-      const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
+      const parsed = formTemplateDefinitionSchema.safeParse(version.definition);
       if (!parsed.success) throw new FormTemplateError("INVALID_TEMPLATE", "That form version's stored definition cannot be read, so it cannot be saved as a template.");
       const { definition: portable, replacedLabels } = replacePolicyVersionAcknowledgments(parsed.data);
       const definition = prepareTemplateDefinition(portable);

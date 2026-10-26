@@ -25,7 +25,7 @@ import {
 } from "@/components/registration-builder/palette-registry";
 import { nextTabIndex, tabAfterSelectionChange } from "@/components/registration-builder/sidebar-tabs";
 import { builderFieldModules, type BuilderModuleDefinition } from "@/modules/forms/builder-modules";
-import { formFieldTypes, getFormTemplate, registrationFormDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { formFieldTypes, formTemplateDefinitionSchema, getFormTemplate, registrationFormDefinitionSchema, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 
 const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
 
@@ -216,6 +216,10 @@ describe("what an entry adds (#1132)", () => {
         // A new acknowledgment waits for its wording, exactly as when the type is changed in the settings.
         expect(parsed.success).toBe(false);
         if (!parsed.success) expect(parsed.error.issues.every((issue) => issue.path.includes("acknowledgment"))).toBe(true);
+      } else if (entry.id === "type:MEMBER_LIST") {
+        // Offered in information forms only: a registration form refuses it, the shared structure accepts it (#1222).
+        expect(parsed.success).toBe(false);
+        expect(formTemplateDefinitionSchema.safeParse({ ...definition, sections: plan.sections }).success).toBe(true);
       } else {
         expect(parsed.success, `${entry.id}: ${parsed.success ? "" : JSON.stringify(parsed.error.issues)}`).toBe(true);
       }

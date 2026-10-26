@@ -4,8 +4,16 @@ import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibilityRuleProblems } from "@/modules/forms/visibility-rule";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
+import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
+import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
 
 export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
+/**
+ * The types an information form may use: the shared ones plus MEMBER_LIST (#1222). `formFieldTypes` stays without it, so the
+ * club form builder, the question library and the registration builder never offer or accept a member list; the registration
+ * definition schema refuses it explicitly (see `registrationFormDefinitionSchema`).
+ */
+export const informationFormFieldTypes = [...formFieldTypes, "MEMBER_LIST"] as const;
 export const formFieldScopes = ["REGISTRATION", "ATTENDEE"] as const;
 export const choiceFieldTypes = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE"] as const;
 export const conditionOperators = ["EQUALS", "NOT_EQUALS", "INCLUDES", "NOT_EMPTY"] as const;
@@ -140,13 +148,62 @@ export const acknowledgmentConfigSchema = z.discriminatedUnion("source", [
 ]);
 export type AcknowledgmentConfig = z.infer<typeof acknowledgmentConfigSchema>;
 
+export const memberColumnTypes = ["TEXT", "NUMBER", "SELECT"] as const;
+export const memberColumnSchema = z.object({
+  key: z.string().trim().min(2).max(40).regex(/^[a-z][a-z0-9_]*$/, "Member list column keys use lowercase letters, numbers, and underscores."),
+  label: z.string().trim().min(2).max(80),
+  type: z.enum(memberColumnTypes),
+  required: z.boolean(),
+}).strict();
+export type MemberListColumn = z.infer<typeof memberColumnSchema>;
+
+/** The most rows a member list answer can carry. */
+export const MEMBER_LIST_MAX_ROWS = 60;
+const MEMBER_TEXT_MAX = 120;
+const MEMBER_AGE_MAX = 120;
+
+/**
+ * What is wrong with a member list answer (#1222), or an empty list. The answer is an array of rows; a row has only the
+ * field's declared columns, each checked by its type. A row with every column empty is refused so a blank line never counts.
+ */
+export function memberListProblems(field: Pick<RegistrationFormField, "label" | "memberColumns" | "options">, value: unknown): string[] {
+  const label = field.label;
+  const columns = field.memberColumns ?? [];
+  if (!Array.isArray(value)) return [`${label} must be a list of rows.`];
+  if (value.length > MEMBER_LIST_MAX_ROWS) return [`${label} allows up to ${MEMBER_LIST_MAX_ROWS} rows.`];
+  const problems: string[] = [];
+  value.forEach((row, index) => {
+    const where = `${label}, row ${index + 1}`;
+    if (!row || typeof row !== "object" || Array.isArray(row)) { problems.push(`${where} is not valid.`); return; }
+    const record = row as Record<string, unknown>;
+    const known = new Set(columns.map((column) => column.key));
+    if (Object.keys(record).some((key) => !known.has(key))) { problems.push(`${where} has a column this form does not ask for.`); return; }
+    const filled = columns.some((column) => record[column.key] !== undefined && record[column.key] !== null && String(record[column.key]).trim() !== "");
+    if (!filled) { problems.push(`${where} is empty. Fill it in or remove it.`); return; }
+    for (const column of columns) {
+      const raw = record[column.key];
+      const empty = raw === undefined || raw === null || String(raw).trim() === "";
+      if (empty) { if (column.required) problems.push(`${where}: ${column.label} is required.`); continue; }
+      if (column.type === "TEXT") {
+        if (typeof raw !== "string" || raw.trim().length > MEMBER_TEXT_MAX) problems.push(`${where}: ${column.label} must be text of ${MEMBER_TEXT_MAX} characters or fewer.`);
+      } else if (column.type === "NUMBER") {
+        const number = typeof raw === "number" ? raw : typeof raw === "string" && /^\d{1,3}$/.test(raw.trim()) ? Number(raw) : Number.NaN;
+        if (!Number.isInteger(number) || number < 0 || number > MEMBER_AGE_MAX) problems.push(`${where}: ${column.label} must be a whole number from 0 to ${MEMBER_AGE_MAX}.`);
+      } else if (typeof raw !== "string" || !field.options.includes(raw)) {
+        problems.push(`${where}: ${column.label} must use one of its configured choices.`);
+      }
+    }
+  });
+  return problems;
+}
+
 export const formFieldSchema = z.object({
   id: z.string().trim().min(3).max(80),
   key: z.string().trim().min(2).max(60).regex(/^[a-z][a-z0-9_]*$/, "Field keys use lowercase letters, numbers, and underscores."),
   label: z.string().trim().min(2, "Every field needs a label.").max(120),
   helpText: z.string().trim().max(500).default(""),
   placeholder: z.string().trim().max(120).optional(),
-  type: z.enum(formFieldTypes),
+  type: z.enum(informationFormFieldTypes),
   scope: z.enum(formFieldScopes),
   required: z.boolean(),
   options: z.array(z.string().trim().min(1).max(120)).max(200).default([]),
@@ -227,6 +284,12 @@ export const formFieldSchema = z.object({
    */
   sensitive: z.boolean().optional(),
   /**
+   * The columns of a MEMBER_LIST field (#1222): repeating rows, one per person, each answering these columns. Only a
+   * MEMBER_LIST carries them. Information forms accept a member list only with the exact columns in
+   * `modules/information-forms/definition.ts`; the Select column takes its choices from `options`.
+   */
+  memberColumns: z.array(memberColumnSchema).min(1).max(6).optional(),
+  /**
    * What an ACKNOWLEDGMENT field records (#150). Required on that type and refused on every other. Evidence of each
    * acknowledgment lives in its own append-only table; the stored answer is only `true`.
    */
@@ -241,6 +304,20 @@ export const formFieldSchema = z.object({
     }
   } else if (field.acknowledgment) {
     context.addIssue({ code: "custom", path: ["acknowledgment"], message: "Only an acknowledgment field carries acknowledgment wording." });
+  }
+  if (field.type === "MEMBER_LIST") {
+    const columns = field.memberColumns ?? [];
+    if (columns.length === 0) context.addIssue({ code: "custom", path: ["memberColumns"], message: "A member list needs its columns." });
+    if (new Set(columns.map((column) => column.key)).size !== columns.length) context.addIssue({ code: "custom", path: ["memberColumns"], message: "Member list columns must have different keys." });
+    // Defense in depth (#1222): a column that reads as a sensitive answer is refused wherever a member list parses, not only by the information form check.
+    for (const column of columns) {
+      if (isSensitiveFieldText(column.label.replaceAll("_", " ")) || isSensitiveFieldText(column.key.replaceAll("_", " "))) {
+        context.addIssue({ code: "custom", path: ["memberColumns"], message: `The member list column "${column.label}" is not allowed: a member list cannot collect health, medical, birth-date or other sensitive answers.` });
+      }
+    }
+    if (columns.some((column) => column.type === "SELECT") && field.options.length < 2) context.addIssue({ code: "custom", path: ["options"], message: "A member list level column needs at least two choices." });
+  } else if (field.memberColumns) {
+    context.addIssue({ code: "custom", path: ["memberColumns"], message: "Only a member list carries columns." });
   }
   if (field.autoDate && field.type !== "DATE") {
     context.addIssue({ code: "custom", path: ["autoDate"], message: "Only a date question can fill in today's date." });
@@ -332,7 +409,8 @@ export function fieldRuns<T extends { group?: string }>(fields: readonly T[]) {
 export const formSectionSchema = z.object({
   id: z.string().trim().min(3).max(80),
   title: z.string().trim().min(2, "Every section needs a title.").max(120),
-  description: z.string().trim().max(500).default(""),
+  // 3,000: the Adventurer release text and purpose statement (#1222) are a section's own text, word for word.
+  description: z.string().trim().max(3000).default(""),
   stepLabel: z.string().trim().min(2).max(40).optional(),
   isReviewStep: z.boolean().optional(),
   fields: z.array(formFieldSchema).min(1, "Every section needs at least one field.").max(20),
@@ -358,7 +436,11 @@ export function assertNoReservedChoiceValues(definition: z.infer<typeof registra
   if (issues.length > 0) throw new z.ZodError(issues);
 }
 
-export const registrationFormDefinitionSchema = z.object({
+/**
+ * The structure of a form definition, member list included. Used by form templates and by information forms; every registration
+ * and club form path uses `registrationFormDefinitionSchema` below, which refuses a member list.
+ */
+export const formTemplateDefinitionSchema = z.object({
   title: z.string().trim().min(3, "Form title must be at least 3 characters.").max(120),
   description: z.string().trim().max(500).default(""),
   confirmationMessage: z.string().trim().min(3).max(500),
@@ -516,6 +598,15 @@ export const registrationFormDefinitionSchema = z.object({
       });
     }
   }
+});
+
+/** The registration form definition: the same structure, but a member list is refused (#1222). It belongs to information forms only. */
+export const registrationFormDefinitionSchema = formTemplateDefinitionSchema.superRefine((definition, context) => {
+  definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
+    if (field.type === "MEMBER_LIST") {
+      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "type"], message: "A member list can only be used in an information form." });
+    }
+  }));
 });
 
 /**
@@ -1481,6 +1572,9 @@ formTemplates.splice(
   conferencePatchesTemplate,
 );
 
+// The Adventurer club forms (#1222) are information form templates: the information form builder offers them, a registration form picker never does.
+formTemplates.push(...adventurerInformationTemplates);
+
 /**
  * Drops keys from the "at least one" rule (#606) that no longer name a field, and the rule itself once fewer
  * than two remain, so removing or renaming a referenced field never leaves a definition that cannot be saved.
@@ -1953,6 +2047,10 @@ export function validateTestResponses(
       if (field.type === "CHECKBOX" && typeof value !== "boolean") issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be checked or unchecked.` });
       // An acknowledgment is only ever given (`true`); `hasValue` already treats an unticked box as no answer (#150).
       if (field.type === "ACKNOWLEDGMENT" && value !== true) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be acknowledged.` });
+      if (field.type === "MEMBER_LIST") {
+        for (const message of memberListProblems(field, value)) issues.push({ fieldId: field.id, key: field.key, message });
+        continue;
+      }
       if (field.type === "ADDRESS") {
         for (const message of validateAddressValue(fieldDisplayLabel(field), value)) {
           issues.push({ fieldId: field.id, key: field.key, message });

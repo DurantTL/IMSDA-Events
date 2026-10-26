@@ -52,7 +52,7 @@ describe("the adapter", () => {
     expect(view.activeVersion.id).toBe("v2");
     expect(view.versions.map((version) => [version.versionNumber, version.status])).toEqual([[2, "DRAFT"], [1, "ARCHIVED"]]);
     expect(view.eventId).toBe("");
-    expect(view.information).toEqual({ status: "DRAFT", fillAccess: "SIGNED_IN", opensAt: "2026-02-01T10:00:00.000Z", closesAt: null });
+    expect(view.information).toEqual({ status: "DRAFT", fillAccess: "SIGNED_IN", opensAt: "2026-02-01T10:00:00.000Z", closesAt: null, submissionNotifyEmails: [] });
     expect(view.activeVersion.testSubmissions).toEqual([]);
   });
 

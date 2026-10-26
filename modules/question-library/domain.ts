@@ -26,7 +26,14 @@ export type QuestionLibraryFragment = { fields: RegistrationFormField[] };
 
 export const questionLibraryFragmentSchema = z.object({
   fields: z.array(formFieldSchema).min(1, "Choose at least one question to save.").max(MAX_LIBRARY_FIELDS, `A saved question holds at most ${MAX_LIBRARY_FIELDS} fields.`),
-}).strict();
+}).strict().superRefine((fragment, context) => {
+  // A member list belongs to information forms only (#1222); the library feeds registration and club forms too.
+  fragment.fields.forEach((field, index) => {
+    if (field.type === "MEMBER_LIST") {
+      context.addIssue({ code: "custom", path: ["fields", index, "type"], message: `"${field.label}" is a member list, which only an information form can use, so it cannot be saved to the library.` });
+    }
+  });
+});
 
 const nameSchema = z.string().trim().min(1, "Enter a name for the saved question.").max(120);
 const descriptionSchema = z.string().trim().max(500);

@@ -651,6 +651,8 @@ enum MessageTemplateKey {
   CLUB_TEAM_ADVANCEMENT_NOTICE
   /// A club form was submitted (#1017): one internal email per address on the form's alert list. Names, a time and a staff link; never an answer.
   CLUB_FORM_SUBMITTED
+  /// An information form got a response (#1222): one internal email per address on the form's alert list. The form's name, a time and a staff link; never an answer.
+  INFORMATION_FORM_SUBMITTED
   /// A registrant's cancellation request was received (#170). Status only: never the reason, the amount or the outcome.
   CANCELLATION_REQUEST_RECEIVED
   /// A cancellation request changed status (#170). Status only: never the reason, the amount or a staff note.
@@ -4401,6 +4403,9 @@ model InformationForm {
   closesAt                DateTime?
   createdByUserId         String
   sourceTemplateVersionId String?
+  /// Addresses emailed when a response arrives (#1222), at most 10, set in the form's settings and not versioned with the
+  /// definition. Empty means no email. The email never carries answers.
+  submissionNotifyEmails  String[]                  @default([])
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
 

@@ -1,9 +1,10 @@
 import "server-only";
 
 import type { InformationFormTarget } from "@/modules/information-forms/domain";
+import { parseStoredInformationFormDefinition } from "@/modules/information-forms/definition";
 import { InformationFormError } from "@/modules/information-forms/errors";
 import { getInformationForm } from "@/modules/information-forms/repository";
-import { getInformationFormResponse, listInformationFormResponses } from "@/modules/information-forms/responses";
+import { getInformationFormResponse, listInformationFormResponses, memberListFieldKeys } from "@/modules/information-forms/responses";
 
 export const RESPONSES_PAGE_SIZE = 50;
 
@@ -21,7 +22,8 @@ export async function loadInformationFormResponsesPage(target: InformationFormTa
         throw error;
       })
       : null;
-    return { name: form.name, total: page.total, rows: page.responses, nextCursor: page.nextCursor, selected };
+    const hasMemberList = form.versions.some((version) => version.status !== "DRAFT" && memberListFieldKeys(parseStoredInformationFormDefinition(version.definition)).length > 0);
+    return { name: form.name, hasMemberList, total: page.total, rows: page.responses, nextCursor: page.nextCursor, selected };
   } catch (error) {
     if (error instanceof InformationFormError && error.code === "FORM_NOT_FOUND") return null;
     throw error;

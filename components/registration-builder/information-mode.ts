@@ -17,6 +17,8 @@ export type InformationBuilderConfig = {
   eventSlug: string | null;
   /** What the form belongs to, shown in the preview: the event's name, or "General forms". */
   ownerLabel: string;
+  /** Only a system administrator edits the response-alert addresses (#1222). */
+  canEditRecipients: boolean;
 };
 
 export type InformationFillAccess = "ANYONE_WITH_LINK" | "SIGNED_IN";
@@ -28,6 +30,8 @@ export type InformationFormExtras = {
   fillAccess: InformationFillAccess;
   opensAt: string | null;
   closesAt: string | null;
+  /** Addresses emailed when a response arrives (#1222). */
+  submissionNotifyEmails: string[];
 };
 
 type DateLike = string | Date;
@@ -41,6 +45,7 @@ export type InformationFormApi = {
   fillAccess: InformationFillAccess;
   opensAt: DateLike | null;
   closesAt: DateLike | null;
+  submissionNotifyEmails?: string[];
   createdAt: DateLike;
   updatedAt: DateLike;
   versions: Array<{
@@ -55,11 +60,11 @@ export type InformationFormApi = {
 };
 
 export function generalInformationConfig(): InformationBuilderConfig {
-  return { scope: "GENERAL", eventId: null, eventSlug: null, ownerLabel: "General forms" };
+  return { scope: "GENERAL", eventId: null, eventSlug: null, ownerLabel: "General forms", canEditRecipients: true };
 }
 
-export function eventInformationConfig(event: { id: string; slug: string; name: string }): InformationBuilderConfig {
-  return { scope: "EVENT", eventId: event.id, eventSlug: event.slug, ownerLabel: event.name };
+export function eventInformationConfig(event: { id: string; slug: string; name: string }, isSystemAdmin = false): InformationBuilderConfig {
+  return { scope: "EVENT", eventId: event.id, eventSlug: event.slug, ownerLabel: event.name, canEditRecipients: isSystemAdmin };
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +147,7 @@ export function informationFormToView(form: InformationFormApi): FormView {
     createdBy: "",
     activeVersion,
     versions,
-    information: { status: form.status, fillAccess: form.fillAccess, opensAt: isoOrNull(form.opensAt), closesAt: isoOrNull(form.closesAt) },
+    information: { status: form.status, fillAccess: form.fillAccess, opensAt: isoOrNull(form.opensAt), closesAt: isoOrNull(form.closesAt), submissionNotifyEmails: form.submissionNotifyEmails ?? [] },
   };
 }
 
@@ -306,7 +311,7 @@ export function publishInformationDraftRequest(config: InformationBuilderConfig,
   return call(fetchImpl, informationFormApiPath(config, formId, "/publish"), "POST", { expectedUpdatedAt });
 }
 
-export function saveInformationSettingsRequest(config: InformationBuilderConfig, formId: string, settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null }, fetchImpl: typeof fetch = fetch) {
+export function saveInformationSettingsRequest(config: InformationBuilderConfig, formId: string, settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null; submissionNotifyEmails?: string[] }, fetchImpl: typeof fetch = fetch) {
   return call(fetchImpl, informationFormApiPath(config, formId, "/settings"), "PATCH", settings);
 }
 

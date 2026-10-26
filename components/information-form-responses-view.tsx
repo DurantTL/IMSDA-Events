@@ -16,6 +16,8 @@ const submittedFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", 
 
 /** One answer as readable text: lists joined, yes/no for a checkbox, an address on one line. */
 export function answerText(value: unknown): string {
+  // A member list (#1222): one member per line of text, "name, age, level, working on".
+  if (Array.isArray(value) && value.some((item) => item && typeof item === "object")) return value.map((item) => answerText(item)).join("; ");
   if (Array.isArray(value)) return value.map((item) => String(item)).join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).filter((part) => part !== "" && part !== null && part !== undefined).map(String).join(", ");
@@ -38,12 +40,14 @@ export function responseColumns(rows: ResponseRowView[]) {
  * event page (MANAGE_FORMS). The caller has already authorized the viewer and loaded the data through the module's
  * target-scoped queries; nothing here reads data itself.
  */
-export function InformationFormResponsesView({ formName, total, rows, selected, exportHref, rowHref, closeHref, nextHref }: {
+export function InformationFormResponsesView({ formName, total, rows, selected, exportHref, membersExportHref, rowHref, closeHref, nextHref }: {
   formName: string;
   total: number;
   rows: ResponseRowView[];
   selected: ResponseRowView | null;
   exportHref: string;
+  /** Set when the form has a member list: a CSV with one row per member. */
+  membersExportHref?: string | undefined;
   rowHref: (id: string) => string;
   closeHref: string;
   nextHref: string | null;
@@ -53,7 +57,12 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
     <section className="page-stack information-form-responses">
       <StaffPageHeader
         description={`${formName}: answers sent through the form's public link.`}
-        primary={total > 0 ? <a className="secondary-button information-form-download" download href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</a> : undefined}
+        primary={total > 0 ? (
+          <>
+            <a className="secondary-button information-form-download" download href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
+            {membersExportHref && <a className="secondary-button information-form-download" download href={membersExportHref}><Download aria-hidden="true" size={16} /> Download members CSV</a>}
+          </>
+        ) : undefined}
       />
       <section className="panel">
         <h2 className="information-form-count">{total.toLocaleString("en-US")} {total === 1 ? "response" : "responses"}</h2>

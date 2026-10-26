@@ -30,10 +30,10 @@ describe("notification catalog (#1016)", () => {
     expect(isNotificationKey(undefined)).toBe(false);
   });
 
-  it("covers the ten send sites the issue traced, plus the club form alert (#1017), the registration form notifications (#1081) the honor instructor class emails (#1098) and the honor watch summaries (#1099)", () => {
-    expect(notificationKeys).toHaveLength(14);
+  it("covers the ten send sites the issue traced, plus the club form alert (#1017), the information form response alert (#1222), the registration form notifications (#1081) the honor instructor class emails (#1098) and the honor watch summaries (#1099)", () => {
+    expect(notificationKeys).toHaveLength(15);
     const built = notificationCatalog.filter((entry) => entry.built);
-    expect(built).toHaveLength(14);
+    expect(built).toHaveLength(15);
     const ready = notificationCatalog.find((entry) => entry.key === "CLUB_FORM_SUBMITTED");
     expect(ready?.built).toBe(true);
   });
