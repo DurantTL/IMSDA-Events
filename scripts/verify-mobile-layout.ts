@@ -202,6 +202,8 @@ const pages: PageSpec[] = [
   { name: "public-calendar", path: "/calendar", role: "visitor" },
   { name: "public-home", path: "/", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
+  // The public Club forms list (#1221).
+  { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },
   { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
   { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /unsubscribe link didn.t work/i },
   { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /isn.t available/i },
@@ -251,6 +253,8 @@ const pages: PageSpec[] = [
   // No area club Orders page (#918): club Orders are not an Area Coordinator's to see; the route answers 404.
   area("club-honors", `/account/area/${clubA}/honors`),
   area("club-forms", `/account/area/${clubA}/forms`),
+  // A new form's fill-in page (#1221): the Can Collecting Report, as the director. Turned on by this script's seed.
+  { name: "club-form-can-collecting-new", path: `/account/clubs/${clubA}/forms/can_collecting_report/new`, role: "director" },
   area("club-awards", `/account/area/${clubA}/awards`),
   area("health", "/account/area/health"),
   // Staff, as an event administrator.
@@ -1279,6 +1283,9 @@ async function seedSynthetic(prisma: PrismaClient) {
       },
     });
   }
+
+  // #1221: the Can Collecting Report is turned on here so its fill-in page can be audited (the sync creates it off).
+  await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { enabled: true } });
 
   // New club applications (#817): one waiting at a church that already has a club (a duplicate flag), one typed church, one declined; plus a private link.
   const { hashOpaqueToken } = await import("../modules/access/tokens");

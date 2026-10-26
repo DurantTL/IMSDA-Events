@@ -18,6 +18,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${baseUrl}/clubs`,
     changeFrequency: "weekly" as const,
     priority: 0.7,
+  }, {
+    url: `${baseUrl}/clubs/forms`,
+    changeFrequency: "weekly" as const,
+    priority: 0.6,
   }, ...events.map((event) => ({
     url: `${baseUrl}/events/${encodeURIComponent(event.slug)}`,
     lastModified: event.updatedAt,

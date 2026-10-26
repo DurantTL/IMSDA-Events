@@ -59,6 +59,17 @@ export async function resolveAreaCoordinatorViewer(): Promise<Extract<ClubFormsV
 }
 
 /**
+ * For the Area Coordinator's send-a-link route (#1221): an active Area Coordinator, or a system administrator acting
+ * as one, or a 403. A removed or expired grant resolves to no viewer. Which clubs they may send for
+ * is `viewerCanSendLinkForClub` (all clubs until #843).
+ */
+export async function requireAreaCoordinatorViewer() {
+  const viewer = await resolveAreaCoordinatorViewer();
+  if (viewer) return viewer;
+  throw new AccessDeniedError("Area Coordinator access is required.", 403, "PERMISSION_DENIED");
+}
+
+/**
  * Conference staff for club forms (Caleb, 2026-09-29): system administrators,
  * and Event Admins of an event that has not ended. Nobody else, whatever other
  * permissions they hold: not check-in, read-only, communications, registration

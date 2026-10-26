@@ -185,6 +185,11 @@ async function main() {
     "TEMPLATE_NOT_FOUND",
     "a disabled form can't be sent by link",
   );
+  await expectCode(
+    links.createClubFormLink(area, { organizationId: clubs.a, templateKey: SLIP, recipientEmail: `coordinator@${emailDomain}` }),
+    "TEMPLATE_NOT_FOUND",
+    "a disabled form can't be sent by an Area Coordinator either",
+  );
   for (const key of templateKeys) await templates.setClubFormTemplateEnabled(key, true, users.admin);
   assert((await templates.listEnabledClubFormTemplates()).filter((row) => templateKeys.includes(row.key)).length === 4, "an enabled form shows to clubs");
   const slipRow = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } });
@@ -254,12 +259,19 @@ async function main() {
       "FORBIDDEN",
       "only the club's director writes",
     );
-    await expectCode(
-      links.createClubFormLink(viewer, { organizationId: clubs.a, templateKey: SLIP, recipientEmail: `x@${emailDomain}` }),
-      "FORBIDDEN",
-      "only the club's director sends a link",
-    );
+    // #1221: an Area Coordinator may send a link too (for any club); conference staff may not.
+    if (viewer !== area) {
+      await expectCode(
+        links.createClubFormLink(viewer, { organizationId: clubs.a, templateKey: SLIP, recipientEmail: `x@${emailDomain}` }),
+        "FORBIDDEN",
+        "only the club's director or an Area Coordinator sends a link",
+      );
+    }
   }
+  const areaSent = await links.createClubFormLink(area, { organizationId: clubs.a, templateKey: SLIP, recipientEmail: `coordinator@${emailDomain}` });
+  const areaLinkRow = await prisma.clubFormLink.findUniqueOrThrow({ where: { id: areaSent.linkId } });
+  assert(areaLinkRow.organizationId === clubs.a && areaLinkRow.createdAs === "AREA_COORDINATOR" && areaLinkRow.createdByAccountId === accounts.area, "an Area Coordinator's link belongs to the club and records who sent it and as what");
+  await links.revokeClubFormLink(directorA, clubs.a, areaSent.linkId);
 
   const areaList = await submissions.listSubmissionsForViewer(area, { organizationId: clubs.a });
   assert(areaList.length === 1 && areaList[0].status === "SUBMITTED", "an Area Coordinator sees submitted forms only");

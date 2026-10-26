@@ -67,7 +67,6 @@ import { openSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 const now = new Date("2026-10-05T15:00:00Z");
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const otherDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-b", actor: { kind: "ATTENDEE", accountId: "acct-9" } };
-const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
 const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
 
 const TOKEN = "T".repeat(43);
@@ -188,8 +187,8 @@ describe("sending a private link (#610)", () => {
     expect(capped.expiresAt).toEqual(new Date("2026-11-04T15:00:00Z"));
   });
 
-  it("is refused for anyone but this club's director or deputy", async () => {
-    for (const viewer of [otherDirector, areaCoordinator, staff]) {
+  it("is refused for anyone but this club's director or deputy, or an Area Coordinator", async () => {
+    for (const viewer of [otherDirector, staff]) {
       await expect(createClubFormLink(viewer, input, now)).rejects.toMatchObject({ code: "FORBIDDEN" });
     }
     expect(mocks.linkCreate).not.toHaveBeenCalled();

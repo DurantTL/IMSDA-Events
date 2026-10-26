@@ -12915,6 +12915,18 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .information-member-add, .information-member-remove { min-height: 44px; justify-self: start; }
 .fb-info-alerts textarea { width: 100%; min-height: 96px; }
 
+/* Public Club forms list (#1221) */
+.club-forms-index-group { display: grid; gap: 8px; }
+.club-forms-index-group h2 { margin: 0; font-size: 1.25rem; color: var(--ink); }
+.club-forms-index-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.club-forms-index-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+.club-forms-index-text { min-width: 0; display: grid; gap: 2px; }
+.club-forms-index-text h3 { margin: 0; font-size: 1rem; }
+.club-forms-index-text p { margin: 0; line-height: 1.4; }
+.club-forms-index-note { font-weight: 600; }
+.club-forms-index-action { min-height: 44px; white-space: nowrap; text-decoration: none; }
+@media (max-width: 520px) { .club-forms-index-item { flex-direction: column; align-items: stretch; } }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
