@@ -26,6 +26,7 @@ export default async function EventInformationFormResponsesPage({ searchParams }
     <InformationFormResponsesView
       closeHref={base}
       exportHref={`/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export`}
+      membersExportHref={data.hasMemberList ? `/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export?format=members` : undefined}
       formName={data.name}
       nextHref={data.nextCursor ? `${base}&cursor=${encodeURIComponent(data.nextCursor)}` : null}
       rowHref={(id) => `${base}&response=${encodeURIComponent(id)}`}

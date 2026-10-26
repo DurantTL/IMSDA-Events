@@ -51,6 +51,8 @@ export type PaletteEntry = {
    * by a list. Set it only to override that.
    */
   informationForm?: boolean;
+  /** Offered only in an information form, never in a registration form (#1222). */
+  informationOnly?: boolean;
 };
 
 export type PaletteGroup = {
@@ -213,6 +215,7 @@ type TypeEntrySpec = {
   icon: LucideIcon;
   keywords: string[];
   extra?: (field: RegistrationFormField) => Partial<RegistrationFormField>;
+  informationOnly?: boolean;
 };
 
 const choiceOptions = ["Option one", "Option two"];
@@ -231,6 +234,15 @@ const typeEntrySpecs: TypeEntrySpec[] = [
   { type: "RANKED_CHOICE", label: "Ranked choice", description: "Put choices in order", group: PALETTE_GROUP_IDS.general, icon: ListOrdered, keywords: ["rank", "order", "first choice", "preference"], extra: () => ({ options: [...choiceOptions], minSelections: 2, maxSelections: 2 }) },
   { type: "CHECKBOX", label: "Checkbox", description: "One box to tick", group: PALETTE_GROUP_IDS.general, icon: SquareCheck, keywords: ["tick", "agree", "yes", "confirm"], extra: () => ({ placeholder: "Yes, I agree" }) },
   { type: "ACKNOWLEDGMENT", label: "Recorded acknowledgment", description: "A signed-off agreement, recorded with its wording", group: PALETTE_GROUP_IDS.agreements, icon: FileCheck2, keywords: ["agreement", "waiver", "release", "policy", "consent", "terms"], extra: (field) => acknowledgmentTypePatch(field, "ACKNOWLEDGMENT") },
+  { type: "MEMBER_LIST", label: "Member list", description: "Repeating rows of name, age, level and what they are working on", group: PALETTE_GROUP_IDS.people, icon: Users, keywords: ["members", "rows", "list", "adventurer", "club members"], informationOnly: true, extra: () => ({
+    options: ["Level one", "Level two"],
+    memberColumns: [
+      { key: "name", label: "Name", type: "TEXT", required: true },
+      { key: "age", label: "Age", type: "NUMBER", required: true },
+      { key: "level", label: "Level", type: "SELECT", required: true },
+      { key: "working_on", label: "Working on this year", type: "TEXT", required: false },
+    ],
+  }) },
   { type: "CALCULATED", label: "Automatic fee", description: "A fixed fee added to the total", group: PALETTE_GROUP_IDS.money, icon: Calculator, keywords: ["price", "registration fee", "cost", "charge", "payment"] },
 ];
 
@@ -242,6 +254,7 @@ function typeEntry(spec: TypeEntrySpec): PaletteEntry {
     group: spec.group,
     icon: spec.icon,
     keywords: spec.keywords,
+    ...(spec.informationOnly ? { informationOnly: true } : {}),
     add(context) {
       const field = baseField(context, spec.label, spec.type);
       return { fields: [{ ...field, ...spec.extra?.(field) }] };

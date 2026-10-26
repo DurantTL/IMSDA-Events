@@ -96,7 +96,7 @@ export function useInformationActions(
     setForms((current) => current.map((form) => (form.id === view.id ? mergeSettingsForm(form, view) : form)));
   }
 
-  async function saveSettings(settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null }) {
+  async function saveSettings(settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null; submissionNotifyEmails?: string[] }) {
     if (!information || !selectedForm) return false;
     setBusy("settings"); setError(""); setNotice("");
     try {

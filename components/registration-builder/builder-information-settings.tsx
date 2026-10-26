@@ -7,6 +7,8 @@ import { ExternalLink, Lock, LockOpen } from "lucide-react";
 import { useLoadedBuilder } from "./builder-context";
 import { informationPublicPath, informationResponsesHref, isoToLocalInput, localInputToIso, type InformationFillAccess } from "./information-mode";
 import { useHydrated } from "./use-editor-layout";
+import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
+import { INFORMATION_FORM_ALERT_MAX_RECIPIENTS } from "@/modules/information-forms/domain";
 
 const accessLabels: Record<InformationFillAccess, { title: string; hint: string }> = {
   ANYONE_WITH_LINK: { title: "Anyone with the link", hint: "No sign-in. Anyone who has the link can answer." },
@@ -26,7 +28,10 @@ function SettingsFields() {
   const [opens, setOpens] = useState(isoToLocalInput(current?.opensAt ?? null));
   const [closes, setCloses] = useState(isoToLocalInput(current?.closesAt ?? null));
   const [problem, setProblem] = useState("");
+  const [recipients, setRecipients] = useState((current?.submissionNotifyEmails ?? []).join("\n"));
+  const [recipientProblem, setRecipientProblem] = useState("");
   if (!information || !current) return null;
+  const savedRecipients = current.submissionNotifyEmails ?? [];
   const publicPath = informationPublicPath(information, selectedForm.slug);
   const changed = fillAccess !== current.fillAccess || opens !== isoToLocalInput(current.opensAt) || closes !== isoToLocalInput(current.closesAt);
 
@@ -37,6 +42,14 @@ function SettingsFields() {
     if (opensAt && closesAt && new Date(closesAt).getTime() <= new Date(opensAt).getTime()) { setProblem("The closing time must be after the opening time."); return; }
     setProblem("");
     await saveInformationSettings({ fillAccess, opensAt, closesAt });
+  }
+
+  async function saveRecipients() {
+    // The same check as the server: an address already saved is not held against the person re-saving the list.
+    const checked = parseAlertRecipients(recipients, savedRecipients);
+    if (!checked.ok) { setRecipientProblem(checked.message); return; }
+    setRecipientProblem("");
+    if (await saveInformationSettings({ submissionNotifyEmails: checked.emails })) setRecipients(checked.emails.join("\n"));
   }
 
   return (
@@ -59,6 +72,22 @@ function SettingsFields() {
         <p className="fb-hint">Times are in this browser&apos;s time zone. Leave a time empty for no limit. The form still has to be open (below) to accept answers.</p>
         {problem && <p className="form-error" role="alert">{problem}</p>}
         <button className="fb-btn outline" type="button" disabled={!changed || busy !== null} onClick={save}>{busy === "settings" ? "Saving…" : "Save settings"}</button>
+      </section>
+      <section className="panel fb-info-alerts" aria-labelledby="fb-info-alerts-title">
+        <div className="section-heading"><div><p className="eyebrow">Email</p><h2 id="fb-info-alerts-title">Email when a response arrives</h2></div></div>
+        <label>Email these addresses when a response arrives
+          <textarea
+            name="builder-info-notify-emails" autoComplete="off" spellCheck={false} rows={4} maxLength={2000}
+            aria-invalid={Boolean(recipientProblem)} aria-describedby={`fb-info-alerts-hint${recipientProblem ? " fb-info-alerts-error" : ""}`}
+            disabled={busy !== null} value={recipients}
+            onChange={(event) => { setRecipients(event.target.value); setRecipientProblem(""); }}
+          />
+        </label>
+        <p className="fb-hint" id="fb-info-alerts-hint">
+          One address per line, up to {INFORMATION_FORM_ALERT_MAX_RECIPIENTS}. Leave it empty to send nothing. Each address gets one email per response that says a response arrived and links to it here. The email never includes the answers: people sign in to read them. It also follows the &quot;Information form response received&quot; switch on the Notifications page.
+        </p>
+        {recipientProblem && <p className="form-error" id="fb-info-alerts-error" role="alert">{recipientProblem}</p>}
+        <button className="fb-btn outline" type="button" disabled={busy !== null || recipients.trim() === savedRecipients.join("\n").trim()} onClick={saveRecipients}>{busy === "settings" ? "Saving…" : "Save addresses"}</button>
       </section>
       <section className="panel fb-info-status" aria-labelledby="fb-info-status-title">
         <div className="section-heading"><div><p className="eyebrow">Open or close</p><h2 id="fb-info-status-title">Accepting answers</h2></div></div>

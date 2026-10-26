@@ -23,6 +23,7 @@ export const notificationKeys = [
   "MEMBER_TRANSFER_STARTED",
   "MEMBER_TRANSFER_COMPLETED",
   "CLUB_FORM_SUBMITTED",
+  "INFORMATION_FORM_SUBMITTED",
   "REGISTRATION_FORM_NOTIFICATIONS",
   "HONOR_INSTRUCTOR_CLASS_EMAILS",
   "HONOR_WATCH_SUMMARIES",
@@ -41,6 +42,8 @@ export type NotificationRecipientSource =
   | { kind: "event-list" }
   /** A list kept per club form, on that form's settings page; the club forms list is where to choose one. */
   | { kind: "club-form-list" }
+  /** A list kept per information form, in that form's Form settings tab (#1222). */
+  | { kind: "information-form-list" }
   /** A list kept per registration form, in that form's Notifications panel in the registration form builder (#1081). */
   | { kind: "registration-form-list" }
   /** A list kept per event, on that event's honor classes page (#1099). */
@@ -202,6 +205,17 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     sourceNote: "Set on each club form's settings page, under \"Email these addresses when this form is submitted\". An empty list sends nothing.",
     sentFrom: "modules/club-forms/submission-alert.ts",
     switchReadIn: ["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"],
+    built: true,
+  },
+  {
+    key: "INFORMATION_FORM_SUBMITTED",
+    name: "Information form response received",
+    when: "When someone answers an information form, such as the Adventurer club forms. The email names the form and when, and links to the response. It never carries the answers.",
+    recipients: "Set on each information form.",
+    source: { kind: "information-form-list" },
+    sourceNote: "Set in each information form's Form settings, under \"Email these addresses when a response arrives\". An empty list sends nothing.",
+    sentFrom: "modules/information-forms/submission-alert.ts",
+    switchReadIn: ["modules/information-forms/responses.ts"],
     built: true,
   },
   {

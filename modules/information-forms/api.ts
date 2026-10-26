@@ -22,7 +22,7 @@ import {
   setInformationFormStatus,
   updateInformationFormSettings,
 } from "@/modules/information-forms/repository";
-import { buildInformationFormResponsesCsv, getInformationFormResponse, listInformationFormResponses } from "@/modules/information-forms/responses";
+import { buildInformationFormMembersCsv, buildInformationFormResponsesCsv, getInformationFormResponse, listInformationFormResponses } from "@/modules/information-forms/responses";
 import { logError } from "@/lib/logger";
 
 /**
@@ -111,7 +111,9 @@ export function informationFormHandlers<P>(authorize: (params: P) => Promise<Inf
     }),
     getResponse: (request: Request, params: ResponseParams) => read(params, async ({ target }) => json({ response: await getInformationFormResponse(target, params.formId, params.responseId) })),
     exportResponses: (request: Request, params: FormParams) => read(params, async ({ userId, target }) => {
-      const file = await buildInformationFormResponsesCsv(target, params.formId, userId);
+      // `?format=members` is one row per member of a form's member list (#1222); otherwise one row per response.
+      const members = new URL(request.url).searchParams.get("format") === "members";
+      const file = members ? await buildInformationFormMembersCsv(target, params.formId, userId) : await buildInformationFormResponsesCsv(target, params.formId, userId);
       return new Response(file.csv, { headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${file.filename}"`,

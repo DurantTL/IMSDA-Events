@@ -67,6 +67,7 @@ export const fieldTypeLabels: Record<RegistrationFormField["type"], string> = {
   NUMBER: "Number",
   CALCULATED: "Automatic fee",
   ADDRESS: "Address",
+  MEMBER_LIST: "Member list",
 };
 
 export const choicePresets = [

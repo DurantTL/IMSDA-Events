@@ -14,8 +14,38 @@ const REFUSED_KEY_PATTERN = /(?:^|_)(?:payment|pay|price|fee|fees|tuition|promo|
 /** Labels that ask for a payment, roster, meal plan, lodging or attendee type. */
 const REFUSED_LABEL_PATTERN = /\b(?:payment|pay now|credit card|promo(?:tion)? code|meal (?:plan|ticket|selection|choice)s?|lodging|cabin (?:assignment|request|choice)|room (?:assignment|request)|housing|attendee type|roster)\b/i;
 
-function fieldRefusals(field: RegistrationFormField): string[] {
+/**
+ * The one exception to the no-roster rule (#1222, Caleb's decision of October 26): a MEMBER_LIST field, repeating rows that
+ * collect exactly a name, an age, a level and what the person is working on, for the Annual Adventurer Club Registration.
+ * The allowlist is the exact row shape: any other column, or a column of another type, is refused, and a column label that
+ * reads as sensitive (a birth date, health, a parent) is refused like any other label. The attendee scope and the
+ * attendee roster stay refused, and so does every sensitive-field rule.
+ */
+export const MEMBER_LIST_ALLOWED_COLUMNS = [
+  { key: "name", type: "TEXT" },
+  { key: "age", type: "NUMBER" },
+  { key: "level", type: "SELECT" },
+  { key: "working_on", type: "TEXT" },
+] as const;
+
+function memberListRefusals(field: RegistrationFormField): string[] {
+  if (field.type !== "MEMBER_LIST") return [];
   const reasons: string[] = [];
+  const columns = field.memberColumns ?? [];
+  const allowed = new Map<string, string>(MEMBER_LIST_ALLOWED_COLUMNS.map((column) => [column.key, column.type]));
+  const extra = columns.filter((column) => allowed.get(column.key) !== column.type);
+  if (extra.length > 0) reasons.push(`a member list may collect only name, age, level and what they are working on, not ${extra.map((column) => `"${column.label}"`).join(", ")}`);
+  if (MEMBER_LIST_ALLOWED_COLUMNS.some((column) => !columns.some((candidate) => candidate.key === column.key))) {
+    reasons.push("a member list must have exactly the name, age, level and working-on columns");
+  }
+  if (columns.some((column) => isSensitiveFieldText(column.label.replaceAll("_", " ")) || isSensitiveFieldText(column.key.replaceAll("_", " ")))) {
+    reasons.push("information forms cannot collect health, medical or other sensitive answers, including in a member list");
+  }
+  return reasons;
+}
+
+function fieldRefusals(field: RegistrationFormField): string[] {
+  const reasons: string[] = [...memberListRefusals(field)];
   if (field.priceCents !== undefined || field.choicePricesCents) reasons.push("information forms cannot carry prices");
   if (field.latePricing) reasons.push("information forms cannot carry late pricing");
   if (field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount) reasons.push("information forms cannot carry credits");
@@ -54,6 +84,9 @@ export function informationFormDefinitionIssues(definition: InformationFormDefin
       });
     }
   });
+  if (informationFormFields(definition).filter((field) => field.type === "MEMBER_LIST").length > 1) {
+    issues.push({ path: ["sections"], message: "An information form can have only one member list." });
+  }
   definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
     for (const reason of fieldRefusals(field)) {
       issues.push({

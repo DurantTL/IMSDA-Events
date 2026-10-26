@@ -11,3 +11,22 @@ the field.
 - Versions follow `RegistrationFormVersion`: a published version never changes; editing creates a new draft.
 - `storeInformationFormResponse` is the idempotent write the public fill page (part C) will call.
 - Every query takes a target and finds forms inside it, so an id from another scope or event is "not found".
+
+## Response alerts (#1222)
+
+`InformationForm.submissionNotifyEmails` (at most 10, empty by default) lists the addresses emailed when a response
+arrives. It is set in the builder's Form settings tab ("Email when a response arrives"), saved with the other settings
+(`PATCH .../settings`, system administrators for `GENERAL`, `MANAGE_FORMS` for `EVENT`) and is not versioned with the
+definition. `submission-alert.ts` queues one internal email per address after the response is stored, never inside the
+write: a failure to queue or send is logged (response id only) and the response stays saved. The email names the form and
+the time and links to the response; it never carries an answer. It follows the "Information form response received"
+switch (#1016), read before the response is written.
+
+## The Adventurer templates and the member list (#1222)
+
+`adventurer-templates.ts` holds the four Adventurer club forms as information-audience code templates (synced by
+`npm run form-templates:sync`). The annual registration uses a `MEMBER_LIST` field: repeating rows of exactly name, age,
+level and what the member is working on. It is the single exception to the no-roster rule, and `memberListRefusals` in
+`definition.ts` allowlists that exact row shape: any other column or column type, a sensitive column label, a second
+member list, an attendee scope or an attendee roster is still refused. `GET .../responses/export?format=members` exports
+one CSV row per member (club, name, age, level, working on).

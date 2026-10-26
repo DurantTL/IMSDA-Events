@@ -323,6 +323,7 @@ describe("what each alert writes (#1033)", () => {
       "modules/event-locations/waitlist-digest.ts",
       "modules/club-transfers/repository.ts",
       "modules/club-forms/submission-alert.ts",
+      "modules/information-forms/submission-alert.ts",
       "modules/registration-form-notifications/queue.ts",
       "modules/honors/class-change-emails.ts",
       "modules/honors/watch-emails.ts",

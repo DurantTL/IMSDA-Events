@@ -12907,6 +12907,14 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-registration-field > small.phone-input-message.is-notice,
 .app-shell .form-stack label > small.phone-input-message.is-notice { color: var(--muted); font-weight: 600; padding-left: 8px; border-left: 3px solid var(--line, #c9c9c9); }
 
+/* Information form member list (#1222): one bordered row per member on the public fill page. */
+.information-member-list { display: grid; gap: 12px; min-width: 0; }
+.information-member-list .information-member-help { margin: 4px 0 0; }
+.information-member-row { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.information-member-row input:not([type="checkbox"]):not([type="radio"]), .information-member-row select { min-height: 44px; }
+.information-member-add, .information-member-remove { min-height: 44px; justify-self: start; }
+.fb-info-alerts textarea { width: 100%; min-height: 96px; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

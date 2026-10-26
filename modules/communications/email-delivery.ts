@@ -1335,6 +1335,10 @@ async function prepareAccountEmailBody(
   if (input.templateKey === "CLUB_FORM_SUBMITTED") {
     return { bodyText: input.bodyText };
   }
+  // Information form response alert (#1222): names and a link only, no sentinel; never rewrite anything in it.
+  if (input.templateKey === "INFORMATION_FORM_SUBMITTED") {
+    return { bodyText: input.bodyText };
+  }
   if (input.templateKey?.startsWith("NEW_CLUB_APPLICATION_")) {
     return { bodyText: input.bodyText };
   }

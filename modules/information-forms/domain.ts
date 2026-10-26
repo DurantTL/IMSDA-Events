@@ -12,6 +12,9 @@ export function scopeWhere(target: InformationFormTarget) {
   return target.scope === "EVENT" ? { scope: "EVENT" as const, eventId: target.eventId } : { scope: "GENERAL" as const, eventId: null };
 }
 
+/** The most addresses one form can email when a response arrives (#1222), the same cap as the club forms. */
+export const INFORMATION_FORM_ALERT_MAX_RECIPIENTS = 10;
+
 const isoDateTime = z.string().datetime({ offset: true }).transform((value) => new Date(value));
 
 export const createInformationFormSchema = z.object({
@@ -32,6 +35,11 @@ export const informationFormSettingsSchema = z.object({
   fillAccess: z.enum(["ANYONE_WITH_LINK", "SIGNED_IN"]).optional(),
   opensAt: z.union([isoDateTime, z.null()]).optional(),
   closesAt: z.union([isoDateTime, z.null()]).optional(),
+  /**
+   * Addresses emailed when a response arrives (#1222). Checked in `updateInformationFormSettings`, which judges each address
+   * against the ones already saved (an old address nobody touched never blocks a save); here only the shape and a cap.
+   */
+  submissionNotifyEmails: z.array(z.string().trim().max(200)).max(INFORMATION_FORM_ALERT_MAX_RECIPIENTS, `Add at most ${INFORMATION_FORM_ALERT_MAX_RECIPIENTS} addresses.`).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "Send at least one setting to change.");
 
 export const publishInformationFormSchema = z.object({

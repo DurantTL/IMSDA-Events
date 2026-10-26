@@ -108,7 +108,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   const canEditNotifications = canEditRegistrationNotifications && !information;
   // The question library (#1070) is layered over the registry; in information mode its entries pass the same refusal check as every other.
   const libraryRegistry = useQuestionLibraryRegistry(registry ?? paletteRegistry, information ? information.eventId : eventId, libraryRefresh);
-  const paletteSource = useMemo(() => information ? filterPaletteRegistry(libraryRegistry) : libraryRegistry, [information, libraryRegistry]);
+  const paletteSource = useMemo(() => information ? filterPaletteRegistry(libraryRegistry) : filterPaletteRegistry(libraryRegistry, (entry) => !entry.informationOnly), [information, libraryRegistry]);
   const layoutControls = useEditorLayout();
   const hydrated = useHydrated();
   const { layout, showSidebar } = layoutControls;

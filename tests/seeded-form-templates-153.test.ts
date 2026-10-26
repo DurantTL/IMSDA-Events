@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 
+import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { formTemplates, getFormTemplate, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { bundledSeededFormTemplates, seededFormTemplateKeys } from "@/modules/forms/seeded-template-data";
 import { loadSeededFormTemplate } from "@/modules/forms/seeded-templates";
@@ -37,7 +38,8 @@ describe("seeded form templates (#153)", () => {
   });
 
   it("generates every built-in form template, in the old order, identical to the pre-#153 TypeScript definitions", () => {
-    expect(formTemplates.map((template) => template.key)).toEqual(fixture.templates.map((entry) => entry.key));
+    // The pre-#153 list: information form templates (#1222) were added after it and are checked in their own tests.
+    expect(formTemplates.filter((template) => !isInformationTemplateAudience(template.audience)).map((template) => template.key)).toEqual(fixture.templates.map((entry) => entry.key));
     for (const legacy of fixture.templates) {
       const current = getFormTemplate(legacy.key)!;
       expect({ key: legacy.key, sha256: digest(current), sections: current.definition.sections.length, fields: current.definition.sections.reduce((n, s) => n + s.fields.length, 0) })

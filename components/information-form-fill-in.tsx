@@ -4,7 +4,8 @@ import { useState } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { FieldInput } from "@/components/club-form-fill-in";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
-import { fieldRuns, isFieldVisible, typedAnswerProblem, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { InformationMemberListInput, withoutBlankMemberRows } from "@/components/information-member-list-input";
+import { fieldRuns, isFieldVisible, memberListProblems, typedAnswerProblem, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 
 type Issue = { key?: string; message: string };
 
@@ -24,13 +25,24 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const problemFor = (field: RegistrationFormField) => {
-    const raw = typedAnswerProblem(field, answers[field.key]);
+    const raw = field.type === "MEMBER_LIST" ? (memberListProblems(field, withoutBlankMemberRows(answers[field.key]))[0] ?? "") : typedAnswerProblem(field, answers[field.key]);
     if (raw && (attempted || touched[field.key])) return raw;
     // A server refusal tied to this field (cleared once the answer is edited).
     return issues.find((issue) => issue.key === field.key && !touched[field.key])?.message ?? "";
   };
   const blocking = definition.sections.flatMap((section) => section.fields)
-    .filter((field) => isFieldVisible(field, answers) && typedAnswerProblem(field, answers[field.key]));
+    .filter((field) => isFieldVisible(field, answers) && (field.type === "MEMBER_LIST" ? memberListProblems(field, withoutBlankMemberRows(answers[field.key])).length > 0 : typedAnswerProblem(field, answers[field.key])));
+
+  /** The answers as sent: a member list without its blank spare rows, and not at all when nothing was entered. */
+  function cleanedAnswers() {
+    const next = { ...answers };
+    for (const field of definition.sections.flatMap((section) => section.fields)) {
+      if (field.type !== "MEMBER_LIST") continue;
+      const rows = withoutBlankMemberRows(next[field.key]);
+      if (rows.length > 0) next[field.key] = rows; else delete next[field.key];
+    }
+    return next;
+  }
 
   async function submit() {
     setAttempted(true);
@@ -46,7 +58,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
       const response = await fetch("/api/public/information-forms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers }),
+        body: JSON.stringify({ slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers() }),
       });
       const result = await response.json().catch(() => ({})) as { message?: string; issues?: Issue[]; confirmationMessage?: string };
       if (!response.ok) {
@@ -85,7 +97,15 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
             <ClubFormSectionTitle>{section.title}</ClubFormSectionTitle>
             {section.description && <p className="field-help">{section.description}</p>}
             {fieldRuns(fields).map((run, runIndex) => {
-              const inputs = run.fields.map((field) => (
+              const inputs = run.fields.map((field) => field.type === "MEMBER_LIST" ? (
+                <InformationMemberListInput
+                  field={field}
+                  key={field.id}
+                  onChange={(rows) => setAnswers((current) => ({ ...current, [field.key]: rows }))}
+                  problem={problemFor(field)}
+                  value={answers[field.key]}
+                />
+              ) : (
                 <FieldInput
                   answers={answers}
                   field={field}
