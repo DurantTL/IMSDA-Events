@@ -189,6 +189,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
     rows.push({ route, kind: "reached", oldPlace: "Page link", scope: "Event", destinationPath: parent, label: `Reached from ${parent}`, group: parent, reachedFrom: { parent, linkedIn } });
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
+  rows.push({ route: "/admin/clubs", kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: "/admin/clubs", label: "Clubs Administrator dashboard", group: "Club administration", note: "The Clubs Administrator's home, opened from the role switcher and the Clubs sidebar. Clubs Administrators and system administrators only." });
   rows.push({
     route: "/people/matches", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Possible duplicate people", group: "/people",
     reachedFrom: { parent: "/people", linkedIn: "components/people-workspace.tsx" },

@@ -1,0 +1,458 @@
+/* Clubs Administrator dashboard (#1226), from the Events Administrator layout (#1227): tabs, a header card, four count cards, one card per event, then separate work rows. */
+.workspace {
+  padding-bottom: 32px;
+}
+
+.hero {
+  display: grid;
+  gap: 6px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(240, 179, 35, 0.28), transparent 30%),
+    linear-gradient(140deg, var(--imsda-navy-deep), var(--imsda-navy) 56%, #245a74);
+  color: white;
+  padding: 20px 26px;
+  box-shadow: var(--shadow);
+}
+
+.hero :global(.eyebrow) {
+  margin: 0;
+  color: #b8d2de;
+}
+
+.hero h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.hero p {
+  max-width: 760px;
+  margin: 0;
+  color: #d6e5ec;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  line-height: 1.55;
+}
+
+.hero .identity {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cards article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  align-items: center;
+  gap: 1px 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+  padding: 14px 16px;
+  box-shadow: 0 9px 24px rgba(0, 59, 92, 0.05);
+}
+
+.cardIcon {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1 / 4;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--imsda-navy-soft);
+  color: var(--imsda-navy);
+}
+
+.cards article > :not(.cardIcon) {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.cards strong {
+  color: var(--imsda-navy);
+  font-size: 1.45rem;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+}
+
+.cards p,
+.cards small {
+  margin: 0;
+}
+
+.cards p {
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+
+.cards small {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.cards small a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+.summaryLine {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.sectionHeading h2 {
+  margin: 2px 0 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.05rem);
+}
+
+.sectionHeading p:not(:global(.eyebrow)) {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.55;
+}
+
+.eventList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+}
+
+.eventCard {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fbfcfd;
+  padding: 14px 16px;
+}
+
+.eventCard h3 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  overflow-wrap: break-word;
+}
+
+.eventCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.eventCard .registered {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.eventBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status,
+.countdown {
+  border-radius: 999px;
+  background: var(--imsda-navy-soft);
+  color: var(--imsda-navy);
+  padding: 4px 10px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+
+.countdown {
+  background: var(--imsda-gold-soft);
+  color: #76520b;
+}
+
+.eventLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.linkButton {
+  min-height: 44px;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--imsda-navy);
+}
+
+.empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.workList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workRow {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 10px 14px;
+}
+
+.rowCount {
+  color: var(--imsda-navy);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.rowLabel {
+  display: grid;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  overflow-wrap: break-word;
+}
+
+.rowLabel small,
+.rowLinks small {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.rowLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  min-width: 0;
+}
+
+.rowLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 1080px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .hero {
+    padding: 16px 18px;
+  }
+
+  .cards {
+    gap: 8px;
+  }
+
+  .cards article {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .cardIcon {
+    display: none;
+  }
+
+  .cards article > :not(.cardIcon) {
+    grid-column: 1;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .workRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .eventLinks > * {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* Clubs Administrator dashboard (#1226): additions to the shared dashboard layout. */
+.cards a.cardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.yearForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 10px;
+}
+
+.yearForm label,
+.searchForm label {
+  display: grid;
+  gap: 4px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.yearForm select,
+.searchForm input {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.yearForm button,
+.searchForm button {
+  min-height: 44px;
+}
+
+.searchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 10px;
+}
+
+.searchForm label {
+  flex: 1 1 220px;
+}
+
+.rule {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.applicationList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.application {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 12px 14px;
+}
+
+.application h3 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  overflow-wrap: break-word;
+}
+
+.application p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+.applicationActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.applicationActions a,
+.quickActions a,
+.seeAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.quickActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clubTable {
+  min-width: 0;
+}
+
+.clubTable table {
+  width: 100%;
+}
+
+.eventLine {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}

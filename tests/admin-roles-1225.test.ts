@@ -88,7 +88,7 @@ describe("the role showing (cookie fallback)", () => {
   });
 
   it("lands each role on its own home and picks its sidebar", () => {
-    expect(adminRoleLanding("CLUBS_ADMIN")).toBe("/admin/clubs/summary");
+    expect(adminRoleLanding("CLUBS_ADMIN")).toBe("/admin/clubs");
     expect(adminRoleLanding("SYSTEM_ADMIN")).toBe("/admin");
     expect(adminRoleLanding("EVENTS_ADMIN")).toBe("/overview");
     expect(adminRoleSidebarKind("CLUBS_ADMIN")).toBe("clubs");
@@ -164,7 +164,7 @@ describe("the switch route", () => {
     mocks.membershipFindMany.mockResolvedValue([{ eventId: "e1" }]);
     const response = await post("CLUBS_ADMIN");
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("/admin/clubs/summary");
+    expect(response.headers.get("location")).toBe("/admin/clubs");
     expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_admin_role", "CLUBS_ADMIN", expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" }));
     expect(mocks.cookieSet.mock.calls[0]![2]).not.toHaveProperty("maxAge");
     expect(mocks.cookieSet.mock.calls[0]![2]).not.toHaveProperty("expires");

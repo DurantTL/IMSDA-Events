@@ -45,7 +45,7 @@ describe("AdminRoleSwitcher", () => {
 describe("the Clubs sidebar", () => {
   it("lists only the club areas and lights the most specific page", () => {
     expect(clubsAdminNavigation.map((item) => item.href)).toEqual([
-      "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/club-forms",
+      "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/club-forms",
     ]);
     expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
     expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
