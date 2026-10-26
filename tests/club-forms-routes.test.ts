@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   rejectCrossOriginRequest: vi.fn(),
   requireClubLeaderViewer: vi.fn(),
   requireStaffViewer: vi.fn(),
-  requireSystemAdministrator: vi.fn(),
+  requireClubsAdministration: vi.fn(),
   createClubFormLink: vi.fn(),
   resolveClubFormLinkForFill: vi.fn(),
   submitClubFormViaLink: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("@/modules/club-forms/access", () => ({
   requireClubLeaderViewer: mocks.requireClubLeaderViewer,
   requireStaffViewer: mocks.requireStaffViewer,
 }));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireClubsAdministration: mocks.requireClubsAdministration }));
 vi.mock("@/modules/club-forms/links", () => ({
   createClubFormLink: mocks.createClubFormLink,
   resolveClubFormLinkForFill: mocks.resolveClubFormLinkForFill,
@@ -213,20 +213,20 @@ describe("sending and withdrawing links from the club portal (#610)", () => {
 
 describe("the system administrator's switch and the staff export (#610)", () => {
   it("turns a form on for a system administrator only", async () => {
-    mocks.requireSystemAdministrator.mockResolvedValue({ id: "admin-1" });
+    mocks.requireClubsAdministration.mockResolvedValue({ id: "admin-1" });
     mocks.setClubFormTemplateEnabled.mockResolvedValue({ key: "off_premises_permission_slip", enabled: true });
     const response = await TOGGLE(json({ enabled: true }, "https://events.imsda.test/x", "PATCH"), { params: Promise.resolve({ templateKey: "off_premises_permission_slip" }) });
     expect(response.status).toBe(200);
     expect(mocks.setClubFormTemplateEnabled).toHaveBeenCalledWith("off_premises_permission_slip", true, "admin-1");
 
-    mocks.requireSystemAdministrator.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
+    mocks.requireClubsAdministration.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
     const refused = await TOGGLE(json({ enabled: true }, "https://events.imsda.test/x", "PATCH"), { params: Promise.resolve({ templateKey: "off_premises_permission_slip" }) });
     expect(refused.status).toBe(403);
     expect(mocks.setClubFormTemplateEnabled).toHaveBeenCalledTimes(1);
   });
 
   it("downloads the CSV the export builds, uncached, and passes the filters through", async () => {
-    mocks.requireStaffViewer.mockResolvedValue({ kind: "STAFF", userId: "staff-1", systemAdmin: false });
+    mocks.requireStaffViewer.mockResolvedValue({ kind: "STAFF", userId: "staff-1", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true });
     mocks.buildClubFormsCsv.mockResolvedValue({ csv: "\"Form\"\r\n", filename: "form.csv", rowCount: 0 });
     const response = await EXPORT(new Request("https://events.imsda.test/api/staff/club-forms/export?form=off_premises_permission_slip&club=club-a"));
     expect(response.status).toBe(200);

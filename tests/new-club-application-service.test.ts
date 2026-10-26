@@ -58,6 +58,7 @@ import {
 } from "@/modules/club-applications/email";
 
 const systemAdmin: AuthenticatedUser = { id: "user-admin", email: "admin@imsda-events.test", displayName: "Alex Admin", globalRole: "SYSTEM_ADMIN" } as AuthenticatedUser;
+const clubsAdmin: AuthenticatedUser = { id: "user-clubs", email: "clubs@imsda-events.test", displayName: "Cam ClubsAdmin", globalRole: null } as AuthenticatedUser;
 const eventAdmin: AuthenticatedUser = { id: "user-ea", email: "ea@imsda-events.test", displayName: "Eli EventAdmin", globalRole: null } as AuthenticatedUser;
 
 const NOW = new Date("2026-10-08T15:00:00Z");
@@ -100,6 +101,8 @@ function fakeDatabase() {
   const invites: any[] = [];
   const clubInvites: any[] = [];
   const outbox: any[] = [];
+  // Clubs Administrator grants (#1225), by user id: a revoked grant has revokedAt set.
+  const clubsAdminGrants = new Map<string, { revokedAt: Date | null }>();
   let sequence = 0;
   const next = (prefix: string) => `${prefix}-${++sequence}`;
 
@@ -182,11 +185,17 @@ function fakeDatabase() {
         return {};
       }),
     },
+    clubsAdministratorGrant: {
+      findFirst: vi.fn(async ({ where }: any) => {
+        const grant = clubsAdminGrants.get(where.userId);
+        return grant && grant.revokedAt === null ? { id: `grant-${where.userId}` } : null;
+      }),
+    },
     adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { create: vi.fn(async ({ data }: any) => { outbox.push(data); return { id: `msg-${outbox.length}` }; }) },
   };
   const prisma = { ...tx, $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
-  return { prisma, organizations, applications, invites, clubInvites, outbox };
+  return { prisma, organizations, applications, invites, clubInvites, outbox, clubsAdminGrants };
 }
 
 let db: ReturnType<typeof fakeDatabase>;
@@ -341,6 +350,26 @@ describe("who can see applications and the attachment", () => {
   it("returns nothing for an application with no attachment", async () => {
     await submitNewClubApplication(input({ clubName: "No Attachment Club" }), { now: NOW });
     await expect(getApplicationAttachment("SYSTEM_ADMIN", db.applications[1].id)).resolves.toBeNull();
+  });
+
+  it("lets a Clubs Administrator approve and decline (#1225), recording who decided in the audit trail", async () => {
+    db.clubsAdminGrants.set(clubsAdmin.id, { revokedAt: null });
+    await submitNewClubApplication(input({ clubName: "Second Synthetic Club" }), { now: NOW });
+    await expect(decideNewClubApplication(clubsAdmin, db.applications[0].id, { decision: "approve" }, NOW)).resolves.toMatchObject({ status: "APPROVED" });
+    await expect(decideNewClubApplication(clubsAdmin, db.applications[1].id, { decision: "decline", declineReason: "Not this year." }, NOW)).resolves.toMatchObject({ status: "DECLINED" });
+    const audited = mocks.writeAuditLog.mock.calls.map((call) => call[0]);
+    expect(audited).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "NEW_CLUB_APPLICATION_APPROVED", actorUserId: clubsAdmin.id }),
+      expect.objectContaining({ action: "NEW_CLUB_APPLICATION_DECLINED", actorUserId: clubsAdmin.id }),
+    ]));
+  });
+
+  it("refuses a Clubs Administrator whose grant was revoked, with nothing decided", async () => {
+    db.clubsAdminGrants.set(clubsAdmin.id, { revokedAt: new Date("2026-10-01T00:00:00Z") });
+    const id = db.applications[0].id;
+    await expect(decideNewClubApplication(clubsAdmin, id, { decision: "approve" }, NOW)).rejects.toMatchObject({ status: 403, code: "PERMISSION_DENIED" });
+    expect(db.applications[0].status).toBe("PENDING");
+    expect(mocks.writeAuditLog.mock.calls.map((call) => call[0].action).filter((action) => /APPROVED|DECLINED/.test(action))).toEqual([]);
   });
 
   it("never lets an Area Coordinator, an event admin or a signed-out visitor decide", async () => {

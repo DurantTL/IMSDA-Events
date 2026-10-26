@@ -8,6 +8,7 @@ import { BackLink } from "@/components/back-link";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { ClubOverview } from "@/components/club-overview";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubImports } from "@/modules/club-imports/move-year";
 import { rosterYearView } from "@/modules/club-rosters/domain";
@@ -34,7 +35,10 @@ export default async function StaffOpenClubPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
+  // A Clubs Administrator (#1225) sees what a system administrator sees here (roster, birth dates, Sterling Volunteers
+  // detail, guardians); the staff-only change tools (club admins, profile, honors, act-as, year move) stay with system administrators.
+  const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const view = rosterYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
@@ -51,24 +55,32 @@ export default async function StaffOpenClubPage({
   return (
     <section className="page-stack">
       <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
-          <UserCog aria-hidden="true" size={14} /> Club admins
-        </Link>
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/profile${fromHere}`}>
-          <IdCard aria-hidden="true" size={14} /> Club profile
-        </Link>
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/club/honors`}>
-          <Award aria-hidden="true" size={14} /> Honors
-        </Link>
-        <ActAsButton
-          access="Full director powers, attributed to you"
-          club={club.name}
-          endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/act-as-director`}
-          label="Act as Director (2 hours)"
-          resultAction="Open the club portal"
-          role="Director"
-        />
+        {isSystemAdmin ? (
+          <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
+        ) : (
+          <BackLink href="/admin/clubs/summary" variant="staff">Back to Clubs</BackLink>
+        )}
+        {isSystemAdmin && (
+          <>
+            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
+              <UserCog aria-hidden="true" size={14} /> Club admins
+            </Link>
+            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/profile${fromHere}`}>
+              <IdCard aria-hidden="true" size={14} /> Club profile
+            </Link>
+            <Link className="secondary-button" href={`/admin/organizations/${organizationId}/club/honors`}>
+              <Award aria-hidden="true" size={14} /> Honors
+            </Link>
+            <ActAsButton
+              access="Full director powers, attributed to you"
+              club={club.name}
+              endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/act-as-director`}
+              label="Act as Director (2 hours)"
+              resultAction="Open the club portal"
+              role="Director"
+            />
+          </>
+        )}
       </div>
 
       <div className="page-intro">
@@ -84,8 +96,8 @@ export default async function StaffOpenClubPage({
       </div>
 
       <p className="inline-notice" role="status">
-        <Eye aria-hidden="true" size={14} /> View only. Change club admins or the profile with the buttons above, and file
-        or correct reports from Monthly Records.
+        <Eye aria-hidden="true" size={14} /> View only.{" "}
+        {isSystemAdmin ? "Change club admins or the profile with the buttons above, and file or correct reports from Monthly Records." : "File or correct reports from Monthly Records."}
       </p>
 
       <nav aria-label="Roster club year" className="intro-actions club-year-choice">
@@ -111,7 +123,7 @@ export default async function StaffOpenClubPage({
         backgroundChecks={{ includeNotes: true }}
         birthDatesEndpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/roster/birth-dates`}
         organizationId={organizationId}
-        staffHonorsHref={`/admin/organizations/${encodeURIComponent(organizationId)}/club/honors`}
+        staffHonorsHref={isSystemAdmin ? `/admin/organizations/${encodeURIComponent(organizationId)}/club/honors` : undefined}
         reportHref={(month) => `/admin/clubs/reports/${organizationId}/${month}${fromHere}`}
         reportsEditable
         rosterYear={view.clubYear}
@@ -120,7 +132,7 @@ export default async function StaffOpenClubPage({
       {guardianViewer && !view.readOnly && <ClubGuardiansPanel headingLevel={3} organizationId={organizationId} viewer={guardianViewer} />}
 
       {/* Keyed by the imports' years, so the panel starts fresh after a move refreshes the page. */}
-      {imports.length > 0 && (
+      {isSystemAdmin && imports.length > 0 && (
         <ClubImportYearMove
           imports={imports}
           key={imports.map((item) => item.clubYear).join(",")}

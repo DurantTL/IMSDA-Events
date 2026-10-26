@@ -3,7 +3,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { discardClubFormDraft, saveClubFormDraft } from "@/modules/club-forms/builder";
 import { saveDraftSchema } from "@/modules/club-forms/builder-domain";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ templateKey: string }> };
 
@@ -14,7 +14,7 @@ async function putHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     const { templateKey } = await context.params;
     const input = saveDraftSchema.parse(await readClubFormJson(request));
     return Response.json(await saveClubFormDraft(templateKey, input, admin.id), { headers: noStore });
@@ -28,7 +28,7 @@ async function deleteHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     const { templateKey } = await context.params;
     return Response.json(await discardClubFormDraft(templateKey, admin.id), { headers: noStore });
   } catch (error) {

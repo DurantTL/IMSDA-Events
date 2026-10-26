@@ -310,7 +310,12 @@ export type HealthViewer =
   | { kind: "AREA_COORDINATOR"; accountId: string }
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
   /** `actAsId` is set when the administrator is acting as a club director (#442), so the audit shows it. */
-  | { kind: "SYSTEM_ADMIN"; userId: string; actAsId?: string };
+  /**
+   * `viaClubsAdministrator` (#1225, Caleb 2026-10-26) marks a Clubs Administrator who sees what a system administrator
+   * sees here, with the same reasons, break-glass and audit; it is only for the audit trail and to keep the import
+   * system-administrator only.
+   */
+  | { kind: "SYSTEM_ADMIN"; userId: string; actAsId?: string; viaClubsAdministrator?: true };
 
 /** EDIT is entering or changing a record from the paper form (a Registrar only when none exists); CONFIRM re-affirms one that was read. */
 export type HealthAction = "VIEW" | "EDIT" | "CONFIRM" | "SEND_LINK";
@@ -346,11 +351,11 @@ export function viewerCanSeeEvent(viewer: HealthViewer, eventId: string) {
 /** Audit attribution: who, never what they saw. */
 export function healthAuditActor(viewer: HealthViewer): {
   actorUserId?: string;
-  metadata: { viewerKind: HealthViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string };
+  metadata: { viewerKind: HealthViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string; actorRole?: "CLUBS_ADMINISTRATOR" };
 } {
   switch (viewer.kind) {
     case "SYSTEM_ADMIN":
-      return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind, ...(viewer.actAsId ? { actAsId: viewer.actAsId } : {}) } };
+      return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind, ...(viewer.actAsId ? { actAsId: viewer.actAsId } : {}), ...(viewer.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" as const } : {}) } };
     case "HEALTH_ROLE":
       return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
     case "AREA_COORDINATOR":

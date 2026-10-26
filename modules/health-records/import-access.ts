@@ -10,7 +10,7 @@ import { requireHealthRecordsEnabled } from "@/modules/health-records/flag";
  */
 export function requireHealthImporter(viewer: HealthViewer) {
   requireHealthRecordsEnabled();
-  if (viewer.kind !== "SYSTEM_ADMIN" || viewer.actAsId) {
+  if (viewer.kind !== "SYSTEM_ADMIN" || viewer.actAsId || viewer.viaClubsAdministrator) {
     throw new HealthRecordError("FORBIDDEN", "Only a system administrator can import health records.");
   }
   return viewer;

@@ -6,6 +6,7 @@ import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsT
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
 import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubSummaryAdminPage({ searchParams }: { searchParams: Promise<{ year?: string; sort?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const now = new Date();

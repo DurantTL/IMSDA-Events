@@ -72,8 +72,8 @@ function matches(row: Row, where: Where) {
 const leader: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const otherLeader: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-b", actor: { kind: "ATTENDEE", accountId: "acct-9" } };
 const coordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
-const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: false };
-const admin: ClubFormsViewer = { kind: "STAFF", userId: "admin-1", systemAdmin: true };
+const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
+const admin: ClubFormsViewer = { kind: "STAFF", userId: "admin-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -3,16 +3,16 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { setOpenApplicationClosed } from "@/modules/club-forms/open-applications";
 import { openLinkClosedSchema } from "@/modules/club-forms/schemas";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ templateKey: string }> };
 
-/** A system administrator closes or reopens an open application for the current club year (#1229). Nobody else can. */
+/** A system administrator or Clubs Administrator (#1225) closes or reopens an open application for the current club year (#1229). Nobody else can. */
 async function putHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     const { templateKey } = await context.params;
     const { closed } = openLinkClosedSchema.parse(await readClubFormJson(request));
     return Response.json(await setOpenApplicationClosed(templateKey, closed, admin.id), {

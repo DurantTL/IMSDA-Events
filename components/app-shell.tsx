@@ -42,6 +42,8 @@ import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, sys
 import { alwaysOnModuleKeys, disabledModuleCardKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
+import { AdminRoleSwitcher } from "@/components/admin-role-switcher";
+import { adminRoleSidebarKind, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
 import type { EventPermission } from "@/modules/access/permissions";
 import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
@@ -57,6 +59,8 @@ import {
   orderedSidebarItems,
   sidebarActiveHref,
   sidebarSections,
+  clubsAdminActiveHref,
+  clubsAdminNavigation,
   staffSubpageTitle,
   systemNavigation,
   withCurrentEvent,
@@ -83,7 +87,7 @@ type ShellEvent = {
   removableModules?: readonly string[];
   /** Modules whose data keeps them usable for this event, so the module states match the Event features page (#1180). */
   dataPresentModules?: readonly string[];
-  /** Club forms (#610) are open to system admins and Event Admins of a current event; computed server-side. */
+  /** Club forms (#610) are open to system admins, Clubs Administrators and Event Admins of a current event; computed server-side. */
   clubFormsAccess?: boolean;
 };
 type ShellUser = { id?: string; displayName: string; email: string; globalRole?: "SYSTEM_ADMIN" | null };
@@ -97,6 +101,7 @@ export function AppShell({
   defaultEventId = null,
   events,
   user,
+  adminRoleView = null,
 }: {
   attendeeAccountAvailable?: boolean;
   /** The default event was chosen automatically (#465): show the notice on pages without `?event=`. */
@@ -110,6 +115,11 @@ export function AppShell({
   defaultEventId?: string | null;
   events: ShellEvent[];
   user: ShellUser;
+  /**
+   * The admin roles this account holds and the one showing (#1225), computed server-side. The switcher changes the
+   * sidebar and home only; no server gate reads it.
+   */
+  adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts } | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -191,6 +201,13 @@ export function AppShell({
     events.find((event) => event.id === selectedEventId)?.permissions ?? [],
   );
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
+  // The role switcher's view (#1225): Clubs swaps the sidebar for the club areas; System (or no switcher) is as before.
+  const sidebarKind = adminRoleView ? adminRoleSidebarKind(adminRoleView.active) : "default";
+  const clubsView = sidebarKind === "clubs";
+  // A Clubs Administrator with any event membership keeps the event picker and sidebar (#1225 review); only one with
+  // no events at all gets the club-only chrome.
+  const clubsOnly = clubsView && events.length === 0;
+  const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname) : null;
   // Event Admins can ask for a module (#741 slice 3); system administrators turn modules on directly.
   const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
   // The other workspaces this staff identity may switch into (#108): the
@@ -235,10 +252,10 @@ export function AppShell({
   }) : [];
   // The fixed order lives in `sidebarSections` (#964) and `orderedSidebarItems`.
   // System management is not here: it is drawn once, above the event picker.
-  const visibleNavigation: NavigationItem[] = eventlessProfile
+  const visibleNavigation: NavigationItem[] = eventlessProfile || clubsOnly
     ? []
     : orderedSidebarItems(selectedPermissions, showMore);
-  const visibleSections = eventlessProfile ? [] : sidebarSections(selectedPermissions);
+  const visibleSections = eventlessProfile || clubsOnly ? [] : sidebarSections(selectedPermissions);
   const moreItemVisible = visibleNavigation.find((item) => item.href === "/more");
   // A page that is no sidebar item lights its parent, or More when the viewer can't see it (#964).
   const visibleHrefs = new Set([...visibleSections.flatMap((view) => view.items.map((item) => item.href)), ...visibleNavigation.map((item) => item.href)]);
@@ -257,10 +274,12 @@ export function AppShell({
     setDismissedGroup(open ? { section, pathname } : null);
   }
   // On /admin pages a system administrator's sidebar lists the system groups (#966), not the event workspace's.
-  const showSystemNav = showsSystemChrome({ isSystemAdmin, pathname });
+  const showSystemNav = sidebarKind === "default" && showsSystemChrome({ isSystemAdmin, pathname });
   const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
   // Which work context the page is in (#1180): System, the selected event or the account page. A label only; it grants nothing.
-  const workContext = activeWorkContext({ pathname, isSystemAdmin, eventName: selectedEvent?.name });
+  const workContext = clubsView
+    ? { kind: "system" as const, kindLabel: "Clubs", label: "Clubs administration", detail: "All clubs" }
+    : activeWorkContext({ pathname, isSystemAdmin, eventName: selectedEvent?.name });
   const contextSwitches = workContextSwitches({ isSystemAdmin, attendeeAccountAvailable, selectedEventId, active: workContext.kind });
   // The phone System menu lists the same destinations as the desktop System sidebar, and nothing without the role.
   const systemMenu = showSystemNav ? systemMenuGroups({ isSystemAdmin, pathname, selectedEventId }) : [];
@@ -340,7 +359,7 @@ export function AppShell({
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
 
-        {user.globalRole === "SYSTEM_ADMIN" && (
+        {user.globalRole === "SYSTEM_ADMIN" && sidebarKind === "default" && (
           <div className="system-navigation">
             <span className="system-navigation-label">Global administration</span>
             <GuardedLink
@@ -360,8 +379,8 @@ export function AppShell({
           </div>
         )}
 
-        {!eventlessProfile && <span className="event-workspace-label">Event workspace</span>}
-        {!eventlessProfile && <div className="event-picker-wrap">
+        {!eventlessProfile && !clubsOnly && <span className="event-workspace-label">Event workspace</span>}
+        {!eventlessProfile && !clubsOnly && <div className="event-picker-wrap">
           <label className="sr-only" htmlFor="event-picker">Event workspace</label>
           <div className="select-shell">
             <select
@@ -392,6 +411,12 @@ export function AppShell({
         </div>
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
+          {clubsView && clubsAdminNavigation.map(({ href, icon: Icon, label }) => (
+            <GuardedLink key={href} className={activeClubsHref === href ? "nav-item active" : "nav-item"} href={href} aria-current={activeClubsHref === href ? "page" : undefined} {...tipProps(label)}>
+              <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
+              <span>{label}</span>
+            </GuardedLink>
+          ))}
           {showSystemNav && (
             <>
               <GuardedLink className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
@@ -509,6 +534,7 @@ export function AppShell({
       {collapsed && tooltip && <div className="sidebar-tooltip" aria-hidden="true" style={{ top: tooltip.top, left: tooltip.left }}>{tooltip.label}</div>}
 
       <main className="workspace">
+        {adminRoleView && <AdminRoleSwitcher active={adminRoleView.active} counts={adminRoleView.counts} held={adminRoleView.held} />}
         <header className="workspace-header">
           <div>
             <p className="eyebrow">Staff workspace</p>
@@ -559,7 +585,7 @@ export function AppShell({
               systemAdminContext={systemAdminContext ? { ...systemAdminContext, href: withCurrentEvent(systemAdminContext.href, selectedEventId) } : systemAdminContext}
             />
           </div>
-          {!isSystemRoute && !eventlessProfile && (
+          {!isSystemRoute && !eventlessProfile && !clubsOnly && (
             <label className="mobile-event-picker">
               <span className="sr-only">Current event</span>
               <select value={selectedEventId} onChange={(event) => selectEvent(event.target.value)}>
@@ -582,7 +608,14 @@ export function AppShell({
       </main>
 
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
-      {!showSystemNav && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
+      {clubsView && <nav className="mobile-nav" aria-label="Mobile navigation">
+        {clubsAdminNavigation.map(({ href, icon: Icon, label }) => (
+          <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={href} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
+            <Icon aria-hidden="true" size={22} /><span>{label}</span>
+          </GuardedLink>
+        ))}
+      </nav>}
+      {!showSystemNav && !clubsView && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
         {mobileNavigation.map(({ href, icon: Icon, label }) => {
           const isActive = !isProfileRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;
           if (href === "/more") {

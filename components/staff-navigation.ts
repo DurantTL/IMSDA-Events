@@ -229,6 +229,26 @@ export const systemNavigation: NavigationItem = {
   icon: ShieldCheck,
 };
 
+/**
+ * The Clubs Administrator's sidebar (#1225): the club areas only. Shown when the
+ * Clubs Administrator view of the role switcher is active. It is a view, not a
+ * permission: each page and route checks the role itself.
+ */
+export const clubsAdminNavigation: readonly NavigationItem[] = [
+  { href: "/admin/clubs/summary", label: "Clubs summary", icon: Tent },
+  { href: "/admin/clubs/applications", label: "New clubs", icon: ClipboardPen },
+  { href: "/admin/clubs/reports", label: "Monthly records", icon: FileText },
+  { href: "/admin/clubs/reports/year-end", label: "Year-end", icon: Trophy },
+  { href: "/admin/club-forms", label: "Club forms", icon: ListChecks },
+];
+
+/** The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. */
+export function clubsAdminActiveHref(pathname: string): string | null {
+  return clubsAdminNavigation.reduce<string | null>((best, item) => (
+    (pathname === item.href || pathname.startsWith(`${item.href}/`)) && (!best || item.href.length > best.length) ? item.href : best
+  ), null);
+}
+
 export const navigation: readonly NavigationItem[] = [
   // The dashboard page needs the event view permission; kitchen staff (#1029) hold only the kitchen counts one and see no dashboard item.
   { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, hiddenWhenHoldingWithout: { has: "MANAGE_KITCHEN_COUNTS", lacks: "VIEW_EVENT" }, sidebar: "daily" },
@@ -595,7 +615,7 @@ export function buildMoreDirectoryCards({
     },
     { key: "club-assignments", group: "people-access", allowed: clubEvent && canManageClubAssignments(permissions), href: `/more/club-assignments${eventQuery}`, icon: Tent, title: "Club assignments", description: "Set each registered club's campsite, duty, and activity, then email directors after review.", cta: "Assign clubs" },
     { key: "event-patches", group: "setup", allowed: clubEvent && has("CONFIGURE_EVENT"), href: `/more/event-patches${eventQuery}`, icon: Trophy, title: "Event patches", description: "Link the patch or pin a club event gives, so directors are suggested it for every member who attended.", cta: "Link patches" },
-    // Club forms (#610) belong to no event: system administrators and Event Admins of a current event only.
+    // Club forms (#610) belong to no event: system administrators, Clubs Administrators and Event Admins of a current event only.
     { key: "club-forms", group: "people-access", allowed: clubFormsAccess, href: `/more/club-forms${eventQuery}`, icon: FileText, title: "Club forms", description: "Membership applications, staff service forms, permission slips, and passenger lists clubs have filled in.", cta: "Open club forms" },
     // Health information for club events (#658): system administrators, plus staff a system administrator gave VIEW_HEALTH_INFORMATION. No role carries it.
     { key: "event-health", group: "people-access", allowed: clubEvent && has("VIEW_HEALTH_INFORMATION"), href: `/more/event-health${eventQuery}`, icon: HeartPulse, title: "Event health information", description: "Dietary notes as entered, the medical-need flag, and emergency contacts for this club event, with a printable confidential sheet.", cta: "Open health information" },

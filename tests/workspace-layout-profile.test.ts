@@ -28,6 +28,11 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers(mocks.requestTarget === null ? {} : { "x-imsda-request-target": mocks.requestTarget }),
 }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+// The shell asks which admin roles the account holds (#1225): none here.
+vi.mock("@/modules/access/admin-roles", () => ({
+  isActiveClubsAdministrator: async () => false,
+  resolveAdminRoleView: async () => ({ roles: { systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: [] }, held: [], active: null }),
+}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
   getCurrentAttendee: mocks.getCurrentAttendee,

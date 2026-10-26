@@ -3,16 +3,16 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { templateFillModeSchema } from "@/modules/club-forms/schemas";
 import { setClubFormTemplateFillMode } from "@/modules/club-forms/templates";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 type RouteContext = { params: Promise<{ templateKey: string }> };
 
-/** A system administrator sets who fills a club form in (#1229). Nobody else can. */
+/** A system administrator or Clubs Administrator (#1225) sets who fills a club form in (#1229). Nobody else can. */
 async function putHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     const { templateKey } = await context.params;
     const { fillMode } = templateFillModeSchema.parse(await readClubFormJson(request));
     return Response.json(await setClubFormTemplateFillMode(templateKey, fillMode, admin.id), {

@@ -7154,6 +7154,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   body { background: white !important; color: #111 !important; }
   body { font-size: 10pt; }
   .sidebar,
+  .admin-role-bar,
   .workspace-header,
   .destination-search,
   .mobile-nav,
@@ -12926,6 +12927,46 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .club-forms-index-note { font-weight: 600; }
 .club-forms-index-action { min-height: 44px; white-space: nowrap; text-decoration: none; }
 @media (max-width: 520px) { .club-forms-index-item { flex-direction: column; align-items: stretch; } }
+
+/* Admin role switcher (#1225): a bar across the top of the staff workspace. Pills wrap on a phone; the page never scrolls sideways. */
+.admin-role-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+.admin-role-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; min-width: 0; }
+.admin-role-pill {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cddde4;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--imsda-navy);
+  padding: 8px 16px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.admin-role-pill[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
+.admin-role-pill:focus-visible { outline: 3px solid var(--imsda-gold, #f0b323); outline-offset: 2px; }
+.admin-role-count {
+  min-width: 24px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--imsda-navy);
+  padding: 2px 8px;
+  text-align: center;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+.admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+@media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-pill { flex: 1 1 auto; justify-content: center; } }
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }

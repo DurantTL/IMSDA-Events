@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   setClubFormTemplateEnabled: vi.fn(),
   setClubFormAlertRecipients: vi.fn(),
   runClubFormTemplateSync: vi.fn(),
+  isActiveClubsAdministrator: vi.fn(),
   setClubFormTemplateFillMode: vi.fn(),
   setOpenApplicationClosed: vi.fn(),
 }));
@@ -17,8 +18,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
-// The real system administrator gate runs; only the session behind it is faked.
+// The real club administration gate (#1225) runs; only the session and the Clubs Administrator grant behind it are faked.
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isActiveClubsAdministrator }));
 vi.mock("@/modules/club-forms/builder", () => ({
   createClubFormTemplate: mocks.createClubFormTemplate,
   saveClubFormDraft: mocks.saveClubFormDraft,
@@ -70,6 +72,7 @@ const routes: Array<{ name: string; call: () => Promise<Response>; service: () =
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
+  mocks.isActiveClubsAdministrator.mockResolvedValue(false);
   mocks.getCurrentSession.mockResolvedValue({ user: admin });
   mocks.createClubFormTemplate.mockResolvedValue({ key: "synthetic_form", version: 1 });
   mocks.saveClubFormDraft.mockResolvedValue({ key: "synthetic_form", version: 1, draftUpdatedAt: "2026-10-05T15:00:00.000Z" });
@@ -94,8 +97,29 @@ describe("Sync templates is single-flight (#742)", () => {
   });
 });
 
-describe("club form builder routes are for system administrators only (#712)", () => {
+describe("club form builder routes are for system administrators and Clubs Administrators only (#712, #1225)", () => {
   for (const route of routes) {
+    // Alert emails and template sync are system upkeep: they stay system-administrator only.
+    const systemOnly = route.name === "sync templates" || route.name.startsWith("set alert recipients");
+    if (systemOnly) {
+      it(`${route.name}: refuses even an active Clubs Administrator`, async () => {
+        mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
+        mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+        expect((await route.call()).status).toBe(403);
+        expect(route.service()).not.toHaveBeenCalled();
+      });
+    } else it(`${route.name}: lets a Clubs Administrator through, and refuses them once the grant is revoked`, async () => {
+      mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
+      mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+      expect((await route.call()).status).toBeLessThan(400);
+      expect(route.service()).toHaveBeenCalledTimes(1);
+      vi.clearAllMocks();
+      mocks.rejectCrossOriginRequest.mockReturnValue(null);
+      mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+      expect((await route.call()).status).toBe(403);
+      expect(route.service()).not.toHaveBeenCalled();
+    });
+
     it(`${route.name}: refuses a signed-in user who is not a system administrator, before doing anything`, async () => {
       mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
       const response = await route.call();

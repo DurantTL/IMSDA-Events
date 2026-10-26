@@ -55,8 +55,9 @@ const otherDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "c
 const actingDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1" } };
 const areaCoordinator: ClubFormsViewer = { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "acct-2" } };
 // Conference staff: a system administrator, and an Event Admin of a current event.
-const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
-const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false };
+const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
+const clubsAdminOnly: ClubFormsViewer = { kind: "STAFF", userId: "staff-3", systemAdmin: false, clubsAdministrator: true, sensitiveAnswers: true };
+const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAdmin: false, clubsAdministrator: false, sensitiveAnswers: true };
 
 const SECRET_PHYSICIAN = "Dr. Synthetic Physician";
 const SECRET_PHONE = "(515) 555-0199";
@@ -482,6 +483,13 @@ describe("opening a submission (#610)", () => {
       expect(new Set(view.restrictedKeys)).toEqual(new Set(staffRow().birthDateFieldKeys));
       expect(JSON.stringify(view)).not.toContain(BIRTH);
       expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ metadata: expect.objectContaining({ sensitiveRevealed: true, birthDatesRevealed: false }) });
+    });
+
+    it("shows a Clubs Administrator everything a system administrator sees, birth dates and health answers (Caleb, 2026-10-26)", async () => {
+      const view = await getSubmissionForViewer(clubsAdminOnly, submissionId);
+      expect(view.answers).toMatchObject({ birth_date: BIRTH, child_1_birth_date: "2018-01-01", health_limitation: "Yes", health_limitation_how: SECRET_PHYSICIAN });
+      expect(view.restrictedKeys).toEqual([]);
+      expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ actorUserId: "staff-3", metadata: expect.objectContaining({ sensitiveRevealed: true }) });
     });
 
     it("shows an Area Coordinator Restricted for birth dates and every other sensitive field", async () => {

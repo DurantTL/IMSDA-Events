@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getRosterAccessStateForPage: vi.fn(),
   getEnabledClubFormTemplate: vi.fn(),
   listRosterChoices: vi.fn(),
+  isActiveClubsAdministrator: vi.fn(),
 }));
 
 class Redirect extends Error {
@@ -24,6 +25,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
+vi.mock("@/modules/access/admin-roles", () => ({
+  isActiveClubsAdministrator: mocks.isActiveClubsAdministrator,
+  hasClubsAdministration: async (user: { id: string; globalRole?: string | null }) => user.globalRole === "SYSTEM_ADMIN" || mocks.isActiveClubsAdministrator(user.id),
+}));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: mocks.staffLoginRedirectPath }));
 vi.mock("@/modules/club-forms/builder", () => ({ getClubFormBuilderView: mocks.getClubFormBuilderView }));
 vi.mock("@/modules/club-forms/templates", () => ({
@@ -31,6 +36,7 @@ vi.mock("@/modules/club-forms/templates", () => ({
   getEnabledClubFormTemplate: mocks.getEnabledClubFormTemplate,
   withLiveDirectory: async (definition: unknown) => definition,
 }));
+vi.mock("@/modules/club-forms/open-applications", () => ({ listClosedOpenApplicationKeys: vi.fn(async () => new Set<string>()) }));
 vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.listRosterChoices }));
 vi.mock("@/modules/club-forms/access", () => ({ clubLeaderViewerFromAccess: vi.fn() }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
@@ -48,9 +54,19 @@ const params = Promise.resolve({ templateKey: "off_premises_permission_slip" });
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.staffLoginRedirectPath.mockResolvedValue("/login");
+  mocks.isActiveClubsAdministrator.mockResolvedValue(false);
 });
 
-describe("the club form builder page is for system administrators only (#712)", () => {
+describe("the club form builder page is for system administrators and Clubs Administrators only (#712, #1225)", () => {
+  it("lets a Clubs Administrator open the list and the builder, and refuses them once the grant is revoked", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-3", globalRole: null } });
+    mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+    mocks.listClubFormTemplatesForAdmin.mockResolvedValue([]);
+    await expect(AdminClubFormsPage()).resolves.toBeTruthy();
+    mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+    await expect(AdminClubFormsPage()).rejects.toMatchObject({ to: "/no-access" });
+  });
+
   it("sends a visitor who is not signed in to sign in, and reads no form", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: null });
     await expect(ClubFormBuilderPage({ params })).rejects.toMatchObject({ to: "/login" });

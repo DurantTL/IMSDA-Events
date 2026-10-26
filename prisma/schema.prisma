@@ -808,6 +808,7 @@ model User {
   attendeeAccount   AttendeeAccount? @relation("UserAttendeeLink", fields: [attendeeAccountId], references: [id], onDelete: SetNull)
 
   memberships               EventMembership[]
+  clubsAdministratorGrant   ClubsAdministratorGrant?
   credential                AuthCredential?
   sessions                  UserSession[]
   resetTokens               PasswordResetToken[]
@@ -2704,6 +2705,25 @@ model AreaCoordinatorGrant {
   updatedAt         DateTime  @updatedAt
 
   attendeeAccount AttendeeAccount @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt])
+}
+
+/// A Clubs Administrator (#1225): conference-wide staff for the club areas
+/// (reports, points, club forms, rosters with birth dates, new club
+/// applications). Given and taken away by system administrators; one row per
+/// staff user, kept after removal for the record. Read on every request, so a
+/// removal takes effect on the next one.
+model ClubsAdministratorGrant {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([revokedAt])
 }

@@ -322,13 +322,34 @@ birth dates need their own protection.
    check-in use the **age on the event date**, computed on the server. Screens
    that do not need the full date never receive it.
 3. **Who sees the full birth date** (decided 2026-09-22):
-   - that club's own directors and deputies with an active grant (H1); and
-   - system administrators.
+   - that club's own directors and deputies with an active grant (H1);
+   - system administrators; and
+   - **Clubs Administrators** (decided 2026-10-26, #1225, below).
 
    No one else sees it, including event staff with `VIEW_SENSITIVE_DATA`
    (registration managers, finance, and check-in staff). They see age only.
    Every reveal or export of full birth dates is audited, without the date
    itself.
+
+   **Clubs Administrator** (decided 2026-10-26 by Caleb Durant, GitHub issue
+   #1225): a conference-wide staff role that a system administrator gives and
+   takes away (each change audited with who and when). A Clubs Administrator
+   may read sealed club roster birth dates, through the same audited reveal
+   a system administrator uses, and the club forms' birth-date answers.
+   System administrators still may. **Widened the same day** (Caleb: "club
+   administrators should see the same as what a system administrator would
+   see. everything with breakglass and reasons etc."): within the club areas a
+   Clubs Administrator sees what a system administrator sees, through the same
+   server checks, reason prompts, break-glass and audit entries (see Addendum B,
+   Decided 2026-10-26): club form sensitive answers, health records and sealed
+   copies, Sterling Volunteers detail for club people, and guardian contacts.
+   The role does **not** extend to system or email settings, accounts, Team
+   management, events the person is not assigned to, event-scoped coordinator
+   health, or write and admin actions that are not about viewing (health
+   record import, club import, invites and transfers, director grants,
+   act-as-director, the honors catalog, sealed-copy holds); those stay with
+   system administrators. The role is read from the database on every request,
+   so a removal takes effect on the next one.
 
    **Club Registrar and Reporter roles** (decided 2026-09-23, #375): a
    director or deputy may give a club **Registrar** the roster and event
@@ -529,6 +550,20 @@ human can accept, change or reject them before any real record is stored.
 - **Consent wording:** the three statements are the verbatim text from the 2026
   Pathfinder Health Record (`HEALTH_CONSENT_TEXT`, version
   `pathfinder-health-record-2026`).
+
+### Decided 2026-10-26 (Communication Director, #1225)
+
+**Clubs Administrator and the Pathfinder Health Record.** Caleb decided that a
+Clubs Administrator sees what a system administrator sees: view-only access to
+a club member's health record, with the same one-time privacy notice, the same
+break-glass reason and 24-hour grant for the live record and sealed copies, and
+the same audit entries. The audit row names the person and, where it records
+the kind of viewer, marks the role as Clubs Administrator. Like a system
+administrator, a Clubs Administrator also sees the break-glass grants list
+(who opened which record, when, and the reason they gave). Importing health
+records, placing and lifting sealed-copy holds, and event-scoped coordinator
+health stay with system administrators. The grant is checked on every request,
+so removing it ends access on the next one.
 
 ### Decided 2026-10-14 (Communication Director and IT Director, #923)
 

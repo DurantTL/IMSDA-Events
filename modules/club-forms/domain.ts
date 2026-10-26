@@ -351,15 +351,16 @@ export type ClubFormActor =
  *   sees the club's files, including sensitive answers and birth dates.
  * - AREA_COORDINATOR: read-only over every club; every sensitive answer is
  *   "Restricted".
- * - STAFF: conference staff, which is only system administrators and Event
- *   Admins of a current event (Caleb, 2026-09-29). Read-only. They read the
- *   sensitive answers (health, conduct, physician, emergency contacts), but
- *   only a system administrator reads full birth dates (ADR 0005 Addendum A).
+ * - STAFF: conference staff, which is only system administrators, Clubs
+ *   Administrators and Event Admins of a current event (Caleb, 2026-09-29 and
+ *   2026-10-26). Read-only. They read the sensitive answers (health, conduct,
+ *   physician, emergency contacts), but only a system administrator or Clubs
+ *   Administrator reads full birth dates (ADR 0005 Addendum A).
  */
 export type ClubFormsViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; actor: ClubFormActor }
   | { kind: "AREA_COORDINATOR"; actor: ClubFormActor }
-  | { kind: "STAFF"; userId: string; systemAdmin: boolean };
+  | { kind: "STAFF"; userId: string; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean };
 
 /**
  * A submission with no club (a "Not listed" open application, #1229) is conference staff's alone: `organizationId`
@@ -403,13 +404,14 @@ export function clubFormClubLabel(organizationName: string | null | undefined, u
 /** Health, conduct, physician and emergency-contact answers (not birth dates). */
 export function viewerCanRevealSensitive(viewer: ClubFormsViewer, organizationId: string | null) {
   if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
-  return viewer.kind === "STAFF";
+  // System administrators, Clubs Administrators and current Event Admins read these (#1225).
+  return viewer.kind === "STAFF" && viewer.sensitiveAnswers;
 }
 
-/** Full birth dates (ADR 0005 Addendum A): the club's own leaders and system administrators only. */
+/** Full birth dates (ADR 0005 Addendum A): the club's own leaders, system administrators and Clubs Administrators. */
 export function viewerCanRevealBirthDates(viewer: ClubFormsViewer, organizationId: string | null) {
   if (viewer.kind === "CLUB_LEADER") return organizationId !== null && viewer.organizationId === organizationId;
-  return viewer.kind === "STAFF" && viewer.systemAdmin;
+  return viewer.kind === "STAFF" && (viewer.systemAdmin || viewer.clubsAdministrator);
 }
 
 /**

@@ -92,6 +92,7 @@ export async function listStaffMemberships(eventId: string) {
           globalRole: true,
           accountStatus: true,
           credential: { select: { disabledAt: true } },
+          clubsAdministratorGrant: { select: { revokedAt: true } },
         },
       },
     },
@@ -113,6 +114,8 @@ export async function listStaffMemberships(eventId: string) {
       globalRole: row.user.globalRole,
       accountStatus: row.user.accountStatus,
       accountDisabled: Boolean(row.user.credential?.disabledAt),
+      /** An active Clubs Administrator grant (#1225); shown to system administrators on the Team page. */
+      clubsAdministrator: Boolean(row.user.clubsAdministratorGrant && !row.user.clubsAdministratorGrant.revokedAt),
     },
   }));
 }

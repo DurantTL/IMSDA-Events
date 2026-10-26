@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rolePermissions } from "@/modules/access/permissions";
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
@@ -68,7 +69,7 @@ export async function resolveAreaGuardianViewer(): Promise<Extract<GuardianViewe
 
 /**
  * Conference staff with the sensitive-data permission, or null. A system
- * administrator is always allowed. Anyone else must hold the permission on the
+ * administrator or an active Clubs Administrator is always allowed. Anyone else must hold the permission on the
  * given event's membership, and that event must not have ended (the same
  * precedent as `staffClubFormsAccess`); with no event named they get nothing.
  */
@@ -77,6 +78,8 @@ export async function resolveStaffGuardianViewer(eventId?: string, now = new Dat
   if (!user) return null;
   const viewer = { kind: "STAFF" as const, userId: user.id };
   if (user.globalRole === "SYSTEM_ADMIN") return viewer;
+  // A Clubs Administrator (#1225, Caleb 2026-10-26) sees the same guardian contacts a system administrator does.
+  if (await isActiveClubsAdministrator(user.id)) return viewer;
   if (!eventId) return null;
   const prisma = getPrisma();
   const [memberships, event] = await Promise.all([

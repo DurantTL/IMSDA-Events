@@ -7,6 +7,7 @@ import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { ClubFormBuilder } from "@/components/club-form-builder";
 import { ClubFormAlertRecipients } from "@/components/club-form-alert-recipients";
 import { ClubFormDraftDiscard } from "@/components/club-form-draft-discard";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getClubFormBuilderView } from "@/modules/club-forms/builder";
 import { STALE_DRAFT_MESSAGE } from "@/modules/club-forms/builder-messages";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubFormBuilderPage({ params }: { params: Promise<{ templateKey: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { templateKey } = await params;
   const view = await getClubFormBuilderView(templateKey).catch((error: unknown) => {
     if (error instanceof ClubFormError && error.code === "TEMPLATE_NOT_FOUND") return null;
@@ -54,7 +55,9 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
       ) : view.draftBaseVersion !== null && (view.draft !== null || view.draftUnreadable)
         ? <p className="field-help">This draft was started on version {view.draftBaseVersion}.</p>
         : null}
-      <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
+      {user.globalRole === "SYSTEM_ADMIN"
+        ? <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
+        : <p className="inline-notice" role="status">Who is emailed when this form is submitted is set by a system administrator.</p>}
       <BuilderPhoneNotice backHref="/admin/club-forms" backLabel="Back to club forms" builderName="club form builder" />
       <div className="builder-phone-hidden">
         {view.draftUnreadable ? (

@@ -124,7 +124,7 @@ import type { ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
 
 const slipSeed = clubFormTemplateSeeds.find((seed) => seed.key === "off_premises_permission_slip")!;
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
-const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
+const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 
 function seedRow(overrides: Record<string, unknown> = {}) {
   return {

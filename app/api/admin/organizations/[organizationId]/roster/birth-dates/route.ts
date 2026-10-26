@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { organizationApiError } from "@/modules/organizations/api-errors";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { revealRosterBirthDates } from "@/modules/club-rosters/repository";
@@ -13,7 +13,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { organizationId } = await context.params;
     const birthDates = await revealRosterBirthDates(organizationId, clubYearFor(new Date()), { userId: actor.id });
     return Response.json({ birthDates }, { headers: { "Cache-Control": "no-store" } });

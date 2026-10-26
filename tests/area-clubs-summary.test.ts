@@ -23,6 +23,8 @@ const client = {
   clubDirectorGrant: { findMany: mocks.grantFindMany },
   event: { findMany: mocks.eventFindMany },
   areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique },
+  // A Clubs Administrator (#1225) may also export; nobody in these tests holds the grant.
+  clubsAdministratorGrant: { findFirst: async () => null },
 };
 
 vi.mock("server-only", () => ({}));
@@ -279,7 +281,7 @@ describe("area club export permissions (#657)", () => {
     expect((await AREA_EXPORT(request("/api/attendee/area-clubs/export"))).status).toBe(404);
   });
 
-  it("gives the staff export to system administrators only", async () => {
+  it("gives the staff export to system administrators (and Clubs Administrators, #1225) only", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: "SYSTEM_ADMIN" } });
     expect((await ADMIN_EXPORT(request("/api/admin/club-reports/area-export"))).status).toBe(200);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u2", globalRole: "STAFF" } });

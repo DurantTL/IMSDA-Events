@@ -7,7 +7,8 @@ export type TeamMenuItemKey =
   | "send-password-reset"
   | "change-email"
   | "reset-two-step"
-  | "toggle-sign-in";
+  | "toggle-sign-in"
+  | "toggle-clubs-administrator";
 
 export type TeamMenuItem = {
   key: TeamMenuItemKey;
@@ -18,12 +19,16 @@ export type TeamMenuItem = {
 /**
  * Which "More actions" items a team row offers. Same rules the row's buttons
  * had before they moved into the menu: reset two-step only for someone else
- * who has started two-step, and the sign-in toggle never for yourself.
+ * who has started two-step, and the sign-in toggle never for yourself. The
+ * Clubs Administrator toggle (#1225) is offered for anyone who is not a system
+ * administrator (they already have every club area).
  */
 export function teamMenuItems(member: {
   id: string;
   mfaStatus: string;
   signInDisabled: boolean;
+  globalRole?: string | null;
+  clubsAdministrator?: boolean;
 }, currentUserId: string): TeamMenuItem[] {
   const items: TeamMenuItem[] = [
     { key: "send-password-reset", label: "Send password reset", danger: false },
@@ -32,6 +37,13 @@ export function teamMenuItems(member: {
   const isSelf = member.id === currentUserId;
   if (!isSelf && member.mfaStatus !== "NONE") {
     items.push({ key: "reset-two-step", label: "Reset two-step", danger: false });
+  }
+  if (member.clubsAdministrator !== undefined && member.globalRole !== "SYSTEM_ADMIN") {
+    items.push({
+      key: "toggle-clubs-administrator",
+      label: member.clubsAdministrator ? "Remove Clubs Administrator" : "Make Clubs Administrator",
+      danger: member.clubsAdministrator,
+    });
   }
   if (!isSelf) {
     items.push({
@@ -56,13 +68,14 @@ export function nextMenuIndex(key: string, current: number, count: number): numb
 export type TeamMenuHandlers = Record<
   "sendPasswordReset" | "changeEmail" | "resetTwoStep" | "toggleSignIn",
   () => void
->;
+> & { toggleClubsAdministrator?: () => void };
 
 /** Routes a menu item to the row's existing handler. */
 export function dispatchTeamMenuAction(key: TeamMenuItemKey, handlers: TeamMenuHandlers) {
   if (key === "send-password-reset") handlers.sendPasswordReset();
   else if (key === "change-email") handlers.changeEmail();
   else if (key === "reset-two-step") handlers.resetTwoStep();
+  else if (key === "toggle-clubs-administrator") handlers.toggleClubsAdministrator?.();
   else handlers.toggleSignIn();
 }
 

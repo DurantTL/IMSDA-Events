@@ -1,4 +1,4 @@
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { listBackgroundCheckReviews } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -10,7 +10,7 @@ import { withRequestContext } from "@/lib/request-context";
  */
 async function getHandler() {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     const reviews = await listBackgroundCheckReviews();
     return Response.json({ reviews });
   } catch (error) {

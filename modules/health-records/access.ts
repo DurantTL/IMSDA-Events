@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { AccessDeniedError } from "@/modules/access/authorization";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured } from "@/modules/attendee-accounts/passkeys";
@@ -56,7 +57,7 @@ export async function requireHealthViewerForClub(organizationId: string, now = n
 }
 
 /**
- * For staff routes and pages: a system administrator, or a user whose ACTIVE
+ * For staff routes and pages: a system administrator, an active Clubs Administrator (#1225), or a user whose ACTIVE
  * event membership carries VIEW_HEALTH_INFORMATION (view only, for those events).
  */
 export async function requireStaffHealthViewer(): Promise<HealthViewer> {
@@ -64,6 +65,9 @@ export async function requireStaffHealthViewer(): Promise<HealthViewer> {
   const { user } = await getCurrentSession();
   if (!user) throw new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED");
   if (user.globalRole === "SYSTEM_ADMIN") return { kind: "SYSTEM_ADMIN", userId: user.id };
+  // A Clubs Administrator (#1225, Caleb 2026-10-26) sees what a system administrator sees here: same view-only access,
+  // reasons, break-glass and audit. Read from the database now, so a revoke applies at once.
+  if (await isActiveClubsAdministrator(user.id)) return { kind: "SYSTEM_ADMIN", userId: user.id, viaClubsAdministrator: true };
   const memberships = await getPrisma().eventMembership.findMany({
     where: { userId: user.id, status: "ACTIVE", permissions: { has: "VIEW_HEALTH_INFORMATION" } },
     select: { eventId: true, permissions: true },

@@ -51,6 +51,20 @@ describe("team account menu items", () => {
       "Change email",
     ]);
   });
+
+  it("offers the Clubs Administrator toggle (#1225) for anyone but a system administrator, and routes it", () => {
+    expect(labels(teamMenuItems(member({ globalRole: "USER", clubsAdministrator: false }), "me"))).toContain("Make Clubs Administrator");
+    const remove = teamMenuItems(member({ globalRole: "USER", clubsAdministrator: true }), "me").find((item) => item.key === "toggle-clubs-administrator");
+    expect(remove).toMatchObject({ label: "Remove Clubs Administrator", danger: true });
+    expect(labels(teamMenuItems(member({ globalRole: "SYSTEM_ADMIN", clubsAdministrator: false }), "me"))).not.toContain("Make Clubs Administrator");
+    const toggleClubsAdministrator = vi.fn();
+    const toggleSignIn = vi.fn();
+    dispatchTeamMenuAction("toggle-clubs-administrator", {
+      sendPasswordReset: vi.fn(), changeEmail: vi.fn(), resetTwoStep: vi.fn(), toggleSignIn, toggleClubsAdministrator,
+    });
+    expect(toggleClubsAdministrator).toHaveBeenCalledOnce();
+    expect(toggleSignIn).not.toHaveBeenCalled();
+  });
 });
 
 describe("team account menu rendering and keyboard", () => {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -72,7 +73,9 @@ async function auditRefusal(actorUserId: string | undefined, metadata: Record<st
  */
 async function requireSystemAdmin(viewer: HealthViewer, attempted: string, targetId: string | null, options: { flagOptional?: boolean } = {}): Promise<SystemAdmin> {
   if (!options.flagOptional) requireHealthRecordsEnabled();
-  if (viewer.kind === "SYSTEM_ADMIN") return viewer;
+  // A Clubs Administrator (#1225) may open sealed copies and use break-glass like a system administrator; holds stay system-only.
+  const clubsMayDo = ["BREAK_GLASS_START", "VIEW_SEALED_COPIES", "LIST_BREAK_GLASS"].includes(attempted);
+  if (viewer.kind === "SYSTEM_ADMIN" && (!viewer.viaClubsAdministrator || clubsMayDo)) return viewer;
   const who = healthAuditActor(viewer);
   await auditRefusal(who.actorUserId, { ...who.metadata, reason: "NOT_SYSTEM_ADMIN" }, attempted, targetId);
   throw new HealthRecordError("FORBIDDEN", "Sealed health copies can be opened only by a system administrator, with break-glass.");
@@ -85,7 +88,7 @@ async function requireSystemAdmin(viewer: HealthViewer, attempted: string, targe
  * unauthenticated request is a 401 and cannot be attributed, so it is not audited. With the flag off (`flagOptional`
  * routes only) anyone but a system administrator gets the unknown-route answer and nothing is audited.
  */
-export async function requireSnapshotAdminViewer(attempted: string, targetId: string | null, options: { flagOptional?: boolean } = {}): Promise<SystemAdmin> {
+export async function requireSnapshotAdminViewer(attempted: string, targetId: string | null, options: { flagOptional?: boolean; allowClubsAdministrator?: boolean } = {}): Promise<SystemAdmin> {
   const flagOn = healthRecordsEnabled();
   if (!flagOn && !options.flagOptional) requireHealthRecordsEnabled();
   const { user } = await getCurrentSession();
@@ -95,6 +98,8 @@ export async function requireSnapshotAdminViewer(attempted: string, targetId: st
   }
   if (!user) throw new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED");
   if (user.globalRole === "SYSTEM_ADMIN") return { kind: "SYSTEM_ADMIN", userId: user.id };
+  // Viewing sealed copies and break-glass are open to an active Clubs Administrator (#1225); holds stay system-only.
+  if (options.allowClubsAdministrator && await isActiveClubsAdministrator(user.id)) return { kind: "SYSTEM_ADMIN", userId: user.id, viaClubsAdministrator: true };
   const memberships = await getPrisma().eventMembership.findMany({
     where: { userId: user.id, status: "ACTIVE", permissions: { has: "VIEW_HEALTH_INFORMATION" } },
     select: { permissions: true },

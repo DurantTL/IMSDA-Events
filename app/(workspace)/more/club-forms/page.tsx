@@ -29,7 +29,7 @@ export default async function StaffClubFormsPage({
   const { event, form, club } = await searchParams;
   const viewer = await resolveStaffViewer();
   if (!viewer) {
-    return <AccessRestricted detail="Club forms are for system administrators and Event Admins of a current event." title="Club forms are restricted" />;
+    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" />;
   }
   const [templates, clubs, submissions] = await Promise.all([
     listClubFormTemplateNames(),
@@ -48,11 +48,13 @@ export default async function StaffClubFormsPage({
           <p className="eyebrow">Conference staff</p>
           <h2 className="duplicate-page-title">{staffPageTitles.clubForms}</h2>
           <p>
-            Submitted forms by club. You can read health, conduct, physician and emergency-contact answers; each time
-            you open a form that has them, it is recorded.{" "}
-            {viewer.systemAdmin
-              ? "As a system administrator you can also read birth dates."
-              : "Birth dates show as Restricted: only the club's own director and deputies and system administrators can read them."}
+            Submitted forms by club.{" "}
+            {viewer.sensitiveAnswers
+              ? "You can read health, conduct, physician and emergency-contact answers; each time you open a form that has them, it is recorded. "
+              : "Health, conduct, physician and emergency-contact answers show as Restricted for your role. "}
+            {viewer.systemAdmin || viewer.clubsAdministrator
+              ? `As a ${viewer.systemAdmin ? "system administrator" : "Clubs Administrator"} you can also read birth dates.`
+              : "Birth dates show as Restricted: only the club's own director and deputies, system administrators and Clubs Administrators can read them."}
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { AccessDeniedError, type AuthenticatedUser } from "@/modules/access/authorization";
 import { hasEventEnded } from "@/modules/events/lifecycle";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -70,12 +71,15 @@ export async function requireAreaCoordinatorViewer() {
 }
 
 /**
- * Conference staff for club forms (Caleb, 2026-09-29): system administrators,
- * and Event Admins of an event that has not ended. Nobody else, whatever other
- * permissions they hold: not check-in, read-only, communications, registration
- * or finance roles, even with VIEW_SENSITIVE_DATA. Conference staff read the
- * sensitive answers; only a system administrator reads birth dates (the
- * viewer's `systemAdmin` flag decides that). The event model has no archived
+ * Conference staff for club forms (Caleb, 2026-09-29, extended 2026-10-26,
+ * #1225): system administrators, Clubs Administrators (an active grant, held
+ * across events), and Event Admins of an event that has not ended. Nobody
+ * else, whatever other permissions they hold: not check-in, read-only,
+ * communications, registration or finance roles, even with VIEW_SENSITIVE_DATA.
+ * System administrators, Clubs Administrators (Caleb, 2026-10-26: they see what
+ * a system administrator sees) and current Event Admins read the sensitive
+ * answers (`sensitiveAnswers`); only a system administrator or a Clubs
+ * Administrator reads birth dates (`systemAdmin` / `clubsAdministrator`). The event model has no archived
  * state, so "current" is "has not ended" (`hasEventEnded`).
  */
 export function staffClubFormsAccess(
@@ -85,24 +89,28 @@ export function staffClubFormsAccess(
     event: { timezone: string; endsAt: Date };
   }>,
   now = new Date(),
-): { isStaff: boolean; systemAdmin: boolean } {
-  if (user.globalRole === "SYSTEM_ADMIN") return { isStaff: true, systemAdmin: true };
-  const isStaff = memberships.some((membership) => membership.role === "EVENT_ADMIN" && !hasEventEnded(membership.event, now));
-  return { isStaff, systemAdmin: false };
+  clubsAdministrator = false,
+): { isStaff: boolean; systemAdmin: boolean; clubsAdministrator: boolean; sensitiveAnswers: boolean } {
+  if (user.globalRole === "SYSTEM_ADMIN") return { isStaff: true, systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
+  const eventAdmin = memberships.some((membership) => membership.role === "EVENT_ADMIN" && !hasEventEnded(membership.event, now));
+  return { isStaff: eventAdmin || clubsAdministrator, systemAdmin: false, clubsAdministrator, sensitiveAnswers: eventAdmin || clubsAdministrator };
 }
 
 /** Conference staff, or null for anyone else (including a signed-out visitor). */
 export async function resolveStaffViewer(now = new Date()): Promise<Extract<ClubFormsViewer, { kind: "STAFF" }> | null> {
   const { user } = await getCurrentSession();
   if (!user) return null;
+  const clubsAdministrator = user.globalRole === "SYSTEM_ADMIN" ? false : await isActiveClubsAdministrator(user.id);
   const memberships = user.globalRole === "SYSTEM_ADMIN"
     ? []
     : await getPrisma().eventMembership.findMany({
       where: { userId: user.id, status: "ACTIVE", role: "EVENT_ADMIN" },
       select: { role: true, event: { select: { timezone: true, endsAt: true } } },
     });
-  const access = staffClubFormsAccess(user, memberships, now);
-  return access.isStaff ? { kind: "STAFF", userId: user.id, systemAdmin: access.systemAdmin } : null;
+  const access = staffClubFormsAccess(user, memberships, now, clubsAdministrator);
+  return access.isStaff
+    ? { kind: "STAFF", userId: user.id, systemAdmin: access.systemAdmin, clubsAdministrator: access.clubsAdministrator, sensitiveAnswers: access.sensitiveAnswers }
+    : null;
 }
 
 /** For staff API routes: conference staff, or a 401 (signed out) / 403 (signed in, not staff). */

@@ -3,13 +3,17 @@ import { ActAsBanner } from "@/components/act-as-banner";
 import { AppShell } from "@/components/app-shell";
 import { removableModuleKeys } from "@/components/event-modules-page-model";
 import { listActiveEventPermissionsForUser, listActiveEventRolesForUser } from "@/modules/access/membership-repository";
+import { resolveAdminRoleView } from "@/modules/access/admin-roles";
+import type { AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { eventPermissions } from "@/modules/access/permissions";
 import { findSwitchableAttendeeAccountForStaff } from "@/modules/attendee-accounts/current-attendee";
 import { disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { moduleStatesByEvent } from "@/modules/event-modules/service";
 import { staffClubFormsAccess } from "@/modules/club-forms/access";
+import { countWaitingNewClubApplications } from "@/modules/club-applications/repository";
 import { eventsNeedingModuleState } from "@/modules/event-modules/shell-scope";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
+import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -39,12 +43,26 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   const modulesByEvent = await moduleStatesByEvent(eventsNeedingModuleState(events, defaultEventId));
   // Club forms (#610): one answer per user, from the same helper `resolveStaffViewer`
   // uses (system admin, or EVENT_ADMIN of any event that has not ended).
+  // The admin role switcher (#1225): the roles held (read from the database now, so a revoke applies at once) and what is
+  // waiting in each. The counts are for the pills only; a count that cannot be read is left off, never shown as zero.
+  const adminRoleView = await resolveAdminRoleView(user);
   const clubFormsAccess = staffClubFormsAccess(
     user,
     events
       .filter((event) => rolesByEvent.get(event.id) === "EVENT_ADMIN")
       .map((event) => ({ role: "EVENT_ADMIN", event: { timezone: event.timezone, endsAt: event.endsAt } })),
+    new Date(),
+    adminRoleView.roles.clubsAdministrator,
   ).isStaff;
+  const adminRoleCounts: AdminRoleCounts = {};
+  await Promise.all([
+    adminRoleView.roles.clubsAdministrator
+      ? countWaitingNewClubApplications("CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
+      : undefined,
+    isSystemAdmin
+      ? getAdminAttentionSummary().then((summary) => { adminRoleCounts.SYSTEM_ADMIN = summary.total; }).catch(() => undefined)
+      : undefined,
+  ]);
   const shellEvents = events.map((event) => ({
     id: event.id,
     slug: event.slug,
@@ -73,6 +91,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
         defaultEventId={defaultEventId}
         events={shellEvents}
         user={user}
+        adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts } : null}
       >
         {children}
       </AppShell>

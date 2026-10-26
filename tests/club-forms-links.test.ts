@@ -67,7 +67,7 @@ import { openSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 const now = new Date("2026-10-05T15:00:00Z");
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const otherDirector: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-b", actor: { kind: "ATTENDEE", accountId: "acct-9" } };
-const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true };
+const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 
 const TOKEN = "T".repeat(43);
 const SECRET_HEALTH = "Synthetic health detail";

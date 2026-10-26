@@ -77,7 +77,7 @@ describe("with the health records switch off", () => {
     expect((await holdsRoute.GET(get())).status).toBe(200);
     expect((await liftRoute.POST(post({ reason: REASON }), ctx)).status).toBe(200);
     expect((await grantsRoute.GET(get())).status).toBe(200);
-    for (const call of state.repo.requireSnapshotAdminViewer.mock.calls) expect(call[2]).toEqual({ flagOptional: true });
+    for (const call of state.repo.requireSnapshotAdminViewer.mock.calls) expect(call[2]).toMatchObject({ flagOptional: true });
   });
 
   it("answers anyone but a system administrator like an unknown route on those routes", async () => {
@@ -112,7 +112,7 @@ describe("who is asked before the body is read", () => {
 
   it("names the attempt and its target to the resolver, so the refusal can be audited", async () => {
     await personRoute.GET(get(), ctx);
-    expect(state.repo.requireSnapshotAdminViewer).toHaveBeenLastCalledWith("VIEW_SEALED_COPIES", "person-1");
+    expect(state.repo.requireSnapshotAdminViewer).toHaveBeenLastCalledWith("VIEW_SEALED_COPIES", "person-1", { allowClubsAdministrator: true });
     await liftRoute.POST(post({ reason: REASON }), ctx);
     expect(state.repo.requireSnapshotAdminViewer).toHaveBeenLastCalledWith("LIFT_HOLD", "hold-1", { flagOptional: true });
   });

@@ -2,6 +2,7 @@ import "server-only";
 
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { redirect } from "next/navigation";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { eventPermissions, isKitchenWithoutEventView, kitchenCountsPath, rolePermissions } from "@/modules/access/permissions";
 import { withoutArchivedEvents } from "@/modules/events/archive";
@@ -87,12 +88,15 @@ async function loadSignedInEvents(options: { allowNoEvents?: boolean; anyStaffWi
   // pages that need an event still resolve (and redirect) on their own.
   // The staff-only /profile page (#623) also lets any staff account with no
   // events in, so they can still reach their own security settings.
+  // A Clubs Administrator (#1225) has no event assignment by default and works in the global club pages, so the
+  // workspace layout lets them in too; any page that needs an event still resolves (and redirects) on its own.
   if (
     events.length === 0
     && !options.anyStaffWithoutEvents
-    && !(options.allowNoEvents && user.globalRole === "SYSTEM_ADMIN")
+    && !(options.allowNoEvents && (user.globalRole === "SYSTEM_ADMIN" || await isActiveClubsAdministrator(user.id)))
   ) {
-    redirect("/no-access");
+    // A Clubs Administrator with no event assignment has no event page to land on: their home is the Clubs summary.
+    redirect(await isActiveClubsAdministrator(user.id) ? "/admin/clubs/summary" : "/no-access");
   }
   return { user, events };
 }

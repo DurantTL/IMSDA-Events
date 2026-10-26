@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubYearEndConference } from "@/components/club-year-end-conference";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isReportYear, latestStartedReportYear, reportYearLabel, reportYearStart } from "@/modules/club-reports/year-end-domain";
 import { listYearEndReportsForYear } from "@/modules/club-reports/year-end-repository";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubYearEndReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { year } = await searchParams;
   const current = latestStartedReportYear(new Date());
   const reportYear = year && isReportYear(year) ? year : current;
