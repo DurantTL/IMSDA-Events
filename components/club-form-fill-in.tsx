@@ -238,7 +238,7 @@ export function ClubFormFillIn(props: Props) {
           <ClubFormSectionTitle>Your club</ClubFormSectionTitle>
           <div className="club-form-apply-club">
             <label>
-              Club <span aria-hidden="true">{"\u00a0*"}</span>
+              <span>Club<span aria-hidden="true">{"\u00a0*"}</span></span>
               <select onChange={(event) => setClubChoice(event.target.value)} required value={clubChoice}>
                 <option value="">Choose your club…</option>
                 {props.clubs.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
@@ -247,7 +247,7 @@ export function ClubFormFillIn(props: Props) {
             </label>
             {clubChoice === "NOT_LISTED" && (
               <label>
-                Your club&apos;s name <span aria-hidden="true">{"\u00a0*"}</span>
+                <span>Your club&apos;s name<span aria-hidden="true">{"\u00a0*"}</span></span>
                 <input maxLength={120} onChange={(event) => setUnlistedClubName(event.target.value)} required value={unlistedClubName} />
               </label>
             )}

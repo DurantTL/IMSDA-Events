@@ -54,7 +54,7 @@ describe("notification catalog (#1016)", () => {
     expect(entry?.sentFrom).toBe("modules/club-forms/submission-alert.ts");
     expect(entry?.recipients).toBe("Set on each club form.");
     expect(entry?.source).toEqual({ kind: "club-form-list" });
-    expect(entry?.switchReadIn).toEqual(["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"]);
+    expect(entry?.switchReadIn).toEqual(["modules/club-forms/links.ts", "modules/club-forms/open-applications.ts", "modules/club-forms/submissions.ts"]);
   });
 
   it("asks for a warning only before the lockout alert goes off", () => {
