@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { withCurrentEvent } from "@/components/staff-navigation";
+import { GuideScreenshotFigure } from "@/components/guide-screenshot";
 import { BackLink } from "@/components/back-link";
 import { docLabel, docUrl } from "@/modules/help/guides";
 import { loadHelpViewer } from "@/modules/help/viewer";
@@ -54,6 +55,7 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
         <section className={styles.section} aria-labelledby="guide-steps">
           <h3 className={styles.sectionTitle} id="guide-steps">Steps</h3>
           <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>
+          <GuideScreenshotFigure guide={guide} />
         </section>
         <section className={styles.section} aria-labelledby="guide-verify">
           <h3 className={styles.sectionTitle} id="guide-verify">How to check it worked</h3>

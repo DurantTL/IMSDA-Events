@@ -4,6 +4,7 @@ import { getMessagingWorkspace } from "@/modules/communications/messaging-reposi
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { listAnnouncements } from "@/modules/communications/repository";
 import type { CommunicationsView, MessagingWorkspaceData } from "@/modules/communications/types";
+import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -101,6 +102,8 @@ export default async function CommunicationsPage({
     ? requestedView as CommunicationsView
     : "announcements";
   return (
+    <>
+    <StaffContextualHelp guideId="resolve-email-problem" event={requested} />
     <CommunicationsWorkspace
       key={event.id}
       eventId={event.id}
@@ -114,5 +117,6 @@ export default async function CommunicationsPage({
       initialView={initialView}
       openNew={openNew === "1"}
     />
+    </>
   );
 }

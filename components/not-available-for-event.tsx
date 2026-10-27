@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CalendarOff } from "lucide-react";
 
 /**
@@ -13,6 +14,7 @@ export function NotAvailableForEvent({ reason }: { reason: string }) {
         <span><CalendarOff aria-hidden="true" size={26} /></span>
         <h2>Not available for this event</h2>
         <p>{reason}</p>
+        <Link className="secondary-button forbidden-state-action" href="/help">Open Help &amp; learning</Link>
       </div>
     </section>
   );

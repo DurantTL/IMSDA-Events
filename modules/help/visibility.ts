@@ -81,3 +81,24 @@ export function filterGuides<T extends Pick<HelpGuide, "title" | "summary" | "ke
     return words.every((word) => haystack.includes(word));
   });
 }
+
+/** The hub's workspace filter: every guide, or only System administration or Event workspace guides. */
+export type WorkspaceFilter = "all" | "System" | "Event";
+
+export const workspaceFilterLabels: Record<WorkspaceFilter, string> = {
+  all: "All",
+  System: "System administration",
+  Event: "Event workspace",
+};
+
+/**
+ * The filter choices this viewer is offered. System appears only when they have a System guide, so staff who
+ * cannot open System guides never see a choice that would always be empty (and never learn they exist).
+ */
+export function workspaceFilterOptions(guides: readonly Pick<HelpGuide, "workspace">[]): WorkspaceFilter[] {
+  return guides.some((guide) => guide.workspace === "System") ? ["all", "System", "Event"] : ["all", "Event"];
+}
+
+export function filterGuidesByWorkspace<T extends Pick<HelpGuide, "workspace">>(guides: readonly T[], filter: WorkspaceFilter): T[] {
+  return filter === "all" ? [...guides] : guides.filter((guide) => guide.workspace === filter);
+}
