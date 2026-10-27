@@ -160,7 +160,7 @@ export async function listPublicCalendarItems(
     const registration = registrationFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
-      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, eventTitle: event.name, ...registration });
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, eventTitle: event.name, eventStartsOn: calendarDateIn(event.startsAt, event.timezone), eventEndsOn: calendarDateIn(event.endsAt, event.timezone), ...registration });
   });
 
   const items: CalendarItem[] = [

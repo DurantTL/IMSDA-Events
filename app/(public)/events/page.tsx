@@ -52,7 +52,7 @@ function EventCard({ item, directsClub }: { item: CalendarItem; directsClub: boo
     <li className="open-events-card">
       <h3><Link href={item.href!}>{item.eventTitle ?? item.title}</Link></h3>
       <p className="calendar-agenda-meta">
-        <span><CalendarDays size={14} aria-hidden="true" /> {formatDateRange(item.startsOn, item.endsOn)}</span>
+        <span><CalendarDays size={14} aria-hidden="true" /> {formatDateRange(item.eventStartsOn ?? item.startsOn, item.eventEndsOn ?? item.endsOn)}</span>
         {item.location && <span><MapPin size={14} aria-hidden="true" /> {item.location}</span>}
       </p>
       {statusLine && <p className={`calendar-agenda-status${open ? " is-open" : ""}`}>{statusLine}</p>}

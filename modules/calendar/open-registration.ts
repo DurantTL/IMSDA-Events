@@ -25,6 +25,9 @@ export function openRegistrationHref(filter: OpenRegistrationFilter) {
   return filter === "all" ? "/events" : `/events?for=${filter}`;
 }
 
+/** A linked item (#1086) sorts by its event's own start. */
+const eventStart = (item: CalendarItem) => item.eventStartsOn ?? item.startsOn;
+
 export function selectOpenRegistrationItems(items: CalendarItem[], filter: OpenRegistrationFilter = "all"): CalendarItem[] {
   const seen = new Set<string>();
   return items
@@ -35,7 +38,7 @@ export function selectOpenRegistrationItems(items: CalendarItem[], filter: OpenR
       && !!item.registrationStatus
       && listedStatuses.has(item.registrationStatus))
     // Several linked items can point at one event (#1086): keep the earliest.
-    .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title))
+    .sort((a, b) => eventStart(a).localeCompare(eventStart(b)) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title))
     .filter((item) => {
       if (seen.has(item.href!)) return false;
       seen.add(item.href!);

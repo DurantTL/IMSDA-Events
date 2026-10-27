@@ -225,6 +225,16 @@ describe("club portal cases (#1217)", () => {
     expect(html).toContain(">Fictitious Camp</a>");
     expect(html).not.toContain("Day 2 Hike");
   });
+
+  it("shows a linked item's event dates, not the item's own", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item("camp", {
+      title: "Fictitious Day 1 Check-in", eventTitle: "Fictitious Camp", startsOn: "2026-11-10", endsOn: "2026-11-10",
+      eventStartsOn: "2026-11-10", eventEndsOn: "2026-11-14",
+    })]);
+    const html = await render();
+    expect(html).toContain("November 10–14, 2026");
+    expect(html).not.toContain("November 10, 2026");
+  });
 });
 
 describe("what the page can never list (#1217)", () => {

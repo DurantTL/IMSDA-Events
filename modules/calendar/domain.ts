@@ -38,6 +38,9 @@ export type CalendarItem = {
   clubPortal?: boolean;
   /** Set when several items link to one event (#1086): the event's own name, which lists use instead of an entry title. */
   eventTitle?: string;
+  /** With `eventTitle`: the event's own dates, which lists use instead of the linked item's date. */
+  eventStartsOn?: string;
+  eventEndsOn?: string;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */
   isClosure?: boolean;
   /**
