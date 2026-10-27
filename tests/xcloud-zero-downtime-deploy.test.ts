@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 // #1263: deploys switch to the new version without stopping the site.
 const root = process.cwd();
 const deployScript = path.join(root, "deploy/xcloud/deploy.sh");
+const autodeployScript = path.join(root, "deploy/xcloud/autodeploy.sh");
 const entrypoint = path.join(root, "docker-entrypoint.sh");
 const holdingServer = path.join(root, "deploy/startup-holding-server.mjs");
 const sha = "b".repeat(40);
@@ -108,6 +109,87 @@ describe("deploy.sh zero-downtime switch", () => {
     expect(status).toBe(1);
     expect(calls).toContain("tag imsda-events:previous imsda-events:live prep= skip=");
     expect(calls.at(-2)).toContain("up -d --no-deps app prep= skip=");
+  });
+});
+
+describe("autodeploy.sh night window", () => {
+  // git logs every call; rev-parse answers FAKE_ORIGIN. docker answers the live
+  // label from FAKE_LIVE and pulls succeed unless FAKE_PULL_EXIT is set.
+  const autoGit = `#!/bin/sh
+echo "git $*" >> "$FAKE_LOG"
+case "$*" in *rev-parse*) echo "$FAKE_ORIGIN" ;; *fetch*) exit "\${FAKE_FETCH_EXIT:-0}" ;; esac
+exit 0
+`;
+  const autoDocker = `#!/bin/sh
+echo "docker $*" >> "$FAKE_LOG"
+case "$1" in
+  image) echo "$FAKE_LIVE" ;;
+  pull) exit "\${FAKE_PULL_EXIT:-0}" ;;
+esac
+exit 0
+`;
+  const fakeDate = `#!/bin/sh
+echo "$TZ" > "$FAKE_LOG.tz"
+echo "$FAKE_HOUR"
+`;
+
+  function runAutodeploy(env: Record<string, string>) {
+    const ctx = setup({ git: autoGit, docker: autoDocker, date: fakeDate, "imsda-deploy": logger("imsda-deploy") });
+    writeFileSync(ctx.log, "");
+    writeFileSync(`${ctx.log}.tz`, "");
+    const result = spawnSync("sh", [autodeployScript], {
+      encoding: "utf8",
+      env: {
+        PATH: `${ctx.bin}:/usr/bin:/bin`,
+        XCLOUD_SITE_PATH: ctx.dir,
+        IMSDA_DEPLOY: path.join(ctx.bin, "imsda-deploy"),
+        FAKE_LOG: ctx.log,
+        FAKE_ORIGIN: sha,
+        FAKE_LIVE: "c".repeat(40),
+        ...env,
+      },
+    });
+    return { ...result, calls: readFileSync(ctx.log, "utf8"), tz: readFileSync(`${ctx.log}.tz`, "utf8").trim() };
+  }
+
+  it("fetches origin/main and deploys a published commit inside the window, moving the checkout only then", () => {
+    const { status, calls, tz } = runAutodeploy({ FAKE_HOUR: "02" });
+    expect(status).toBe(0);
+    expect(tz).toBe("America/Chicago");
+    expect(calls).toContain("fetch --quiet origin main");
+    expect(calls).toContain(`docker pull --quiet ghcr.io/duranttl/imsda-events:${sha}`);
+    expect(calls.indexOf("merge --ff-only --quiet origin/main")).toBeLessThan(calls.indexOf("imsda-deploy"));
+    expect(calls).toContain("imsda-deploy");
+  });
+
+  it.each(["05", "08", "13", "23"])("waits outside the default window (hour %s) without touching the checkout", (hour) => {
+    const { status, calls } = runAutodeploy({ FAKE_HOUR: hour });
+    expect(status).toBe(0);
+    expect(calls).not.toContain("merge");
+    expect(calls).not.toContain("imsda-deploy");
+  });
+
+  it("honours a custom window", () => {
+    expect(runAutodeploy({ FAKE_HOUR: "09", IMSDA_DEPLOY_WINDOW: "08-10" }).calls).toContain("imsda-deploy");
+  });
+
+  it("does nothing when origin/main is already live", () => {
+    const { calls } = runAutodeploy({ FAKE_HOUR: "02", FAKE_LIVE: sha });
+    expect(calls).not.toContain("merge");
+    expect(calls).not.toContain("imsda-deploy");
+  });
+
+  it("waits when the image is not published yet", () => {
+    const { status, calls } = runAutodeploy({ FAKE_HOUR: "02", FAKE_PULL_EXIT: "1" });
+    expect(status).toBe(0);
+    expect(calls).not.toContain("merge");
+    expect(calls).not.toContain("imsda-deploy");
+  });
+
+  it("skips the run when the fetch fails", () => {
+    const { status, calls } = runAutodeploy({ FAKE_HOUR: "02", FAKE_FETCH_EXIT: "1" });
+    expect(status).toBe(0);
+    expect(calls).not.toContain("imsda-deploy");
   });
 });
 

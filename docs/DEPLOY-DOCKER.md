@@ -421,8 +421,8 @@ once a day.
 Script on this site. Its own deploy pulls `main` into `/var/www/events.imsda.org`
 and then runs `down` / `up` on the base file, which restarts the app on every
 merge. That restart drops anyone who is submitting a form, so it should be
-turned off (see "Deploys without downtime" below); the timer then pulls `main`
-itself. A systemd timer does the deploy:
+turned off (see "Deploys without downtime" below); the timer then fetches
+`main` itself. A systemd timer does the deploy:
 
 - [`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh), installed as
   `/usr/local/bin/imsda-deploy`, waits up to 20 minutes for
@@ -431,11 +431,13 @@ itself. A systemd timer does the deploy:
   new version does not start, it leaves the live version running.
 - [`deploy/xcloud/autodeploy.sh`](../deploy/xcloud/autodeploy.sh), installed as
   `/usr/local/bin/imsda-autodeploy`, runs every 2 minutes from
-  `imsda-autodeploy.timer`. It runs `git pull --ff-only origin main` in the
-  site checkout as the checkout's owner (`IMSDA_GIT_PULL=0` turns that off).
-  When the checked-out commit differs from the live image's
-  `org.opencontainers.image.revision` label and that commit's image is
-  published, it runs `imsda-deploy`.
+  `imsda-autodeploy.timer`. It fetches `origin/main` as the checkout's owner
+  (`u_events`). When that commit differs from the live image's
+  `org.opencontainers.image.revision` label, its image is published, and the
+  time is inside the deploy window (`IMSDA_DEPLOY_WINDOW`, default `00-05`:
+  midnight to 5 AM Central), it fast-forwards the checkout to it and runs
+  `imsda-deploy`. Outside the window it waits; running `imsda-deploy` by hand
+  deploys the checked-out commit at any time.
 - [`deploy/xcloud/cleanup.sh`](../deploy/xcloud/cleanup.sh), installed as
   `/usr/local/bin/imsda-cleanup`, runs after each successful `imsda-deploy` and
   daily from `imsda-cleanup.timer`. It removes all
@@ -446,13 +448,15 @@ itself. A systemd timer does the deploy:
   stays. Cleanup and deploy take turns through `flock` on
   `/run/imsda-deploy.lock`; a failed cleanup never fails a deploy.
 
-So after a merge: the timer pulls the commit within 2 minutes but the site
-keeps running the old image (and, until xCloud's deploy is turned off, xCloud
-also pulls it and restarts the old version briefly). At 6 PM Central
+So after a merge nothing changes on the server until the night window: the
+timer only fetches. (Until xCloud's deploy is turned off, xCloud still pulls
+the commit and restarts the old version briefly.) At 6 PM Central
 GitHub publishes the image for the latest `main` (about 10 minutes), and the
 timer switches to it within 2 minutes, so the day's merges go live together.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
-on `main`; the timer deploys it about 12 minutes later. Additive database
+on `main`, wait about 10 minutes, then pull and run `imsda-deploy` by hand
+(step 3 under "Deploys without downtime"); otherwise the timer deploys it in
+the next night window. Additive database
 migrations can be run as soon as their PR merges: the old code ignores new
 tables and columns until the evening deploy. Watch it with
 `journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
@@ -493,11 +497,11 @@ what was typed when a submit fails this way and offer **Try again**.
    docker compose -f /home/u_events/239298/docker-compose.yml --profile standby config --quiet && echo config-ok
    ```
 
-2. **Check the timer can pull** (it uses the same Git access xCloud set up for
-   `u_events`):
+2. **Check the timer can fetch** (it uses the same Git access xCloud set up
+   for `u_events`):
 
    ```bash
-   runuser -u u_events -- git -C /var/www/events.imsda.org pull --ff-only origin main && echo pull-ok
+   runuser -u u_events -- git -C /var/www/events.imsda.org fetch origin main && echo fetch-ok
    ```
 
    If this asks for a password or fails, stop here and leave xCloud's deploy on
@@ -506,9 +510,22 @@ what was typed when a submit fails this way and offer **Try again**.
 3. **Turn off xCloud's deploy on merge.** In the xCloud dashboard open the
    events.imsda.org site, then its **Git** settings, and turn off the automatic
    deploy on push (xCloud calls it "Push to Deploy" or "Auto Deploy"; the
-   wording may differ). After that a merge no longer restarts the app; the timer
-   pulls `main` every 2 minutes and deploys once the image is published. Check
-   the next day with `journalctl -u imsda-autodeploy.service --since today`.
+   wording may differ). After that a merge no longer pulls code or restarts
+   the app. The timer fetches `main` every 2 minutes and deploys between
+   midnight and 5 AM Central once the image is published. Check it the next
+   morning:
+
+   ```bash
+   systemctl list-timers imsda-autodeploy.timer        # next run is listed
+   journalctl -u imsda-autodeploy.service --since today | grep Deploying
+   curl -s http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
+   ```
+
+   To use a different window, add `Environment=IMSDA_DEPLOY_WINDOW=01-04` under
+   `[Service]` in `/etc/systemd/system/imsda-autodeploy.service`, then
+   `systemctl daemon-reload`. For a change that can't wait, run
+   `imsda-deploy` by hand after `runuser -u u_events -- git -C
+   /var/www/events.imsda.org pull --ff-only origin main`.
 
 4. **Optional, for no gap at all: let nginx fall back to the standby.** Only if
    xCloud lets you add custom Nginx config for the site. Replace the
