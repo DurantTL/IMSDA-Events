@@ -134,7 +134,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const who = name.trim() || "the person";
   return (
     <>
-      <button className="primary-button" onClick={show} type="button">
+      <button aria-haspopup="dialog" className="primary-button" onClick={show} type="button">
         <UserPlus aria-hidden="true" size={16} /> Invite a person
       </button>
       {open ? (

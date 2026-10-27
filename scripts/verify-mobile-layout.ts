@@ -366,18 +366,6 @@ const pages: PageSpec[] = [
   // People & access (#1275): the list, and one person (the seeded Registration manager, a non-admin staff login with an event membership) with its boxes.
   staff("people", "/admin/people?q=imsda-events.test", "system-admin"),
   staff("people-person", "/admin/people/staff/usr_registration_manager", "system-admin"),
-  // Invite a person (#1276): the dialog open with an event row, a club row and every field error showing. Nothing is submitted
-  // (the empty form is refused in the browser).
-  {
-    ...staff("people-invite", "/admin/people", "system-admin"),
-    prepare: async (page) => {
-      await page.getByRole("button", { name: "Invite a person" }).click({ timeout: 5000 });
-      await page.getByRole("button", { name: "Add an event" }).click({ timeout: 5000 });
-      await page.getByRole("button", { name: "Add a club" }).click({ timeout: 5000 });
-      await page.getByRole("button", { name: "Send invite" }).click({ timeout: 5000 });
-      await page.waitForTimeout(200);
-    },
-  },
   // The person page opened from an invite with access ready to save (#1276): nothing is saved.
   staff("people-person-chosen", "/admin/people/staff/usr_registration_manager?grant=sa%2Cca%2Cac%2Ce%3Aevt_wr26%3AEVENT_ADMIN", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
@@ -3656,6 +3644,35 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     // First Escape cancels the confirm, the second closes the launcher.
     await page.keyboard.press("Escape").catch(() => undefined);
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(100);
+  }
+
+  // Invite a person (#1276): the dialog with an event row, a club row and every field error showing must fit, scroll
+  // nothing sideways and keep every control a big enough tap target. The empty form is refused in the browser, so
+  // nothing is submitted.
+  if (spec.name === "staff-people") {
+    const inviteName = `${spec.name} (invite dialog)`;
+    try {
+      await page.getByRole("button", { name: "Invite a person" }).click({ timeout: 3000 });
+      await page.getByRole("button", { name: "Add an event" }).click({ timeout: 3000 });
+      await page.getByRole("button", { name: "Add a club" }).click({ timeout: 3000 });
+      await page.getByRole("button", { name: "Send invite" }).click({ timeout: 3000 });
+      await page.waitForTimeout(200);
+      const fit = await page.evaluate(dialogFitInPage);
+      dialogsOpened += fit.count;
+      if (fit.count === 0) record("dialog-open-failed", inviteName, width, "the invite dialog did not open");
+      for (const problem of fit.problems) record("dialog-too-tall", inviteName, width, problem);
+      const dialogFields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio, dialogOnly: true });
+      fieldsChecked += dialogFields.checked;
+      for (const problem of dialogFields.problems) record("field-boundary", inviteName, width, problem);
+      const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+      if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", inviteName, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
+      for (const target of open.smallTargets) record("small-tap-target", inviteName, width, target);
+      if (takeShots) await page.screenshot({ path: `${prefix}-invite-dialog.jpg`, type: "jpeg", quality: 60 });
+    } catch (error) {
+      record("dialog-open-failed", inviteName, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
   }
