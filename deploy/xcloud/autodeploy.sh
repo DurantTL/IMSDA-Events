@@ -10,11 +10,18 @@ set -eu
 SITE="${XCLOUD_SITE_PATH:-/var/www/events.imsda.org}"
 BRANCH="${IMSDA_DEPLOY_BRANCH:-main}"
 # Start and end hour (24h, America/Chicago); the end hour is not included.
+# A window may cross midnight (22-02).
 WINDOW="${IMSDA_DEPLOY_WINDOW:-00-05}"
 DEPLOY="${IMSDA_DEPLOY:-/usr/local/bin/imsda-deploy}"
+# Written by imsda-deploy when a commit fails; that commit is not retried.
+FAILED_FILE="${IMSDA_FAILED_SHA_FILE:-/var/lib/imsda/failed-sha}"
 
 # Git runs as the checkout's owner (u_events), so root never owns files in it.
 OWNER="$(stat -c %U "$SITE")"
+if [ "$OWNER" = "UNKNOWN" ] || ! id -u "$OWNER" >/dev/null 2>&1; then
+  echo "[autodeploy] $SITE has no known owner; fix its ownership (u_events)." >&2
+  exit 1
+fi
 as_owner() {
   if [ "$(id -un)" = "$OWNER" ]; then "$@"; else runuser -u "$OWNER" -- "$@"; fi
 }
@@ -28,13 +35,18 @@ LIVE="$(docker image inspect imsda-events:live \
   --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)"
 
 [ "$SHA" = "$LIVE" ] && exit 0
+if [ "$SHA" = "$(cat "$FAILED_FILE" 2>/dev/null || true)" ]; then
+  exit 0
+fi
 
 # One leading zero is dropped so "08" is compared as 8.
 HOUR="$(TZ=America/Chicago date +%H)"; HOUR="${HOUR#0}"
 START="${WINDOW%-*}"; START="${START#0}"
 END="${WINDOW#*-}"; END="${END#0}"
-if [ "$HOUR" -lt "$START" ] || [ "$HOUR" -ge "$END" ]; then
-  exit 0
+if [ "$START" -le "$END" ]; then
+  { [ "$HOUR" -ge "$START" ] && [ "$HOUR" -lt "$END" ]; } || exit 0
+else
+  { [ "$HOUR" -ge "$START" ] || [ "$HOUR" -lt "$END" ]; } || exit 0
 fi
 
 if ! docker pull --quiet "ghcr.io/duranttl/imsda-events:$SHA" >/dev/null 2>&1; then

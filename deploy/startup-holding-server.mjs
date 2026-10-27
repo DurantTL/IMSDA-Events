@@ -28,5 +28,10 @@ const server = createServer((request, response) => {
 
 server.listen(port, "0.0.0.0");
 for (const signal of ["SIGTERM", "SIGINT"]) {
-  process.on(signal, () => server.close(() => process.exit(0)));
+  process.on(signal, () => {
+    // Never hold up the app's start for a slow client.
+    server.closeAllConnections();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 2000).unref();
+  });
 }

@@ -450,15 +450,15 @@ turned off (see "Deploys without downtime" below); the timer then fetches
 
 So after a merge nothing changes on the server until the night window: the
 timer only fetches. (Until xCloud's deploy is turned off, xCloud still pulls
-the commit and restarts the old version briefly.) At 6 PM Central
-GitHub publishes the image for the latest `main` (about 10 minutes), and the
-timer switches to it within 2 minutes, so the day's merges go live together.
+the commit and restarts the old version briefly.) Once a day GitHub publishes
+the image for the latest `main` ("Prebuilt images from GitHub"), and the timer
+switches to it in the next night window, so the day's merges go live together.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
 on `main`, wait about 10 minutes, then pull and run `imsda-deploy` by hand
 (step 3 under "Deploys without downtime"); otherwise the timer deploys it in
 the next night window. Additive database
 migrations can be run as soon as their PR merges: the old code ignores new
-tables and columns until the evening deploy. Watch it with
+tables and columns until the night deploy. Watch it with
 `journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
 `imsda-deploy` as `root`.
 
@@ -469,21 +469,32 @@ then started it: about a minute in which nginx showed a 502 page and a form
 submitted in that window failed. Now:
 
 1. **The old version keeps serving** while a one-off container of the new
-   image runs migrations and syncs (`IMSDA_PREP_ONLY=1`). Migrations are
-   additive, so the old code is unaffected.
+   image runs migrations and syncs (`IMSDA_PREP_ONLY=1`). From then on the old
+   code runs on the new schema, so **every migration must be additive**: new
+   tables, new nullable columns or columns with a default. Never a `NOT NULL`
+   column without a default, a rename or a drop in the same release as the
+   code that stops using it; split those over two releases.
 2. **The new version starts next to it** as the `standby` service on
    `127.0.0.1:8101` and must report the new SHA on `/api/health`. If it never
-   does, the deploy stops and the live version is untouched.
+   does, the deploy stops and the live app is not restarted (the database is
+   already migrated, which is why migrations must be additive).
 3. **The live tag moves and `app` restarts on 8100** with the preparation
    skipped (`IMSDA_SKIP_DB_PREP=1`), so it answers within a few seconds. If it
    does not come back on the new SHA, the script puts `imsda-events:previous`
-   back.
+   back and keeps the standby running until it is healthy.
 4. **The standby is removed.**
+
+A commit that fails is written to `/var/lib/imsda/failed-sha` and the timer
+does not retry it; the next merge to `main` is tried as usual. Running
+`imsda-deploy` by hand always tries. An image built before #1263 (for example
+when deploying an older commit by hand) does not support this, so the script
+switches to it the old way, with about a minute offline.
 
 Whenever the container does run the preparation itself (a manual `up`, a
 rollback), it answers with a short 503 "The site is updating" response (JSON
-for `/api/*`) until the app starts, instead of nginx's 502 page. Forms keep
-what was typed when a submit fails this way and offer **Try again**.
+for `/api/*`) until the app starts, instead of nginx's 502 page. The forms
+change that keeps what was typed and offers **Try again** on such an answer
+is a separate PR for #1263.
 
 **What Caleb does once on the server (human steps):**
 
@@ -523,7 +534,7 @@ what was typed when a submit fails this way and offer **Try again**.
 
    To use a different window, add `Environment=IMSDA_DEPLOY_WINDOW=01-04` under
    `[Service]` in `/etc/systemd/system/imsda-autodeploy.service`, then
-   `systemctl daemon-reload`. For a change that can't wait, run
+   `systemctl daemon-reload` (a window may cross midnight, like `22-02`). For a change that can't wait, run
    `imsda-deploy` by hand after `runuser -u u_events -- git -C
    /var/www/events.imsda.org pull --ff-only origin main`.
 
@@ -543,7 +554,7 @@ what was typed when a submit fails this way and offer **Try again**.
    ```
 
    Without it, the only gap is the few seconds while `app` restarts in step 3
-   above; forms retry once by themselves and keep their answers.
+   above.
 
 Install or update (as `root`, from a checkout of `main`):
 
@@ -599,7 +610,7 @@ By hand, as `root`:
 ```bash
 B=/home/u_events/239298/docker-compose.yml
 docker compose -f $B config --quiet && echo config-ok
-docker compose -f $B up -d app                        # restart on the live image
+IMSDA_SKIP_DB_PREP=1 docker compose -f $B up -d app   # restart on the live image
 curl -s http://127.0.0.1:8100/api/health
 docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
@@ -609,12 +620,16 @@ docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println
 
 ```bash
 docker tag imsda-events:previous imsda-events:live
-docker compose -f /home/u_events/239298/docker-compose.yml up -d app
+IMSDA_SKIP_DB_PREP=1 docker compose -f /home/u_events/239298/docker-compose.yml up -d app
 ```
 
+`IMSDA_SKIP_DB_PREP=1` keeps the container from re-running migrations and
+syncs that already ran. Without it, `up -d` recreates the container and the
+site shows "updating" for about a minute.
+
 Stop the autodeploy timer before a rollback (`systemctl stop imsda-autodeploy.timer`),
-otherwise autodeploy redeploys the checked-out version within 2 minutes; start it
-again once `main` is fixed.
+otherwise autodeploy redeploys `main` in the next night window; start it again
+once `main` is fixed.
 
 Migrations only move forward; rolling back the image does not undo them.
 

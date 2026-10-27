@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,7 +16,8 @@ const sha = "b".repeat(40);
 const fakeDocker = `#!/bin/sh
 echo "$* prep=\${IMSDA_PREP_ONLY:-} skip=\${IMSDA_SKIP_DB_PREP:-}" >> "$FAKE_LOG"
 case "$1" in
-  image) exit 0 ;;
+  image) case "$*" in *--format*) echo "\${FAKE_PREVIOUS:-}" ;; esac; exit 0 ;;
+  run) exit "\${FAKE_LEGACY_EXIT:-0}" ;;
   compose) case "$*" in *" run "*) exit "\${FAKE_PREP_EXIT:-0}" ;; esac ;;
 esac
 exit 0
@@ -67,11 +68,15 @@ function runDeploy(env: Record<string, string>) {
       XCLOUD_COMPOSE_FILE: ctx.compose,
       IMSDA_HEALTH_WAIT_SECONDS: "6",
       IMSDA_CLEANUP: "/nonexistent",
+      IMSDA_FAILED_SHA_FILE: path.join(ctx.dir, "failed-sha"),
+      FAKE_PREVIOUS: "c".repeat(40),
       FAKE_LOG: ctx.log,
       ...env,
     },
   });
-  return { ...result, calls: readFileSync(ctx.log, "utf8").trim().split("\n") };
+  const failedFile = path.join(ctx.dir, "failed-sha");
+  const failed = existsSync(failedFile) ? readFileSync(failedFile, "utf8").trim() : null;
+  return { ...result, failed, calls: readFileSync(ctx.log, "utf8").trim().split("\n") };
 }
 
 describe("deploy.sh zero-downtime switch", () => {
@@ -91,16 +96,18 @@ describe("deploy.sh zero-downtime switch", () => {
   });
 
   it("leaves the live version alone when the new version never reports its SHA", () => {
-    const { status, calls, stderr } = runDeploy({ FAKE_SHA_8101: "c".repeat(40), FAKE_SHA_8100: "c".repeat(40) });
+    const { status, calls, stderr, failed } = runDeploy({ FAKE_SHA_8101: "c".repeat(40), FAKE_SHA_8100: "c".repeat(40) });
     expect(status).toBe(1);
-    expect(stderr).toContain("live version was not changed");
+    expect(stderr).toContain("live app was not restarted");
+    expect(failed).toBe(sha);
     expect(calls.some((c) => c.includes("imsda-events:live") && c.startsWith("tag"))).toBe(false);
     expect(calls.some((c) => c.includes(" app"))).toBe(false);
   });
 
   it("stops before starting anything when the migrations fail", () => {
-    const { status, calls } = runDeploy({ FAKE_PREP_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
-    expect(status).not.toBe(0);
+    const { status, calls, stderr } = runDeploy({ FAKE_PREP_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(1);
+    expect(stderr).toContain("Migrations or syncs");
     expect(calls.some((c) => c.includes("up -d"))).toBe(false);
   });
 
@@ -108,7 +115,23 @@ describe("deploy.sh zero-downtime switch", () => {
     const { status, calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: "c".repeat(40) });
     expect(status).toBe(1);
     expect(calls).toContain("tag imsda-events:previous imsda-events:live prep= skip=");
-    expect(calls.at(-2)).toContain("up -d --no-deps app prep= skip=");
+    // The previous version restarts without re-running the preparation, and
+    // the standby is removed only after that.
+    const rollback = calls.findIndex((c, index) => c.includes("up -d --no-deps app") && index > calls.indexOf("tag imsda-events:previous imsda-events:live prep= skip="));
+    expect(calls[rollback]).toContain("skip=1");
+    expect(calls.findIndex((c, index) => c.includes("rm -sf standby") && index > rollback)).toBeGreaterThan(rollback);
+  });
+
+  it("clears the failed marker after a successful deploy", () => {
+    expect(runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha }).failed).toBeNull();
+  });
+
+  it("switches an image built before #1263 the old way instead of hanging on its prep run", () => {
+    const { status, calls } = runDeploy({ FAKE_LEGACY_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(0);
+    expect(calls.some((c) => c.includes(" run ") && c.includes("compose"))).toBe(false);
+    expect(calls.some((c) => c.includes("standby"))).toBe(false);
+    expect(calls.some((c) => c.includes("up -d --no-deps app"))).toBe(true);
   });
 });
 
@@ -146,6 +169,7 @@ echo "$FAKE_HOUR"
         FAKE_LOG: ctx.log,
         FAKE_ORIGIN: sha,
         FAKE_LIVE: "c".repeat(40),
+        IMSDA_FAILED_SHA_FILE: path.join(ctx.dir, "failed-sha"),
         ...env,
       },
     });
@@ -171,6 +195,20 @@ echo "$FAKE_HOUR"
 
   it("honours a custom window", () => {
     expect(runAutodeploy({ FAKE_HOUR: "09", IMSDA_DEPLOY_WINDOW: "08-10" }).calls).toContain("imsda-deploy");
+  });
+
+  it("supports a window that crosses midnight", () => {
+    expect(runAutodeploy({ FAKE_HOUR: "23", IMSDA_DEPLOY_WINDOW: "22-02" }).calls).toContain("imsda-deploy");
+    expect(runAutodeploy({ FAKE_HOUR: "01", IMSDA_DEPLOY_WINDOW: "22-02" }).calls).toContain("imsda-deploy");
+    expect(runAutodeploy({ FAKE_HOUR: "03", IMSDA_DEPLOY_WINDOW: "22-02" }).calls).not.toContain("imsda-deploy");
+  });
+
+  it("does not retry a commit that already failed to deploy", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "failed-sha-"));
+    dirs.push(dir);
+    writeFileSync(path.join(dir, "failed-sha"), `${sha}\n`);
+    const { calls } = runAutodeploy({ FAKE_HOUR: "02", IMSDA_FAILED_SHA_FILE: path.join(dir, "failed-sha") });
+    expect(calls).not.toContain("imsda-deploy");
   });
 
   it("does nothing when origin/main is already live", () => {
