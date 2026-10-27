@@ -45,14 +45,14 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
           />
         )}
       />
-      <h2 className="club-summary-section">Overview</h2>
+      <h2 className="club-summary-section" id="overview">Overview</h2>
       <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
       <ClubNewYearStatus clubHref={links.clubHref} status={newYearStatus} />
-      <h2 className="club-summary-section">Monthly Records</h2>
+      <h2 className="club-summary-section" id="monthly-records">Monthly Records</h2>
       <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
-      <h2 className="club-summary-section">Points</h2>
+      <h2 className="club-summary-section" id="points">Points</h2>
       <AreaPointsChart basePath="/admin/clubs/summary" clubYear={clubYear} clubs={clubs} sort={parseLeaderboardSort(params.sort)} />
-      <h2 className="club-summary-section">Club events</h2>
+      <h2 className="club-summary-section" id="club-events">Club events</h2>
       <AreaClubEvents clubHref={links.clubHref} events={events} />
     </section>
   );

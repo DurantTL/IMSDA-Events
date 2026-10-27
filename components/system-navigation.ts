@@ -189,6 +189,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/organizations\/[^/]+\/location(\/|$)/, "Church location"],
   [/^\/admin\/organizations\/[^/]+\/profile(\/|$)/, "Club profile"],
   [/^\/admin\/organizations(\/|$)/, "Clubs and churches"],
+  [/^\/admin\/clubs\/?$/, "Club administration"],
   [/^\/admin\/clubs\/applications(\/|$)/, "New club applications"],
   [/^\/admin\/clubs\/health-import(\/|$)/, "Import health records"],
   [/^\/admin\/clubs\/import(\/|$)/, "Import clubs"],

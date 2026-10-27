@@ -332,6 +332,8 @@ const pages: PageSpec[] = [
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
   staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
+  // The Clubs Administrator dashboard (#1226), opened as a system administrator.
+  { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
