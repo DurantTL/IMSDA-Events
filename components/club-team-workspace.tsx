@@ -154,7 +154,7 @@ export function ClubTeamWorkspace({
               <span>
                 <strong translate="no">{member.displayName}{member.accountId === viewerAccountId ? " (you)" : ""}</strong>
                 <small translate="no">{member.email}</small>
-                {canOpenPeople ? <Link className="secondary-button" href={`/admin/people/account/${member.accountId}`}>See all of this person&apos;s access</Link> : null}
+                {canOpenPeople ? <Link className="secondary-button" href={`/admin/people/account/${member.accountId}`}>See all of this person&apos;s access<span className="sr-only"> ({member.displayName})</span></Link> : null}
               </span>
               <span className="status-chip purple">{clubDirectorRoleLabels[member.role]}</span>
               {member.removableByClub ? (

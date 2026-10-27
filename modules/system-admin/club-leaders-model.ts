@@ -2,6 +2,8 @@ import { CLUB_ROLE_LABELS, CLUB_ROLE_VALUES, parsePeopleId, type ClubRoleValue }
 
 /** The pure half of the Club leaders list (#1277): reading the URL, the where-clause and the sort order. */
 
+export const CLUB_LEADERS_MAX_ROWS = 2000;
+
 export type ClubLeaderFilters = { clubId: string | null; role: ClubRoleValue | null };
 
 /** Reads `?role=` as a club role (`director`, `deputy`, `registrar`, `reporter`); anything else is every role. */
@@ -16,14 +18,14 @@ export function parseLeaderFilters(params: { club?: unknown; role?: unknown }): 
   return { clubId: parsePeopleId(params.club), role: parseLeaderRole(params.role) };
 }
 
-/** Current roles only (not revoked, started, not ended), in CLUB-type organizations only. */
+/** Current roles only (not revoked, started, not ended), in active CLUB-type organizations only (the club picker offers active clubs). */
 export function buildLeadersWhere(filters: ClubLeaderFilters, now = new Date()) {
   return {
     revokedAt: null,
     effectiveFrom: { lte: now },
     OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
     role: filters.role ? filters.role : { in: [...CLUB_ROLE_VALUES] },
-    organization: { type: "CLUB", ...(filters.clubId ? { id: filters.clubId } : {}) },
+    organization: { type: "CLUB", isActive: true, ...(filters.clubId ? { id: filters.clubId } : {}) },
   };
 }
 

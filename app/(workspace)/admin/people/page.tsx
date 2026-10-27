@@ -32,8 +32,8 @@ export default async function PeopleAccessPage({
   const query = parsePeopleQuery(params.q);
   const filters = parsePeopleFilters(params, viewer.scope);
   const pageNumber = parsePeoplePage(params.page);
-  const pendingList = filters.role?.kind === "pending" ? await listPendingPeople(viewer.scope, query) : null;
-  const pendingPage = pendingList ? pagePeople(pendingList, pageNumber) : null;
+  const pending = filters.role?.kind === "pending" ? await listPendingPeople(viewer.scope, query) : null;
+  const pendingPage = pending ? pagePeople(pending.rows, pageNumber) : null;
   const [result, eventOptions, clubOptions] = await Promise.all([
     pendingPage
       ? Promise.resolve({ items: [], rows: [], page: pendingPage.page, pageCount: pendingPage.pageCount, total: pendingPage.total, pageSize: pendingPage.pageSize })
@@ -62,6 +62,7 @@ export default async function PeopleAccessPage({
         eventOptions={eventOptions}
         clubOptions={clubOptions}
         pending={pendingPage?.items ?? []}
+        pendingCapped={pending?.capped ?? false}
         page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
       />
     </>

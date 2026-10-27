@@ -312,6 +312,7 @@ export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now =
               effectiveFrom: { lte: now },
               OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
               organization: {
+                isActive: true,
                 ...(scope === "clubs" ? { type: "CLUB" } : {}),
                 ...(filters.clubId ? { id: filters.clubId } : {}),
               },

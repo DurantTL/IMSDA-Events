@@ -22,13 +22,21 @@ export type PendingPerson = {
 };
 
 const ROLE_WORD = { DIRECTOR: "Director", DEPUTY: "Deputy", REGISTRAR: "Registrar", REPORTER: "Reporter" } as const;
-const MAX_ROWS = 500;
+export const PENDING_MAX_ROWS = 500;
+const MAX_ROWS = PENDING_MAX_ROWS;
+
+/** Lapsed invites stay listed (staff may resend from the club page) but are labelled. */
+function inviteNote(invite: { status: string; sentAt: Date | null; expiresAt: Date | null }, now: Date): string {
+  if (invite.expiresAt && invite.expiresAt <= now) return " (expired)";
+  if (invite.status === "PENDING" && !invite.sentAt) return " (not sent yet)";
+  return "";
+}
 
 function textFilter(text: string) {
   return text ? { contains: text, mode: "insensitive" as const } : undefined;
 }
 
-export async function listPendingPeople(scope: PeopleScope, query = ""): Promise<PendingPerson[]> {
+export async function listPendingPeople(scope: PeopleScope, query = "", now = new Date()): Promise<{ rows: PendingPerson[]; capped: boolean }> {
   const prisma = getPrisma();
   const text = query.trim().slice(0, 120);
   const textWhere = text ? { OR: [{ email: textFilter(text) }, { name: textFilter(text) }] } : undefined;
@@ -44,7 +52,7 @@ export async function listPendingPeople(scope: PeopleScope, query = ""): Promise
       },
       orderBy: [{ createdAt: "desc" }],
       take: MAX_ROWS,
-      select: { id: true, email: true, name: true, role: true, organization: { select: { name: true } } },
+      select: { id: true, email: true, name: true, role: true, status: true, sentAt: true, expiresAt: true, organization: { select: { name: true } } },
     }),
     scope === "full"
       ? prisma.user.findMany({
@@ -77,10 +85,12 @@ export async function listPendingPeople(scope: PeopleScope, query = ""): Promise
         key: `invite-${invite.id}`,
         name: invite.name,
         email: invite.email,
-        what: `${ROLE_WORD[invite.role]} of ${invite.organization.name}`,
+        what: `${ROLE_WORD[invite.role]} of ${invite.organization.name}${inviteNote(invite, now)}`,
         href: accountId ? `/admin/people/account/${accountId}` : null,
       };
     }),
   ];
-  return rows.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email, "en", { sensitivity: "base" }) || a.key.localeCompare(b.key));
+  const capped = invites.length >= MAX_ROWS || staff.length >= MAX_ROWS;
+  rows.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email, "en", { sensitivity: "base" }) || a.key.localeCompare(b.key));
+  return { rows, capped };
 }

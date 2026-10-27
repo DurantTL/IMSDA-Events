@@ -24,6 +24,7 @@ export function PeopleDirectory({
   eventOptions = [],
   clubOptions = [],
   pending = [],
+  pendingCapped = false,
 }: {
   scope?: "full" | "clubs";
   query: string;
@@ -32,6 +33,8 @@ export function PeopleDirectory({
   clubOptions?: readonly { id: string; name: string }[];
   /** This page of the pending-invites list, when the Pending filter is on. */
   pending?: readonly PendingPerson[];
+  /** The pending list hit its row cap, so the total is a lower bound. */
+  pendingCapped?: boolean;
   rows: readonly PeopleRow[];
   page: number;
   pageCount: number;
@@ -81,7 +84,9 @@ export function PeopleDirectory({
           ? "Pick an event to see who has this role."
           : total === 0
             ? "No people found."
-            : `${total} ${total === 1 ? "person" : "people"}${role ? ` with ${peopleRoleLabel(role)}` : ""}${query ? ` matching "${query}"` : ""}.`}
+            : role?.kind === "pending"
+              ? `${pendingCapped ? "Showing the first " : ""}${total} pending ${total === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Search to narrow the list." : "."}`
+              : `${total} ${total === 1 ? "person" : "people"}${role ? ` with ${peopleRoleLabel(role)}` : ""}${query ? ` matching "${query}"` : ""}.`}
       </p>
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>

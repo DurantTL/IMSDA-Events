@@ -102,11 +102,11 @@ describe("role where-clauses", () => {
   it("a club role is a current grant; a Clubs Administrator only gets CLUB-type organizations", () => {
     const grant = (where: ReturnType<typeof buildRoleWhere>) => (where?.account as { clubDirectorGrants: { some: Record<string, unknown> } }).clubDirectorGrants.some;
     const full = grant(buildRoleWhere(filtersFor("club-deputy", { club: "org_1" }), "full", now));
-    expect(full).toMatchObject({ role: "DEPUTY", revokedAt: null, effectiveFrom: { lte: now }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }], organization: { id: "org_1" } });
+    expect(full).toMatchObject({ role: "DEPUTY", revokedAt: null, effectiveFrom: { lte: now }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }], organization: { isActive: true, id: "org_1" } });
     expect(full.organization).not.toHaveProperty("type");
     const clubs = grant(buildRoleWhere(filtersFor("club-deputy", { club: "org_1" }, "clubs"), "clubs", now));
-    expect(clubs.organization).toEqual({ type: "CLUB", id: "org_1" });
-    expect(grant(buildRoleWhere(filtersFor("club-director", {}, "clubs"), "clubs", now)).organization).toEqual({ type: "CLUB" });
+    expect(clubs.organization).toEqual({ type: "CLUB", isActive: true, id: "org_1" });
+    expect(grant(buildRoleWhere(filtersFor("club-director", {}, "clubs"), "clubs", now)).organization).toEqual({ type: "CLUB", isActive: true });
   });
 
   it("builds nothing for a system or event role asked by a Clubs Administrator, or for pending", () => {
@@ -157,7 +157,7 @@ describe("pending invites", () => {
     mocks.inviteFindMany.mockResolvedValue([{ id: "i1", email: "new@example.test", name: "Nia New", role: "DIRECTOR", organization: { name: "Synthetic Club" } }]);
     mocks.accountFindMany.mockResolvedValue([{ id: "a5", email: "NEW@example.test" }]);
     mocks.userFindMany.mockResolvedValue([{ id: "u7", email: "staff@example.test", displayName: "Stan Staff" }]);
-    const full = await listPendingPeople("full");
+    const full = (await listPendingPeople("full")).rows;
     expect(full.map((row) => [row.name, row.what, row.href])).toEqual([
       ["Nia New", "Director of Synthetic Club", "/admin/people/account/a5"],
       ["Stan Staff", "Staff login, not activated yet", "/admin/people/staff/u7"],
@@ -166,9 +166,33 @@ describe("pending invites", () => {
     expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ accountStatus: "PENDING_ACTIVATION" });
 
     mocks.userFindMany.mockClear();
-    const clubs = await listPendingPeople("clubs");
+    const clubs = (await listPendingPeople("clubs")).rows;
     expect(clubs.map((row) => row.what)).toEqual(["Director of Synthetic Club"]);
     expect(mocks.userFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("pending invite labels", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("labels expired and never-sent invites and keeps them listed", async () => {
+    const base = { name: "", role: "REGISTRAR", organization: { name: "Synthetic Club" } };
+    mocks.inviteFindMany.mockResolvedValue([
+      { ...base, id: "i1", email: "a@example.test", status: "SENT", sentAt: new Date("2026-09-01"), expiresAt: new Date("2026-10-01") },
+      { ...base, id: "i2", email: "b@example.test", status: "PENDING", sentAt: null, expiresAt: null },
+      { ...base, id: "i3", email: "c@example.test", status: "SENT", sentAt: new Date("2026-10-20"), expiresAt: new Date("2026-11-20") },
+    ]);
+    mocks.accountFindMany.mockResolvedValue([]);
+    const { rows } = await listPendingPeople("clubs", "", now);
+    expect(rows.map((row) => row.what)).toEqual([
+      "Registrar of Synthetic Club (expired)", "Registrar of Synthetic Club (not sent yet)", "Registrar of Synthetic Club",
+    ]);
+  });
+
+  it("flags a capped list", async () => {
+    mocks.inviteFindMany.mockResolvedValue(Array.from({ length: 500 }, (_, i) => ({ id: `i${i}`, email: `p${i}@example.test`, name: "", role: "DIRECTOR", status: "SENT", sentAt: now, expiresAt: null, organization: { name: "C" } })));
+    mocks.accountFindMany.mockResolvedValue([]);
+    expect((await listPendingPeople("clubs", "", now)).capped).toBe(true);
   });
 });
 
@@ -204,6 +228,9 @@ describe("the People list with filters", () => {
     expect(html).toContain("Director of Synthetic Club");
     expect(html).toContain('href="/admin/people/staff/u7"');
     expect(html).not.toContain("Resend");
+    expect(html).toContain("2 pending invites");
+    expect(render({ filters: filtersFor("pending"), pending: [], total: 1 })).toContain("1 pending invite.");
+    expect(render({ filters: filtersFor("pending"), pending: [], total: 500, pendingCapped: true })).toContain("Showing the first 500 pending invites");
   });
 });
 
@@ -218,9 +245,9 @@ describe("Club leaders", () => {
       effectiveFrom: { lte: now },
       OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
       role: { in: ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] },
-      organization: { type: "CLUB" },
+      organization: { type: "CLUB", isActive: true },
     });
-    expect(buildLeadersWhere({ clubId: "org_1", role: "REPORTER" }, now)).toMatchObject({ role: "REPORTER", organization: { type: "CLUB", id: "org_1" } });
+    expect(buildLeadersWhere({ clubId: "org_1", role: "REPORTER" }, now)).toMatchObject({ role: "REPORTER", organization: { type: "CLUB", isActive: true, id: "org_1" } });
   });
 
   it("sorts by club name, then Director, Deputy, Registrar, Reporter, then name", async () => {
@@ -232,7 +259,7 @@ describe("Club leaders", () => {
     ]);
     const leaders = await listClubLeaders({ clubId: null, role: null }, now);
     expect(leaders.map((leader) => leader.key)).toEqual(["3", "5", "4", "2", "1"]);
-    expect(mocks.grantFindMany.mock.calls[0][0].where.organization).toEqual({ type: "CLUB" });
+    expect(mocks.grantFindMany.mock.calls[0][0].where.organization).toEqual({ type: "CLUB", isActive: true });
     expect(sortClubLeaders([])).toEqual([]);
   });
 
@@ -243,6 +270,12 @@ describe("Club leaders", () => {
     const plain = renderToStaticMarkup(createElement(ClubLeadersList, { ...props, canOpenPeople: false }));
     expect(plain).not.toContain("/admin/people");
     expect(plain).toContain("Dee Director");
+  });
+
+  it("says when the list is capped", () => {
+    const many = Array.from({ length: 2000 }, (_, i) => ({ key: `k${i}`, accountId: `a${i}`, name: "N", email: "n@example.test", clubId: "o", clubName: "C", role: "DIRECTOR" as const, roleLabel: "Director" }));
+    const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: many, clubs: [], filters: { clubId: null, role: null }, canOpenPeople: false }));
+    expect(html).toContain("Showing the first 2000 current roles");
   });
 
   it("is a Clubs tab", () => {
@@ -269,6 +302,7 @@ describe("link gates", () => {
     const show = (canOpenPeople: boolean) => renderToStaticMarkup(createElement(ClubDirectorsWorkspace, { club: { id: "o1", name: "Synthetic Club", isActive: true }, initialGrants: grants as never, canOpenPeople }));
     expect(show(true)).toContain("See all of this person&#x27;s access");
     expect(show(true)).toContain('href="/admin/people/account/a1"');
+    expect(show(true)).toContain("(Dee Director)");
     expect(show(false)).not.toContain("See all of this person");
 
     const { ClubTeamWorkspace } = await import("@/components/club-team-workspace");

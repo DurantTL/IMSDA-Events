@@ -3,6 +3,7 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import {
   buildLeadersWhere,
+  CLUB_LEADERS_MAX_ROWS,
   leaderRoleLabel,
   sortClubLeaders,
   type ClubLeader,
@@ -13,7 +14,7 @@ import {
 export async function listClubLeaders(filters: ClubLeaderFilters, now = new Date()): Promise<ClubLeader[]> {
   const grants = await getPrisma().clubDirectorGrant.findMany({
     where: buildLeadersWhere(filters, now) as never,
-    take: 2000,
+    take: CLUB_LEADERS_MAX_ROWS,
     select: {
       id: true,
       role: true,

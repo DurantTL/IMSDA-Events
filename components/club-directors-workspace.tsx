@@ -216,7 +216,7 @@ export function ClubDirectorsWorkspace({
                     {canOpenPeople ? (
                       <>
                         <br />
-                        <Link className="secondary-button" href={`/admin/people/account/${grant.account.id}`}>See all of this person&apos;s access</Link>
+                        <Link className="secondary-button" href={`/admin/people/account/${grant.account.id}`}>See all of this person&apos;s access<span className="sr-only"> ({grant.account.displayName})</span></Link>
                       </>
                     ) : null}
                   </th>
