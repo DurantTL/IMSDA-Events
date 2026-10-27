@@ -28,6 +28,8 @@ describe("health data stays out of exports, the check-in book, communications an
       "app/api/internal/outbox/sweep/route.ts",
       // Shows the "Import health records" link only when the feature is on (#878); it imports the flag and nothing else.
       "app/(workspace)/admin/organizations/page.tsx",
+      // Hides the Clubs Administrator's "Import health records" sidebar link while the feature is off (#1232); flag only.
+      "components/workspace-shell.tsx",
     ]);
     const offenders = [...sourceFiles("modules"), ...sourceFiles("components"), ...sourceFiles("app"), ...sourceFiles("lib")]
       .filter((path) => !path.startsWith("modules/health-records/"))
@@ -39,6 +41,11 @@ describe("health data stays out of exports, the check-in book, communications an
 
   it("lets the organizations page import nothing from the health module but the feature flag (#878)", () => {
     const imports = [...read("app/(workspace)/admin/organizations/page.tsx").matchAll(/from "(@\/modules\/health-records\/[^"]+)"/g)].map((match) => match[1]);
+    expect(imports).toEqual(["@/modules/health-records/flag"]);
+  });
+
+  it("lets the workspace shell import nothing from the health module but the feature flag (#1232)", () => {
+    const imports = [...read("components/workspace-shell.tsx").matchAll(/from "(@\/modules\/health-records\/[^"]+)"/g)].map((match) => match[1]);
     expect(imports).toEqual(["@/modules/health-records/flag"]);
   });
 

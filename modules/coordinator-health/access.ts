@@ -46,6 +46,6 @@ export function clubLeaderHealthViewerFromAccess(access: OpenRosterAccess): Extr
     organizationId: access.club.organizationId,
     actor: access.actor.kind === "ATTENDEE"
       ? { kind: "ATTENDEE", accountId: access.actor.accountId }
-      : { kind: "STAFF_ACTING", userId: access.actor.userId, actAsId: access.actor.actAsId },
+      : { kind: "STAFF_ACTING", userId: access.actor.userId, actAsId: access.actor.actAsId, ...(access.actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
   };
 }

@@ -1,12 +1,12 @@
 import { withRequestContext } from "@/lib/request-context";
 import { clubSupplyApiError } from "@/modules/club-supplies/api-errors";
 import { clubSupplyCsvTemplate } from "@/modules/club-supplies/catalog-csv";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 
 /** The club supply catalog CSV template (#531). */
 async function getHandler() {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     return new Response(clubSupplyCsvTemplate(), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",

@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { rematchBackgroundCheckList } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -13,7 +13,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const admin = await requireSystemAdministrator();
+    const admin = await requireClubsAdministration();
     await rematchBackgroundCheckList(new Date(), admin.id);
     return Response.json({ ok: true });
   } catch (error) {

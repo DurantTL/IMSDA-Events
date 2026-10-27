@@ -60,6 +60,7 @@ import {
   sidebarActiveHref,
   sidebarSections,
   clubsAdminActiveHref,
+  clubsAdminHealthImportHref,
   clubsAdminNavigation,
   staffSubpageTitle,
   systemNavigation,
@@ -119,7 +120,7 @@ export function AppShell({
    * The admin roles this account holds and the one showing (#1225), computed server-side. The switcher changes the
    * sidebar and home only; no server gate reads it.
    */
-  adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts } | null;
+  adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -208,6 +209,14 @@ export function AppShell({
   // no events at all gets the club-only chrome.
   const clubsOnly = clubsView && events.length === 0;
   const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname) : null;
+  // The health record import page only exists while the Health Record feature is on (#1232).
+  const clubsNavItems = clubsAdminNavigation.filter((item) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false);
+  // The phone Clubs bar scrolls sideways (#1232): bring the page's own item into view when the page changes.
+  const clubsMobileNavRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!activeClubsHref) return;
+    clubsMobileNavRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [activeClubsHref]);
   // Event Admins can ask for a module (#741 slice 3); system administrators turn modules on directly.
   const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
   // The other workspaces this staff identity may switch into (#108): the
@@ -411,7 +420,7 @@ export function AppShell({
         </div>
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
-          {clubsView && clubsAdminNavigation.map(({ href, icon: Icon, label }) => (
+          {clubsView && clubsNavItems.map(({ href, icon: Icon, label }) => (
             <GuardedLink key={href} className={activeClubsHref === href ? "nav-item active" : "nav-item"} href={href} aria-current={activeClubsHref === href ? "page" : undefined} {...tipProps(label)}>
               <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
               <span>{label}</span>
@@ -608,8 +617,8 @@ export function AppShell({
       </main>
 
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
-      {clubsView && <nav className="mobile-nav" aria-label="Mobile navigation">
-        {clubsAdminNavigation.map(({ href, icon: Icon, label }) => (
+      {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation" ref={clubsMobileNavRef}>
+        {clubsNavItems.map(({ href, icon: Icon, label }) => (
           <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={href} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
             <Icon aria-hidden="true" size={22} /><span>{label}</span>
           </GuardedLink>

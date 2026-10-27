@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubDirectorsWorkspace } from "@/components/club-directors-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { allowedReturnTo } from "@/lib/return-to";
 import { listDirectorGrants } from "@/modules/organizations/director-grants-repository";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
@@ -24,9 +25,8 @@ export default async function ClubDirectorsPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
-
   const { organizationId } = await params;
+  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access");
   const { from } = await searchParams;
   let initial: Awaited<ReturnType<typeof listDirectorGrants>>;
   try {
@@ -36,7 +36,7 @@ export default async function ClubDirectorsPage({
     throw error;
   }
   const clubHref = `/admin/organizations/${organizationId}/club`;
-  const backHref = allowedReturnTo(from, [clubHref], "/admin/organizations");
+  const backHref = allowedReturnTo(from, [clubHref], user.globalRole === "SYSTEM_ADMIN" ? "/admin/organizations" : clubHref);
   const backLabel = backHref === clubHref ? `Back to ${initial.club.name}` : "Back to Clubs and churches";
 
   return (

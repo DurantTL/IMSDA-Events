@@ -12983,6 +12983,13 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (min-width: 601px) { .club-form-fill-mode { min-width: 13rem; } }
 .club-form-apply-club { display: grid; gap: 10px; }
 
+/* Clubs Administrator phone bar (#1232): more pages than fit across, so the bar scrolls sideways inside itself; the page never does. */
+@media (max-width: 800px) {
+  .mobile-nav.mobile-nav-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .mobile-nav.mobile-nav-scroll::-webkit-scrollbar { display: none; }
+  .mobile-nav.mobile-nav-scroll a { flex: 0 0 auto; min-width: 84px; min-height: 52px; padding-inline: 8px; }
+}
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

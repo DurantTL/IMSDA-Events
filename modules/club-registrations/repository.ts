@@ -1384,6 +1384,8 @@ export async function amendClubRegistration(
   actor: ClubRegistrationActor,
   input: ClubRegistrationEditInput,
   now = new Date(),
+  /** `viaClubsAdministrator` (#1232): the acting staff member is a Clubs Administrator, for the name shown in the history. */
+  actingAs: { viaClubsAdministrator?: boolean } = {},
 ) {
   const event = await requireClubEvent(eventId);
   // Which of the club's registrations is being changed (#809): its team's key, the empty key on an event without teams.
@@ -1736,7 +1738,7 @@ export async function amendClubRegistration(
       { ...amendmentInput, previewOnly: false, quoteFingerprint: preview.quoteFingerprint },
       "accountId" in actor
         ? { kind: "CLUB_DIRECTOR", attendeeAccountId: actor.accountId, displayName: account?.displayName ?? "Club director" }
-        : { kind: "STAFF_ACTING_DIRECTOR", id: actor.userId, actAsId: actor.actAsId, displayName: "A system administrator acting as director" },
+        : { kind: "STAFF_ACTING_DIRECTOR", id: actor.userId, actAsId: actor.actAsId, displayName: actingAs.viaClubsAdministrator ? "A Clubs Administrator acting as director" : "A system administrator acting as director" },
       now,
       engineOptions,
     );

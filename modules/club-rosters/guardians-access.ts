@@ -29,7 +29,7 @@ export function clubLeaderGuardianViewerFromAccess(access: OpenRosterAccess): Ex
     organizationId: access.club.organizationId,
     actor: access.actor.kind === "ATTENDEE"
       ? { kind: "ATTENDEE", accountId: access.actor.accountId }
-      : { kind: "STAFF_ACTING", userId: access.actor.userId, actAsId: access.actor.actAsId },
+      : { kind: "STAFF_ACTING", userId: access.actor.userId, actAsId: access.actor.actAsId, ...(access.actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
   };
 }
 
@@ -63,7 +63,7 @@ export async function resolveAreaGuardianViewer(): Promise<Extract<GuardianViewe
     kind: "AREA_COORDINATOR",
     actor: viewer.actor.kind === "ATTENDEE"
       ? { kind: "ATTENDEE", accountId: viewer.actor.accountId }
-      : { kind: "STAFF_ACTING", userId: viewer.actor.userId, actAsId: viewer.actor.actAsId },
+      : { kind: "STAFF_ACTING", userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...(viewer.actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
   };
 }
 

@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { honorApiError } from "@/modules/honors/api-errors";
 import { updateHonor } from "@/modules/honors/repository";
 import { honorUpdateSchema } from "@/modules/honors/schemas";
@@ -9,7 +9,7 @@ async function patchHandler(request: Request, context: { params: Promise<{ honor
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { honorId } = await context.params;
     const input = honorUpdateSchema.parse(await request.json());
     return Response.json({ honors: await updateHonor(honorId, input, actor.id) });

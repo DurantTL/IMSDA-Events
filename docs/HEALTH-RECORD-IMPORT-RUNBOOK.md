@@ -14,7 +14,7 @@ tooling with synthetic files only and never runs it on real data.
 
 - `HEALTH_RECORDS_ENABLED=true` and the encryption key (`SECRET_ENCRYPTION_KEY`,
   backed up) are set. With the feature off the page does not exist.
-- You are a **system administrator**. Nobody else can preview or apply, and an
+- You are a **system administrator** or an active **Clubs Administrator** (ADR 0005 Addendum B, #1232). Nobody else can preview or apply, and an
   administrator acting as a director cannot.
 - You have read and confirmed the health information privacy notice once. The
   import page shows it first if you haven't.

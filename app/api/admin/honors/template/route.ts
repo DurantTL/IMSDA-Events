@@ -1,4 +1,4 @@
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { honorApiError } from "@/modules/honors/api-errors";
 import { honorCsvTemplate } from "@/modules/honors/catalog-csv";
 import { withRequestContext } from "@/lib/request-context";
@@ -6,7 +6,7 @@ import { withRequestContext } from "@/lib/request-context";
 /** The honor catalog CSV template (#385). */
 async function getHandler() {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     return new Response(honorCsvTemplate(), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",

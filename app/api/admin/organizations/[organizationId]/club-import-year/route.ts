@@ -2,7 +2,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubImportApiError } from "@/modules/club-imports/api-errors";
 import { moveImportYear, previewImportYearMove } from "@/modules/club-imports/move-year";
 import { importYearMoveSchema } from "@/modules/club-imports/schemas";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubOrganizationAdministration } from "@/modules/organizations/access";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -14,8 +14,8 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
     const { organizationId } = await context.params;
+    const actor = await requireClubOrganizationAdministration(organizationId);
     const { fromYear, toYear, mode } = importYearMoveSchema.parse(await request.json());
     const body = mode === "preview"
       ? { preview: await previewImportYearMove(organizationId, fromYear, toYear) }

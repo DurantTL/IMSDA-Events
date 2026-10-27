@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Eye } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { ClubHonorsWorkspace } from "@/components/club-honors-workspace";
+import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
 import { rosterYearView } from "@/modules/club-rosters/domain";
@@ -26,8 +27,8 @@ export default async function StaffClubHonorsPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
   const { organizationId } = await params;
+  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access");
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
     select: { type: true, name: true, isActive: true },

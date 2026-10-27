@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { matchRejectedBackgroundCheckPairing } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -17,7 +17,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { entryId, personId } = bodySchema.parse(await request.json());
     await matchRejectedBackgroundCheckPairing(entryId, personId, actor.id);
     return Response.json({ ok: true });

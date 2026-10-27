@@ -49,7 +49,7 @@ export { HEALTH_WINDOW_DAYS, healthWindowEndsOn, healthWindowOpen } from "@/modu
 
 export type HealthActor =
   | { kind: "ATTENDEE"; accountId: string }
-  | { kind: "STAFF_ACTING"; userId: string; actAsId: string };
+  | { kind: "STAFF_ACTING"; userId: string; actAsId: string; viaClubsAdministrator?: true };
 
 export type HealthViewer =
   /** Automatic. A staff account, which already passed two-step sign-in. */
@@ -72,7 +72,7 @@ export function viewerCanSeeClub(viewer: HealthViewer, organizationId: string) {
 /** Audit fields that say who looked, never what they saw. */
 export function healthAuditActor(viewer: HealthViewer): {
   actorUserId?: string;
-  metadata: { viewerKind: HealthViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string };
+  metadata: { viewerKind: HealthViewer["kind"]; actorAttendeeAccountId?: string; actAsId?: string; actorRole?: "CLUBS_ADMINISTRATOR" };
 } {
   switch (viewer.kind) {
     case "SYSTEM_ADMIN":
@@ -83,7 +83,7 @@ export function healthAuditActor(viewer: HealthViewer): {
     case "CLUB_LEADER":
       return viewer.actor.kind === "ATTENDEE"
         ? { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: viewer.actor.accountId } }
-        : { actorUserId: viewer.actor.userId, metadata: { viewerKind: viewer.kind, actAsId: viewer.actor.actAsId } };
+        : { actorUserId: viewer.actor.userId, metadata: { viewerKind: viewer.kind, actAsId: viewer.actor.actAsId, ...(viewer.actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" as const } : {}) } };
   }
 }
 

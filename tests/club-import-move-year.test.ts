@@ -38,7 +38,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: mocks.refreshMatches }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator, requireClubsAdministration: mocks.requireSystemAdministrator, requireClubOrganizationAdministration: mocks.requireSystemAdministrator }));
 
 import { POST } from "@/app/api/admin/organizations/[organizationId]/club-import-year/route";
 import { AccessDeniedError } from "@/modules/access/authorization";
