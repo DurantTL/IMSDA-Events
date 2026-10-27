@@ -26,7 +26,7 @@ import {
 
 const now = new Date("2026-11-01T15:00:00.000Z");
 const endsAt = new Date("2026-11-02T06:00:00.000Z");
-const eventDates = { endsAt: new Date("2026-11-01T12:00:00.000Z"), timezone: "America/Chicago" };
+const eventDates = { startsAt: new Date("2026-10-30T12:00:00.000Z"), endsAt: new Date("2026-11-01T12:00:00.000Z"), timezone: "America/Chicago" };
 
 function stationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -59,7 +59,7 @@ function prismaFor(row: Record<string, unknown> | null) {
       create: vi.fn().mockResolvedValue({ id: "station_new", label: "Back table", expiresAt: endsAt }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    event: { findUnique: vi.fn().mockResolvedValue({ id: "event_1", startsAt: new Date("2026-10-30T12:00:00.000Z"), ...eventDates }) },
+    event: { findUnique: vi.fn().mockResolvedValue({ id: "event_1", ...eventDates }) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return prisma;
@@ -112,8 +112,13 @@ describe("resolveStationToken (#892)", () => {
     prismaFor(stationRow());
     expect((await resolveStationToken("device-token", new Date("2026-11-02T03:00:00.000Z"))).ok).toBe(true);
     // Dates edited after the station started: the event now ended on Oct 30, though expiresAt is still later.
-    prismaFor(stationRow({ event: { name: "Synthetic Camp Meeting", endsAt: new Date("2026-10-30T12:00:00.000Z"), timezone: "America/Chicago" } }));
+    prismaFor(stationRow({ event: { name: "Synthetic Camp Meeting", startsAt: new Date("2026-10-29T12:00:00.000Z"), endsAt: new Date("2026-10-30T12:00:00.000Z"), timezone: "America/Chicago" } }));
     expect(await resolveStationToken("device-token", now)).toEqual({ ok: false, reason: "EXPIRED" });
+  });
+
+  it("rejects a station while the event's current start is more than two days away (moved later)", async () => {
+    prismaFor(stationRow({ event: { name: "Synthetic Camp Meeting", ...eventDates, startsAt: new Date("2026-11-20T12:00:00.000Z") } }));
+    expect(await resolveStationToken("device-token", now)).toEqual({ ok: false, reason: "EVENT_MOVED" });
   });
 
   it("rejects a station whose starter was disabled", async () => {

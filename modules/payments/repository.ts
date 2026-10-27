@@ -1,4 +1,3 @@
-import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { runSerializableTransaction } from "@/modules/payments/serializable";
 import { getRegistrationById } from "@/modules/registrations/repository";
@@ -8,6 +7,7 @@ import {
 } from "@/modules/payments/deposit-domain";
 import { enqueueRefundNoticeMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
+import { findPaymentReplay } from "@/modules/payments/payment-replay";
 import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { logError } from "@/lib/logger";
 import {
@@ -44,25 +44,6 @@ export class PaymentOperationError extends Error {
   }
 }
 
-/** True when `key` already saved a payment for this registration; throws when another registration owns it. */
-async function findPaymentReplay(
-  client: Pick<Prisma.TransactionClient, "payment">,
-  eventId: string,
-  registrationId: string,
-  key: string | undefined,
-) {
-  if (!key) return false;
-  const existing = await client.payment.findUnique({
-    where: { idempotencyKey: key },
-    select: { eventId: true, registrationId: true },
-  });
-  if (!existing) return false;
-  if (existing.eventId !== eventId || existing.registrationId !== registrationId) {
-    throw new PaymentOperationError("PAYMENT_IDEMPOTENCY_KEY_REUSED");
-  }
-  return true;
-}
-
 export async function recordManualPayment(
   eventId: string,
   registrationId: string,
@@ -78,7 +59,7 @@ export async function recordManualPayment(
   const stationSummary = auditContext ? stationSummarySuffix(auditContext.station.label) : "";
   // A retry of a payment that was already saved answers with the registration as it stands: no second Payment row, no
   // second audit entry, and no balance check (the first save already used the balance up).
-  const replayed = await findPaymentReplay(prisma, eventId, registrationId, input.idempotencyKey);
+  const replayed = await findPaymentReplay(prisma, eventId, registrationId, input);
   if (replayed) return getRegistrationById(eventId, registrationId);
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
@@ -129,7 +110,7 @@ export async function recordManualPayment(
       FOR NO KEY UPDATE
     `;
     // Two submissions of one attempt racing each other: the loser sees the winner's row here and does nothing.
-    if (await findPaymentReplay(tx, eventId, registrationId, input.idempotencyKey)) return;
+    if (await findPaymentReplay(tx, eventId, registrationId, input)) return;
     const locked = await tx.registration.findFirst({
       where: { id: registrationId, eventId },
       select: { status: true, totalAmount: true },

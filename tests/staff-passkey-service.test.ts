@@ -95,6 +95,7 @@ vi.mock("@/lib/prisma", () => {
         return { count: rows.length };
       },
     },
+    checkInStation: { updateMany: async () => ({ count: 0 }) },
     userMfaEnrollment: {
       findUnique: async () => state.enrollment,
       deleteMany: async () => {

@@ -13,6 +13,7 @@ import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   CHECK_IN_STATION_COOKIE_NAME,
+  STATION_START_LEAD_MS,
   shouldTouchStation,
   stationCapabilities,
   stationInvalidReason,
@@ -132,7 +133,7 @@ export async function resolveStationToken(
       lastSeenAt: true,
       revokedAt: true,
       stoppedAt: true,
-      event: { select: { name: true, endsAt: true, timezone: true } },
+      event: { select: { name: true, startsAt: true, endsAt: true, timezone: true } },
       startedBy: {
         select: {
           id: true,
@@ -159,6 +160,7 @@ export async function resolveStationToken(
     stoppedAt: row.stoppedAt,
     // The event's current dates decide too, so editing them after the station started moves its end.
     eventEnded: hasEventEnded({ endsAt: row.event.endsAt, timezone: row.event.timezone }, now),
+    eventNotOpen: now.getTime() < row.event.startsAt.getTime() - STATION_START_LEAD_MS,
     starter: {
       accountStatus: row.startedBy.accountStatus,
       hasCredential: Boolean(row.startedBy.credential),

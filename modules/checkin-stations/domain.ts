@@ -58,7 +58,8 @@ export type StationInvalidReason =
   | "STOPPED"
   | "EXPIRED"
   | "STARTER_INACTIVE"
-  | "PERMISSION_LOST";
+  | "PERMISSION_LOST"
+  | "EVENT_MOVED";
 
 export type StationRecordState = {
   expiresAt: Date;
@@ -66,6 +67,8 @@ export type StationRecordState = {
   stoppedAt: Date | null;
   /** True once the event's current dates say it is over (dates edited after the station started move this). */
   eventEnded?: boolean;
+  /** True while the event's current start is more than the start lead away (it was moved later after the station started). */
+  eventNotOpen?: boolean;
   starter: {
     accountStatus: string;
     hasCredential: boolean;
@@ -86,6 +89,7 @@ export function stationInvalidReason(
   if (station.revokedAt) return "REVOKED";
   if (station.stoppedAt) return "STOPPED";
   if (station.expiresAt.getTime() <= now.getTime() || station.eventEnded) return "EXPIRED";
+  if (station.eventNotOpen) return "EVENT_MOVED";
   if (
     !station.starter.hasCredential
     || station.starter.credentialDisabledAt

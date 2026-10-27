@@ -19,7 +19,7 @@ import {
   type StationPaymentSummary,
 } from "@/modules/checkin-stations/domain";
 import type { ResolvedStation } from "@/modules/checkin-stations/repository";
-import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapshot-hooks";
+import { findPaymentReplay } from "@/modules/payments/payment-replay";
 import { PaymentOperationError, recordManualPayment } from "@/modules/payments/repository";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 import { registrationBalanceCents } from "@/modules/payments/square-domain";
@@ -181,7 +181,6 @@ export async function checkInStationFamily(
         item.idempotencyKey,
         { auditContext: { station: { id: station.station.id, label: station.station.label } } },
       );
-      if (operation.checkedIn) await sealHealthSnapshotAfterCheckIn(eventId, item.attendeeId);
       results.push({
         attendeeId: item.attendeeId,
         status: !operation.checkedIn
@@ -222,6 +221,11 @@ export async function recordStationPayment(
   input: { registrationId: string; method: "CASH" | "CHECK"; amountCents: number; checkNumber: string; idempotencyKey: string },
 ): Promise<StationPaymentSummary> {
   const eventId = station.station.eventId;
+  // A retry after a lost response must get the saved payment back, whatever the balance is now: decided first,
+  // before the paid, club and amount checks that a retry would otherwise fail.
+  if (await findPaymentReplay(getPrisma(), eventId, input.registrationId, input)) {
+    return paymentSummaryFor(eventId, input.registrationId);
+  }
   const summary = await requirePayableRegistration(station, input.registrationId);
   if (summary.state === "DUE" && input.amountCents > summary.balanceCents) {
     throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");

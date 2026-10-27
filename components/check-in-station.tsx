@@ -356,8 +356,12 @@ function PaymentPanel({
     setBusy(false);
     if (!response.ok) {
       setError(response.message);
-      // No answer came back: the payment may or may not have been saved. Refresh the balance from the server.
-      if (response.status === 0) await onRefresh();
+      // No answer, or a server error: the payment may or may not have been saved. Refresh the balance, and do not
+      // invite a plain resubmit. The same attempt key stays, so a repeat of this exact entry replays safely.
+      if (response.status === 0 || response.status >= 500) {
+        await onRefresh();
+        setError("This payment may already be recorded. Check the balance above before recording again.");
+      }
       return;
     }
     attemptKey.current = null;

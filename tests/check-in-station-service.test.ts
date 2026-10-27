@@ -26,7 +26,6 @@ const mocks = vi.hoisted(() => {
     checkInAttendee: vi.fn(),
     recordManualPayment: vi.fn(),
     writeAuditLog: vi.fn(),
-    seal: vi.fn(),
   };
 });
 
@@ -47,7 +46,6 @@ vi.mock("@/modules/checkin/repository", () => ({
   CheckInOperationError: mocks.MockCheckInError,
   checkInAttendee: mocks.checkInAttendee,
 }));
-vi.mock("@/modules/health-records/snapshot-hooks", () => ({ sealHealthSnapshotAfterCheckIn: mocks.seal }));
 vi.mock("@/modules/payments/repository", () => ({
   PaymentOperationError: mocks.MockPaymentError,
   recordManualPayment: mocks.recordManualPayment,
@@ -101,7 +99,7 @@ function prismaFor(registration: Record<string, unknown> | null = registrationRo
         where.id.in.filter((id) => ["attendee_1", "attendee_2", "attendee_3"].includes(id)).map((id) => ({ id }))),
     },
     auditLog: { findFirst: vi.fn().mockResolvedValue(note) },
-    payment: { create: vi.fn() },
+    payment: { create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return prisma;
@@ -187,7 +185,6 @@ describe("station check-in (#892)", () => {
       "event_1", "attendee_1", "user_1", keyA,
       { auditContext: { station: { id: "station_1", label: "Front desk tablet" } } },
     );
-    expect(mocks.seal).toHaveBeenCalledWith("event_1", "attendee_1");
   });
 
   it("rejects an attendee that is not on this registration in this event", async () => {
@@ -229,7 +226,6 @@ describe("station check-in (#892)", () => {
     });
     expect(results).toEqual([{ attendeeId: "attendee_3", status: "NEEDS_DESK_REVIEW" }]);
     expect(mocks.checkInAttendee.mock.calls[0][4]).not.toHaveProperty("sterlingOverrideReason");
-    expect(mocks.seal).not.toHaveBeenCalled();
   });
 });
 
@@ -264,6 +260,38 @@ describe("station payments (#892)", () => {
     prismaFor(registrationRow({ payments: [{ amount: 100, refunds: [] }] }));
     await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "", idempotencyKey: keyA }))
       .rejects.toMatchObject({ code: "NOTHING_DUE" });
+    expect(mocks.recordManualPayment).not.toHaveBeenCalled();
+  });
+
+  it("replays a retry after a full payment instead of failing as nothing due", async () => {
+    // The first save paid the whole balance; the retry carries the same key, amount and method.
+    const prisma = prismaFor(registrationRow({ payments: [{ amount: 100, refunds: [] }] }));
+    prisma.payment.findUnique = vi.fn().mockResolvedValue({ eventId: "event_1", registrationId: "registration_1", amount: 60, method: "CASH" });
+    const summary = await recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 6000, checkNumber: "", idempotencyKey: keyA });
+    expect(summary).toEqual({ state: "PAID" });
+    expect(mocks.recordManualPayment).not.toHaveBeenCalled();
+  });
+
+  it("replays a retry after a partial payment even though the amount now exceeds the balance", async () => {
+    // Total 100, 40 paid earlier plus this 40 saved: balance 20, and the retried 40 is over it.
+    const prisma = prismaFor(registrationRow({ payments: [{ amount: 40, refunds: [] }, { amount: 40, refunds: [] }] }));
+    prisma.payment.findUnique = vi.fn().mockResolvedValue({ eventId: "event_1", registrationId: "registration_1", amount: 40, method: "CHECK" });
+    const summary = await recordStationPayment(station, { registrationId: "registration_1", method: "CHECK", amountCents: 4000, checkNumber: "1042", idempotencyKey: keyA });
+    expect(summary).toMatchObject({ state: "DUE", balanceCents: 2000 });
+    expect(mocks.recordManualPayment).not.toHaveBeenCalled();
+  });
+
+  it("rejects a key that belongs to another registration, or to a different amount or method", async () => {
+    const prisma = prismaFor();
+    for (const saved of [
+      { eventId: "event_1", registrationId: "registration_other", amount: 25, method: "CASH" },
+      { eventId: "event_1", registrationId: "registration_1", amount: 30, method: "CASH" },
+      { eventId: "event_1", registrationId: "registration_1", amount: 25, method: "CHECK" },
+    ]) {
+      prisma.payment.findUnique = vi.fn().mockResolvedValue(saved);
+      await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 2500, checkNumber: "", idempotencyKey: keyA }))
+        .rejects.toMatchObject({ code: "PAYMENT_IDEMPOTENCY_KEY_REUSED" });
+    }
     expect(mocks.recordManualPayment).not.toHaveBeenCalled();
   });
 

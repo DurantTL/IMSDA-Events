@@ -36,7 +36,7 @@ function checkInClient() {
   return tx;
 }
 
-function paymentClient(existingPayment: { eventId: string; registrationId: string } | null = null) {
+function paymentClient(existingPayment: { eventId: string; registrationId: string; amount: number; method: string } | null = null) {
   const tx = {
     $queryRaw: vi.fn().mockResolvedValue([]),
     registration: { findFirst: vi.fn().mockResolvedValue({ status: "CONFIRMED", totalAmount: 100 }) },
@@ -110,7 +110,7 @@ describe("station audit context (#892)", () => {
     expect(first.auditLog.create).toHaveBeenCalledTimes(1);
 
     // The retry: the key now exists for this registration, and the full balance was already used up.
-    const retry = paymentClient({ eventId: "event_1", registrationId: "registration_1" });
+    const retry = paymentClient({ eventId: "event_1", registrationId: "registration_1", amount: 100, method: "CASH" } as never);
     await recordManualPayment("event_1", "registration_1", "user_1", { amountCents: 10_000, method: "CASH", reference: "", idempotencyKey }, station);
     expect(retry.payment.create).not.toHaveBeenCalled();
     expect(retry.auditLog.create).not.toHaveBeenCalled();
@@ -118,10 +118,22 @@ describe("station audit context (#892)", () => {
   });
 
   it("rejects a key already used for another registration", async () => {
-    const tx = paymentClient({ eventId: "event_1", registrationId: "registration_other" });
+    const tx = paymentClient({ eventId: "event_1", registrationId: "registration_other", amount: 100, method: "CASH" } as never);
     await expect(recordManualPayment("event_1", "registration_1", "user_1", { amountCents: 100, method: "CASH", reference: "", idempotencyKey }, station))
       .rejects.toMatchObject({ code: "PAYMENT_IDEMPOTENCY_KEY_REUSED" });
     expect(tx.payment.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a replay whose amount or method differs from the saved payment", async () => {
+    for (const saved of [
+      { eventId: "event_1", registrationId: "registration_1", amount: 99, method: "CASH" },
+      { eventId: "event_1", registrationId: "registration_1", amount: 100, method: "CHECK" },
+    ]) {
+      const tx = paymentClient(saved as never);
+      await expect(recordManualPayment("event_1", "registration_1", "user_1", { amountCents: 10_000, method: "CASH", reference: "", idempotencyKey }, station))
+        .rejects.toMatchObject({ code: "PAYMENT_IDEMPOTENCY_KEY_REUSED" });
+      expect(tx.payment.create).not.toHaveBeenCalled();
+    }
   });
 
   it("records an unkeyed (finance desk) payment with a null key and never looks one up", async () => {
