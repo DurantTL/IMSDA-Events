@@ -139,7 +139,7 @@ describe("task words and synonyms", () => {
 
   it("finds Team for invite staff, ranked above unrelated pages", () => {
     const results = labels(find(admin, "invite staff"));
-    expect(results.slice(0, 2)).toEqual(expect.arrayContaining(["System:Team", "Event:Team"]));
+    expect(results.slice(0, 2)).toEqual(expect.arrayContaining(["System:People & access", "Event:Team"]));
     expect(results).not.toContain("System:Platform settings");
   });
 
@@ -150,7 +150,7 @@ describe("task words and synonyms", () => {
   });
 
   it("matches plurals and prefixes, ignores case, and needs every word to match", () => {
-    expect(labels(find(admin, "TEAMS"))).toContain("System:Team");
+    expect(labels(find(admin, "TEAMS"))).toContain("System:People & access");
     expect(labels(find(admin, "readi"))).toContain("System:System readiness");
     expect(find(admin, "team zzzunmatched")).toEqual([]);
     expect(find(admin, "   ")).toEqual([]);
@@ -176,14 +176,14 @@ describe("task words and synonyms", () => {
 
 describe("scope labels", () => {
   it("shows System beside the System Team and Event beside the event Team", () => {
-    const team = find(admin, "team").filter((result) => result.label === "Team");
+    const team = find(admin, "team").filter((result) => result.label === "Team" || result.label === "People & access");
     expect(team.map((result) => result.scope).sort()).toEqual(["Event", "System"]);
     const settings = find(admin, "settings").filter((result) => /settings/i.test(result.label));
     expect(settings.map((result) => result.scope)).toEqual(expect.arrayContaining(["System", "Event"]));
   });
 
   it("renders each result with its scope in text, not colour alone", () => {
-    const destinations = buildSearchDestinations(admin).filter((destination) => destination.label === "Team");
+    const destinations = buildSearchDestinations(admin).filter((destination) => destination.label === "Team" || destination.label === "People & access");
     const markup = destinations.map((destination) => renderToStaticMarkup(
       createElement(DestinationOption, { active: false, destination, id: destination.key, onChoose: () => {}, onHover: () => {} }),
     )).join("");

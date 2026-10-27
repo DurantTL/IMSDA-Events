@@ -10,6 +10,9 @@ import { EventGeneralLinkPanel } from "@/components/event-general-link-panel";
 import { generalLinkUrl } from "@/modules/general-link-registrations/domain";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 import { getServerEnv } from "@/lib/env";
+import { getPrisma } from "@/lib/prisma";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
+import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 import { CalendarDatesConfirmation, CalendarLinkBanner } from "@/components/calendar-link-banner";
 import { getCalendarLinkNotice } from "@/modules/calendar/event-links";
 import { decideEventArchiveAccess } from "@/modules/events/archive";
@@ -30,7 +33,7 @@ export default async function EventSettingsPage({
     return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." />;
   }
   const { user } = await getCurrentSession();
-  const [settings, locations, coordinators, teamSettings, generalLink, linkNotice] = await Promise.all([getEventSettings(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id)]);
+  const [settings, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings] = await Promise.all([getEventSettings(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id)]);
   if (!settings) notFound();
   return (
     <>
@@ -38,7 +41,10 @@ export default async function EventSettingsPage({
       {linkNotice && <CalendarLinkBanner key={`calendar-link-${event.id}`} eventId={event.id} notice={linkNotice} />}
       {/* Keyed on the event's dates too: after Update from the calendar banner the form remounts with the new dates,
           so a later save can't write the old ones back (the server also refuses a save over a newer version). */}
-      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canOpenPlatformSettings={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed} />
+      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canOpenPlatformSettings={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed}
+        // Where each value comes from (#1258): the defaults a new event is seeded from, and the event's sender against the central one. Names and addresses only.
+        platformDefaults={{ defaultTimezone: platform.defaultTimezone, defaultAttendeeEditPolicy: platform.defaultAttendeeEditPolicy }}
+        emailSender={emailSettings ? { senderName: emailSettings.senderName, replyToOverride: emailSettings.replyToOverride, central: { name: emailSettings.central.name, replyTo: emailSettings.central.replyTo } } : undefined} />
       {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
       {settings.audience === "CLUB" && generalLink && (
         <EventGeneralLinkPanel

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, Copy, Link2 } from "lucide-react";
+import { useConfirm } from "@/components/use-confirm";
 
 export type GeneralLinkPanelSettings = {
   enabled: boolean;
@@ -17,12 +18,30 @@ export type GeneralLinkPanelSettings = {
  * account register a team. Shows the address to copy, and links to the teams waiting for a club.
  */
 export function EventGeneralLinkPanel({ eventId, publicUrl, initialSettings }: { eventId: string; publicUrl: string; initialSettings: GeneralLinkPanelSettings }) {
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [settings, setSettings] = useState(initialSettings);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   async function toggle(enabled: boolean) {
+    // One click changes what the public can open, so the consequence is shown first (#1258). Cancel changes nothing.
+    const confirmed = await askConfirm({
+      title: enabled ? "Turn on the general registration link" : "Turn off the general registration link",
+      confirmLabel: enabled ? "Turn the link on" : "Turn the link off",
+      body: enabled ? (
+        <p>
+          Anyone with the link can register a club team for this event without an account. A team whose director is not a current
+          director or deputy of the club waits in <strong>Teams waiting for a club</strong> until you confirm it. You can turn it off again.
+        </p>
+      ) : (
+        <p>
+          The public registration page stops working right away and shows &ldquo;not found&rdquo; to anyone who opens the link you shared.
+          Teams already registered or waiting stay where they are. You can turn it on again.
+        </p>
+      ),
+    });
+    if (!confirmed) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -95,6 +114,7 @@ export function EventGeneralLinkPanel({ eventId, publicUrl, initialSettings }: {
           </Link>
         </p>
       )}
+      {confirmDialog}
     </section>
   );
 }

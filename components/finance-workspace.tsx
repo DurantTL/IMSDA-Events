@@ -234,6 +234,7 @@ export function FinanceWorkspace({
           { href: `/finance/cancellation-policy?event=${eventId}`, label: "Cancellation rules" },
           { href: `/finance/cancellation-requests?event=${eventId}`, label: "Cancellation requests" },
           { href: `/finance/square-payments?event=${eventId}`, label: "Unmatched Square payments" },
+          { href: `/more/ledger-health?event=${eventId}`, label: "Ledger check" },
         ]}
       />
       <section className="finance-summary" aria-label="Financial summary">

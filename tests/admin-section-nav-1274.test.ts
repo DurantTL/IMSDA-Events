@@ -37,14 +37,14 @@ describe("which section a page shows", () => {
   });
 
   it("shows System on System-only pages", () => {
-    for (const path of ["/admin/team", "/admin/settings", "/admin/organizations", `/admin/organizations/${org}/billing`, "/admin/event-templates/t1"]) {
+    for (const path of ["/admin/readiness", "/admin/settings", "/admin/organizations", `/admin/organizations/${org}/billing`, "/admin/event-templates/t1"]) {
       expect(adminSectionFor(path, system), path).toBe("system");
     }
-    expect(adminSectionFor("/admin/team", clubs)).toBeNull();
+    expect(adminSectionFor("/admin/readiness", clubs)).toBeNull();
   });
 
   it("shows Clubs on shared club pages only in the Clubs view (or for a Clubs Administrator who is no System administrator)", () => {
-    for (const path of ["/admin/clubs/import", "/admin/honors", "/admin/club-supplies", "/admin/club-forms", "/admin/club-forms/k", "/admin/organizations/background-checks", `/admin/organizations/${org}/club`, `/admin/organizations/${org}/profile`]) {
+    for (const path of ["/admin/clubs/import", "/admin/honors", "/admin/club-supplies", "/admin/club-forms", "/admin/club-forms/k", "/admin/organizations/background-checks", `/admin/organizations/${org}/club`, `/admin/organizations/${org}/profile`, "/admin/people", "/admin/people/staff/u1"]) {
       expect(adminSectionFor(path, { active: "CLUBS_ADMIN", systemAdmin: true }), path).toBe("clubs");
       expect(adminSectionFor(path, system), path).toBe("system");
       expect(adminSectionFor(path, { active: "EVENTS_ADMIN", systemAdmin: false }), path).toBe("clubs");
@@ -78,14 +78,14 @@ describe("System tabs", () => {
   });
 
   it("sends hash tabs to the dashboard from any other page", () => {
-    const tabs = nav("system", "/admin/team").tabs;
+    const tabs = nav("system", "/admin/people").tabs;
     expect(tabs.find((tab) => tab.key === "events")?.href).toBe("/admin#upcoming-events");
     expect(tabs.find((tab) => tab.key === "health")?.href).toBe("/admin#system-health");
   });
 
   it("marks a tab's own page as page and a page of its area as true", () => {
-    expect(marked(nav("system", "/admin/team").tabs)).toEqual([["people", "page"]]);
-    expect(marked(nav("system", "/admin/accounts").tabs)).toEqual([["people", "true"]]);
+    expect(marked(nav("system", "/admin/people").tabs)).toEqual([["people", "page"]]);
+    expect(marked(nav("system", "/admin/people/account/a1").tabs)).toEqual([["people", "true"]]);
     expect(marked(nav("system", "/admin/forms").tabs)).toEqual([["forms", "page"]]);
     expect(marked(nav("system", "/admin/information-forms/f1/responses").tabs)).toEqual([["forms", "true"]]);
     expect(marked(nav("system", "/admin/event-templates/t1").tabs)).toEqual([["events", "true"]]);
@@ -126,6 +126,8 @@ describe("Clubs tabs", () => {
     expect(marked(nav("clubs", "/admin/clubs/invites").tabs)).toEqual([["new-clubs", "true"]]);
     expect(marked(nav("clubs", `/admin/organizations/${org}/club`).tabs)).toEqual([["all-clubs", "true"]]);
     expect(marked(nav("clubs", `/admin/organizations/${org}/directors`).tabs)).toEqual([["all-clubs", "true"]]);
+    expect(marked(nav("clubs", "/admin/people").tabs)).toEqual([["people", "page"]]);
+    expect(marked(nav("clubs", "/admin/people/staff/u1").tabs)).toEqual([["people", "true"]]);
   });
 });
 
@@ -198,7 +200,7 @@ describe("back links", () => {
   });
 
   it("draws none on a main page", () => {
-    for (const path of ["/admin", "/admin/team", "/admin/organizations", "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/reports", "/admin/clubs/applications", "/admin/club-forms", "/admin/event-templates"]) {
+    for (const path of ["/admin", "/admin/people", "/admin/organizations", "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/reports", "/admin/clubs/applications", "/admin/club-forms", "/admin/event-templates"]) {
       expect(adminBackLink("system", path), path).toBeNull();
     }
   });
@@ -213,12 +215,12 @@ describe("the rendered header", () => {
   const render = (model: ReturnType<typeof nav>) => renderToStaticMarkup(createElement(AdminSectionHeader, { nav: model }));
 
   it("names the section, labels the tab row, and marks page and true", () => {
-    const html = render(nav("system", "/admin/accounts"));
+    const html = render(nav("system", "/admin/people/staff/u1"));
     expect(html).toContain("System administration");
     expect(html).toContain('aria-label="System administration sections"');
-    expect(html).toMatch(/<a aria-current="true" href="\/admin\/team">People<\/a>/);
+    expect(html).toMatch(/<a aria-current="true" href="\/admin\/people">People<\/a>/);
     expect(html).not.toContain('aria-current="page"');
-    expect(render(nav("system", "/admin/team"))).toMatch(/<a aria-current="page" href="\/admin\/team">People<\/a>/);
+    expect(render(nav("system", "/admin/people"))).toMatch(/<a aria-current="page" href="\/admin\/people">People<\/a>/);
   });
 
   it("draws the back link as a plain link to the parent, and none on a main page", () => {

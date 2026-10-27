@@ -82,6 +82,8 @@ import { getPublicLodgingOffer, planRegistrationLodging, recordRegistrationLodgi
 import { syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { eventStartDate, planPublicResponsibleAdults } from "@/modules/guardian-authority/domain";
 import { teamNameTakenMessage } from "@/modules/club-teams/domain";
+import { appendSubmissionCharge } from "@/modules/ledger/entries";
+import { moneyOnlyPricingSnapshot } from "@/modules/ledger/domain";
 
 export type PublicRegistrationErrorCode =
   | "FORM_NOT_FOUND"
@@ -1196,13 +1198,33 @@ async function createPublicRegistrationTransaction(
       submittedAt: now,
     },
   });
+  // The discount the stored total actually reflects (capped at the subtotal by the pricing step), kept only for a
+  // registration-level code: per-person codes are their own PROMO_CODE adjustment lines and are already inside the total.
+  const ledgerPromoDiscountCents = claimedPromo ? admittedCalculation.discountAmountCents ?? 0 : 0;
   if (claimedPromo) {
     await recordPromoCodeRedemption(tx, {
       eventId: form.eventId,
       registrationId: registration.id,
       claimed: claimedPromo,
+      appliedDiscountCents: ledgerPromoDiscountCents,
+      currency: definition.payment?.currency ?? "USD",
     });
   }
+  // Shadow ledger (#117): the same transaction as the stored total, which stays authoritative.
+  await appendSubmissionCharge(tx, {
+    eventId: form.eventId,
+    registrationId: registration.id,
+    totalCents: admittedCalculation.totalCents,
+    appliedDiscountCents: ledgerPromoDiscountCents,
+    currency: definition.payment?.currency ?? "USD",
+    pricingSnapshot: {
+      ...moneyOnlyPricingSnapshot(admittedCalculation),
+      pricingDate: prepared.pricingDate,
+      formVersionId: version.id,
+      waitlisted: isWaitlisted,
+      attendeePromoDiscountCents: claimedPromo ? 0 : admittedCalculation.discountAmountCents ?? 0,
+    },
+  });
   const access = await issueRegistrationAccessToken(tx, {
     registrationId: registration.id,
     now,

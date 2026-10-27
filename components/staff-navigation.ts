@@ -165,6 +165,7 @@ export const staffPageTitles = {
   lodgingAssignments: "Lodging assignments",
   issuedAssets: "Issued assets",
   scheduledEmails: "Scheduled emails",
+  ledgerCheck: "Ledger check (shadow)",
 } as const;
 
 /** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
@@ -206,6 +207,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
+  ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
   ["/events-admin", "exact", "Event administration"],
@@ -248,7 +250,7 @@ export const clubsAdminHealthImportHref = "/admin/clubs/health-import";
 export const eventsAdminHomeItem: NavigationItem = { href: "/events-admin", label: "Event administration", icon: LayoutDashboard };
 
 /** The collapsible groups of the Clubs Administrator's sidebar (#1245). */
-export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications";
+export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications" | "clubs-people";
 
 export type ClubsNavGroup = { key: ClubsNavGroupKey; label: string; items: readonly NavigationItem[] };
 
@@ -302,6 +304,11 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
       { href: "/admin/clubs/applications", label: "New club applications", icon: ClipboardPen },
       { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
     ],
+  },
+  {
+    key: "clubs-people",
+    label: "People",
+    items: [{ href: "/admin/people", label: "People & access", icon: UsersRound }],
   },
 ];
 

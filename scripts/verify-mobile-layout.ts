@@ -321,6 +321,8 @@ const pages: PageSpec[] = [
   staff("honors", "/more/honors"),
   staff("honors-rosters", "/more/honors/rosters"),
   staff("event-health", "/more/event-health"),
+  // Ledger check (shadow, #117): the empty state, or the list of registrations whose ledger differs from the stored total.
+  staff("ledger-check", "/more/ledger-health"),
   staff("attendee-configuration", "/more/attendee-configuration"),
   staff("club-assignments", "/more/club-assignments"),
   staff("program-assignments", "/more/program-assignments"),
@@ -365,8 +367,9 @@ const pages: PageSpec[] = [
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),
-  staff("team", "/admin/team", "system-admin"),
-  staff("accounts", "/admin/accounts", "system-admin"),
+  // People & access (#1275): the list, and one person (the seeded Registration manager, a non-admin staff login with an event membership) with its boxes.
+  staff("people", "/admin/people?q=imsda-events.test", "system-admin"),
+  staff("people-person", "/admin/people/staff/usr_registration_manager", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),

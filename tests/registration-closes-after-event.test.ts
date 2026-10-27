@@ -341,6 +341,8 @@ describe("server-side enforcement", () => {
       const tx = {
         person: { create: vi.fn().mockResolvedValue({ id: "person_1" }) },
         registration: { create: vi.fn().mockResolvedValue({ id: "registration_1" }) },
+        registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger_1" }) },
+        user: { findUnique: vi.fn().mockResolvedValue({ displayName: "Staff Sample" }) },
         auditLog: { create: vi.fn().mockResolvedValue({}) },
         event: { findUnique: eventLookup },
       };

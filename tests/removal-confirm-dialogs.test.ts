@@ -18,7 +18,7 @@ function source(relativePath: string) {
 describe("high-consequence actions use the shared ConfirmDialog, not window.confirm() (#471)", () => {
   const files = [
     "components/check-in-workspace.tsx",
-    "components/attendee-accounts-workspace.tsx",
+    "components/person-access-controls.tsx",
     "components/club-team-workspace.tsx",
     "components/calendar-admin-workspace.tsx",
     "components/registration-amendment-editor.tsx",
@@ -45,8 +45,8 @@ describe("high-consequence actions use the shared ConfirmDialog, not window.conf
     expect(code).toContain("This cannot undo or change any check-in already received by the server.");
   });
 
-  it("attendee-accounts-workspace keeps the reset/coordinator/sign-out consequences", () => {
-    const code = source("components/attendee-accounts-workspace.tsx");
+  it("person-access-controls keeps the reset/coordinator/sign-out consequences", () => {
+    const code = source("components/person-access-controls.tsx");
     expect(code).toContain("Their authenticator and passkeys are removed and they're signed out.");
     expect(code).toContain("They'll no longer see other clubs.");
     expect(code).toContain("They'll see every club, view only (ages, not birth dates), after a second sign-in step.");
@@ -102,9 +102,9 @@ describe("removal review dialogs say what's removed and what's kept (#471)", () 
   });
 
   it("attendee accounts shows the server's specific error inside the dialog", () => {
-    const code = source("components/attendee-accounts-workspace.tsx");
-    expect(code).toContain("setDialogError(failure)");
-    expect(code).not.toContain('setDialogError("That account couldn\'t be updated.")');
+    const code = source("components/person-access-controls.tsx");
+    expect(code).toContain("setFormError(failure)");
+    expect(code).toContain("setError(failure)");
   });
 
   it("clears a leftover page error when a confirm dialog opens, so it can't show in the new dialog", () => {

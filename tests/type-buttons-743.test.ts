@@ -258,7 +258,7 @@ describe("confirmation copy names the object and the consequence (#743)", () => 
       ["components/registration-builder/builder-dialogs.tsx", /`Remove "\$\{removeSectionTarget\.section\.title\}"`/],
       ["components/registration-builder/builder-dialogs.tsx", /`Withdraw \$\{selectedForm\.name\}`/],
       ["components/public-registration-form.tsx", /confirmLabel=\{`Remove \$\{pendingName\}`\}/],
-      ["components/attendee-accounts-workspace.tsx", /`Sign \$\{account\.email\} out everywhere`/],
+      ["components/person-access-controls.tsx", /`Sign \$\{account\.email\} out everywhere`/],
       ["components/organization-directory-workspace.tsx", /`Delete \$\{editor\.check\.name\}`/],
       ["components/tag-configuration-workspace.tsx", /`Deactivate "\$\{deactivateTarget\.name\}"`/],
       ["components/check-in-workspace.tsx", /`Discard retry for \$\{discardTarget\.attendeeLabel\}`/],

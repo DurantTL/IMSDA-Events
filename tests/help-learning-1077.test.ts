@@ -193,7 +193,7 @@ describe("links to working pages", () => {
     expect(unavailable).toBe(0);
     expect(links.map((link) => link.href)).toEqual([
       "/staff?event=evt_synthetic",
-      "/admin/team?event=evt_synthetic",
+      "/admin/people?event=evt_synthetic",
       "/admin/clubs/invites?event=evt_synthetic",
     ]);
   });

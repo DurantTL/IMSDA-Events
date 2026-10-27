@@ -47,6 +47,7 @@ const clubsCapablePatterns: readonly RegExp[] = [
   /^\/admin\/club-supplies(\/|$)/,
   /^\/admin\/club-forms(\/|$)/,
   /^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile)(\/|$)/,
+  /^\/admin\/people(\/|$)/,
 ];
 
 /**
@@ -101,6 +102,7 @@ const clubsGroupTab: Record<ClubsNavGroupKey, string> = {
   "clubs-events": "club-events",
   "clubs-forms": "forms",
   "clubs-applications": "new-clubs",
+  "clubs-people": "people",
 };
 
 function clubsAreaKey(pathname: string): string | null {

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate";
@@ -77,8 +79,19 @@ export async function listClubsForArea() {
   }));
 }
 
+/**
+ * Grants or removes the Area Coordinator role. The actor is checked here as well as at the route (#1275, decision
+ * A): a system administrator or an active Clubs Administrator, read from the database by `actorUserId`; anyone else
+ * is refused with a 403. The audit entry notes when a Clubs Administrator acted.
+ */
 export async function setAreaCoordinator(attendeeAccountId: string, on: boolean, actorUserId: string, now = new Date()) {
   const prisma = getPrisma();
+  const actor = await prisma.user.findUnique({ where: { id: actorUserId }, select: { globalRole: true } });
+  const isSystemAdmin = actor?.globalRole === "SYSTEM_ADMIN";
+  const viaClubsAdministrator = !isSystemAdmin && actor !== null && await isActiveClubsAdministrator(actorUserId);
+  if (!isSystemAdmin && !viaClubsAdministrator) {
+    throw new AccessDeniedError("Clubs Administrator or system administrator access is required to change Area Coordinators.", 403, "PERMISSION_DENIED");
+  }
   await prisma.$transaction(async (tx) => {
     const account = await tx.attendeeAccount.findUnique({ where: { id: attendeeAccountId }, select: { id: true } });
     if (!account) throw new AreaCoordinatorError("ACCOUNT_NOT_FOUND", "That account could not be found.");
@@ -100,7 +113,7 @@ export async function setAreaCoordinator(attendeeAccountId: string, on: boolean,
       entityType: "AttendeeAccount",
       entityId: attendeeAccountId,
       summary: on ? "Made an account an Area Coordinator." : "Removed an Area Coordinator.",
-      metadata: { attendeeAccountId },
+      metadata: viaClubsAdministrator ? { attendeeAccountId, viaClubsAdministrator: true } : { attendeeAccountId },
     }, tx);
   });
 }

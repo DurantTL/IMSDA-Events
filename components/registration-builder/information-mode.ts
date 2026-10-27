@@ -6,6 +6,7 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { informationFormDefinitionIssues, parseStoredInformationFormDefinition } from "@/modules/information-forms/definition";
 import { sensitiveFieldPattern } from "@/modules/forms/sensitive-fields";
+import { submitJson, type SubmitJsonMethod } from "@/lib/submit-json";
 import type { FormVersionView, FormView } from "./builder-types";
 
 export type InformationScope = "GENERAL" | "EVENT";
@@ -287,18 +288,13 @@ export function informationIssuesFromResponse(result: unknown, definition: Regis
 
 export type InformationCallResult<T> = { ok: true; value: T } | { ok: false; message: string; body: unknown };
 
-async function call(fetchImpl: typeof fetch, url: string, method: string, body?: unknown): Promise<InformationCallResult<InformationFormApi>> {
-  try {
-    const response = await fetchImpl(url, {
-      method,
-      ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
-    });
-    const result = await response.json().catch(() => ({})) as { form?: InformationFormApi; message?: unknown };
-    if (!response.ok || !result.form) return { ok: false, message: typeof result.message === "string" && result.message ? result.message : "The request could not be completed.", body: result };
-    return { ok: true, value: result.form };
-  } catch (caught) {
-    return { ok: false, message: caught instanceof Error ? caught.message : "The request could not be completed.", body: {} };
-  }
+// Through the shared submit helper (#1263), so an answer that is not the app's JSON (a 405, a proxy page) names its status and the
+// deploy holding page's UPDATING answer gets the "site is updating" wording instead of a bare "could not be completed".
+async function call(fetchImpl: typeof fetch, url: string, method: SubmitJsonMethod, body?: unknown): Promise<InformationCallResult<InformationFormApi>> {
+  const result = await submitJson(url, body, { method, fetchImpl, fallbackMessage: "The request could not be completed." });
+  const form = result.body.form as InformationFormApi | undefined;
+  if (!result.ok || !form) return { ok: false, message: typeof result.body.message === "string" && result.body.message ? result.body.message : "The request could not be completed.", body: result.body };
+  return { ok: true, value: form };
 }
 
 export function saveInformationDraftRequest(config: InformationBuilderConfig, formId: string, definition: RegistrationFormDefinition, expectedUpdatedAt: string, fetchImpl: typeof fetch = fetch) {
@@ -316,7 +312,7 @@ export function saveInformationSettingsRequest(config: InformationBuilderConfig,
 }
 
 export function setInformationStatusRequest(config: InformationBuilderConfig, formId: string, status: "OPEN" | "CLOSED", fetchImpl: typeof fetch = fetch) {
-  return call(fetchImpl, informationFormApiPath(config, formId, "/status"), "POST", { status });
+  return call(fetchImpl, informationFormApiPath(config, formId, "/status"), "PATCH", { status });
 }
 
 export type InformationPublishResult =

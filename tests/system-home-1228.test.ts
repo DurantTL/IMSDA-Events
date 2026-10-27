@@ -152,7 +152,7 @@ describe("common tasks", () => {
     expect(groups.get("Events")).toHaveLength(5);
     expect(groups.get("Clubs")).toHaveLength(5);
     expect(groups.get("Forms")).toHaveLength(5);
-    expect(groups.get("People")).toEqual(["/admin/team", "/admin/accounts"]);
+    expect(groups.get("People")).toEqual(["/admin/people"]);
     expect(groups.get("Settings")).toEqual(["/admin/email", "/admin/settings"]);
   });
 
@@ -214,8 +214,8 @@ describe("the refreshed page", () => {
     const html = await renderHome();
     const tasks = html.slice(html.indexOf('data-testid="common-tasks"'), html.indexOf('id="system-health"'));
     for (const heading of ["Events", "Clubs", "Forms", "People", "Settings"]) expect(tasks).toContain(`<h3>${heading}</h3>`);
-    for (const label of ["Create an event", "Conference calendar", "Copy from a past event", "Event templates", "Archived events", "Clubs and churches", "Club Monthly Records", "Club summary", "New club applications", "Club member transfers", "All forms", "Club forms", "Form templates", "Question library", "Information forms", "Team", "Accounts", "Email", "Platform settings"]) {
-      expect(tasks, label).toContain(`>${label}</a>`);
+    for (const label of ["Create an event", "Conference calendar", "Copy from a past event", "Event templates", "Archived events", "Clubs and churches", "Club Monthly Records", "Club summary", "New club applications", "Club member transfers", "All forms", "Club forms", "Form templates", "Question library", "Information forms", "People & access", "Email", "Platform settings"]) {
+      expect(tasks, label).toContain(`>${label.replace("&", "&amp;")}</a>`);
     }
   });
 

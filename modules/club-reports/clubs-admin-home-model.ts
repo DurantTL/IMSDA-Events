@@ -179,6 +179,7 @@ export function clubsAdminTabs(clubYear: string, waitingApplications?: number): 
     { key: "club-events", label: "Club events", href: href.clubEvents },
     { key: "forms", label: "Forms", href: href.forms },
     { key: "new-clubs", label: waitingApplications === undefined ? "New clubs" : `New clubs (${waitingApplications})`, href: href.applications },
+    { key: "people", label: "People", href: "/admin/people" },
   ];
 }
 

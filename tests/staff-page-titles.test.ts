@@ -80,7 +80,8 @@ describe("staff page names (#685)", () => {
 
   it("names each /admin page in the topbar instead of 'System management' (#981)", () => {
     expect(staffSubpageTitle("/admin")).toBeNull();
-    expect(staffSubpageTitle("/admin/team")).toBe("Team");
+    expect(staffSubpageTitle("/admin/people")).toBe("People & access");
+    expect(staffSubpageTitle("/admin/people/staff/usr_1")).toBe("People & access");
     expect(staffSubpageTitle("/admin/settings")).toBe("Platform settings");
     expect(staffSubpageTitle("/admin/readiness")).toBe("System readiness");
     expect(staffSubpageTitle("/admin/calendar")).toBe("Conference calendar");
@@ -125,7 +126,7 @@ describe("staff page names (#685)", () => {
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
       clubs: "more/clubs", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
-      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets", scheduledEmails: "communications/scheduled",
+      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets", scheduledEmails: "communications/scheduled", ledgerCheck: "more/ledger-health",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form", formResponses: "information-forms/responses",
     };

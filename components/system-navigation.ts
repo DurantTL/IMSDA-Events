@@ -20,7 +20,6 @@ import {
   UserPlus,
   UsersRound,
   BarChart3,
-  KeyRound,
   ListChecks,
   Bell,
   BookmarkPlus,
@@ -89,8 +88,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "People",
     collapsedByDefault: false,
     items: [
-      { href: "/admin/team", label: "Team", description: "Who runs events and what they can do.", icon: UsersRound },
-      { href: "/admin/accounts", label: "Accounts", description: "Staff and attendee sign-in accounts.", icon: KeyRound },
+      { href: "/admin/people", label: "People & access", description: "Staff logins and website accounts: who they are and what they can reach.", icon: UsersRound },
     ],
   },
   {
@@ -209,14 +207,13 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],
   [/^\/admin\/honors(\/|$)/, "Honor catalog"],
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
-  [/^\/admin\/accounts(\/|$)/, "Accounts"],
+  [/^\/admin\/(people|team|accounts)(\/|$)/, "People & access"],
   [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
   [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],
   [/^\/admin\/event-templates(\/|$)/, "Event templates"],
   [/^\/admin\/(email|notifications)(\/|$)/, "Email"],
   [/^\/admin\/readiness(\/|$)/, "System readiness"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
-  [/^\/admin\/team(\/|$)/, "Team"],
   [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
 ];
 
