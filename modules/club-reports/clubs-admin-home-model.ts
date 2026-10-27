@@ -25,7 +25,10 @@ import {
   type AreaEventClubRow,
   type MonthStatus,
 } from "@/modules/club-reports/area-summary-domain";
-import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubYearOptions } from "@/modules/club-rosters/domain";
+
+// Lives in the roster domain so the Clubs sidebar (a client component) can use it.
+export { clubYearOptions };
 
 export const NEW_CLUBS_LIMIT = 5;
 export const REGISTERED_CLUBS_LIMIT = 10;
@@ -115,13 +118,6 @@ export const recordStatusLabels: Record<MonthStatus, string> = {
 
 export function recordStatusLabel(status: MonthStatus | null) {
   return status ? recordStatusLabels[status] : "Not yet due";
-}
-
-/** The current club year and the three before it, newest first; the selected year is added when it is not among them. */
-export function clubYearOptions(selected: string, now: Date) {
-  const start = Number(clubYearFor(now).slice(0, 4));
-  const years = [0, 1, 2, 3].map((back) => `${start - back}-${String((start - back + 1) % 100).padStart(2, "0")}`);
-  return years.includes(selected) ? years : [...years, selected].sort().reverse();
 }
 
 /** The month the monthly-records card counts: this month when it is in the club year, else the club year's last month. */

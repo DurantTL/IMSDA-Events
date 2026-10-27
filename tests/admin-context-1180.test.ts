@@ -238,11 +238,10 @@ describe("role separation", () => {
 });
 
 describe("distinct tool collections", () => {
-  it("keeps the two meanings of the calendar route apart by label", () => {
+  it("lists the calendar route once, as the Conference calendar", () => {
     const calendar = systemNavGroups.flatMap((group) => group.items.map((item) => ({ group: group.key, ...item }))).filter((item) => item.href === "/admin/calendar");
-    expect(calendar.map((item) => item.label)).toEqual(["Create event from calendar item", "Manage public calendar"]);
-    expect(calendar.map((item) => item.group)).toEqual(["system-events", "system-catalogs"]);
-    expect(new Set(calendar.map((item) => item.label)).size).toBe(2);
+    expect(calendar.map((item) => item.label)).toEqual(["Conference calendar"]);
+    expect(calendar.map((item) => item.group)).toEqual(["system-events"]);
   });
 
   it("keeps System and Event destinations in separate scopes", () => {

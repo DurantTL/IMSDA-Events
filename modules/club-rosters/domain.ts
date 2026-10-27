@@ -95,6 +95,13 @@ export function clubYearFor(date: Date) {
   return `${start}-${String((start + 1) % 100).padStart(2, "0")}`;
 }
 
+/** The current club year and the three before it, newest first; the selected year is added when it is not among them. */
+export function clubYearOptions(selected: string, now: Date) {
+  const start = Number(clubYearFor(now).slice(0, 4));
+  const years = [0, 1, 2, 3].map((back) => `${start - back}-${String((start - back + 1) % 100).padStart(2, "0")}`);
+  return years.includes(selected) ? years : [...years, selected].sort().reverse();
+}
+
 /** The previous, current, and next club year (#541): what an import may target and a roster may show. */
 export function clubYearChoices(now = new Date()) {
   const year = Number(clubYearFor(now).slice(0, 4));

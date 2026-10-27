@@ -51,13 +51,13 @@ const labels = (results: { label: string; scope: string }[]) => results.map((res
 const find = (context: DestinationSearchContext, query: string) => searchDestinations(buildSearchDestinations(context), query);
 
 describe("destination registry per role", () => {
-  it("gives a system administrator every System destination, with the calendar's two meanings kept apart", () => {
+  it("gives a system administrator every System destination, with the calendar listed once", () => {
     const destinations = buildSearchDestinations(admin);
     const system = destinations.filter((destination) => destination.scope === "System");
     const expected = systemNavGroups.flatMap((group) => group.items.map((item) => item.label));
     expect(system.map((destination) => destination.label)).toEqual(expected);
     expect(system.filter((destination) => destination.href.startsWith("/admin/calendar")).map((destination) => destination.label))
-      .toEqual(["Create event from calendar item", "Manage public calendar"]);
+      .toEqual(["Conference calendar"]);
   });
 
   it("gives limited event staff only their own event destinations and their profile", () => {
@@ -142,9 +142,9 @@ describe("task words and synonyms", () => {
     expect(results).not.toContain("System:Platform settings");
   });
 
-  it("finds Copy a past event for copy event, duplicate and clone", () => {
+  it("finds Copy from a past event for copy event, duplicate and clone", () => {
     for (const query of ["copy event", "duplicate event", "clone"]) {
-      expect(labels(find(admin, query))[0]).toBe("System:Copy a past event");
+      expect(labels(find(admin, query))[0]).toBe("System:Copy from a past event");
     }
   });
 

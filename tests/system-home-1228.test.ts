@@ -214,7 +214,7 @@ describe("the refreshed page", () => {
     const html = await renderHome();
     const tasks = html.slice(html.indexOf('data-testid="common-tasks"'), html.indexOf('id="system-health"'));
     for (const heading of ["Events", "Clubs", "Forms", "People", "Settings"]) expect(tasks).toContain(`<h3>${heading}</h3>`);
-    for (const label of ["Create event", "Create event from calendar item", "Copy a past event", "Event templates", "Archived events", "Clubs and churches", "Monthly reports", "Club summary", "Applications and invites", "Member transfers", "All forms", "Club forms", "Form templates", "Question library", "Information forms", "Team", "Accounts", "Email", "Platform settings"]) {
+    for (const label of ["Create an event", "Create event from calendar item", "Copy from a past event", "Event templates", "Archived events", "Clubs and churches", "Club Monthly Records", "Club summary", "Applications and invites", "Club member transfers", "All forms", "Club forms", "Form templates", "Question library", "Information forms", "Team", "Accounts", "Email", "Platform settings"]) {
       expect(tasks, label).toContain(`>${label}</a>`);
     }
   });

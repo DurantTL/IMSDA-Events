@@ -344,6 +344,12 @@
   gap: 8px 10px;
 }
 
+/* The Clubs sidebar has the club year picker above 800px (#1245), so the page's own goes. It stays on phones (the sidebar
+   is hidden), in the icons-only sidebar and in any view whose sidebar has no picker. */
+@media (min-width: 801px) {
+  :global(html:not([data-sidebar="collapsed"]) .app-shell:has(.clubs-year-form)) .yearForm { display: none; }
+}
+
 .yearForm label,
 .searchForm label {
   display: grid;

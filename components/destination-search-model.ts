@@ -1,5 +1,8 @@
 import {
   buildMoreDirectoryCards,
+  clubsAdminGroups,
+  clubsAdminHealthImportHref,
+  clubsAdminHomeItem,
   eventFeaturesItem,
   matchesVisibility,
   navigation,
@@ -25,7 +28,7 @@ import type { EventPermission } from "@/modules/access/permissions";
  * route handler keeps its own server authorization; nothing here grants access.
  * Planned features are not in the registry, so they cannot appear.
  */
-export type DestinationScope = "System" | "Event" | "Profile";
+export type DestinationScope = "System" | "Clubs" | "Event" | "Profile";
 
 export type SearchDestination = {
   /** Stable per scope and path, used as the option id and React key. */
@@ -49,11 +52,17 @@ export type DestinationSearchContext = {
   clubFormsAccess: boolean;
   /** Cards hidden for the selected event by the module rules (#741). */
   hiddenCardKeys?: ReadonlySet<string>;
+  /**
+   * Set only while the Clubs Administrator view of the role switcher is showing (#1245): the Clubs sidebar's
+   * destinations become searchable. `healthImport` is false when the Health Record feature is off, as in the sidebar.
+   */
+  clubsAdmin?: { healthImport: boolean };
 };
 
 /** What each scope means, for the label beside a result. */
 export const destinationScopeLabels: Record<DestinationScope, string> = {
   System: "System",
+  Clubs: "Clubs",
   Event: "Event",
   Profile: "Profile",
 };
@@ -62,6 +71,7 @@ export const destinationScopeLabels: Record<DestinationScope, string> = {
 export function destinationScopeDescription(scope: DestinationScope): string {
   switch (scope) {
     case "System": return "System administration";
+    case "Clubs": return "Clubs administration";
     case "Event": return "The selected event";
     case "Profile": return "Your account";
   }
@@ -77,7 +87,14 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/event-templates": ["template", "starting point", "new event"],
   "/archived-events": ["archive", "finished events", "old events", "past events", "put away"],
   "/admin/organizations": ["church", "churches", "club directory", "organizations", "directors"],
+  "/admin/clubs": ["clubs dashboard", "what is waiting", "club year"],
   "/admin/clubs/reports": ["monthly record", "club reports"],
+  "/admin/clubs/reports/year-end": ["year end", "pathfinder year", "annual report"],
+  "/admin/clubs/invites": ["invite club", "club invitation", "director invite"],
+  "/admin/clubs/import": ["upload clubs", "csv", "bulk clubs"],
+  "/admin/clubs/health-import": ["medical", "upload health", "csv"],
+  "/admin/clubs/summary#points": ["points", "scores", "standings"],
+  "/admin/clubs/summary#club-events": ["club events", "registered clubs", "next event"],
   "/admin/clubs/summary": ["club overview", "club health"],
   "/admin/clubs/applications": ["invite club", "new club", "club invite", "application"],
   "/admin/clubs/transfers": ["move member", "transfer member"],
@@ -140,7 +157,7 @@ function eventDescriptionFor(item: NavigationItem): string {
 }
 
 /**
- * Every destination this viewer may open, in menu order: System, then Event,
+ * Every destination this viewer may open, in menu order: System, then Clubs (in the Clubs view), then Event,
  * then Profile. Built from the same registry and rules as the menus.
  */
 export function buildSearchDestinations(context: DestinationSearchContext): SearchDestination[] {
@@ -167,6 +184,27 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
           keywords: [...(destinationKeywords[item.href] ?? []), group.label],
         });
       }
+    }
+  }
+
+  if (context.clubsAdmin) {
+    // The Clubs sidebar's own destinations, with the group as context. Never built outside the Clubs view.
+    const clubsHome = { label: clubsAdminHomeItem.label, href: clubsAdminHomeItem.href, group: null as string | null };
+    const clubItems = [
+      clubsHome,
+      ...clubsAdminGroups.flatMap((group) => group.items.map((item) => ({ label: item.label, href: item.href, group: group.label }))),
+    ].filter((item) => item.href !== clubsAdminHealthImportHref || context.clubsAdmin?.healthImport !== false);
+    for (const item of clubItems) {
+      // A page the System groups already list (Club summary, Monthly Records) stays one result, in System scope.
+      if (!item.href.includes("#") && systemPaths.has(item.href)) continue;
+      add({
+        key: `Clubs:${item.href}`,
+        scope: "Clubs",
+        label: item.label,
+        description: item.group ? `${item.group} in club administration.` : "What is waiting across every club, then the clubs themselves.",
+        href: item.href,
+        keywords: [...(destinationKeywords[item.href] ?? destinationKeywords[pathOf(item.href)] ?? []), ...(item.group ? [item.group] : [])],
+      });
     }
   }
 

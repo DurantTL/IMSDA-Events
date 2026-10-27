@@ -12,6 +12,7 @@ import { moduleStatesByEvent } from "@/modules/event-modules/service";
 import { staffClubFormsAccess } from "@/modules/club-forms/access";
 import { countWaitingNewClubApplications } from "@/modules/club-applications/repository";
 import { eventsNeedingModuleState } from "@/modules/event-modules/shell-scope";
+import { countEventsAdminWaiting } from "@/modules/events/events-admin-home-repository";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
@@ -56,7 +57,11 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
     adminRoleView.roles.clubsAdministrator,
   ).isStaff;
   const adminRoleCounts: AdminRoleCounts = {};
+  const eventAdminEventIds = adminRoleView.roles.eventAdminEventIds;
   await Promise.all([
+    eventAdminEventIds.length > 0
+      ? countEventsAdminWaiting(eventAdminEventIds, new Date()).then((count) => { adminRoleCounts.EVENTS_ADMIN = count; }).catch(() => undefined)
+      : undefined,
     adminRoleView.roles.clubsAdministrator
       ? countWaitingNewClubApplications("CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
       : undefined,

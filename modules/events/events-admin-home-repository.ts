@@ -4,7 +4,7 @@ import { getPrisma } from "@/lib/prisma";
 import { findDashboardEvents, toDashboardEventSource } from "@/modules/system-admin/repository";
 import { failedEmailWheres } from "@/modules/system-admin/email-problem-filters";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
-import type { EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
+import { buildEventsAdminHome, type EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
 
 /**
  * The Events Administrator dashboard's read (#1227). `eventIds` must come from `resolveAdminRoles(user).eventAdminEventIds`
@@ -42,4 +42,13 @@ export async function getEventsAdminEventSources(eventIds: readonly string[], no
     draftRegistrationCount: byId.get(row.id)?._count.registrations ?? 0,
     failedEmailCount: failedByEvent.get(row.id) ?? 0,
   }));
+}
+
+/**
+ * What the Events Administrator pill counts (#1245): the dashboard's "Need attention" total, from the same read and the
+ * same model, so the pill and the page cannot disagree. `eventIds` is the signed-in person's own
+ * `resolveAdminRoles(user).eventAdminEventIds`. Callers leave the count off when this throws, never show it as zero.
+ */
+export async function countEventsAdminWaiting(eventIds: readonly string[], now = new Date()): Promise<number> {
+  return buildEventsAdminHome(await getEventsAdminEventSources(eventIds, now), now).counts.needAttention;
 }
