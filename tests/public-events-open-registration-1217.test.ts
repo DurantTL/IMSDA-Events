@@ -257,11 +257,25 @@ describe("featured events on /events (#1218)", () => {
   });
 
   it("does not add a featured event the filter or the open-registration rules leave out", async () => {
-    mocks.listPublicCalendarItems.mockResolvedValue([item("a")]);
-    mocks.listFeaturedEventRows.mockResolvedValue([row("closed")]);
-    const html = await render();
-    expect(html).not.toContain("closed");
+    mocks.listPublicCalendarItems.mockResolvedValue([
+      item("a", { clubEvent: true }),
+      item("shut", { registrationOpen: false, registrationStatus: "CLOSED" }),
+      item("public"),
+    ]);
+    mocks.listFeaturedEventRows.mockResolvedValue([row("shut"), row("public")]);
+    const html = await render("clubs");
+    expect(html).toContain("Fictitious a Weekend");
+    expect(html).not.toContain("Fictitious shut");
+    expect(html).not.toContain("Fictitious public");
     expect(html).not.toContain("open-events-featured");
+  });
+
+  it("names the pin in the link for screen readers, not only in the visible label", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item("a")]);
+    mocks.listFeaturedEventRows.mockResolvedValue([row("a")]);
+    const html = await render();
+    expect(html).toContain('<p aria-hidden="true" class="open-events-featured">Featured</p>');
+    expect(html).toContain('<span class="sr-only">Featured: </span>Fictitious a Weekend</a>');
   });
 });
 

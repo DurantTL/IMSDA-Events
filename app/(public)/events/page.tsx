@@ -52,8 +52,8 @@ function EventCard({ item, directsClub, featured }: { item: CalendarItem; direct
   const open = item.registrationStatus === "OPEN" || item.registrationStatus === "WAITLIST";
   return (
     <li className="open-events-card">
-      {featured && <p className="open-events-featured">Featured</p>}
-      <h3><Link href={item.href!}>{item.eventTitle ?? item.title}</Link></h3>
+      {featured && <p aria-hidden="true" className="open-events-featured">Featured</p>}
+      <h3><Link href={item.href!}>{featured && <span className="sr-only">Featured: </span>}{item.eventTitle ?? item.title}</Link></h3>
       <p className="calendar-agenda-meta">
         <span><CalendarDays size={14} aria-hidden="true" /> {formatDateRange(item.eventStartsOn ?? item.startsOn, item.eventEndsOn ?? item.endsOn)}</span>
         {item.location && <span><MapPin size={14} aria-hidden="true" /> {item.location}</span>}
