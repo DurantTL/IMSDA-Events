@@ -32,7 +32,8 @@ export async function getRequiredFormsStatus(clubYear: string, organizationIds?:
   const [memberRows, submissionRows] = await Promise.all([
     needsMembers
       ? prisma.clubRosterMember.findMany({
-        where: { organizationId: { in: clubIds }, clubYear, status: "ACTIVE" },
+        // Members with no linked person are left out, matching the roster choices a director can send a link for.
+        where: { organizationId: { in: clubIds }, clubYear, status: "ACTIVE", personId: { not: null } },
         select: { id: true, organizationId: true, attendeeType: true, person: { select: { firstName: true, lastName: true } } },
       })
       : Promise.resolve([]),

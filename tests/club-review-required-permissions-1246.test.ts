@@ -103,6 +103,13 @@ describe("what is passed through", () => {
     expect(mocks.setClubReportReviewed).not.toHaveBeenCalled();
   });
 
+  it("answers malformed JSON with a 400, not a 500", async () => {
+    signInAs("clubsAdmin");
+    const bad = new Request("https://events.imsda.test/api", { method: "PUT", headers: { "content-type": "application/json", origin: "https://events.imsda.test" }, body: "{not json" });
+    expect((await reviewRoute(bad, { params: Promise.resolve({ organizationId: "club-1", month: "2026-10" }) })).status).toBe(400);
+    expect(mocks.setClubReportReviewed).not.toHaveBeenCalled();
+  });
+
   it("rejects a month that is not a report month", async () => {
     signInAs("clubsAdmin");
     const response = await reviewRoute(json({ reviewed: true }), { params: Promise.resolve({ organizationId: "club-1", month: "nope" }) });

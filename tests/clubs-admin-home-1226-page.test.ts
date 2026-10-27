@@ -109,7 +109,7 @@ describe("what it shows", () => {
     expect(html).toContain("Only registered clubs count toward an event&#x27;s total.");
     expect(html).toContain("Monthly records to review");
     expect(html).toContain("Clubs with forms missing");
-    expect(html).toContain("/admin/clubs/forms-missing?year=2026-27");
+    expect(html).toContain("/admin/club-forms?view=missing&amp;year=2026-27");
     expect(html).toContain("/admin/clubs/reports?year=2026-27&amp;month=2026-10&amp;review=to-review");
     expect(html).toContain(`name="year"`);
   });

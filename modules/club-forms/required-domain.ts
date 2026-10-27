@@ -113,8 +113,8 @@ export function clubsWithFormsMissing(results: readonly ClubRequiredForms[]) {
     .filter((club) => club.items.length > 0);
 }
 
-export const CLUBS_FORMS_MISSING_PATH = "/admin/clubs/forms-missing";
+export const CLUBS_FORMS_MISSING_PATH = "/admin/club-forms";
 
 export function clubsFormsMissingHref(clubYear: string) {
-  return `${CLUBS_FORMS_MISSING_PATH}?year=${encodeURIComponent(clubYear)}`;
+  return `${CLUBS_FORMS_MISSING_PATH}?view=missing&year=${encodeURIComponent(clubYear)}`;
 }

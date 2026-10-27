@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** #1246: the list page behind "Clubs with forms missing": its gate, and that it shows exactly the clubs the card counts. Synthetic data only. */
+/** #1246: the Club forms page's missing view behind "Clubs with forms missing": its gate, and that it shows exactly the clubs the card counts. Synthetic data only. */
 const mocks = vi.hoisted(() => ({ getCurrentSession: vi.fn(), hasClubsAdministration: vi.fn(), getRequiredFormsStatus: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); } }));
@@ -10,7 +10,7 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/access/admin-roles", () => ({ hasClubsAdministration: mocks.hasClubsAdministration }));
 vi.mock("@/modules/club-forms/required", () => ({ getRequiredFormsStatus: mocks.getRequiredFormsStatus }));
 
-import ClubsFormsMissingPage from "@/app/(workspace)/admin/clubs/forms-missing/page";
+import ClubsFormsMissingPage from "@/app/(workspace)/admin/club-forms/page";
 import { clubsWithFormsMissing } from "@/modules/club-forms/required-domain";
 import { buildClubsAdminHome } from "@/modules/club-reports/clubs-admin-home-model";
 
@@ -20,7 +20,7 @@ const status = [
   { id: "c2", name: "Beta Pathfinders", church: "", items: [item({ status: "DONE" })] },
   { id: "c3", name: "Gamma Pathfinders", church: "", items: [item({})] },
 ];
-const render = async (year?: string) => renderToStaticMarkup(await ClubsFormsMissingPage({ searchParams: Promise.resolve({ year }) }));
+const render = async (year?: string) => renderToStaticMarkup(await ClubsFormsMissingPage({ searchParams: Promise.resolve({ view: "missing", year }) }));
 
 beforeEach(() => {
   vi.clearAllMocks();

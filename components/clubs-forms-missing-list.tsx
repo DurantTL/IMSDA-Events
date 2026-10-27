@@ -1,31 +1,13 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { cardCell } from "@/components/table-card-labels";
-import { hasClubsAdministration } from "@/modules/access/admin-roles";
-import { getCurrentSession } from "@/modules/access/current-session";
-import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { getRequiredFormsStatus } from "@/modules/club-forms/required";
-import { clubsWithFormsMissing, requirementSummary } from "@/modules/club-forms/required-domain";
-import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
-
-export const metadata: Metadata = { title: "Clubs with forms missing" };
-export const dynamic = "force-dynamic";
+import { requirementSummary, type ClubRequiredForms } from "@/modules/club-forms/required-domain";
 
 /**
- * The clubs behind the dashboard's "Clubs with forms missing" card (#1246): every active club missing at least one
- * required form in the club year, and what each is missing. Counts only for per-member forms, never names. It reads
- * `getRequiredFormsStatus` and `clubsWithFormsMissing`, the same as the card, so the two always agree.
+ * The clubs behind the dashboard's "Clubs with forms missing" card (#1246), shown as a view of Admin → Club forms.
+ * `clubs` is `clubsWithFormsMissing(...)`, the same list the card counts. Counts only for members, never names.
  */
-export default async function ClubsFormsMissingPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
-  const { user } = await getCurrentSession();
-  if (!user) redirect(await staffLoginRedirectPath());
-  if (!(await hasClubsAdministration(user))) redirect("/no-access");
-  const { year } = await searchParams;
-  const clubYear = resolveAreaClubYear(year, new Date());
-  const clubs = clubsWithFormsMissing(await getRequiredFormsStatus(clubYear));
-
+export function ClubsFormsMissingList({ clubs, clubYear }: { clubs: ClubRequiredForms[]; clubYear: string }) {
   return (
     <section className="page-stack">
       <BackLink href={`/admin/clubs?year=${encodeURIComponent(clubYear)}`} variant="staff">Back to club administration</BackLink>
@@ -34,7 +16,7 @@ export default async function ClubsFormsMissingPage({ searchParams }: { searchPa
         <h2 id="forms-missing-heading">Clubs with forms missing</h2>
         <p className="field-help" data-testid="forms-missing-count">
           {clubs.length} {clubs.length === 1 ? "club is" : "clubs are"} missing a required form. A form counts as done when the club has a submitted entry for the club year.
-          Set which forms are required under <Link href="/admin/club-forms">Club forms</Link>.
+          Set which forms are required in <Link href="/admin/club-forms">Club forms</Link>.
         </p>
         {clubs.length === 0 ? (
           <p className="report-empty">No club is missing a required form.</p>

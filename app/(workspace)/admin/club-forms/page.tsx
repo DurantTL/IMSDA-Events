@@ -3,6 +3,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClubsFormsMissingList } from "@/components/clubs-forms-missing-list";
 import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormFillMode } from "@/components/club-form-fill-mode";
@@ -12,6 +13,9 @@ import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getServerEnv } from "@/lib/env";
+import { getRequiredFormsStatus } from "@/modules/club-forms/required";
+import { clubsWithFormsMissing } from "@/modules/club-forms/required-domain";
+import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { listClosedOpenApplicationKeys } from "@/modules/club-forms/open-applications";
 import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
@@ -26,10 +30,15 @@ export const dynamic = "force-dynamic";
  * that was filled in is deleted. Each form can be edited in the builder, and new
  * forms created there (#712).
  */
-export default async function AdminClubFormsPage() {
+export default async function AdminClubFormsPage({ searchParams }: { searchParams: Promise<{ view?: string; year?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
+  // ?view=missing (#1246): the clubs behind the dashboard's "Clubs with forms missing" card, same gate as this page.
+  const { view, year } = await searchParams;
+  if (view === "missing") {
+    return <ClubsFormsMissingList clubYear={resolveAreaClubYear(year)} clubs={clubsWithFormsMissing(await getRequiredFormsStatus(resolveAreaClubYear(year)))} />;
+  }
   const templates = await listClubFormTemplatesForAdmin();
   const closedKeys = await listClosedOpenApplicationKeys();
   const clubYear = clubYearFor(new Date());

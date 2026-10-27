@@ -132,6 +132,7 @@ const slipAnswers = {
 };
 
 async function main() {
+  const reqAuditSince = new Date();
   const templates = await import("../modules/club-forms/templates");
   const submissions = await import("../modules/club-forms/submissions");
   const links = await import("../modules/club-forms/links");
@@ -914,7 +915,7 @@ async function main() {
   await templates.syncClubFormTemplates();
   const afterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } });
   assert(afterSync.requirement === "PER_ROLE_MEMBER_YEAR" && afterSync.requiredRoles.join(",") === "YOUTH,STAFF", "the sync leaves the Required setting alone");
-  assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_REQUIREMENT_CHANGED", entityId: requiredRow.id, actorUserId: users.sysAdmin } }) === 1, "changing Required is audited");
+  assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_REQUIREMENT_CHANGED", entityId: requiredRow.id, actorUserId: users.sysAdmin, createdAt: { gte: reqAuditSince } } }) === 1, "changing Required is audited");
   await templates.setClubFormTemplateRequirement(CAN_COLLECTING, { requirement: "ONCE_PER_CLUB_YEAR", requiredRoles: ["STAFF"] }, users.sysAdmin);
   assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } })).requiredRoles.length === 0, "roles are dropped for a once-per-club requirement");
   await prisma.clubFormTemplate.update({ where: { key: CAN_COLLECTING }, data: { requirement: "NOT_REQUIRED", requiredRoles: [], requirementChangedAt: null, requirementChangedByUserId: null } });

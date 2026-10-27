@@ -105,7 +105,7 @@ describe("what each club is missing", () => {
     const home = buildClubsAdminHome({ clubYear: "2026-27", now: new Date("2026-10-26T18:00:00Z"), clubs: [], events: [], applications: [], waitingCount: 0, requiredForms: result });
     expect(home.counts.clubsWithFormsMissing).toBe(missing.length);
     expect(clubsAdminHrefs("2026-27").formsMissing).toBe(clubsFormsMissingHref("2026-27"));
-    expect(clubsFormsMissingHref("2026-27")).toBe("/admin/clubs/forms-missing?year=2026-27");
+    expect(clubsFormsMissingHref("2026-27")).toBe("/admin/club-forms?view=missing&year=2026-27");
   });
 
   it("nothing is missing when nothing is required", () => {

@@ -6861,12 +6861,6 @@ enum ClubFormLinkStatus {
   REVOKED
 }
 
-/// A conference-managed club form (#610): forms that are not tied to an event
-/// (membership application, staff service form, permission slip, passenger
-/// list). `definition` is validated by the registration-form definition
-/// schema, so the builder's field types and validation apply. Every template
-/// is off (`enabled = false`) until a system administrator turns it on, and
-/// clubs never see a disabled one. Sensitive fields are marked per field key.
 /// Whether a club form is required (#1246): not at all, once per club each club year, or once for each member of the
 /// chosen roster types each club year. Done means a SUBMITTED ClubFormSubmission in that club year.
 enum ClubFormRequirement {
@@ -6875,6 +6869,12 @@ enum ClubFormRequirement {
   PER_ROLE_MEMBER_YEAR
 }
 
+/// A conference-managed club form (#610): forms that are not tied to an event
+/// (membership application, staff service form, permission slip, passenger
+/// list). `definition` is validated by the registration-form definition
+/// schema, so the builder's field types and validation apply. Every template
+/// is off (`enabled = false`) until a system administrator turns it on, and
+/// clubs never see a disabled one. Sensitive fields are marked per field key.
 model ClubFormTemplate {
   id                 String    @id @default(cuid())
   key                String    @unique

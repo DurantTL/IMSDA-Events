@@ -153,7 +153,7 @@ export async function saveClubReport(
     if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
     const existing = await tx.clubMonthlyReport.findUnique({
       where: { organizationId_reportMonth: { organizationId, reportMonth } },
-      select: { id: true, status: true, firstSubmittedAt: true, submittedAt: true, totalPoints: true, onTimePoints: true },
+      select: { id: true, status: true, firstSubmittedAt: true, submittedAt: true, totalPoints: true, onTimePoints: true, reviewedAt: true },
     });
     // A staff "act as" director (#442) gets exactly the club's rules — never
     // the conference office's power to change a report after its due date.
@@ -219,6 +219,7 @@ export async function saveClubReport(
         ...(existing?.status === "SUBMITTED"
           ? { previousTotalPoints: existing.totalPoints, previousOnTimePoints: existing.onTimePoints }
           : {}),
+        ...(existing?.reviewedAt ? { reviewCleared: true } : {}),
         ...(!isClub && pastDue && input.status === "SUBMITTED" && existing?.firstSubmittedAt && existing.status === "DRAFT"
           ? { resubmittedAfterDueDate: true }
           : {}),
@@ -245,7 +246,7 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
     if (!club || club.type !== "CLUB") throw new ClubReportError("CLUB_NOT_FOUND", "That club could not be found.");
     const existing = await tx.clubMonthlyReport.findUnique({
       where: { organizationId_reportMonth: { organizationId, reportMonth } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, reviewedAt: true },
     });
     if (!existing) throw new ClubReportError("CLUB_REPORT_NOT_FOUND", "That report could not be found.");
     if (existing.status !== "SUBMITTED") throw new ClubReportError("CLUB_REPORT_NOT_SUBMITTED", "This report is already a draft.");
@@ -268,6 +269,7 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
         reportId: saved.id,
         totalPoints: saved.totalPoints,
         onTimePoints: saved.onTimePoints,
+        ...(existing.reviewedAt ? { reviewCleared: true } : {}),
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : actor.actAsId ? { actAsId: actor.actAsId } : {}),
       },
     }, tx);

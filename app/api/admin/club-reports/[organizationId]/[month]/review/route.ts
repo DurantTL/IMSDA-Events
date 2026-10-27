@@ -16,7 +16,13 @@ async function putHandler(request: Request, context: { params: Promise<{ organiz
     const actor = await requireClubsAdministration();
     const { organizationId, month } = await context.params;
     if (!isReportMonth(month)) return Response.json({ error: "CLUB_REPORT_MONTH_INVALID", message: "That month isn't valid." }, { status: 400 });
-    const { reviewed } = reviewSchema.parse(await request.json());
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "INVALID_CLUB_REPORT", message: "Send a JSON request body." }, { status: 400 });
+    }
+    const { reviewed } = reviewSchema.parse(body);
     return Response.json(await setClubReportReviewed(organizationId, month, reviewed, actor.id), { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {
     return clubReportApiError(error, "Marking a Monthly Record reviewed");
