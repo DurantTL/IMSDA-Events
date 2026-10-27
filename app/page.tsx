@@ -3,12 +3,14 @@ import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
-import { eventTransitionNames } from "@/modules/events/view-transition";
-import { AgendaItem } from "@/components/calendar-agenda-item";
+import { eventSlugFromHref, eventTransitionNames } from "@/modules/events/view-transition";
+import { EventPhotoCard, eventCardImage } from "@/components/event-photo-card";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, firstPerSeries } from "@/modules/calendar/domain";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
+import { homeFeaturedLimit, featuredItemsFor, withoutFeatured } from "@/modules/events/featured-domain";
+import { listEventCardImages, listFeaturedEventRows } from "@/modules/events/featured";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +29,21 @@ const upcomingLimit = 6;
  */
 export default async function Home() {
   const today = conferenceToday();
-  const [items, attendee] = await Promise.all([
+  const [items, attendee, featuredRows] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, 365)),
     getCurrentAttendee(),
+    listFeaturedEventRows(today, homeFeaturedLimit),
   ]);
-  const upcoming = firstPerSeries(items).slice(0, upcomingLimit);
-  const cardNames = eventTransitionNames(upcoming);
+  // Featured events lead the page as larger cards (#1218) and are left out of "Coming up", so no card shows twice.
+  const featured = featuredItemsFor(items, featuredRows);
+  const upcoming = withoutFeatured(firstPerSeries(items), featured).slice(0, upcomingLimit);
+  const cardImages = await listEventCardImages([...featured, ...upcoming].flatMap((item) => {
+    const slug = eventSlugFromHref(item.href);
+    return slug ? [slug] : [];
+  }));
+  const usedNames = new Set<string>();
+  const featuredNames = eventTransitionNames(featured, usedNames);
+  const cardNames = eventTransitionNames(upcoming, usedNames);
   const signedInName = attendee.account?.displayName || attendee.account?.verifiedEmail;
 
   return (
@@ -55,12 +66,28 @@ export default async function Home() {
       </section>
 
       <div className="calendar-layout">
-        <section aria-labelledby="home-upcoming-heading" className="calendar-agenda">
-          <h2 id="home-upcoming-heading">Coming up</h2>
+        {featured.length > 0 && (
+          <section aria-labelledby="home-featured-heading" className="event-featured">
+            <h2 id="home-featured-heading">Featured</h2>
+            <ul aria-labelledby="home-featured-heading" className="event-featured-list">
+              {featured.map((item) => (
+                <EventPhotoCard image={eventCardImage(item, cardImages)} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section aria-labelledby="home-upcoming-heading" className="calendar-agenda event-photo-strip">
+          <div className="event-photo-strip-head">
+            <h2 id="home-upcoming-heading">Coming up</h2>
+            <Link className="event-photo-see-all" href="/calendar?view=list">See all <ChevronRight size={16} aria-hidden="true" /></Link>
+          </div>
           {upcoming.length === 0 ? (
-            <p className="calendar-empty">Nothing is on the calendar yet. Check back soon.</p>
+            <p className="calendar-empty">{featured.length > 0 ? "Everything coming up is featured above." : "Nothing is on the calendar yet. Check back soon."}</p>
           ) : (
-            <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} transitionName={cardNames.get(item.key)} />)}</ul>
+            <ul aria-labelledby="home-upcoming-heading" className="event-photo-list">
+              {upcoming.map((item) => <EventPhotoCard image={eventCardImage(item, cardImages)} item={item} key={item.key} transitionName={cardNames.get(item.key)} />)}
+            </ul>
           )}
           <p className="home-more">
             <Link className="primary-button home-calendar-button" href="/calendar?view=list">

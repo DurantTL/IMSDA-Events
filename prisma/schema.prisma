@@ -1704,6 +1704,12 @@ model Event {
   /// Published events appear on the public conference calendar unless a
   /// system administrator hides them there (#107). Unpublished events never do.
   showOnCalendar       Boolean            @default(true)
+  /// Staff pin the event to the top of the public homepage and calendar (#1218). Only counts while the event is published,
+  /// shown on the calendar and not archived; `featuredOrder` 1 shows first; `featureUntil` (a YYYY-MM-DD date, last day
+  /// featured) falls back to the event's start date when empty.
+  featured             Boolean            @default(false)
+  featuredOrder        Int?
+  featureUntil         String?
   /// Short label for filtering the public calendar, e.g. "Youth" or "Camp meeting".
   calendarCategory     String?
   /// Set when staff archive the event (#635): hidden from pickers, default selection and every public page, and registration

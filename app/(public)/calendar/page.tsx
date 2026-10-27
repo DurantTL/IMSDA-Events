@@ -13,6 +13,10 @@ import { calendarBarIntroDelay } from "@/components/calendar-motion-helpers";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import { CalendarPanelItem } from "@/components/calendar-panel-item";
 import { eventTransitionNames } from "@/modules/events/view-transition";
+import { EventPhotoCard, eventCardImage } from "@/components/event-photo-card";
+import { eventSlugFromHref } from "@/modules/events/view-transition";
+import { featuredItemsFor, withoutFeatured } from "@/modules/events/featured-domain";
+import { listEventCardImages, listFeaturedEventRows } from "@/modules/events/featured";
 import {
   calendarCategories,
   calendarItemTone,
@@ -102,8 +106,17 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   // View-transition names must be unique on the page (#1208): in month view the day panel is named first, then the month
   // agenda skips events already named; the list view names its own list.
   const usedTransitionNames = new Set<string>();
+  // The list view pins featured events above the list (#1218), in the chosen category, and leaves them out of the list
+  // below so no card shows twice. The month view is unchanged.
+  const featuredItems = view === "list" ? featuredItemsFor(items, await listFeaturedEventRows(today)) : [];
+  const featuredImages = await listEventCardImages(featuredItems.flatMap((item) => {
+    const slug = eventSlugFromHref(item.href);
+    return slug ? [slug] : [];
+  }));
+  const featuredNames = eventTransitionNames(featuredItems, usedTransitionNames);
+  const listItems = withoutFeatured(firstPerSeries(items), featuredItems);
   const panelNames = eventTransitionNames(view === "month" ? sortCalendarItems(selectedItems) : [], usedTransitionNames);
-  const agendaNames = eventTransitionNames(view === "month" ? monthItems : firstPerSeries(items), usedTransitionNames);
+  const agendaNames = eventTransitionNames(view === "month" ? monthItems : listItems, usedTransitionNames);
   // A day (or a bar, or "+N more") opens that day's panel; an adjacent-month day lands on its own month.
   const dayHrefFor = (date: string) => calendarHref(
     { view: "month", month: date.slice(0, 7) === currentMonthKey ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), category, date },
@@ -305,12 +318,24 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
           ) : items.length === 0 ? (
             <p className="calendar-empty">Nothing is on the calendar yet{category ? ` in ${category}` : ""}. Check back soon.</p>
           ) : (
-            groupByMonth(firstPerSeries(items), today).map(([key, group]) => (
+            <>
+            {featuredItems.length > 0 && (
+              <div className="event-featured">
+                <h3 id="calendar-featured-heading">Featured</h3>
+                <ul aria-labelledby="calendar-featured-heading" className="event-featured-list">
+                  {featuredItems.map((item) => (
+                    <EventPhotoCard image={eventCardImage(item, featuredImages)} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
+                  ))}
+                </ul>
+              </div>
+            )}
+            {groupByMonth(listItems, today).map(([key, group]) => (
               <div className="calendar-agenda-group" key={key}>
                 <h3 className="calendar-agenda-month">{monthLabel(parseMonthParam(key, today))}</h3>
                 <ul className="calendar-agenda-list">{group.map((item) => <AgendaItem item={item} key={item.key} transitionName={agendaNames.get(item.key)} />)}</ul>
               </div>
-            ))
+            ))}
+            </>
           )}
         </section>
 

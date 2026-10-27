@@ -45,6 +45,9 @@ export function draftFromEvent(event: EventSettingsRecord | null): EventSettings
     seminarPreferenceClosesOn: event?.seminarPreferenceClosesOn ?? null,
     seminarPreferenceSelfServiceLocked:
       event?.seminarPreferenceSelfServiceLocked ?? false,
+    featured: event?.featured ?? false,
+    featuredOrder: event?.featuredOrder ?? null,
+    featureUntil: event?.featureUntil ?? null,
     waitlistEnabled: event?.waitlistEnabled ?? false,
     autoPromoteWaitlist: event?.waitlistEnabled
       ? (event.autoPromoteWaitlist ?? false)
@@ -69,6 +72,8 @@ export function eventSettingsRequestBody(draft: EventSettingsInput) {
     registrationClosesOn: draft.registrationClosesOn || null,
     paymentDueOn: draft.paymentDueOn || null,
     capacity: draft.capacity || null,
+    featuredOrder: draft.featuredOrder || null,
+    featureUntil: draft.featureUntil || null,
   };
 }
 

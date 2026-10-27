@@ -32,6 +32,11 @@ vi.mock("@/modules/calendar/repository", () => ({
   listPublicCalendarItems: async () => items,
 }));
 
+vi.mock("@/modules/events/featured", () => ({
+  listFeaturedEventRows: async () => [],
+  listEventCardImages: async () => new Map(),
+}));
+
 afterEach(() => vi.useRealTimers());
 
 async function render(searchParams: Record<string, string>) {
