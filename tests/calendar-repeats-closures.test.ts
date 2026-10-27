@@ -159,6 +159,12 @@ describe("closure rendering", () => {
     expect(html).toContain("Conference date");
     expect(html).not.toContain("calendar-closure");
   });
+
+  it("asks a full event with a waitlist to join the waitlist, as its event page does (#1205)", () => {
+    const html = renderToStaticMarkup(createElement(AgendaItem, { item: item({ kind: "EVENT", href: "/events/retreat", registrationOpen: true, registrationStatus: "WAITLIST" }) }));
+    expect(html).toContain("Join the waitlist");
+    expect(html).not.toContain(">Register<");
+  });
 });
 
 describe("lists and the month view", () => {

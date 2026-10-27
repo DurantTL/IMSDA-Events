@@ -25,7 +25,7 @@ import { CalendarPanelItem } from "@/components/calendar-panel-item";
 import type { CalendarItem } from "@/modules/calendar/domain";
 import { listPublicCalendarItems } from "@/modules/calendar/repository";
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
-import { resolvePublicRegistrationState } from "@/modules/events/public-registration-status";
+import { resolvePublicCapacityStatus } from "@/modules/events/public-registration-status";
 
 const validDefinition = {
   title: "Registration",
@@ -80,17 +80,19 @@ async function calendarFor(events: unknown[], occupied: Record<string, number> =
 
 describe("the capacity-aware public registration state (#1215)", () => {
   it("full with a waitlist, full without, and open with seats", () => {
-    expect(resolvePublicRegistrationState("OPEN", true, 0, true)).toBe("WAITLIST");
-    expect(resolvePublicRegistrationState("OPEN", true, 0, false)).toBe("FULL");
-    expect(resolvePublicRegistrationState("OPEN", true, 3, false)).toBe("OPEN");
-    expect(resolvePublicRegistrationState("OPEN", true, null, false)).toBe("OPEN");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: 0, waitlistEnabled: true })).toBe("WAITLIST");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: 0, waitlistEnabled: false })).toBe("FULL");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: 3, waitlistEnabled: false })).toBe("OPEN");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: null, waitlistEnabled: false })).toBe("OPEN");
   });
 
   it("checks full before forms, and leaves other phases alone", () => {
-    expect(resolvePublicRegistrationState("OPEN", false, 0, false)).toBe("FULL");
-    expect(resolvePublicRegistrationState("OPEN", false, 2, false)).toBe("OPENING_SOON");
-    expect(resolvePublicRegistrationState("UPCOMING", true, 0, true)).toBe("UPCOMING");
-    expect(resolvePublicRegistrationState("CLOSED", true, 0, true)).toBe("CLOSED");
+    expect(resolvePublicCapacityStatus("OPEN", false, { remaining: 0, waitlistEnabled: false })).toBe("FULL");
+    // A waitlist with no listed form has nothing to join yet.
+    expect(resolvePublicCapacityStatus("OPEN", false, { remaining: 0, waitlistEnabled: true })).toBe("FULL");
+    expect(resolvePublicCapacityStatus("OPEN", false, { remaining: 2, waitlistEnabled: false })).toBe("OPENING_SOON");
+    expect(resolvePublicCapacityStatus("UPCOMING", true, { remaining: 0, waitlistEnabled: true })).toBe("UPCOMING");
+    expect(resolvePublicCapacityStatus("CLOSED", true, { remaining: 0, waitlistEnabled: true })).toBe("CLOSED");
   });
 });
 
@@ -98,26 +100,32 @@ describe("the event page and the calendar agree on a full event (#1215)", () => 
   it("full event, waitlist on: waitlist on both", async () => {
     const event = eventRow("e1", { capacity: 5, waitlistEnabled: true });
     const items = await calendarFor([event], { e1: 5 });
-    expect(items.get("event-e1")).toMatchObject({ registrationOpen: true, registrationFull: "WAITLIST" });
+    expect(items.get("event-e1")).toMatchObject({ registrationOpen: true, registrationStatus: "WAITLIST" });
     expect(describePublicEventLifecycle(event as never, 5, now, true)).toMatchObject({ state: "WAITLIST", statusLabel: "Event full · waitlist open", ctaLabel: "Join the waitlist", ctaEnabled: true });
   });
 
   it("full event, no waitlist: full on both, and no Register", async () => {
     const event = eventRow("e1", { capacity: 5 });
     const items = await calendarFor([event], { e1: 5 });
-    expect(items.get("event-e1")).toMatchObject({ registrationOpen: false, registrationFull: "FULL" });
+    expect(items.get("event-e1")).toMatchObject({ registrationOpen: false, registrationStatus: "FULL" });
     expect(describePublicEventLifecycle(event as never, 5, now, true)).toMatchObject({ state: "FULL", statusLabel: "Event full", ctaEnabled: false });
   });
 
   it("seats left: open on both", async () => {
     const event = eventRow("e1", { capacity: 5 });
     const items = await calendarFor([event], { e1: 4 });
-    expect(items.get("event-e1")).toMatchObject({ registrationOpen: true, registrationFull: null });
+    expect(items.get("event-e1")).toMatchObject({ registrationOpen: true, registrationStatus: "OPEN" });
     expect(describePublicEventLifecycle(event as never, 4, now, true)).toMatchObject({ state: "OPEN", statusLabel: "Registration open", ctaEnabled: true });
   });
 
-  it("full with no listed form still reads full, as on the event page", () => {
+  it("full with no listed form offers nothing to click on either surface", async () => {
     expect(describePublicEventLifecycle(eventRow("e1", { capacity: 5 }) as never, 5, now, false)).toMatchObject({ state: "FULL", ctaEnabled: false });
+    expect(describePublicEventLifecycle(eventRow("e1", { capacity: 5, waitlistEnabled: true }) as never, 5, now, false)).toMatchObject({ statusLabel: "Event full", ctaEnabled: false });
+    mocks.eventFindMany.mockResolvedValue([eventRow("e1", { capacity: 5, waitlistEnabled: true })]);
+    mocks.formFindMany.mockResolvedValue([]);
+    mocks.attendeeGroupBy.mockResolvedValue([{ eventId: "e1", _count: { _all: 5 } }]);
+    const [item] = await listPublicCalendarItems("2027-02-01", "2027-02-28", now);
+    expect(item).toMatchObject({ registrationOpen: false, registrationStatus: "FULL" });
   });
 });
 
@@ -152,7 +160,7 @@ describe("one batched seat count for the calendar (#1215)", () => {
     mocks.formFindMany.mockResolvedValue([{ eventId: "e1", versions: [{ definition: validDefinition }] }]);
     mocks.attendeeGroupBy.mockResolvedValue([{ eventId: "e1", _count: { _all: 2 } }]);
     const items = await listPublicCalendarItems("2027-02-01", "2027-02-28", now);
-    expect(items.find((item) => item.key === "entry-entry-mo")).toMatchObject({ kind: "EVENT", registrationOpen: false, registrationFull: "FULL" });
+    expect(items.find((item) => item.key === "entry-entry-mo")).toMatchObject({ kind: "EVENT", registrationOpen: false, registrationStatus: "FULL" });
     expect(mocks.attendeeGroupBy).toHaveBeenCalledTimes(1);
   });
 });
@@ -165,29 +173,32 @@ describe("calendar item labels (#1215)", () => {
   const toneMap = new Map();
 
   it("open: Registration open and Register", () => {
-    const open = item({ registrationOpen: true });
+    const open = item({ registrationOpen: true, registrationStatus: "OPEN" });
     expect(renderToStaticMarkup(createElement(AgendaItem, { item: open }))).toMatch(/Registration open[\s\S]*Register/);
     expect(renderToStaticMarkup(createElement(CalendarPanelItem, { item: open, toneMap }))).toContain("Registration open");
   });
 
   it("waitlist: Event full, waitlist open and Join the waitlist as the primary button", () => {
-    const waitlist = item({ registrationOpen: true, registrationFull: "WAITLIST" });
+    const waitlist = item({ registrationOpen: true, registrationStatus: "WAITLIST" });
     const agenda = renderToStaticMarkup(createElement(AgendaItem, { item: waitlist }));
     expect(agenda).toContain("Event full · waitlist open");
     expect(agenda).toContain("Join the waitlist");
     expect(agenda).toContain("primary-button");
     expect(agenda).not.toContain("Registration open");
+    expect(agenda).not.toContain(">Register<");
     expect(renderToStaticMarkup(createElement(CalendarPanelItem, { item: waitlist, toneMap }))).toContain("Event full · waitlist open");
   });
 
-  it("full: Event full (not green) and Details as the secondary button", () => {
-    const full = item({ registrationFull: "FULL" });
+  it("full: Event full (not styled as open) and Details as the secondary button", () => {
+    const full = item({ registrationStatus: "FULL" });
     const agenda = renderToStaticMarkup(createElement(AgendaItem, { item: full }));
     expect(agenda).toContain("Event full");
-    expect(agenda).not.toContain("status-chip green");
+    expect(agenda).not.toContain("is-open");
     expect(agenda).toContain("Details");
     expect(agenda).toContain("secondary-button");
     expect(agenda).not.toContain("Register");
-    expect(renderToStaticMarkup(createElement(CalendarPanelItem, { item: full, toneMap }))).toContain("Event full");
+    const panel = renderToStaticMarkup(createElement(CalendarPanelItem, { item: full, toneMap }));
+    expect(panel).toContain("Event full");
+    expect(panel).not.toContain("status-chip green");
   });
 });

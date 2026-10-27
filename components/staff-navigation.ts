@@ -243,6 +243,7 @@ export const clubsAdminHealthImportHref = "/admin/clubs/health-import";
  * view, not a permission: each page and route checks the role itself.
  */
 export const clubsAdminNavigation: readonly NavigationItem[] = [
+  { href: "/admin/clubs", label: "Club administration", icon: LayoutDashboard },
   { href: "/admin/clubs/summary", label: "Clubs summary", icon: Tent },
   { href: "/admin/clubs/applications", label: "New clubs", icon: ClipboardPen },
   { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
@@ -257,10 +258,13 @@ export const clubsAdminNavigation: readonly NavigationItem[] = [
   { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", icon: ShieldCheck },
 ];
 
-/** The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. */
+/**
+ * The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. The dashboard,
+ * "/admin/clubs", is the parent of every club page, so it lights only on exactly that path.
+ */
 export function clubsAdminActiveHref(pathname: string): string | null {
   return clubsAdminNavigation.reduce<string | null>((best, item) => (
-    (pathname === item.href || pathname.startsWith(`${item.href}/`)) && (!best || item.href.length > best.length) ? item.href : best
+    (pathname === item.href || (item.href !== "/admin/clubs" && pathname.startsWith(`${item.href}/`))) && (!best || item.href.length > best.length) ? item.href : best
   ), null);
 }
 

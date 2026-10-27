@@ -20,9 +20,9 @@ import { feedLockKey } from "@/modules/calendar/feed-plan";
 import { importedFieldNames } from "@/modules/calendar/ics-import";
 import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarBulkRequest, CalendarEntryInput, CalendarEntryUpdate, CalendarEventSettings, CalendarRepeatInput } from "@/modules/calendar/schemas";
-import { evaluateEventRegistrationPhase, remainingEventCapacity } from "@/modules/events/lifecycle";
-import { countOccupiedSpotsByEvent, listEventIdsWithPublishedForms } from "@/modules/events/public-forms-repository";
-import { resolvePublicRegistrationState } from "@/modules/events/public-registration-status";
+import { activeRegistrationStatuses, evaluateEventRegistrationPhase, remainingEventCapacity } from "@/modules/events/lifecycle";
+import { listEventIdsWithPublishedForms } from "@/modules/events/public-forms-repository";
+import { resolvePublicCapacityStatus } from "@/modules/events/public-registration-status";
 
 export { CalendarError };
 
@@ -41,6 +41,7 @@ const publicEventSelect = {
   registrationClosesOn: true,
   waitlistEnabled: true,
   capacity: true,
+  audience: true,
 } as const;
 
 /** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
@@ -117,25 +118,37 @@ export async function listPublicCalendarItems(
       select: publicEventWithLinksSelect,
     })).map((event) => [event.id, event]));
   const standalone = entries.filter((entry) => !entry.linkedEventId || !publishedLinked.has(entry.linkedEventId));
-  // One batched check for every event shown: "Registration open" and Register need a published form (#1201), and
-  // a full event offers the waitlist or nothing (#1215). Seats are counted once, only for open events with a capacity.
-  const openEvents = [...new Map([...events, ...publishedLinked.values()]
-    .filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN")
-    .map((event) => [event.id, event])).values()];
-  const [withForms, occupied] = await Promise.all([
-    listEventIdsWithPublishedForms(openEvents.map((event) => event.id)),
-    countOccupiedSpotsByEvent(openEvents.filter((event) => event.capacity !== null && event.capacity !== undefined).map((event) => event.id)),
-  ]);
+  // One batched check for every event shown: "Registration open" and Register need a published form (#1201).
+  const withForms = await listEventIdsWithPublishedForms([...new Set([
+    ...events.filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
+    ...[...publishedLinked.values()].filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
+  ])]);
+  // Places taken, for open events with a capacity: one grouped query, counted exactly as the event page counts them (#1204).
+  const openWithCapacity = [...new Set([...events, ...publishedLinked.values()]
+    .filter((event) => event.capacity !== null && event.capacity !== undefined && evaluateEventRegistrationPhase(event, now) === "OPEN")
+    .map((event) => event.id))];
+  const occupiedByEvent = new Map<string, number>();
+  if (openWithCapacity.length > 0) {
+    const rows = await prisma.registrationAttendee.groupBy({
+      by: ["eventId"],
+      where: { eventId: { in: openWithCapacity }, registration: { status: { in: [...activeRegistrationStatuses] } } },
+      _count: { _all: true },
+    });
+    for (const row of rows) occupiedByEvent.set(row.eventId, row._count._all);
+  }
   const registrationFor = (event: PublicEventWithLinks) => {
-    const state = resolvePublicRegistrationState(
-      evaluateEventRegistrationPhase(event, now),
-      withForms.has(event.id),
-      remainingEventCapacity(event.capacity ?? null, occupied.get(event.id) ?? 0),
-      event.waitlistEnabled,
-    );
+    const phase = evaluateEventRegistrationPhase(event, now);
+    const formsListed = withForms.has(event.id);
+    const status = resolvePublicCapacityStatus(phase, formsListed, {
+      remaining: remainingEventCapacity(event.capacity ?? null, occupiedByEvent.get(event.id) ?? 0),
+      waitlistEnabled: event.waitlistEnabled,
+    });
     return {
-      registrationOpen: state === "OPEN" || state === "WAITLIST",
-      registrationFull: state === "WAITLIST" || state === "FULL" ? state : null,
+      // Register shows when it leads somewhere: open, or a waitlist to join. Not when the event is full.
+      registrationOpen: status === "OPEN" || status === "WAITLIST",
+      registrationStatus: status,
+      registrationOpensOn: event.registrationOpensOn,
+      clubEvent: event.audience === "CLUB",
     };
   };
   const registerItems = entries.flatMap((entry) => {

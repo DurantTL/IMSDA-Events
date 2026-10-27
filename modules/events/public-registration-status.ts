@@ -19,28 +19,6 @@ export function resolvePublicRegistrationStatus(
 }
 
 /**
- * The public status once capacity is known (#1215). WAITLIST: the event is full and takes waitlist
- * registrations. FULL: the event is full and does not.
- */
-export type PublicRegistrationState = PublicRegistrationStatus | "WAITLIST" | "FULL";
-
-/**
- * The single capacity-aware decision behind the event page, the homepage and the calendar. A full event is
- * checked before forms, as the event page always has: with no seats left it reads full (or waitlist) even if no
- * form is listed. `remainingSpots` is null when the event has no capacity limit.
- */
-export function resolvePublicRegistrationState(
-  phase: EventRegistrationPhase,
-  formsListed: boolean,
-  remainingSpots: number | null,
-  waitlistEnabled: boolean,
-): PublicRegistrationState {
-  if (phase !== "OPEN") return phase;
-  if (remainingSpots === 0) return waitlistEnabled ? "WAITLIST" : "FULL";
-  return resolvePublicRegistrationStatus(phase, formsListed);
-}
-
-/**
  * What staff dashboards call each public status (#1227, #1228). Both dashboards read the status from
  * `resolvePublicRegistrationStatus`, so an open event with no listed form says "Opens soon", the same as the public page.
  */
@@ -58,10 +36,63 @@ export function registrationStatusLabel(phase: EventRegistrationPhase, formsList
 
 /**
  * True for open dates with at least one listed form. Capacity, a full event and the waitlist are
- * not considered here (#1215): use `resolvePublicRegistrationState` for the public answer.
+ * handled separately (not part of #1201); this only answers the dates-plus-form question.
  */
 export function isPublicRegistrationOpen(phase: EventRegistrationPhase, formsListed: boolean) {
   return resolvePublicRegistrationStatus(phase, formsListed) === "OPEN";
+}
+
+/**
+ * The status a list or page shows once capacity is known: the dates-and-form status, or FULL / WAITLIST when the event's
+ * places are all taken (#1204). Full with a waitlist and a listed form is WAITLIST (joining is possible); without a listed
+ * form it is FULL, since there is nothing to join. The calendar and the event page both call this.
+ */
+export type PublicCapacityStatus = PublicRegistrationStatus | "FULL" | "WAITLIST";
+
+export function resolvePublicCapacityStatus(
+  phase: EventRegistrationPhase,
+  formsListed: boolean,
+  capacity: { remaining: number | null; waitlistEnabled: boolean },
+): PublicCapacityStatus {
+  if (phase === "OPEN" && capacity.remaining === 0) return capacity.waitlistEnabled && formsListed ? "WAITLIST" : "FULL";
+  return resolvePublicRegistrationStatus(phase, formsListed);
+}
+
+export const eventFullLabel = "Event full";
+export const eventWaitlistLabel = "Event full \u00b7 waitlist open";
+
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function conferenceYear(now: Date) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric" }).format(now));
+}
+
+/**
+ * The one plain-language status line the homepage, the calendar and the event page share (#1204, #1205). It comes
+ * from the status above, never from a second rule: "Registration open", "Registration opens in February",
+ * "Club registration opens in December", "Registration opening soon" (open dates, no listed form) and
+ * "Registration closed". The year is added only when the opening month falls in a later year than today's, so
+ * "in February" never reads as a month that has already passed.
+ */
+export function publicStatusLine(
+  { status, opensOn, isClubEvent = false }: { status: PublicCapacityStatus; opensOn?: string | null; isClubEvent?: boolean },
+  now = new Date(),
+): string {
+  const noun = isClubEvent ? "Club registration" : "Registration";
+  if (status === "OPEN") return "Registration open";
+  if (status === "WAITLIST") return eventWaitlistLabel;
+  if (status === "FULL") return eventFullLabel;
+  if (status === "OPENING_SOON") return "Registration opening soon";
+  if (status === "UPCOMING") {
+    const match = opensOn ? /^(\d{4})-(\d{2})-\d{2}$/.exec(opensOn) : null;
+    const month = match ? monthNames[Number(match[2]) - 1] : undefined;
+    if (!match || !month) return `${noun} opens soon`;
+    const year = Number(match[1]);
+    return `${noun} opens in ${month}${year > conferenceYear(now) ? ` ${year}` : ""}`;
+  }
+  // CLOSED and DRAFT: a draft is not public, so it reads as closed.
+  if (status === "CLOSED" || status === "DRAFT") return "Registration closed";
+  return "Registration closed";
 }
 
 /**

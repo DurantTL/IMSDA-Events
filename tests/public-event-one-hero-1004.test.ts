@@ -29,10 +29,8 @@ const landing = (contentSections: unknown[]) => ({
     audience: "GENERAL", dateLabel: "November 6 – 8, 2026", timeLabel: "Friday, 9:00 AM CST – Sunday, 12:00 PM CST",
   },
   lifecycle: {
-    phase: "OPEN", state: "OPEN", statusLabel: "Registration open", detail: "Choose a form.", ctaLabel: "Start registration",
-    ctaEnabled: true, ended: false, heroTagline: "Everything you need.", formsHeading: "Choose how you are registering",
-    emptyForms: { title: "Forms are being prepared", body: "Details are available now." },
-    availability: { heading: "Registration open", body: "Spots remain." }, remainingSpots: null,
+    phase: "OPEN", state: "OPEN", statusLabel: "Registration open", detail: "Choose a form.", ctaLabel: "Register", action: "REGISTER",
+    ctaEnabled: true, ended: false, formsHeading: "Choose how you are registering", remainingSpots: null,
   },
   forms: [],
   contentSections,
