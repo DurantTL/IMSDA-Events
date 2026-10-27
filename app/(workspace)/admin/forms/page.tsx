@@ -7,6 +7,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { loadFormsHub } from "@/modules/forms-hub/load";
 import { filterFormsHubRows, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "All forms" };
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path="/admin/forms" section="system" />
       <StaffPageHeader description="Club forms, general forms and every event's information forms in one place. Registration forms are built inside each event." />
       <section className="panel">
         <form action="/admin/forms" className="club-form-filter forms-hub-filter" method="get">

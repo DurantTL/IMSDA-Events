@@ -5,6 +5,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { EventTemplateOperationError, getEventTemplate } from "@/modules/event-templates/repository";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { EventTemplateEditor } from "@/components/event-template-editor";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Edit event template" };
 
@@ -22,6 +23,7 @@ export default async function EventTemplateEditorPage({
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path={`/admin/event-templates/${templateId}`} section="system" />
       <StaffPageHeader description={`Editing ${template.name}`} />
       <EventTemplateEditor initialTemplate={template} />
     </section>

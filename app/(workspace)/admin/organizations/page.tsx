@@ -6,6 +6,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { getOrganizationSummary, listSponsorOptions, listOrganizationsPage } from "@/modules/organizations/repository";
 import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Clubs and churches" };
 
@@ -43,6 +44,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
 
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/organizations" section="system" />
       <OrganizationDirectoryWorkspace
         tools={organizationTools(healthRecordsEnabled())}
         sponsorOptions={sponsorOptions}

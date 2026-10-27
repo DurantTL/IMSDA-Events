@@ -168,7 +168,8 @@ export function clubsAdminHrefs(clubYear: string) {
   };
 }
 
-export function clubsAdminTabs(clubYear: string, waitingApplications: number): ClubsAdminTab[] {
+/** The Clubs tabs. `waitingApplications` is left out on pages that do not count them (#1274), so the label has no count. */
+export function clubsAdminTabs(clubYear: string, waitingApplications?: number): ClubsAdminTab[] {
   const href = clubsAdminHrefs(clubYear);
   return [
     { key: "overview", label: "Overview", href: href.overview },
@@ -177,7 +178,7 @@ export function clubsAdminTabs(clubYear: string, waitingApplications: number): C
     { key: "points", label: "Points", href: href.points },
     { key: "club-events", label: "Club events", href: href.clubEvents },
     { key: "forms", label: "Forms", href: href.forms },
-    { key: "new-clubs", label: `New clubs (${waitingApplications})`, href: href.applications },
+    { key: "new-clubs", label: waitingApplications === undefined ? "New clubs" : `New clubs (${waitingApplications})`, href: href.applications },
   ];
 }
 

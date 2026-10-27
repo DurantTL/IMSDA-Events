@@ -16,10 +16,9 @@ import {
   buildClubsAdminHome,
   clubYearOptions,
   clubsAdminHrefs,
-  clubsAdminTabs,
 } from "@/modules/club-reports/clubs-admin-home-model";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
-import { DashboardTabs } from "@/components/dashboard-tabs";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { cardCell } from "@/components/table-card-labels";
 import styles from "./admin-clubs.module.css";
 
@@ -52,13 +51,12 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, requiredForms, query });
   const { counts, nextEvent, registeredClubs } = home;
   const href = clubsAdminHrefs(clubYear);
-  const tabs = clubsAdminTabs(clubYear, counts.waitingApplications);
   const canOpenEvent = nextEvent !== null && (user.globalRole === "SYSTEM_ADMIN" || roles.eventAdminEventIds.includes(nextEvent.id));
   const eventParam = nextEvent ? encodeURIComponent(nextEvent.id) : "";
 
   return (
     <section className={`page-stack ${styles.workspace}`}>
-      <DashboardTabs label="Club administration sections" tabs={tabs} currentKey="overview" />
+      <AdminSectionHeaderFor path="/admin/clubs" section="clubs" clubYear={clubYear} waitingApplications={counts.waitingApplications} />
 
       <section className={styles.hero} aria-labelledby="clubs-admin-heading">
         <p className="eyebrow">All clubs and applications</p>

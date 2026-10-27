@@ -59,13 +59,14 @@ describe("back buttons that repeat the sidebar or More are gone", () => {
     expect(hrefs).toContain("/admin/organizations");
   });
 
-  it("keeps a back link on admin sub-pages that have no sidebar entry, through the shared BackLink", () => {
+  it("keeps a back link on admin sub-pages that have no sidebar entry, through the section header (#1274)", () => {
     for (const file of [
       "app/(workspace)/admin/clubs/import/page.tsx", "app/(workspace)/admin/clubs/invites/page.tsx", "app/(workspace)/admin/organizations/directory/page.tsx",
       "app/(workspace)/admin/organizations/import/page.tsx", "app/(workspace)/admin/club-forms/[templateKey]/page.tsx",
     ]) {
       const source = read(file);
-      expect(source, file).toContain("<BackLink");
+      // The back link is drawn by the section header (#1274), which keeps it in the active section.
+      expect(source, file).toMatch(/<AdminPageHeader|<AdminSectionHeaderFor/);
       expect(source, file).not.toContain("more-back-link");
     }
   });

@@ -262,13 +262,14 @@ export function nextEventNote(events: ReadonlyArray<{ timing: "UPCOMING" | "IN_P
 
 export type HomeTab = { key: string; label: string; href: string };
 
-/** The top tabs (#1228). Events and System health jump within this page; the rest open the page that owns them. */
+/** The top tabs (#1228, Settings added in #1274). Events and System health jump within this page; the rest open the page that owns them. */
 export const systemHomeTabs: readonly HomeTab[] = [
   { key: "overview", label: "Overview", href: "/admin" },
   { key: "events", label: "Events", href: "#upcoming-events" },
   { key: "clubs", label: "Clubs", href: "/admin/clubs/summary" },
   { key: "people", label: "People", href: "/admin/team" },
   { key: "forms", label: "Forms", href: "/admin/forms" },
+  { key: "settings", label: "Settings", href: "/admin/settings" },
   { key: "health", label: "System health", href: "#system-health" },
 ];
 

@@ -274,6 +274,8 @@ const pages: PageSpec[] = [
   staff("overview", "/overview"),
   // The Events Administrator dashboard (#1227): the event-admin test user holds an EVENT_ADMIN membership. It takes no ?event=.
   { name: "staff-events-admin", path: "/events-admin", role: "event-admin", expectText: /Event administration/ },
+  // The section header (#1274) on an event page: the event-admin test user administers this event, so its tabs show.
+  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Event administration/ },
   staff("people-registrations", "/people"),
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),
@@ -951,6 +953,13 @@ async function seedInformationForm(prisma: PrismaClient): Promise<PageSpec[]> {
       await page.getByRole("button", { name: /Add another member/i }).click();
     },
   }];
+}
+
+/** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */
+async function seedEventTemplatePages(prisma: PrismaClient): Promise<PageSpec[]> {
+  const template = await prisma.eventTemplate.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } });
+  if (!template) return [];
+  return [{ name: "staff-event-template-editor-back-link", path: `/admin/event-templates/${template.id}`, role: "system-admin", expectText: /Back to Event templates/ }];
 }
 
 async function cleanupInformationForm(prisma: PrismaClient) {
@@ -3972,6 +3981,7 @@ async function main() {
     pages.push(...await seedCancellationEvent(prisma));
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
+    pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
     browser = await chromium.launch({

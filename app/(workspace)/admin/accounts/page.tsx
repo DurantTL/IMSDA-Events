@@ -8,6 +8,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { parseAccountSort } from "@/modules/system-admin/account-sort";
 import { listAttendeeAccountsWithCap } from "@/modules/system-admin/user-admin";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Accounts" };
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function AttendeeAccountsPage({
   const linkedEmailChangesTogether = await isUnifiedSignInEnabled();
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/accounts" section="system" />
       <StaffPageHeader
         description="Attendee and club accounts (people who sign in at /account)."
         primary={(

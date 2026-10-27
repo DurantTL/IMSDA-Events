@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * builder's device hint and the Dashboard checklist. Synthetic data only.
  */
 vi.mock("server-only", () => ({}));
+// The section header (#1274) is async and has its own tests; these pages are tested without it.
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 const staffUser = vi.hoisted(() => ({ current: { id: "u1", globalRole: null as string | null } }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: staffUser.current }) }));
 vi.mock("next/navigation", () => ({

@@ -31,6 +31,7 @@ import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/reposi
 import { getResponsibleAdultsByAttendee } from "@/modules/guardian-authority/repository";
 import { countPendingTeams } from "@/modules/general-link-registrations/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
 
@@ -104,6 +105,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   searchParamsForLinks.set("event", event.id);
   if (filter) searchParamsForLinks.set("filter", filter);
   return <>
+      <AdminPageHeader path="/people" eventId={event.id} />
     <OperationsSearchBar
       basePath="/people"
       carry={{ filter }}

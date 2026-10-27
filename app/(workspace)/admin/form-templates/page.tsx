@@ -7,6 +7,7 @@ import { FormTemplateCopy } from "@/components/form-template-copy";
 import { cardCell } from "@/components/table-card-labels";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listFormTemplateLibrary } from "@/modules/forms/form-template-library";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Form templates" };
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function AdminFormTemplatesPage() {
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path="/admin/form-templates" section="system" />
       <StaffPageHeader
         description="The registration form templates event staff start a form from. Open one to edit it in the form builder. Every save makes a new version; forms already created from a template keep the version they were created with. A template you have edited here is never overwritten by a code update."
       />

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { TeamDirectoryWorkspace } from "@/components/team-directory-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getTeamDirectory } from "@/modules/system-admin/team-directory";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -14,6 +15,7 @@ export default async function TeamDirectoryPage() {
 
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/team" section="system" />
       <TeamDirectoryWorkspace
         initialDirectory={await getTeamDirectory()}
         currentUserId={user.id}

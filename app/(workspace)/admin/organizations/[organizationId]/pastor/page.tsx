@@ -1,10 +1,10 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ChurchPastorContact } from "@/components/church-pastor-contact";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getChurchPastorContactView } from "@/modules/organizations/contacts-repository";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Pastor contact" };
 
@@ -18,7 +18,7 @@ export default async function StaffChurchPastorContactPage({ params }: { params:
   if (!view) notFound();
   return (
     <section className="page-stack">
-      <BackLink href="/admin/organizations/directory" variant="staff">Back to the directory</BackLink>
+      <AdminSectionHeaderFor path={`/admin/organizations/${organizationId}/pastor`} section="system" />
       <div className="page-intro">
         <div>
           <p className="eyebrow">Church contacts</p>

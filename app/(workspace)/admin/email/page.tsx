@@ -17,6 +17,7 @@ import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repos
 import { buildEmailHealth } from "@/modules/system-admin/email-health";
 import { listActiveSuppressions } from "@/modules/communications/email-suppression";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Email" };
 
@@ -47,6 +48,7 @@ export default async function EmailPage() {
 
   return (
     <section className="page-stack notifications-page">
+      <AdminSectionHeaderFor path="/admin/email" section="system" />
       <StaffPageHeader
         description={(
           <>

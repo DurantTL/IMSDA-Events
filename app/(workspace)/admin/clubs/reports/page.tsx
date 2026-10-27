@@ -14,6 +14,7 @@ import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-reposit
 import { listClubReportsForYear } from "@/modules/club-reports/repository";
 import { REVIEW_FILTER, recordsToReview } from "@/modules/club-reports/review-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club Monthly Records" };
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
     : null;
   return (
     <>
+      <AdminPageHeader path="/admin/clubs/reports" year={clubYear} />
       <StaffPageHeader
         extra={(
           <>
