@@ -16,9 +16,15 @@ const saved: PlatformSettingsDraft = {
   invoiceHeaderOrganization: "",
   invoiceHeaderAddress: "",
   invoiceHeaderPhone: "(515) 555-0100",
+  publicHelpPhone: "",
+  publicHelpEmail: "help@example.test",
 };
 
 describe("platform settings change preview (#1076)", () => {
+  it("treats the homepage help email's letter case as no change", () => {
+    expect(platformSettingsChanges(saved, { ...saved, publicHelpEmail: " Help@Example.test " })).toEqual([]);
+  });
+
   it("lists nothing when nothing changed", () => {
     expect(platformSettingsChanges(saved, { ...saved })).toEqual([]);
   });

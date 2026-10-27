@@ -80,13 +80,13 @@ describe("calendar page wiring (#1117)", () => {
     expect(page).toContain("calendar-more-link");
     expect(page).toContain("more ${hidden === 1 ? \"event\" : \"events\"} on ${formatWeekdayDate(week[index])}");
     expect(page).toContain("calendar-day-detail");
-    expect(page).toContain("Clear category");
-    expect(page).toContain("Back to {monthLabel(month)}");
+    expect(page).toContain("Show everything");
+    expect(page).toContain("Show all of {monthName}");
   });
 
-  it("opens an adjacent-month date on its own month and keeps the category", () => {
+  it("opens an adjacent-month date on its own month and keeps the filter", () => {
     expect(page).toContain("date.slice(0, 7)");
-    expect(page).toContain("category, date },");
+    expect(page).toContain("filter, category, date },");
   });
 
   it("keeps the phone dots decorative and gives the day link a 44px target", () => {

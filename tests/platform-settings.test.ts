@@ -53,6 +53,54 @@ describe("platform settings invoice header (#780)", () => {
   });
 });
 
+describe("platform settings homepage help contact (#1251)", () => {
+  it("is optional: blank is unset, so the homepage shows no help line", () => {
+    const parsed = platformSettingsInputSchema.parse(validInput({ publicHelpPhone: " ", publicHelpEmail: "" }));
+    expect(parsed.publicHelpPhone).toBeNull();
+    expect(parsed.publicHelpEmail).toBeNull();
+    expect(platformSettingsInputSchema.parse(validInput())).toMatchObject({ publicHelpPhone: null, publicHelpEmail: null });
+  });
+
+  it("keeps a trimmed, lower-cased email and refuses a malformed one", () => {
+    expect(platformSettingsInputSchema.parse(validInput({ publicHelpEmail: " Help@Example.Test " })).publicHelpEmail).toBe("help@example.test");
+    expect(platformSettingsInputSchema.safeParse(validInput({ publicHelpEmail: "not-an-address" })).success).toBe(false);
+  });
+
+  it("does not reuse the internal support contact", () => {
+    expect(platformSettingsInputSchema.safeParse(validInput({ supportContact: "a@example.test" })).success).toBe(false);
+  });
+
+  function helpDatabase(storedPhone: string | null) {
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      platformSettings: { findUnique: vi.fn().mockResolvedValue({ id: "platform", organizationName: "IMSDA", publicHelpPhone: storedPhone, publicHelpEmail: null }), upsert: vi.fn().mockResolvedValue({}) },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+    };
+    database.getPrisma.mockReturnValue({
+      $transaction: vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
+      platformSettings: { upsert: vi.fn().mockResolvedValue({ organizationName: "IMSDA", updatedAt: new Date("2026-10-27T00:00:00Z"), updatedBy: null }) },
+    });
+    return tx;
+  }
+
+  it("refuses a phone that fails the shared check, without echoing it, and writes nothing", async () => {
+    const tx = helpDatabase(null);
+    const attempt = updatePlatformSettings(platformSettingsInputSchema.parse(validInput({ publicHelpPhone: "call-me-maybe" })), "admin-1");
+    await expect(attempt).rejects.toBeInstanceOf(PlatformSettingsError);
+    await expect(attempt).rejects.not.toThrow("call-me-maybe");
+    expect(tx.platformSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("stores a valid phone in one form and audits both sides", async () => {
+    const tx = helpDatabase("(515) 555-0199");
+    await updatePlatformSettings(platformSettingsInputSchema.parse(validInput({ publicHelpPhone: "515 555 0100", publicHelpEmail: "help@example.test" })), "admin-1");
+    expect(tx.platformSettings.upsert.mock.calls[0][0].update).toMatchObject({ publicHelpPhone: "(515) 555-0100", publicHelpEmail: "help@example.test" });
+    const metadata = tx.auditLog.create.mock.calls[0][0].data.metadata;
+    expect(metadata.before).toMatchObject({ publicHelpPhone: "(515) 555-0199", publicHelpEmail: null });
+    expect(metadata.after).toMatchObject({ publicHelpPhone: "(515) 555-0100", publicHelpEmail: "help@example.test" });
+  });
+});
+
 describe("platform settings input", () => {
   it("treats a cleared field as unset rather than an empty string", () => {
     const parsed = platformSettingsInputSchema.parse(validInput({ logoUrl: "" }));

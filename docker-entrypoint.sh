@@ -11,6 +11,30 @@
 #   docker compose exec app npm run admin:create -- --email you@imsda.org --name "Your Name"
 set -e
 
+# deploy/xcloud/deploy.sh runs the preparation below in a one-off container
+# (IMSDA_PREP_ONLY=1) while the old version keeps serving, then starts the new
+# version with IMSDA_SKIP_DB_PREP=1 so it answers within seconds (#1263).
+if [ "${IMSDA_SKIP_DB_PREP:-}" = "1" ]; then
+  echo "[entrypoint] Database preparation already done by the deploy; starting: $*"
+  exec "$@"
+fi
+
+# Until the app starts, answer every request with a short 503 "updating"
+# response (JSON for /api/*) instead of leaving nginx to show a 502 page.
+HOLDER_PID=""
+stop_holder() {
+  if [ -n "$HOLDER_PID" ]; then
+    kill "$HOLDER_PID" 2>/dev/null || true
+    wait "$HOLDER_PID" 2>/dev/null || true
+    HOLDER_PID=""
+  fi
+}
+if [ "${IMSDA_PREP_ONLY:-}" != "1" ] && [ -f /app/deploy/startup-holding-server.mjs ]; then
+  node /app/deploy/startup-holding-server.mjs &
+  HOLDER_PID=$!
+  trap stop_holder EXIT
+fi
+
 echo "[entrypoint] Applying database migrations (prisma migrate deploy)..."
 npx prisma migrate deploy
 
@@ -47,5 +71,12 @@ if [ "${RUN_DB_SEED}" = "true" ]; then
   exit 1
 fi
 
+if [ "${IMSDA_PREP_ONLY:-}" = "1" ]; then
+  echo "[entrypoint] Database preparation finished (IMSDA_PREP_ONLY)."
+  exit 0
+fi
+
+stop_holder
+trap - EXIT
 echo "[entrypoint] Starting: $*"
 exec "$@"

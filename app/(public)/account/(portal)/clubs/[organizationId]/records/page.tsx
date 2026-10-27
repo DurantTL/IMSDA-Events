@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
+import { PortalContextualHelp } from "@/components/contextual-help-slot";
 import { ClubMeetingNotes } from "@/components/club-meeting-notes";
 import { ClubReportForm } from "@/components/club-report-form";
 import { calendarDateIn } from "@/modules/calendar/domain";
@@ -93,7 +94,7 @@ export default async function ClubRecordsPage({
 
   return (
     <>
-
+      <PortalContextualHelp guideId="director-monthly-record" />
       <div className="club-home-stats">
         <div className="club-home-stat">
           <CheckCircle2 size={20} aria-hidden="true" />

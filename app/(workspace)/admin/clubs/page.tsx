@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardPen, Tent } from "lucide-react";
+import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardList, ClipboardPen, Tent } from "lucide-react";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { hasClubsAdministration, resolveAdminRoles } from "@/modules/access/admin-roles";
+import { getRequiredFormsStatus } from "@/modules/club-forms/required";
 import { countWaitingNewClubApplications, listNewClubApplications } from "@/modules/club-applications/repository";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { parseClubQuery } from "@/modules/club-reports/area-summary-domain";
@@ -40,14 +41,15 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const query = parseClubQuery(params.q);
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
-  const [clubs, events, applications, waitingCount, roles] = await Promise.all([
+  const [clubs, events, applications, waitingCount, roles, requiredForms] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
     resolveAdminRoles(user),
+    getRequiredFormsStatus(clubYear),
   ]);
-  const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, query });
+  const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, requiredForms, query });
   const { counts, nextEvent, registeredClubs } = home;
   const href = clubsAdminHrefs(clubYear);
   const tabs = clubsAdminTabs(clubYear, counts.waitingApplications);
@@ -94,10 +96,17 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           </article>
           <article data-card="monthly-records">
             <span className={styles.cardIcon}><ClipboardCheck aria-hidden="true" size={20} /></span>
-            <strong>{counts.monthlyRecordsSubmitted}</strong>
-            <p>Monthly records submitted</p>
-            <small>For {home.reportMonthLabel}. There is no reviewed mark yet, so every submitted record counts.</small>
-            <small><Link className={styles.cardLink} href={href.reports}>Open monthly records</Link></small>
+            <strong>{counts.monthlyRecordsToReview}</strong>
+            <p>Monthly records to review</p>
+            <small>For {home.reportMonthLabel}: submitted and not marked reviewed yet</small>
+            <small><Link className={styles.cardLink} href={href.recordsToReview(home.reportMonth)}>Review monthly records</Link></small>
+          </article>
+          <article data-card="forms-missing">
+            <span className={styles.cardIcon}><ClipboardList aria-hidden="true" size={20} /></span>
+            <strong>{counts.clubsWithFormsMissing}</strong>
+            <p>Clubs with forms missing</p>
+            <small>Clubs missing a required form for club year {clubYear}</small>
+            <small><Link className={styles.cardLink} href={href.formsMissing}>See what each is missing</Link></small>
           </article>
           <article data-card="next-event">
             <span className={styles.cardIcon}><CalendarDays aria-hidden="true" size={20} /></span>

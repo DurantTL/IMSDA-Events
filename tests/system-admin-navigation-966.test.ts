@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 
 describe("system navigation groups", () => {
-  it("lists the groups in order, with only Catalogs and settings collapsed by default", () => {
+  it("lists the groups in order, with only Catalogs and settings collapsed by default on the dashboard", () => {
     expect(systemNavGroups.map((group) => group.label)).toEqual(["Events", "Clubs", "People", "Forms", "Catalogs and settings"]);
     expect(systemNavGroups.filter((group) => group.collapsedByDefault).map((group) => group.label)).toEqual(["Catalogs and settings"]);
   });
@@ -92,14 +92,16 @@ describe("system navigation groups", () => {
     expect(systemNavActiveItem("/admin/organizations")?.label).toBe("Clubs and churches");
     expect(systemNavActiveItem("/admin/organizations/org_1/profile")?.label).toBe("Clubs and churches");
     expect(systemNavActiveItem("/admin/organizations/background-checks")?.label).toBe("Sterling Volunteers");
-    expect(systemNavActiveItem("/admin/clubs/reports/org_1/2026-09")?.label).toBe("Monthly reports");
-    expect(systemNavActiveItem("/admin/clubs/invites")?.label).toBe("New club applications and invites");
+    expect(systemNavActiveItem("/admin/clubs/reports/org_1/2026-09")?.label).toBe("Club Monthly Records");
+    expect(systemNavActiveItem("/admin/clubs/invites")?.label).toBe("New club applications");
     expect(systemNavActiveItem("/admin/organizationsx")).toBeNull();
     expect(systemNavActiveItem("/admin")).toBeNull();
+    expect(systemNavActiveItem("/admin/calendar")?.label).toBe("Conference calendar");
     expect(systemNavActiveEntryKey("/admin/calendar")).toBe("system-events:/admin/calendar");
   });
 
-  it("opens a group by default unless it is collapsed by default, and keeps the saved choice", () => {
+  it("opens a group by default only when a caller asks, and keeps the saved choice; the sidebar never asks (#1245)", () => {
+    expect(readFileSync(join(process.cwd(), "components/app-shell.tsx"), "utf8")).not.toContain("group.collapsedByDefault");
     const base = { containsCurrentPage: false, dismissedOnThisPage: false };
     expect(resolveSidebarGroupOpen({ ...base, saved: undefined, defaultOpen: true })).toBe(true);
     expect(resolveSidebarGroupOpen({ ...base, saved: undefined, defaultOpen: false })).toBe(false);
@@ -110,13 +112,16 @@ describe("system navigation groups", () => {
 });
 
 describe("sidebar on /admin pages", () => {
-  it("shows the system groups to a system admin, collapsible, with Catalogs and settings closed", () => {
+  it("shows the system groups to a system admin, collapsible, all closed until opened", () => {
     const nav = sidebarOf(render(admin));
     for (const label of ["Events", "Clubs", "People", "Forms", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
     expect(nav).toContain('href="/admin/clubs/reports?event=evt_one"');
     expect(nav).toContain('href="/event-setup/copy?event=evt_one"');
     expect(nav).toMatch(/id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-system-catalogs-toggle"/);
-    expect(nav).toMatch(/id="nav-group-system-clubs-toggle"[^>]*aria-expanded="true"|aria-expanded="true"[^>]*id="nav-group-system-clubs-toggle"/);
+    // Every group starts closed (#1245); only the one holding the current page opens.
+    for (const group of systemNavGroups) {
+      expect(nav).toMatch(new RegExp(`id="nav-group-${group.key}-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-${group.key}-toggle"`));
+    }
     // The event workspace sections are not drawn on system pages.
     expect(nav).not.toContain("Registrations");
   });

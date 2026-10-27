@@ -17,6 +17,8 @@ import {
   type PlatformSettingsDraft,
   type PlatformSettingsField,
 } from "@/components/platform-settings-impact";
+import { HomepageMinistriesEditor } from "@/components/homepage-ministries-editor";
+import type { HomepageMinistry } from "@/modules/system-admin/homepage-ministries-domain";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
 
 type Draft = PlatformSettingsDraft;
@@ -33,6 +35,8 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     invoiceHeaderOrganization: settings.invoiceHeaderOrganization ?? "",
     invoiceHeaderAddress: settings.invoiceHeaderAddress ?? "",
     invoiceHeaderPhone: settings.invoiceHeaderPhone ?? "",
+    publicHelpPhone: settings.publicHelpPhone ?? "",
+    publicHelpEmail: settings.publicHelpEmail ?? "",
   };
 }
 
@@ -58,9 +62,11 @@ export type SignInSwitchState = {
 export function PlatformSettingsWorkspace({
   initialSettings,
   initialSignIn,
+  initialMinistries,
 }: {
   initialSettings: PlatformSettingsRecord;
   initialSignIn: SignInSwitchState;
+  initialMinistries: { ministries: HomepageMinistry[]; updatedAt: string | null; updatedByName: string | null };
 }) {
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [signIn, setSignIn] = useState(initialSignIn);
@@ -134,6 +140,8 @@ export function PlatformSettingsWorkspace({
   // The invoice phone gets the shared check inline (#1193); the saved phone is the one already stored, which is flagged but never blocks.
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
+  const [helpPhoneTouched, setHelpPhoneTouched] = useState(false);
+  const helpPhoneProblem = inlinePhoneProblem("Phone", draft.publicHelpPhone, settings.publicHelpPhone, helpPhoneTouched);
   const changes = platformSettingsChanges(draftFrom(settings), draft);
   const dirty = changes.length > 0;
   const shownOutcome = outcome?.kind === "conflict" && !dirty ? null : outcome;
@@ -185,14 +193,19 @@ export function PlatformSettingsWorkspace({
     setOutcome(null);
     setFieldErrors({});
     setPhoneTouched(false);
+    setHelpPhoneTouched(false);
   }
 
   async function save(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
     setPhoneTouched(true);
-    if (phoneProblem.blocking) {
+    setHelpPhoneTouched(true);
+    if (phoneProblem.blocking || helpPhoneProblem.blocking) {
       setOutcome({ kind: "failed", message: "Check the highlighted answers and try again." });
-      focusFirstInvalid(["invoiceHeaderPhone"]);
+      focusFirstInvalid([
+        ...(phoneProblem.blocking ? ["invoiceHeaderPhone" as const] : []),
+        ...(helpPhoneProblem.blocking ? ["publicHelpPhone" as const] : []),
+      ]);
       return;
     }
     if (settings.passkeyRpId
@@ -263,7 +276,9 @@ export function PlatformSettingsWorkspace({
           }
         }
       }
-      const codeField = serverCodeFields[result.error as string];
+      const codeField = result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Help phone")
+        ? "publicHelpPhone"
+        : serverCodeFields[result.error as string];
       if (codeField && !invalid[codeField]) invalid[codeField] = result.message ?? "Check this answer.";
       setFieldErrors(invalid);
       setOutcome({ kind: "failed", message: result.message ?? "The platform settings could not be saved." });
@@ -432,6 +447,25 @@ export function PlatformSettingsWorkspace({
         <section className="panel">
           <div className="section-heading">
             <div>
+              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Public homepage</p>
+              <h2>Homepage help contact</h2>
+            </div>
+          </div>
+          <p className="settings-ownership"><strong>Central value.</strong> Shown on the public front page right away.</p>
+          <p className="field-help platform-note">
+            Shown at the bottom of the front page as &ldquo;Need help? Call &hellip; or email &hellip;&rdquo;. Leave a field blank to leave that part out; with both
+            blank no help line shows. This is separate from the alert addresses, which are internal.
+          </p>
+          <label>Help phone
+            <input {...invalidProps("publicHelpPhone", helpPhoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setHelpPhoneTouched(true)} type="tel" {...field("publicHelpPhone")} />
+            {fieldError("publicHelpPhone", helpPhoneProblem.message ?? undefined)}
+          </label>
+          <label>Help email<input autoComplete="off" maxLength={200} type="email" {...field("publicHelpEmail")} {...invalidProps("publicHelpEmail")} />{fieldError("publicHelpEmail")}</label>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <div>
               <p className="eyebrow"><Mail aria-hidden="true" size={14} /> New event defaults</p>
               <h2>What a new event starts from</h2>
             </div>
@@ -520,6 +554,8 @@ export function PlatformSettingsWorkspace({
           {settings.updatedByName ? ` by ${settings.updatedByName}` : ""}.
         </p>
       </form>
+
+      <HomepageMinistriesEditor initial={initialMinistries.ministries} updatedAt={initialMinistries.updatedAt} updatedByName={initialMinistries.updatedByName} />
     </section>
   );
 }

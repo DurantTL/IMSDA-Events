@@ -5,6 +5,7 @@ import { PlatformSettingsWorkspace } from "@/components/platform-settings-worksp
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { getSignInLinkCheck } from "@/modules/account-merge/sign-in-switch";
+import { getHomepageMinistriesForAdmin } from "@/modules/system-admin/homepage-ministries";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 
 export const metadata: Metadata = { title: "Platform settings" };
@@ -18,6 +19,7 @@ export default async function PlatformSettingsPage() {
     <>
       <PlatformSettingsWorkspace
         initialSettings={await getPlatformSettings()}
+        initialMinistries={await getHomepageMinistriesForAdmin()}
         initialSignIn={{ enabled: await isUnifiedSignInEnabled(), linkCheck: await getSignInLinkCheck() }}
       />
     </>

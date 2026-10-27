@@ -3,7 +3,6 @@ import {
   Archive,
   Award,
   CalendarCheck,
-  CalendarDays,
   CalendarPlus,
   CheckCircle2,
   Church,
@@ -52,7 +51,10 @@ export type SystemNavItem = {
 export type SystemNavGroup = {
   key: SystemNavGroupKey;
   label: string;
-  /** Closed until opened, on the dashboard and in the sidebar. */
+  /**
+   * Closed until opened on the /admin dashboard's catalog directory. Only the dashboard reads it: every sidebar group
+   * starts closed (#1245), except the one holding the current page.
+   */
   collapsedByDefault: boolean;
   items: readonly SystemNavItem[];
 };
@@ -63,9 +65,9 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "Events",
     collapsedByDefault: false,
     items: [
-      { href: "/event-setup", label: "Create event", description: "Start a new event, blank or from a template.", icon: CalendarPlus },
-      { href: "/admin/calendar", label: "Create event from calendar item", description: "Pick an item on the public calendar and turn it into a registration event.", icon: CalendarCheck },
-      { href: "/event-setup/copy", label: "Copy a past event", description: "Start from last year's event settings and forms.", icon: Copy },
+      { href: "/event-setup", label: "Create an event", description: "Start a new event, blank or from a template.", icon: CalendarPlus },
+      { href: "/admin/calendar", label: "Conference calendar", description: "Turn a calendar item into a registration event, and add, edit and publish the public calendar visitors see.", icon: CalendarCheck },
+      { href: "/event-setup/copy", label: "Copy from a past event", description: "Start from last year's event settings and forms.", icon: Copy },
       { href: "/admin/event-templates", label: "Event templates", description: "The starting points new events are built from.", icon: LayoutTemplate },
       { href: "/archived-events", label: "Archived events", description: "Events that are finished and put away.", icon: Archive },
     ],
@@ -76,10 +78,10 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     collapsedByDefault: false,
     items: [
       { href: "/admin/organizations", label: "Clubs and churches", description: "The directory of every club and church.", icon: Church },
-      { href: "/admin/clubs/reports", label: "Monthly reports", description: "Club Monthly Records, month by month.", icon: FileText },
+      { href: "/admin/clubs/reports", label: "Club Monthly Records", description: "Club Monthly Records, month by month.", icon: FileText },
       { href: "/admin/clubs/summary", label: "Club summary", description: "How every club is doing at a glance.", icon: BarChart3 },
-      { href: "/admin/clubs/applications", label: "New club applications and invites", description: "Applications waiting for review and invites sent.", icon: UserPlus, alsoActiveFor: ["/admin/clubs/invites"] },
-      { href: "/admin/clubs/transfers", label: "Member transfers", description: "Members moving from one club to another.", icon: ArrowRightLeft },
+      { href: "/admin/clubs/applications", label: "New club applications", description: "Applications waiting for review and invites sent.", icon: UserPlus, alsoActiveFor: ["/admin/clubs/invites"] },
+      { href: "/admin/clubs/transfers", label: "Club member transfers", description: "Members moving from one club to another.", icon: ArrowRightLeft },
     ],
   },
   {
@@ -111,7 +113,6 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/honors", label: "Honor catalog", description: "The honors clubs can earn.", icon: Award },
       { href: "/admin/club-supplies", label: "Club supply catalog", description: "Supplies clubs can order.", icon: Package },
       { href: "/admin/master-award-rules", label: "Master Award rules", description: "What it takes to earn a Master Award.", icon: Trophy },
-      { href: "/admin/calendar", label: "Manage public calendar", description: "Add, edit and publish the calendar visitors see. Same page as creating an event from a calendar item.", icon: CalendarDays },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
       { href: "/admin/email", label: "Email", description: "The central sender, paused events, staff alerts, and email health.", icon: Bell, alsoActiveFor: ["/admin/notifications"] },
       { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
@@ -128,8 +129,6 @@ function isAtOrBelow(pathname: string, path: string): boolean {
  * The sidebar item a /admin page lights: the longest matching path, so
  * /admin/organizations/background-checks lights Sterling Volunteers and not
  * Clubs and churches. `null` for /admin itself and pages with no item.
- * Create event from calendar item and Manage public calendar are the same page: the
- * first listing (Create event from calendar item) is the one that lights.
  */
 export function systemNavActiveItem(pathname: string): SystemNavItem | null {
   let best: { item: SystemNavItem; length: number } | null = null;
@@ -144,16 +143,15 @@ export function systemNavActiveItem(pathname: string): SystemNavItem | null {
   return best?.item ?? null;
 }
 
-/** A stable per-entry key: the same href can be listed in two groups (the calendar). */
+/** A stable per-entry key, shared by the sidebar, the phone menu and their active checks. */
 export function systemNavEntryKey(group: SystemNavGroup, item: SystemNavItem): string {
   return `${group.key}:${item.href}`;
 }
 
-/** The entry (group and item) a page lights; the group is the first one listing the item. */
+/** The entry (group and item) a page lights. */
 export function systemNavActiveEntryKey(pathname: string): string | null {
   const item = systemNavActiveItem(pathname);
   if (!item) return null;
-  // /admin/calendar is both "Create event from calendar item" and "Manage public calendar": light the Events entry only.
   const group = systemNavGroups.find((candidate) => candidate.items.includes(item));
   return group ? systemNavEntryKey(group, item) : null;
 }
@@ -225,7 +223,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
 /**
  * Pages that sit in the System management workspace: every /admin page, and the
  * event-creation pages under /event-setup (#981), which the system sidebar lists
- * under Events > Create event / Copy a past event.
+ * under Events > Create an event / Copy from a past event.
  */
 export function isSystemWorkspacePath(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/event-setup" || pathname.startsWith("/event-setup/");

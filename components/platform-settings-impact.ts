@@ -10,12 +10,15 @@ export type PlatformSettingsDraft = {
   invoiceHeaderOrganization: string;
   invoiceHeaderAddress: string;
   invoiceHeaderPhone: string;
+  publicHelpPhone: string;
+  publicHelpEmail: string;
 };
 
 export type PlatformSettingsField = keyof PlatformSettingsDraft;
 
 const identityEffect = "Shown everywhere the organization appears, right away.";
 const newEventEffect = "Newly created events start from this; existing events and already sent messages keep their own values.";
+const homepageEffect = "Shown on the public front page right away.";
 const invoiceEffect = "Applies to invoice PDFs made after saving; earlier PDFs keep their header.";
 
 export const platformSettingsFieldInfo: Record<PlatformSettingsField, { label: string; effect: string }> = {
@@ -29,6 +32,8 @@ export const platformSettingsFieldInfo: Record<PlatformSettingsField, { label: s
   invoiceHeaderOrganization: { label: "Organization on invoices", effect: invoiceEffect },
   invoiceHeaderAddress: { label: "Invoice mailing address", effect: invoiceEffect },
   invoiceHeaderPhone: { label: "Invoice phone", effect: invoiceEffect },
+  publicHelpPhone: { label: "Homepage help phone", effect: homepageEffect },
+  publicHelpEmail: { label: "Homepage help email", effect: homepageEffect },
 };
 
 export const platformSettingsFields = Object.keys(platformSettingsFieldInfo) as PlatformSettingsField[];
@@ -51,10 +56,10 @@ export type PlatformSettingsChange = {
   effect: string;
 };
 
-/** Surrounding spaces are not a change (the server trims), and the passkey domain is lower-cased there too. */
+/** Surrounding spaces are not a change (the server trims), and the passkey domain and help email are lower-cased there too. */
 export function normalizePlatformSettingValue(field: PlatformSettingsField, value: string) {
   const trimmed = value.trim();
-  return field === "passkeyRpId" ? trimmed.toLowerCase() : trimmed;
+  return field === "passkeyRpId" || field === "publicHelpEmail" ? trimmed.toLowerCase() : trimmed;
 }
 
 /** Every field whose draft value differs from the saved one, in form order, with its plain-language effect. */

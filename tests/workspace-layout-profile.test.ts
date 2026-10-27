@@ -116,4 +116,20 @@ describe("(workspace) layout for /profile without a staff session", () => {
     await expect(renderLayout()).resolves.toBeTruthy();
     expect(await redirectedTo("/overview")).toBe("/no-access");
   });
+
+  it("lets staff with no events through to /help and below (#1077), and keeps sending signed-out visitors to the staff login", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", email: "riley@imsda-events.test", globalRole: null } });
+    mocks.getCurrentAttendee.mockResolvedValue(nobody);
+    mocks.listEventsForUser.mockResolvedValue([]);
+    for (const target of ["/help", "/help/", "/help/invite-staff?event=evt_synthetic", "/help/glossary"]) {
+      mocks.requestTarget = target;
+      await expect(renderLayout()).resolves.toBeTruthy();
+    }
+    // A path that only starts with the same letters is not Help.
+    expect(await redirectedTo("/helpful")).toBe("/no-access");
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
+    expect(await redirectedTo("/help")).toBe("/login?next=%2Fhelp");
+    expect(await redirectedTo("/help/invite-staff")).toBe("/login?next=%2Fhelp%2Finvite-staff");
+  });
 });

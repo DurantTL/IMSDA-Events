@@ -62,9 +62,9 @@ describe("the club form builder page is for system administrators and Clubs Admi
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-3", globalRole: null } });
     mocks.isActiveClubsAdministrator.mockResolvedValue(true);
     mocks.listClubFormTemplatesForAdmin.mockResolvedValue([]);
-    await expect(AdminClubFormsPage()).resolves.toBeTruthy();
+    await expect(AdminClubFormsPage({ searchParams: Promise.resolve({}) })).resolves.toBeTruthy();
     mocks.isActiveClubsAdministrator.mockResolvedValue(false);
-    await expect(AdminClubFormsPage()).rejects.toMatchObject({ to: "/no-access" });
+    await expect(AdminClubFormsPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/no-access" });
   });
 
   it("sends a visitor who is not signed in to sign in, and reads no form", async () => {
@@ -81,7 +81,7 @@ describe("the club form builder page is for system administrators and Clubs Admi
 
   it("refuses the same user on the list page", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-2", globalRole: "USER" } });
-    await expect(AdminClubFormsPage()).rejects.toMatchObject({ to: "/no-access" });
+    await expect(AdminClubFormsPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/no-access" });
     expect(mocks.listClubFormTemplatesForAdmin).not.toHaveBeenCalled();
   });
 });

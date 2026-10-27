@@ -19,7 +19,8 @@ export const monthStatusLabels: Record<MonthStatus, string> = {
   FUTURE: "Not yet due",
 };
 
-export type MonthCell = { month: string; status: MonthStatus; points: number | null };
+/** `reviewed` (#1246) is true only for a submitted record a Clubs Administrator has marked Reviewed. */
+export type MonthCell = { month: string; status: MonthStatus; points: number | null; reviewed?: boolean };
 
 export type AreaSummaryInput = {
   id: string;
@@ -31,7 +32,7 @@ export type AreaSummaryInput = {
   adultCount?: number;
   registrationOnTime: boolean;
   backgroundChecks: { missing: number; notInCompliance: number; expiringSoon: number };
-  reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number }>;
+  reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number; reviewedAt?: Date | null }>;
 };
 
 export type AreaClubSummary = {
@@ -60,7 +61,7 @@ export function monthCell(
   now: Date,
 ): MonthCell {
   if (report?.status === "SUBMITTED") {
-    return { month, status: report.onTimePoints > 0 ? "SUBMITTED" : "LATE", points: report.totalPoints };
+    return { month, status: report.onTimePoints > 0 ? "SUBMITTED" : "LATE", points: report.totalPoints, reviewed: Boolean(report.reviewedAt) };
   }
   if (report?.status === "DRAFT") return { month, status: "DRAFT", points: null };
   if (month > calendarDateIn(now).slice(0, 7)) return { month, status: "FUTURE", points: null };

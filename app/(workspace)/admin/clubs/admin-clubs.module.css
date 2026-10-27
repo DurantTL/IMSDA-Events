@@ -1,4 +1,4 @@
-/* Clubs Administrator dashboard (#1226), from the Events Administrator layout (#1227): tabs, a header card, four count cards, one card per event, then separate work rows. */
+/* Clubs Administrator dashboard (#1226), from the Events Administrator layout (#1227): tabs, a header card, five count cards in a three-column grid, one card per event, then separate work rows. */
 .workspace {
   padding-bottom: 32px;
 }
@@ -42,7 +42,7 @@
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -342,6 +342,12 @@
   flex-wrap: wrap;
   align-items: end;
   gap: 8px 10px;
+}
+
+/* The Clubs sidebar has the club year picker above 800px (#1245), so the page's own goes. It stays on phones (the sidebar
+   is hidden), in the icons-only sidebar and in any view whose sidebar has no picker. */
+@media (min-width: 801px) {
+  :global(html:not([data-sidebar="collapsed"]) .app-shell:has(.clubs-year-form)) .yearForm { display: none; }
 }
 
 .yearForm label,

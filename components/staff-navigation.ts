@@ -7,6 +7,8 @@ import {
   FileText,
   FileUp,
   BedDouble,
+  CalendarDays,
+  Star,
   UtensilsCrossed,
   HeartPulse,
   KeyRound,
@@ -165,6 +167,9 @@ export const staffPageTitles = {
   scheduledEmails: "Scheduled emails",
 } as const;
 
+/** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
+export const helpPageTitle = "Help & learning";
+
 type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", title: string];
 
 /**
@@ -173,6 +178,9 @@ type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", 
  * `prefix` is both.
  */
 const subpageRules: readonly SubpageRule[] = [
+  // Help & learning (#1077) is not a nav item; the sidebar draws its own link.
+  ["/help/glossary", "prefix", "Glossary"],
+  ["/help", "prefix", helpPageTitle],
   ["/more/honors/rosters", "prefix", staffPageTitles.honorsRosters],
   ["/more/honors/schedule", "prefix", staffPageTitles.honorsSchedule],
   ["/more/honors/instructors", "prefix", staffPageTitles.honorsInstructors],
@@ -236,27 +244,86 @@ export const systemNavigation: NavigationItem = {
 /** The health record import (#878) exists only while the Health Record feature is on; the shell drops its link otherwise. */
 export const clubsAdminHealthImportHref = "/admin/clubs/health-import";
 
+/** The Events Administrator's dashboard link, first in the Events view's sidebar (#1245). Its label is its page title; the page keeps its own gate. */
+export const eventsAdminHomeItem: NavigationItem = { href: "/events-admin", label: "Event administration", icon: LayoutDashboard };
+
+/** The collapsible groups of the Clubs Administrator's sidebar (#1245). */
+export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications";
+
+export type ClubsNavGroup = { key: ClubsNavGroupKey; label: string; items: readonly NavigationItem[] };
+
+/** The one ungrouped Clubs link, above the groups. Its label is its page title. */
+export const clubsAdminHomeItem: NavigationItem = { href: "/admin/clubs", label: "Club administration", icon: LayoutDashboard };
+
 /**
- * The Clubs Administrator's sidebar (#1225): the club areas only, with the club management pages Caleb opened to the
- * role on 2026-10-26 (#1232): invites, member transfers, club and health record imports, the honor and supply
- * catalogs and Sterling Volunteers. Shown when the Clubs Administrator view of the role switcher is active. It is a
- * view, not a permission: each page and route checks the role itself.
+ * The Clubs Administrator's sidebar (#1225, grouped in #1245): the club areas only, with the club management pages
+ * Caleb opened to the role on 2026-10-26 (#1232): invites, member transfers, club and health record imports, the honor
+ * and supply catalogs and Sterling Volunteers. Labels are the pages' own titles. An item with a `#` opens a section of
+ * a page that is already another item's, so it never lights. Shown when the Clubs Administrator view of the role
+ * switcher is active. It is a view, not a permission: each page and route checks the role itself.
+ */
+export const clubsAdminGroups: readonly ClubsNavGroup[] = [
+  {
+    key: "clubs-clubs",
+    label: "Clubs",
+    items: [
+      { href: "/admin/clubs/summary", label: "Club summary", icon: Tent },
+      { href: "/admin/clubs/transfers", label: "Club member transfers", icon: ArrowRightLeft },
+      { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", icon: ShieldCheck },
+      { href: "/admin/honors", label: "Honor catalog", icon: Award },
+      { href: "/admin/club-supplies", label: "Club supply catalog", icon: Package },
+      { href: "/admin/clubs/import", label: "Import clubs", icon: FileUp },
+      { href: clubsAdminHealthImportHref, label: "Import health records", icon: HeartPulse },
+    ],
+  },
+  {
+    key: "clubs-records",
+    label: "Records and points",
+    items: [
+      { href: "/admin/clubs/reports", label: "Club Monthly Records", icon: FileText },
+      { href: "/admin/clubs/reports/year-end", label: "Club Year-End Reports", icon: Trophy },
+      { href: "/admin/clubs/summary#points", label: "Points", icon: Star },
+    ],
+  },
+  {
+    key: "clubs-events",
+    label: "Club events",
+    items: [{ href: "/admin/clubs/summary#club-events", label: "Club events", icon: CalendarDays }],
+  },
+  {
+    key: "clubs-forms",
+    label: "Forms",
+    items: [{ href: "/admin/club-forms", label: "Club forms", icon: ListChecks }],
+  },
+  {
+    key: "clubs-applications",
+    label: "Applications",
+    items: [
+      { href: "/admin/clubs/applications", label: "New club applications", icon: ClipboardPen },
+      { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
+    ],
+  },
+];
+
+/**
+ * The Clubs sidebar as a flat list of pages (the phone Clubs bar, which scrolls sideways, and the active-page match):
+ * Club administration, then every group's pages. The `#` section links are left out, so each page is listed once.
  */
 export const clubsAdminNavigation: readonly NavigationItem[] = [
-  { href: "/admin/clubs", label: "Club administration", icon: LayoutDashboard },
-  { href: "/admin/clubs/summary", label: "Clubs summary", icon: Tent },
-  { href: "/admin/clubs/applications", label: "New clubs", icon: ClipboardPen },
-  { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
-  { href: "/admin/clubs/reports", label: "Monthly records", icon: FileText },
-  { href: "/admin/clubs/reports/year-end", label: "Year-end", icon: Trophy },
-  { href: "/admin/clubs/transfers", label: "Member transfers", icon: ArrowRightLeft },
-  { href: "/admin/clubs/import", label: "Import clubs", icon: FileUp },
-  { href: clubsAdminHealthImportHref, label: "Import health records", icon: HeartPulse },
-  { href: "/admin/club-forms", label: "Club forms", icon: ListChecks },
-  { href: "/admin/honors", label: "Honor catalog", icon: Award },
-  { href: "/admin/club-supplies", label: "Club supplies", icon: Package },
-  { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", icon: ShieldCheck },
+  clubsAdminHomeItem,
+  ...clubsAdminGroups.flatMap((group) => group.items.filter((item) => !item.href.includes("#"))),
 ];
+
+/** The Clubs pages that read `?year=`; their sidebar links carry the year the viewer picked. */
+export const clubsAdminYearPaths: readonly string[] = ["/admin/clubs", "/admin/clubs/summary", "/admin/clubs/reports", "/admin/clubs/reports/year-end"];
+
+/** A Clubs sidebar href with `?year=` (before any `#`) when the page reads it and a year is chosen. */
+export function clubsAdminHrefForYear(href: string, year: string | null): string {
+  if (!year) return href;
+  const [path, hash] = href.split("#");
+  if (!clubsAdminYearPaths.includes(path)) return href;
+  return `${path}?year=${encodeURIComponent(year)}${hash ? `#${hash}` : ""}`;
+}
 
 /**
  * The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. The dashboard,

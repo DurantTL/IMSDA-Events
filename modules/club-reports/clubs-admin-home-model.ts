@@ -8,9 +8,12 @@
  * Every number says what one unit is:
  * - Active clubs: clubs returned by the summary read, which is every active club (the All clubs page's set).
  * - New club applications waiting: applications with status PENDING, in any year (the applications page's count).
- * - Monthly records submitted: clubs whose Monthly Record for the report month has status SUBMITTED or LATE. A record
- *   has no "reviewed" state, so none is claimed. The report month is the current calendar month (Central time) when it
- *   falls in the selected club year, otherwise that club year's last month.
+ * - Monthly records to review (#1246): clubs whose Monthly Record for the report month is submitted (SUBMITTED or LATE)
+ *   and not marked Reviewed: the length of `recordsToReview`, the rows the Monthly records list shows when the card's
+ *   link is followed. The report month is the current calendar month (Central time) when it falls in the selected club
+ *   year, otherwise that club year's last month.
+ * - Clubs with forms missing (#1246): active clubs with at least one required form missing in the club year: the
+ *   length of `clubsWithFormsMissing`, the rows the forms-missing list page shows.
  * - Registered for next event: clubs whose registration for the next club event is REGISTERED, out of every active
  *   club. The next club event is the first event of the club year whose start date (Central time) is today or later.
  * - People registered: the event's headcount across registered clubs only.
@@ -25,7 +28,12 @@ import {
   type AreaEventClubRow,
   type MonthStatus,
 } from "@/modules/club-reports/area-summary-domain";
-import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubYearOptions } from "@/modules/club-rosters/domain";
+import { clubsWithFormsMissing, clubsFormsMissingHref, type ClubRequiredForms } from "@/modules/club-forms/required-domain";
+import { recordState, recordStateLabels, recordsToReview, recordsToReviewHref, type RecordState } from "@/modules/club-reports/review-domain";
+
+// Lives in the roster domain so the Clubs sidebar (a client component) can use it.
+export { clubYearOptions };
 
 export const NEW_CLUBS_LIMIT = 5;
 export const REGISTERED_CLUBS_LIMIT = 10;
@@ -72,6 +80,8 @@ export type ClubsAdminClubRow = {
   church: string;
   rosterSize: number;
   recordStatus: MonthStatus | null;
+  /** Not submitted, Submitted or Reviewed (#1246); null only when the month is not yet due. */
+  recordState: RecordState | null;
   recordLabel: string;
 };
 
@@ -90,7 +100,8 @@ export type ClubsAdminHome = {
   counts: {
     activeClubs: number;
     waitingApplications: number;
-    monthlyRecordsSubmitted: number;
+    monthlyRecordsToReview: number;
+    clubsWithFormsMissing: number;
   };
   /** "2026-10" and its label, "October 2026". */
   reportMonth: string;
@@ -103,25 +114,9 @@ export type ClubsAdminHome = {
   registeredClubs: { rows: ClubsAdminClubRow[]; matchCount: number; total: number };
 };
 
-/** What each month status is called beside a club. There is no "Needs review" state, so none is shown. */
-export const recordStatusLabels: Record<MonthStatus, string> = {
-  SUBMITTED: "Submitted",
-  LATE: "Submitted late",
-  DRAFT: "Draft",
-  DUE: "Due",
-  MISSING: "Not submitted",
-  FUTURE: "Not yet due",
-};
-
-export function recordStatusLabel(status: MonthStatus | null) {
-  return status ? recordStatusLabels[status] : "Not yet due";
-}
-
-/** The current club year and the three before it, newest first; the selected year is added when it is not among them. */
-export function clubYearOptions(selected: string, now: Date) {
-  const start = Number(clubYearFor(now).slice(0, 4));
-  const years = [0, 1, 2, 3].map((back) => `${start - back}-${String((start - back + 1) % 100).padStart(2, "0")}`);
-  return years.includes(selected) ? years : [...years, selected].sort().reverse();
+/** What a club's record for the month is called in the clubs table (#1246): Not submitted, Submitted or Reviewed; a future month is "Not yet due". */
+export function recordStatusLabel(cell: { status: MonthStatus; reviewed?: boolean } | null) {
+  return cell && cell.status !== "FUTURE" ? recordStateLabels[recordState(cell)] : "Not yet due";
 }
 
 /** The month the monthly-records card counts: this month when it is in the club year, else the club year's last month. */
@@ -161,8 +156,10 @@ export function clubsAdminHrefs(clubYear: string) {
   const year = `year=${encodeURIComponent(clubYear)}`;
   return {
     overview: `/admin/clubs?${year}`,
+    formsMissing: clubsFormsMissingHref(clubYear),
     summary: `/admin/clubs/summary?${year}`,
     reports: `/admin/clubs/reports?${year}`,
+    recordsToReview: (month: string) => recordsToReviewHref(clubYear, month),
     points: `/admin/clubs/summary?${year}#points`,
     clubEvents: `/admin/clubs/summary?${year}#club-events`,
     forms: "/admin/club-forms",
@@ -191,11 +188,13 @@ export function buildClubsAdminHome(input: {
   events: readonly ClubsAdminEventSource[];
   applications: readonly ClubsAdminApplicationSource[];
   waitingCount: number;
+  /** Where every active club stands on the forms staff marked required (`getRequiredFormsStatus`). */
+  requiredForms?: readonly ClubRequiredForms[];
   query?: string;
 }): ClubsAdminHome {
   const { clubYear, now, clubs } = input;
   const month = chooseReportMonth(clubYear, now);
-  const statusOf = (club: AreaClubSummary) => club.months.find((cell) => cell.month === month)?.status ?? null;
+  const cellOf = (club: AreaClubSummary) => club.months.find((cell) => cell.month === month) ?? null;
 
   const next = pickNextEvent(input.events, now);
   const nextEvent: ClubsAdminNextEvent | null = next
@@ -224,10 +223,8 @@ export function buildClubsAdminHome(input: {
     counts: {
       activeClubs: clubs.length,
       waitingApplications: input.waitingCount,
-      monthlyRecordsSubmitted: clubs.filter((club) => {
-        const status = statusOf(club);
-        return status === "SUBMITTED" || status === "LATE";
-      }).length,
+      monthlyRecordsToReview: recordsToReview(clubs, month).length,
+      clubsWithFormsMissing: clubsWithFormsMissing(input.requiredForms ?? []).length,
     },
     reportMonth: month,
     reportMonthLabel: reportMonthLabel(month),
@@ -249,8 +246,16 @@ export function buildClubsAdminHome(input: {
     moreNewClubs: waiting > NEW_CLUBS_LIMIT,
     registeredClubs: {
       rows: matches.slice(0, REGISTERED_CLUBS_LIMIT).map((club) => {
-        const status = statusOf(club);
-        return { id: club.id, name: club.name, church: club.church, rosterSize: club.rosterSize, recordStatus: status, recordLabel: recordStatusLabel(status) };
+        const cell = cellOf(club);
+        return {
+          id: club.id,
+          name: club.name,
+          church: club.church,
+          rosterSize: club.rosterSize,
+          recordStatus: cell?.status ?? null,
+          recordState: cell && cell.status !== "FUTURE" ? recordState(cell) : null,
+          recordLabel: recordStatusLabel(cell),
+        };
       }),
       matchCount: matches.length,
       total: clubs.length,

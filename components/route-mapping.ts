@@ -58,16 +58,16 @@ type Menu = readonly [route: string, scope: DestinationScope, oldPlace: RouteMap
 
 const menuRoutes: readonly Menu[] = [
   // System management groups (systemNavGroups)
-  ["/event-setup", "System", "System management", "Events", "Create event"],
-  ["/admin/calendar", "System", "System management", "Events", "Create event from calendar item"],
-  ["/event-setup/copy", "System", "System management", "Events", "Copy a past event"],
+  ["/event-setup", "System", "System management", "Events", "Create an event"],
+  ["/admin/calendar", "System", "System management", "Events", "Conference calendar"],
+  ["/event-setup/copy", "System", "System management", "Events", "Copy from a past event"],
   ["/admin/event-templates", "System", "System management", "Events", "Event templates"],
   ["/archived-events", "System", "System management", "Events", "Archived events"],
   ["/admin/organizations", "System", "System management", "Clubs", "Clubs and churches"],
-  ["/admin/clubs/reports", "System", "System management", "Clubs", "Monthly reports"],
+  ["/admin/clubs/reports", "System", "System management", "Clubs", "Club Monthly Records"],
   ["/admin/clubs/summary", "System", "System management", "Clubs", "Club summary"],
-  ["/admin/clubs/applications", "System", "System management", "Clubs", "New club applications and invites"],
-  ["/admin/clubs/transfers", "System", "System management", "Clubs", "Member transfers"],
+  ["/admin/clubs/applications", "System", "System management", "Clubs", "New club applications"],
+  ["/admin/clubs/transfers", "System", "System management", "Clubs", "Club member transfers"],
   ["/admin/team", "System", "System management", "People", "Team"],
   ["/admin/accounts", "System", "System management", "People", "Accounts"],
   ["/admin/forms", "System", "System management", "Forms", "All forms"],
@@ -180,8 +180,6 @@ export function buildRouteMapping(): RouteMappingRow[] {
   for (const [route, scope, oldPlace, group, label] of menuRoutes) {
     rows.push({ route, kind: "menu", oldPlace, scope, destinationPath: route, label, group });
   }
-  // The calendar route has two meanings, listed in two System groups.
-  rows.push({ route: "/admin/calendar", kind: "menu", oldPlace: "System management", scope: "System", destinationPath: "/admin/calendar", label: "Manage public calendar", group: "Catalogs and settings" });
   for (const [route, destinationPath] of aliasRoutes) {
     rows.push({ route, kind: "alias", oldPlace: "System management", scope: "System", destinationPath, label: `Opens ${destinationPath}`, group: "Alias" });
   }
@@ -190,6 +188,8 @@ export function buildRouteMapping(): RouteMappingRow[] {
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
   rows.push({ route: "/admin/feature-requests", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Feature requests", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Approve or decline event feature requests; the System home only counts them." });
+  rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
+  rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });
   rows.push({ route: "/events-admin", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/events-admin", label: "Events Administrator dashboard", group: "Event administration", note: "The Events Administrator's home, opened from the role switcher. Only people with an active EVENT_ADMIN membership see it, and only for those events." });
   rows.push({ route: "/admin/clubs", kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: "/admin/clubs", label: "Clubs Administrator dashboard", group: "Club administration", note: "The Clubs Administrator's home, opened from the role switcher and the Clubs sidebar. Clubs Administrators and system administrators only." });
   rows.push({
@@ -203,7 +203,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
 /** Dynamic detail pages: each is opened from a list or parent page, so none is a row above. A new dynamic page fails the page test until it is listed here with its reason. */
 export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/club-forms/[templateKey]": "Club form builder, opened from Club forms.",
-  "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Monthly reports.",
+  "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Club Monthly Records.",
   "/admin/event-templates/[templateId]": "Edit one event template, opened from Event templates.",
   "/admin/form-templates/[templateKey]": "One form template, opened from Form templates.",
   "/admin/information-forms/[formId]": "One information form, opened from Information forms.",
@@ -221,6 +221,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/more/club-forms/[submissionId]": "One club form submission, from Club forms.",
   "/more/clubs/[organizationId]": "One club's roster, from This event's clubs.",
   "/more/clubs/reports/[organizationId]/[month]": "One Monthly Record, from the event's club reports.",
+  "/help/[guideId]": "One Help & learning guide, opened from the Help hub and from search; only for a viewer who may see it.",
   "/more/health-records/[organizationId]/[memberId]": "One member's health record, opened from the club roster; protected data, so no menu entry.",
   "/more/program-assignments/[runId]": "One assignment run, from Seminar assignments.",
   "/more/reports/clubs/packet/[organizationId]": "One club's packet, from club event reports.",

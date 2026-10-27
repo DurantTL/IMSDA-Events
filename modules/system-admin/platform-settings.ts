@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
+import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { isValidRelyingPartyId } from "@/modules/attendee-accounts/passkey-domain";
 
@@ -57,6 +58,12 @@ export const platformSettingsInputSchema = z.object({
   ),
   // Judged in `updatePlatformSettings` against the stored phone (#1193), so an old saved one is not held against a save.
   invoiceHeaderPhone: optionalField(z.string().max(MAX_PHONE_LENGTH)),
+  /**
+   * The help line in the public homepage footer (#1251): "Need help? Call ... or email ...". Blank leaves that part out. Not
+   * `supportContact`, the internal alert inbox. The phone is judged in `updatePlatformSettings`, like the invoice phone.
+   */
+  publicHelpPhone: optionalField(z.string().max(MAX_PHONE_LENGTH)),
+  publicHelpEmail: optionalEmail,
 }).strict();
 
 export type PlatformSettingsInput = z.infer<typeof platformSettingsInputSchema>;
@@ -130,9 +137,28 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
     invoiceHeaderOrganization: row.invoiceHeaderOrganization,
     invoiceHeaderAddress: row.invoiceHeaderAddress,
     invoiceHeaderPhone: row.invoiceHeaderPhone,
+    publicHelpPhone: row.publicHelpPhone,
+    publicHelpEmail: row.publicHelpEmail,
     updatedAt: row.updatedAt.toISOString(),
     updatedByName: row.updatedBy?.displayName ?? null,
   };
+}
+
+/**
+ * The help contact the public homepage footer shows (#1251). A narrow read that never creates the row and never throws:
+ * a database problem just leaves the help line off, so the front page still loads.
+ */
+export async function getPublicHelpContact(): Promise<{ phone: string | null; email: string | null }> {
+  try {
+    const row = await getPrisma().platformSettings.findUnique({
+      where: { id: PLATFORM_SETTINGS_ID },
+      select: { publicHelpPhone: true, publicHelpEmail: true },
+    });
+    return { phone: row?.publicHelpPhone?.trim() || null, email: row?.publicHelpEmail?.trim() || null };
+  } catch (error) {
+    logError("Reading the homepage help contact failed", error);
+    return { phone: null, email: null };
+  }
 }
 
 export class PlatformSettingsError extends Error {
@@ -181,6 +207,8 @@ const BASELINE_FIELDS = [
   "invoiceHeaderOrganization",
   "invoiceHeaderAddress",
   "invoiceHeaderPhone",
+  "publicHelpPhone",
+  "publicHelpEmail",
 ] as const;
 
 export async function updatePlatformSettings(
@@ -200,7 +228,7 @@ export async function updatePlatformSettings(
     // meanwhile is neither reported as a conflict nor written back stale (#1076).
     const normalize = (key: string, value: unknown) => {
       const text = String(value ?? "").trim();
-      return key === "passkeyRpId" ? text.toLowerCase() : text;
+      return key === "passkeyRpId" || key === "publicHelpEmail" ? text.toLowerCase() : text;
     };
     let edited: readonly (typeof BASELINE_FIELDS)[number][] = BASELINE_FIELDS;
     if (baseline && before) {
@@ -224,6 +252,11 @@ export async function updatePlatformSettings(
       const phone = resolvePhoneChange(input.invoiceHeaderPhone, before?.invoiceHeaderPhone);
       if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Invoice phone: ${phone.message}`);
       input = { ...input, invoiceHeaderPhone: phone.value };
+    }
+    if (input.publicHelpPhone && edited.includes("publicHelpPhone")) {
+      const phone = resolvePhoneChange(input.publicHelpPhone, before?.publicHelpPhone);
+      if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Help phone: ${phone.message}`);
+      input = { ...input, publicHelpPhone: phone.value };
     }
     // Any change, not only clearing: a passkey is bound to the domain it was
     // made for, so a new domain strands existing passkeys just the same.
@@ -266,6 +299,8 @@ export async function updatePlatformSettings(
               invoiceHeaderOrganization: before.invoiceHeaderOrganization,
               invoiceHeaderAddress: before.invoiceHeaderAddress,
               invoiceHeaderPhone: before.invoiceHeaderPhone,
+              publicHelpPhone: before.publicHelpPhone,
+              publicHelpEmail: before.publicHelpEmail,
             }
             : null,
           after: {
@@ -277,6 +312,8 @@ export async function updatePlatformSettings(
             invoiceHeaderOrganization: input.invoiceHeaderOrganization ?? null,
             invoiceHeaderAddress: input.invoiceHeaderAddress ?? null,
             invoiceHeaderPhone: input.invoiceHeaderPhone ?? null,
+            publicHelpPhone: input.publicHelpPhone ?? null,
+            publicHelpEmail: input.publicHelpEmail ?? null,
           },
         },
       },

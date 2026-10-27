@@ -200,7 +200,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
   const css = read("app/globals.css");
 
   it("draws bars per week from the layout, with continuation glyphs, date ranges and 'more' links", () => {
-    expect(page).toContain("weekBarLayout(week, items)");
+    expect(page).toContain("weekBarLayout(week, items, calendarGridRows)");
     expect(page).toContain('className="calendar-week"');
     expect(page).toContain("bar.continuesBefore");
     expect(page).toContain("bar.continuesAfter");
@@ -223,7 +223,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
   it("keeps the phone dots decorative and still reads items only through the existing public set", () => {
     expect(page).toContain("CalendarMonthChip");
     expect(page).toContain("listPublicCalendarItems(from, to)");
-    expect(page).toContain("filterByCategory(allItems, category)");
+    expect(page).toContain("filterByGroup(allItems, filter)");
     const chip = read("components/calendar-month-chip.tsx");
     expect(chip).toContain('"aria-hidden": true');
     expect(chip).toContain("tabIndex: -1");
@@ -233,10 +233,10 @@ describe("calendar page wiring (#1202, #1203)", () => {
   it("fills the panel with the complete set for the day, through the agenda's link, and prompts when no day is chosen", () => {
     expect(page).toContain("itemsOnDate(items, selectedDate)");
     expect(page).toContain("sortCalendarItems(selectedItems).map((item, index) => <CalendarPanelItem");
-    expect(page).toContain("Select a day to see everything on it.");
+    expect(page).toContain("Select a day to see only that day.");
     expect(page).toContain("CalendarDayFocus");
-    expect(page).toContain("Clear category");
-    expect(page).toContain("Month agenda");
+    expect(page).toContain("Show everything");
+    expect(page).toContain("Show {moreItems.length} more in {monthName}");
     const panelItem = read("components/calendar-panel-item.tsx");
     expect(panelItem).toContain("ItemLink");
     expect(panelItem).toContain("formatDateRange");
@@ -244,8 +244,8 @@ describe("calendar page wiring (#1202, #1203)", () => {
     expect(css).toMatch(/@media \(min-width: 1001px\) \{\s*\.calendar-board \{ grid-template-columns: minmax\(0, 1fr\) 320px; \}/);
   });
 
-  it("shows a colour swatch in each category button and a key for IMSDA events", () => {
-    expect(page).toContain("calendarKeyTone(name, toneMap)");
+  it("shows a colour key for the categories in the month, and IMSDA events", () => {
+    expect(page).toContain("monthKeyEntries(monthItems, toneMap)");
     expect(css).toMatch(/\.calendar-categories \{ display: flex; flex-wrap: wrap;/);
     expect(css).toMatch(/\.calendar-day-detail \{ max-height: calc\(100vh - 24px\); overflow-y: auto; overscroll-behavior: contain; \}/);
     expect(css).toMatch(/\.calendar-bar-title \{ flex: 0 0 auto; max-width: 100%;/);
@@ -255,7 +255,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
   });
 
   it("keeps the week height fixed, motion short and off for reduced motion", () => {
-    expect(css).toMatch(/\.calendar-week \{ grid-template-rows: 48px repeat\(4, 38px\) 36px; height: 236px;/);
+    expect(css).toMatch(/\.calendar-week \{ grid-template-rows: 44px repeat\(2, 22px\); height: 88px;/);
     expect(css).toMatch(/transition: filter 0\.2s ease;/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.calendar-bar \{ transition: none; \}/);
     const start = css.indexOf("/* Month bars, category tones");
