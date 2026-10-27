@@ -404,7 +404,7 @@ deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
 
 **The site never runs an image built on the server.** `.github/workflows/docker-image.yml` publishes
 `ghcr.io/duranttl/imsda-events:<sha>` for the latest `main` once a day at
-6 PM Central, or when started by hand from the Actions tab (see "Prebuilt
+midnight Central, or when started by hand from the Actions tab (see "Prebuilt
 images from GitHub"). Its public build values
 (`APP_BASE_URL`, `EMBED_ALLOWED_ORIGINS`, `SQUARE_ENVIRONMENT`,
 `SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
@@ -450,11 +450,12 @@ turned off (see "Deploys without downtime" below); the timer then fetches
 
 So after a merge nothing changes on the server until the night window: the
 timer only fetches. (Until xCloud's deploy is turned off, xCloud still pulls
-the commit and restarts the old version briefly.) Once a day GitHub publishes
-the image for the latest `main` ("Prebuilt images from GitHub"), and the timer
-switches to it in the next night window, so the day's merges go live together.
-The timer deploys only the newest commit on `main`: if something merges after
-the day's image was built, that night waits for the next image.
+the commit and restarts the old version briefly.) At midnight Central GitHub
+publishes the image for the latest `main` (about 10 minutes, "Prebuilt images
+from GitHub"), and the timer switches to it in that night's window, so the
+day's merges go live together. The timer deploys only the newest commit on
+`main`: if something merges after the day's image was built, that night waits
+for the next image.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
 on `main`, wait about 10 minutes, then pull and run `imsda-deploy` by hand
 (step 3 under "Deploys without downtime"); otherwise the timer deploys it in
@@ -987,7 +988,7 @@ admin/ops view separately, but not a reason to roll back.
 ## Prebuilt images from GitHub (no build on the server)
 
 Building the image on the 4 GB server takes about 40 minutes (`next build`).
-`.github/workflows/docker-image.yml` builds it on GitHub once a day at 6 PM
+`.github/workflows/docker-image.yml` builds it on GitHub once a day at midnight
 Central for the latest `main` (skipped when that commit already has an image),
 and by hand from the Actions tab ("Run workflow"), and publishes:
 

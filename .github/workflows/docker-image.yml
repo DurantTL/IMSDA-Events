@@ -2,8 +2,8 @@ name: Docker image
 
 # Builds the production image on GitHub and publishes it to GitHub Container
 # Registry, so the server pulls a finished image instead of compiling Next for
-# 40 minutes on a 4 GB host. Runs once a day at 6 PM Central (the day's merges
-# go live together) and by hand from the Actions tab ("Run workflow") when a
+# 40 minutes on a 4 GB host. Runs once a day at midnight Central (the day's merges
+# go live together, when almost no one is filling in a form) and by hand from the Actions tab ("Run workflow") when a
 # change can't wait.
 #
 #   ghcr.io/duranttl/imsda-events:<full commit sha>   (deploy this one)
@@ -13,12 +13,13 @@ name: Docker image
 # headers (no secrets). Set them as repository variables; the defaults below are
 # the production values. Secrets are only ever supplied at runtime (env files).
 on:
-  # 6 PM Central all year: 23:00 UTC is 6 PM daylight time, 00:00 UTC is 6 PM
-  # standard time. Whichever runs second finds the image already published and
-  # skips, so main is built once a day.
+  # Midnight Central all year (Caleb, October 27, 2026: deploys interrupt anyone
+  # submitting a form, so they happen overnight). 05:00 UTC is midnight daylight
+  # time, 06:00 UTC is midnight standard time. Whichever runs second finds the
+  # image already published and skips, so main is built once a day.
   schedule:
-    - cron: "0 23 * * *"
-    - cron: "0 0 * * *"
+    - cron: "0 5 * * *"
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 concurrency:
