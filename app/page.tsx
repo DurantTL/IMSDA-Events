@@ -109,14 +109,14 @@ export default async function Home() {
             <div aria-hidden="true" className="season-months-row">
               <span className="season-lane-spacer" />
               <span className="season-months-track">
-                {ribbon.marks.map((mark) => <span className="season-month-label" key={mark.label} style={{ left: `${mark.leftPct}%` }}>{mark.label}</span>)}
+                {ribbon.marks.filter((mark) => mark.showLabel).map((mark) => <span className="season-month-label" key={mark.label} style={{ left: `${mark.leftPct}%` }}>{mark.label}</span>)}
               </span>
             </div>
             {ribbon.lanes.map((lane) => (
               <div className="season-lane" key={lane.lane}>
                 <h3 className="season-lane-label">{lane.label}</h3>
                 <ul aria-label={`${lane.label}, next six months`} className={`season-lane-track season-lane-${lane.lane}`} style={{ height: `${lane.rows * 48 + 8}px` }}>
-                  {ribbon.marks.slice(1).map((mark) => <li aria-hidden="true" className="season-gridline" key={mark.label} style={{ left: `${mark.leftPct}%` }} />)}
+                  {ribbon.marks.filter((mark) => mark.leftPct > 0).map((mark) => <li aria-hidden="true" className="season-gridline" key={mark.label} style={{ left: `${mark.leftPct}%` }} />)}
                   {lane.entries.map((entry) => {
                     const title = entry.item.eventTitle ?? entry.item.title;
                     const position = entry.anchor === "left" ? { left: `${entry.edgePct}%` } : { right: `${entry.edgePct}%` };

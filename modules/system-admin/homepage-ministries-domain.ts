@@ -12,6 +12,8 @@ export const homepageMinistryIcons = [
 export type HomepageMinistryIcon = (typeof homepageMinistryIcons)[number];
 
 export const homepageMinistryCount = 6;
+/** The longest calendar category (modules/calendar/schemas.ts). */
+const calendarCategoryMax = 40;
 export const homepageMinistryDescriptionMax = 200;
 export const defaultMinistryLink = "/calendar?view=list";
 
@@ -46,12 +48,13 @@ export function calendarCategoryHref(category: string) {
   return `/calendar?view=list&category=${encodeURIComponent(category)}`;
 }
 
-/** A tile's link: its own link if staff set one, else the calendar filtered to its first category, else the whole calendar. */
+/** A tile's link: its own link if staff set one, else the calendar filtered to its category when it has exactly one, else the whole calendar. */
 export function ministryLinkHref(ministry: Pick<HomepageMinistry, "linkHref" | "categories">): string {
   const own = ministry.linkHref?.trim();
   if (own && isValidMinistryLink(own)) return own;
-  const first = ministry.categories.map((category) => category.trim()).find(Boolean);
-  return first ? calendarCategoryHref(first) : defaultMinistryLink;
+  // The calendar filters by one category, so with two or more the filtered page would hide some of the tile's items.
+  const categories = ministry.categories.map((category) => category.trim()).filter(Boolean);
+  return categories.length === 1 ? calendarCategoryHref(categories[0]) : defaultMinistryLink;
 }
 
 const blankToNull = (value: unknown) => (typeof value === "string" ? value.trim() : value);
@@ -71,7 +74,7 @@ export const homepageMinistryInputSchema = z.object({
     blankToNull,
     z.union([z.literal(""), z.string().max(500).refine(isValidMinistryLink, "A link must start with / (a page on this site) or https://.")]),
   ).nullable().optional().transform((value) => (value ? value : null)),
-  categories: z.array(z.string().trim().min(1).max(60)).max(10, "Use at most 10 categories.").default([])
+  categories: z.array(z.string().trim().min(1).max(calendarCategoryMax, "A category can be at most 40 characters.")).max(10, "Use at most 10 categories.").default([])
     .transform((list) => {
       const seen = new Set<string>();
       return list.filter((category) => {

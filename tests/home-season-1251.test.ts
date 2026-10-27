@@ -129,9 +129,13 @@ describe("the six-month ribbon (#1251)", () => {
   });
 
   it("labels each month start once and drops a first label that would sit on the next one", () => {
-    expect(seasonMonthMarks(seasonWindow("2026-10-27")).map((mark) => mark.label)).toEqual(["November", "December", "January 2027", "February 2027", "March 2027", "April 2027"]);
+    const short = seasonMonthMarks(seasonWindow("2026-10-27"));
+    expect(short.filter((mark) => mark.showLabel).map((mark) => mark.label)).toEqual(["November", "December", "January 2027", "February 2027", "March 2027", "April 2027"]);
+    // The dropped label keeps its month boundary: every later month still has a grid line position.
+    expect(short.filter((mark) => mark.leftPct > 0)).toHaveLength(6);
+    expect(short[0]).toMatchObject({ label: "October", showLabel: false });
     const full = seasonMonthMarks(seasonWindow("2026-10-01"));
-    expect(full[0]).toEqual({ label: "October", leftPct: 0 });
+    expect(full[0]).toEqual({ label: "October", leftPct: 0, showLabel: true });
     expect(full).toHaveLength(6);
   });
 
@@ -255,10 +259,13 @@ describe("ministry tiles (#1251)", () => {
     expect(tiles.every((entry) => entry.next === null && entry.href === "/calendar?view=list")).toBe(true);
   });
 
-  it("links to the tile's own link, else the calendar filtered to the first category, else the calendar", () => {
+  it("links to the tile's own link, else the calendar filtered to a single category, else the calendar", () => {
     expect(ministryLinkHref({ linkHref: "/clubs", categories: ["Youth"] })).toBe("/clubs");
     expect(ministryLinkHref({ linkHref: "https://example.test/x", categories: [] })).toBe("https://example.test/x");
-    expect(ministryLinkHref({ linkHref: null, categories: ["Women's Ministries", "Youth"] })).toBe("/calendar?view=list&category=Women's%20Ministries");
+    expect(ministryLinkHref({ linkHref: null, categories: ["Women's Ministries"] })).toBe("/calendar?view=list&category=Women's%20Ministries");
+    // Two or more categories: no single-category filter could show them all.
+    expect(ministryLinkHref({ linkHref: null, categories: ["Women's Ministries", "Youth"] })).toBe("/calendar?view=list");
+    expect(ministryLinkHref({ linkHref: null, categories: [" Youth ", " "] })).toBe("/calendar?view=list&category=Youth");
     expect(ministryLinkHref({ linkHref: "", categories: [] })).toBe("/calendar?view=list");
     // A stored link that fails the rule is never used.
     expect(ministryLinkHref({ linkHref: "//evil.example", categories: ["Youth"] })).toBe("/calendar?view=list&category=Youth");

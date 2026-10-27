@@ -38,6 +38,11 @@ describe("homepage ministries input (#1251)", () => {
     expect(parsed.ministries[0]).toMatchObject({ description: null, linkHref: null, categories: ["Youth", "Camp Meeting"] });
   });
 
+  it("limits a category to 40 characters, like the calendar's", () => {
+    expect(homepageMinistriesInputSchema.safeParse(sixTiles({ categories: ["a".repeat(40)] })).success).toBe(true);
+    expect(homepageMinistriesInputSchema.safeParse(sixTiles({ categories: ["a".repeat(41)] })).success).toBe(false);
+  });
+
   it("limits a description to 200 plain-text characters on one line", () => {
     expect(homepageMinistriesInputSchema.safeParse(sixTiles({ description: "a".repeat(200) })).success).toBe(true);
     expect(homepageMinistriesInputSchema.safeParse(sixTiles({ description: "a".repeat(201) })).success).toBe(false);

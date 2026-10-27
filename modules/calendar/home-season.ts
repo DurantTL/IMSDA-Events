@@ -108,18 +108,21 @@ export function seasonWindow(today: string): SeasonWindow {
 }
 
 /** Where each month starts along the ribbon, as a percentage, for the labels and grid lines. The first label sits at 0. */
+export type SeasonMark = { label: string; leftPct: number; showLabel: boolean };
+
 export function seasonMonthMarks(window: SeasonWindow) {
-  const marks: { label: string; leftPct: number }[] = [];
+  const marks: SeasonMark[] = [];
   const [startYear, startMonth] = window.start.split("-").map(Number);
-  marks.push({ label: monthNames[startMonth - 1], leftPct: 0 });
+  marks.push({ label: monthNames[startMonth - 1], leftPct: 0, showLabel: true });
   for (let step = 1; step <= 6; step += 1) {
     const first = firstOfMonthAfter(window.start, step);
     if (first > window.end) break;
     const [year, month] = first.split("-").map(Number);
-    marks.push({ label: year === startYear ? monthNames[month - 1] : `${monthNames[month - 1]} ${year}`, leftPct: round((daysBetween(window.start, first) / window.totalDays) * 100) });
+    marks.push({ label: year === startYear ? monthNames[month - 1] : `${monthNames[month - 1]} ${year}`, leftPct: round((daysBetween(window.start, first) / window.totalDays) * 100), showLabel: true });
   }
-  // A month with only a few days left would put its label on top of the next one's.
-  if (marks.length > 1 && marks[1].leftPct < 8) marks.shift();
+  // A month with only a few days left would put its label on top of the next one's: drop that label only; every month
+  // boundary keeps its grid line.
+  if (marks.length > 1 && marks[1].leftPct < 8) marks[0].showLabel = false;
   return marks;
 }
 
@@ -187,7 +190,7 @@ export function seasonItems(items: CalendarItem[], from: string, to: string) {
 }
 
 /** The ribbon: one lane each for clubs, ministries and camps, and office closures, every entry placed by date. */
-export function seasonRibbon(items: CalendarItem[], window: SeasonWindow): { lanes: SeasonLaneLayout[]; marks: { label: string; leftPct: number }[] } {
+export function seasonRibbon(items: CalendarItem[], window: SeasonWindow): { lanes: SeasonLaneLayout[]; marks: SeasonMark[] } {
   const visible = seasonItems(items, window.start, window.end);
   const lanes = seasonLanes.map(({ lane, label }) => {
     const rowEnds: { from: number; to: number }[][] = [];

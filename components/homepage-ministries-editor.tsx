@@ -86,8 +86,8 @@ export function HomepageMinistriesEditor({
         </div>
         <p className="field-help platform-note">
           The six &ldquo;Find your place&rdquo; tiles on the front page. Each shows its next upcoming calendar item from the categories you list
-          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar filtered to the first
-          category. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
+          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar filtered to the
+          category when a tile has exactly one, or the whole calendar when it has two or more. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
         </p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="inline-notice" role="status">{notice}</p>}
@@ -102,7 +102,7 @@ export function HomepageMinistriesEditor({
             </label>
             <label>
               Calendar categories
-              <input autoComplete="off" value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
+              <input autoComplete="off" maxLength={400} value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
             </label>
             <label>
               Link
