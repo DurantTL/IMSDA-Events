@@ -15,7 +15,8 @@ type RouteContext = { params: Promise<{ role: string }> };
  * only changes the view: no server gate reads the cookie, and a role the
  * person does not hold is ignored. So a cross-site link can at most switch a
  * signed-in person's view among the roles they already hold. The switcher
- * uses plain links, not next/link, so nothing prefetches this.
+ * uses plain links, not next/link, so the app never prefetches this; a
+ * browser or CDN link prefetch could at worst do the same harmless switch.
  */
 async function getHandler(_request: Request, context: RouteContext) {
   const { user } = await getCurrentSession();
