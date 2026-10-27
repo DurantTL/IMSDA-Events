@@ -57,7 +57,7 @@ function clubEventRow(overrides: Record<string, unknown> = {}) {
     startsAt: new Date("2027-03-12T22:00:00.000Z"),
     endsAt: new Date("2027-03-14T17:00:00.000Z"),
     timezone: "America/Chicago",
-    location: "Fictitious Camp",
+    location: "Fictitious Camp", locations: [],
     capacity: 300,
     publicInfoUrl: null,
     supportContact: "events@example.test",

@@ -35,6 +35,12 @@ async function loadPublicEventLanding(
       endsAt: true,
       timezone: true,
       location: true,
+      // Active sites only, for the per-site "Get directions" links (#1213).
+      locations: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
+        select: { name: true, address: true },
+      },
       capacity: true,
       publicInfoUrl: true,
       supportContact: true,
@@ -179,6 +185,9 @@ async function loadPublicEventLanding(
       endsAt: event.endsAt.toISOString(),
       timezone: event.timezone,
       location: event.location,
+      sites: event.locations.map((site) => ({ name: site.name, address: site.address })),
+      isPublished: event.isPublished,
+      archivedAt: event.archivedAt ? event.archivedAt.toISOString() : null,
       capacity: event.capacity,
       supportContact: event.supportContact,
       refundPolicy: event.refundPolicy,

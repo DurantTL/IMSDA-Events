@@ -30,7 +30,7 @@ beforeEach(() => {
     startsAt: new Date("2026-08-14T21:00:00.000Z"),
     endsAt: new Date("2026-08-16T17:00:00.000Z"),
     timezone: "America/Chicago",
-    location: "Fictitious Conference Center",
+    location: "Fictitious Conference Center", locations: [],
     capacity: 100,
     publicInfoUrl: null,
     supportContact: "events@example.test",
@@ -163,5 +163,27 @@ describe("public event landing repository forms and lifecycle", () => {
     ]);
     expect(landing?.forms).toHaveLength(1);
     expect(landing?.lifecycle.statusLabel).toBe("Registration open");
+  });
+});
+
+describe("public event landing sites (#1213)", () => {
+  it("reads only active sites' name and address, in order, and exposes them", async () => {
+    prismaMocks.eventFindFirst.mockResolvedValue({
+      id: "e", slug: "s", name: "N", startsAt: new Date("2026-08-14T21:00:00.000Z"), endsAt: new Date("2026-08-16T17:00:00.000Z"),
+      timezone: "America/Chicago", location: "Iowa and Missouri", capacity: null, publicInfoUrl: null, supportContact: null,
+      isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
+      registrationForms: [], announcements: [], locations: [{ name: "Camp Heritage", address: "1 Lake Rd" }],
+    });
+    const landing = await getPublicEventLanding("s", now);
+    expect(prismaMocks.eventFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        locations: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
+          select: { name: true, address: true },
+        },
+      }),
+    }));
+    expect(landing?.event.sites).toEqual([{ name: "Camp Heritage", address: "1 Lake Rd" }]);
   });
 });
