@@ -767,6 +767,7 @@ export function PublicSquarePayment({
   );
   const retryElement = siteUpdating && (
     <SubmitRetryNotice
+      message={siteUpdating}
       busy={Boolean(submittingMethod) || hostedSubmitting || Boolean(choiceSubmitting)}
       onRetry={() => retryRef.current?.()}
     />

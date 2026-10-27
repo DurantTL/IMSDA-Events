@@ -6,7 +6,8 @@ import { useEffect, useRef } from "react";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
-import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
+import { clearEditDraft, getBrowserEditDraftStorage } from "@/lib/local-edit-draft";
+import { type FormVersionView, type FormView, blankPreviewAttendees, builderBackupKey, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 import { clearHistory } from "./edit-history";
 import { runPublishFlow } from "./publish-flow";
 import { useInformationActions } from "./use-information-actions";
@@ -224,6 +225,8 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       cancelLabel: "Keep editing",
       destructive: true,
     }))) return;
+    // The discarded changes must not come back from this browser's backup later (#1263).
+    if (dirty) clearEditDraft(getBrowserEditDraftStorage(), builderBackupKey(eventId, selectedForm?.id));
     const nextDefinition = structuredClone(form.activeVersion.definition);
     setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setHistory(clearHistory(nextDefinition)); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
   }

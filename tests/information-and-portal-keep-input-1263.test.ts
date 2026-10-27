@@ -128,14 +128,14 @@ describe("registration contact edit (#1263)", () => {
 describe("the retry notice (#1263)", () => {
   it("is an alert with a labelled Try again button, disabled while busy", async () => {
     const onRetry = vi.fn();
-    mounted = await mount(createElement(SubmitRetryNotice, { onRetry }));
+    mounted = await mount(createElement(SubmitRetryNotice, { onRetry, message: SITE_UPDATING_MESSAGE }));
     const notice = mounted.container.querySelector(".submit-retry-notice")!;
     expect(notice.getAttribute("role")).toBe("alert");
     expect(notice.textContent).toContain(SITE_UPDATING_MESSAGE);
     await click(buttonByText(mounted.container, "Try again"));
     expect(onRetry).toHaveBeenCalledTimes(1);
     await mounted.unmount();
-    mounted = await mount(createElement(SubmitRetryNotice, { onRetry, busy: true }));
+    mounted = await mount(createElement(SubmitRetryNotice, { onRetry, busy: true, message: SITE_UPDATING_MESSAGE }));
     expect(mounted.container.querySelector("button")!.disabled).toBe(true);
   });
 });

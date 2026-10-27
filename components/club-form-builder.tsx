@@ -171,6 +171,8 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     const warnings = Array.isArray(result.warnings) ? result.warnings as BuilderIssue[] : [];
     setSaved(specSignature(spec));
     setHasDraft(true);
+    // Saved on the server: the "restored" notice and its Discard (back to the loaded spec) no longer apply.
+    editBackup.dismiss();
     setIssues(warnings);
     setDraftStamp(typeof result.draftUpdatedAt === "string" ? result.draftUpdatedAt : null);
     setMessage(warnings.length > 0

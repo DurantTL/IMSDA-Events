@@ -1,8 +1,7 @@
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
-import { editDraftKey } from "@/lib/local-edit-draft";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { clearHistory } from "./edit-history";
-import { blankPreviewAttendees, firstPreviewStepId } from "./builder-types";
+import { blankPreviewAttendees, builderBackupKey, firstPreviewStepId } from "./builder-types";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderWorkspaceProps } from "./builder-types";
@@ -39,7 +38,7 @@ export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: Return
     closeModuleLibrary();
   };
   const backup = useLocalEditDraft({
-    storageKey: editDraftKey("registration-builder", `${eventId}:${state.selectedFormId ?? ""}`),
+    storageKey: builderBackupKey(eventId, state.selectedFormId),
     version: state.selectedVersion?.updatedAt ?? "",
     value: state.definition,
     dirty: state.dirty && state.definition !== null,

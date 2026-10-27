@@ -1494,7 +1494,7 @@ export function CommunicationsWorkspace({
         </nav>
       )}
 
-      {siteUpdating && !draftOpen && <SubmitRetryNotice busy={saving} onRetry={() => retryRef.current?.()} />}
+      {siteUpdating && !draftOpen && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => retryRef.current?.()} />}
       {error && !draftOpen && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 

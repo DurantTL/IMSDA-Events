@@ -89,6 +89,16 @@ describe("registration builder backup (#1263)", () => {
     expect(mounted!.container.textContent).not.toContain("We restored your unsaved changes");
   });
 
+  it("clears the backup of changes discarded by opening another form", async () => {
+    saveEditDraft(window.localStorage, keyFor("form_a"), stamp, definitionWith("Unsaved A question"));
+    await open();
+    await click(buttonContaining("Form B"));
+    await click(buttonContaining("Discard changes and open Form B"));
+    await tick(1000);
+    expect(shown()).toContain("Saved B question");
+    expect(window.localStorage.getItem(keyFor("form_a"))).toBeNull();
+  });
+
   it("Discard goes back to the saved form in place, without a reload, and clears the backup", async () => {
     saveEditDraft(window.localStorage, keyFor("form_a"), stamp, definitionWith("Unsaved A question"));
     const reload = vi.fn();

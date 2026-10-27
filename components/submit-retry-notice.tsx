@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
 
 /**
  * Shown when a submit could not reach the site, usually because it is restarting (#1263). The form
@@ -11,13 +10,14 @@ import { SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
 export function SubmitRetryNotice({
   onRetry,
   busy = false,
-  message = SITE_UPDATING_MESSAGE,
+  message,
   className,
   focusOnShow = false,
 }: {
   onRetry: () => void;
   busy?: boolean;
-  message?: string;
+  /** The result's own message: it differs for keyed and unkeyed writes, so it is required. */
+  message: string;
   className?: string;
   /** Bring the notice into view and focus it when it appears, for a long form whose Submit is far from it. */
   focusOnShow?: boolean;

@@ -108,7 +108,7 @@ export function AttendeeSignUpForm({
   }
 
   const retryNotice = siteUpdating
-    ? <SubmitRetryNotice busy={busy} onRetry={() => { const pending = pendingRef.current; if (pending) void send(pending.kind, pending.body); }} />
+    ? <SubmitRetryNotice message={siteUpdating} busy={busy} onRetry={() => { const pending = pendingRef.current; if (pending) void send(pending.kind, pending.body); }} />
     : null;
 
   if (sentTo) {
