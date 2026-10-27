@@ -197,3 +197,7 @@ visibility condition is exactly what gated that destination before.
    new button class.
 
 Phone layout rules (tables as cards, 44px targets, dialogs, fixed bars) and the Playwright audit that checks them are in `docs/RESPONSIVE.md` (#447).
+
+## Help & learning (#1077)
+
+The sidebar ends with one pinned **Help & learning** link for every staff member, lit on `/help` and below. It opens the guide hub; guides and the glossary are also found through "Find a page or task" (the phone More sheet and System menu include that search). See `docs/HELP-AND-LEARNING.md`.

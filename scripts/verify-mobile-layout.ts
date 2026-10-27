@@ -300,6 +300,11 @@ const pages: PageSpec[] = [
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
   staff("more-launcher-admin", "/overview", "system-admin"),
+  // Help & learning (#1077): the hub, a guide and the glossary, for a system admin and for event staff.
+  staff("help-hub-admin", "/help", "system-admin"),
+  staff("help-guide-admin", "/help/create-or-copy-event", "system-admin"),
+  staff("help-glossary", "/help/glossary"),
+  staff("help-hub-event-staff", "/help", "kitchen"),
   staff("reports", "/more/reports"),
   staff("reports-clubs", "/more/reports/clubs"),
   staff("clubs-oversight", "/more/clubs"),
