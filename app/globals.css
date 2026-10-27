@@ -8441,6 +8441,10 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-swatch { flex: none; box-sizing: border-box; width: 16px; height: 16px; border-left: 5px solid var(--cal-edge); border-radius: 4px; background: var(--cal-fill); }
 .calendar-tone-event .calendar-swatch { border-left-width: 0; }
 .calendar-tone-closure .calendar-swatch { border: 1px dashed var(--cal-edge); background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 3px, #fde4cc 3px, #fde4cc 6px); }
+/* Year view (#1250): hover tints and the closure hatch live here, with the other calendar tone rules. */
+a.calendar-year-day:hover { background: #eef3f6; }
+.calendar-year-mark.is-closure, .calendar-year-slot.is-closure { background: repeating-linear-gradient(135deg, #8a4b1f, #8a4b1f 2px, #fde4cc 2px, #fde4cc 4px); }
+.calendar-year-row:hover { background: #f4f7f9; }
 .calendar-key-item { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; }
 .calendar-board { display: grid; align-items: start; gap: 16px; }
 .calendar-board > * { min-width: 0; }
@@ -13291,7 +13295,6 @@ html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-hei
 .calendar-year-day.is-today .calendar-year-number { border-color: var(--imsda-navy); font-weight: 800; }
 .calendar-year-day.has-items { cursor: pointer; font-weight: 700; }
 .calendar-year-day.is-selected { box-shadow: inset 0 0 0 2px var(--imsda-purple); background: var(--imsda-purple-soft); }
-a.calendar-year-day:hover { background: #eef3f6; }
 a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
 .calendar-year-marks { display: grid; gap: 3px; width: 100%; }
 .calendar-year-day.has-items { position: relative; }
@@ -13304,10 +13307,8 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .calendar-year-mark.is-bar.is-end { margin-right: 6px; border-radius: 0 4px 4px 0; }
 .calendar-year-mark.is-bar.is-start.continues-before { margin-left: 0; border-radius: 0; }
 .calendar-year-mark.is-bar.is-end.continues-after { margin-right: 0; border-radius: 0; }
-.calendar-year-mark.is-closure, .calendar-year-slot.is-closure { background: repeating-linear-gradient(135deg, #8a4b1f, #8a4b1f 2px, #fde4cc 2px, #fde4cc 4px); }
 .calendar-year-rows { display: none; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .calendar-year-row { display: grid; gap: 6px; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 10px 12px; color: var(--ink); text-decoration: none; }
-.calendar-year-row:hover { background: #f4f7f9; }
 .calendar-year-row:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .calendar-year-row-name { color: var(--imsda-navy); font-size: 1.0625rem; font-weight: 800; }
 .calendar-year-strip { display: flex; gap: 1px; height: 16px; }
