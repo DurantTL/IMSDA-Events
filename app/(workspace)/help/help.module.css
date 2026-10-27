@@ -130,6 +130,7 @@
 .sectionTitle {
   margin: 0;
   font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 700;
 }
 
 .guideTitle {
