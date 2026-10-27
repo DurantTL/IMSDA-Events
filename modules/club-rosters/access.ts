@@ -30,7 +30,7 @@ export const ROSTER_UNLOCK_HOURS = 12;
 /** Who is acting, for attribution: an attendee themself, or staff acting as a club's director. */
 export type ClubActor =
   | { kind: "ATTENDEE"; accountId: string; sessionId: string }
-  | { kind: "STAFF_ACTING"; userId: string; staffSessionId: string; actAsId: string; organizationId: string };
+  | { kind: "STAFF_ACTING"; userId: string; staffSessionId: string; actAsId: string; organizationId: string; viaClubsAdministrator?: true };
 
 /** Attribution fields for a repository write: never both, and staff acting never yields an accountId. */
 export function actorAttribution(actor: ClubActor): { accountId: string } | { userId: string; actAsId: string } {
@@ -73,7 +73,7 @@ export async function getRosterAccessState(organizationId: string, now = new Dat
         state: "OPEN",
         club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null },
         capabilities: clubCapabilities("DIRECTOR"),
-        actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId },
+        actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
       };
     }
     return { state: "NOT_FOUND" };
@@ -196,7 +196,7 @@ export async function getClubRoleAccess(organizationId: string, now = new Date()
         state: "OK",
         club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null },
         capabilities: clubCapabilities("DIRECTOR"),
-        actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId },
+        actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
       };
     }
     return { state: "NOT_FOUND" };

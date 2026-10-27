@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubProfileForm } from "@/components/club-profile-form";
+import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { allowedReturnTo } from "@/lib/return-to";
 import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club-profile-repository";
@@ -23,14 +24,14 @@ export default async function StaffClubProfilePage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
   const { organizationId } = await params;
+  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access");
   const { from } = await searchParams;
   const profile = await getClubProfile(organizationId);
   if (!profile) notFound();
   const sponsors = await listSponsorOptions(profile.sponsoringChurchId);
   const clubHref = `/admin/organizations/${organizationId}/club`;
-  const backHref = allowedReturnTo(from, [clubHref], "/admin/organizations");
+  const backHref = allowedReturnTo(from, [clubHref], user.globalRole === "SYSTEM_ADMIN" ? "/admin/organizations" : clubHref);
   const backLabel = backHref === clubHref ? `Back to ${profile.name}` : "Back to Clubs and churches";
   return (
     <section className="page-stack">

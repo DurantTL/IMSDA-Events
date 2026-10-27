@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   actAsFindFirst: vi.fn(),
   sessionFindUnique: vi.fn(),
+  grantFindFirst: vi.fn(),
   orgFindUnique: vi.fn(),
   memberFindMany: vi.fn(),
   memberCreate: vi.fn(),
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 const client = {
   staffActAs: { findFirst: mocks.actAsFindFirst, updateMany: vi.fn() },
   userSession: { findUnique: mocks.sessionFindUnique },
+  clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
   organization: { findUnique: mocks.orgFindUnique },
   attendeeMfaEnrollment: { findUnique: async () => ({ status: "ACTIVE" }) },
   attendeePasskey: { count: async () => 0 },
@@ -86,6 +88,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getCurrentSession.mockResolvedValue(admin);
   mocks.sessionFindUnique.mockResolvedValue(liveStaffSession());
+  mocks.grantFindFirst.mockResolvedValue(null);
   mocks.actAsFindFirst.mockResolvedValue(actingRow("CLUB_DIRECTOR", "club-a"));
   mocks.getCurrentAttendee.mockResolvedValue(clubBDirector);
   mocks.listDirectedClubs.mockImplementation(async (accountId: string) => (
@@ -170,7 +173,37 @@ describe("Area Coordinator view-only pages (#442)", () => {
   it("stay closed when the staff user is no longer a system administrator", async () => {
     mocks.actAsFindFirst.mockResolvedValue(actingRow("AREA_COORDINATOR", null));
     mocks.getCurrentSession.mockResolvedValue({ ...admin, user: { ...admin.user, globalRole: null } });
+    mocks.sessionFindUnique.mockResolvedValue({ ...liveStaffSession(), user: { ...liveStaffSession().user, globalRole: null } });
     await expect(areaPage()).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("stay closed to a Clubs Administrator, whose act-as is only ever for a club's Director (#1232)", async () => {
+    mocks.actAsFindFirst.mockResolvedValue(actingRow("AREA_COORDINATOR", null));
+    mocks.getCurrentSession.mockResolvedValue({ ...admin, user: { ...admin.user, globalRole: null } });
+    mocks.sessionFindUnique.mockResolvedValue({ ...liveStaffSession(), user: { ...liveStaffSession().user, globalRole: null } });
+    mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+    await expect(areaPage()).rejects.toThrow("NOT_FOUND");
+  });
+});
+
+describe("a Clubs Administrator acting as club A's director (#1232)", () => {
+  const asClubsAdmin = () => {
+    mocks.getCurrentSession.mockResolvedValue({ ...admin, user: { ...admin.user, globalRole: null } });
+    mocks.sessionFindUnique.mockResolvedValue({ ...liveStaffSession(), user: { ...liveStaffSession().user, globalRole: null } });
+  };
+
+  it("opens club A with the same director powers while the grant is active", async () => {
+    asClubsAdmin();
+    mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+    await expect(getRosterAccessState("club-a")).resolves.toMatchObject({
+      state: "OPEN", actor: { kind: "STAFF_ACTING", userId: "admin-1", actAsId: "act-1", organizationId: "club-a", viaClubsAdministrator: true },
+    });
+  });
+
+  it("falls back to the attendee account on the very next request once the grant is revoked", async () => {
+    asClubsAdmin();
+    mocks.grantFindFirst.mockResolvedValue(null);
+    await expect(getRosterAccessState("club-a")).resolves.toMatchObject({ state: "NOT_FOUND" });
   });
 });
 

@@ -161,7 +161,7 @@ describe("who may request", () => {
     expect(db.outbox[0]).toMatchObject({ templateKey: "MODULE_REQUEST_SUBMITTED", recipientKind: "INTERNAL", recipientEmail: "office@imsda-events.test", eventId: null });
     expect(db.outbox[0].subjectSnapshot).toContain("Merchandise");
     expect(db.outbox[0].bodyTextSnapshot).toContain("We sell shirts at the gate.");
-    expect(db.outbox[0].bodyTextSnapshot).toContain("https://events.imsda.test/admin#module-requests");
+    expect(db.outbox[0].bodyTextSnapshot).toContain("https://events.imsda.test/admin/feature-requests");
     // Account email is not configured here, so nothing is sent and the row waits.
     expect(mocks.processAccountEmailQueue).not.toHaveBeenCalled();
   });

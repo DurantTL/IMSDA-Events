@@ -5,7 +5,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubImportApiError } from "@/modules/club-imports/api-errors";
 import { listClubInvites, sendClubInvites } from "@/modules/club-imports/invites";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { withRequestContext } from "@/lib/request-context";
 
 const sendSchema = z.object({
@@ -22,7 +22,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const selection = sendSchema.parse(await request.json());
     const { sent, messageIds } = await sendClubInvites(selection, actor.id);
     after(async () => {

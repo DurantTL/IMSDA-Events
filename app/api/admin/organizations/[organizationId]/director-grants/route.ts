@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubOrganizationAdministration } from "@/modules/organizations/access";
 import { organizationApiError } from "@/modules/organizations/api-errors";
 import {
   createDirectorGrant,
@@ -12,8 +12,8 @@ type RouteContext = { params: Promise<{ organizationId: string }> };
 
 async function getHandler(_request: Request, context: RouteContext) {
   try {
-    await requireSystemAdministrator();
     const { organizationId } = await context.params;
+    await requireClubOrganizationAdministration(organizationId);
     return Response.json(await listDirectorGrants(organizationId));
   } catch (error) {
     return organizationApiError(error, "Loading club directors");
@@ -24,8 +24,8 @@ async function postHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
     const { organizationId } = await context.params;
+    const actor = await requireClubOrganizationAdministration(organizationId);
     const input = createDirectorGrantInputSchema.parse(await request.json());
     return Response.json(
       await createDirectorGrant(organizationId, input, actor.id),

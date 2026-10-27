@@ -4,6 +4,7 @@ import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { listDirectoryReviewEntries } from "@/modules/forms/directory-review";
 import { getSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
+import { failedEmailWheres } from "@/modules/system-admin/email-problem-filters";
 import { eventCountFromGroups } from "@/modules/system-admin/attention-event-count";
 import { countCancellationRequestsWaiting } from "@/modules/system-admin/attention-cancellation-hook";
 import {
@@ -125,24 +126,10 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     // Two indexed reads that cannot overlap (the second leaves out status FAILED), so nothing is counted twice. Both
     // leave out an original that a later retry already got sent: it is no longer a problem.
     read("email-failed", "failed email", NONE, async () => {
-      const notRecovered = { retries: { none: { status: "SENT" as const } } };
+      const [failedWhere, providerWhere] = failedEmailWheres(problemSince);
       const [failed, providerProblems] = await Promise.all([
-        prisma.messageOutbox.groupBy({
-          by: ["eventId"],
-          where: { status: "FAILED", failedAt: { gte: problemSince }, ...notRecovered },
-          _count: { _all: true },
-        }),
-        prisma.messageOutbox.groupBy({
-          by: ["eventId"],
-          where: {
-            status: { not: "FAILED" },
-            provider: { in: ["RESEND", "SES"] },
-            providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] },
-            providerStatusAt: { gte: problemSince },
-            ...notRecovered,
-          },
-          _count: { _all: true },
-        }),
+        prisma.messageOutbox.groupBy({ by: ["eventId"], where: failedWhere, _count: { _all: true } }),
+        prisma.messageOutbox.groupBy({ by: ["eventId"], where: providerWhere, _count: { _all: true } }),
       ]);
       return groupedCount([...failed, ...providerProblems]);
     }),

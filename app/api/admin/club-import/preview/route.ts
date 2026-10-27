@@ -2,7 +2,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubImportApiError } from "@/modules/club-imports/api-errors";
 import { MAX_CLUB_LIST_BYTES, MAX_IMPORT_BYTES, isClubListExport, parseClubImportFile } from "@/modules/club-imports/domain";
 import { annotateImportDrafts } from "@/modules/club-imports/repository";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -13,7 +13,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     const body = await request.text();
     if (body.length > MAX_IMPORT_BYTES) {
       return Response.json({ error: "EXPORT_TOO_LARGE", message: "That file is larger than 5 MB. Export fewer entries at a time." }, { status: 413 });

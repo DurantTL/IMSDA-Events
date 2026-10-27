@@ -1,4 +1,4 @@
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { rosterBackgroundCsvTemplate, sterlingCsvTemplate } from "@/modules/background-checks/domain";
 import { withRequestContext } from "@/lib/request-context";
@@ -9,7 +9,7 @@ import { withRequestContext } from "@/lib/request-context";
  */
 async function getHandler(request: Request) {
   try {
-    await requireSystemAdministrator();
+    await requireClubsAdministration();
     const sterling = new URL(request.url).searchParams.get("format") === "sterling";
     return new Response(sterling ? sterlingCsvTemplate() : rosterBackgroundCsvTemplate(), {
       headers: {

@@ -55,7 +55,7 @@ vi.mock("@/modules/system-admin/platform-settings", () => ({
   platformSettingsInputSchema: { parse: (value: unknown) => value },
   PlatformSettingsError: class PlatformSettingsError extends Error {},
 }));
-vi.mock("@/modules/background-checks/repository", () => ({ listBackgroundCheckReviews: mocks.listBackgroundCheckReviews }));
+vi.mock("@/modules/background-checks/repository", () => ({ listBackgroundCheckReviews: mocks.listBackgroundCheckReviews, rematchBackgroundCheckList: vi.fn(async () => undefined) }));
 vi.mock("@/modules/system-admin/user-admin", () => ({
   resetStaffTwoStep: mocks.resetStaffTwoStep,
   sendStaffPasswordReset: vi.fn(),
@@ -221,9 +221,10 @@ describe("what a Clubs Administrator sees like a system administrator, and what 
     }
   });
 
-  it("keeps the health record import system-administrator only", () => {
-    expect(() => requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-clubs", viaClubsAdministrator: true })).toThrow(/system administrator/);
+  it("lets a Clubs Administrator run the health record import like a system administrator (#1232), but never while acting as a director", () => {
+    expect(requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-clubs", viaClubsAdministrator: true })).toMatchObject({ userId: "u-clubs" });
     expect(requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-sys" })).toMatchObject({ userId: "u-sys" });
+    expect(() => requireHealthImporter({ kind: "SYSTEM_ADMIN", userId: "u-clubs", actAsId: "act-1", viaClubsAdministrator: true })).toThrow(/Clubs Administrator/);
   });
 
   it("opens sealed copies and break-glass to a Clubs Administrator but not the holds, and refuses a revoked grant", async () => {
@@ -263,7 +264,7 @@ describe("what a Clubs Administrator sees like a system administrator, and what 
     expect((await call()).status).toBe(200);
   });
 
-  it("opens Sterling Volunteers read routes to a Clubs Administrator, not to a revoked one, and keeps its writes system-only", async () => {
+  it("opens Sterling Volunteers read routes to a Clubs Administrator, not to a revoked one, and the review writes too (#1232)", async () => {
     signInAs("clubsAdmin");
     expect((await backgroundReviews(json("/api/admin/background-checks/reviews", "GET"))).status).toBe(200);
     expect(mocks.listBackgroundCheckReviews).toHaveBeenCalledTimes(1);
@@ -271,6 +272,8 @@ describe("what a Clubs Administrator sees like a system administrator, and what 
     expect((await backgroundReviews(json("/api/admin/background-checks/reviews", "GET"))).status).toBe(403);
     expect(mocks.listBackgroundCheckReviews).toHaveBeenCalledTimes(1);
     signInAs("clubsAdmin");
+    expect((await rematch(json("/api/admin/background-checks/rematch", "POST"))).status).toBe(200);
+    signInAs("revokedClubsAdmin");
     expect((await rematch(json("/api/admin/background-checks/rematch", "POST"))).status).toBe(403);
   });
 

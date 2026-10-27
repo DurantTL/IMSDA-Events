@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { honorApiError } from "@/modules/honors/api-errors";
 import { HonorCsvError, MAX_HONOR_CSV_BYTES, parseHonorCsv, planHonorImport } from "@/modules/honors/catalog-csv";
 import { applyHonorImport, listHonors } from "@/modules/honors/repository";
@@ -16,7 +16,7 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { csv, confirm } = importSchema.parse(await request.json());
     let rows;
     try {

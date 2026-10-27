@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator, requireClubsAdministration: mocks.requireSystemAdministrator, requireClubOrganizationAdministration: mocks.requireSystemAdministrator }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/club-supplies/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-supplies/repository")>("@/modules/club-supplies/repository");

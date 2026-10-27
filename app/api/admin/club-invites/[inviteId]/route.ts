@@ -2,7 +2,7 @@ import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubImportApiError } from "@/modules/club-imports/api-errors";
 import { listClubInvites, updateClubInvite } from "@/modules/club-imports/invites";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { withRequestContext } from "@/lib/request-context";
 
 const changeSchema = z.union([
@@ -15,7 +15,7 @@ async function patchHandler(request: Request, context: { params: Promise<{ invit
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { inviteId } = await context.params;
     await updateClubInvite(inviteId, changeSchema.parse(await request.json()), actor.id);
     return Response.json({ invites: await listClubInvites() });

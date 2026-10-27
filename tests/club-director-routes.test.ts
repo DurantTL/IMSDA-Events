@@ -13,7 +13,7 @@ vi.mock("@/modules/access/request-security", () => ({
   rejectCrossOriginRequest: mocks.rejectCrossOriginRequest,
 }));
 vi.mock("@/modules/organizations/access", () => ({
-  requireSystemAdministrator: mocks.requireSystemAdministrator,
+  requireSystemAdministrator: mocks.requireSystemAdministrator, requireClubsAdministration: mocks.requireSystemAdministrator, requireClubOrganizationAdministration: mocks.requireSystemAdministrator,
 }));
 vi.mock("@/modules/organizations/director-grants-repository", () => ({
   listDirectorGrants: mocks.listDirectorGrants,

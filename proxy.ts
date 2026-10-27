@@ -35,6 +35,7 @@ export const config = {
     "/registration-builder/:path*",
     "/staff/:path*",
     "/event-setup/:path*",
+    "/events-admin/:path*",
     "/no-access",
     "/select-event",
     "/archived-events",

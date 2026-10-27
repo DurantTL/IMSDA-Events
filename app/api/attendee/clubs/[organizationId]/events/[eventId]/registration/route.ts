@@ -97,7 +97,9 @@ async function patchHandler(request: Request, context: { params: Promise<{ organ
     }
     const input = clubRegistrationEditInputSchema.parse(JSON.parse(body));
     // Only the club's own summary: never the staff view of the registration.
-    const { pendingMessageIds, result } = await amendClubRegistration(organizationId, eventId, actorAttribution(access.actor), input);
+    const { pendingMessageIds, result } = await amendClubRegistration(organizationId, eventId, actorAttribution(access.actor), input, undefined, {
+      viaClubsAdministrator: access.actor.kind === "STAFF_ACTING" && access.actor.viaClubsAdministrator === true,
+    });
     try {
       await processQueuedMessageIdsAfterCommit(pendingMessageIds);
     } catch (error) {

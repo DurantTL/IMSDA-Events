@@ -173,7 +173,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                   <strong translate="no">{result.clubName}</strong>{result.kind === "CLUB_LIST" ? "" : ` (${result.clubYear})`}: {result.message}
                   {result.status === "IMPORTED" && result.kind !== "CLUB_LIST" && ` ${result.membersAdded} added to the roster, ${result.membersSkipped} skipped; ${result.invitesCreated} invite${result.invitesCreated === 1 ? "" : "s"} waiting.`}
                   {result.organizationId && result.status !== "FAILED" && result.kind === "CLUB_LIST" && (
-                    <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}`}>Open the club</a>.</>
+                    <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club`}>Open the club</a>.</>
                   )}
                   {result.organizationId && result.status !== "FAILED" && result.kind !== "CLUB_LIST" && (
                     <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club?year=${encodeURIComponent(result.clubYear)}`}>View the {result.clubYear} roster</a>.</>

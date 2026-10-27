@@ -19,6 +19,22 @@ export function resolvePublicRegistrationStatus(
 }
 
 /**
+ * What staff dashboards call each public status (#1227, #1228). Both dashboards read the status from
+ * `resolvePublicRegistrationStatus`, so an open event with no listed form says "Opens soon", the same as the public page.
+ */
+export const registrationStatusLabels: Record<PublicRegistrationStatus, string> = {
+  OPEN: "Registration open",
+  UPCOMING: "Opens soon",
+  OPENING_SOON: "Opens soon",
+  DRAFT: "Draft",
+  CLOSED: "Registration closed",
+};
+
+export function registrationStatusLabel(phase: EventRegistrationPhase, formsListed: boolean): string {
+  return registrationStatusLabels[resolvePublicRegistrationStatus(phase, formsListed)];
+}
+
+/**
  * True for open dates with at least one listed form. Capacity, a full event and the waitlist are
  * handled separately (not part of #1201); this only answers the dates-plus-form question.
  */

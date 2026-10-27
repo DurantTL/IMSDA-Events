@@ -261,6 +261,8 @@ const pages: PageSpec[] = [
   area("health", "/account/area/health"),
   // Staff, as an event administrator.
   staff("overview", "/overview"),
+  // The Events Administrator dashboard (#1227): the event-admin test user holds an EVENT_ADMIN membership. It takes no ?event=.
+  { name: "staff-events-admin", path: "/events-admin", role: "event-admin", expectText: /Event administration/ },
   staff("people-registrations", "/people"),
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),
@@ -329,6 +331,7 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
+  staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
   { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),

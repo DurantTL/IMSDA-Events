@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { listBackgroundCheckReviews, resolveBackgroundCheckReview, restoreDismissedBackgroundCheckReview } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -26,7 +26,7 @@ async function postHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { reviewId } = await context.params;
     const decision = resolveSchema.parse(await request.json());
     await resolveBackgroundCheckReview(reviewId, decision, actor.id);
@@ -44,7 +44,7 @@ async function deleteHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { reviewId } = await context.params;
     await restoreDismissedBackgroundCheckReview(reviewId, actor.id);
     return Response.json({ reviews: await listBackgroundCheckReviews() });

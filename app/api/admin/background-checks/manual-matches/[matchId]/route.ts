@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireSystemAdministrator } from "@/modules/organizations/access";
+import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { listManualBackgroundCheckMatches, undoManualBackgroundCheckMatch } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
@@ -15,7 +15,7 @@ async function deleteHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const actor = await requireSystemAdministrator();
+    const actor = await requireClubsAdministration();
     const { matchId } = await context.params;
     await undoManualBackgroundCheckMatch(matchId, actor.id);
     return Response.json({ matches: await listManualBackgroundCheckMatches() });

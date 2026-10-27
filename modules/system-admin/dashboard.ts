@@ -53,7 +53,7 @@ export type SystemAdminDashboardSource = {
   unresolvedAlertCount: number;
 };
 
-function registrationBalance(registration: SystemAdminEventSource["registrations"][number]) {
+export function registrationBalance(registration: SystemAdminEventSource["registrations"][number]) {
   const paidCents = registration.payments.reduce((paymentTotal, payment) => {
     const refundedCents = payment.refunds.reduce(
       (refundTotal, refund) => refundTotal + refund.amountCents,

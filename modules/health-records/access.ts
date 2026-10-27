@@ -37,15 +37,20 @@ import type { HealthViewer } from "@/modules/health-records/domain";
 
 /**
  * For the club portal and its API routes: the club's own director or deputy,
- * or its Registrar (write-only, #923). A system administrator "acting as" the
- * director is a system administrator: view-only staff, never an editor of
+ * or its Registrar (write-only, #923). A system administrator (or a Clubs Administrator, #1232, marked in the audit)
+ * "acting as" the director is a system administrator: view-only staff, never an editor of
  * health records.
  */
 export async function requireHealthViewerForClub(organizationId: string, now = new Date()): Promise<HealthViewer> {
   requireHealthRecordsEnabled();
   const access = await requireRosterAccess(organizationId, now);
   if (access.actor.kind === "STAFF_ACTING") {
-    return { kind: "SYSTEM_ADMIN", userId: access.actor.userId, actAsId: access.actor.actAsId };
+    return {
+      kind: "SYSTEM_ADMIN",
+      userId: access.actor.userId,
+      actAsId: access.actor.actAsId,
+      ...(access.actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}),
+    };
   }
   if (access.club.role === "REGISTRAR") {
     return { kind: "CLUB_REGISTRAR", organizationId: access.club.organizationId, accountId: access.actor.accountId };

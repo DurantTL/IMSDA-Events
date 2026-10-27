@@ -17,7 +17,9 @@ describe("Clubs navigation", () => {
     expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
     expect(clubsAdminActiveHref("/admin/club-forms/some_form")).toBe("/admin/club-forms");
     // Pages the sidebar does not list light nothing, as before.
-    expect(clubsAdminActiveHref("/admin/clubs/transfers")).toBeNull();
+    expect(clubsAdminActiveHref("/admin/clubs/transfers")).toBe("/admin/clubs/transfers");
+    // A club page with no sidebar item of its own never lights the dashboard.
+    expect(clubsAdminActiveHref("/admin/clubs/unlisted-page")).toBeNull();
     expect(clubsAdminActiveHref("/admin/accounts")).toBeNull();
   });
 

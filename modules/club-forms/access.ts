@@ -20,7 +20,7 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
 function actorFromClubActor(actor: ClubActor): ClubFormActor {
   return actor.kind === "ATTENDEE"
     ? { kind: "ATTENDEE", accountId: actor.accountId }
-    : { kind: "STAFF_ACTING", userId: actor.userId, actAsId: actor.actAsId };
+    : { kind: "STAFF_ACTING", userId: actor.userId, actAsId: actor.actAsId, ...(actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) };
 }
 
 type OpenRosterAccess = Awaited<ReturnType<typeof requireRosterAccess>>;
@@ -54,7 +54,7 @@ export async function resolveAreaCoordinatorViewer(): Promise<Extract<ClubFormsV
   if (account) return { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: account.id } };
   const acting = await currentStaffActingContext();
   if (acting?.role === "AREA_COORDINATOR") {
-    return { kind: "AREA_COORDINATOR", actor: { kind: "STAFF_ACTING", userId: acting.userId, actAsId: acting.actAsId } };
+    return { kind: "AREA_COORDINATOR", actor: { kind: "STAFF_ACTING", userId: acting.userId, actAsId: acting.actAsId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) } };
   }
   return null;
 }

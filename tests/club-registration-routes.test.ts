@@ -127,7 +127,7 @@ describe("club registration routes", () => {
   it("reopens and amends a submitted club registration for a current director", async () => {
     const response = await EDIT(request("PATCH", edit), ctx("club-a"));
     expect(response.status).toBe(200);
-    expect(mocks.amendClubRegistration).toHaveBeenCalledWith("club-a", "event-1", { accountId: "director-1" }, { ...edit, rosterAges: {}, saveAgeToRosterIds: [] });
+    expect(mocks.amendClubRegistration).toHaveBeenCalledWith("club-a", "event-1", { accountId: "director-1" }, { ...edit, rosterAges: {}, saveAgeToRosterIds: [] }, undefined, { viaClubsAdministrator: false });
     // Only the club summary, never the staff view of the registration (B3).
     await expect(response.json()).resolves.toEqual({ confirmationCode: "REG-1", updatedAt: "2026-10-15T13:00:00.000Z", attendeeCount: 2 });
   });
