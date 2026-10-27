@@ -2808,6 +2808,10 @@ model ClubMonthlyReport {
   submittedByAccountId String?
   updatedByAccountId   String?
   updatedByUserId      String?
+  /// The "Reviewed" mark (#1246): set by a Clubs Administrator or system administrator on a submitted record, cleared
+  /// by undoing it or when the record is reopened or changed after review. Audited.
+  reviewedAt           DateTime?
+  reviewedByUserId     String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -6863,6 +6867,14 @@ enum ClubFormLinkStatus {
 /// schema, so the builder's field types and validation apply. Every template
 /// is off (`enabled = false`) until a system administrator turns it on, and
 /// clubs never see a disabled one. Sensitive fields are marked per field key.
+/// Whether a club form is required (#1246): not at all, once per club each club year, or once for each member of the
+/// chosen roster types each club year. Done means a SUBMITTED ClubFormSubmission in that club year.
+enum ClubFormRequirement {
+  NOT_REQUIRED
+  ONCE_PER_CLUB_YEAR
+  PER_ROLE_MEMBER_YEAR
+}
+
 model ClubFormTemplate {
   id                 String    @id @default(cuid())
   key                String    @unique
@@ -6910,6 +6922,12 @@ model ClubFormTemplate {
   fillMode             String?
   fillModeChangedAt    DateTime?
   fillModeChangedByUserId String?
+  /// The "Required" setting (#1246): a staff choice only, never written by `club-forms:sync` or the builder. Nothing is
+  /// required until staff choose. `requiredRoles` (roster types) applies to PER_ROLE_MEMBER_YEAR only.
+  requirement          ClubFormRequirement @default(NOT_REQUIRED)
+  requiredRoles        ClubRosterAttendeeType[] @default([])
+  requirementChangedAt DateTime?
+  requirementChangedByUserId String?
   /// Set the first time the template is edited or created in the app (#712).
   /// `club-forms:sync` never overwrites a customized template.
   customizedAt       DateTime?

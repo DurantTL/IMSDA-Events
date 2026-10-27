@@ -65,6 +65,7 @@ const reportSelect = {
   status: true,
   submittedAt: true,
   firstSubmittedAt: true,
+  reviewedAt: true,
   updatedAt: true,
 } satisfies Prisma.ClubMonthlyReportSelect;
 
@@ -78,6 +79,8 @@ function serializeReport(report: StoredReport) {
     honors: (Array.isArray(report.honors) ? report.honors : []) as ReportHonor[],
     submittedAt: report.submittedAt ? report.submittedAt.toISOString() : null,
     firstSubmittedAt: report.firstSubmittedAt ? report.firstSubmittedAt.toISOString() : null,
+    /** The "Reviewed" mark (#1246), shown read-only to directors and coordinators. Never set on a draft. */
+    reviewedAt: report.reviewedAt ? report.reviewedAt.toISOString() : null,
     updatedAt: report.updatedAt.toISOString(),
   };
 }
@@ -188,6 +191,9 @@ export async function saveClubReport(
       status: input.status,
       submittedAt: input.status === "SUBMITTED" ? (existing?.status === "SUBMITTED" ? existing.submittedAt : now) : null,
       firstSubmittedAt,
+      // Any change or resubmission needs a fresh look, so the mark is cleared (#1246).
+      reviewedAt: null,
+      reviewedByUserId: null,
       ...("accountId" in actor && becomingSubmittedNow ? { submittedByAccountId: actor.accountId } : {}),
       ...("accountId" in actor
         ? { updatedByAccountId: actor.accountId, updatedByUserId: null }
@@ -246,8 +252,8 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
     const saved = await tx.clubMonthlyReport.update({
       where: { id: existing.id },
       data: "accountId" in actor
-        ? { status: "DRAFT", submittedAt: null, updatedByAccountId: actor.accountId, updatedByUserId: null }
-        : { status: "DRAFT", submittedAt: null, updatedByUserId: actor.userId, updatedByAccountId: null },
+        ? { status: "DRAFT", submittedAt: null, reviewedAt: null, reviewedByUserId: null, updatedByAccountId: actor.accountId, updatedByUserId: null }
+        : { status: "DRAFT", submittedAt: null, reviewedAt: null, reviewedByUserId: null, updatedByUserId: actor.userId, updatedByAccountId: null },
       select: reportSelect,
     });
     await writeAuditLog({
@@ -284,7 +290,7 @@ export async function listClubReportsForYear(clubYear: string) {
     }),
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, status: "SUBMITTED" },
-      select: { organizationId: true, reportMonth: true, totalPoints: true, onTimePoints: true, firstSubmittedAt: true },
+      select: { organizationId: true, reportMonth: true, totalPoints: true, onTimePoints: true, firstSubmittedAt: true, reviewedAt: true },
     }),
     prisma.clubYearStanding.findMany({ where: { clubYear }, select: { organizationId: true, registrationOnTime: true } }),
   ]);
@@ -296,7 +302,7 @@ export async function listClubReportsForYear(clubYear: string) {
     registrationOnTime: onTimeByClub.get(club.id) ?? false,
     reports: Object.fromEntries(reports
       .filter((report) => report.organizationId === club.id)
-      .map((report) => [report.reportMonth, { totalPoints: report.totalPoints, onTime: report.onTimePoints > 0 }])) as Record<string, { totalPoints: number; onTime: boolean }>,
+      .map((report) => [report.reportMonth, { totalPoints: report.totalPoints, onTime: report.onTimePoints > 0, reviewed: Boolean(report.reviewedAt) }])) as Record<string, { totalPoints: number; onTime: boolean; reviewed: boolean }>,
   }));
 }
 

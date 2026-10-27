@@ -13209,6 +13209,22 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .event-featured-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 }
 
+/* Reviewed monthly records and required club forms (#1246). */
+.club-report-review { display: grid; gap: 6px; justify-items: start; }
+.club-report-review button { min-height: 44px; }
+.club-report-review-panel { display: grid; gap: 8px; justify-items: start; }
+.club-report-review-panel .field-help { margin: 0; }
+.club-form-requirement { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.club-form-requirement select { min-height: 44px; max-width: 100%; }
+.club-form-requirement button { min-height: 44px; }
+.club-form-requirement-roles { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
+.forms-missing-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.forms-missing-list small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.club-forms-required-list, .club-forms-required-members { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.club-forms-required-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.club-forms-required .field-help { margin: 4px 0 0; }
+.club-forms-required-members > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

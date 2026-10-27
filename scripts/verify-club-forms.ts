@@ -101,7 +101,7 @@ async function cleanup() {
   await prisma.clubFormTemplateVersion.deleteMany({ where: { templateId: { in: builderTemplateIds } } });
   await prisma.clubFormTemplate.deleteMany({ where: { id: { in: builderTemplateIds } } });
   // Templates are shared rows: leave them, but switch every one back off.
-  await prisma.clubFormTemplate.updateMany({ where: { key: { in: [...templateKeys, TLT_APPLICATION] } }, data: { enabled: false, enabledAt: null, enabledByUserId: null } });
+  await prisma.clubFormTemplate.updateMany({ where: { key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, data: { enabled: false, enabledAt: null, enabledByUserId: null, requirement: "NOT_REQUIRED", requiredRoles: [], requirementChangedAt: null, requirementChangedByUserId: null } });
   // "Who fills it in" is the sync's again: back to the code's default, with no staff change recorded (#1229).
   const { clubFormTemplateSeeds } = await import("../modules/club-forms/definitions");
   for (const seed of clubFormTemplateSeeds.filter((candidate) => [TLT_APPLICATION, CAN_COLLECTING].includes(candidate.key))) {
@@ -906,6 +906,18 @@ async function main() {
     // A form that is not an open application cannot be filled through the open route.
     await expectCode(apply(clubs.a, "moved"), "TEMPLATE_NOT_FOUND", "the open route refuses a form that is no longer open");
   }
+
+  // The Required setting (#1246): a staff choice the sync never overwrites, audited, with roles kept only for a per-member requirement.
+  await templates.setClubFormTemplateRequirement(CAN_COLLECTING, { requirement: "PER_ROLE_MEMBER_YEAR", requiredRoles: ["STAFF", "YOUTH"] }, users.sysAdmin);
+  const requiredRow = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } });
+  assert(requiredRow.requirement === "PER_ROLE_MEMBER_YEAR" && requiredRow.requiredRoles.join(",") === "YOUTH,STAFF", "the Required setting and its roles are saved");
+  await templates.syncClubFormTemplates();
+  const afterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } });
+  assert(afterSync.requirement === "PER_ROLE_MEMBER_YEAR" && afterSync.requiredRoles.join(",") === "YOUTH,STAFF", "the sync leaves the Required setting alone");
+  assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_REQUIREMENT_CHANGED", entityId: requiredRow.id, actorUserId: users.sysAdmin } }) === 1, "changing Required is audited");
+  await templates.setClubFormTemplateRequirement(CAN_COLLECTING, { requirement: "ONCE_PER_CLUB_YEAR", requiredRoles: ["STAFF"] }, users.sysAdmin);
+  assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: CAN_COLLECTING } })).requiredRoles.length === 0, "roles are dropped for a once-per-club requirement");
+  await prisma.clubFormTemplate.update({ where: { key: CAN_COLLECTING }, data: { requirement: "NOT_REQUIRED", requiredRoles: [], requirementChangedAt: null, requirementChangedByUserId: null } });
 
   // Club forms and links block deleting a club.
   const deletion = await orgRepository.getOrganizationDeletionCheck(clubs.a);

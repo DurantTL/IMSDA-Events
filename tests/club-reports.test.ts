@@ -350,7 +350,7 @@ describe("the conference list hides drafts", () => {
     expect(mocksExtra.reportFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ status: "SUBMITTED" }),
     }));
-    expect(club.reports).toEqual({ "2026-09": { totalPoints: 300, onTime: true } });
+    expect(club.reports).toEqual({ "2026-09": { totalPoints: 300, onTime: true, reviewed: false } });
   });
 });
 

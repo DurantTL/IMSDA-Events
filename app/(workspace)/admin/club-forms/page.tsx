@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormFillMode } from "@/components/club-form-fill-mode";
+import { ClubFormRequirement } from "@/components/club-form-requirement";
 import { ClubFormTemplateToggle } from "@/components/club-forms-actions";
 import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
@@ -48,7 +49,7 @@ export default async function AdminClubFormsPage() {
           <table role="table" className="report-table table-cards">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Required</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
               {templates.map((template) => (
@@ -65,6 +66,19 @@ export default async function AdminClubFormsPage() {
                           fillMode={template.fillMode}
                           key={`${template.key}-${template.fillMode}-${closedKeys.has(template.key)}`}
                           name={template.name}
+                          templateKey={template.key}
+                        />
+                      )
+                      : <small className="quiet-copy">Sync first</small>}
+                  </td>
+                  <td {...cardCell("Required")}>
+                    {template.version > 0
+                      ? (
+                        <ClubFormRequirement
+                          key={`${template.key}-${template.requirement}-${template.requiredRoles.join(",")}`}
+                          name={template.name}
+                          requiredRoles={template.requiredRoles}
+                          requirement={template.requirement}
                           templateKey={template.key}
                         />
                       )

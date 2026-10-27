@@ -95,7 +95,7 @@ export function ClubReportsConference({
                       ? `${viewOnlyReportHref.base}/${encodeURIComponent(club.id)}/${month}${viewOnlyReportHref.query}`
                       : `/admin/clubs/reports/${encodeURIComponent(club.id)}/${month}`;
                     if (report) {
-                      return <td key={month} {...cardCell(shortMonth(month))}><Link href={href}>{report.totalPoints}</Link>{!report.onTime && <small> late</small>}</td>;
+                      return <td key={month} {...cardCell(shortMonth(month))}><Link href={href}>{report.totalPoints}</Link>{!report.onTime && <small> late</small>}{report.reviewed && <small> reviewed</small>}</td>;
                     }
                     if (future) return <td key={month} {...cardCell(shortMonth(month))} className="club-reports-future">—</td>;
                     if (viewOnly) {

@@ -344,6 +344,8 @@ const pages: PageSpec[] = [
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),
   staff("club-reports", "/admin/clubs/reports", "system-admin"),
+  staff("club-reports-to-review", `/admin/clubs/reports?year=2026-27&month=${reportMonth}&review=to-review`, "system-admin"),
+  staff("clubs-forms-missing", "/admin/clubs/forms-missing?year=2026-27", "system-admin"),
   staff("club-transfers", "/admin/clubs/transfers", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),

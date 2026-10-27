@@ -9,7 +9,6 @@ import {
   clubsAdminHrefs,
   clubsAdminTabs,
   pickNextEvent,
-  recordStatusLabels,
   type ClubsAdminApplicationSource,
   type ClubsAdminEventSource,
 } from "@/modules/club-reports/clubs-admin-home-model";
@@ -52,7 +51,7 @@ describe("counts", () => {
     const home = buildClubsAdminHome(base);
     expect(home.counts.activeClubs).toBe(4);
     // Alpha submitted on time, Beta late; a draft and no record do not count.
-    expect(home.counts.monthlyRecordsSubmitted).toBe(2);
+    expect(home.counts.monthlyRecordsToReview).toBe(2);
     expect(home.rosterMembers).toBe(25);
     expect(home.reportMonth).toBe("2026-10");
     expect(home.reportMonthLabel).toBe("October 2026");
@@ -71,7 +70,7 @@ describe("counts", () => {
     expect(chooseReportMonth(past, now)).toBe("2025-08");
     const home = buildClubsAdminHome({ ...base, clubYear: past, clubs: pastClubs });
     expect(home.reportMonthLabel).toBe("August 2025");
-    expect(home.counts.monthlyRecordsSubmitted).toBe(1);
+    expect(home.counts.monthlyRecordsToReview).toBe(1);
   });
 
   it("uses the current month when it is in the selected year, and the last month for a future year", () => {
@@ -157,11 +156,21 @@ describe("registered clubs", () => {
     const home = buildClubsAdminHome(base);
     expect(home.registeredClubs.rows.map((row) => [row.name, row.recordLabel, row.rosterSize])).toEqual([
       ["Alpha Pathfinders", "Submitted", 12],
-      ["Beta Adventurers", "Submitted late", 8],
-      ["Gamma Pathfinders", "Draft", 5],
-      ["Delta Explorers", "Due", 0],
+      ["Beta Adventurers", "Submitted", 8],
+      ["Gamma Pathfinders", "Not submitted", 5],
+      ["Delta Explorers", "Not submitted", 0],
     ]);
-    expect(recordStatusLabels).toMatchObject({ MISSING: "Not submitted", FUTURE: "Not yet due" });
+  });
+
+  it("shows Reviewed once a Clubs Administrator has marked a submitted record (#1246)", () => {
+    const reviewed = [
+      club("c1", "Alpha Pathfinders", [{ ...submitted("2026-10"), reviewedAt: new Date("2026-10-26T12:00:00Z") }]),
+      club("c2", "Beta Adventurers", [submitted("2026-10", 0)]),
+    ];
+    const home = buildClubsAdminHome({ ...base, clubs: reviewed });
+    expect(home.registeredClubs.rows.map((row) => row.recordLabel)).toEqual(["Reviewed", "Submitted"]);
+    expect(home.counts.monthlyRecordsToReview).toBe(1);
+    expect(home.registeredClubs.rows.map((row) => row.recordState)).toEqual(["REVIEWED", "SUBMITTED"]);
   });
 
   it("filters by name or church and keeps the total", () => {
