@@ -209,10 +209,21 @@ describe("environment-managed provider status (#1258)", () => {
     // Production without the unlock is not configured, and says why without a value.
     const production = square({ SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-x", SQUARE_WEBHOOK_SIGNATURE_KEY: "k" });
     expect(production.payments).toMatchObject({ status: "not-configured", missing: [], note: "Production is selected but not unlocked." });
-    expect(square({ SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-x", SQUARE_ENABLE_PRODUCTION: "true" }).payments.status).toBe("configured");
+    // Scenario B: a webhook key is set but Production is not unlocked, so the app refuses webhooks: not "configured".
+    expect(production.webhook).toMatchObject({ status: "not-configured", missing: [], note: "Production is selected but not unlocked." });
+    // Scenario A: credentials set, no webhook key: the app treats Square as off, so payments is not configured either.
+    const noWebhook = square({});
+    expect(noWebhook.payments).toMatchObject({ status: "not-configured", missing: [], note: "Card payments stay off until the Square webhook is set." });
+    expect(noWebhook.webhook.status).toBe("not-configured");
+    // A malformed address is "not valid", not "blank".
+    const badUrl = square({ SQUARE_WEBHOOK_SIGNATURE_KEY: "k", SQUARE_WEBHOOK_NOTIFICATION_URL: "", APP_BASE_URL: "not a url" });
+    expect(badUrl.webhook).toMatchObject({ status: "not-configured", missing: [] });
+    expect(badUrl.webhook.note).toContain("not valid");
+    expect(square({ SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-x", SQUARE_ENABLE_PRODUCTION: "true", SQUARE_WEBHOOK_SIGNATURE_KEY: "k" }).payments.status).toBe("configured");
     // Blank credentials are named.
     const blank = buildEnvironmentStatus({}, readers).services.find((s) => s.id === "payments")!;
     expect(blank.missing).toEqual(["SQUARE_APPLICATION_ID", "SQUARE_ACCESS_TOKEN", "SQUARE_LOCATION_ID"]);
+    expect(blank.status).toBe("not-configured");
   });
 
   it("is only computed for a system administrator", () => {

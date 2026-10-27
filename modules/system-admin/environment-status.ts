@@ -61,15 +61,18 @@ function squareServices(source: Source): EnvironmentServiceStatus[] {
     ...(config.accessToken ? [] : ["SQUARE_ACCESS_TOKEN"]),
     ...(config.locationId ? [] : ["SQUARE_LOCATION_ID"]),
   ];
-  const note = config.issue ? squareNotes[config.issue] ?? null : null;
-  const paymentsOk = missing.length === 0 && !note;
-  const webhookMissing = [
-    ...(config.webhookSignatureKey ? [] : ["SQUARE_WEBHOOK_SIGNATURE_KEY (or SQUARE_WEBHOOK_SECRET)"]),
-    ...(config.webhookNotificationUrl ? [] : ["SQUARE_WEBHOOK_NOTIFICATION_URL or APP_BASE_URL"]),
-  ];
+  // Status is the app's own verdict (`paymentConfigured` / `webhookConfigured`); the lists and notes only explain it.
+  const environmentNote = config.issue ? squareNotes[config.issue] ?? null : null;
+  const paymentNote = environmentNote
+    ?? (config.issue === "MISSING_WEBHOOK_CONFIGURATION" ? "Card payments stay off until the Square webhook is set." : null);
+  const webhookMissing = config.webhookSignatureKey ? [] : ["SQUARE_WEBHOOK_SIGNATURE_KEY (or SQUARE_WEBHOOK_SECRET)"];
+  const webhookNote = environmentNote
+    ?? (!config.webhookNotificationUrl
+      ? "The webhook address is not valid: check SQUARE_WEBHOOK_NOTIFICATION_URL or APP_BASE_URL."
+      : config.issue === "MISSING_PAYMENT_CREDENTIALS" ? "Webhooks are refused until the payment credentials are set." : null);
   return [
-    { id: "payments", label: "Square payments", status: paymentsOk ? "configured" : "not-configured", missing, note },
-    { id: "payment-webhook", label: "Square payment confirmations (webhook)", status: webhookMissing.length === 0 ? "configured" : "not-configured", missing: webhookMissing, note: null },
+    { id: "payments", label: "Square payments", status: config.paymentConfigured ? "configured" : "not-configured", missing, note: paymentNote },
+    { id: "payment-webhook", label: "Square payment confirmations (webhook)", status: config.webhookConfigured ? "configured" : "not-configured", missing: webhookMissing, note: webhookNote },
   ];
 }
 

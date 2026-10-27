@@ -37,12 +37,18 @@ afterEach(async () => {
 });
 
 async function saveAnswering(status: number, body: Record<string, unknown>) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  vi.stubGlobal("fetch", fetchMock);
   mounted = await mount(createElement(EventSettingsWorkspace, { mode: "edit", initialEvent: event }));
   const location = mounted.container.querySelector<HTMLInputElement>("#event-field-location")!;
   await typeInto(location, "Edited Camp");
   await submitForm(mounted.container.querySelector("form.event-settings-layout")!);
   await flush();
+  // The failed state comes from the save itself, not from a request made when the page mounted.
+  const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+  expect(calls).toHaveLength(1);
+  expect(calls[0][0]).toBe("/api/events/event-1");
+  expect(calls[0][1].method).toBe("PATCH");
   return { location, status: mounted.container.querySelector("[data-save-state]")?.getAttribute("data-save-state"), bar: mounted.container.querySelector(".event-savebar-status")?.textContent ?? "" };
 }
 
