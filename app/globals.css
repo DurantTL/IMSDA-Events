@@ -13199,7 +13199,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
    labels, 44px taps; no new motion. */
 /* The sticky bar's height (one row of tabs and month navigation, one row of chips; three rows on a phone), shared by the side panel's
    offset and the scroll padding that keeps anchors and focus out from under the bar. */
-:root { --calendar-bar-height: 112px; }
+:root { --calendar-bar-height: 124px; }
 html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-height) + 12px); }
 .calendar-layout { gap: 12px; margin-top: 16px; }
 .calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
@@ -13241,7 +13241,7 @@ html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-hei
   .calendar-subscribe-compact { width: 100%; }
   .calendar-subscribe-compact .calendar-subscribe-toggle { width: 100%; justify-content: center; }
   .calendar-sticky-bar { padding: 6px; }
-  :root { --calendar-bar-height: 164px; }
+  :root { --calendar-bar-height: 172px; }
   .calendar-day { min-height: 50px; }
 }
 /* A short viewport (landscape phone, 200% zoom) would be half covered by a stuck bar, so it scrolls away. */
