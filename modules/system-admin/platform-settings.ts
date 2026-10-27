@@ -205,7 +205,7 @@ export async function updatePlatformSettings(
     let edited: readonly (typeof BASELINE_FIELDS)[number][] = BASELINE_FIELDS;
     if (baseline && before) {
       edited = BASELINE_FIELDS.filter((key) => key in baseline && normalize(key, input[key]) !== baseline[key]);
-      const stale = edited.filter((key) => normalize(key, before[key]) !== baseline[key]);
+      const stale = edited.filter((key) => normalize(key, before[key]) !== baseline[key] && normalize(key, before[key]) !== normalize(key, input[key]));
       if (stale.length > 0) {
         throw new PlatformSettingsError(
           "PLATFORM_SETTINGS_CONFLICT",

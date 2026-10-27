@@ -304,7 +304,10 @@ describe("stale-write baseline (#1076)", () => {
   it("refuses the save and names the fields when someone else changed them since the page loaded", async () => {
     const tx = baselineDatabase();
     const attempt = updatePlatformSettings(
-      { ...platformSettingsInputSchema.parse(validInput()), baseline: { ...matching, organizationName: "Old name", defaultTimezone: "UTC" } },
+      {
+        ...platformSettingsInputSchema.parse(validInput({ organizationName: "IMSDA Mine", defaultTimezone: "America/Denver" })),
+        baseline: { ...matching, organizationName: "Old name", defaultTimezone: "UTC" },
+      },
       "admin-1",
     );
     await expect(attempt).rejects.toMatchObject({
@@ -313,6 +316,15 @@ describe("stale-write baseline (#1076)", () => {
     });
     expect(tx.platformSettings.upsert).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("is no conflict when someone else already saved the same value this save sends", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: { ...matching, organizationName: "Old name", defaultTimezone: "UTC" } },
+      "admin-1",
+    );
+    expect(tx.platformSettings.upsert).toHaveBeenCalled();
   });
 
   it("saves when the baseline still matches, and never writes the baseline to the row or the audit", async () => {

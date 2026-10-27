@@ -13214,7 +13214,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   line-height: 1.5;
 }
-.settings-fields { display: grid; gap: inherit; min-width: 0; margin: 0; border: 0; padding: 0; }
+.settings-fields { min-width: 0; margin: 0; border: 0; padding: 0; }
 .settings-scope-note { margin: 0; color: var(--muted); }
 .settings-scope-note a, .settings-ownership a { display: inline-flex; align-items: center; min-height: 44px; }
 .settings-ownership { margin: 0; color: var(--muted); }

@@ -330,7 +330,7 @@ export function PlatformSettingsWorkspace({
       </section>
 
       <form className="form-stack" onSubmit={save}>
-        <fieldset className="settings-fields" disabled={saving}>
+        <fieldset className="form-stack settings-fields" disabled={saving}>
         <section className="panel">
           <div className="section-heading">
             <div>
