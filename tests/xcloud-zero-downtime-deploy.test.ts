@@ -62,6 +62,7 @@ function runDeploy(env: Record<string, string>) {
   const result = spawnSync("sh", [deployScript], {
     encoding: "utf8",
     env: {
+      NODE_ENV: "test",
       PATH: `${ctx.bin}:/usr/bin:/bin`,
       IMSDA_LOCK_HELD: "1",
       XCLOUD_SITE_PATH: ctx.dir,
@@ -175,6 +176,7 @@ echo "$FAKE_HOUR"
     const result = spawnSync("sh", [autodeployScript], {
       encoding: "utf8",
       env: {
+        NODE_ENV: "test",
         PATH: `${ctx.bin}:/usr/bin:/bin`,
         XCLOUD_SITE_PATH: ctx.dir,
         IMSDA_DEPLOY: path.join(ctx.bin, "imsda-deploy"),
@@ -249,7 +251,7 @@ describe("docker-entrypoint.sh preparation modes", () => {
     writeFileSync(ctx.log, "");
     const result = spawnSync("sh", [entrypoint, "echo", "app-started"], {
       encoding: "utf8",
-      env: { PATH: `${ctx.bin}:/usr/bin:/bin`, FAKE_LOG: ctx.log, ...env },
+      env: { NODE_ENV: "test", PATH: `${ctx.bin}:/usr/bin:/bin`, FAKE_LOG: ctx.log, ...env },
     });
     return { ...result, calls: readFileSync(ctx.log, "utf8").trim() };
   }
