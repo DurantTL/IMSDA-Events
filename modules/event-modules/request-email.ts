@@ -114,7 +114,7 @@ export async function queueRequestSubmittedEmail(client: OutboxAndFeed, officeEm
         input.reason,
         "",
         "Review it in System management:",
-        link("/admin#module-requests"),
+        link("/admin/feature-requests"),
         "",
         "IMSDA Events",
       ].join("\n"),
@@ -131,7 +131,7 @@ export async function queueRequestSubmittedEmail(client: OutboxAndFeed, officeEm
     notificationKey: "EVENT_MODULE_REQUESTED",
     occurrenceKey: `module-request:${input.requestId}`,
     summary: `An event admin asked for the ${input.moduleTitle} feature to be turned on.`,
-    href: "/admin#module-requests",
+    href: "/admin/feature-requests",
   });
   return [message.id];
 }

@@ -22,6 +22,11 @@ export type HomeValue = {
   label: string;
   /** The count, or `null` when it could not be read. */
   value: number | null;
+  /**
+   * The one line under the count (#1228): "Nothing waiting" (or "None found" for events) at zero, "Next starts in N
+   * days" for upcoming events, and `null` when the count is unavailable, so a failed read never reads as zero.
+   */
+  note: string | null;
   /** What one unit is. */
   unit: string;
   /** Which records are counted, and over what period. */
@@ -36,7 +41,7 @@ export type HomeValue = {
 
 export type HomeValueInput = {
   /** `summary.upcomingEventCount` and `generatedAt` of the dashboard read, or `null` when that read failed. */
-  events: { upcomingEventCount: number; generatedAt: string } | null;
+  events: { upcomingEventCount: number; generatedAt: string; nextEventNote?: string | null } | null;
   /** The shared attention summary, or `null` when it could not be loaded at all. */
   attention: AttentionSummary | null;
 };
@@ -66,11 +71,16 @@ export function attentionValue(attention: AttentionSummary | null, key: Attentio
  */
 export function buildHomeValues({ events, attention }: HomeValueInput): HomeValue[] {
   const attentionAt = attention?.generatedAt ?? null;
+  const waiting = (value: number | null) => (value === null ? null : value === 0 ? "Nothing waiting" : null);
+  const applications = attentionValue(attention, "club-applications");
+  const failed = attentionValue(attention, "email-failed");
+  const approvals = attentionValue(attention, "staff-invitation-approvals");
   return [
     {
       key: "upcoming-events",
       label: "Upcoming events",
       value: events ? events.upcomingEventCount : null,
+      note: !events ? null : events.upcomingEventCount === 0 ? "None found" : events.nextEventNote ?? null,
       unit: "events",
       scope: "Not archived and not ended, so an event in progress counts.",
       readAt: events?.generatedAt ?? null,
@@ -79,8 +89,9 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
     },
     {
       key: "club-applications",
-      label: "New club applications waiting",
-      value: attentionValue(attention, "club-applications"),
+      label: "Club applications",
+      value: applications,
+      note: waiting(applications),
       unit: "applications",
       scope: "Every pending application, any year.",
       readAt: attentionAt,
@@ -89,8 +100,9 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
     },
     {
       key: "failed-email",
-      label: "Failed messages",
-      value: attentionValue(attention, "email-failed"),
+      label: "Failed messages (last 7 days)",
+      value: failed,
+      note: waiting(failed),
       unit: "messages",
       scope: "Failed, bounced or marked as spam in the last 7 days and not resent, across all events and account email.",
       readAt: attentionAt,
@@ -99,8 +111,9 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
     },
     {
       key: "waiting-invites",
-      label: "Staff registrations waiting for approval",
-      value: attentionValue(attention, "staff-invitation-approvals"),
+      label: "Staff approvals",
+      value: approvals,
+      note: waiting(approvals),
       unit: "staff registrations",
       scope: "Staff registrations waiting for approval, across all events.",
       readAt: attentionAt,
@@ -203,14 +216,14 @@ export function buildWorkList(attention: AttentionSummary | null, featureRequest
       });
     }
   }
-  // Feature requests are decided in the review queue on this page; the link only scrolls there and approves nothing.
+  // Feature requests are decided on their own review page; this link only opens it and approves nothing.
   const requestRow: WorkRow = {
     key: "feature-requests",
     groupTitle: "Waiting on staff",
     label: featureRequests === 1 ? "feature request waiting for a decision" : "feature requests waiting for a decision",
     count: featureRequests,
     atLeast: featureRequests !== null && featureRequests >= FEATURE_REQUEST_READ_LIMIT,
-    href: "#module-requests",
+    href: "/admin/feature-requests",
     linkLabel: "Review feature requests",
     reviewOnly: false,
   };
@@ -236,17 +249,55 @@ export function groupWorkRows(rows: readonly WorkRow[]): Array<{ title: string; 
 }
 
 /**
- * The Common tasks links, by destination. They are looked up in the shared System navigation so a renamed or removed
- * destination fails a test instead of leaving a dead link.
+ * "Next starts in N days" for the Upcoming events card (#1228), from the dashboard's events (sorted in progress first,
+ * then soonest start). `null` when none has not ended. Same wording as each event card's countdown.
  */
-export const commonTaskHrefs = [
-  { href: "/admin/team", heading: "People and access" },
-  { href: "/admin/accounts", heading: "People and access" },
-  { href: "/admin/form-templates", heading: "Forms and templates" },
-  { href: "/admin/forms", heading: "Forms and templates" },
-  { href: "/admin/email", heading: "Email and settings" },
-  { href: "/admin/settings", heading: "Email and settings" },
-] as const;
+export function nextEventNote(events: ReadonlyArray<{ timing: "UPCOMING" | "IN_PROGRESS" | "PAST"; daysUntilStart: number | null }>): string | null {
+  const next = events.find((event) => event.timing !== "PAST");
+  if (!next) return null;
+  if (next.timing === "IN_PROGRESS") return "Happening now";
+  if (next.daysUntilStart === null) return null;
+  return next.daysUntilStart <= 1 ? "Next starts within a day" : `Next starts in ${next.daysUntilStart} days`;
+}
+
+export type HomeTab = { key: string; label: string; href: string };
+
+/** The top tabs (#1228). Events and System health jump within this page; the rest open the page that owns them. */
+export const systemHomeTabs: readonly HomeTab[] = [
+  { key: "overview", label: "Overview", href: "/admin" },
+  { key: "events", label: "Events", href: "#upcoming-events" },
+  { key: "clubs", label: "Clubs", href: "/admin/clubs/summary" },
+  { key: "people", label: "People", href: "/admin/team" },
+  { key: "forms", label: "Forms", href: "/admin/forms" },
+  { key: "health", label: "System health", href: "#system-health" },
+];
+
+/**
+ * The Common tasks links, grouped as the mockup groups them (#1228), by destination. Each is looked up in the shared
+ * System navigation so a renamed or removed destination fails a test instead of leaving a dead link. `label` names the
+ * link when the mockup's name is shorter than the navigation's.
+ */
+export const commonTaskHrefs: ReadonlyArray<{ href: string; heading: string; label?: string }> = [
+  { href: "/event-setup", heading: "Events" },
+  { href: "/admin/calendar", heading: "Events", label: "Create event from calendar item" },
+  { href: "/event-setup/copy", heading: "Events" },
+  { href: "/admin/event-templates", heading: "Events" },
+  { href: "/archived-events", heading: "Events" },
+  { href: "/admin/organizations", heading: "Clubs" },
+  { href: "/admin/clubs/reports", heading: "Clubs" },
+  { href: "/admin/clubs/summary", heading: "Clubs" },
+  { href: "/admin/clubs/applications", heading: "Clubs", label: "Applications and invites" },
+  { href: "/admin/clubs/transfers", heading: "Clubs" },
+  { href: "/admin/forms", heading: "Forms" },
+  { href: "/admin/club-forms", heading: "Forms" },
+  { href: "/admin/form-templates", heading: "Forms" },
+  { href: "/admin/question-library", heading: "Forms" },
+  { href: "/admin/information-forms", heading: "Forms" },
+  { href: "/admin/team", heading: "People" },
+  { href: "/admin/accounts", heading: "People" },
+  { href: "/admin/email", heading: "Settings" },
+  { href: "/admin/settings", heading: "Settings" },
+];
 
 /** Time shown for a read, in UTC so the server and the reader agree. */
 export function readTimeLabel(iso: string | null): string | null {

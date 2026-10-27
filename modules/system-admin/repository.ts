@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { getOutboxQueueHealth } from "@/modules/communications/outbox-sweep";
@@ -13,96 +14,109 @@ function moneyToCents(value: { toString(): string } | number) {
   return Math.round(Number(value) * 100);
 }
 
-export async function getSystemAdminDashboard(now = new Date()) {
-  const prisma = getPrisma();
-  const [events, activeUserCount, pendingUserCount, systemAdminCount, unresolvedAlertCount] =
-    await Promise.all([
-      prisma.event.findMany({
-        // Archived events (#635) are off the dashboard; the Archived events list holds them.
-        where: { archivedAt: null },
-        orderBy: { startsAt: "asc" },
+/** The per-event numbers the System home and the Events Administrator dashboard (#1227) both show. */
+const dashboardEventSelect = {
+  id: true,
+  archivedAt: true,
+  slug: true,
+  name: true,
+  startsAt: true,
+  endsAt: true,
+  timezone: true,
+  location: true,
+  capacity: true,
+  isPublished: true,
+  registrationOpensOn: true,
+  registrationClosesOn: true,
+  waitlistEnabled: true,
+  registrations: {
+    where: { status: { in: ["SUBMITTED", "CONFIRMED"] } },
+    select: {
+      status: true,
+      totalAmount: true,
+      payments: {
+        where: { status: "SUCCEEDED" },
         select: {
-          id: true,
-          archivedAt: true,
-          slug: true,
-          name: true,
-          startsAt: true,
-          endsAt: true,
-          timezone: true,
-          location: true,
-          capacity: true,
-          isPublished: true,
-          registrationOpensOn: true,
-          registrationClosesOn: true,
-          waitlistEnabled: true,
-          registrations: {
-            where: { status: { in: ["SUBMITTED", "CONFIRMED"] } },
-            select: {
-              status: true,
-              totalAmount: true,
-              payments: {
-                where: { status: "SUCCEEDED" },
-                select: {
-                  amount: true,
-                  refunds: {
-                    where: { status: "SUCCEEDED" },
-                    select: { amount: true },
-                  },
-                },
-              },
-            },
-          },
-          attendees: {
-            where: { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
-            select: { id: true },
-          },
-          checkIns: {
-            where: {
-              undoneAt: null,
-              attendee: { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
-            },
-            select: { id: true },
-          },
-          memberships: {
-            where: { status: "ACTIVE" },
-            select: { id: true },
-          },
-          registrationForms: {
-            where: { versions: { some: { status: "PUBLISHED" } } },
-            select: { id: true },
-          },
-          waitlistEntries: {
-            where: { status: "WAITING" },
-            select: { id: true },
-          },
-          importRuns: {
-            where: {
-              OR: [
-                { status: "FAILED" },
-                { errors: { gt: 0 } },
-                { warnings: { gt: 0 } },
-              ],
-            },
-            select: { status: true, errors: true },
-          },
-          messageOutbox: {
-            where: {
-              OR: [
-                { status: "FAILED" },
-                { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } },
-              ],
-            },
-            select: { id: true },
+          amount: true,
+          refunds: {
+            where: { status: "SUCCEEDED" },
+            select: { amount: true },
           },
         },
-      }),
-      prisma.user.count({ where: { accountStatus: "ACTIVE" } }),
-      prisma.user.count({ where: { accountStatus: "PENDING_ACTIVATION" } }),
-      prisma.user.count({ where: { globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE" } }),
-      prisma.alertNotification.count({ where: { resolvedAt: null } }),
-    ]);
+      },
+    },
+  },
+  attendees: {
+    where: { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
+    select: { id: true },
+  },
+  checkIns: {
+    where: {
+      undoneAt: null,
+      attendee: { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
+    },
+    select: { id: true },
+  },
+  memberships: {
+    where: { status: "ACTIVE" },
+    select: { id: true },
+  },
+  registrationForms: {
+    where: { versions: { some: { status: "PUBLISHED" } } },
+    select: { id: true },
+  },
+  waitlistEntries: {
+    where: { status: "WAITING" },
+    select: { id: true },
+  },
+  importRuns: {
+    where: {
+      OR: [
+        { status: "FAILED" },
+        { errors: { gt: 0 } },
+        { warnings: { gt: 0 } },
+      ],
+    },
+    select: { status: true, errors: true },
+  },
+  messageOutbox: {
+    where: {
+      OR: [
+        { status: "FAILED" },
+        { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } },
+      ],
+    },
+    select: { id: true },
+  },
+} satisfies Prisma.EventSelect;
 
-  const eventSources: SystemAdminEventSource[] = events.map((event) => ({
+type DashboardEventRow = Prisma.EventGetPayload<{ select: typeof dashboardEventSelect }>;
+
+export type DashboardEventFilter = {
+  /**
+   * Only these events. `undefined` reads every event; an empty list reads none, and runs no query at all, so a person
+   * with no events can never fall through to an unfiltered read.
+   */
+  eventIds?: readonly string[];
+  /** Only events that have not ended at this instant (`endsAt >= endsOnOrAfter`). */
+  endsOnOrAfter?: Date;
+};
+
+/** The one event read behind both dashboards: archived events (#635) are never read, whatever the filter says. */
+export async function findDashboardEvents(
+  prisma: Pick<PrismaClient, "event">,
+  filter: DashboardEventFilter = {},
+): Promise<DashboardEventRow[]> {
+  if (filter.eventIds !== undefined && filter.eventIds.length === 0) return [];
+  const where: Prisma.EventWhereInput = { archivedAt: null };
+  if (filter.eventIds !== undefined) where.id = { in: [...filter.eventIds] };
+  if (filter.endsOnOrAfter) where.endsAt = { gte: filter.endsOnOrAfter };
+  return prisma.event.findMany({ where, orderBy: { startsAt: "asc" }, select: dashboardEventSelect });
+}
+
+/** The row shaped for `buildSystemAdminDashboard` (money in cents). */
+export function toDashboardEventSource(event: DashboardEventRow): SystemAdminEventSource {
+  return {
     id: event.id,
     slug: event.slug,
     name: event.name,
@@ -134,7 +148,21 @@ export async function getSystemAdminDashboard(now = new Date()) {
     importIssueCount: event.importRuns.filter((run) => run.status === "FAILED" || run.errors > 0).length,
     importWarningCount: event.importRuns.filter((run) => run.status !== "FAILED" && run.errors === 0).length,
     deliveryIssueCount: event.messageOutbox.length,
-  }));
+  };
+}
+
+export async function getSystemAdminDashboard(now = new Date()) {
+  const prisma = getPrisma();
+  const [events, activeUserCount, pendingUserCount, systemAdminCount, unresolvedAlertCount] =
+    await Promise.all([
+      findDashboardEvents(prisma),
+      prisma.user.count({ where: { accountStatus: "ACTIVE" } }),
+      prisma.user.count({ where: { accountStatus: "PENDING_ACTIVATION" } }),
+      prisma.user.count({ where: { globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE" } }),
+      prisma.alertNotification.count({ where: { resolvedAt: null } }),
+    ]);
+
+  const eventSources = events.map(toDashboardEventSource);
 
   return buildSystemAdminDashboard({
     events: eventSources,

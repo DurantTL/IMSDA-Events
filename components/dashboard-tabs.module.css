@@ -1,0 +1,39 @@
+/* Top tabs on the admin dashboards (#1227, #1228). They wrap instead of scrolling, so nothing overflows at 360px. */
+.tabs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+}
+
+.tabs li {
+  min-width: 0;
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-bottom: 3px solid transparent;
+  border-radius: 10px 10px 0 0;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: break-word;
+}
+
+.tabs a[aria-current="page"] {
+  border-bottom-color: var(--imsda-gold);
+  color: var(--imsda-navy);
+}
+
+.tabs a:focus-visible {
+  outline: 2px solid var(--imsda-navy);
+  outline-offset: 2px;
+}

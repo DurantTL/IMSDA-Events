@@ -206,7 +206,7 @@ describe("home values", () => {
     expect(byKey["failed-email"].scope).toContain("all events and account email");
     expect(byKey["club-applications"].scope).toBe("Every pending application, any year.");
     expect(byKey["club-applications"].scope).not.toContain("all events");
-    expect(byKey["waiting-invites"].label).toBe("Staff registrations waiting for approval");
+    expect(byKey["waiting-invites"].label).toBe("Staff approvals");
   });
 
   it("links staff approvals only when the bell supplies an event, never to an event-less page", () => {
@@ -263,7 +263,7 @@ describe("work across the platform", () => {
     }
     const hrefs = Object.fromEntries(list.rows.map((row) => [row.key, row.href]));
     expect(hrefs["club-applications"]).toBe("/admin/clubs/applications");
-    expect(hrefs["feature-requests"]).toBe("#module-requests");
+    expect(hrefs["feature-requests"]).toBe("/admin/feature-requests");
     expect(hrefs["outbox-sweep"]).toBe("#system-health");
     expect(hrefs["staff-invitation-approvals"]).toBe("/people/staff-invitations/approvals?event=e1");
   });
@@ -310,7 +310,7 @@ describe("System home page", () => {
     expect(html).toContain("Open club applications");
     expect(html).toContain("Review feature requests");
     expect(html).toContain("Open email problems");
-    expect(html).toContain("1 in queue");
+    expect(html).toContain("1 feature request waiting");
     expect(html).toContain("How these numbers differ");
     expect(html).toContain("Unread alerts in your feed");
     // Existing totals keep a truthful label.
@@ -463,7 +463,7 @@ describe("System home page", () => {
       expect(nav.has(href), href).toBe(true);
       expect(html).toContain(`href="${href}"`);
     }
-    for (const heading of ["People and access", "Forms and templates", "Email and settings"]) expect(html).toContain(heading);
+    for (const heading of ["Events", "Clubs", "Forms", "People", "Settings"]) expect(html).toContain(`<h3>${heading}</h3>`);
   });
 
   it("refuses everyone who is not a signed-in system administrator", async () => {

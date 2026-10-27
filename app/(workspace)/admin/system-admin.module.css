@@ -926,6 +926,31 @@ details.taskGroup[open] .taskGrid {
   font-size: max(var(--type-floor, 0px), 0.6rem);
 }
 
+/* ---- Updated stamp, card note and the health report link (#1228) ---- */
+.hero .updated {
+  margin-top: 6px;
+  color: #b8d2de;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.metrics small.metricNote {
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.fullReport {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
 /* ---- Tablet ---- */
 @media (max-width: 1080px) {
   .commonGrid {

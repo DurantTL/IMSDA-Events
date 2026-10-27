@@ -235,13 +235,13 @@ describe("System home health panel", () => {
     const html = await renderHome();
     expect(html).toContain("The queue was read and is empty");
     expect(html).toContain("0 failed, bounced or spam-marked");
-    const panel = html.slice(html.indexOf('id="system-health"'), html.indexOf("System management tasks"));
+    const panel = html.slice(html.indexOf('id="system-health"'), html.indexOf('aria-label="Catalogs and settings"'));
     expect(panel).not.toMatch(/is ready|all set|all clear/i);
   });
 
   it("offers no control that sends, enables, deploys, migrates or unlocks", async () => {
     const html = await renderHome();
-    const panel = html.slice(html.indexOf('id="system-health"'), html.indexOf("System management tasks"));
+    const panel = html.slice(html.indexOf('id="system-health"'), html.indexOf('aria-label="Catalogs and settings"'));
     expect(panel).not.toMatch(/<button|<form|type="submit"/);
   });
 });

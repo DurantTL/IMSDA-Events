@@ -218,6 +218,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/readiness(\/|$)/, "System readiness"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/team(\/|$)/, "Team"],
+  [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
 ];
 
 /**
