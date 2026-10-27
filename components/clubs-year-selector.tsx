@@ -12,17 +12,17 @@ export function ClubsYearSelector() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [now] = useState(() => new Date());
-  const model = clubYearSelectorModel(pathname, searchParams.get("year"), now);
+  const model = clubYearSelectorModel(pathname, searchParams.get("year"), now, searchParams);
   return (
     // Keyed by the selected year, so the select follows the URL after a navigation.
     <form className="clubs-year-form" method="get" action={model.action} key={model.selected}>
       <label htmlFor="clubs-year-select">Club year</label>
+      {model.carry.map(([name, value]) => <input type="hidden" name={name} value={value} key={name} />)}
       <div className="clubs-year-controls">
         <select
           id="clubs-year-select"
           name="year"
           defaultValue={model.selected}
-          onChange={(event) => event.currentTarget.form?.requestSubmit()}
         >
           {model.options.map((year) => <option key={year} value={year}>{year}</option>)}
         </select>

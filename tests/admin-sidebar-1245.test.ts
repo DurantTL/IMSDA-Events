@@ -176,6 +176,23 @@ describe("the club year selector", () => {
     }
   });
 
+  it("carries q and sort only when the form returns to the current page", () => {
+    const params = new URLSearchParams("q=pathfinder&sort=name&year=2025-26");
+    expect(clubYearSelectorModel("/admin/clubs", "2025-26", now, params).carry).toEqual([["q", "pathfinder"], ["sort", "name"]]);
+    expect(clubYearSelectorModel("/admin/honors", null, now, params).carry).toEqual([]);
+    expect(clubYearSelectorModel("/admin/clubs", null, now, new URLSearchParams("q=")).carry).toEqual([]);
+    navigation.pathname = "/admin/clubs/summary";
+    navigation.search = "sort=name&year=2025-26";
+    const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {} };
+    expect(render({ user: staff, adminRoleView: view })).toContain('<input type="hidden" name="sort" value="name"/>');
+  });
+
+  it("never submits on change: only the Show button does (WCAG 3.2.2)", () => {
+    const source = readFileSync(join(process.cwd(), "components/clubs-year-selector.tsx"), "utf8");
+    expect(source).not.toContain("onChange");
+    expect(source).not.toContain("requestSubmit");
+  });
+
   it("selects a valid ?year=, else the current club year, with the shared options", () => {
     expect(clubYearSelectorModel("/admin/clubs", null, now)).toMatchObject({ selected: "2026-27", linkYear: null });
     expect(clubYearSelectorModel("/admin/clubs", "2024-25", now)).toMatchObject({ selected: "2024-25", linkYear: "2024-25" });

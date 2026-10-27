@@ -1,10 +1,11 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { findDashboardEvents, toDashboardEventSource } from "@/modules/system-admin/repository";
+import { findDashboardEvents, moneyToCents, toDashboardEventSource } from "@/modules/system-admin/repository";
 import { failedEmailWheres } from "@/modules/system-admin/email-problem-filters";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
-import { buildEventsAdminHome, type EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
+import type { EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
+import { registrationBalance } from "@/modules/system-admin/dashboard";
 
 /**
  * The Events Administrator dashboard's read (#1227). `eventIds` must come from `resolveAdminRoles(user).eventAdminEventIds`
@@ -45,10 +46,33 @@ export async function getEventsAdminEventSources(eventIds: readonly string[], no
 }
 
 /**
- * What the Events Administrator pill counts (#1245): the dashboard's "Need attention" total, from the same read and the
- * same model, so the pill and the page cannot disagree. `eventIds` is the signed-in person's own
- * `resolveAdminRoles(user).eventAdminEventIds`. Callers leave the count off when this throws, never show it as zero.
+ * What the Events Administrator pill counts (#1245): the dashboard's "Need attention" total (open balances plus draft
+ * registrations), read with two small queries instead of the whole dashboard read, since the shell runs it on every
+ * page. Same scope as `getEventsAdminEventSources` and `buildEventsAdminHome`: only `eventIds` (the signed-in person's
+ * own `resolveAdminRoles(user).eventAdminEventIds`), not archived, not ended; open balances exclude events billed to
+ * churches; the balance rule is `registrationBalance`. Callers leave the count off when this throws, never show zero.
  */
 export async function countEventsAdminWaiting(eventIds: readonly string[], now = new Date()): Promise<number> {
-  return buildEventsAdminHome(await getEventsAdminEventSources(eventIds, now), now).counts.needAttention;
+  if (eventIds.length === 0) return 0;
+  const prisma = getPrisma();
+  const scope = { id: { in: [...eventIds] }, archivedAt: null, endsAt: { gte: now } };
+  const [drafts, registrations] = await Promise.all([
+    prisma.registration.count({ where: { status: "DRAFT", event: scope } }),
+    prisma.registration.findMany({
+      where: { status: { in: ["SUBMITTED", "CONFIRMED"] }, event: { ...scope, billingMode: { not: "DEFERRED_ORGANIZATION_INVOICE" } } },
+      select: {
+        totalAmount: true,
+        payments: { where: { status: "SUCCEEDED" }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } } },
+      },
+    }),
+  ]);
+  const open = registrations.filter((registration) => registrationBalance({
+    status: "CONFIRMED",
+    totalAmountCents: moneyToCents(registration.totalAmount),
+    payments: registration.payments.map((payment) => ({
+      amountCents: moneyToCents(payment.amount),
+      refunds: payment.refunds.map((refund) => ({ amountCents: moneyToCents(refund.amount) })),
+    })),
+  }) > 0).length;
+  return open + drafts;
 }

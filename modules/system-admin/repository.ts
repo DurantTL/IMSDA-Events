@@ -10,7 +10,7 @@ import {
   type SystemAdminEventSource,
 } from "@/modules/system-admin/dashboard";
 
-function moneyToCents(value: { toString(): string } | number) {
+export function moneyToCents(value: { toString(): string } | number) {
   return Math.round(Number(value) * 100);
 }
 
