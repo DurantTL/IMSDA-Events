@@ -29,7 +29,7 @@
 .scopeNote strong,
 .healthyState strong {
   display: block;
-  font-size: 0.78rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
 .scopeNote p,
@@ -197,7 +197,7 @@
 
 .issueTitle strong {
   color: var(--ink);
-  font-size: 0.76rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   overflow-wrap: anywhere;
 }
 
@@ -235,7 +235,7 @@
 
 .resolveLink {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 5px;

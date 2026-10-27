@@ -245,6 +245,7 @@ function fixture({
       }),
     },
     eventAttendeeType: { findMany: vi.fn(async () => []) },
+    registrationLedgerEntry: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => data) },
     registrationOperation: {
       findUnique: vi.fn(async ({ where }: { where: { eventId_clientRequestId: { clientRequestId: string } } }) => (
         operations.get(where.eventId_clientRequestId.clientRequestId) ?? null

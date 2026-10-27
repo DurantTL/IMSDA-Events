@@ -142,6 +142,7 @@ function fixture() {
       findUnique: vi.fn().mockResolvedValue({ eventId: "event-1", confirmationCode: "REG-HW-DEMO", event: { endsAt: event.endsAt } }),
     },
     registrationAccessToken: { create: vi.fn().mockResolvedValue({ id: "access-1" }) },
+    registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger-1" }) },
     registrationWaitlistEntry: { aggregate: vi.fn(), create: vi.fn() },
     messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
     // The form's own notifications (#1081): none configured.

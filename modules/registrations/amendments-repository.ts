@@ -1,5 +1,7 @@
 import "server-only";
 
+import { appendAmendmentDelta } from "@/modules/ledger/entries";
+import { ledgerActor, moneyOnlyPricingSnapshot, type LedgerActor } from "@/modules/ledger/domain";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
@@ -86,6 +88,13 @@ export type AmendmentActor =
 
 function amendmentActorUserId(actor: AmendmentActor) {
   return actor.kind === "CLUB_DIRECTOR" || actor.kind === "GROUP_CONTACT" ? null : actor.id;
+}
+
+/** The actor as an immutable ledger snapshot (#117): an id, and the name only for a staff member; no foreign key. */
+function amendmentLedgerActor(actor: AmendmentActor): LedgerActor {
+  if (actor.kind === "CLUB_DIRECTOR") return ledgerActor("ATTENDEE_ACCOUNT", actor.attendeeAccountId, null);
+  if (actor.kind === "GROUP_CONTACT") return ledgerActor("PERSON", actor.personId, null);
+  return ledgerActor("STAFF", actor.id, actor.displayName);
 }
 
 /** Who the audit calls the actor, without a name. */
@@ -1971,6 +1980,26 @@ async function amendRegistrationInner(
             afterSnapshot: afterSnapshot as Prisma.InputJsonValue,
             responseSnapshot: response as unknown as Prisma.InputJsonValue,
             createdAt: now,
+          },
+        });
+        // Shadow ledger (#117): the change in total as one entry keyed to this operation, in the same transaction as the
+        // new stored total (which stays authoritative). An amendment that leaves the total alone writes nothing.
+        await appendAmendmentDelta(tx, {
+          eventId,
+          registrationId,
+          operationId: amendmentId,
+          previousTotalCents: cents(prepared.registration.totalAmount),
+          finalTotalCents: prepared.finalTotalCents,
+          actor: amendmentLedgerActor(actor),
+          // The free-text reason stays on the operation: a ledger row can never be erased, so it keeps no free text.
+          reason: null,
+          currency: prepared.definition.payment?.currency ?? "USD",
+          pricingSnapshot: {
+            previousTotalCents: cents(prepared.registration.totalAmount),
+            totalCents: prepared.finalTotalCents,
+            pricing: moneyOnlyPricingSnapshot(prepared.nextPricingSnapshot),
+            adjustmentsCents: prepared.adjustmentsCents,
+            mealCreditCents: prepared.mealCreditCents,
           },
         });
         await tx.auditLog.create({

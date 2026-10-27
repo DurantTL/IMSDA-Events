@@ -1,4 +1,5 @@
 import { phoneToStore } from "@/lib/field-validation";
+import { appendSubmissionCharge, staffLedgerActor } from "@/modules/ledger/entries";
 import { getPrisma } from "@/lib/prisma";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { decideEventCapacity } from "@/modules/events/lifecycle";
@@ -519,6 +520,15 @@ export async function createRegistration(eventId: string, input: RegistrationInp
           },
         },
       },
+    });
+
+    // Shadow ledger (#117): same transaction as the stored total, which stays authoritative.
+    await appendSubmissionCharge(tx, {
+      eventId,
+      registrationId: registration.id,
+      totalCents: input.totalAmountCents,
+      actor: await staffLedgerActor(tx, actorUserId),
+      pricingSnapshot: { source: "STAFF_CREATED" },
     });
 
     await tx.auditLog.create({

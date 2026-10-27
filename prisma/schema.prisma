@@ -1822,6 +1822,7 @@ model Event {
   honorClassWaitlist                  HonorClassWaitlistEntry[]
   memberTransferRegistrationMoves     MemberTransferRegistrationMove[]
   registrationOperations              RegistrationOperation[]
+  registrationLedgerEntries           RegistrationLedgerEntry[]
   registrationPaymentChoiceOperations RegistrationPaymentChoiceOperation[]
   cancellationPolicyVersions          EventCancellationPolicyVersion[]
   cancellationCalculations            CancellationCalculation[]
@@ -3108,6 +3109,7 @@ model Registration {
   promoCodeRedemption     PromoCodeRedemption?
   churchSponsorFinanceReviews ChurchSponsorFinanceReview[]
   operations              RegistrationOperation[]
+  ledgerEntries           RegistrationLedgerEntry[]
   paymentChoiceOperations RegistrationPaymentChoiceOperation[]
   merchandiseOrders       MerchandiseOrder[]
   notes                   StaffNote[]
@@ -10360,4 +10362,59 @@ model SeededEventContent {
   updatedAt DateTime @updatedAt
 
   @@unique([kind, key])
+}
+
+enum RegistrationLedgerEntryKind {
+  CHARGE
+  DISCOUNT
+  CREDIT
+}
+
+enum RegistrationLedgerSourceType {
+  REGISTRATION_SUBMISSION
+  AMENDMENT
+  PROMO_REDEMPTION
+}
+
+enum RegistrationLedgerOrigin {
+  LIVE
+  BACKFILL
+}
+
+enum RegistrationLedgerActorType {
+  SYSTEM
+  STAFF
+  ATTENDEE_ACCOUNT
+  PERSON
+}
+
+/// An append-only charge, discount or credit on one registration (#117, slice 1 of #74). `amountCents` is signed
+/// (CHARGE >= 0, DISCOUNT <= 0, CREDIT <= 0, a database check), so what a registration owes is the plain sum of its
+/// entries. Shadow mode: `Registration.totalAmount` stays authoritative and nothing user-visible reads these rows yet.
+/// Never updated and never deleted (a database trigger refuses both, except the cascade from a deleted registration or
+/// event); a correction is a new entry. The actor is a snapshot with no foreign key, so removing a user cannot rewrite
+/// history. (sourceType, sourceId, kind) is the idempotency key shared by live writes and the backfill.
+model RegistrationLedgerEntry {
+  id                String                       @id @default(cuid())
+  eventId           String
+  registrationId    String
+  kind              RegistrationLedgerEntryKind
+  amountCents       Int
+  currency          String                       @default("USD")
+  pricingSnapshot   Json
+  sourceType        RegistrationLedgerSourceType
+  sourceId          String
+  origin            RegistrationLedgerOrigin     @default(LIVE)
+  actorType         RegistrationLedgerActorType  @default(SYSTEM)
+  actorId           String?
+  actorNameSnapshot String?
+  reason            String?
+  createdAt         DateTime                     @default(now())
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceType, sourceId, kind])
+  @@index([registrationId, createdAt])
+  @@index([eventId])
 }
