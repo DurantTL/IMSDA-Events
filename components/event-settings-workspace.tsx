@@ -987,6 +987,32 @@ export function EventSettingsWorkspace({
               <textarea id={settingsFieldDomId("refundPolicy")} {...fieldAria("refundPolicy")} value={draft.refundPolicy ?? ""} rows={5} maxLength={4000} placeholder="Refunds are available until two weeks before the event." onChange={(event) => update("refundPolicy", event.target.value || null)} />
               <small>Shown to registrants on the event page, before they submit a registration, and on their confirmation. Plain text; leave a blank line between paragraphs. Leave empty to show nothing. This only displays the policy; refunds are still handled by staff.</small>
             {fieldNote("refundPolicy")}</label>
+            <div className="event-settings-option">
+              <label className="event-setting-toggle">
+                <input id={settingsFieldDomId("featured")} {...fieldAria("featured")} type="checkbox" checked={draft.featured ?? false} onChange={(event) => update("featured", event.target.checked)} />
+                <span>
+                  <strong>Feature on the public site</strong>
+                  <small>
+                    Pins this event to the top of the homepage and the top of the calendar&rsquo;s list view. Only a published, public,
+                    unarchived event is shown there; unpublishing or archiving it removes it on its own. The homepage shows the first three.
+                  </small>
+                {fieldNote("featured")}</span>
+              </label>
+              {draft.featured && (
+                <>
+                  <label>
+                    Featured order
+                    <input id={settingsFieldDomId("featuredOrder")} {...fieldAria("featuredOrder")} type="number" inputMode="numeric" min={1} max={99} step={1} value={draft.featuredOrder ?? ""} placeholder="1" onChange={(event) => update("featuredOrder", event.target.value ? Number(event.target.value) : null)} />
+                    <small>1 shows first. Leave empty to show after the events that have a number.</small>
+                  {fieldNote("featuredOrder")}</label>
+                  <label>
+                    Feature until (optional)
+                    <input id={settingsFieldDomId("featureUntil")} {...fieldAria("featureUntil")} type="date" value={draft.featureUntil ?? ""} onChange={(event) => update("featureUntil", event.target.value || null)} />
+                    <small>The last day it is featured. Leave empty to stop on the day the event starts{draft.startsOn ? ` (${draft.startsOn})` : ""}.</small>
+                  {fieldNote("featureUntil")}</label>
+                </>
+              )}
+            </div>
             {draft.publicInfoUrl && (
               <a className="secondary-button event-info-preview" href={draft.publicInfoUrl} target="_blank" rel="noreferrer">
                 <ExternalLink size={15} aria-hidden="true" /> Open IMSDA.org page

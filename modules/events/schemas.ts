@@ -169,6 +169,11 @@ export const eventSettingsInputSchema = z.object({
   audience: z.enum(["GENERAL", "CLUB"]).optional(),
   seminarPreferenceClosesOn: calendarDateSchema.nullable().default(null),
   seminarPreferenceSelfServiceLocked: z.boolean().default(false),
+  // Feature on the public site (#1218). All three are absent-keeps-stored, so a stale client can't unfeature an event.
+  // Order 1 shows first; the date is the last day it is featured (empty: the event's start date).
+  featured: z.boolean().optional(),
+  featuredOrder: z.number().int().min(1, "Use 1 or higher; 1 shows first.").max(99, "Use a number up to 99.").nullable().optional(),
+  featureUntil: calendarDateSchema.nullable().optional(),
   ...lifecycleFields,
 }).superRefine((value, context) => {
   validateLifecycle(value, context);

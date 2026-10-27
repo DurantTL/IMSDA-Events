@@ -133,6 +133,15 @@ function lodgingUpdateData(input: EventLodgingInput) {
   ) as Partial<Record<keyof EventLodgingInput, string | null>>;
 }
 
+/** The featured columns a save changes (#1218); a field the request leaves out keeps its stored value. */
+function featuredUpdateData(input: Pick<EventSettingsInput, "featured" | "featuredOrder" | "featureUntil">) {
+  return {
+    ...(input.featured !== undefined ? { featured: input.featured } : {}),
+    ...(input.featuredOrder !== undefined ? { featuredOrder: input.featuredOrder } : {}),
+    ...(input.featureUntil !== undefined ? { featureUntil: input.featureUntil } : {}),
+  };
+}
+
 export async function getEventSettings(eventId: string) {
   const prisma = getPrisma();
   const [event, publishedForms, paymentInstructions] = await Promise.all([
@@ -176,6 +185,9 @@ export async function getEventSettings(eventId: string) {
         seminarPreferenceClosesOn: true,
         seminarPreferenceSelfServiceLocked: true,
         autoPromoteWaitlist: true,
+        featured: true,
+        featuredOrder: true,
+        featureUntil: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -240,6 +252,9 @@ export async function getEventSettings(eventId: string) {
     seminarPreferenceSelfServiceLocked:
       event.seminarPreferenceSelfServiceLocked,
     autoPromoteWaitlist: event.autoPromoteWaitlist,
+    featured: event.featured,
+    featuredOrder: event.featuredOrder,
+    featureUntil: event.featureUntil,
     publishedFormCount,
     publishedForms,
     createdAt: event.createdAt.toISOString(),
@@ -432,6 +447,9 @@ export async function updateEventSettings(
           seminarPreferenceClosesOn: true,
           seminarPreferenceSelfServiceLocked: true,
           autoPromoteWaitlist: true,
+          featured: true,
+          featuredOrder: true,
+          featureUntil: true,
         },
       }),
       tx.eventPaymentInstructionVersion.findFirst({
@@ -518,6 +536,7 @@ export async function updateEventSettings(
         seminarPreferenceSelfServiceLocked:
           input.seminarPreferenceSelfServiceLocked,
         autoPromoteWaitlist: input.autoPromoteWaitlist,
+        ...featuredUpdateData(input),
       },
     });
     // Switching an event to CLUB is a deliberate act (#741): it gets the club
@@ -533,6 +552,25 @@ export async function updateEventSettings(
           versionNumber: (currentPaymentInstructions?.versionNumber ?? 0) + 1,
           instructions: requestedInstructions,
           approvedByUserId: actorUserId,
+        },
+      });
+    }
+    const featuredBefore = { featured: current.featured, featuredOrder: current.featuredOrder, featureUntil: current.featureUntil };
+    const featuredAfter = { ...featuredBefore, ...featuredUpdateData(input) };
+    if (JSON.stringify(featuredBefore) !== JSON.stringify(featuredAfter)) {
+      // Its own entry (#1218), so "who featured this and when" is one filter, with the old and new values beside it.
+      await tx.auditLog.create({
+        data: {
+          eventId,
+          actorUserId,
+          action: "EVENT_FEATURED_CHANGED",
+          entityType: "Event",
+          entityId: eventId,
+          correlationId: crypto.randomUUID(),
+          summary: featuredAfter.featured === featuredBefore.featured
+            ? `Changed how ${input.name} is featured on the public site.`
+            : featuredAfter.featured ? `Featured ${input.name} on the public site.` : `Stopped featuring ${input.name} on the public site.`,
+          metadata: { before: featuredBefore, after: featuredAfter },
         },
       });
     }

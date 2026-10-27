@@ -13,6 +13,8 @@ vi.mock("@/modules/calendar/repository", () => ({
   conferenceToday: () => "2026-09-23",
   listPublicCalendarItems: mocks.listPublicCalendarItems,
 }));
+const featured = vi.hoisted(() => ({ rows: vi.fn(), images: vi.fn() }));
+vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: featured.rows, listEventCardImages: featured.images }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 // An async server component cannot render inside renderToStaticMarkup, so this stands in for it with the same presentational links (#1009).
 vi.mock("@/components/public-header-session-links", async () => {
@@ -45,6 +47,8 @@ async function render() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  featured.rows.mockResolvedValue([]);
+  featured.images.mockResolvedValue(new Map());
   mocks.listPublicCalendarItems.mockResolvedValue([]);
   mocks.getCurrentSession.mockResolvedValue({ user: null });
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
@@ -129,5 +133,28 @@ describe("public front page (#373)", () => {
     const html = await render();
     expect(html).toContain("My registrations");
     expect(html).toContain("Signed in as Pat Example");
+  });
+});
+
+describe("featured events and the Coming up strip (#1218, #1210)", () => {
+  it("shows no Featured section when nothing is featured, and Coming up is a labelled list of linked cards", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item(1), item(2)]);
+    const html = await render();
+    expect(html).not.toContain("home-featured-heading");
+    expect(html).toContain('<ul aria-labelledby="home-upcoming-heading" class="event-photo-list">');
+    expect(html).toContain('href="/events/camp-1">Fictitious Camp 1</a>');
+    expect(html).toContain('href="/calendar?view=list">See all');
+  });
+
+  it("leads with featured events and leaves them out of Coming up", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item(1), item(2), item(3)]);
+    featured.rows.mockResolvedValue([{ slug: "camp-2", featuredOrder: 1, featureUntil: null, startsOn: "2026-10-02", endsOn: "2026-10-02" }]);
+    featured.images.mockResolvedValue(new Map([["camp-2", { assetId: "asset-9" }]]));
+    const html = await render();
+    expect(html.indexOf("home-featured-heading")).toBeLessThan(html.indexOf("home-upcoming-heading"));
+    expect(html.split('href="/events/camp-2"').length - 1).toBe(1);
+    expect(html).toContain("/api/public/events/camp-2/assets/asset-9?w=640");
+    expect(html).toContain("event-photo-card-featured");
+    expect(html.slice(html.indexOf("home-upcoming-heading"))).not.toContain("Fictitious Camp 2");
   });
 });

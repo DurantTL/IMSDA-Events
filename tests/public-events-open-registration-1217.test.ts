@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   listPublicCalendarItems: vi.fn(),
   getCurrentAttendee: vi.fn(),
   listDirectedClubs: vi.fn(),
+  listFeaturedEventRows: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -15,6 +16,7 @@ vi.mock("@/modules/calendar/repository", () => ({
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
+vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: mocks.listFeaturedEventRows }));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 
 import OpenForRegistrationPage from "@/app/(public)/events/page";
@@ -55,6 +57,7 @@ beforeEach(() => {
   mocks.listPublicCalendarItems.mockResolvedValue([]);
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
   mocks.listDirectedClubs.mockResolvedValue([]);
+  mocks.listFeaturedEventRows.mockResolvedValue([]);
 });
 afterEach(() => vi.useRealTimers());
 
@@ -234,6 +237,45 @@ describe("club portal cases (#1217)", () => {
     const html = await render();
     expect(html).toContain("November 10–14, 2026");
     expect(html).not.toContain("November 10, 2026");
+  });
+});
+
+describe("featured events on /events (#1218)", () => {
+  const row = (slug: string) => ({ slug, featuredOrder: null, featureUntil: null, startsOn: "2026-11-10", endsOn: "2026-11-12" });
+
+  it("pins featured events to the top in featured order, each once, with a Featured label", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([
+      item("a", { startsOn: "2026-11-01" }), item("b", { startsOn: "2026-11-05" }), item("c", { startsOn: "2026-11-09" }),
+    ]);
+    mocks.listFeaturedEventRows.mockResolvedValue([row("c"), row("b")]);
+    const html = await render();
+    const order = ["Fictitious c", "Fictitious b", "Fictitious a"].map((title) => html.indexOf(title));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    expect(html.match(/Fictitious c Weekend/g)).toHaveLength(1);
+    expect(html.match(/open-events-featured/g)).toHaveLength(2);
+  });
+
+  it("does not add a featured event the filter or the open-registration rules leave out", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([
+      item("a", { clubEvent: true }),
+      item("shut", { registrationOpen: false, registrationStatus: "CLOSED" }),
+      item("public"),
+    ]);
+    mocks.listFeaturedEventRows.mockResolvedValue([row("shut"), row("public")]);
+    const html = await render("clubs");
+    expect(html).toContain("Fictitious a Weekend");
+    expect(html).not.toContain("Fictitious shut");
+    expect(html).not.toContain("Fictitious public");
+    expect(html).not.toContain("open-events-featured");
+  });
+
+  it("names the pin in the link for screen readers, not only in the visible label", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item("a")]);
+    mocks.listFeaturedEventRows.mockResolvedValue([row("a")]);
+    const html = await render();
+    expect(html).toContain('<p aria-hidden="true" class="open-events-featured">Featured</p>');
+    expect(html).toContain('<span class="sr-only">Featured: </span>Fictitious a Weekend</a>');
   });
 });
 
