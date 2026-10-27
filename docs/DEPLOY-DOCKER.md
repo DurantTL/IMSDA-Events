@@ -418,19 +418,23 @@ to 99% (#943). `imsda-cleanup` (below) removes them after every deploy and
 once a day.
 
 **How a new version goes live.** xCloud does not run the Git page's Deploy
-Script on this site: its deploy pulls `main` into `/var/www/events.imsda.org`
-and then runs `down` / `up` on the base file, which only restarts the image
-already tagged `imsda-events:live`. A systemd timer finishes the job:
+Script on this site. Its own deploy pulls `main` into `/var/www/events.imsda.org`
+and then runs `down` / `up` on the base file, which restarts the app on every
+merge. That restart drops anyone who is submitting a form, so it should be
+turned off (see "Deploys without downtime" below); the timer then pulls `main`
+itself. A systemd timer does the deploy:
 
 - [`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh), installed as
   `/usr/local/bin/imsda-deploy`, waits up to 20 minutes for
-  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, keeps the outgoing image as
-  `imsda-events:previous`, tags the new one `imsda-events:live` and runs
-  `up -d app`. If the image never appears it stops without changing anything.
+  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, then switches to it
+  without stopping the site (next section). If the image never appears, or the
+  new version does not start, it leaves the live version running.
 - [`deploy/xcloud/autodeploy.sh`](../deploy/xcloud/autodeploy.sh), installed as
   `/usr/local/bin/imsda-autodeploy`, runs every 2 minutes from
-  `imsda-autodeploy.timer`. When the checked-out commit differs from the live
-  image's `org.opencontainers.image.revision` label and that commit's image is
+  `imsda-autodeploy.timer`. It runs `git pull --ff-only origin main` in the
+  site checkout as the checkout's owner (`IMSDA_GIT_PULL=0` turns that off).
+  When the checked-out commit differs from the live image's
+  `org.opencontainers.image.revision` label and that commit's image is
   published, it runs `imsda-deploy`.
 - [`deploy/xcloud/cleanup.sh`](../deploy/xcloud/cleanup.sh), installed as
   `/usr/local/bin/imsda-cleanup`, runs after each successful `imsda-deploy` and
@@ -442,8 +446,9 @@ already tagged `imsda-events:live`. A systemd timer finishes the job:
   stays. Cleanup and deploy take turns through `flock` on
   `/run/imsda-deploy.lock`; a failed cleanup never fails a deploy.
 
-So after a merge: xCloud pulls the commit within a minute (and restarts the old
-version briefly) but the site keeps running the old image. At 6 PM Central
+So after a merge: the timer pulls the commit within 2 minutes but the site
+keeps running the old image (and, until xCloud's deploy is turned off, xCloud
+also pulls it and restarts the old version briefly). At 6 PM Central
 GitHub publishes the image for the latest `main` (about 10 minutes), and the
 timer switches to it within 2 minutes, so the day's merges go live together.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
@@ -452,6 +457,76 @@ migrations can be run as soon as their PR merges: the old code ignores new
 tables and columns until the evening deploy. Watch it with
 `journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
 `imsda-deploy` as `root`.
+
+### Deploys without downtime (#1263)
+
+Before #1263 every deploy stopped the app, ran migrations and template syncs,
+then started it: about a minute in which nginx showed a 502 page and a form
+submitted in that window failed. Now:
+
+1. **The old version keeps serving** while a one-off container of the new
+   image runs migrations and syncs (`IMSDA_PREP_ONLY=1`). Migrations are
+   additive, so the old code is unaffected.
+2. **The new version starts next to it** as the `standby` service on
+   `127.0.0.1:8101` and must report the new SHA on `/api/health`. If it never
+   does, the deploy stops and the live version is untouched.
+3. **The live tag moves and `app` restarts on 8100** with the preparation
+   skipped (`IMSDA_SKIP_DB_PREP=1`), so it answers within a few seconds. If it
+   does not come back on the new SHA, the script puts `imsda-events:previous`
+   back.
+4. **The standby is removed.**
+
+Whenever the container does run the preparation itself (a manual `up`, a
+rollback), it answers with a short 503 "The site is updating" response (JSON
+for `/api/*`) until the app starts, instead of nginx's 502 page. Forms keep
+what was typed when a submit fails this way and offer **Try again**.
+
+**What Caleb does once on the server (human steps):**
+
+1. **Copy the new compose file and scripts in** (as `root`, from an up-to-date
+   checkout of `main`):
+
+   ```bash
+   install -m 644 -o u_events -g u_events deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml
+   install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+   install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+   docker compose -f /home/u_events/239298/docker-compose.yml --profile standby config --quiet && echo config-ok
+   ```
+
+2. **Check the timer can pull** (it uses the same Git access xCloud set up for
+   `u_events`):
+
+   ```bash
+   runuser -u u_events -- git -C /var/www/events.imsda.org pull --ff-only origin main && echo pull-ok
+   ```
+
+   If this asks for a password or fails, stop here and leave xCloud's deploy on
+   (step 3) until the Git access is fixed.
+
+3. **Turn off xCloud's deploy on merge.** In the xCloud dashboard open the
+   events.imsda.org site, then its **Git** settings, and turn off the automatic
+   deploy on push (xCloud calls it "Push to Deploy" or "Auto Deploy"; the
+   wording may differ). After that a merge no longer restarts the app; the timer
+   pulls `main` every 2 minutes and deploys once the image is published. Check
+   the next day with `journalctl -u imsda-autodeploy.service --since today`.
+
+4. **Optional, for no gap at all: let nginx fall back to the standby.** Only if
+   xCloud lets you add custom Nginx config for the site. Replace the
+   `proxy_pass http://127.0.0.1:8100;` target with an upstream that has 8101 as
+   a backup:
+
+   ```nginx
+   upstream imsda_events_app {
+       server 127.0.0.1:8100 max_fails=1 fail_timeout=5s;
+       server 127.0.0.1:8101 backup;
+   }
+   # in the location block:
+   proxy_pass http://imsda_events_app;
+   proxy_next_upstream error timeout http_502 http_503;
+   ```
+
+   Without it, the only gap is the few seconds while `app` restarts in step 3
+   above; forms retry once by themselves and keep their answers.
 
 Install or update (as `root`, from a checkout of `main`):
 
