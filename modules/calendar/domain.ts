@@ -34,6 +34,10 @@ export type CalendarItem = {
   registrationStatus?: PublicCapacityStatus;
   registrationOpensOn?: string | null;
   clubEvent?: boolean;
+  /** Only for events (#1217): clubs register through the club portal (club audience with an organization invoice). */
+  clubPortal?: boolean;
+  /** Set when several items link to one event (#1086): the event's own name, which lists use instead of an entry title. */
+  eventTitle?: string;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */
   isClosure?: boolean;
   /**

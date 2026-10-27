@@ -14,6 +14,7 @@ import {
   type OpenRegistrationFilter,
 } from "@/modules/calendar/open-registration";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
+import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 
@@ -49,14 +50,14 @@ function EventCard({ item, directsClub }: { item: CalendarItem; directsClub: boo
   const open = item.registrationStatus === "OPEN" || item.registrationStatus === "WAITLIST";
   return (
     <li className="open-events-card">
-      <h3><Link href={item.href!}>{item.title}</Link></h3>
+      <h3><Link href={item.href!}>{item.eventTitle ?? item.title}</Link></h3>
       <p className="calendar-agenda-meta">
         <span><CalendarDays size={14} aria-hidden="true" /> {formatDateRange(item.startsOn, item.endsOn)}</span>
         {item.location && <span><MapPin size={14} aria-hidden="true" /> {item.location}</span>}
       </p>
       {statusLine && <p className={`calendar-agenda-status${open ? " is-open" : ""}`}>{statusLine}</p>}
-      {item.clubEvent && (directsClub
-        ? <Link className="secondary-button open-events-register" href={`/account/club-registration/${item.href!.replace(/^\/events\//, "")}`}>Register your club <ChevronRight size={14} aria-hidden="true" /></Link>
+      {item.clubPortal && (directsClub
+        ? open && <Link className="secondary-button open-events-register" href={clubRegistrationEntryPath(decodeURIComponent(item.href!.replace(/^\/events\//, "")))}>Register your club <ChevronRight size={14} aria-hidden="true" /></Link>
         : <p className="open-events-note">Clubs register through their director</p>)}
     </li>
   );

@@ -90,16 +90,6 @@ const nextConfig: NextConfig = {
         destination: "/overview",
         permanent: false,
       },
-      // The public events home lives at "/" (#437), and "/events" is a
-      // predictable address people guess (#470). This matches "/events"
-      // exactly, never "/events/<slug>". A permanent redirect is cached by
-      // browsers and would shadow a real page, so whoever builds #106's
-      // separate "/events" directory must remove this rule in that change.
-      {
-        source: "/events",
-        destination: "/",
-        permanent: true,
-      },
       // A signed-out visitor to check-in goes to staff sign-in and comes
       // back here afterwards (#470). The staff workspace layout redirects
       // signed-out requests to a bare "/login" and, since layouts render in

@@ -108,7 +108,7 @@ describe("selectOpenRegistrationItems (#1217)", () => {
 
 describe("the /events page (#1217)", () => {
   const rows = () => [
-    item("spring-camporee", { title: "Fictitious Spring Camporee", clubEvent: true, startsOn: "2026-11-10", endsOn: "2026-11-12" }),
+    item("spring-camporee", { title: "Fictitious Spring Camporee", clubEvent: true, clubPortal: true, startsOn: "2026-11-10", endsOn: "2026-11-12" }),
     item("family-day", { title: "Fictitious Family Day", startsOn: "2026-11-20", endsOn: "2026-11-20" }),
     item("closed-camp", { registrationStatus: "CLOSED", registrationOpen: false }),
   ];
@@ -185,6 +185,45 @@ describe("the /events page (#1217)", () => {
   it("shows the empty state when only closed events remain", async () => {
     mocks.listPublicCalendarItems.mockResolvedValue([item("x", { registrationStatus: "CLOSED", registrationOpen: false })]);
     expect(await render()).toContain("No events are open for registration right now");
+  });
+});
+
+describe("club portal cases (#1217)", () => {
+  const director = () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1" }, via: "attendee", sessionId: "s" });
+    mocks.listDirectedClubs.mockResolvedValue([{ organizationId: "org-1", name: "Fictitious Club", role: "DIRECTOR", sponsoringChurch: null }]);
+  };
+
+  it("a club-audience event outside the club portal has no button and no note, but is still a Club event", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item("other-club", { clubEvent: true, clubPortal: false })]);
+    for (const signedIn of [false, true]) {
+      if (signedIn) director();
+      const html = await render("clubs");
+      expect(html).toContain("/events/other-club");
+      expect(html).not.toContain("Clubs register through their director");
+      expect(html).not.toContain("Register your club");
+    }
+  });
+
+  it.each(["UPCOMING", "OPENING_SOON", "FULL"] as const)("hides the director button on %s", async (status) => {
+    director();
+    mocks.listPublicCalendarItems.mockResolvedValue([item("c", { clubEvent: true, clubPortal: true, registrationStatus: status, registrationOpen: false })]);
+    const html = await render();
+    expect(html).not.toContain("Register your club");
+    expect(html).not.toContain("Clubs register through their director");
+  });
+
+  it("shows the button on WAITLIST and uses the encoded entry path", async () => {
+    director();
+    mocks.listPublicCalendarItems.mockResolvedValue([item("a b", { href: "/events/a%20b", clubEvent: true, clubPortal: true, registrationStatus: "WAITLIST" })]);
+    expect(await render()).toContain('href="/account/club-registration/a%20b"');
+  });
+
+  it("names a card by the event, not by a linked entry's title", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item("camp", { title: "Fictitious Day 2 Hike", eventTitle: "Fictitious Camp" })]);
+    const html = await render();
+    expect(html).toContain(">Fictitious Camp</a>");
+    expect(html).not.toContain("Day 2 Hike");
   });
 });
 

@@ -42,6 +42,7 @@ const publicEventSelect = {
   waitlistEnabled: true,
   capacity: true,
   audience: true,
+  billingMode: true,
 } as const;
 
 /** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
@@ -149,6 +150,8 @@ export async function listPublicCalendarItems(
       registrationStatus: status,
       registrationOpensOn: event.registrationOpensOn,
       clubEvent: event.audience === "CLUB",
+      // Clubs register through the portal only for deferred-invoice club events (the club entry page 404s otherwise).
+      clubPortal: event.audience === "CLUB" && event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     };
   };
   const registerItems = entries.flatMap((entry) => {
@@ -157,7 +160,7 @@ export async function listPublicCalendarItems(
     const registration = registrationFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
-      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, ...registration });
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, eventTitle: event.name, ...registration });
   });
 
   const items: CalendarItem[] = [
