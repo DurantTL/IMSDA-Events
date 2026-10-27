@@ -1,7 +1,12 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { DraftRestoredNotice } from "@/components/draft-restored-notice";
+import { useAnswerDraft } from "@/components/use-answer-draft";
+import { shortHash } from "@/modules/forms/answer-draft";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { clubFormIsDirty, dropStaleRankedChoices, clubFormUnsavedMessage, rankLabel, rankedMaximum, toggleRankedChoice, withAutoDateAnswers } from "@/components/club-form-state";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { LockKeyhole } from "lucide-react";
@@ -99,6 +104,30 @@ export function ClubFormFillIn(props: Props) {
   const current = { answers, rosterMemberId, subjectName };
   const dirty = !doneMessage && clubFormIsDirty(current, saved);
   const allowNavigation = useUnsavedChangesGuard(dirty, clubFormUnsavedMessage);
+  // The site was restarting (#1263): the answers stay in the form and Try again re-sends them with the same key.
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
+  const lastSubmitRef = useRef(true);
+  // A local draft (#1263) for the anonymous modes only: a signed-in director's form and any page that
+  // starts from saved answers never write one, the same rule as the public registration drafts.
+  const draftIdentity = props.mode === "link"
+    ? { scope: "club-link", formId: shortHash(props.token) }
+    : { scope: props.mode === "open" ? "club-open" : "club-form", formId: props.templateKey };
+  const hasPrefill = Object.keys(props.initialAnswers ?? {}).length > 0;
+  const answerDraft = useAnswerDraft({
+    enabled: props.mode !== "club" && !hasPrefill,
+    identity: draftIdentity,
+    definition,
+    sealedKeys: sensitiveFieldKeys,
+    answers,
+    extras: { clubChoice, unlistedClubName },
+    dirty: dirty || clubChoice !== "" || unlistedClubName !== "",
+    done: Boolean(doneMessage),
+    onRestore: (draft) => {
+      setAnswers((currentAnswers) => ({ ...currentAnswers, ...draft.answers }));
+      setClubChoice(draft.extras.clubChoice ?? "");
+      setUnlistedClubName(draft.extras.unlistedClubName ?? "");
+    },
+  });
   // Inline checks (#855): the same validators the server runs. An old answer that fails and was not changed is
   // flagged for correction but never blocks saving the rest of the form.
   const [attempted, setAttempted] = useState(false);
@@ -130,52 +159,51 @@ export function ClubFormFillIn(props: Props) {
       setIssues([]);
       return;
     }
+    if (saving) return;
     setSaving(true);
     setError("");
     setIssues([]);
     setNotice("");
+    setSiteUpdating(false);
+    lastSubmitRef.current = submit;
     try {
       const response = props.mode === "club"
-        ? await fetch(`/api/attendee/clubs/${encodeURIComponent(props.organizationId)}/forms/submissions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            templateKey: props.templateKey,
-            submissionId: savedId,
-            rosterMemberId: rosterMemberId || null,
-            subjectName: rosterMemberId ? undefined : subjectName || undefined,
-            answers,
-            submit,
-          }),
+        ? await submitJson(`/api/attendee/clubs/${encodeURIComponent(props.organizationId)}/forms/submissions`, {
+          templateKey: props.templateKey,
+          submissionId: savedId,
+          rosterMemberId: rosterMemberId || null,
+          subjectName: rosterMemberId ? undefined : subjectName || undefined,
+          answers,
+          submit,
         })
         : props.mode === "open"
-          ? await fetch(`/api/public/club-form-applications/${encodeURIComponent(props.templateKey)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              organizationId: clubChoice,
-              unlistedClubName: clubChoice === "NOT_LISTED" ? unlistedClubName.trim() : undefined,
-              idempotencyKey,
-              answers,
-            }),
-          })
-          : await fetch(`/api/public/club-forms/${encodeURIComponent(props.token)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ answers }),
-          });
-      const result = await response.json().catch(() => ({})) as {
+          // The open application carries a key the server dedupes on, so a quiet retry is safe.
+          ? await submitJson(`/api/public/club-form-applications/${encodeURIComponent(props.templateKey)}`, {
+            organizationId: clubChoice,
+            unlistedClubName: clubChoice === "NOT_LISTED" ? unlistedClubName.trim() : undefined,
+            idempotencyKey,
+            answers,
+          }, { idempotent: true })
+          : await submitJson(`/api/public/club-forms/${encodeURIComponent(props.token)}`, { answers });
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        return;
+      }
+      const result = response.body as {
         message?: string;
         issues?: Issue[];
         submission?: { id: string; status: string };
         confirmationMessage?: string;
       };
       if (!response.ok) {
+        // A single-use link that is already used or withdrawn (404): the saved answers have nowhere to go.
+        if (props.mode === "link" && response.status === 404) answerDraft.clear();
         setError(result.message ?? "The form could not be saved.");
         setIssues(result.issues ?? []);
         return;
       }
       setSaved(current);
+      answerDraft.clear();
       if (props.mode !== "club") {
         setDoneMessage(result.confirmationMessage ?? "Thank you. Your form has been received.");
         return;
@@ -291,7 +319,21 @@ export function ClubFormFillIn(props: Props) {
         );
       })}
 
+      {answerDraft.notice && (
+        <DraftRestoredNotice
+          kind={answerDraft.notice}
+          onDismiss={answerDraft.dismissNotice}
+          onDiscard={() => {
+            answerDraft.clear();
+            answerDraft.dismissNotice();
+            setAnswers(initialAnswers);
+            setClubChoice("");
+            setUnlistedClubName("");
+          }}
+        />
+      )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void send(lastSubmitRef.current)} />}
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

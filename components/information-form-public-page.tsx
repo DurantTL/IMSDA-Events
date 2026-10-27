@@ -71,8 +71,9 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
   }
 
   const { form } = view;
+  // Signed-in visitors never get a browser draft, like the public registration form (#1263).
+  const { account } = await getCurrentAttendee();
   if (form.fillAccess === "SIGNED_IN") {
-    const { account } = await getCurrentAttendee();
     const path = publicInformationFormPath(target);
     if (!account) {
       return (
@@ -107,7 +108,7 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
         </div>
       </section>
       <div className="public-manage-layout club-form-public">
-        <InformationFormFillIn definition={form.definition} eventSlug={target.eventSlug} slug={target.slug} />
+        <InformationFormFillIn definition={form.definition} disableDrafts={Boolean(account)} eventSlug={target.eventSlug} slug={target.slug} />
       </div>
     </Shell>
   );

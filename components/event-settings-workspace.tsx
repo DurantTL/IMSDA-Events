@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { useLocalEditDraft } from "@/components/use-local-edit-draft";
+import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
+import { shortHash } from "@/modules/forms/answer-draft";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -153,6 +158,7 @@ export function EventSettingsWorkspace({
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   // The dates this form was loaded with (or last saved as). A save sends them back, and the server refuses it if the
   // stored dates differ (they were updated from the calendar banner meanwhile), so a stale form can never write the
   // old dates over the new ones. Only dates are guarded: other writes to the event never cause a conflict.
@@ -210,6 +216,24 @@ export function EventSettingsWorkspace({
   );
   // The save bar stays after the form until the page is scrolled or something is edited, so it never covers the first sections (#996).
   const scrolledPastTop = usePinAfterScroll(null);
+  // Unsaved settings are backed up in this browser and come back after a reload (#1263).
+  const editBackup = useLocalEditDraft({
+    storageKey: editDraftKey("event-settings", initialEvent?.id ?? `new-${calendarPrefill?.entryId ?? ""}`),
+    version: shortHash(JSON.stringify(startingDraft(initialEvent, calendarPrefill))),
+    value: draft,
+    dirty,
+    onRestore: (stored) => {
+      if (!stored || typeof stored !== "object" || Array.isArray(stored)) return false;
+      setDraft((current) => {
+        const next = { ...current } as Record<string, unknown>;
+        for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+          if (key in current && typeof value === typeof (current as Record<string, unknown>)[key]) next[key] = value;
+        }
+        return next as EventSettingsInput;
+      });
+      return true;
+    },
+  });
   const savebarPinned = scrolledPastTop || dirty;
   // Tell the calendar banner beside this form whether answering it would discard unsaved changes (#445).
   useEffect(() => {
@@ -281,31 +305,35 @@ export function EventSettingsWorkspace({
     setSaveMessage(null);
   }
 
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (saving) return;
+    setSiteUpdating(false);
     setSaving(true);
     setSaveMessage(null);
     setFieldErrors({});
     setError("");
     setNotice("");
     try {
-      const response = await fetch(
+      const response = await submitJson(
         mode === "create" ? "/api/events" : `/api/events/${initialEvent!.id}`,
         {
-          method: mode === "create" ? "POST" : "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...eventSettingsRequestBody(draft),
-            ...(mode === "create" && calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}),
-            ...(mode === "edit" && loadedDates ? { expectedStartsOn: loadedDates.startsOn, expectedEndsOn: loadedDates.endsOn } : {}),
-            // Only a step the person opened sends its choices; skipped, the server applies the audience's defaults (#965).
-            ...(mode === "create" && (chosenModules !== null || !showOnCalendar)
-              ? { features: { modules: effectiveModules, showOnCalendar } }
-              : {}),
-          }),
+          ...eventSettingsRequestBody(draft),
+          ...(mode === "create" && calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}),
+          ...(mode === "edit" && loadedDates ? { expectedStartsOn: loadedDates.startsOn, expectedEndsOn: loadedDates.endsOn } : {}),
+          // Only a step the person opened sends its choices; skipped, the server applies the audience's defaults (#965).
+          ...(mode === "create" && (chosenModules !== null || !showOnCalendar)
+            ? { features: { modules: effectiveModules, showOnCalendar } }
+            : {}),
         },
+        { method: mode === "create" ? "POST" : "PATCH" },
       );
-      const result = await response.json().catch(() => ({})) as EventApiResult;
+      // A restart: the settings stay as typed, no navigation happens, and Try again sends them (#1263).
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        return;
+      }
+      const result = response.body as EventApiResult;
       if (!response.ok || !result.event) {
         const errors = fieldErrorsFromIssues(result.issues);
         if (Object.keys(errors).length > 0) showFieldErrors(errors);
@@ -443,8 +471,8 @@ export function EventSettingsWorkspace({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/events/${initialEvent!.id}/publish`, { method: "POST" });
-      const result = await response.json().catch(() => ({})) as EventApiResult;
+      const response = await submitJson(`/api/events/${initialEvent!.id}/publish`, undefined, { method: "POST" });
+      const result = response.body as EventApiResult;
       if (!response.ok || !result.event) {
         throw new Error(result.message ?? "The event could not be published.");
       }
@@ -480,8 +508,8 @@ export function EventSettingsWorkspace({
     setUnpublishing(true);
     setUnpublishError("");
     try {
-      const response = await fetch(`/api/events/${initialEvent!.id}/unpublish`, { method: "POST" });
-      const result = await response.json().catch(() => ({})) as EventApiResult;
+      const response = await submitJson(`/api/events/${initialEvent!.id}/unpublish`, undefined, { method: "POST" });
+      const result = response.body as EventApiResult;
       if (!response.ok || !result.event) {
         throw new Error(result.message ?? "The event could not be unpublished.");
       }
@@ -754,6 +782,13 @@ export function EventSettingsWorkspace({
         </span>
       </div>
 
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
+      {editBackup.restored && (
+        <div className="form-notice draft-restored-notice" role="status">
+          <span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span>
+          <button className="secondary-button" type="button" onClick={() => { editBackup.discard(); setDraft(savedDraft); }}>Discard</button>
+        </div>
+      )}
       {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 

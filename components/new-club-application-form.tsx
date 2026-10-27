@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 import {
@@ -55,14 +57,18 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // The site was restarting (#1263): the form keeps everything, including the chosen file.
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
 
   function set<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submit(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (saving) return;
     setError("");
+    setSiteUpdating(false);
     if (file && file.size > MAX_APPLICATION_ATTACHMENT_BYTES) {
       setError(`The attachment must be ${Math.floor(MAX_APPLICATION_ATTACHMENT_BYTES / (1024 * 1024))} MB or smaller.`);
       return;
@@ -94,8 +100,12 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       body.set("data", JSON.stringify(data));
       if (inviteToken) body.set("inviteToken", inviteToken);
       if (file) body.set("attachment", file);
-      const response = await fetch("/api/public/club-applications", { method: "POST", body });
-      const result = await response.json().catch(() => ({})) as { message?: string };
+      const response = await submitJson("/api/public/club-applications", body);
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        return;
+      }
+      const result = response.body as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "The application could not be sent. Please try again.");
       setDone(true);
     } catch (caught) {
@@ -248,6 +258,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
         <input autoComplete="off" id="new_club_website" name="website" onChange={(event) => setWebsite(event.target.value)} tabIndex={-1} type="text" value={website} />
       </div>
 
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void submit()} />}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="intro-actions">
         <button className="primary-button" disabled={saving} type="submit">{saving ? "Sending…" : "Send application"}</button>

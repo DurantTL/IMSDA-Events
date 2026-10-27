@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
@@ -25,6 +27,9 @@ export function AttendeeRegistrationContactForm({
   const [attempted, setAttempted] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  // The site was restarting (#1263): the fields and the typed code stay, and Try again sends them as they are.
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
+  const retryRef = useRef<(() => void) | null>(null);
   const [notice, setNotice] = useState<{ tone: "idle" | "error" | "saved"; message: string }>({
     tone: "idle",
     message: "",
@@ -36,15 +41,19 @@ export function AttendeeRegistrationContactForm({
   }
 
   async function requestCode() {
+    if (requesting) return;
+    setSiteUpdating(false);
     setRequesting(true);
     setNotice({ tone: "idle", message: "Requesting a code…" });
     try {
-      const response = await fetch("/api/attendee/step-up", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      });
-      const payload = await response.json().catch(() => null) as {
+      const response = await submitJson("/api/attendee/step-up", {});
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        retryRef.current = () => void requestCode();
+        setNotice({ tone: "idle", message: "" });
+        return;
+      }
+      const payload = response.body as {
         message?: string;
         developmentCode?: string;
       } | null;
@@ -61,8 +70,10 @@ export function AttendeeRegistrationContactForm({
     }
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (saving) return;
+    setSiteUpdating(false);
     setAttempted(true);
     // The saved phone is the one the server compares with (#871); the same number never blocks.
     if (phoneBlocks("Phone", contact.phone, savedContact.phone)) {
@@ -72,15 +83,18 @@ export function AttendeeRegistrationContactForm({
     setSaving(true);
     setNotice({ tone: "idle", message: "Saving contact details…" });
     try {
-      const response = await fetch(
+      const response = await submitJson(
         `/api/attendee/registrations/${encodeURIComponent(registrationId)}`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ code, contact }),
-        },
+        { code, contact },
+        { method: "PATCH" },
       );
-      const payload = await response.json().catch(() => null) as {
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        retryRef.current = () => void save();
+        setNotice({ tone: "idle", message: "" });
+        return;
+      }
+      const payload = response.body as {
         contact?: Contact;
         message?: string;
       } | null;
@@ -148,6 +162,7 @@ export function AttendeeRegistrationContactForm({
             {notice.message}
           </p>
         </div>
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving || requesting} onRetry={() => retryRef.current?.()} />}
       </form>
     </details>
   );

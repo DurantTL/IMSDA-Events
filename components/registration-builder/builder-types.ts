@@ -1,6 +1,7 @@
 // Shared types, labels and small helpers for the registration form builder.
 // Nothing here touches React state, so every zone of the editor can import it.
 
+import { editDraftKey } from "@/lib/local-edit-draft";
 import type { AddressValue } from "@/modules/forms/address";
 import { getAttendeeRosterConfig, type ChoiceUsage, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
@@ -146,3 +147,8 @@ export type BuilderWorkspaceProps = {
   information?: InformationBuilderConfig;
 };
 
+
+/** Where the open form's unsaved definition is backed up in this browser (#1263). */
+export function builderBackupKey(eventId: string, formId: string | null | undefined) {
+  return editDraftKey("registration-builder", `${eventId}:${formId ?? ""}`);
+}

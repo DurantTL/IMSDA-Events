@@ -39,6 +39,8 @@ import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SubmitButton } from "@/components/submit-button";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { PublicLodgingStep } from "@/components/public-lodging-step";
 import {
@@ -317,7 +319,7 @@ export type PublicRegistrationFormProps = {
      * edited attendees itself instead of submitting a new registration.
      * Field issues come back with the attendee index they belong to.
      */
-    submitEdit?: (attendees: RosterAttendee[]) => Promise<{ ok: true } | { ok: false; message: string; issues: FormIssue[] }>;
+    submitEdit?: (attendees: RosterAttendee[]) => Promise<{ ok: true } | { ok: false; message: string; issues: FormIssue[]; unavailable?: boolean }>;
     /**
      * Each kept person's answers as saved, by client id (#855). A phone, email, number or date they did not change is
      * not re-checked, so an old answer that fails today's rules never blocks reopening the registration; a changed one
@@ -718,6 +720,8 @@ export function PublicRegistrationForm({
   const [promoCodeApplying, setPromoCodeApplying] = useState(false);
   const [promoCodeNotice, setPromoCodeNotice] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
+  const submitInFlight = useRef(false);
   // Club cards tuck roster-known answers away (#853); once a question has been shown (a server issue, or "Change"),
   // it stays shown for the rest of the visit. Keyed by `${clientId}:${fieldKey}`, or `${clientId}:*` for "Change".
   const [revealedFields, setRevealedFields] = useState<Record<string, true>>({});
@@ -3119,8 +3123,10 @@ export function PublicRegistrationForm({
     return nextIssues;
   }
 
-  async function submit(submitEvent: React.FormEvent<HTMLFormElement>) {
-    submitEvent.preventDefault();
+  async function submit(submitEvent?: React.FormEvent<HTMLFormElement>) {
+    submitEvent?.preventDefault();
+    if (submitInFlight.current) return;
+    setSiteUpdating(false);
     if (!currentStep.isReview) {
       continueRegistration();
       return;
@@ -3150,7 +3156,10 @@ export function PublicRegistrationForm({
       try {
         const outcome = await club.submitEdit(attendees);
         if (outcome.ok) club.onSubmitted?.();
-        else {
+        else if (outcome.unavailable) {
+          // The site is restarting: nothing was lost; Try again re-sends with the same request id (#1263).
+          setSiteUpdating(outcome.message || unavailableMessage({ body: {} }));
+        } else {
           setServerIssues(outcome.issues);
           showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
         }
@@ -3164,6 +3173,7 @@ export function PublicRegistrationForm({
     }
 
     setSubmitting(true);
+    submitInFlight.current = true;
     setIssues([]);
     setError("");
     const submissionKey = idempotencyKey ?? crypto.randomUUID();
@@ -3173,10 +3183,10 @@ export function PublicRegistrationForm({
       const groupPicks = group
         ? Object.fromEntries(Object.entries(group.honorSelections).filter(([clientId, ids]) => sentPeople.has(clientId) && ids.length > 0))
         : {};
-      const response = await fetch(club?.submitUrl ?? group?.submitUrl ?? `/api/public/events/${encodeURIComponent(event.slug)}/forms/${encodeURIComponent(form.slug)}/registrations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // The key rides in the body and the server dedupes on it (#1263), so a quiet retry after a
+      // lost connection is safe; "Try again" reuses the same key because the state keeps it.
+      const submission = await submitJson(club?.submitUrl ?? group?.submitUrl ?? `/api/public/events/${encodeURIComponent(event.slug)}/forms/${encodeURIComponent(form.slug)}/registrations`,
+        {
           versionId: form.versionId,
           idempotencyKey: submissionKey,
           responses: rosterEnabled ? registrationResponses : responses,
@@ -3197,9 +3207,19 @@ export function PublicRegistrationForm({
           ...(group?.teamName ? { teamName: group.teamName } : {}),
           ...(Object.keys(groupPicks).length > 0 ? { honorSelections: groupPicks } : {}),
           website,
-        }),
-      });
-      const result = await response.json().catch(() => ({})) as {
+        },
+        { idempotent: true, fallbackMessage: "We could not complete the registration." },
+      );
+      if (submission.unavailable) {
+        // The site is restarting: keep every answer, the key and the draft; offer Try again.
+        setSiteUpdating(unavailableMessage(submission));
+        // The notice sits at the top of the form: bring the host page there too (a cross-origin iframe
+        // cannot be scrolled by focus() alone), and the notice itself takes focus.
+        window.imsdaEmbedScrollTop?.();
+        return;
+      }
+      const response = submission;
+      const result = submission.body as {
         confirmation?: Confirmation;
         honors?: { error?: string } | null;
         issues?: FormIssue[];
@@ -3208,7 +3228,8 @@ export function PublicRegistrationForm({
       };
       if (!response.ok || !result.confirmation) {
         // A busy-queue conflict wrote nothing; keep the key so submitting again replays safely (#920).
-        if (response.status < 500 && result.error !== "SUBMISSION_CONFLICT") setIdempotencyKey(null);
+        // A timeout (status 0) may still be running, so it keeps the key too.
+        if (response.status !== 0 && response.status < 500 && result.error !== "SUBMISSION_CONFLICT") setIdempotencyKey(null);
         const nextIssues = Array.isArray(result.issues)
           ? result.issues.filter((issue) => issue && typeof issue.key === "string" && typeof issue.message === "string")
           : [];
@@ -3239,6 +3260,7 @@ export function PublicRegistrationForm({
       window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
     } finally {
       setSubmitting(false);
+      submitInFlight.current = false;
     }
   }
 
@@ -3527,6 +3549,7 @@ export function PublicRegistrationForm({
             )}
           </section>
 
+          {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
             <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
               <strong><AlertTriangle aria-hidden="true" size={16} /> {error || "Review the highlighted fields."}</strong>

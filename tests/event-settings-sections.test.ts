@@ -258,7 +258,8 @@ describe("event settings render by event type (#624)", () => {
     // The save body spreads the whole draft, hidden fields included. It is built by `eventSettingsRequestBody`
     // (#965 moved it out of the form so the Event features page sends exactly the same body).
     const source = readFileSync(path.join(process.cwd(), "components/event-settings-workspace.tsx"), "utf8");
-    expect(source).toMatch(/body: JSON\.stringify\(\{\s*\.\.\.eventSettingsRequestBody\(draft\),/);
+    // #1263: the body is now the payload argument of submitJson rather than a JSON.stringify call.
+    expect(source).toMatch(/submitJson\(\s*mode === "create" \? "\/api\/events" : `\/api\/events\/\$\{initialEvent!\.id\}`,\s*\{\s*\.\.\.eventSettingsRequestBody\(draft\),/);
     const helper = readFileSync(path.join(process.cwd(), "modules/events/settings-draft.ts"), "utf8");
     expect(helper).toMatch(/export function eventSettingsRequestBody\(draft: EventSettingsInput\) \{\s*return \{\s*\.\.\.draft,/);
   });

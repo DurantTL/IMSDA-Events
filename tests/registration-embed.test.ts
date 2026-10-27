@@ -119,7 +119,7 @@ describe("registration embed", () => {
   it("requests parent scrolling for steps, validation, and completion", () => {
     expect(
       registrationForm.match(/window\.imsdaEmbedScrollTop\?\.\(\)/g),
-    ).toHaveLength(5);
+    ).toHaveLength(6); // steps, validation, completion, and the "site is updating" notice (#1263)
   });
 
   it("uses CSP frame ancestors without a conflicting X-Frame-Options header", () => {

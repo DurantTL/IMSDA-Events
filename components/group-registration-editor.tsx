@@ -1,7 +1,8 @@
 "use client";
 
 import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { submitJson } from "@/lib/submit-json";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { ClubLocationPicker } from "@/components/club-location-picker";
@@ -32,6 +33,7 @@ function newClientId() {
  * changed in their own picker on the same page.
  */
 export function GroupRegistrationEditor({ token, workspace }: { token: string; workspace: Workspace }) {
+  const requestIdRef = useRef<{ id: string; signature: string } | null>(null);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"who" | "form">("who");
@@ -118,11 +120,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
 
   const submitEdit = useCallback(async (attendees: RosterAttendee[]) => {
     const keptByClientId = new Map(registered.map((person) => [person.clientId, person.attendeeId]));
-    const response = await fetch(`/api/public/manage/${encodeURIComponent(token)}/group`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clientRequestId: crypto.randomUUID(),
+    const body = {
         expectedUpdatedAt: workspace.registration.updatedAt,
         attendees: attendees.map((attendee) => {
           const attendeeId = keptByClientId.get(attendee.clientId) ?? null;
@@ -131,10 +129,19 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
             : { attendeeId: null, clientId: attendee.clientId, responses: attendee.responses };
         }),
         ...(locationId && locationId !== currentLocationId ? { locationId } : {}),
-      }),
-    });
+    };
+    // One request id for an unchanged edit until it gets an answer, so Try again after a restart is
+    // replayed, not repeated; a changed edit gets a new id (#1263).
+    const signature = JSON.stringify(body);
+    if (requestIdRef.current?.signature !== signature) requestIdRef.current = { id: crypto.randomUUID(), signature };
+    const response = await submitJson(`/api/public/manage/${encodeURIComponent(token)}/group`,
+      { clientRequestId: requestIdRef.current.id, ...body },
+      { method: "PATCH", idempotent: true },
+    );
+    if (response.unavailable) return { ok: false as const, unavailable: true as const, message: String(response.body.message ?? ""), issues: [] as FormIssue[] };
+    requestIdRef.current = null;
     if (response.ok) return { ok: true as const };
-    const result = await response.json().catch(() => ({})) as {
+    const result = response.body as {
       message?: string;
       issues?: Array<{ key?: unknown; message?: unknown; clientId?: unknown }>;
     };

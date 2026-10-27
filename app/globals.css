@@ -13478,6 +13478,16 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
   @keyframes calendar-year-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
 
+/* Submit failed because the site is updating (#1263): the message and a Try again button; the form keeps its values. */
+.submit-retry-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0; border: 1px solid #ddcd9e; border-left: 4px solid #b58a1f; border-radius: 10px; background: var(--imsda-gold-soft); color: #5b4410; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.45; }
+.submit-retry-notice:focus { outline: 3px solid var(--focus-ring, #1d5f9c); outline-offset: 2px; }
+.submit-retry-notice > span { min-width: 0; flex: 1 1 14rem; overflow-wrap: anywhere; }
+.submit-retry-notice .secondary-button { min-width: 44px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+/* Restored local draft notice for club and information forms (#1263). */
+.draft-restored-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.draft-restored-notice .secondary-button { min-width: 44px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

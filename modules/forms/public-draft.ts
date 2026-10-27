@@ -193,7 +193,7 @@ function pruneHidden(
   return next;
 }
 
-function isPlainValue(value: unknown): boolean {
+export function isPlainValue(value: unknown): boolean {
   if (typeof value === "string" || typeof value === "boolean") return true;
   if (Array.isArray(value)) return value.every((item) => typeof item === "string");
   if (value && typeof value === "object") {

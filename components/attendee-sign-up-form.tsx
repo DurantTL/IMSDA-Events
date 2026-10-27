@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { Eye, EyeOff, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
 import {
@@ -42,6 +44,7 @@ export function AttendeeSignUpForm({
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const emailRef = useRef<HTMLInputElement>(null);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   /** Only ever set by a development server with no account email configured. */
   const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
 
@@ -57,53 +60,56 @@ export function AttendeeSignUpForm({
     removeAttendeeAuthFragment();
   }, [initialEmail]);
 
-  async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // Kept in memory only, so Try again after a restart sends what was typed (#1263). Never stored.
+  const pendingRef = useRef<{ kind: "details" | "code"; body: Record<string, unknown> } | null>(null);
+
+  async function send(kind: "details" | "code", body: Record<string, unknown>) {
+    if (busy) return;
+    pendingRef.current = { kind, body };
+    setSiteUpdating(false);
     setBusy(true);
     setError("");
-    const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "");
+    const email = String(body.email ?? "");
     try {
-      const response = await fetch("/api/attendee/sign-up", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          displayName: form.get("displayName"),
-          password: form.get("password"),
-        }),
-      });
-      const result = await response.json();
+      const response = await submitJson(kind === "details" ? "/api/attendee/sign-up" : "/api/attendee/verify-email", body);
+      if (response.unavailable) {
+        setSiteUpdating(unavailableMessage(response));
+        setBusy(false);
+        return;
+      }
+      pendingRef.current = null;
+      const result = response.body as { message?: string; developmentCode?: string };
+      if (kind === "code") {
+        if (!response.ok) throw new Error(result.message ?? "That code could not be checked.");
+        router.replace(takeAttendeeAuthReturnPath() ?? "/account");
+        router.refresh();
+        return;
+      }
       if (!response.ok) throw new Error(result.message ?? "Unable to create an account.");
       setDevelopmentCode(result.developmentCode ?? null);
       setSentTo(email);
       setBusy(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create an account.");
+      setError(caught instanceof Error ? caught.message : kind === "code" ? "That code could not be checked." : "Unable to create an account.");
       setBusy(false);
     }
   }
 
-  async function submitCode(event: React.FormEvent<HTMLFormElement>) {
+  function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
-    setError("");
     const form = new FormData(event.currentTarget);
-    try {
-      const response = await fetch("/api/attendee/verify-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: form.get("code") }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "That code could not be checked.");
-      router.replace(takeAttendeeAuthReturnPath() ?? "/account");
-      router.refresh();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That code could not be checked.");
-      setBusy(false);
-    }
+    void send("details", { email: String(form.get("email") ?? ""), displayName: form.get("displayName"), password: form.get("password") });
   }
+
+  function submitCode(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void send("code", { code: form.get("code") });
+  }
+
+  const retryNotice = siteUpdating
+    ? <SubmitRetryNotice message={siteUpdating} busy={busy} onRetry={() => { const pending = pendingRef.current; if (pending) void send(pending.kind, pending.body); }} />
+    : null;
 
   if (sentTo) {
     return (
@@ -123,6 +129,7 @@ export function AttendeeSignUpForm({
           </div>
         )}
         <OneTimeCodeInput label="Six-digit code" autoFocus disabled={busy} />
+        {retryNotice}
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button full-button" type="submit" disabled={busy}>
           <MailCheck aria-hidden="true" size={17} /> {busy ? "Checking…" : "Verify and continue"}
@@ -190,6 +197,7 @@ export function AttendeeSignUpForm({
         </span>
       </label>
       <PasswordRequirementsChecklist password={password} owner={{ email, displayName }} />
+      {retryNotice}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button
         className="primary-button full-button"
