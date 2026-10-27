@@ -8441,6 +8441,10 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-swatch { flex: none; box-sizing: border-box; width: 16px; height: 16px; border-left: 5px solid var(--cal-edge); border-radius: 4px; background: var(--cal-fill); }
 .calendar-tone-event .calendar-swatch { border-left-width: 0; }
 .calendar-tone-closure .calendar-swatch { border: 1px dashed var(--cal-edge); background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 3px, #fde4cc 3px, #fde4cc 6px); }
+/* Year view (#1250): hover tints and the closure hatch live here, with the other calendar tone rules. */
+a.calendar-year-day:hover { background: #eef3f6; }
+.calendar-year-mark.is-closure, .calendar-year-slot.is-closure { background: repeating-linear-gradient(135deg, #8a4b1f, #8a4b1f 2px, #fde4cc 2px, #fde4cc 4px); }
+.calendar-year-row:hover { background: #f4f7f9; }
 .calendar-key-item { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; }
 .calendar-board { display: grid; align-items: start; gap: 16px; }
 .calendar-board > * { min-width: 0; }
@@ -8468,7 +8472,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 /* Desktop and tablet: every week is its own grid of seven equal columns and one fixed height. The seven day cells span the whole
    week and draw the divider lines; each bar sits on the week by column span, in a row below the date row. */
 @media (min-width: 761px) {
-  .calendar-week { grid-template-rows: 48px repeat(4, 38px) 36px; height: 236px; background: var(--line); }
+  .calendar-week { grid-template-rows: 44px repeat(2, 22px); height: 88px; background: var(--line); }
   .calendar-week > .calendar-day { position: relative; grid-row: 1 / -1; min-height: 0; padding: 0; }
   .calendar-week > .calendar-day:nth-child(1) { grid-column: 1; }
   .calendar-week > .calendar-day:nth-child(2) { grid-column: 2; }
@@ -8477,11 +8481,11 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-week > .calendar-day:nth-child(5) { grid-column: 5; }
   .calendar-week > .calendar-day:nth-child(6) { grid-column: 6; }
   .calendar-week > .calendar-day:nth-child(7) { grid-column: 7; }
-  .calendar-week .calendar-day-link { position: absolute; inset: 0; display: block; width: auto; min-height: 0; margin: 0; padding: 12px; border-radius: 0; }
+  .calendar-week .calendar-day-link { position: absolute; inset: 0; display: block; width: auto; min-height: 0; margin: 0; padding: 8px 12px; border-radius: 0; }
   .calendar-week .calendar-day-number { width: 30px; height: 30px; font-size: 1rem; }
   .calendar-day .calendar-dots { display: none; }
   .calendar-bar {
-    position: relative; z-index: 1; display: flex; align-items: center; align-self: start; gap: 6px; min-width: 0; height: 30px; margin: 0 8px 8px;
+    position: relative; z-index: 1; display: flex; align-items: center; align-self: center; gap: 6px; min-width: 0; height: 20px; margin: 0 8px;
     padding: 0 10px; overflow: hidden; border-left: 4px solid var(--cal-edge); border-radius: 8px; background: var(--cal-fill); color: var(--cal-ink);
     font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap;
     transition: filter 0.2s ease;
@@ -8499,7 +8503,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-bar:hover { filter: brightness(0.94); }
   .calendar-bar:focus-visible, .calendar-week > .calendar-more-link:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
   .calendar-week > .calendar-more-link {
-    position: relative; z-index: 1; display: inline-flex; align-items: center; align-self: center; justify-self: start; min-height: 32px; margin-left: 8px; padding: 0 8px;
+    position: relative; z-index: 1; display: inline-flex; align-items: center; align-self: center; justify-self: end; min-height: 44px; margin-right: 4px; padding: 0 8px;
     border-radius: 8px; color: var(--imsda-purple); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 800; text-decoration: underline;
   }
 }
@@ -13219,6 +13223,237 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 @media (min-width: 801px) {
   html[data-sidebar="collapsed"] .clubs-year-form { display: none; }
+}
+
+/* Reviewed monthly records and required club forms (#1246). */
+.club-report-review { display: grid; gap: 6px; justify-items: start; }
+.club-report-review button { min-height: 44px; }
+.club-report-review-panel { display: grid; gap: 8px; justify-items: start; }
+.club-report-review-panel .field-help { margin: 0; }
+.club-form-requirement { display: grid; gap: 8px; justify-items: start; min-width: 0; width: 100%; max-width: 15rem; }
+.club-form-requirement > label { width: 100%; min-width: 0; }
+.club-form-requirement select { min-height: 44px; width: 100%; max-width: 100%; }
+.club-form-requirement button { min-height: 44px; }
+.club-form-requirement-roles { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
+.forms-missing-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.forms-missing-list small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.club-forms-required-list, .club-forms-required-members { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.club-forms-required-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.club-forms-required .field-help { margin: 4px 0 0; }
+.club-forms-required-members > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* Public homepage season view (#1251): the navy band with the gold Closing soon box, the six-month ribbon (861px and wider),
+   Find your place, the three-month list (narrower than that) and the footer line. Solid colours only.
+   Body text 1rem, labels 0.875rem, taps 44px, visible focus; the only motion is a colour change, off for reduced motion. */
+.public-home-page .season-band { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; justify-content: space-between; gap: 16px 24px; }
+.season-band-text { display: grid; align-content: center; gap: 4px; min-width: 0; flex: 1 1 18rem; }
+.public-home-page .season-band .season-band-line { margin: 4px 0 0; color: #ffffff; font-size: 1rem; line-height: 1.45; }
+.season-closing { display: grid; align-content: center; gap: 4px; flex: 0 1 22rem; min-width: 0; border-left: 6px solid var(--imsda-purple); border-radius: 12px; background: var(--imsda-gold); padding: 14px 18px; color: var(--imsda-navy-deep); }
+.season-closing h2 { margin: 0; color: var(--imsda-navy-deep); font-size: 0.875rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.season-closing p { margin: 0; }
+.season-closing-title { font-size: 1.125rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.season-closing-line { font-size: 1rem; font-weight: 600; }
+.season-closing-register { display: inline-flex; align-items: center; justify-content: center; justify-self: start; min-width: 44px; min-height: 44px; margin-top: 6px; border-radius: 10px; background: var(--imsda-navy); padding: 0 20px; color: #ffffff; font-size: 1rem; font-weight: 800; text-decoration: none; }
+.season-closing-register:focus-visible { outline: 3px solid var(--imsda-navy-deep); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .public-home-page .season-band { flex-direction: column; align-items: stretch; }
+  .season-band-text, .season-closing { flex: 0 0 auto; }
+}
+.home-season { display: grid; gap: 12px; min-width: 0; }
+.home-season-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.home-season h2, .home-places h2 { margin: 0; color: var(--ink); font-size: 1.25rem; }
+.season-ribbon { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: #ffffff; padding: 12px 14px 14px; }
+.season-months-row, .season-lane { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 12px; align-items: start; min-width: 0; }
+.season-months-track { position: relative; display: block; height: 1.5rem; }
+.season-month-label { position: absolute; top: 0; white-space: nowrap; color: var(--imsda-purple); font-size: 0.875rem; font-weight: 800; letter-spacing: 0.02em; }
+.season-lane-label { margin: 0; padding-top: 10px; color: var(--imsda-navy); font-size: 0.875rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.season-lane-track { position: relative; min-width: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.season-gridline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--line); }
+.season-lane-empty { position: absolute; top: 4px; left: 0; display: flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 0.875rem; }
+.season-item { position: absolute; min-width: 0; height: 44px; }
+.season-item-body { display: grid; align-content: center; gap: 4px; width: 100%; min-height: 44px; min-width: 0; border-radius: 8px; color: var(--ink); text-decoration: none; }
+a.season-item-body:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.season-mark { display: block; height: 10px; border-radius: 5px; background: var(--imsda-navy); }
+.season-mark-dot { width: 12px; height: 12px; border-radius: 50%; }
+.season-lane-ministries .season-mark { background: var(--imsda-purple); }
+.season-lane-closed .season-mark { background: var(--imsda-gold); border: 1px solid var(--imsda-navy); }
+.season-item-right .season-mark { justify-self: end; }
+.season-item-right .season-item-label { text-align: right; }
+.season-item-label { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 0.875rem; line-height: 1.2; }
+.season-item-label strong { font-weight: 700; }
+.season-item-label small { color: var(--muted); font-size: 0.875rem; }
+.home-places { display: grid; gap: 12px; min-width: 0; }
+.home-places-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.home-places-list > li { min-width: 0; }
+.home-place { display: flex; align-items: center; gap: 14px; height: 100%; min-height: 88px; border: 1px solid var(--line); border-left: 6px solid var(--imsda-purple); border-radius: 12px; background: #ffffff; padding: 14px 16px; color: var(--ink); font-size: 1rem; text-decoration: none; }
+.home-place:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.home-place-icon { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 12px; background: var(--imsda-navy); color: #ffffff; }
+.home-place-text { display: grid; flex: 1 1 auto; gap: 3px; min-width: 0; }
+.home-place-text strong { color: var(--imsda-navy); font-size: 1.25rem; line-height: 1.2; overflow-wrap: anywhere; }
+.home-place-desc { color: var(--ink); font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+.home-place-next { color: var(--muted); font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+.home-place-flag { color: #8a2d12; font-size: 0.875rem; font-weight: 800; }
+.home-place > svg:last-child { flex: 0 0 auto; color: var(--imsda-navy); }
+.season-month-list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.season-month-list h3 { margin: 0 0 6px; color: var(--imsda-purple); font-size: 1.125rem; }
+.season-month-list ul { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.season-month-list ul > li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-height: 48px; border-bottom: 1px solid var(--line); padding: 4px 2px; font-size: 1rem; }
+.season-month-date { flex: 0 0 5.5rem; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+.season-month-link { display: inline-flex; align-items: center; min-height: 44px; flex: 1 1 8rem; color: var(--imsda-navy); font-weight: 700; overflow-wrap: anywhere; }
+.season-month-link:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.season-month-name { flex: 1 1 8rem; font-weight: 700; overflow-wrap: anywhere; }
+.season-month-tag { color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+.home-season-ribbon { display: none; }
+.home-season-months { display: grid; }
+@media (min-width: 861px) {
+  .home-season-ribbon { display: grid; }
+  .home-season-months { display: none; }
+}
+@media (max-width: 760px) {
+  .home-places-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-place, .season-item-body { transition: none; }
+}
+.home-footer { display: grid; gap: 4px; margin: 8px 0 0; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); font-size: 1rem; }
+.home-footer p { margin: 0; }
+.home-footer-verse cite { color: var(--imsda-purple); font-style: normal; font-weight: 700; }
+.home-footer-help a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
+.home-footer-help a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Platform settings: homepage ministries and help contact (#1251). Staff labels at least 14px; the help text overrides .field-help's negative margin. */
+.platform-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.ministry-tile-fields { display: grid; gap: 12px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; }
+.ministry-tile-fields > legend { padding: 0 6px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
+.ministry-tile-fields label { min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.ministry-tile-fields label > small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+/* Calendar month page, compact (#1249): a one-line header with the subscribe button, a sticky bar (view tabs, month navigation and
+   filter chips), 88px week rows, and the month list beside the grid (below it on a phone). Flat fills only; 16px body text, 14px
+   labels, 44px taps; no new motion. */
+/* The sticky bar's height (one row of tabs and month navigation, one row of chips; three rows on a phone), shared by the side panel's
+   offset and the scroll padding that keeps anchors and focus out from under the bar. */
+:root { --calendar-bar-height: 124px; }
+html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-height) + 12px); }
+.calendar-layout { gap: 12px; margin-top: 16px; }
+.calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
+.calendar-head h1 { margin: 0; color: var(--imsda-navy); font-size: clamp(1.5rem, 4vw, 1.9rem); line-height: 1.2; letter-spacing: 0; }
+.calendar-head p { margin: 2px 0 0; color: var(--muted); font-size: 1rem; line-height: 1.45; }
+.calendar-head p a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-underline-offset: 3px; }
+.calendar-subscribe-compact { position: relative; flex: none; }
+.calendar-subscribe-popover { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; width: min(340px, calc(100vw - 24px)); }
+.calendar-subscribe-popover .calendar-subscribe-options { width: 100%; }
+.calendar-subscribe-popover p { margin: 6px 4px 0; border-radius: 8px; background: #fff; padding: 8px 10px; color: var(--ink); font-size: 1rem; line-height: 1.4; box-shadow: var(--shadow); }
+.calendar-subscribe-popover p:empty { display: none; }
+.calendar-sticky-bar {
+  position: sticky; top: 0; z-index: 6; display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 8px;
+}
+.calendar-sticky-bar .calendar-toolbar { gap: 8px 16px; }
+.calendar-sticky-bar .calendar-view-toggle { border: 0; background: #f1f4f5; }
+.calendar-sticky-bar .calendar-view-toggle a { min-height: 44px; font-size: 0.875rem; }
+.calendar-sticky-bar .calendar-month-nav h2 { min-width: 150px; font-size: 1.1rem; }
+.calendar-sticky-bar .calendar-categories { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: 2px; }
+.calendar-sticky-bar .calendar-categories a { font-size: 0.875rem; }
+:root .calendar-sticky-bar .calendar-month-nav .secondary-button { width: 44px; min-width: 44px; min-height: 44px; }
+.calendar-sticky-bar .calendar-categories a[aria-current="page"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
+.calendar-sticky-bar a:focus-visible, .calendar-month-more > summary:focus-visible, .calendar-subscribe-toggle:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.calendar-side { display: grid; gap: 10px; align-content: start; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px; }
+.calendar-month-list h2 { margin: 0; color: var(--ink); font-size: 1.2rem; }
+.calendar-month-list .calendar-day-prompt { position: static; display: block; margin: 0; border: 0; background: none; padding: 0; color: var(--muted); font-size: 1rem; }
+.calendar-month-list .calendar-empty { padding: 14px; font-size: 1rem; }
+.calendar-month-more > summary { display: flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-size: 1rem; font-weight: 800; cursor: pointer; }
+.calendar-month-more[open] > .calendar-panel-list { margin-top: 6px; }
+.calendar-key { display: flex; flex-wrap: wrap; gap: 0 12px; margin: 0; padding: 0; list-style: none; }
+.calendar-key .calendar-key-item { min-height: 28px; padding: 2px 0; color: var(--ink); }
+.calendar-key { order: 1; }
+.calendar-side { order: 2; }
+@media (min-width: 1001px) {
+  .calendar-key { order: 0; grid-column: 1; grid-row: 2; }
+  .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--calendar-bar-height) + 12px); max-height: calc(100vh - var(--calendar-bar-height) - 28px); overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (max-width: 760px) {
+  .calendar-subscribe-compact { width: 100%; }
+  .calendar-subscribe-compact .calendar-subscribe-toggle { width: 100%; justify-content: center; }
+  .calendar-sticky-bar { padding: 6px; }
+  :root { --calendar-bar-height: 172px; }
+  .calendar-day { min-height: 50px; }
+}
+/* A short viewport (landscape phone, 200% zoom) would be half covered by a stuck bar, so it scrolls away. */
+@media (max-height: 560px) {
+  .calendar-sticky-bar { position: static; }
+  html:has(.calendar-sticky-bar) { scroll-padding-top: 12px; }
+  .calendar-side { position: static; max-height: none; }
+}
+/* Bar hit areas: the bars are 20px tall, so a transparent strip grows each one into the free space around it, never over a day number
+   (top bars reach up into the date row's lower edge, bottom bars down into the next week's top padding) or a neighbouring bar. */
+@media (min-width: 761px) {
+  .calendar-bar::after { content: ""; position: absolute; inset: -1px 0; }
+  .calendar-bar-row-0::after { top: -6px; }
+  .calendar-bar-row-1::after { bottom: -8px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-sticky-bar .calendar-categories { scroll-behavior: smooth; }
+}
+
+/* Calendar Year view (#1250): twelve mini months beside the side panel from 900px up, twelve one-link rows below it. A marked day is a
+   44px link; every other day is plain text. Marks use the month page's tone colours; flat fills only (closures keep their hatch). */
+.calendar-year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.calendar-year-month { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 2px 8px 8px; }
+.calendar-year-month h3 { margin: 0; }
+.calendar-year-month h3 a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-size: 1.0625rem; font-weight: 800; text-underline-offset: 3px; }
+.calendar-year-weekdays, .calendar-year-week { display: grid; grid-template-columns: repeat(7, minmax(44px, 1fr)); }
+.calendar-year-weekdays span { padding: 2px 0 4px; color: var(--muted); font-size: 0.875rem; font-weight: 700; text-align: center; }
+.calendar-year-day { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 4px 0; color: var(--ink); font-size: 0.875rem; text-decoration: none; }
+.calendar-year-day.is-sabbath { background: #faf7fd; }
+.calendar-year-day.is-sabbath .calendar-year-number { color: var(--imsda-purple); font-weight: 800; }
+.calendar-year-number { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; border: 2px solid transparent; border-radius: 999px; line-height: 1; }
+.calendar-year-day.is-today .calendar-year-number { border-color: var(--imsda-navy); font-weight: 800; }
+.calendar-year-day.has-items { cursor: pointer; font-weight: 700; }
+.calendar-year-day.is-selected { box-shadow: inset 0 0 0 2px var(--imsda-purple); background: var(--imsda-purple-soft); }
+a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
+.calendar-year-marks { display: grid; gap: 3px; width: 100%; }
+.calendar-year-day.has-items { position: relative; }
+.calendar-year-more { position: absolute; top: 2px; right: 4px; color: var(--imsda-navy); font-size: 0.875rem; font-weight: 800; line-height: 1; }
+.calendar-year-mark { display: block; height: 8px; background: var(--cal-edge); }
+.calendar-year-mark.is-empty { background: none; }
+.calendar-year-mark.is-dot, .calendar-year-mark.is-overflow { width: 8px; margin: 0 auto; border-radius: 50%; }
+.calendar-year-mark.is-overflow { background: #5b6b75; }
+.calendar-year-mark.is-bar.is-start { margin-left: 6px; border-radius: 4px 0 0 4px; }
+.calendar-year-mark.is-bar.is-end { margin-right: 6px; border-radius: 0 4px 4px 0; }
+.calendar-year-mark.is-bar.is-start.continues-before { margin-left: 0; border-radius: 0; }
+.calendar-year-mark.is-bar.is-end.continues-after { margin-right: 0; border-radius: 0; }
+.calendar-year-rows { display: none; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.calendar-year-row { display: grid; gap: 6px; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 10px 12px; color: var(--ink); text-decoration: none; }
+.calendar-year-row:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.calendar-year-row-name { color: var(--imsda-navy); font-size: 1.0625rem; font-weight: 800; }
+.calendar-year-strip { display: flex; gap: 1px; height: 16px; }
+.calendar-year-slot { flex: 1 1 0; min-width: 0; border-radius: 2px; background: #e9eef1; }
+.calendar-year-slot.is-sabbath { background: #d3dbe0; }
+.calendar-year-slot.has-mark { background: var(--cal-edge); }
+.calendar-year-slot.is-overflow { background: #5b6b75; }
+.calendar-year-row-items { display: grid; gap: 2px; font-size: 1rem; line-height: 1.4; }
+.calendar-year-row-more, .calendar-year-row-none { color: var(--muted); }
+/* Three 44px-cell months need about 1000px, so the panel sits under the year until the page is wide enough for both side by side. */
+.calendar-layout:has(.calendar-year-board) { max-width: 1440px; }
+.calendar-year-board .calendar-key { order: 1; grid-column: auto; grid-row: auto; }
+.calendar-year-board .calendar-side { order: 2; grid-column: auto; grid-row: auto; position: static; max-height: none; overflow: visible; }
+@media (min-width: 1001px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1500px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr) 320px; }
+  .calendar-year-board .calendar-key { order: 0; grid-column: 1; grid-row: 2; }
+  .calendar-year-board .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--calendar-bar-height) + 12px); max-height: calc(100vh - var(--calendar-bar-height) - 28px); overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (min-width: 1229px) and (max-width: 1488px) {
+  .calendar-layout:has(.calendar-year-board) { margin-right: 24px; margin-left: 24px; }
+}
+@media (max-width: 899px) {
+  .calendar-year-day-hint { display: none; }
+  .calendar-year-grid { display: none; }
+  .calendar-year-rows { display: grid; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-year-grid, .calendar-year-rows { animation: calendar-year-in 0.2s ease-out; }
+  @keyframes calendar-year-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.

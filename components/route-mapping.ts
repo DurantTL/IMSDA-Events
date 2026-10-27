@@ -188,6 +188,8 @@ export function buildRouteMapping(): RouteMappingRow[] {
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
   rows.push({ route: "/admin/feature-requests", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Feature requests", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Approve or decline event feature requests; the System home only counts them." });
+  rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
+  rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });
   rows.push({ route: "/events-admin", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/events-admin", label: "Events Administrator dashboard", group: "Event administration", note: "The Events Administrator's home, opened from the role switcher. Only people with an active EVENT_ADMIN membership see it, and only for those events." });
   rows.push({ route: "/admin/clubs", kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: "/admin/clubs", label: "Clubs Administrator dashboard", group: "Club administration", note: "The Clubs Administrator's home, opened from the role switcher and the Clubs sidebar. Clubs Administrators and system administrators only." });
   rows.push({
@@ -219,6 +221,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/more/club-forms/[submissionId]": "One club form submission, from Club forms.",
   "/more/clubs/[organizationId]": "One club's roster, from This event's clubs.",
   "/more/clubs/reports/[organizationId]/[month]": "One Monthly Record, from the event's club reports.",
+  "/help/[guideId]": "One Help & learning guide, opened from the Help hub and from search; only for a viewer who may see it.",
   "/more/health-records/[organizationId]/[memberId]": "One member's health record, opened from the club roster; protected data, so no menu entry.",
   "/more/program-assignments/[runId]": "One assignment run, from Seminar assignments.",
   "/more/reports/clubs/packet/[organizationId]": "One club's packet, from club event reports.",

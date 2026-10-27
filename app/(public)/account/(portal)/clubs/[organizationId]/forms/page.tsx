@@ -9,9 +9,12 @@ import { groupClubFormsByFillMode, openApplicationUrl } from "@/modules/club-for
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { listClubFormLinks } from "@/modules/club-forms/links";
+import { getRequiredFormsStatus } from "@/modules/club-forms/required";
+import { requirementSummary } from "@/modules/club-forms/required-domain";
 import { listRosterChoices, listSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { clubYearFor } from "@/modules/club-rosters/domain";
 
 export const metadata: Metadata = { title: "Club forms" };
 export const dynamic = "force-dynamic";
@@ -54,12 +57,16 @@ export default async function ClubFormsPage({
     );
   }
   const viewer = clubLeaderViewerFromAccess(access);
-  const [templates, rosterMembers, submissions, links] = await Promise.all([
+  const clubYear = clubYearFor(new Date());
+  const [templates, rosterMembers, submissions, links, requiredStatus] = await Promise.all([
     listEnabledClubFormTemplates(),
     listRosterChoices(organizationId),
     listSubmissionsForViewer(viewer, member ? { rosterMemberId: member } : {}),
     listClubFormLinks(viewer, organizationId),
+    getRequiredFormsStatus(clubYear, [organizationId]),
   ]);
+  const requiredItems = requiredStatus[0]?.items ?? [];
+  const fillModeByKey = new Map(templates.map((template) => [template.key, template.fillMode]));
   const base = `/account/clubs/${organizationId}/forms`;
   const { families, club: clubForms } = groupClubFormsByFillMode(templates);
 
@@ -74,6 +81,66 @@ export default async function ClubFormsPage({
           and deputy and the conference office can open them.
         </p>
       </section>
+
+      {requiredItems.length > 0 && (
+        <section aria-labelledby="club-forms-required" className="public-manage-card club-forms-required" data-testid="required-forms">
+          <h2 id="club-forms-required">Required forms for {clubYear}</h2>
+          <p className="field-help">The conference requires these. A form counts as done when a submitted entry exists for the club year.</p>
+          <ul className="club-forms-required-list">
+            {requiredItems.map((item) => {
+              const open = fillModeByKey.get(item.templateKey) === "OPEN_APPLICATION";
+              return (
+                <li key={item.templateKey} data-required-form={item.templateKey}>
+                  <div className="club-forms-required-head">
+                    <strong>{item.name}</strong>
+                    <span className={`status-chip ${item.status === "MISSING" ? "gold" : "green"}`}>{item.status === "MISSING" ? "Missing" : "Done"}</span>
+                  </div>
+                  <p className="field-help">{requirementSummary(item.requirement, item.roles)}</p>
+                  {item.requirement === "ONCE_PER_CLUB_YEAR" && item.status === "MISSING" && !open && (
+                    <div className="club-form-template-actions">
+                      <Link className="primary-button" href={`${base}/${item.templateKey}/new`}><FileText aria-hidden="true" size={14} /> Fill in</Link>
+                      <SendClubFormLink
+                        defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
+                        formName={item.name}
+                        organizationId={organizationId}
+                        rosterMembers={rosterMembers}
+                        templateKey={item.templateKey}
+                      />
+                    </div>
+                  )}
+                  {item.requirement === "PER_ROLE_MEMBER_YEAR" && (
+                    item.missingMembers.length === 0
+                      ? <p className="field-help">All {item.memberCount} {item.memberCount === 1 ? "member has" : "members have"} one.</p>
+                      : (
+                        <>
+                          <p className="field-help" data-testid="missing-members-count">{item.missingMembers.length} of {item.memberCount} {item.memberCount === 1 ? "member is" : "members are"} missing this form:</p>
+                          <ul className="club-forms-required-members">
+                            {item.missingMembers.map((missing) => (
+                              <li key={missing.id}>
+                                <span translate="no">{missing.name}</span>
+                                {!open && (
+                                  <SendClubFormLink
+                                    defaultDays={CLUB_FORM_LINK_DEFAULT_DAYS}
+                                    defaultRosterMemberId={missing.id}
+                                    formName={item.name}
+                                    organizationId={organizationId}
+                                    rosterMembers={[{ id: missing.id, name: missing.name }]}
+                                    templateKey={item.templateKey}
+                                    triggerLabel={<>Send link<span className="sr-only"> to {missing.name} for {item.name}</span></>}
+                                  />
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {templates.length === 0 ? (
         <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>

@@ -18,24 +18,57 @@
   font-family: inherit;
 }
 
-/* A pin drawn in CSS on the (empty) divIcon itself, not fetched as an
-   image, so nothing but the tiles reaches an external host. */
+/* The church-map pin (#1244): the Pathfinder logo with a coloured dot at
+   the anchor point. Both parts are drawn in CSS on the (empty) divIcon, and
+   the logo is served from this app, so nothing but the tiles reaches an
+   external host. The pin is 44px wide (the church map's is 40) so it meets
+   the tap-target minimum; the logo and dot sit exactly as they do there. */
 .markerIcon {
+  --pin-dot: #003b5c;
   box-sizing: border-box;
-  border-radius: 50%;
-  background: var(--imsda-purple, #4a2e83);
+  position: relative;
+  background: none;
+  border: 0;
+}
+
+.markerIcon::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 6px;
+  width: 32px;
+  height: 32px;
+  background: url("/pathfinder-logo-pin.png") center / contain no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.markerIcon::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  transform: translateX(-50%);
   border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+  background: var(--pin-dot);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .markerIcon:focus-visible {
   outline: 3px solid #f9a13a;
   outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .markerIcon.selected {
-  background: #f9a13a;
-  box-shadow: 0 0 0 3px rgba(249, 161, 58, 0.35), 0 1px 4px rgba(0, 0, 0, 0.35);
+  --pin-dot: #f9a13a;
+}
+
+.markerIcon.selected::after {
+  box-shadow: 0 0 0 3px rgba(249, 161, 58, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .map :global(.club-map-tooltip) strong {

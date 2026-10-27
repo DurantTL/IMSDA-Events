@@ -167,6 +167,9 @@ export const staffPageTitles = {
   scheduledEmails: "Scheduled emails",
 } as const;
 
+/** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
+export const helpPageTitle = "Help & learning";
+
 type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", title: string];
 
 /**
@@ -175,6 +178,9 @@ type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", 
  * `prefix` is both.
  */
 const subpageRules: readonly SubpageRule[] = [
+  // Help & learning (#1077) is not a nav item; the sidebar draws its own link.
+  ["/help/glossary", "prefix", "Glossary"],
+  ["/help", "prefix", helpPageTitle],
   ["/more/honors/rosters", "prefix", staffPageTitles.honorsRosters],
   ["/more/honors/schedule", "prefix", staffPageTitles.honorsSchedule],
   ["/more/honors/instructors", "prefix", staffPageTitles.honorsInstructors],

@@ -33,6 +33,8 @@ export type CalendarItem = {
    */
   registrationStatus?: PublicCapacityStatus;
   registrationOpensOn?: string | null;
+  /** Only for events (#1251): the last day registration is open (inclusive), which the homepage's closing-soon flags count down to. */
+  registrationClosesOn?: string | null;
   clubEvent?: boolean;
   /** The event's time zone, so a "opens in N days" count uses the event's own today (#1209). */
   registrationTimeZone?: string;
@@ -234,6 +236,14 @@ export function calendarKeyTone(category: string, toneMap: Map<string, CalendarT
   return categoryKey(category) === closureCategory.toLowerCase() ? "closure" : (toneMap.get(categoryKey(category)) ?? 1);
 }
 
+/** Rows of bars a month-grid week shows under the date (#1249); anything further is counted as "+N more". */
+export const calendarGridRows = 2;
+
+/** "+3 more": what a crowded day shows after its bars. */
+export function calendarMoreLabel(hidden: number) {
+  return `+${hidden} more`;
+}
+
 export type WeekBar = {
   item: CalendarItem;
   /** 1 to 7, the grid column the bar starts in. */
@@ -302,7 +312,7 @@ export function parseDateParam(value: string | undefined, today: string): string
 }
 
 /** The month shown and the selected date: a valid date (month view only) wins over the month param and decides the month. */
-export function resolveMonthAndDate(view: "month" | "list", monthParam: string | undefined, dateParam: string | undefined, today: string) {
+export function resolveMonthAndDate(view: string, monthParam: string | undefined, dateParam: string | undefined, today: string) {
   const selectedDate = view === "month" ? parseDateParam(dateParam, today) : undefined;
   return { selectedDate, month: parseMonthParam(selectedDate ? selectedDate.slice(0, 7) : monthParam, today) };
 }
@@ -310,6 +320,11 @@ export function resolveMonthAndDate(view: "month" | "list", monthParam: string |
 /** "April 24, 2027". */
 export function formatLongDate(date: string) {
   return formatDateRange(date, date);
+}
+
+/** "1 item", "5 items": the Year view's day and month labels (#1250). */
+export function calendarItemCountLabel(count: number) {
+  return `${count} ${count === 1 ? "item" : "items"}`;
 }
 
 /** "1 event", "5 events": the count is always words, never colour. */

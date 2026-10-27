@@ -70,7 +70,8 @@ describe("tables that became phone cards (#447)", () => {
   });
 
   it("the admin club forms table is table-cards with labelled cells and the form as row header", () => {
-    expect(clubForms).toContain('role="table" className="report-table table-cards"');
+    expect(clubForms).toContain('role="table" className="report-table table-cards table-cards-tablet"');
+    expect(clubForms).toContain('className="report-table-wrap card-box"');
     for (const label of ["Status", "Filled in", "Version"]) expect(clubForms).toContain(`cardCell("${label}")`);
     expect(clubForms).toContain("cardCell(null)");
     expect(clubForms).toContain('<th role="rowheader" scope="row">{template.name}');

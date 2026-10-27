@@ -2,15 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { HomepageMinistryIconView } from "@/components/homepage-ministry-icon";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { eventSlugFromHref, eventTransitionNames } from "@/modules/events/view-transition";
 import { EventPhotoCard, eventCardImage } from "@/components/event-photo-card";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { addDays, firstPerSeries } from "@/modules/calendar/domain";
+import { addDays } from "@/modules/calendar/domain";
+import { helpContactLinks, ministryTiles, nextClosingSoon, nextMonthsList, seasonRibbon, seasonWindow } from "@/modules/calendar/home-season";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
-import { homeFeaturedLimit, featuredItemsFor, withoutFeatured } from "@/modules/events/featured-domain";
+import { homeFeaturedLimit, featuredItemsFor } from "@/modules/events/featured-domain";
 import { listEventCardImages, listFeaturedEventRows } from "@/modules/events/featured";
+import { listHomepageMinistries } from "@/modules/system-admin/homepage-ministries";
+import { getPublicHelpContact } from "@/modules/system-admin/platform-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -21,30 +25,37 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const upcomingLimit = 6;
+const fullCalendarHref = "/calendar?view=list";
+const fullYearHref = "/calendar?view=year";
 
 /**
- * The public front door (#373). Members, club leaders, and visitors start
- * here. The header offers Sign in (#1009).
+ * The public front door (#373, #1251). Members, club leaders, and visitors start here. The header offers Sign in
+ * (#1009). Top to bottom: the season band, featured events (#1218), the six-month ribbon (wide screens), "Find your
+ * place", the next three months (phones), then the account links. Every date comes from the calendar and events.
  */
 export default async function Home() {
-  const today = conferenceToday();
-  const [items, attendee, featuredRows] = await Promise.all([
+  const now = new Date();
+  const today = conferenceToday(now);
+  const [items, attendee, featuredRows, ministries, help] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, 365)),
     getCurrentAttendee(),
     listFeaturedEventRows(today),
+    listHomepageMinistries(),
+    getPublicHelpContact(),
   ]);
-  // Featured events lead the page as larger cards (#1218) and are left out of "Coming up", so no card shows twice.
+  // Featured events lead the page as larger cards (#1218).
   const featured = featuredItemsFor(items, featuredRows).slice(0, homeFeaturedLimit);
-  const upcoming = withoutFeatured(firstPerSeries(items), featured).slice(0, upcomingLimit);
-  const cardImages = await listEventCardImages([...featured, ...upcoming].flatMap((item) => {
+  const cardImages = await listEventCardImages(featured.flatMap((item) => {
     const slug = eventSlugFromHref(item.href);
     return slug ? [slug] : [];
   }));
-  const usedNames = new Set<string>();
-  const featuredNames = eventTransitionNames(featured, usedNames);
-  const cardNames = eventTransitionNames(upcoming, usedNames);
+  const featuredNames = eventTransitionNames(featured, new Set<string>());
   const signedInName = attendee.account?.displayName || attendee.account?.verifiedEmail;
+  const closing = nextClosingSoon(items, now);
+  const ribbon = seasonRibbon(items, seasonWindow(today));
+  const months = nextMonthsList(items, today);
+  const tiles = ministryTiles(ministries, items, today, now);
+  const helpLinks = helpContactLinks(help);
 
   return (
     <main className="public-registration-page public-calendar-page public-home-page">
@@ -58,11 +69,24 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="public-registration-hero calendar-hero public-home-banner">
-        <div>
+      <section className="public-registration-hero calendar-hero public-home-banner season-band">
+        <div className="season-band-text">
           <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
-          <h1>Events and registration</h1>
+          <h1>The season ahead</h1>
+          <p className="season-band-line">Camps, clubs and conference dates for the next six months.</p>
         </div>
+        {closing && (
+          <aside aria-labelledby="season-closing-heading" className="season-closing">
+            <h2 id="season-closing-heading">Closing soon</h2>
+            <p className="season-closing-title">{closing.item.eventTitle ?? closing.item.title}</p>
+            <p className="season-closing-line">{closing.line}</p>
+            {closing.item.href && (
+              <Link className="season-closing-register" href={closing.item.href}>
+                Register<span className="sr-only"> for {closing.item.eventTitle ?? closing.item.title}</span>
+              </Link>
+            )}
+          </aside>
+        )}
       </section>
 
       <div className="calendar-layout">
@@ -77,25 +101,101 @@ export default async function Home() {
           </section>
         )}
 
-        <section aria-labelledby="home-upcoming-heading" className="calendar-agenda event-photo-strip">
-          <div className="event-photo-strip-head">
-            <h2 id="home-upcoming-heading">Coming up</h2>
-            <Link className="event-photo-see-all" href="/calendar?view=list">See all <ChevronRight size={16} aria-hidden="true" /></Link>
+        <section aria-labelledby="home-season-heading" className="home-season home-season-ribbon">
+          <div className="home-season-head">
+            <h2 id="home-season-heading">Next six months</h2>
+            <Link className="event-photo-see-all" href={fullYearHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></Link>
           </div>
-          {upcoming.length === 0 ? (
-            <p className="calendar-empty">{featured.length > 0 ? "Everything coming up is featured above." : "Nothing is on the calendar yet. Check back soon."}</p>
-          ) : (
-            <ul aria-labelledby="home-upcoming-heading" className="event-photo-list">
-              {upcoming.map((item) => <EventPhotoCard image={eventCardImage(item, cardImages)} item={item} key={item.key} transitionName={cardNames.get(item.key)} />)}
-            </ul>
-          )}
+          <div className="season-ribbon">
+            <div aria-hidden="true" className="season-months-row">
+              <span className="season-lane-spacer" />
+              <span className="season-months-track">
+                {ribbon.marks.filter((mark) => mark.showLabel).map((mark) => <span className="season-month-label" key={mark.label} style={{ left: `${mark.leftPct}%` }}>{mark.label}</span>)}
+              </span>
+            </div>
+            {ribbon.lanes.map((lane) => (
+              <div className="season-lane" key={lane.lane}>
+                <h3 className="season-lane-label">{lane.label}</h3>
+                <ul aria-label={`${lane.label}, next six months`} className={`season-lane-track season-lane-${lane.lane}`} style={{ height: `${lane.rows * 48 + 8}px` }}>
+                  {ribbon.marks.filter((mark) => mark.leftPct > 0).map((mark) => <li aria-hidden="true" className="season-gridline" key={mark.label} style={{ left: `${mark.leftPct}%` }} />)}
+                  {lane.entries.map((entry) => {
+                    const title = entry.item.eventTitle ?? entry.item.title;
+                    const position = entry.anchor === "left" ? { left: `${entry.edgePct}%` } : { right: `${entry.edgePct}%` };
+                    const body = (
+                      <>
+                        <span aria-hidden="true" className={`season-mark season-mark-${entry.mark}`} style={entry.mark === "bar" ? { width: `${entry.markPct}%` } : undefined} />
+                        <span className="season-item-label"><strong>{title}</strong> <small>{entry.dateLabel}</small></span>
+                      </>
+                    );
+                    return (
+                      <li className={`season-item season-item-${entry.anchor}`} key={entry.item.key} style={{ ...position, width: `${entry.extentPct}%`, top: `${entry.row * 48 + 4}px` }}>
+                        {entry.item.href
+                          ? <Link className="season-item-body" href={entry.item.href} title={entry.accessibleLabel}>{body}</Link>
+                          : <span className="season-item-body" title={entry.accessibleLabel}>{body}</span>}
+                      </li>
+                    );
+                  })}
+                  {lane.entries.length === 0 && <li className="season-lane-empty">Nothing in this lane.</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
           <p className="home-more">
             <Link className="home-events-link" href="/events">See all events open for registration</Link>
           </p>
+        </section>
+
+        <section aria-labelledby="home-places-heading" className="home-places">
+          <h2 id="home-places-heading">Find your place</h2>
+          <ul className="home-places-list">
+            {tiles.map((tile) => (
+              <li key={tile.position}>
+                <Link className="home-place" href={tile.href}>
+                  <span className="home-place-icon"><HomepageMinistryIconView icon={tile.icon} /></span>
+                  <span className="home-place-text">
+                    <strong>{tile.name}</strong>
+                    {tile.description && <span className="home-place-desc">{tile.description}</span>}
+                    {tile.next && <span className="home-place-next">Next: {tile.next.title}, {tile.next.dateLabel}</span>}
+                    {tile.closing && <span className="home-place-flag">{tile.closing.line}</span>}
+                  </span>
+                  <ChevronRight size={20} aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="home-months-heading" className="home-season home-season-months">
+          <h2 id="home-months-heading">Next three months</h2>
+          <ol className="season-month-list">
+            {months.map((month) => (
+              <li key={month.key}>
+                <h3>{month.label}</h3>
+                {month.entries.length === 0 ? (
+                  <p className="calendar-empty">Nothing scheduled yet.</p>
+                ) : (
+                  <ul>
+                    {month.entries.map(({ item, dateLabel, isClosure }) => (
+                      <li key={item.key}>
+                        <span className="season-month-date">{dateLabel}</span>
+                        {item.href
+                          ? <Link className="season-month-link" href={item.href}>{item.eventTitle ?? item.title}</Link>
+                          : <span className="season-month-name">{item.eventTitle ?? item.title}</span>}
+                        {isClosure && <span className="season-month-tag">Office closed</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ol>
           <p className="home-more">
-            <Link className="primary-button home-calendar-button" href="/calendar?view=list">
+            <Link className="primary-button home-calendar-button" href={fullCalendarHref}>
               <CalendarDays size={18} aria-hidden="true" /> See the full calendar
             </Link>
+          </p>
+          <p className="home-more">
+            <Link className="home-events-link" href="/events">See all events open for registration</Link>
           </p>
         </section>
 
@@ -129,6 +229,18 @@ export default async function Home() {
         </nav>
 
         <StartAClubCallout variant="line" />
+
+        <footer className="home-footer">
+          <p className="home-footer-verse">Not forsaking the assembling of ourselves together. <cite>Hebrews 10:25</cite></p>
+          {helpLinks && (
+            <p className="home-footer-help">
+              Need help?{" "}
+              {helpLinks.phone && <>Call <a href={helpLinks.phone.href}>{helpLinks.phone.text}</a></>}
+              {helpLinks.phone && helpLinks.email && " or "}
+              {helpLinks.email && <>{helpLinks.phone ? "email" : "Email"} <a href={helpLinks.email.href}>{helpLinks.email.text}</a></>}
+            </p>
+          )}
+        </footer>
       </div>
     </main>
   );

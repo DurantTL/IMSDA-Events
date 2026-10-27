@@ -12,6 +12,7 @@ import {
 } from "@/components/staff-navigation";
 import { systemNavGroups } from "@/components/system-navigation";
 import type { EventPermission } from "@/modules/access/permissions";
+import { visibleGuides } from "@/modules/help/visibility";
 
 /**
  * Destination search (#1177, slice A of #1074). It searches the canonical
@@ -28,7 +29,7 @@ import type { EventPermission } from "@/modules/access/permissions";
  * route handler keeps its own server authorization; nothing here grants access.
  * Planned features are not in the registry, so they cannot appear.
  */
-export type DestinationScope = "System" | "Clubs" | "Event" | "Profile";
+export type DestinationScope = "System" | "Clubs" | "Event" | "Profile" | "Help";
 
 export type SearchDestination = {
   /** Stable per scope and path, used as the option id and React key. */
@@ -65,6 +66,7 @@ export const destinationScopeLabels: Record<DestinationScope, string> = {
   Clubs: "Clubs",
   Event: "Event",
   Profile: "Profile",
+  Help: "Help",
 };
 
 /** The text a screen reader hears for a result's scope. */
@@ -74,6 +76,7 @@ export function destinationScopeDescription(scope: DestinationScope): string {
     case "Clubs": return "Clubs administration";
     case "Event": return "The selected event";
     case "Profile": return "Your account";
+    case "Help": return "Help & learning guide";
   }
 }
 
@@ -256,6 +259,15 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
     href: "/profile",
     keywords: destinationKeywords["/profile"] ?? [],
   });
+
+  // Help & learning (#1077): the hub, the glossary and the guides this viewer may see. Static titles and keywords
+  // written in code, never event data. They are listed after every matching page (see `searchDestinations`).
+  const helpViewer = { isSystemAdmin: context.isSystemAdmin, selectedEventId: context.selectedEventId, permissions: context.permissions };
+  add({ key: "Help:/help", scope: "Help", label: "Help & learning", description: "Short guides for common tasks.", href: withCurrentEvent("/help", context.selectedEventId), keywords: ["guide", "how to", "learn", "training", "support"] });
+  for (const guide of visibleGuides(helpViewer)) {
+    add({ key: `Help:/help/${guide.id}`, scope: "Help", label: guide.title, description: guide.summary, href: withCurrentEvent(`/help/${guide.id}`, context.selectedEventId), keywords: guide.keywords });
+  }
+  add({ key: "Help:/help/glossary", scope: "Help", label: "Glossary", description: "What the words in the workspace mean.", href: withCurrentEvent("/help/glossary", context.selectedEventId), keywords: ["terms", "words", "meaning", "definitions", "jargon"] });
   return destinations;
 }
 
@@ -339,12 +351,16 @@ export function searchDestinations(
 ): SearchDestination[] {
   const tokens = query.split(/[^A-Za-z0-9]+/).filter(Boolean);
   if (tokens.length === 0) return [];
-  return destinations
+  const ranked = destinations
     .map((destination, index) => ({ destination, index, score: scoreDestination(destination, tokens) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, limit)
     .map((entry) => entry.destination);
+  // Help guides (#1077) follow every page that matches, but keep up to two places when pages fill the list.
+  const guides = ranked.filter((destination) => destination.scope === "Help");
+  const pages = ranked.filter((destination) => destination.scope !== "Help");
+  const reserved = Math.min(guides.length, 2);
+  return [...pages.slice(0, limit - reserved), ...guides.slice(0, Math.max(reserved, limit - pages.length))];
 }
 
 /** The live status line: how many results, and how to use them. Empty while nothing is typed. */

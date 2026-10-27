@@ -11,6 +11,7 @@ import {
   type ClubFormTemplateRecord,
 } from "@/modules/club-forms/domain";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
+import { normalizeRequirement, type ClubFormRequirementValue, type RequiredRoleType } from "@/modules/club-forms/required-domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { resealClubFormSubmissions } from "@/modules/club-forms/reseal";
 import { recordClubFormTemplateVersion } from "@/modules/club-forms/versions";
@@ -262,6 +263,9 @@ export type ClubFormTemplateSummary = {
   needsSync: boolean;
   /** Who fills it in (#1229), stored or the seed's default. */
   fillMode: ClubFormFillMode;
+  /** The "Required" setting (#1246): a staff choice, never written by the sync. */
+  requirement: ClubFormRequirementValue;
+  requiredRoles: RequiredRoleType[];
   /** Edited or created in the app (#712): the code's seed no longer applies. */
   customized: boolean;
   /** An unpublished draft is waiting. */
@@ -294,6 +298,8 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
       draftUpdatedAt: true,
       draftBaseVersion: true,
       fillMode: true,
+      requirement: true,
+      requiredRoles: true,
       _count: { select: { submissions: true } },
     },
   });
@@ -310,6 +316,8 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
       submissionCount: row._count.submissions,
       needsSync: Boolean(seed && !row.customizedAt && row.version < seed.version),
       fillMode: effectiveClubFormFillMode(row.fillMode, row.key),
+      requirement: row.requirement,
+      requiredRoles: normalizeRequirement(row.requirement, row.requiredRoles).roles,
       customized: Boolean(row.customizedAt),
       hasDraft: Boolean(row.draftUpdatedAt),
       draftBaseVersion: row.draftUpdatedAt ? row.draftBaseVersion : null,
@@ -318,7 +326,7 @@ export async function listClubFormTemplatesForAdmin(): Promise<ClubFormTemplateS
   });
   for (const seed of clubFormTemplateSeeds) {
     if (stored.has(seed.key)) continue;
-    listed.push({ key: seed.key, name: seed.name, description: seed.description, enabled: false, enabledAt: null, version: 0, submissionCount: 0, needsSync: true, fillMode: seed.fillMode, customized: false, hasDraft: false, draftBaseVersion: null, draftStale: false });
+    listed.push({ key: seed.key, name: seed.name, description: seed.description, enabled: false, enabledAt: null, version: 0, submissionCount: 0, needsSync: true, fillMode: seed.fillMode, requirement: "NOT_REQUIRED", requiredRoles: [], customized: false, hasDraft: false, draftBaseVersion: null, draftStale: false });
   }
   return listed;
 }
@@ -467,6 +475,41 @@ export async function setClubFormTemplateFillMode(key: string, fillMode: ClubFor
       }, tx);
     }
     return { key, fillMode };
+  });
+}
+
+/**
+ * Sets the "Required" setting (#1246). The caller has already passed `requireClubsAdministration()`: only a system
+ * administrator or Clubs Administrator. A staff choice only: the sync and the builder never write these columns, so
+ * nothing overwrites it. Roles are kept only for a per-member requirement. Audited with the before and after.
+ */
+export async function setClubFormTemplateRequirement(
+  key: string,
+  input: { requirement: ClubFormRequirementValue; requiredRoles: readonly string[] },
+  actorUserId: string,
+  now = new Date(),
+) {
+  const next = normalizeRequirement(input.requirement, input.requiredRoles);
+  return getPrisma().$transaction(async (tx) => {
+    const template = await tx.clubFormTemplate.findUnique({ where: { key }, select: { id: true, requirement: true, requiredRoles: true } });
+    if (!template) throw new ClubFormError("TEMPLATE_NOT_FOUND", "That form could not be found.");
+    const before = normalizeRequirement(template.requirement, template.requiredRoles);
+    await tx.clubFormTemplate.update({
+      where: { id: template.id },
+      data: { requirement: next.requirement, requiredRoles: next.roles, requirementChangedAt: now, requirementChangedByUserId: actorUserId },
+    });
+    const changed = before.requirement !== next.requirement || before.roles.join(",") !== next.roles.join(",");
+    if (changed) {
+      await writeAuditLog({
+        actorUserId,
+        action: "CLUB_FORM_REQUIREMENT_CHANGED",
+        entityType: "ClubFormTemplate",
+        entityId: template.id,
+        summary: "Changed whether a club form is required.",
+        metadata: { templateKey: key, from: before.requirement, to: next.requirement, fromRoles: before.roles, toRoles: next.roles },
+      }, tx);
+    }
+    return { key, requirement: next.requirement, requiredRoles: next.roles };
   });
 }
 
