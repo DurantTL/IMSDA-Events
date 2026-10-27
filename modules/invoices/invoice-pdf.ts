@@ -101,10 +101,15 @@ export class Writer {
         if (current) lines.push(current);
         // A single word wider than the line is broken by characters.
         let rest = word;
-        while (font.widthOfTextAtSize(rest, size) > width && rest.length > 1) {
+        while (rest.length > 1) {
+          // Measure a growing prefix, not the whole remainder: a very long unbroken word would otherwise be re-measured
+          // in full for every line it breaks into (quadratic, and slow enough to time out under load).
+          const last = rest.length - 1;
+          let high = Math.min(last, 16);
+          while (high < last && font.widthOfTextAtSize(rest.slice(0, high), size) <= width) high = Math.min(last, high * 2);
+          if (high === last && font.widthOfTextAtSize(rest, size) <= width) break;
           // Binary search for the longest prefix that fits, so a very long unbroken word costs O(n log n), not O(n^2).
           let low = 1;
-          let high = rest.length - 1;
           while (low < high) {
             const middle = Math.ceil((low + high) / 2);
             if (font.widthOfTextAtSize(rest.slice(0, middle), size) <= width) low = middle;

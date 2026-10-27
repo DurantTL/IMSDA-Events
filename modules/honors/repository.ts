@@ -989,6 +989,10 @@ export async function updateHonorOffering(
     if (isRoomCapacityRefusal(error)) {
       throw new HonorConfigurationError("ROOM_TOO_SMALL", "The room has fewer seats than that. Lower the seats, or raise the room first.");
     }
+    // Lost a conflict on every retry (a room or pick saved at the same moment). Nothing was written; say so like the schedule board does.
+    if (isSerializationFailure(error)) {
+      throw new HonorConfigurationError("SCHEDULE_BUSY", "Someone changed the schedule or the class picks at the same moment. Nothing was changed; please try again.");
+    }
     throw error;
   }
   const setup = await getEventHonorSetup(eventId);

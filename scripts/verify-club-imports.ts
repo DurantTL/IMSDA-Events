@@ -194,7 +194,11 @@ async function main() {
       const won = settled.filter((result) => result.status === "fulfilled");
       const lost = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
       assert(won.length === 1 && lost.length === 1, `trial ${trial}: exactly one concurrent move wins (${won.length} won)`);
-      assert(lost[0].reason instanceof ImportYearMoveError && lost[0].reason.code === "IMPORT_MOVE_CONFLICT", `trial ${trial}: the loser is refused with a conflict (${String(lost[0].reason)})`);
+      // Which refusal the loser gets depends on timing, not on a gap in the guard: a loser that read the import record
+      // before the winner committed waits on the row lock and is refused with IMPORT_MOVE_CONFLICT; one that starts
+      // after the winner committed no longer finds the record in the year it asked about (IMPORT_NOT_FOUND). Either way
+      // it is refused with nothing changed, which the winner count, row, record and audit checks below pin down.
+      assert(lost[0].reason instanceof ImportYearMoveError && (lost[0].reason.code === "IMPORT_MOVE_CONFLICT" || lost[0].reason.code === "IMPORT_NOT_FOUND"), `trial ${trial}: the loser is refused as already moved (${String(lost[0].reason)})`);
       const winnerYear = (won[0] as PromiseFulfilledResult<{ toYear: string }>).value.toYear;
       const scope = await prisma.externalIdentity.findFirst({ where: { organizationId: raceClub, provider: "FLUENT_FORMS" }, select: { providerScope: true } });
       assert(scope?.providerScope === `form-89:${winnerYear}`, `trial ${trial}: the import record is in ${winnerYear}`);

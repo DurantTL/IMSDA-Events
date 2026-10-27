@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { lowCostPasswordHash } from "@/tests/support/low-cost-password-hash";
 import { hashPassword, validatePassword, verifyPassword } from "@/modules/access/passwords";
 import {
   checkPasswordRequirements,
@@ -9,13 +10,25 @@ import {
 } from "@/modules/access/password-policy";
 
 describe("staff passwords", () => {
+  // Production scrypt is deliberately slow (N=131072, about 128 MB), so this is
+  // the one test that pays the real cost: a single hash and a single verify. The
+  // default 5 s limit is not enough when the machine is busy, and the cost itself
+  // is the point, so the limit is raised rather than the cost lowered.
   it("stores a salted scrypt hash and verifies without plaintext", async () => {
     const password = "A long local passphrase!";
     const hash = await hashPassword(password);
     expect(hash).toMatch(/^scrypt\$131072\$8\$1\$/);
     expect(hash).not.toContain(password);
     await expect(verifyPassword(password, hash)).resolves.toBe(true);
+  }, 60_000);
+
+  // verifyPassword reads N, r and p from the stored hash, so the rejection paths
+  // need not pay the production cost.
+  it("rejects a wrong password and a malformed hash", async () => {
+    const hash = lowCostPasswordHash("A long local passphrase!");
+    await expect(verifyPassword("A long local passphrase!", hash)).resolves.toBe(true);
     await expect(verifyPassword("A different passphrase!", hash)).resolves.toBe(false);
+    await expect(verifyPassword("A long local passphrase!", "bcrypt$1$2$3$a$b")).resolves.toBe(false);
   });
 
   it("accepts an ordinary passphrase without composition rules", () => {
