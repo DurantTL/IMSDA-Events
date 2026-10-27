@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, DoorClosed, List } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
@@ -7,6 +8,8 @@ import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { AgendaItem } from "@/components/calendar-agenda-item";
 import { CalendarDayLink } from "@/components/calendar-day-link";
 import { CalendarDayFocus } from "@/components/calendar-day-focus";
+import { CalendarMotion } from "@/components/calendar-motion";
+import { calendarBarIntroDelay } from "@/components/calendar-motion-helpers";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import { CalendarPanelItem } from "@/components/calendar-panel-item";
 import {
@@ -177,11 +180,12 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
 
         {view === "month" && (
           <div className="calendar-board">
+            <CalendarMotion category={category ?? ""} month={currentMonthKey} selectedDate={selectedDate ?? ""} />
             <div className="calendar-month" role="presentation">
               <div className="calendar-weekdays">
                 {weekdays.map((weekday) => <div className="calendar-weekday" key={weekday}>{weekday}</div>)}
               </div>
-              {grid.map((week) => {
+              {grid.map((week, weekIndex) => {
                 const { bars, hiddenByDay } = weekBarLayout(week, items);
                 return (
                   <div className="calendar-week" key={week[0]}>
@@ -227,9 +231,10 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                         <CalendarDayLink
                           aria-label={`${item.isClosure ? `${closureLabel}: ` : ""}${item.title}, ${dates}${item.status !== "SCHEDULED" ? `, ${calendarStatusLabels[item.status]}` : ""}`}
                           className={`calendar-bar calendar-tone-${calendarItemTone(item, toneMap)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
+                          data-calendar-key={item.key}
                           href={dayHrefFor(bar.segmentStart)}
                           key={item.key}
-                          style={{ gridColumn: `${bar.startCol} / span ${bar.span}`, gridRow: bar.row + 2 }}
+                          style={{ gridColumn: `${bar.startCol} / span ${bar.span}`, gridRow: bar.row + 2, "--cal-delay": `${calendarBarIntroDelay(weekIndex, bar.startCol, bar.row)}ms` } as CSSProperties}
                         >
                           {bar.continuesBefore && <span aria-hidden="true" className="calendar-bar-edge">‹</span>}
                           {item.isClosure && <DoorClosed size={14} aria-hidden="true" />}
@@ -265,7 +270,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                     : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
                 </p>
                 {selectedItems.length > 0 && (
-                  <ul className="calendar-panel-list">{sortCalendarItems(selectedItems).map((item) => <CalendarPanelItem item={item} key={item.key} toneMap={toneMap} />)}</ul>
+                  <ul className="calendar-panel-list" key={selectedDate}>{sortCalendarItems(selectedItems).map((item, index) => <CalendarPanelItem index={index} item={item} key={item.key} toneMap={toneMap} />)}</ul>
                 )}
                 <div className="calendar-day-actions">
                   <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>

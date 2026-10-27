@@ -8506,6 +8506,40 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 @media (prefers-reduced-motion: reduce) {
   .calendar-bar { transition: none; }
 }
+/* Calendar motion (#1206). Linked highlight of one event across weeks (hover and keyboard focus alike, set by components/calendar-motion.tsx),
+   the day panel rising in, the first-load intro, the month slide. Every animation lives in the no-preference block; under reduced motion the
+   linked event only gets a static outline. Text and borders are visible from the first frame of each animation. */
+@media (prefers-reduced-motion: reduce) {
+  .calendar-bar.is-linked:not(:focus-visible), .calendar-bar.is-selected-event:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+  .calendar-chip.is-linked a:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-chip { transition: filter 0.2s ease; }
+  .calendar-month[data-calendar-active] [data-calendar-key]:not(.is-linked) { filter: saturate(0.35); }
+  .calendar-panel-item { animation: calendar-rise 0.3s ease-out backwards; animation-delay: min(calc(var(--i, 0) * 50ms), 250ms); }
+  @keyframes calendar-rise { from { transform: translateY(14px); } to { transform: none; } }
+  .calendar-month[data-calendar-slide="next"] .calendar-week { animation: calendar-slide-next 0.3s ease-out; }
+  .calendar-month[data-calendar-slide="prev"] .calendar-week { animation: calendar-slide-prev 0.3s ease-out; }
+  @keyframes calendar-slide-next { from { transform: translateX(24px); } to { transform: none; } }
+  @keyframes calendar-slide-prev { from { transform: translateX(-24px); } to { transform: none; } }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  .calendar-bar { transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease; }
+  .calendar-bar.is-linked, .calendar-bar.is-selected-event { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 59, 92, 0.22); }
+  .calendar-bar.is-linked:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  /* First page load only (the client component sets data-calendar-intro-done on <html>): the fill sweeps in from the left behind the
+     text, which stays readable throughout, and today gives one soft gold pulse. */
+  :root:not([data-calendar-intro-done]) .calendar-bar { background: transparent; animation: calendar-bar-text 0.25s ease-out var(--cal-delay, 0ms) backwards; }
+  :root:not([data-calendar-intro-done]) .calendar-bar::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--cal-fill); transform-origin: left center;
+    animation: calendar-bar-draw 0.3s ease-out var(--cal-delay, 0ms) backwards;
+  }
+  :root:not([data-calendar-intro-done]) .calendar-bar.calendar-tone-closure::before { background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 6px, #fde4cc 6px, #fde4cc 12px); }
+  @keyframes calendar-bar-draw { from { transform: scaleX(0); } to { transform: none; } }
+  @keyframes calendar-bar-text { from { color: var(--cal-edge); } to { color: var(--cal-ink); } }
+  :root:not([data-calendar-intro-done]) .calendar-day.is-today .calendar-day-number { animation: calendar-today-pulse 0.6s ease-out 0.4s 1 backwards; }
+  @keyframes calendar-today-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--imsda-gold) 70%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+}
 .calendar-subscribe-menu { display: grid; gap: 8px; justify-items: start; }
 .calendar-subscribe-toggle { min-height: 44px; }
 .calendar-subscribe-options { display: grid; gap: 2px; width: min(100%, 340px); margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: #fff; list-style: none; box-shadow: var(--shadow); }

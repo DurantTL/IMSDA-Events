@@ -29,7 +29,7 @@ export function CalendarMonthChip({ item, className, children }: { item: Calenda
   const dots = useSyncExternalStore(subscribe, () => window.matchMedia(CALENDAR_DOT_QUERY).matches, () => false);
   const access = calendarChipAccessibility(dots);
   return (
-    <li className={className} {...access.item}>
+    <li className={className} data-calendar-key={item.key} {...access.item}>
       <ItemLink item={item} {...access.link}>{children}</ItemLink>
     </li>
   );

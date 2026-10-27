@@ -1,14 +1,15 @@
+import type { CSSProperties } from "react";
 import { CalendarDays, DoorClosed } from "lucide-react";
 import { ItemLink } from "@/components/calendar-agenda-item";
 import { calendarItemStatusLine, calendarItemTone, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem, type CalendarTone } from "@/modules/calendar/domain";
 
 /** One item in the day panel (#1202, #1203): category with its colour, title, dates and status, linking where the agenda links. */
-export function CalendarPanelItem({ item, toneMap }: { item: CalendarItem; toneMap: Map<string, CalendarTone> }) {
+export function CalendarPanelItem({ item, toneMap, index = 0 }: { item: CalendarItem; toneMap: Map<string, CalendarTone>; index?: number }) {
   const tone = calendarItemTone(item, toneMap);
   const statusLine = calendarItemStatusLine(item);
   const label = item.isClosure ? closureLabel : item.category || (item.kind === "EVENT" ? "IMSDA event" : "Conference date");
   return (
-    <li className={`calendar-panel-item calendar-tone-${tone} calendar-status-${item.status.toLowerCase()}`}>
+    <li className={`calendar-panel-item calendar-tone-${tone} calendar-status-${item.status.toLowerCase()}`} style={{ "--i": index } as CSSProperties}>
       <p className="calendar-panel-category">
         <span aria-hidden="true" className="calendar-swatch" />
         {item.isClosure && <DoorClosed size={14} aria-hidden="true" />}
