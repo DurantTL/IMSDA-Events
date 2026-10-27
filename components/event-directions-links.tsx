@@ -6,8 +6,8 @@ export function EventDirectionsLinks({ targets }: { targets: readonly Directions
   if (targets.length === 0) return null;
   return (
     <ul aria-label="Directions" className="public-event-directions">
-      {targets.map((target) => (
-        <li key={target.href}>
+      {targets.map((target, index) => (
+        <li key={`${index}-${target.href}`}>
           <a href={target.href} rel="noopener noreferrer" target="_blank">
             <Navigation size={16} aria-hidden="true" /> {target.label}
             <span className="sr-only"> (opens in a new tab)</span>

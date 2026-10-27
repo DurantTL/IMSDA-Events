@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { EventShareButton, shareOrCopy } from "@/components/event-share-button";
+import { EventShareButton, shareOrCopy, shareStatusMessage } from "@/components/event-share-button";
 
 const data = { title: "Synthetic Retreat", url: "https://events.example.test/events/synthetic-retreat" };
 
@@ -45,5 +45,11 @@ describe("share this event (#1214)", () => {
     expect(markup).toContain('role="status"');
     expect(markup).toContain('aria-live="polite"');
     expect(renderToStaticMarkup(createElement(EventShareButton, { title: data.title, url: null }))).toBe("");
+  });
+
+  it("words the live region for each result and stays quiet when idle", () => {
+    expect(shareStatusMessage("copied")).toBe("Link copied.");
+    expect(shareStatusMessage("failed")).toMatch(/Could not copy/);
+    expect(shareStatusMessage("idle")).toBe("");
   });
 });
