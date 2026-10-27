@@ -80,6 +80,16 @@ beds (Boys 314-316, special use, hold 8; storage has 0).
 - Not modeled yet (not enough data): which RV sites have hookups, and the Hall A
   and Hall B layout of the Girls Dorm.
 
+### Camp Heritage campus map (#779)
+
+`docs/lodging/camp-heritage-campus-map.webp` is the illustrated Camp Heritage
+campus and trail map Caleb supplied on Oct 27, 2026 as the base for the
+interactive lodging map. It is not to scale. It shows the lodging buildings
+(Wildlife Inn, Lakeview Lodge, Four Seasons Lodges, Medicine Lodge, Forest
+Village, Mountain Village), the RV sites along Camp Heritage Rd, and Heritage
+House. Room lists and RV site numbers are still needed before the map can link
+to units.
+
 ## Per event
 
 An event picks **one property** (`EventLodging`). It then gets a row per unit
