@@ -13214,8 +13214,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .club-report-review button { min-height: 44px; }
 .club-report-review-panel { display: grid; gap: 8px; justify-items: start; }
 .club-report-review-panel .field-help { margin: 0; }
-.club-form-requirement { display: grid; gap: 8px; justify-items: start; min-width: 0; }
-.club-form-requirement select { min-height: 44px; max-width: 100%; }
+.club-form-requirement { display: grid; gap: 8px; justify-items: start; min-width: 0; width: 100%; max-width: 15rem; }
+.club-form-requirement > label { width: 100%; min-width: 0; }
+.club-form-requirement select { min-height: 44px; width: 100%; max-width: 100%; }
 .club-form-requirement button { min-height: 44px; }
 .club-form-requirement-roles { display: grid; gap: 4px; margin: 0; padding: 0; border: 0; }
 .forms-missing-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }

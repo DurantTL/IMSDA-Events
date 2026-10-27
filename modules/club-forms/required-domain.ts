@@ -19,8 +19,8 @@ export type RequiredRoleType = (typeof REQUIRED_ROLE_TYPES)[number];
 
 export const requirementLabels: Record<ClubFormRequirementValue, string> = {
   NOT_REQUIRED: "Not required",
-  ONCE_PER_CLUB_YEAR: "Required once per club each club year",
-  PER_ROLE_MEMBER_YEAR: "Required for each member of a role each club year",
+  ONCE_PER_CLUB_YEAR: "Once per club, each year",
+  PER_ROLE_MEMBER_YEAR: "Each member of a role, each year",
 };
 
 export const requiredRoleLabels: Record<RequiredRoleType, string> = {
