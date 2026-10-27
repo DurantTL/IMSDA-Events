@@ -29,7 +29,7 @@ const landing = {
     startsAt: "2026-08-14T21:00:00.000Z",
     endsAt: "2026-08-16T17:00:00.000Z",
     timezone: "America/Chicago",
-    location: "Fictitious Conference Center",
+    location: "Fictitious Conference Center", sites: [], isPublished: true, archivedAt: null,
     capacity: 100,
     supportContact: "events@example.test",
     dateLabel: "August 14 – 16, 2026",

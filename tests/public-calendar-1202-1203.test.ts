@@ -232,7 +232,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
 
   it("fills the panel with the complete set for the day, through the agenda's link, and prompts when no day is chosen", () => {
     expect(page).toContain("itemsOnDate(items, selectedDate)");
-    expect(page).toContain("sortCalendarItems(selectedItems).map((item) => <CalendarPanelItem");
+    expect(page).toContain("sortCalendarItems(selectedItems).map((item, index) => <CalendarPanelItem");
     expect(page).toContain("Select a day to see everything on it.");
     expect(page).toContain("CalendarDayFocus");
     expect(page).toContain("Clear category");

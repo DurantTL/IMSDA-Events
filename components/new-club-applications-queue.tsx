@@ -126,7 +126,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
     const busy = busyId === application.id;
     const open = mode?.id === application.id ? mode.kind : null;
     return (
-      <article className="nca-card" data-application={application.id} key={application.id}>
+      <article className="nca-card" data-application={application.id} id={`application-${application.id}`} key={application.id}>
         <header className="nca-head">
           <div>
             <h3 translate="no">{application.clubName}</h3>

@@ -289,7 +289,7 @@ describe("loadWorkspaceEventContext — the workspace layout never redirects for
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(context.events).toEqual([]);
     // Event-scoped pages (the post-sign-in /overview) have no event to show: the Clubs summary is their home.
-    await expectRedirect("/admin/clubs/summary", () => resolveEventContext(undefined));
+    await expectRedirect("/admin/clubs", () => resolveEventContext(undefined));
 
     mocks.isClubsAdmin.mockResolvedValue(false);
     await expectRedirect("/no-access", () => loadWorkspaceEventContext());

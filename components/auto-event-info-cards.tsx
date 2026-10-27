@@ -1,4 +1,5 @@
 import { EventWhenWhere } from "@/components/event-when-where";
+import type { DirectionsTarget } from "@/modules/events/directions";
 import { formatCardMoney, type EventInfoCards } from "@/modules/event-info-cards/domain";
 
 /**
@@ -11,6 +12,9 @@ export function AutoEventHeader({
   dateLabel,
   timeLabel,
   location,
+  directions,
+  shareUrl,
+  shareTitle,
   titleMode = "h1",
 }: {
   /**
@@ -23,13 +27,16 @@ export function AutoEventHeader({
   dateLabel: string;
   timeLabel?: string;
   location?: string | null;
+  directions?: readonly DirectionsTarget[];
+  shareUrl?: string | null;
+  shareTitle?: string;
 }) {
   return (
     <section className="auto-info-header" {...(titleMode === "h1" ? { "aria-labelledby": "auto-info-title" } : { "aria-label": "Event details" })}>
       <p className="public-registration-eyebrow">{header.eyebrow}</p>
       {titleMode === "h1" ? <h1 id="auto-info-title">{header.title}</h1> : titleMode === "text" ? <p className="auto-info-name">{header.title}</p> : null}
       {header.tagline && <p className="auto-info-tagline">{header.tagline}</p>}
-      <EventWhenWhere dateLabel={dateLabel} timeLabel={timeLabel} location={location} />
+      <EventWhenWhere dateLabel={dateLabel} timeLabel={timeLabel} location={location} directions={directions} shareUrl={shareUrl} shareTitle={shareTitle} />
       {header.subtitle && <p className="auto-info-subtitle">{header.subtitle}</p>}
     </section>
   );

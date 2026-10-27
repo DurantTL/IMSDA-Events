@@ -22,11 +22,15 @@ import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { EventEmbedFullLoad } from "@/components/event-embed-full-load";
 import { sanitizedHtmlBySection } from "@/modules/events/content-html";
 import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-notice";
+import { EventCardTransition } from "@/components/event-card-transition";
+import { eventViewTransitionName } from "@/modules/events/view-transition";
 import { EventWhenWhere } from "@/components/event-when-where";
 import { TranslateHint } from "@/components/translate-hint";
 import { AutoEventHeader, AutoEventInfoCards } from "@/components/auto-event-info-cards";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { contentBlocks, parseBlockData } from "@/modules/events/content-schemas";
+import { getServerEnv } from "@/lib/env";
+import { directionsTargets } from "@/modules/events/directions";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +77,14 @@ export default async function PublicEventPage({
   const landing = await getPublicEventLanding(eventSlug);
   if (!landing) notFound();
 
+  // Directions come from the typed place only (#1213). The share link is the canonical address built from the saved
+  // slug, never the route param or the visitor's own URL, and only for an event others can open (#1214).
+  const directions = directionsTargets({ location: landing.event.location, sites: landing.event.sites });
+  const shareUrl = landing.event.isPublished && !landing.event.archivedAt
+    ? new URL(`/events/${encodeURIComponent(landing.event.slug)}`, getServerEnv().APP_BASE_URL).toString()
+    : null;
+  const whereProps = { directions, shareUrl, shareTitle: landing.event.name };
+
   // Resources sit above the fold, the way the tiles do on the current page;
   // prose reads below the registration options.
   const resourceSections = landing.contentSections.filter(
@@ -85,6 +97,8 @@ export default async function PublicEventPage({
   // The banner only counts when it can draw: invalid banner data renders nothing, so the page keeps its own h1 then.
   const bannerShown = Boolean(heroSection && parseBlockData("HERO", heroSection.data));
   const sameName = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toLowerCase() === b.trim().replace(/\s+/g, " ").toLowerCase();
+  // The card on the homepage and calendar morphs into exactly one header element: the banner, else the header below (#1208).
+  const cardTransitionName = eventViewTransitionName(landing.event.slug);
   const assetUrl = (assetId: string) => publicEventAssetUrl(landing.event.slug, assetId);
   // Auto-built info cards (#651) are for club events only; every other event's
   // page renders exactly as before, without even reading the card data.
@@ -273,29 +287,34 @@ export default async function PublicEventPage({
       {/* The header banner (#816) comes first and owns the page's h1. With one, the event
           header below is a plain details row with no second title or hero (#1004); without
           a banner nothing changes. */}
-      {heroSection && bannerShown && <EventHeroBanner section={heroSection} assetUrl={assetUrl} />}
+      {heroSection && bannerShown && <EventCardTransition name={cardTransitionName}><EventHeroBanner section={heroSection} assetUrl={assetUrl} /></EventCardTransition>}
       {autoCards ? (
+        <EventCardTransition name={bannerShown ? null : cardTransitionName}>
         <AutoEventHeader
           header={autoCards.header}
           dateLabel={landing.event.dateLabel}
           timeLabel={landing.event.timeLabel}
           location={landing.event.location}
+          {...whereProps}
           titleMode={!bannerShown ? "h1" : sameName(heroSection!.title, autoCards.header.title) ? "hidden" : "text"}
         />
+        </EventCardTransition>
       ) : bannerShown ? (
         <section className="public-event-facts" aria-label="Event details">
           {/* The banner's title is free text; when it is not the event's name, the name still appears once, as text. */}
           {!sameName(heroSection!.title, landing.event.name) && <p className="public-event-facts-name">{landing.event.name}</p>}
-          <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
+          <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
         </section>
       ) : (
+        <EventCardTransition name={cardTransitionName}>
         <section className="public-registration-hero public-event-hero">
           <div>
             <p className="public-registration-eyebrow">Iowa-Missouri Conference event</p>
             <h1>{landing.event.name}</h1>
-            <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
+            <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
           </div>
         </section>
+        </EventCardTransition>
       )}
 
       {statusBlock}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { eventTransitionNames } from "@/modules/events/view-transition";
 import { AgendaItem } from "@/components/calendar-agenda-item";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -31,6 +32,7 @@ export default async function Home() {
     getCurrentAttendee(),
   ]);
   const upcoming = firstPerSeries(items).slice(0, upcomingLimit);
+  const cardNames = eventTransitionNames(upcoming);
   const signedInName = attendee.account?.displayName || attendee.account?.verifiedEmail;
 
   return (
@@ -58,7 +60,7 @@ export default async function Home() {
           {upcoming.length === 0 ? (
             <p className="calendar-empty">Nothing is on the calendar yet. Check back soon.</p>
           ) : (
-            <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
+            <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} transitionName={cardNames.get(item.key)} />)}</ul>
           )}
           <p className="home-more">
             <Link className="home-events-link" href="/events">See all events open for registration</Link>

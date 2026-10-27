@@ -45,7 +45,7 @@ describe("AdminRoleSwitcher", () => {
 describe("the Clubs sidebar", () => {
   it("lists only the club areas, with the club management pages opened in #1232, and lights the most specific page", () => {
     expect(clubsAdminNavigation.map((item) => item.href)).toEqual([
-      "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end",
+      "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end",
       "/admin/clubs/transfers", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/club-forms",
       "/admin/honors", "/admin/club-supplies", "/admin/organizations/background-checks",
     ]);

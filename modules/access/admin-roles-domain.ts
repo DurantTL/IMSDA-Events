@@ -56,7 +56,7 @@ export function resolveActiveAdminRole(held: readonly AdminRole[], cookieValue: 
 
 /** Where a role's workspace starts: System management, the Clubs summary, the Events Administrator dashboard, or (no role) the event workspace. */
 export function adminRoleLanding(role: AdminRole | null): string {
-  if (role === "CLUBS_ADMIN") return "/admin/clubs/summary";
+  if (role === "CLUBS_ADMIN") return "/admin/clubs";
   if (role === "SYSTEM_ADMIN") return "/admin";
   if (role === "EVENTS_ADMIN") return "/events-admin";
   return "/overview";

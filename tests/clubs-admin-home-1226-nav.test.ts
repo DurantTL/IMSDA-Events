@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { systemSubpageTitle } from "@/components/system-navigation";
+import { clubsAdminActiveHref, clubsAdminNavigation } from "@/components/staff-navigation";
+import { adminRoleLanding } from "@/modules/access/admin-roles-domain";
+
+/** #1226: the Clubs sidebar's new first item and the Clubs landing. */
+describe("Clubs navigation", () => {
+  it("puts Club administration first", () => {
+    expect(clubsAdminNavigation[0]).toMatchObject({ href: "/admin/clubs", label: "Club administration" });
+  });
+
+  it("lights Club administration only on exactly /admin/clubs", () => {
+    expect(clubsAdminActiveHref("/admin/clubs")).toBe("/admin/clubs");
+    expect(clubsAdminActiveHref("/admin/clubs/summary")).toBe("/admin/clubs/summary");
+    expect(clubsAdminActiveHref("/admin/clubs/applications")).toBe("/admin/clubs/applications");
+    expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
+    expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
+    expect(clubsAdminActiveHref("/admin/club-forms/some_form")).toBe("/admin/club-forms");
+    // Pages the sidebar does not list light nothing, as before.
+    expect(clubsAdminActiveHref("/admin/clubs/transfers")).toBe("/admin/clubs/transfers");
+    // A club page with no sidebar item of its own never lights the dashboard.
+    expect(clubsAdminActiveHref("/admin/clubs/unlisted-page")).toBeNull();
+    expect(clubsAdminActiveHref("/admin/accounts")).toBeNull();
+  });
+
+  it("titles the dashboard without shadowing the club subpages", () => {
+    expect(systemSubpageTitle("/admin/clubs")).toBe("Club administration");
+    expect(systemSubpageTitle("/admin/clubs/")).toBe("Club administration");
+    expect(systemSubpageTitle("/admin/clubs/summary")).toBe("Club summary");
+    expect(systemSubpageTitle("/admin/clubs/applications")).toBe("New club applications");
+    expect(systemSubpageTitle("/admin/clubs/transfers")).toBe("Club member transfers");
+  });
+
+  it("lands a Clubs Administrator on the dashboard", () => {
+    expect(adminRoleLanding("CLUBS_ADMIN")).toBe("/admin/clubs");
+  });
+});

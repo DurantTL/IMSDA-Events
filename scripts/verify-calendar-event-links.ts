@@ -185,6 +185,22 @@ async function main() {
   const pairItems = await listPublicCalendarItems("2026-10-01", "2026-10-31", now);
   const pairEvent = pairItems.find((item) => item.key === `event-${retreatEvent.id}`);
   assert(pairEvent?.registrationOpen === true && pairEvent.href === `/events/${retreatEvent.slug}`, "the event's entry carries Register");
+  // A full event offers the waitlist or nothing, never Register (#1215). One active registration fills capacity 1.
+  const fullPerson = await prisma.person.create({ data: { id: `${P}_full`, firstName: "Full", lastName: "Synthetic" } });
+  const fullRegistration = await prisma.registration.create({ data: { eventId: retreatEvent.id, accountHolderPersonId: fullPerson.id, confirmationCode: `${P.toUpperCase()}FULL1`, status: "CONFIRMED", totalAmount: 0 } });
+  await prisma.registrationAttendee.create({ data: { eventId: retreatEvent.id, registrationId: fullRegistration.id, personId: fullPerson.id, attendeeType: "ADULT", profileSnapshot: {} } });
+  const stateWith = async (capacity: number | null, waitlistEnabled: boolean) => {
+    await prisma.event.update({ where: { id: retreatEvent.id }, data: { capacity, waitlistEnabled } });
+    const item = (await listPublicCalendarItems("2026-10-01", "2026-10-31", now)).find((candidate) => candidate.key === `event-${retreatEvent.id}`);
+    return { registrationOpen: item?.registrationOpen, registrationStatus: item?.registrationStatus };
+  };
+  assert(JSON.stringify(await stateWith(1, false)) === JSON.stringify({ registrationOpen: false, registrationStatus: "FULL" }), "a full event with no waitlist offers no Register (#1215)");
+  assert(JSON.stringify(await stateWith(1, true)) === JSON.stringify({ registrationOpen: true, registrationStatus: "WAITLIST" }), "a full event with a waitlist offers Join the waitlist (#1215)");
+  assert(JSON.stringify(await stateWith(2, false)) === JSON.stringify({ registrationOpen: true, registrationStatus: "OPEN" }), "an event with seats left still offers Register (#1215)");
+  await prisma.registration.update({ where: { id: fullRegistration.id }, data: { status: "CANCELLED" } });
+  assert(JSON.stringify(await stateWith(1, false)) === JSON.stringify({ registrationOpen: true, registrationStatus: "OPEN" }), "a cancelled registration frees its seat (#1215)");
+  await prisma.registration.delete({ where: { id: fullRegistration.id } });
+  await prisma.event.update({ where: { id: retreatEvent.id }, data: { capacity: null, waitlistEnabled: false } });
   const feedKeys = (await listPublicCalendarItems("2026-09-01", "2027-03-31", now, { expandRepeats: false })).map((item) => item.key);
   assert(!feedKeys.includes(`entry-${retreatEntry.id}`) && feedKeys.includes(`event-${retreatEvent.id}`), "the feed (.ics) data shows the pair once too");
   await rejectsWith(links.linkCalendarEntryToEvent(retreatEntry.id, (await createEvent(settings("Other Retreat", `${P}-other-retreat`, "2026-10-09", "2026-10-11"), userId))!.id, userId), "ENTRY_ALREADY_LINKED", "an item already linked can't be linked to a second event");

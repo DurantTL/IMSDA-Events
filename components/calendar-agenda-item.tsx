@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Clock3, DoorClosed, ExternalLink, MapPin } from "lucide-react";
+import { EventCardTransition } from "@/components/event-card-transition";
 import { calendarItemStatusLine, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -10,10 +11,11 @@ export function ItemLink({ item, children, className, tabIndex }: { item: Calend
   return <a className={className} href={item.href} rel="noreferrer" tabIndex={tabIndex} target="_blank">{children}</a>;
 }
 
-export function AgendaItem({ item }: { item: CalendarItem }) {
+export function AgendaItem({ item, transitionName }: { item: CalendarItem; transitionName?: string | null }) {
   const [, month, day] = item.startsOn.split("-").map(Number);
   const statusLine = calendarItemStatusLine(item);
   return (
+    <EventCardTransition name={transitionName}>
     <li className={`calendar-agenda-item calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}>
       <span className="calendar-date-badge" aria-hidden="true">
         <small>{shortMonths[month - 1]}</small>
@@ -48,6 +50,7 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
         </ItemLink>
       )}
     </li>
+    </EventCardTransition>
   );
 }
 

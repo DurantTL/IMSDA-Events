@@ -8506,6 +8506,40 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 @media (prefers-reduced-motion: reduce) {
   .calendar-bar { transition: none; }
 }
+/* Calendar motion (#1206). Linked highlight of one event across weeks (hover and keyboard focus alike, set by components/calendar-motion.tsx),
+   the day panel rising in, the first-load intro, the month slide. Every animation lives in the no-preference block; under reduced motion the
+   linked event only gets a static outline. Text and borders are visible from the first frame of each animation. */
+@media (prefers-reduced-motion: reduce) {
+  .calendar-bar.is-linked:not(:focus-visible), .calendar-bar.is-selected-event:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+  .calendar-chip.is-linked a:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-chip { transition: filter 0.2s ease; }
+  .calendar-month[data-calendar-active] [data-calendar-key]:not(.is-linked) { filter: saturate(0.35); }
+  .calendar-panel-item { animation: calendar-rise 0.3s ease-out backwards; animation-delay: min(calc(var(--i, 0) * 50ms), 250ms); }
+  @keyframes calendar-rise { from { transform: translateY(14px); } to { transform: none; } }
+  .calendar-month[data-calendar-slide="next"] .calendar-week { animation: calendar-slide-next 0.3s ease-out; }
+  .calendar-month[data-calendar-slide="prev"] .calendar-week { animation: calendar-slide-prev 0.3s ease-out; }
+  @keyframes calendar-slide-next { from { transform: translateX(24px); } to { transform: none; } }
+  @keyframes calendar-slide-prev { from { transform: translateX(-24px); } to { transform: none; } }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  .calendar-bar { transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease; }
+  .calendar-bar.is-linked, .calendar-bar.is-selected-event { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 59, 92, 0.22); }
+  .calendar-bar.is-linked:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  /* First page load only (the client component sets data-calendar-intro-done on <html>): the fill sweeps in from the left behind the
+     text, which stays readable throughout, and today gives one soft gold pulse. */
+  :root:not([data-calendar-intro-done]) .calendar-bar { background: transparent; animation: calendar-bar-text 0.25s ease-out var(--cal-delay, 0ms) backwards; }
+  :root:not([data-calendar-intro-done]) .calendar-bar::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--cal-fill); transform-origin: left center;
+    animation: calendar-bar-draw 0.3s ease-out var(--cal-delay, 0ms) backwards;
+  }
+  :root:not([data-calendar-intro-done]) .calendar-bar.calendar-tone-closure::before { background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 6px, #fde4cc 6px, #fde4cc 12px); }
+  @keyframes calendar-bar-draw { from { transform: scaleX(0); } to { transform: none; } }
+  @keyframes calendar-bar-text { from { color: var(--cal-edge); } to { color: var(--cal-ink); } }
+  :root:not([data-calendar-intro-done]) .calendar-day.is-today .calendar-day-number { animation: calendar-today-pulse 0.6s ease-out 0.4s 1 backwards; }
+  @keyframes calendar-today-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--imsda-gold) 70%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+}
 .calendar-subscribe-menu { display: grid; gap: 8px; justify-items: start; }
 .calendar-subscribe-toggle { min-height: 44px; }
 .calendar-subscribe-options { display: grid; gap: 2px; width: min(100%, 340px); margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: #fff; list-style: none; box-shadow: var(--shadow); }
@@ -11181,15 +11215,28 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 }
 .event-hero-image,
 .event-hero-scrim { position: absolute; inset: 0; width: 100%; height: 100%; }
-.event-hero-image { object-fit: cover; }
+.event-hero-image { object-fit: cover; transform-origin: center; }
+/* A very slow one-shot zoom (#1207); never declared when the visitor asks for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .event-hero-image { animation: event-hero-zoom 8s ease-out both; }
+}
+@keyframes event-hero-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
+}
+/* The copy spans the whole banner and carries its own navy fade, so every line of white text sits on at least 78% navy
+   (#003b5c) whatever the photo or the staff overlay: worst case is a white photo, where the text's background is
+   0.78 * #003b5c + 0.22 * white = about #2a627f, and white on that is about 6.2:1 (AA needs 4.5:1). The top 56px
+   fades in from clear and holds only padding, never text. */
 .event-hero-copy {
   position: relative;
   display: grid;
   gap: 8px;
   justify-items: start;
-  max-width: 760px;
-  padding: clamp(18px, 4vw, 40px);
+  padding: calc(clamp(18px, 4vw, 40px) + 56px) clamp(18px, 4vw, 40px) clamp(18px, 4vw, 40px);
+  background: linear-gradient(to bottom, rgba(0, 59, 92, 0) 0, rgba(0, 59, 92, 0.78) 56px, rgba(0, 59, 92, 0.78) 100%);
 }
+.event-hero-copy > * { max-width: 760px; }
 .event-hero-copy h1 {
   margin: 0;
   color: #ffffff;
@@ -13054,6 +13101,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-hero .public-event-summary { color: #fff; }
 .public-event-hero .public-event-summary svg { color: #f9d678; }
 .public-event-facts .public-event-summary svg, .auto-info-header .public-event-summary svg { color: var(--imsda-purple); }
+/* Get directions (#1213) and Share this event (#1214) under the When / Where summary. */
+.public-event-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px; margin: 4px 0 0; }
+.public-event-directions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; padding: 0; list-style: none; }
+.public-event-directions a, .public-event-share-button { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--imsda-navy, #003b5c); font: inherit; font-size: 1rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.public-event-directions a:focus-visible, .public-event-share-button:focus-visible, .public-event-share-field input:focus-visible { outline: 3px solid var(--imsda-navy, #003b5c); outline-offset: 2px; }
+.public-event-hero .public-event-directions a, .public-event-hero .public-event-share-button { color: #fff; }
+.public-event-hero .public-event-directions a:focus-visible, .public-event-hero .public-event-share-button:focus-visible { outline-color: #f9d678; }
+.public-event-share { display: grid; gap: 6px; }
+.public-event-share-field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.public-event-share-field input { min-height: 44px; width: min(100%, 28rem); padding: 8px 10px; border: 1px solid var(--field-border); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 400; }
 .public-event-help-section { display: grid; gap: 6px; margin: 8px 0 40px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 1rem; }
 .public-event-help-section h2 { margin: 0; color: var(--ink); font-size: 1.125rem; }
 .public-event-help-section p { margin: 0; line-height: 1.5; }
@@ -13078,6 +13135,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (prefers-reduced-motion: reduce) {
   .open-events-filter a, .open-events-card a { transition: none; }
 }
+
+/* Event card to event page header morph (#1208). */
+::view-transition-group(.event-card) { animation-duration: 350ms; animation-timing-function: ease-in-out; }
+::view-transition { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
