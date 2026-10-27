@@ -41,7 +41,7 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
   if (originError) return originError;
   try {
     // Access first: a signed-out caller gets 401 and anyone else without a club-area role 403, whatever the body.
-    const admitted = await requireClubsAdministration("Clubs Administrator or system administrator access is required to change Area Coordinators.");
+    const admitted = await requireClubsAdministration("System administrator access is required.");
     const { accountId } = await context.params;
     const input = actionSchema.parse(await request.json());
     const actor = input.action === "area-coordinator" ? admitted : await requireSystemAdministrator();

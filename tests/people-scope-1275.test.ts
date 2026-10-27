@@ -106,7 +106,7 @@ describe("the person page by viewer scope", () => {
     const { readFileSync } = await import("node:fs");
     const list = readFileSync("app/(workspace)/admin/people/page.tsx", "utf8");
     const detail = readFileSync("app/(workspace)/admin/people/[kind]/[id]/page.tsx", "utf8");
-    expect(list).toContain('viewer.scope === "full" ? (\n          <ActAsButton');
+    expect(list).toMatch(/viewer\.scope === "full" \?\s*\(?\s*<ActAsButton/);
     expect(detail).not.toContain("ActAsButton");
   });
 });

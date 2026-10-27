@@ -205,7 +205,7 @@ describe("access is checked before the body is read", () => {
 
   it("still answers an admitted caller's bad body with an error, not access", async () => {
     signInAs("clubsAdmin");
-    expect((await badJson()).status).toBeGreaterThanOrEqual(400);
+    expect((await badJson()).status).toBe(400);
     expect(mocks.areaUpsert).not.toHaveBeenCalled();
   });
 });
