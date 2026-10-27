@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
 import { PeopleDirectory } from "@/components/people-directory";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
-import { searchPeople } from "@/modules/system-admin/people-directory";
-import { parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
+import { pagePeople, parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+import { listPendingPeople } from "@/modules/system-admin/pending-people";
 
 export const metadata: Metadata = { title: "People & access" };
 export const dynamic = "force-dynamic";
@@ -14,7 +15,13 @@ export const dynamic = "force-dynamic";
 export default async function PeopleAccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    page?: string | string[];
+    role?: string | string[];
+    event?: string | string[];
+    club?: string | string[];
+  }>;
 }) {
   const viewer = await resolvePeopleViewer();
   if (!viewer.user) redirect(await staffLoginRedirectPath());
@@ -22,7 +29,17 @@ export default async function PeopleAccessPage({
   // Search and page live in the URL, so a reload or shared link keeps them.
   const params = await searchParams;
   const query = parsePeopleQuery(params.q);
-  const result = await searchPeople(query, parsePeoplePage(params.page), viewer.scope);
+  const filters = parsePeopleFilters(params, viewer.scope);
+  const pageNumber = parsePeoplePage(params.page);
+  const pendingList = filters.role?.kind === "pending" ? await listPendingPeople(viewer.scope, query) : null;
+  const pendingPage = pendingList ? pagePeople(pendingList, pageNumber) : null;
+  const [result, eventOptions, clubOptions] = await Promise.all([
+    pendingPage
+      ? Promise.resolve({ items: [], rows: [], page: pendingPage.page, pageCount: pendingPage.pageCount, total: pendingPage.total, pageSize: pendingPage.pageSize })
+      : searchPeople(query, pageNumber, viewer.scope, filters),
+    viewer.scope === "full" ? listEventOptions() : Promise.resolve([]),
+    listClubOptions(),
+  ]);
   return (
     <>
       <StaffPageHeader
@@ -37,7 +54,14 @@ export default async function PeopleAccessPage({
           />
         ) : undefined}
       />
-      <PeopleDirectory scope={viewer.scope} page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total} />
+      <PeopleDirectory
+        scope={viewer.scope}
+        filters={filters}
+        eventOptions={eventOptions}
+        clubOptions={clubOptions}
+        pending={pendingPage?.items ?? []}
+        page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
+      />
     </>
   );
 }

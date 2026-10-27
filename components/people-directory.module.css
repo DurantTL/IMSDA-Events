@@ -2,7 +2,7 @@
 .wrap { display: grid; gap: 14px; min-width: 0; }
 .search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .searchField { display: grid; flex: 1 1 220px; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.searchField input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 8px 10px; font-size: 16px; }
+.searchField input, .searchField select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 8px 10px; font-size: 16px; }
 .search :global(.primary-button), .search :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .count { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }

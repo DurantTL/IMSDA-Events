@@ -1,15 +1,16 @@
 import Link from "next/link";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
-import { personPath } from "@/modules/system-admin/people-directory-model";
+import type { PendingPerson } from "@/modules/system-admin/pending-people";
+import {
+  needsEventPick,
+  peopleHref,
+  peopleRoleLabel,
+  peopleRoleKey,
+  peopleRoleOptions,
+  personPath,
+  type PeopleFilters,
+} from "@/modules/system-admin/people-directory-model";
 import styles from "./people-directory.module.css";
-
-function pageHref(query: string, page: number) {
-  const params = new URLSearchParams();
-  if (query) params.set("q", query);
-  if (page > 1) params.set("page", String(page));
-  const text = params.toString();
-  return text ? `/admin/people?${text}` : "/admin/people";
-}
 
 /** The People & access list (#1275): search box, one row per person, Previous/Next. Server rendered, URL state. */
 export function PeopleDirectory({
@@ -19,14 +20,25 @@ export function PeopleDirectory({
   pageCount,
   total,
   scope = "full",
+  filters = { role: null, eventId: null, clubId: null },
+  eventOptions = [],
+  clubOptions = [],
+  pending = [],
 }: {
   scope?: "full" | "clubs";
   query: string;
+  filters?: PeopleFilters;
+  eventOptions?: readonly { id: string; name: string }[];
+  clubOptions?: readonly { id: string; name: string }[];
+  /** This page of the pending-invites list, when the Pending filter is on. */
+  pending?: readonly PendingPerson[];
   rows: readonly PeopleRow[];
   page: number;
   pageCount: number;
   total: number;
 }) {
+  const role = filters.role;
+  const pickEvent = needsEventPick(filters);
   return (
     <div className={styles.wrap}>
       <form action="/admin/people" className={styles.search} method="get" role="search">
@@ -34,13 +46,69 @@ export function PeopleDirectory({
           Search by name or email
           <input autoComplete="off" defaultValue={query} maxLength={120} name="q" type="search" />
         </label>
-        <button className="primary-button" type="submit">Search</button>
-        {query ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
+        <label className={styles.searchField}>
+          Who has this role
+          <select defaultValue={role ? peopleRoleKey(role) : ""} name="role">
+            <option value="">Everyone</option>
+            {peopleRoleOptions(scope).map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        {scope === "full" ? (
+          <label className={styles.searchField}>
+            Event (for event roles)
+            <select defaultValue={filters.eventId ?? ""} name="event">
+              <option value="">Pick an event</option>
+              {eventOptions.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className={styles.searchField}>
+          Club (for club roles)
+          <select defaultValue={filters.clubId ?? ""} name="club">
+            <option value="">Any club</option>
+            {clubOptions.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+          </select>
+        </label>
+        <button className="primary-button" type="submit">{role ? "Apply" : "Search"}</button>
+        {query || role ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
       </form>
       <p className={styles.count} role="status">
-        {total === 0 ? "No people found." : `${total} ${total === 1 ? "person" : "people"}${query ? ` matching "${query}"` : ""}.`}
+        {pickEvent
+          ? "Pick an event to see who has this role."
+          : total === 0
+            ? "No people found."
+            : `${total} ${total === 1 ? "person" : "people"}${role ? ` with ${peopleRoleLabel(role)}` : ""}${query ? ` matching "${query}"` : ""}.`}
       </p>
-      {rows.length === 0 ? (
+      {pickEvent ? (
+        <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
+      ) : role?.kind === "pending" ? (
+        pending.length === 0 ? (
+          <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p>
+        ) : (
+          <ul className={styles.list}>
+            {pending.map((item) => (
+              <li className={styles.row} key={item.key}>
+                {item.href ? (
+                  <Link className={styles.rowLink} href={item.href}>
+                    <strong translate="no">{item.name || item.email}</strong>
+                    <small translate="no">{item.email}</small>
+                  </Link>
+                ) : (
+                  <div className={styles.rowLink}>
+                    <strong translate="no">{item.name || item.email}</strong>
+                    <small translate="no">{item.email}</small>
+                  </div>
+                )}
+                <p className={styles.access}>{item.what}</p>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : rows.length === 0 ? (
         <p className={styles.empty}>{query ? "No staff logins or website accounts match that search." : "Nobody has an account yet."}</p>
       ) : (
         <ul className={styles.list}>
@@ -65,9 +133,9 @@ export function PeopleDirectory({
       )}
       {pageCount > 1 ? (
         <nav aria-label="Pages" className={styles.pager}>
-          {page > 1 ? <Link href={pageHref(query, page - 1)} rel="prev">Previous</Link> : <span aria-disabled="true" className={styles.off}>Previous</span>}
+          {page > 1 ? <Link href={peopleHref({ query, page: page - 1, filters })} rel="prev">Previous</Link> : <span aria-disabled="true" className={styles.off}>Previous</span>}
           <span className={styles.count}>Page {page} of {pageCount}</span>
-          {page < pageCount ? <Link href={pageHref(query, page + 1)} rel="next">Next</Link> : <span aria-disabled="true" className={styles.off}>Next</span>}
+          {page < pageCount ? <Link href={peopleHref({ query, page: page + 1, filters })} rel="next">Next</Link> : <span aria-disabled="true" className={styles.off}>Next</span>}
         </nav>
       ) : null}
     </div>
