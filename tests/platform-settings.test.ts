@@ -347,10 +347,42 @@ describe("stale-write baseline (#1076)", () => {
     expect(tx.platformSettings.upsert).toHaveBeenCalled();
   });
 
+  it("writes only the fields this save edited, so another admin's newer value survives", async () => {
+    const tx = baselineDatabase();
+    // Stored now: timezone America/Chicago (admin B saved it). This admin opened the page when it was UTC and edited only the logo.
+    await updatePlatformSettings(
+      {
+        ...platformSettingsInputSchema.parse(validInput({
+          logoUrl: "https://example.test/logo.png",
+          publicWebsiteUrl: "https://imsda.org",
+          defaultTimezone: "UTC",
+        })),
+        baseline: { ...matching, defaultTimezone: "UTC" },
+      },
+      "admin-2",
+    );
+    const call = tx.platformSettings.upsert.mock.calls[0][0];
+    expect(call.update).toEqual({ logoUrl: "https://example.test/logo.png", updatedByUserId: "admin-2" });
+    expect(tx.auditLog.create.mock.calls[0][0].data.metadata.after).toMatchObject({ defaultTimezone: "America/Chicago" });
+  });
+
+  it("conflicts only on a field this save edited that is stale", async () => {
+    const tx = baselineDatabase();
+    await expect(updatePlatformSettings(
+      {
+        ...platformSettingsInputSchema.parse(validInput({ publicWebsiteUrl: "https://imsda.org", defaultTimezone: "Asia/Tokyo" })),
+        baseline: { ...matching, defaultTimezone: "UTC" },
+      },
+      "admin-2",
+    )).rejects.toMatchObject({ code: "PLATFORM_SETTINGS_CONFLICT", fields: ["defaultTimezone"] });
+    expect(tx.platformSettings.upsert).not.toHaveBeenCalled();
+  });
+
   it("keeps today's behaviour when no baseline is sent", async () => {
     const tx = baselineDatabase();
     await updatePlatformSettings(platformSettingsInputSchema.parse(validInput({ organizationName: "Anything" })), "admin-1");
     expect(tx.platformSettings.upsert).toHaveBeenCalled();
+    expect(Object.keys(tx.platformSettings.upsert.mock.calls[0][0].update)).toContain("defaultTimezone");
   });
 
   it("the request schema accepts a string-valued baseline and still refuses unknown fields", async () => {

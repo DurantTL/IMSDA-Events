@@ -196,21 +196,31 @@ export async function updatePlatformSettings(
     const before = await tx.platformSettings.findUnique({
       where: { id: PLATFORM_SETTINGS_ID },
     });
+    // With a baseline, only the fields this save actually edited are compared and written, so a field someone else saved
+    // meanwhile is neither reported as a conflict nor written back stale (#1076).
+    const normalize = (key: string, value: unknown) => {
+      const text = String(value ?? "").trim();
+      return key === "passkeyRpId" ? text.toLowerCase() : text;
+    };
+    let edited: readonly (typeof BASELINE_FIELDS)[number][] = BASELINE_FIELDS;
     if (baseline && before) {
-      const changed = BASELINE_FIELDS.filter((key) => (
-        key in baseline && String(before[key] ?? "") !== baseline[key]
-      ));
-      if (changed.length > 0) {
+      edited = BASELINE_FIELDS.filter((key) => key in baseline && normalize(key, input[key]) !== baseline[key]);
+      const stale = edited.filter((key) => normalize(key, before[key]) !== baseline[key]);
+      if (stale.length > 0) {
         throw new PlatformSettingsError(
           "PLATFORM_SETTINGS_CONFLICT",
           "Someone else saved platform settings since you opened this page.",
-          [...changed],
+          [...stale],
         );
       }
+      // The merged row: this save's edits over whatever is stored now.
+      const merged: Record<string, unknown> = { ...input };
+      for (const key of BASELINE_FIELDS) if (!edited.includes(key)) merged[key] = before[key];
+      input = merged as PlatformSettingsInput;
     }
     // The invoice phone must pass the shared check unless it is the phone already stored (#1193), decided here from the
     // stored row. Valid phones are stored in one form. The message never carries the phone.
-    if (input.invoiceHeaderPhone) {
+    if (input.invoiceHeaderPhone && edited.includes("invoiceHeaderPhone")) {
       const phone = resolvePhoneChange(input.invoiceHeaderPhone, before?.invoiceHeaderPhone);
       if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Invoice phone: ${phone.message}`);
       input = { ...input, invoiceHeaderPhone: phone.value };
@@ -229,7 +239,10 @@ export async function updatePlatformSettings(
     }
     await tx.platformSettings.upsert({
       where: { id: PLATFORM_SETTINGS_ID },
-      update: { ...input, updatedByUserId: actorUserId },
+      update: {
+        ...(baseline && before ? Object.fromEntries(edited.map((key) => [key, input[key]])) : input),
+        updatedByUserId: actorUserId,
+      },
       create: { id: PLATFORM_SETTINGS_ID, ...input, updatedByUserId: actorUserId },
     });
     await tx.auditLog.create({

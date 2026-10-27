@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useConfirm } from "@/components/use-confirm";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
@@ -169,12 +169,16 @@ export function PlatformSettingsWorkspace({
     return message ? <small className="field-error" id={errorId(key)} role="alert">{message}</small> : null;
   }
 
-  function focusFirstInvalid(keys: PlatformSettingsField[]) {
-    const first = platformSettingsFields.find((key) => keys.includes(key));
-    if (!first) return;
-    // After the error messages render.
-    window.setTimeout(() => document.getElementById(fieldId(first))?.focus(), 0);
-  }
+  // Focus waits for the fieldset to be enabled again, which is after the request settles.
+  const [focusRequest, setFocusRequest] = useState<{ keys: PlatformSettingsField[] } | null>(null);
+  const handledFocus = useRef<unknown>(null);
+  useEffect(() => {
+    if (saving || !focusRequest || handledFocus.current === focusRequest) return;
+    handledFocus.current = focusRequest;
+    const first = platformSettingsFields.find((key) => focusRequest.keys.includes(key));
+    if (first) document.getElementById(fieldId(first))?.focus();
+  }, [saving, focusRequest]);
+  const focusFirstInvalid = (keys: PlatformSettingsField[]) => setFocusRequest({ keys });
 
   function cancelChanges() {
     setDraft(draftFrom(settings));
@@ -207,9 +211,9 @@ export function PlatformSettingsWorkspace({
     }
     // Computed before the request, so the success message names what was actually saved.
     const saved = changes;
-    // Only what this person changed is checked, so someone else's edit to a different field is no conflict.
+    // Every saved value, so the server can tell which fields this person edited and writes only those.
     const savedValues = draftFrom(settings);
-    const baseline = Object.fromEntries(changes.map((change) => [change.field, savedValues[change.field]]));
+    const baseline = Object.fromEntries(platformSettingsFields.map((key) => [key, normalizePlatformSettingValue(key, savedValues[key])]));
     const edited = new Set<string>(changes.map((change) => change.field));
     setSaving(true);
     setOutcome(null);
