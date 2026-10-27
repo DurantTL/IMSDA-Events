@@ -235,6 +235,11 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // The staff-run check-in station (#892) shows a registration's names: never cached, never indexed, no referrer.
+        source: "/check-in-station",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // Applications carry a director's contact details and a private attachment (#817).
         source: "/account/area-clubs/applications",
         headers: privateRegistrationHeaders,

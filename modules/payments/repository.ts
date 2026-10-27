@@ -45,8 +45,14 @@ export async function recordManualPayment(
   registrationId: string,
   actorUserId: string,
   input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean },
+  /** #892: set by a check-in station; the entry stays under the starter's account and names the station. */
+  auditContext?: { station: { id: string; label: string } },
 ) {
   const prisma = getPrisma();
+  const stationMetadata = auditContext
+    ? { channel: "CHECK_IN_STATION", station: { id: auditContext.station.id, label: auditContext.station.label } }
+    : null;
+  const stationSummary = stationMetadata ? " (check-in station)" : "";
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
     include: {
@@ -129,11 +135,11 @@ export async function recordManualPayment(
         entityId: payment.id,
         correlationId: crypto.randomUUID(),
         summary: isDeposit
-          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held.`
-          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
+          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held${stationSummary}.`
+          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}${stationSummary}.`,
         metadata: isDeposit
-          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true }
-          : { amountCents: input.amountCents },
+          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true, ...(stationMetadata ?? {}) }
+          : { amountCents: input.amountCents, ...(stationMetadata ?? {}) },
       },
     });
     // The balance moved, so a Pay on Square link quoted against the old one must not stay payable (#327).

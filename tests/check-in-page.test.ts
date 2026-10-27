@@ -45,6 +45,9 @@ vi.mock("@/modules/event-locations/filter", () => ({
 vi.mock("@/modules/club-registrations/repository", () => ({
   listClubCheckInInfo: dependencies.listClubCheckInInfo,
 }));
+vi.mock("@/modules/checkin-stations/repository", () => ({
+  listActiveStations: vi.fn(async () => []),
+}));
 
 import CheckInPage from "@/app/(workspace)/check-in/page";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";

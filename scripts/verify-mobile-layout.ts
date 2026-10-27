@@ -156,7 +156,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "station" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -336,6 +336,21 @@ const pages: PageSpec[] = [
   staff("event-settings", "/more/event-settings"),
   staff("team-results", "/more/team-results"),
   staff("check-in", "/check-in"),
+  // The staff-run check-in station (#892): a device with its own station cookie, no staff session. First the
+  // code entry, then a looked-up registration (its family list and payment panel).
+  { name: "station-check-in-ready", path: "/check-in-station", role: "station", expectText: /Check-in station/i },
+  {
+    name: "station-check-in-family",
+    path: "/check-in-station",
+    role: "station",
+    expectText: /Check-in station/i,
+    prepare: async (page) => {
+      await page.getByLabel(/confirmation code/i).fill("MC-1000");
+      await page.getByRole("button", { name: /Find family/i }).click();
+      await page.getByRole("status").first().waitFor({ timeout: 5000 }).catch(() => undefined);
+      await page.waitForTimeout(500);
+    },
+  },
   // The printable name badge sheets (#981): the sheet preview must not make the page scroll sideways.
   staff("check-in-badges", "/check-in/badges"),
   staff("communications", "/communications"),
@@ -1125,6 +1140,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
   const mine = { startsWith: `${P}_` };
+  await prisma.checkInStation.deleteMany({ where: { label: `${P} station` } }).catch((error: Error) => console.error(`Could not remove the synthetic check-in station: ${error.message}`));
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
@@ -1741,6 +1757,19 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
   const cookie = async (role: SignedInRole) => {
+    if (role === "station") {
+      // A station is a device cookie, not a session: mint one for the seeded event admin directly.
+      const { createOpaqueToken, hashOpaqueToken } = await import("../modules/access/tokens");
+      const { CHECK_IN_STATION_COOKIE_NAME } = await import("../modules/checkin-stations/domain");
+      const admin = await prisma.user.findUnique({ where: { email: "admin@imsda-events.test" } });
+      if (!admin) throw new Error("The seeded account admin@imsda-events.test is missing. Run `npm run db:seed` first.");
+      const token = createOpaqueToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await prisma.checkInStation.create({
+        data: { eventId, startedByUserId: admin.id, label: `${P} station`, tokenHash: hashOpaqueToken(token), expiresAt },
+      });
+      return { name: CHECK_IN_STATION_COOKIE_NAME, value: token, expires: Math.floor(expiresAt.getTime() / 1000) };
+    }
     if (role === "director" || role === "area" || role === "attendee") {
       const accountId = role === "director" ? `${P}_account_director` : role === "area" ? `${P}_account_area` : `${P}_account_attendee`;
       const session = await attendeeSession.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
@@ -1761,6 +1790,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
     director: await cookie("director"),
     area: await cookie("area"),
     attendee: await cookie("attendee"),
+    station: await cookie("station"),
   };
   return cookies;
 }
@@ -3993,7 +4023,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "attendee", "event-admin", "system-admin", "kitchen"] as Role[]) {
+      for (const role of ["visitor", "director", "area", "attendee", "event-admin", "system-admin", "kitchen", "station"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({
