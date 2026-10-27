@@ -43,7 +43,7 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           className={`${item.registrationOpen ? "primary-button" : "secondary-button"} calendar-agenda-action`}
           item={item}
         >
-          {item.kind === "EVENT" ? (item.registrationOpen ? "Register" : "Details") : "More info"}
+          {item.kind === "EVENT" ? (item.registrationOpen ? (item.registrationStatus === "WAITLIST" ? "Join the waitlist" : "Register") : "Details") : "More info"}
           {item.href.startsWith("/") ? <ChevronRight size={14} aria-hidden="true" /> : <ExternalLink size={14} aria-hidden="true" />}
         </ItemLink>
       )}
