@@ -279,14 +279,14 @@ export const systemHomeTabs: readonly HomeTab[] = [
  */
 export const commonTaskHrefs: ReadonlyArray<{ href: string; heading: string; label?: string }> = [
   { href: "/event-setup", heading: "Events" },
-  { href: "/admin/calendar", heading: "Events", label: "Create event from calendar item" },
+  { href: "/admin/calendar", heading: "Events" },
   { href: "/event-setup/copy", heading: "Events" },
   { href: "/admin/event-templates", heading: "Events" },
   { href: "/archived-events", heading: "Events" },
   { href: "/admin/organizations", heading: "Clubs" },
   { href: "/admin/clubs/reports", heading: "Clubs" },
   { href: "/admin/clubs/summary", heading: "Clubs" },
-  { href: "/admin/clubs/applications", heading: "Clubs", label: "Applications and invites" },
+  { href: "/admin/clubs/applications", heading: "Clubs" },
   { href: "/admin/clubs/transfers", heading: "Clubs" },
   { href: "/admin/forms", heading: "Forms" },
   { href: "/admin/club-forms", heading: "Forms" },

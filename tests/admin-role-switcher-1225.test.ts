@@ -44,10 +44,11 @@ describe("AdminRoleSwitcher", () => {
 
 describe("the Clubs sidebar", () => {
   it("lists only the club areas, with the club management pages opened in #1232, and lights the most specific page", () => {
-    expect(clubsAdminNavigation.map((item) => item.href)).toEqual([
-      "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end",
-      "/admin/clubs/transfers", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/club-forms",
-      "/admin/honors", "/admin/club-supplies", "/admin/organizations/background-checks",
+    // The flat page list behind the phone bar and the active match (#1245): the grouped sidebar's pages, each once.
+    expect([...clubsAdminNavigation.map((item) => item.href)].sort()).toEqual([
+      "/admin/club-forms", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
+      "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
+      "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks",
     ]);
     // Never a page a Clubs Administrator cannot open.
     for (const href of clubsAdminNavigation.map((item) => item.href)) {

@@ -172,17 +172,29 @@ visibility condition is exactly what gated that destination before.
     when at least one of its cards is visible.
 - **System Command Center (`app/(workspace)/admin/page.tsx`):** its header
   actions (Create event, Team, Accounts, Platform settings, Churches and
-  clubs, Honor catalog, Manage public calendar, Sterling Volunteers, Refresh) now wrap
+  clubs, Honor catalog, Conference calendar, Sterling Volunteers, Refresh) now wrap
   onto additional lines instead of being clipped by the hero's rounded
   corners, on both desktop and phone widths
   (`app/(workspace)/admin/system-admin.module.css`).
 
-- **Calendar labels (#1180):** `/admin/calendar` is one page with two tasks,
-  so the System sidebar lists it twice with labels that name the task:
-  "Create event from calendar item" (Events group; was "Set up from calendar")
-  and "Manage public calendar" (Catalogs and settings; was "Public calendar").
-  Work contexts, the phone System menu and the committed old-to-new route table
-  (`components/route-mapping.ts`) are described in `tests/admin-context-1180.test.ts`.
+- **Admin sidebars (#1245):** every collapsible sidebar group starts closed; only the group holding the current page
+  opens, and a viewer's open/closed choices are remembered per browser. Item labels are the pages' own titles.
+  - **System** (`systemNavGroups`): Events (Create an event, Conference calendar, Copy from a past event, Event
+    templates, Archived events), Clubs (Clubs and churches, Club Monthly Records, Club summary, New club
+    applications, Club member transfers), People, Forms, Catalogs and settings. `/admin/calendar` is listed once, as
+    "Conference calendar" (it creates events from calendar items and manages the public calendar; this replaced the
+    #1180 pair "Create event from calendar item" and "Manage public calendar"). The `/admin` dashboard's Common tasks
+    use the same labels. Work contexts, the phone System menu and the old-to-new route table
+    (`components/route-mapping.ts`) are described in `tests/admin-context-1180.test.ts`.
+  - **Clubs** (`clubsAdminGroups`): one ungrouped Club administration link, then Clubs (Club summary, Club member
+    transfers, Sterling Volunteers, Honor catalog, Club supply catalog, Import clubs, Import health records), Records
+    and points (Club Monthly Records, Club Year-End Reports, Points), Club events, Forms and Applications (New club
+    applications, Club invites). Points and Club events link to sections of the Club summary and never light. A club
+    year picker (a plain GET form with a Show button) sits under the search; the year-aware links keep `?year=`. The
+    search finds these pages in the Clubs view only. The phone bar stays a flat list of pages.
+  - **Events:** an Event administration link tops the sidebar and lights on `/events-admin`; the role pill's badge is
+    the dashboard's Need attention total (`countEventsAdminWaiting`).
+  All of this is view-only: each page and route keeps its own server gate.
 
 ## Adding a new page below a section's top level
 

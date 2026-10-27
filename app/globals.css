@@ -10854,6 +10854,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: 44px;
   margin: 7px 0 0;
   border: 0;
   border-radius: 8px;
@@ -13211,6 +13212,17 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .event-photo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); overflow: visible; scroll-snap-type: none; padding-bottom: 4px; }
   .event-photo-list > li { flex: none; }
   .event-featured-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+}
+
+/* The club year picker in the Clubs sidebar (#1245): a real GET form under the search. Hidden when the sidebar is icons-only. */
+.clubs-year-form { flex-shrink: 0; display: grid; gap: 6px; margin: 0 4px 14px; }
+.clubs-year-form label { margin: 0 0 0 5px; color: #b6cbd5; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.clubs-year-controls { display: flex; gap: 8px; }
+.clubs-year-controls select { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.09); color: #fff; cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.clubs-year-controls select option { color: var(--ink); }
+.clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+@media (min-width: 801px) {
+  html[data-sidebar="collapsed"] .clubs-year-form { display: none; }
 }
 
 /* Reviewed monthly records and required club forms (#1246). */
