@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { resolveClubsActor } from "@/modules/access/admin-roles";
 import { AccessDeniedError } from "@/modules/access/authorization";
@@ -201,6 +202,8 @@ export type PeopleInviteResult = {
     signUpUrl?: string;
   };
   deferred: { personHref: string } | null;
+  /** Set when the family invites went out but the staff login could not be created; no staff access was applied. */
+  staffError?: string;
   /** Queued invite emails for the route to deliver after the response. */
   messageIds: string[];
 };
@@ -278,7 +281,17 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
   }
 
   if (staffItems) {
-    const staff = createStaff ? await createStaffLoginInvite(actorUserId, { name, email, access }) : null;
+    let staff: StaffLoginInviteResult | null = null;
+    try {
+      staff = createStaff ? await createStaffLoginInvite(actorUserId, { name, email, access }) : null;
+    } catch (error) {
+      // Family invites already committed and are queued. Nothing is thrown away: the route still delivers them, and
+      // the dialog shows what was done and that the staff part failed. No staff access was applied.
+      if (result.messageIds.length === 0 && result.created.clubInviteIds.length === 0 && !result.created.areaCoordinatorInviteId) throw error;
+      logError("Inviting a person: the staff login could not be created after the family invites were sent.", error);
+      result.staffError = "The club and Area Coordinator invites were sent, but the staff login couldn't be created. Try again from Invite a person with only the staff access ticked.";
+      return result;
+    }
     if (staff?.outcome === "created") {
       result.created = { ...result.created, staffLogin: true, invitationEmailed: staff.invitationEmailed, setupUrl: staff.setupUrl, setupExpiresAt: staff.setupExpiresAt };
       personAfter = { ...personAfter, staffId: staff.userId };

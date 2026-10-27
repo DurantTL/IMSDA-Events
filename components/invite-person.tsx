@@ -27,6 +27,7 @@ type InviteResult = {
     signUpUrl?: string;
   };
   deferred: { personHref: string } | null;
+  staffError?: string;
 };
 
 const clubRoles = Object.keys(clubDirectorRoleLabels) as ClubRole[];
@@ -114,7 +115,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
         return;
       }
       const done = body as InviteResult;
-      const createdSomething = done.created.staffLogin || done.created.clubInviteIds.length > 0 || Boolean(done.created.areaCoordinatorInviteId);
+      const createdSomething = done.staffError !== undefined || done.created.staffLogin || done.created.clubInviteIds.length > 0 || Boolean(done.created.areaCoordinatorInviteId);
       if (!createdSomething && done.deferred) {
         // Nothing to create: the person already has an account, so go straight to their page to save the access.
         setOpen(false);
@@ -281,6 +282,7 @@ function InviteOutcome({ name, result }: { name: string; result: InviteResult })
           <CopyApplicationLink label="Copy sign-up link" noun="sign-up link" url={created.signUpUrl} />
         </>
       ) : null}
+      {result.staffError ? <p className={styles.fieldError} role="alert">{result.staffError}</p> : null}
       {deferred ? (
         <p>
           {name} already has an account for part of this, so that access wasn&apos;t invited.{" "}

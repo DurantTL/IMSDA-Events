@@ -13,7 +13,7 @@ import { queueAttendeeVerificationEmail } from "@/modules/attendee-accounts/atte
 import { checkAdminVerificationEmailRateLimit } from "@/modules/rate-limit/service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
 import { applyClubsAdministrator } from "@/modules/access/clubs-administrator";
-import { applyGlobalRole } from "@/modules/access/membership-repository";
+import { MembershipOperationError, applyGlobalRole } from "@/modules/access/membership-repository";
 import { deliverStaffActivation } from "@/modules/communications/staff-activation";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
 
@@ -220,7 +220,14 @@ export async function cancelStaffInvite(userId: string, actorUserId: string, now
     // Clubs Administrator access (and, with its sign-in off, it no longer counts toward the last-administrator rule).
     // Refused, rolling the whole cancel back, only if it is the last working system administrator. Event
     // assignments are kept.
-    await applyGlobalRole(tx, userId, actorUserId, null);
+    try {
+      await applyGlobalRole(tx, userId, actorUserId, null);
+    } catch (error) {
+      if (error instanceof MembershipOperationError && error.code === "LAST_SYSTEM_ADMIN") {
+        throw new MembershipOperationError("LAST_SYSTEM_ADMIN", "Give another active account system administrator access before cancelling this invite.");
+      }
+      throw error;
+    }
     await applyClubsAdministrator(tx, userId, false, actorUserId);
     await writeAuditLog({
       actorUserId,

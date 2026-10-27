@@ -286,8 +286,8 @@ export async function applyGlobalRole(
 
   if (target.globalRole === "SYSTEM_ADMIN" && globalRole === null) {
     const remaining = await tx.user.count({
-      // A login whose sign-in is switched off (a cancelled invite, say) cannot administer anything, so it doesn't count.
-      where: { globalRole: "SYSTEM_ADMIN", id: { not: target.id }, NOT: { credential: { is: { disabledAt: { not: null } } } } },
+      // Only an activated login whose sign-in is on can administer anything: an invited-but-never-activated one, or one whose sign-in is off (a cancelled invite), doesn't count.
+      where: { globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE", id: { not: target.id }, NOT: { credential: { is: { disabledAt: { not: null } } } } },
     });
     if (remaining === 0) {
       throw new MembershipOperationError(

@@ -398,6 +398,31 @@ describe("validation happens before anything is written", () => {
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
   });
 
+  it("returns a partial result, keeping the queued mail and the link, when the staff step fails after the family invites", async () => {
+    mocks.configured.mockReturnValue(false);
+    mocks.membershipCreate.mockRejectedValue(new Error("synthetic failure"));
+    const response = await invite({ systemAdmin: true, events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], areaCoordinator: true, clubs: [{ organizationId: "club_1", role: "DIRECTOR" }] });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.staffError).toContain("staff login couldn't be created");
+    expect(body.created).toMatchObject({ staffLogin: false, clubInviteIds: ["ci-1"], areaCoordinatorInviteId: "ac-1", signUpUrl: "https://events.imsda.test/account/sign-up#email=pat%40example.test" });
+    expect(mocks.deliverAfter).toHaveBeenCalledWith([]);
+    expect(mocks.sendStaffInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it("delivers the queued family mail even when the staff step fails, and lets a staff-only retry through", async () => {
+    mocks.membershipCreate.mockRejectedValueOnce(new Error("synthetic failure"));
+    await invite({ events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], areaCoordinator: true });
+    expect(mocks.deliverAfter).toHaveBeenCalledWith(["msg-1"]);
+    users = users.filter((user) => user.id !== "u-new"); // the failed transaction rolled the new login back
+    // The family invites are now open for this email; a retry with only staff access ticked is not blocked by them.
+    mocks.acFindFirst.mockResolvedValue({ id: "ac-1" });
+    mocks.clubInviteFindFirst.mockResolvedValue({ id: "ci-1" });
+    const retry = await invite({ events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }] });
+    expect(retry.status).toBe(201);
+    expect((await retry.json()).created.staffLogin).toBe(true);
+  });
+
   it("maps the open-invite unique index to ALREADY_INVITED and creates no staff login", async () => {
     const { Prisma } = await import("@prisma/client");
     mocks.acCreate.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "x" }));
@@ -577,7 +602,8 @@ describe("resending and cancelling a staff invite", () => {
   it("refuses to cancel when it would leave no working system administrator", async () => {
     users.push({ id: "u-pend-admin", email: "pa@example.test", displayName: "Pa", globalRole: "SYSTEM_ADMIN", accountStatus: "PENDING_ACTIVATION", credential: { id: "c", disabledAt: null } });
     mocks.userCount.mockResolvedValue(0);
-    await expect(cancelStaffInvite("u-pend-admin", "u-sys", now)).rejects.toMatchObject({ code: "LAST_SYSTEM_ADMIN" });
+    await expect(cancelStaffInvite("u-pend-admin", "u-sys", now)).rejects.toMatchObject({ code: "LAST_SYSTEM_ADMIN", message: expect.stringContaining("before cancelling this invite") });
+    expect(mocks.userCount).toHaveBeenCalledWith({ where: expect.objectContaining({ accountStatus: "ACTIVE" }) });
   });
 
   it("cancels by spending unused links and switching the sign-in off", async () => {
