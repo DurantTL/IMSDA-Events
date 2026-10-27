@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   listAreaClubEvents: vi.fn(),
   listNewClubApplications: vi.fn(),
   countWaitingNewClubApplications: vi.fn(),
+  getRequiredFormsStatus: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +25,7 @@ vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: asyn
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/admin-roles", () => ({ hasClubsAdministration: mocks.hasClubsAdministration, resolveAdminRoles: mocks.resolveAdminRoles }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({ getAreaClubsSummary: mocks.getAreaClubsSummary, listAreaClubEvents: mocks.listAreaClubEvents }));
+vi.mock("@/modules/club-forms/required", () => ({ getRequiredFormsStatus: mocks.getRequiredFormsStatus }));
 vi.mock("@/modules/club-applications/repository", () => ({ listNewClubApplications: mocks.listNewClubApplications, countWaitingNewClubApplications: mocks.countWaitingNewClubApplications }));
 
 import ClubsAdminPage from "@/app/(workspace)/admin/clubs/page";
@@ -57,6 +59,7 @@ beforeEach(() => {
   ] }]);
   mocks.listNewClubApplications.mockResolvedValue([pending("app-1"), pending("app-2", true)]);
   mocks.countWaitingNewClubApplications.mockResolvedValue(2);
+  mocks.getRequiredFormsStatus.mockResolvedValue([]);
 });
 
 afterEach(() => vi.useRealTimers());
@@ -104,7 +107,10 @@ describe("what it shows", () => {
     expect(html).toContain('id="registered-clubs"');
     expect(html).toContain("Only the buttons in this list decide an application.");
     expect(html).toContain("Only registered clubs count toward an event&#x27;s total.");
-    expect(html).not.toMatch(/forms missing/i);
+    expect(html).toContain("Monthly records to review");
+    expect(html).toContain("Clubs with forms missing");
+    expect(html).toContain("/admin/club-forms?view=missing&amp;year=2026-27");
+    expect(html).toContain("/admin/clubs/reports?year=2026-27&amp;month=2026-10&amp;review=to-review");
     expect(html).toContain(`name="year"`);
   });
 
@@ -179,5 +185,31 @@ describe("what it shows", () => {
     expect(html).toContain("None");
     expect(html).toContain("No upcoming club events this club year");
     expect(html).not.toContain("/overview?event=");
+  });
+});
+
+describe("the review and forms-missing cards match the pages they link to (#1246)", () => {
+  const submittedRecord = (reviewedAt?: Date) => [{ reportMonth: "2026-10", status: "SUBMITTED" as const, totalPoints: 60, onTimePoints: 50, reviewedAt }];
+  const withRecord = (id: string, name: string, reviewedAt?: Date) => summarizeClub({
+    id, name, church: `${name} Church`, directors: [], rosterSize: 3, registrationOnTime: true,
+    backgroundChecks: { missing: 0, notInCompliance: 0, expiringSoon: 0 }, reports: submittedRecord(reviewedAt),
+  }, clubYearNow, now);
+
+  it("counts submitted and not reviewed, and shows Reviewed in the clubs table", async () => {
+    mocks.getAreaClubsSummary.mockResolvedValue([withRecord("c1", "Alpha Pathfinders"), withRecord("c2", "Beta Adventurers", new Date("2026-10-20T12:00:00Z")), withRecord("c3", "Gamma Pathfinders")]);
+    const html = await render();
+    expect(html).toMatch(/data-card="monthly-records"[^>]*>.*?<strong>2<\/strong>/);
+    expect(html).toContain("Reviewed");
+    expect(html).toContain(">Submitted<");
+  });
+
+  it("counts clubs with forms missing from the same status the list page reads", async () => {
+    mocks.getRequiredFormsStatus.mockResolvedValue([
+      { id: "c1", name: "Alpha Pathfinders", church: "", items: [{ templateKey: "can", name: "Can", requirement: "ONCE_PER_CLUB_YEAR", roles: [], status: "MISSING", missingMembers: [], memberCount: 0 }] },
+      { id: "c2", name: "Beta Adventurers", church: "", items: [{ templateKey: "can", name: "Can", requirement: "ONCE_PER_CLUB_YEAR", roles: [], status: "DONE", missingMembers: [], memberCount: 0 }] },
+    ]);
+    const html = await render();
+    expect(html).toMatch(/data-card="forms-missing"[^>]*>.*?<strong>1<\/strong>/);
+    expect(mocks.getRequiredFormsStatus).toHaveBeenCalledWith("2026-27");
   });
 });

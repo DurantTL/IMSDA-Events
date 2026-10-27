@@ -32,7 +32,7 @@ export async function getAreaClubsSummary(
   const [reports, standings, rosterGroups, adultGroups, grants] = await Promise.all([
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, organizationId: { in: clubIds } },
-      select: { organizationId: true, reportMonth: true, status: true, totalPoints: true, onTimePoints: true },
+      select: { organizationId: true, reportMonth: true, status: true, totalPoints: true, onTimePoints: true, reviewedAt: true },
     }),
     prisma.clubYearStanding.findMany({ where: { clubYear }, select: { organizationId: true, registrationOnTime: true } }),
     prisma.clubRosterMember.groupBy({

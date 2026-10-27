@@ -242,6 +242,9 @@ export function ClubReportForm({
             {isDraft ? "Draft" : `Submitted${report.submittedAt ? ` (${formatShortDate(report.submittedAt)})` : ""}`}
           </span>
         )}
+        {report && !isDraft && report.reviewedAt && (
+          <span className="status-chip green" data-report-reviewed="">Reviewed ({formatShortDate(report.reviewedAt)})</span>
+        )}
         {asDialog && !inDialog && (
           <button className="primary-button" data-monthly-report-open="" onClick={() => setOpen(true)} type="button">
             <FileText aria-hidden="true" size={16} /> {readOnly ? "View report" : report ? (isDraft ? "Continue report" : "Edit report") : "Open Monthly Record"}
