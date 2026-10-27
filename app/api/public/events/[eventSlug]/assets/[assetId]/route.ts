@@ -1,5 +1,5 @@
 import { findPublishedEventAsset } from "@/modules/events/asset-repository";
-import { eventAssetResponse } from "@/modules/events/asset-response";
+import { eventAssetVariantResponse } from "@/modules/events/asset-image-variants";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -14,7 +14,7 @@ type RouteContext = { params: Promise<{ eventSlug: string; assetId: string }> };
  * files down with it and an unreferenced upload is not one guessed identifier
  * from being public.
  */
-async function getHandler(_request: Request, context: RouteContext) {
+async function getHandler(request: Request, context: RouteContext) {
   try {
     const { eventSlug, assetId } = await context.params;
     const asset = await findPublishedEventAsset(eventSlug, assetId);
@@ -23,7 +23,8 @@ async function getHandler(_request: Request, context: RouteContext) {
       // event is unpublished. Distinguishing them would confirm what exists.
       return new Response("Not found", { status: 404 });
     }
-    return eventAssetResponse(asset);
+    // An optional `?w=` serves a resized copy of a raster image; anything else is the original file (#1207).
+    return eventAssetVariantResponse(asset, new URL(request.url).searchParams.get("w"));
   } catch (error) {
     logError("Serving a public event file failed", error);
     return new Response("Unavailable", { status: 500 });

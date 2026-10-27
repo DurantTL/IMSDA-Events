@@ -22,6 +22,8 @@ import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { EventEmbedFullLoad } from "@/components/event-embed-full-load";
 import { sanitizedHtmlBySection } from "@/modules/events/content-html";
 import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-notice";
+import { EventCardTransition } from "@/components/event-card-transition";
+import { eventViewTransitionName } from "@/modules/events/view-transition";
 import { EventWhenWhere } from "@/components/event-when-where";
 import { TranslateHint } from "@/components/translate-hint";
 import { AutoEventHeader, AutoEventInfoCards } from "@/components/auto-event-info-cards";
@@ -95,6 +97,8 @@ export default async function PublicEventPage({
   // The banner only counts when it can draw: invalid banner data renders nothing, so the page keeps its own h1 then.
   const bannerShown = Boolean(heroSection && parseBlockData("HERO", heroSection.data));
   const sameName = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toLowerCase() === b.trim().replace(/\s+/g, " ").toLowerCase();
+  // The card on the homepage and calendar morphs into exactly one header element: the banner, else the header below (#1208).
+  const cardTransitionName = eventViewTransitionName(landing.event.slug);
   const assetUrl = (assetId: string) => publicEventAssetUrl(landing.event.slug, assetId);
   // Auto-built info cards (#651) are for club events only; every other event's
   // page renders exactly as before, without even reading the card data.
@@ -283,8 +287,9 @@ export default async function PublicEventPage({
       {/* The header banner (#816) comes first and owns the page's h1. With one, the event
           header below is a plain details row with no second title or hero (#1004); without
           a banner nothing changes. */}
-      {heroSection && bannerShown && <EventHeroBanner section={heroSection} assetUrl={assetUrl} />}
+      {heroSection && bannerShown && <EventCardTransition name={cardTransitionName}><EventHeroBanner section={heroSection} assetUrl={assetUrl} /></EventCardTransition>}
       {autoCards ? (
+        <EventCardTransition name={bannerShown ? null : cardTransitionName}>
         <AutoEventHeader
           header={autoCards.header}
           dateLabel={landing.event.dateLabel}
@@ -293,6 +298,7 @@ export default async function PublicEventPage({
           {...whereProps}
           titleMode={!bannerShown ? "h1" : sameName(heroSection!.title, autoCards.header.title) ? "hidden" : "text"}
         />
+        </EventCardTransition>
       ) : bannerShown ? (
         <section className="public-event-facts" aria-label="Event details">
           {/* The banner's title is free text; when it is not the event's name, the name still appears once, as text. */}
@@ -300,6 +306,7 @@ export default async function PublicEventPage({
           <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
         </section>
       ) : (
+        <EventCardTransition name={cardTransitionName}>
         <section className="public-registration-hero public-event-hero">
           <div>
             <p className="public-registration-eyebrow">Iowa-Missouri Conference event</p>
@@ -307,6 +314,7 @@ export default async function PublicEventPage({
             <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
           </div>
         </section>
+        </EventCardTransition>
       )}
 
       {statusBlock}

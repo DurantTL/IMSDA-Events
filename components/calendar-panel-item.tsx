@@ -1,14 +1,16 @@
 import type { CSSProperties } from "react";
 import { CalendarDays, DoorClosed } from "lucide-react";
+import { EventCardTransition } from "@/components/event-card-transition";
 import { ItemLink } from "@/components/calendar-agenda-item";
 import { calendarItemStatusLine, calendarItemTone, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem, type CalendarTone } from "@/modules/calendar/domain";
 
 /** One item in the day panel (#1202, #1203): category with its colour, title, dates and status, linking where the agenda links. */
-export function CalendarPanelItem({ item, toneMap, index = 0 }: { item: CalendarItem; toneMap: Map<string, CalendarTone>; index?: number }) {
+export function CalendarPanelItem({ item, toneMap, index = 0, transitionName }: { item: CalendarItem; toneMap: Map<string, CalendarTone>; index?: number; transitionName?: string | null }) {
   const tone = calendarItemTone(item, toneMap);
   const statusLine = calendarItemStatusLine(item);
   const label = item.isClosure ? closureLabel : item.category || (item.kind === "EVENT" ? "IMSDA event" : "Conference date");
   return (
+    <EventCardTransition name={transitionName}>
     <li className={`calendar-panel-item calendar-tone-${tone} calendar-status-${item.status.toLowerCase()}`} style={{ "--i": index } as CSSProperties}>
       <p className="calendar-panel-category">
         <span aria-hidden="true" className="calendar-swatch" />
@@ -24,5 +26,6 @@ export function CalendarPanelItem({ item, toneMap, index = 0 }: { item: Calendar
         </p>
       )}
     </li>
+    </EventCardTransition>
   );
 }

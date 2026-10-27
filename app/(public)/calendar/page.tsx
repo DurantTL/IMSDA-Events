@@ -12,6 +12,7 @@ import { CalendarMotion } from "@/components/calendar-motion";
 import { calendarBarIntroDelay } from "@/components/calendar-motion-helpers";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import { CalendarPanelItem } from "@/components/calendar-panel-item";
+import { eventTransitionNames } from "@/modules/events/view-transition";
 import {
   calendarCategories,
   calendarItemTone,
@@ -98,6 +99,11 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const currentMonthKey = monthKey(month);
   const base = { view, month: view === "month" ? params.month : undefined, category };
   const selectedItems = selectedDate ? itemsOnDate(items, selectedDate) : [];
+  // View-transition names must be unique on the page (#1208): in month view the day panel is named first, then the month
+  // agenda skips events already named; the list view names its own list.
+  const usedTransitionNames = new Set<string>();
+  const panelNames = eventTransitionNames(view === "month" ? sortCalendarItems(selectedItems) : [], usedTransitionNames);
+  const agendaNames = eventTransitionNames(view === "month" ? monthItems : firstPerSeries(items), usedTransitionNames);
   // A day (or a bar, or "+N more") opens that day's panel; an adjacent-month day lands on its own month.
   const dayHrefFor = (date: string) => calendarHref(
     { view: "month", month: date.slice(0, 7) === currentMonthKey ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), category, date },
@@ -270,7 +276,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                     : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
                 </p>
                 {selectedItems.length > 0 && (
-                  <ul className="calendar-panel-list" key={selectedDate}>{sortCalendarItems(selectedItems).map((item, index) => <CalendarPanelItem index={index} item={item} key={item.key} toneMap={toneMap} />)}</ul>
+                  <ul className="calendar-panel-list" key={selectedDate}>{sortCalendarItems(selectedItems).map((item, index) => <CalendarPanelItem index={index} item={item} key={item.key} toneMap={toneMap} transitionName={panelNames.get(item.key)} />)}</ul>
                 )}
                 <div className="calendar-day-actions">
                   <Link className="secondary-button" href={calendarHref({ view: "month", month: monthKey(month), category }, `calendar-day-${selectedDate}`)}>Back to {monthLabel(month)}</Link>
@@ -294,7 +300,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             monthItems.length === 0 ? (
               <p className="calendar-empty">Nothing is on the calendar for {monthLabel(month)}{category ? ` in ${category}` : ""}.</p>
             ) : (
-              <ul className="calendar-agenda-list">{monthItems.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
+              <ul className="calendar-agenda-list">{monthItems.map((item) => <AgendaItem item={item} key={item.key} transitionName={agendaNames.get(item.key)} />)}</ul>
             )
           ) : items.length === 0 ? (
             <p className="calendar-empty">Nothing is on the calendar yet{category ? ` in ${category}` : ""}. Check back soon.</p>
@@ -302,7 +308,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             groupByMonth(firstPerSeries(items), today).map(([key, group]) => (
               <div className="calendar-agenda-group" key={key}>
                 <h3 className="calendar-agenda-month">{monthLabel(parseMonthParam(key, today))}</h3>
-                <ul className="calendar-agenda-list">{group.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
+                <ul className="calendar-agenda-list">{group.map((item) => <AgendaItem item={item} key={item.key} transitionName={agendaNames.get(item.key)} />)}</ul>
               </div>
             ))
           )}
