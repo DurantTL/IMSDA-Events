@@ -82,3 +82,17 @@ export function withoutFeatured<T extends { key: string; href?: string | null }>
     return !(slug && slugs.has(slug));
   });
 }
+
+/**
+ * A list with its featured events pinned to the top in featured order (#1218), for the `/events` page (#1217): every
+ * item stays in the list exactly once, so its own card (with any club register button) is kept, only moved up.
+ */
+export function pinFeatured<T extends { href?: string | null }>(items: readonly T[], rows: readonly FeaturedEventRow[]): { items: T[]; pinned: Set<T> } {
+  const rank = new Map(rows.map((row, index) => [row.slug, index]));
+  const rankOf = (item: T) => {
+    const slug = eventSlugFromHref(item.href);
+    return slug ? rank.get(slug) : undefined;
+  };
+  const pinned = items.filter((item) => rankOf(item) !== undefined).sort((a, b) => rankOf(a)! - rankOf(b)!);
+  return { items: [...pinned, ...items.filter((item) => rankOf(item) === undefined)], pinned: new Set(pinned) };
+}

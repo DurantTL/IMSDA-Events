@@ -14,6 +14,8 @@ import {
   type OpenRegistrationFilter,
 } from "@/modules/calendar/open-registration";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
+import { pinFeatured } from "@/modules/events/featured-domain";
+import { listFeaturedEventRows } from "@/modules/events/featured";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
@@ -45,11 +47,12 @@ async function visitorRegistersClubs() {
   }
 }
 
-function EventCard({ item, directsClub }: { item: CalendarItem; directsClub: boolean }) {
+function EventCard({ item, directsClub, featured }: { item: CalendarItem; directsClub: boolean; featured: boolean }) {
   const statusLine = calendarItemStatusLine(item);
   const open = item.registrationStatus === "OPEN" || item.registrationStatus === "WAITLIST";
   return (
     <li className="open-events-card">
+      {featured && <p className="open-events-featured">Featured</p>}
       <h3><Link href={item.href!}>{item.eventTitle ?? item.title}</Link></h3>
       <p className="calendar-agenda-meta">
         <span><CalendarDays size={14} aria-hidden="true" /> {formatDateRange(item.eventStartsOn ?? item.startsOn, item.eventEndsOn ?? item.endsOn)}</span>
@@ -67,11 +70,13 @@ function EventCard({ item, directsClub }: { item: CalendarItem; directsClub: boo
 export default async function OpenForRegistrationPage({ searchParams }: { searchParams: Promise<{ for?: string | string[] }> }) {
   const filter = parseOpenRegistrationFilter((await searchParams).for);
   const today = conferenceToday();
-  const [calendarItems, directsClub] = await Promise.all([
+  const [calendarItems, directsClub, featuredRows] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, openRegistrationWindowDays)),
     visitorRegistersClubs(),
+    listFeaturedEventRows(today),
   ]);
-  const items = selectOpenRegistrationItems(calendarItems, filter);
+  // Featured events (#1218) are pinned to the top of this list, each keeping its own card.
+  const { items, pinned } = pinFeatured(selectOpenRegistrationItems(calendarItems, filter), featuredRows);
 
   return (
     <main className="public-registration-page public-calendar-page public-home-page">
@@ -108,7 +113,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
             </div>
           ) : (
             <ul className="calendar-agenda-list open-events-list">
-              {items.map((item) => <EventCard directsClub={directsClub} item={item} key={item.key} />)}
+              {items.map((item) => <EventCard directsClub={directsClub} featured={pinned.has(item)} item={item} key={item.key} />)}
             </ul>
           )}
         </section>
