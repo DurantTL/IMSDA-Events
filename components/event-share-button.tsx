@@ -59,6 +59,11 @@ export function EventShareButton({ title, url }: { title: string; url?: string |
     const outcome = await shareOrCopy({ title, url: url! }, navigator);
     if (outcome !== "copied" && outcome !== "failed") return;
     setState(outcome);
+    // A repeat failure keeps the field mounted, so the effect above does not re-run: focus it here.
+    if (outcome === "failed") {
+      field.current?.focus();
+      field.current?.select();
+    }
     // Clear, then set on a later tick, so a repeat of the same result is announced again.
     setStatus("");
     if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
