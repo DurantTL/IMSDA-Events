@@ -88,7 +88,7 @@ describe("the System sidebar", () => {
   it("starts every group closed, except the one holding the current page", () => {
     const closed = sidebarOf(render({ user: admin }));
     for (const group of systemNavGroups) expect(expanded(closed, group.key), group.key).toBe(false);
-    navigation.pathname = "/admin/team";
+    navigation.pathname = "/admin/people";
     const onTeam = sidebarOf(render({ user: admin }));
     expect(expanded(onTeam, "system-people")).toBe(true);
     expect(expanded(onTeam, "system-events")).toBe(false);
@@ -109,6 +109,7 @@ describe("the Clubs sidebar groups", () => {
       ["clubs-events", "Club events"],
       ["clubs-forms", "Forms"],
       ["clubs-applications", "Applications"],
+      ["clubs-people", "People"],
     ]);
     expect(clubsAdminGroups.map((group) => group.items.map((item) => item.href))).toEqual([
       ["/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks", "/admin/honors", "/admin/club-supplies", "/admin/clubs/import", "/admin/clubs/health-import"],
@@ -116,6 +117,7 @@ describe("the Clubs sidebar groups", () => {
       ["/admin/clubs/summary#club-events"],
       ["/admin/club-forms"],
       ["/admin/clubs/applications", "/admin/clubs/invites"],
+      ["/admin/people"],
     ]);
     for (const item of clubsAdminGroups.flatMap((group) => group.items)) {
       if (item.href.includes("#")) continue;

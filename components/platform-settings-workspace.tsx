@@ -103,7 +103,7 @@ export function PlatformSettingsWorkspace({
             {unlinked > 0 && (
               <p>
                 {unlinked} {unlinked === 1 ? "person still has a separate account" : "people still have separate accounts"}; link
-                them on <Link className="text-button" href="/admin/accounts">Accounts</Link> first.
+                them on <Link className="text-button" href="/admin/people">People & access</Link> first.
               </p>
             )}
             <p>
@@ -360,7 +360,7 @@ export function PlatformSettingsWorkspace({
           <li>Linked pairs: <strong>{signIn.linkCheck.linkedPairs}</strong></li>
         </ul>
         <p className="field-help">
-          Link people by hand on <Link className="text-button" href="/admin/accounts">System management → Accounts</Link>. You can
+          Link people by hand on <Link className="text-button" href="/admin/people">System management → People & access</Link>. You can
           turn this on with unlinked pairs remaining; they keep separate accounts until linked.
         </p>
         {signInError && <p className="form-error" role="alert">{signInError}</p>}

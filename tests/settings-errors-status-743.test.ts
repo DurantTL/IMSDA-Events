@@ -10,7 +10,6 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/more/event-settings",
 }));
 
-import { AttendeeAccountsWorkspace } from "@/components/attendee-accounts-workspace";
 import { AttendeeConfigurationWorkspace } from "@/components/attendee-configuration-workspace";
 import { ClubHonorsWorkspace } from "@/components/club-honors-workspace";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
@@ -485,16 +484,6 @@ describe("status clarity (#743)", () => {
     expect(accountSortOrderText(null)).toBe("Sorted by date created, newest first.");
     expect(accountSortOrderText({ key: "name", direction: "asc" })).toBe("Sorted by account, A to Z.");
     expect(accountSortOrderText({ key: "signin", direction: "desc" })).toBe("Sorted by last sign-in, newest first.");
-    const account = (id: string) => ({
-      id, email: `${id}@example.test`, displayName: id, disabled: false, lastSignedInAt: null, authenticatorOn: false,
-      passkeyCount: 0, areaCoordinator: false, clubRoles: [], createdAt: "2026-01-01T00:00:00.000Z",
-    });
-    const html = renderToStaticMarkup(createElement(AttendeeAccountsWorkspace, {
-      initialAccounts: [account("zed"), account("amy")] as never,
-      initialSort: { key: "name", direction: "desc" },
-    }));
-    expect(html).toContain("Sorted by account, Z to A.");
-    expect(html).toContain('aria-sort="descending"');
   });
 
   it("the club roster and honors roster state their order and mark the sorted column", () => {

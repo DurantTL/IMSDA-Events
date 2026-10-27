@@ -28,6 +28,10 @@ export function userAdminApiError(error: unknown, action: string) {
           : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
   }
+  // A body that is not JSON is the caller's mistake, not a server failure.
+  if (error instanceof SyntaxError) {
+    return Response.json({ error: "INVALID_REQUEST", message: "The request body must be JSON." }, { status: 400 });
+  }
   logError(`${action} failed`, error);
   return Response.json({ error: "USER_ADMIN_FAILED", message: `${action} could not be completed.` }, { status: 500 });
 }

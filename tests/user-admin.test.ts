@@ -39,7 +39,7 @@ vi.mock("@/modules/access/session-store", () => ({ revokeAllUserSessions: mocks.
 vi.mock("@/modules/attendee-accounts/session-store", () => ({ revokeAllAttendeeSessions: mocks.revokeAllAttendeeSessions }));
 vi.mock("@/modules/communications/account-email-dispatch", () => ({ sendAccountRecoveryEmail: mocks.sendAccountRecoveryEmail }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
-vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator, requireClubsAdministration: mocks.requireSystemAdministrator }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 
 import { POST as ACCOUNT_ACTION } from "@/app/api/admin/accounts/[accountId]/route";

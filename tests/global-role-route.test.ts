@@ -64,6 +64,15 @@ describe("global role route", () => {
     expect(mocks.setGlobalRole).toHaveBeenCalledWith("user-2", "user-1", null, "evt_wr26");
   });
 
+  it("refuses a system administrator removing their own role, and still lets them grant it or remove another's", async () => {
+    const own = Promise.resolve({ userId: "user-1" });
+    const response = await PATCH(patchRequest({ globalRole: null }), { params: own });
+    expect(response.status).toBe(403);
+    expect((await response.json()).message).toMatch(/own system administrator role/);
+    expect(mocks.setGlobalRole).not.toHaveBeenCalled();
+    expect((await PATCH(patchRequest({ globalRole: null }), { params })).status).toBe(200);
+  });
+
   it("refuses an event administrator who is not a system administrator", async () => {
     mocks.getCurrentSession.mockResolvedValue({
       user: { id: "user-3", email: "admin@imsda.org", displayName: "Admin", globalRole: null },

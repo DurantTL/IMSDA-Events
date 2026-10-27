@@ -1,52 +1,15 @@
-import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { ActAsButton } from "@/components/act-as-button";
-import { AttendeeAccountsWorkspace } from "@/components/attendee-accounts-workspace";
-import { getCurrentSession } from "@/modules/access/current-session";
-import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
-import { parseAccountSort } from "@/modules/system-admin/account-sort";
-import { listAttendeeAccountsWithCap } from "@/modules/system-admin/user-admin";
 
-export const metadata: Metadata = { title: "Accounts" };
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "People & access" };
 
+/** Accounts moved into People & access (#1275); the search carries over. */
 export default async function AttendeeAccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ q?: string | string[] }>;
 }) {
-  const { user } = await getCurrentSession();
-  if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
-  // Search and sort live in the URL (#738) so a reload or shared link keeps them.
-  const params = await searchParams;
-  const initialQuery = typeof params.q === "string" ? params.q.slice(0, 120) : "";
-  const initialSort = parseAccountSort(params.sort, params.dir);
-  const initial = await listAttendeeAccountsWithCap(initialQuery, initialSort);
-  const linkedEmailChangesTogether = await isUnifiedSignInEnabled();
-  return (
-    <>
-      <StaffPageHeader
-        description="Attendee and club accounts (people who sign in at /account)."
-        primary={(
-          <ActAsButton
-            access="View only"
-            endpoint="/api/admin/act-as/area-coordinator"
-            label="Act as Area Coordinator (2 hours)"
-            resultAction="Open the coordinator view"
-            role="Area Coordinator"
-          />
-        )}
-      />
-      <AttendeeAccountsWorkspace
-        initialAccounts={initial.accounts}
-        initialCapped={initial.capped}
-        initialQuery={initialQuery}
-        initialSort={initialSort}
-        linkedEmailChangesTogether={linkedEmailChangesTogether}
-      />
-    </>
-  );
+  const { q } = await searchParams;
+  const query = (Array.isArray(q) ? q[0] : q)?.trim().slice(0, 120);
+  redirect(query ? `/admin/people?q=${encodeURIComponent(query)}` : "/admin/people");
 }

@@ -60,6 +60,10 @@ async function patchHandler(request: Request, context: { params: Promise<{ userI
 
     const { userId } = await context.params;
     const input = globalRoleSchema.parse(await request.json());
+    // Nobody removes their own system administrator role (#1275): another administrator does it.
+    if (userId === actor.id && input.globalRole === null) {
+      throw new AccessDeniedError("You can't remove your own system administrator role. Ask another system administrator.", 403, "PERMISSION_DENIED");
+    }
     const user = await setGlobalRole(userId, actor.id, input.globalRole, input.eventId);
     return Response.json({ user });
   } catch (error) {

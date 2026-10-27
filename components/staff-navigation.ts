@@ -250,7 +250,7 @@ export const clubsAdminHealthImportHref = "/admin/clubs/health-import";
 export const eventsAdminHomeItem: NavigationItem = { href: "/events-admin", label: "Event administration", icon: LayoutDashboard };
 
 /** The collapsible groups of the Clubs Administrator's sidebar (#1245). */
-export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications";
+export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications" | "clubs-people";
 
 export type ClubsNavGroup = { key: ClubsNavGroupKey; label: string; items: readonly NavigationItem[] };
 
@@ -304,6 +304,11 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
       { href: "/admin/clubs/applications", label: "New club applications", icon: ClipboardPen },
       { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
     ],
+  },
+  {
+    key: "clubs-people",
+    label: "People",
+    items: [{ href: "/admin/people", label: "People & access", icon: UsersRound }],
   },
 ];
 

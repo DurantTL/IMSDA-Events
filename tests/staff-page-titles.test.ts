@@ -80,7 +80,8 @@ describe("staff page names (#685)", () => {
 
   it("names each /admin page in the topbar instead of 'System management' (#981)", () => {
     expect(staffSubpageTitle("/admin")).toBeNull();
-    expect(staffSubpageTitle("/admin/team")).toBe("Team");
+    expect(staffSubpageTitle("/admin/people")).toBe("People & access");
+    expect(staffSubpageTitle("/admin/people/staff/usr_1")).toBe("People & access");
     expect(staffSubpageTitle("/admin/settings")).toBe("Platform settings");
     expect(staffSubpageTitle("/admin/readiness")).toBe("System readiness");
     expect(staffSubpageTitle("/admin/calendar")).toBe("Conference calendar");

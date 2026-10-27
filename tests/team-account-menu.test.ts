@@ -11,10 +11,6 @@ import {
   nextMenuIndex,
   teamMenuItems,
 } from "@/components/team-account-menu";
-import {
-  TeamDirectoryWorkspace,
-  breakableEmail,
-} from "@/components/team-directory-workspace";
 
 const member = (over: Record<string, unknown> = {}) => ({
   id: "u2",
@@ -120,45 +116,5 @@ describe("team account menu dispatch and placement", () => {
       .toEqual({ top: 134, right: 80 });
     expect(menuPlacement({ top: 700, bottom: 730, right: 1200 }, 160, viewport))
       .toEqual({ bottom: 104, right: 80 });
-  });
-});
-
-describe("team directory table", () => {
-  it("breaks emails only after @ and dots", () => {
-    const html = renderToStaticMarkup(createElement("p", null, breakableEmail("a.b@c.example")));
-    expect(html.replace(/<\/?span>/g, "")).toBe("<p>a.<wbr/>b@<wbr/>c.<wbr/>example</p>");
-  });
-
-  it("uses short headers and keeps Edit profile visible with a More actions menu", () => {
-    const html = renderToStaticMarkup(createElement(TeamDirectoryWorkspace, {
-      currentUserId: "me",
-      initialDirectory: {
-        totalCount: 1,
-        activeCount: 1,
-        systemAdminCount: 0,
-        withoutAccessCount: 0,
-        members: [{
-          id: "me",
-          email: "me@example.test",
-          displayName: "Sample Me",
-          jobTitle: "",
-          phone: "",
-          bio: "",
-          globalRole: "USER",
-          accountStatus: "ACTIVE",
-          signInDisabled: false,
-          mfaStatus: "NONE",
-          lastSignedInAt: null,
-          memberships: [],
-        }],
-      } as never,
-    }));
-    for (const header of ["Sign-in", "Two-step", "Last sign-in"]) {
-      expect(html).toContain(`>${header}</th>`);
-    }
-    expect(html).toContain("Edit profile");
-    expect(html).toContain("More actions");
-    expect(html).toContain("This is you");
-    expect(html).not.toContain("Send password reset");
   });
 });
