@@ -51,11 +51,11 @@ describe("the one-line version (#1204)", () => {
 });
 
 describe("pages that show the callout (#1014)", () => {
-  it("home shows the one-line version at the bottom, after Coming up and the links", () => {
+  it("home shows the one-line version at the bottom, after the season, Find your place and the links", () => {
     const source = read("app/page.tsx");
     expect(source).toContain('import { StartAClubCallout } from "@/components/start-a-club-callout"');
     const callout = source.indexOf('<StartAClubCallout variant="line" />');
-    expect(callout).toBeGreaterThan(source.indexOf('aria-labelledby="home-upcoming-heading"'));
+    expect(callout).toBeGreaterThan(source.indexOf('aria-labelledby="home-season-heading"'));
     expect(callout).toBeGreaterThan(source.indexOf("</nav>"));
     expect(source.slice(callout - 80, callout)).not.toContain("session.user &&");
   });

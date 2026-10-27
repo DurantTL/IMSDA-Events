@@ -310,12 +310,12 @@ describe("photo cards and the Coming up strip (#1210, #1218)", () => {
     expect(html).toMatch(/<span class="event-photo-card-link">Title none<\/span>/);
   });
 
-  it("builds the homepage strip as a labelled list with a See all link", () => {
+  it("builds the homepage's Featured list as labelled, and the season replaces the Coming up strip (#1251)", () => {
     const page = readFileSync("app/page.tsx", "utf8");
-    expect(page).toContain('<ul aria-labelledby="home-upcoming-heading" className="event-photo-list">');
-    expect(page).toContain('id="home-upcoming-heading"');
-    expect(page).toContain('href="/calendar?view=list">See all');
     expect(page).toContain('<ul aria-labelledby="home-featured-heading"');
+    expect(page).toContain('id="home-season-heading"');
+    expect(page).not.toContain("home-upcoming-heading");
+    expect(page).not.toContain("event-photo-list");
   });
 
   it("keeps the strip inside its own box, motion off for reduced motion, text and taps at the floors", () => {

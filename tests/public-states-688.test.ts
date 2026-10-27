@@ -63,10 +63,11 @@ describe("group registration not-available state", () => {
   });
 });
 
-describe("calendar subscribe link", () => {
-  it("has an accessible name even when its text is hidden on phones", async () => {
+describe("calendar subscribe button", () => {
+  it("is one header button with a name, not a link to a separate box below the grid", async () => {
     const markup = renderToStaticMarkup(await PublicCalendarPage({ searchParams: Promise.resolve({}) }));
-    const link = markup.match(/<a[^>]*href="#subscribe"[^>]*>/)?.[0] ?? "";
-    expect(link).toContain('aria-label="Subscribe to the calendar"');
+    expect(markup).toContain("Add to my calendar");
+    expect(markup).not.toContain('href="#subscribe"');
+    expect(markup).not.toContain("calendar-subscribe-panel");
   });
 });

@@ -70,7 +70,7 @@ function conferenceYear(now: Date) {
 /** Up to this many days away the status line counts days; further out it names the month. */
 const countdownMaxDays = 30;
 
-function wholeDaysUntil(today: string, opensOn: string): number | null {
+export function wholeDaysUntil(today: string, opensOn: string): number | null {
   const toUtcDay = (value: string) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
     return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86_400_000 : null;
@@ -78,6 +78,27 @@ function wholeDaysUntil(today: string, opensOn: string): number | null {
   const from = toUtcDay(today);
   const to = toUtcDay(opensOn);
   return from === null || to === null ? null : Math.round(to - from);
+}
+
+/** A registration closing flag (#1251) shows from this many days before the closing date. */
+export const closingSoonDays = 14;
+
+/**
+ * Whole calendar days from today (in the event's own time zone) to the last day registration is open, when that is
+ * today or within `closingSoonDays` days; otherwise null. Registration stays open through its closing date (a closing
+ * date of today is still open), so 0 means "closes today".
+ */
+export function daysUntilRegistrationCloses(closesOn: string | null | undefined, timeZone = "America/Chicago", now = new Date()): number | null {
+  if (!closesOn) return null;
+  const days = wholeDaysUntil(calendarDateInEventTimeZone(now, timeZone), closesOn);
+  return days !== null && days >= 0 && days <= closingSoonDays ? days : null;
+}
+
+/** "Registration closes today", "Registration closes tomorrow", "Registration closes in 5 days, on December 5, 2026". `dateLabel` is the closing date, already written out. */
+export function registrationClosesLine(days: number, dateLabel: string): string {
+  if (days === 0) return "Registration closes today";
+  if (days === 1) return "Registration closes tomorrow";
+  return `Registration closes in ${days} days, on ${dateLabel}`;
 }
 
 /**
