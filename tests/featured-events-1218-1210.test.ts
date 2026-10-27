@@ -100,6 +100,11 @@ describe("featured rules (#1218)", () => {
     expect(withoutFeatured([item("a"), other, item("b")], [item("a")]).map((i) => i.key)).toEqual(["event-b"]);
   });
 
+  it("keeps a featured event's other dates on the full calendar list", () => {
+    const other = item("a", { key: "entry-2", kind: "ENTRY" });
+    expect(withoutFeatured([item("a"), other, item("b")], [item("a")], "item").map((i) => i.key)).toEqual(["entry-2", "event-b"]);
+  });
+
   it("keeps three eligible events when a top-ranked row has no calendar item", () => {
     const rows = [row("ghost", { featuredOrder: 1 }), row("a", { featuredOrder: 2 }), row("b", { featuredOrder: 3 }), row("c", { featuredOrder: 4 }), row("d", { featuredOrder: 5 })];
     const picked = featuredItemsFor([item("a"), item("b"), item("c"), item("d")], activeFeaturedRows(rows, "2026-10-27")).slice(0, homeFeaturedLimit);

@@ -61,11 +61,17 @@ export function featuredItemsFor(items: readonly CalendarItem[], rows: readonly 
 }
 
 /**
- * Items that are not already shown as featured, so a card never appears twice on a page. Matched by event page, so an
- * event with several linked calendar entries (#1086) has all of them left out, not only the featured one.
+ * Items that are not already shown as featured, so a card never appears twice on a page. By default matched by event
+ * page, so an event with several linked calendar entries (#1086) has all of them left out of a short list like the
+ * homepage strip. The full calendar passes `match: "item"` so the event's other (or cancelled) dates stay listed.
  */
-export function withoutFeatured<T extends { key: string; href?: string | null }>(items: readonly T[], featured: readonly { key: string; href?: string | null }[]): T[] {
+export function withoutFeatured<T extends { key: string; href?: string | null }>(
+  items: readonly T[],
+  featured: readonly { key: string; href?: string | null }[],
+  match: "event" | "item" = "event",
+): T[] {
   const keys = new Set(featured.map((item) => item.key));
+  if (match === "item") return items.filter((item) => !keys.has(item.key));
   const slugs = new Set(featured.flatMap((item) => {
     const slug = eventSlugFromHref(item.href);
     return slug ? [slug] : [];

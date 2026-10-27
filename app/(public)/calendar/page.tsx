@@ -114,7 +114,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
     return slug ? [slug] : [];
   }));
   const featuredNames = eventTransitionNames(featuredItems, usedTransitionNames);
-  const listItems = withoutFeatured(firstPerSeries(items), featuredItems);
+  const listItems = withoutFeatured(firstPerSeries(items), featuredItems, "item");
   const panelNames = eventTransitionNames(view === "month" ? sortCalendarItems(selectedItems) : [], usedTransitionNames);
   const agendaNames = eventTransitionNames(view === "month" ? monthItems : listItems, usedTransitionNames);
   // A day (or a bar, or "+N more") opens that day's panel; an adjacent-month day lands on its own month.
