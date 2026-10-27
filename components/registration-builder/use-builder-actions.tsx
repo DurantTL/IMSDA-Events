@@ -226,7 +226,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       destructive: true,
     }))) return;
     // The discarded changes must not come back from this browser's backup later (#1263).
-    if (dirty) clearEditDraft(getBrowserEditDraftStorage(), builderBackupKey(eventId, selectedForm?.id));
+    if (dirty) clearEditDraft(getBrowserEditDraftStorage(), builderBackupKey(eventId, state.selectedFormId));
     const nextDefinition = structuredClone(form.activeVersion.definition);
     setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setHistory(clearHistory(nextDefinition)); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
   }
