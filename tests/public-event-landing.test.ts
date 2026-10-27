@@ -26,7 +26,7 @@ describe("public event landing domain", () => {
     )).toMatchObject({
       state: "UPCOMING",
       ctaEnabled: false,
-      statusLabel: "Registration opens in August",
+      statusLabel: "Registration opens tomorrow",
     });
 
     expect(describePublicEventLifecycle(

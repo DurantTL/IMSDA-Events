@@ -34,6 +34,8 @@ export type CalendarItem = {
   registrationStatus?: PublicCapacityStatus;
   registrationOpensOn?: string | null;
   clubEvent?: boolean;
+  /** The event's time zone, so a "opens in N days" count uses the event's own today (#1209). */
+  registrationTimeZone?: string;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */
   isClosure?: boolean;
   /**
@@ -52,7 +54,7 @@ export type CalendarItem = {
 export function calendarItemStatusLine(item: CalendarItem, now = new Date()): string | null {
   if (item.kind !== "EVENT" || item.isClosure || item.status === "CANCELLED") return null;
   if (!item.registrationStatus) return item.registrationOpen ? "Registration open" : null;
-  return publicStatusLine({ status: item.registrationStatus, opensOn: item.registrationOpensOn, isClubEvent: item.clubEvent }, now);
+  return publicStatusLine({ status: item.registrationStatus, opensOn: item.registrationOpensOn, isClubEvent: item.clubEvent, timeZone: item.registrationTimeZone }, now);
 }
 
 /** The first occurrence of each repeating entry; one-off items all stay. Items must already be in date order. */

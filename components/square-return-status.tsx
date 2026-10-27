@@ -52,7 +52,7 @@ export function SquareReturnStatus({
       <h1 id="square-return-heading">Payment status</h1>
       <div className={`public-square-notice is-${tone}`} role={status.state === "HELD" ? "alert" : "status"}>
         {status.state === "CONFIRMED"
-          ? <ShieldCheck size={18} aria-hidden="true" />
+          ? <span className="confirm-check-icon" aria-hidden="true"><ShieldCheck size={18} aria-hidden="true" /></span>
           : status.state === "HELD"
             ? <TriangleAlert size={18} aria-hidden="true" />
             : <LoaderCircle size={18} className="is-spinning" aria-hidden="true" />}

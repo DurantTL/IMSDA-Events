@@ -751,7 +751,7 @@ export function PublicSquarePayment({
       role={returnState === "HELD" ? "alert" : "status"}
     >
       {returnState === "CONFIRMED"
-        ? <ShieldCheck size={18} aria-hidden="true" />
+        ? <span className="confirm-check-icon" aria-hidden="true"><ShieldCheck size={18} aria-hidden="true" /></span>
         : returnState === "HELD"
           ? <TriangleAlert size={18} aria-hidden="true" />
           : <LoaderCircle size={18} className="is-spinning" aria-hidden="true" />}

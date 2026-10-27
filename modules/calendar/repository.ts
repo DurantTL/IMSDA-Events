@@ -149,6 +149,7 @@ export async function listPublicCalendarItems(
       registrationStatus: status,
       registrationOpensOn: event.registrationOpensOn,
       clubEvent: event.audience === "CLUB",
+      registrationTimeZone: event.timezone,
     };
   };
   const registerItems = entries.flatMap((entry) => {
