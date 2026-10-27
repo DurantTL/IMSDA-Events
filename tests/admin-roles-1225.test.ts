@@ -58,6 +58,8 @@ describe("roles held (pure)", () => {
     expect(heldAdminRoles({ ...none, eventAdminEventIds: ["e1"] })).toEqual(["EVENTS_ADMIN"]);
     expect(heldAdminRoles({ systemAdmin: true, clubsAdministrator: true, eventAdminEventIds: ["e1", "e2"] })).toEqual(["EVENTS_ADMIN", "CLUBS_ADMIN", "SYSTEM_ADMIN"]);
     expect(heldAdminRoles({ ...none, clubsAdministrator: true })).toEqual(["CLUBS_ADMIN"]);
+    // A system administrator gets the Clubs view without a grant.
+    expect(heldAdminRoles({ ...none, systemAdmin: true })).toEqual(["CLUBS_ADMIN", "SYSTEM_ADMIN"]);
   });
 
   it("names the roles the way the pills do", () => {

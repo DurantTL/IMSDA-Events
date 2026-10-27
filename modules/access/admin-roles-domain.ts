@@ -5,6 +5,8 @@
  * Three admin roles exist on a staff account:
  * - SYSTEM_ADMIN: `GlobalRole.SYSTEM_ADMIN`.
  * - CLUBS_ADMIN: an active `ClubsAdministratorGrant`, given by a system administrator.
+ *   A system administrator can already do everything in the club areas, so the
+ *   switcher offers them the Clubs view too, with no grant needed.
  * - EVENTS_ADMIN: not a stored role. Anyone with an active EVENT_ADMIN membership
  *   on one or more events, scoped to those events only.
  *
@@ -36,7 +38,7 @@ export function isAdminRole(value: unknown): value is AdminRole {
 export function heldAdminRoles(roles: AdminRoles): AdminRole[] {
   const held: AdminRole[] = [];
   if (roles.eventAdminEventIds.length > 0) held.push("EVENTS_ADMIN");
-  if (roles.clubsAdministrator) held.push("CLUBS_ADMIN");
+  if (roles.clubsAdministrator || roles.systemAdmin) held.push("CLUBS_ADMIN");
   if (roles.systemAdmin) held.push("SYSTEM_ADMIN");
   return held;
 }
