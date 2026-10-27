@@ -271,9 +271,9 @@ describe("registration card (#1175)", () => {
 });
 
 describe("account header and tabs (#1175)", () => {
-  it("gives an ordinary attendee exactly Overview, My registrations and Profile, with identity and sign-out", async () => {
+  it("gives an ordinary attendee exactly Overview, My registrations, Profile and Help (#1259), with identity and sign-out", async () => {
     const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
-    expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile"]);
+    expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile", "Help"]);
     expect(html).toContain("Taylor Lane");
     expect(html).toContain("Sign out");
     expect(html).not.toMatch(/Staff workspace|System management|My clubs?|Waitlists|\/admin|\/overview/);
@@ -282,7 +282,7 @@ describe("account header and tabs (#1175)", () => {
   it("adds only the existing workspace tab a real grant provides, after the attendee tabs", async () => {
     mocks.clubs = [{ organizationId: "club-1", name: "Synthetic Club", role: "DIRECTOR" }];
     renderToStaticMarkup(await AccountPortalLayout({ children: null }));
-    expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile", "My club"]);
+    expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile", "My club", "Help"]);
   });
 
   it("shows no attendee name while a staff member is acting as a club role, even with an attendee cookie present", async () => {

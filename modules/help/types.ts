@@ -59,3 +59,25 @@ export type HelpGuide = {
 };
 
 export type GlossaryTerm = { term: string; meaning: string };
+
+/**
+ * Portal help (#1259): guides for the account portal, kept apart from the staff registry so a portal
+ * viewer never meets a staff or system page, and a staff viewer never gets a portal guide in staff search.
+ * `attendee` is every signed-in account, `director` anyone who directs a club, `coordinator` an Area Coordinator.
+ */
+export type PortalAudience = "attendee" | "director" | "coordinator";
+
+/**
+ * A portal page a guide can point to. `path` may hold `[organizationId]`, which resolves to the viewer's own club
+ * only when they direct exactly one (or are acting as one), and otherwise to the club chooser.
+ */
+export type PortalDestination = {
+  id: string;
+  label: string;
+  path: string;
+  audience: PortalAudience;
+  /** Club pages: the club capability the page needs (see `clubCapabilities`). */
+  capability?: "roster" | "submitReports" | "manageTeam";
+};
+
+export type PortalGuide = Omit<HelpGuide, "workspace" | "audience"> & { audience: PortalAudience };

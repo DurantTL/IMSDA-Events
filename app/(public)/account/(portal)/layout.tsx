@@ -86,6 +86,8 @@ export default async function AccountPortalLayout({ children }: { children: Reac
         : []),
     // An Area Coordinator sees the clubs waitlisted at the locations they coordinate (#599).
     ...(areaCoordinator ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
+    // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
+    { href: "/account/help", label: "Help", matchChildren: true },
   ];
 
   return (

@@ -224,6 +224,12 @@ const pages: PageSpec[] = [
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },
+  // Portal help (#1259): the hub for each portal role, and a guide for the club roles and the coordinator.
+  { name: "account-help-attendee", path: "/account/help", role: "attendee" },
+  { name: "account-help-director", path: "/account/help", role: "director" },
+  { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
+  { name: "account-help-area", path: "/account/help", role: "area" },
+  { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
   club("home", ""),
   club("roster", "/roster"),
   club("roster-inactive", "/roster?inactive=1"),

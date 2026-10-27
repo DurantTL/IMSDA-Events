@@ -55,7 +55,7 @@ const noEvent: HelpViewer = { isSystemAdmin: false, selectedEventId: "", permiss
 const ids = (viewer: HelpViewer) => visibleGuides(viewer).map((guide) => guide.id);
 
 describe("guide registry", () => {
-  it("has the eight initial guides with unique, URL-safe ids that do not collide with the glossary", () => {
+  it("has the initial guides and the #1259 additions, with unique, URL-safe ids that do not collide with the glossary", () => {
     const all = helpGuides.map((guide) => guide.id);
     expect(all).toEqual([
       "choose-workspace",
@@ -66,6 +66,8 @@ describe("guide registry", () => {
       "import-with-preview",
       "resolve-email-problem",
       "understand-system-readiness",
+      "review-new-club-application",
+      "inspect-system-health",
     ]);
     expect(new Set(all).size).toBe(all.length);
     for (const id of all) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);

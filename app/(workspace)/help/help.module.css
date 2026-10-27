@@ -207,3 +207,58 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.filterSet {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.filterSet legend {
+  padding: 0;
+}
+
+.filterOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filterOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid var(--line, #d9dde3);
+  border-radius: 12px;
+  padding: 6px 14px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  cursor: pointer;
+}
+
+.filterOption:has(input:checked) {
+  border-color: var(--imsda-purple, #4b2e83);
+  background: var(--imsda-purple-soft, #efeaf6);
+  font-weight: 700;
+}
+
+.filterOption:has(input:focus-visible) {
+  outline: 3px solid var(--imsda-purple, #4b2e83);
+  outline-offset: 2px;
+}
+
+.filterRadio {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.emptyState {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
