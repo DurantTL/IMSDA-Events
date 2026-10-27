@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { cardCell } from "@/components/table-card-labels";
+import Link from "next/link";
 import { useState } from "react";
 import { Ban, UserCog, UserPlus } from "lucide-react";
 import {
@@ -39,9 +40,12 @@ function dateInputToIso(value: FormDataEntryValue | null) {
 export function ClubDirectorsWorkspace({
   club,
   initialGrants,
+  canOpenPeople = false,
 }: {
   club: { id: string; name: string; isActive: boolean };
   initialGrants: DirectorGrantRecord[];
+  /** Whether the viewer may open People & access (#1277): each person then links to their page. The server decides again. */
+  canOpenPeople?: boolean;
 }) {
   const [grants, setGrants] = useState(initialGrants);
   const [saving, setSaving] = useState(false);
@@ -209,6 +213,12 @@ export function ClubDirectorsWorkspace({
                     <strong translate="no">{grant.account.displayName}</strong>
                     <br />
                     <small translate="no">{grant.account.email}</small>
+                    {canOpenPeople ? (
+                      <>
+                        <br />
+                        <Link className="secondary-button" href={`/admin/people/account/${grant.account.id}`}>See all of this person&apos;s access</Link>
+                      </>
+                    ) : null}
                   </th>
                   <td {...cardCell("Role")}>{clubDirectorRoleLabels[grant.role]}</td>
                   <td {...cardCell("Dates")}>{formatDate(grant.effectiveFrom)} – {formatDate(grant.effectiveTo)}</td>
