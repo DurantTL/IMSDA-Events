@@ -10,7 +10,7 @@ import {
   appendSubmissionCharge,
   staffLedgerActor,
 } from "@/modules/ledger/entries";
-import { ledgerActor } from "@/modules/ledger/domain";
+import { ledgerActor, moneyOnlyPricingSnapshot } from "@/modules/ledger/domain";
 
 function fakeTx() {
   const rows: Array<Record<string, unknown>> = [];
@@ -65,7 +65,7 @@ describe("ledger entry writers", () => {
 
   it("never lets a name reach an entry snapshot, and keeps no free text or non-staff name on an actor", async () => {
     const tx = fakeTx();
-    await appendSubmissionCharge(tx as never, { eventId: "e1", registrationId: "r1", totalCents: 100, pricingSnapshot: { attendeeNames: ["Pat Example"], lineItems: [{ key: "fee", label: "Fee", amountCents: 100, attendeeLabel: "Pat Example" }] } });
+    await appendSubmissionCharge(tx as never, { eventId: "e1", registrationId: "r1", totalCents: 100, pricingSnapshot: moneyOnlyPricingSnapshot({ attendeeNames: ["Pat Example"], lineItems: [{ key: "attendees.0.fee", label: "Fee — Pat Example", amountCents: 100, attendeeLabel: "Pat Example", attendeeIndex: 0 }] }) });
     await appendAmendmentDelta(tx as never, { eventId: "e1", registrationId: "r1", operationId: "op1", previousTotalCents: 100, finalTotalCents: 200, actor: { type: "STAFF", id: "u1", name: "Staff Sample" }, pricingSnapshot: { pricing: { attendeeNames: ["Pat Example"] }, contactSnapshot: { email: "pat@example.test" } } });
     await appendPromoDiscount(tx as never, { eventId: "e1", registrationId: "r1", redemptionId: "red1", appliedDiscountCents: 5, pricingSnapshot: { firstName: "Pat", code: "SAVE" } });
     expect(JSON.stringify(tx.rows.map((row) => row.pricingSnapshot))).not.toMatch(/Pat|attendeeNames|attendeeLabel|pat@example/);

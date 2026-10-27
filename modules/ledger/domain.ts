@@ -52,8 +52,9 @@ export function moneyOnlyPricingSnapshot(value: unknown): Record<string, unknown
       const item = record(line);
       if (!item || typeof item.key !== "string" || typeof item.amountCents !== "number") return [];
       return [{
+        // No label: an attendee line's label carries the attendee's name ("Fee — Pat Doe"), and a row is never erasable.
+        // The key identifies the priced field; the attendee is only a position.
         key: item.key,
-        label: typeof item.label === "string" ? item.label : "",
         amountCents: item.amountCents,
         ...(typeof item.pricingLabel === "string" ? { pricingLabel: item.pricingLabel } : {}),
         ...(typeof item.attendeeIndex === "number" ? { attendeeIndex: item.attendeeIndex } : {}),
@@ -207,7 +208,7 @@ function actorOf(amendment: BackfillAmendment): LedgerActor {
   if (amendment.actorUserId) return ledgerActor("STAFF", amendment.actorUserId, amendment.actorNameSnapshot);
   if (amendment.actorAttendeeAccountId) return ledgerActor("ATTENDEE_ACCOUNT", amendment.actorAttendeeAccountId, null);
   if (amendment.actorPersonId) return ledgerActor("PERSON", amendment.actorPersonId, null);
-  return systemActor(amendment.actorNameSnapshot);
+  return systemActor(BACKFILL_ACTOR_NAME);
 }
 
 export const BACKFILL_ACTOR_NAME = "Ledger backfill";

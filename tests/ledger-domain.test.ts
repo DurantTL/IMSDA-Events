@@ -261,16 +261,16 @@ describe("backfill planning", () => {
   it("keeps no personal name field in any backfilled snapshot", () => {
     const named = {
       registration: { totalAmountCents: 16_000 },
-      pricingSnapshot: { discountAmountCents: 0, totalCents: 16_000, attendeeNames: ["Pat Example"], currency: "USD", lineItems: [{ key: "fee", label: "Fee", amountCents: 16_000, attendeeLabel: "Pat Example" }] },
+      pricingSnapshot: { discountAmountCents: 0, totalCents: 16_000, attendeeNames: ["Pat Example"], currency: "USD", lineItems: [{ key: "attendees.0.fee", label: "Fee — Pat Example", amountCents: 16_000, attendeeLabel: "Pat Example", attendeeIndex: 0 }] },
     };
     const plan = planRegistrationBackfill(registration({
       totalCents: 16_000,
-      submissionSnapshot: { totalCents: 10_000, attendeeNames: ["Pat Example"], lineItems: [{ key: "fee", label: "Fee", amountCents: 10_000, attendeeLabel: "Pat Example" }] },
+      submissionSnapshot: { totalCents: 10_000, attendeeNames: ["Pat Example"], lineItems: [{ key: "attendees.0.fee", label: "Fee — Pat Example", amountCents: 10_000, attendeeLabel: "Pat Example", attendeeIndex: 0 }] },
       amendments: [{ ...amendment("op_1", "2027-02-01T10:00:00Z", 10_000, 16_000), afterSnapshot: named }],
     }));
     const text = JSON.stringify(plan.entries.map((entry) => entry.pricingSnapshot));
-    expect(text).not.toMatch(/Pat Example|attendeeNames|attendeeLabel/);
-    expect(text).toContain("\"label\":\"Fee\"");
+    expect(text).not.toMatch(/Pat|Example|attendeeNames|attendeeLabel|"label"/);
+    expect(text).toContain("\"key\":\"attendees.0.fee\"");
   });
 
   it("carries the form's currency onto reconstructed entries", () => {
@@ -288,12 +288,12 @@ describe("backfill planning", () => {
 });
 
 describe("money-only snapshots", () => {
-  it("keeps line key, label, amount, pricing label and attendee position, and drops names and everything else", () => {
+  it("keeps line key, amount, pricing label and attendee position, and drops the label, names and everything else", () => {
     const snapshot = moneyOnlyPricingSnapshot({
       currency: "USD", totalCents: 100, subtotalCents: 100, processingFeeCents: 0, promoCode: "SAVE", attendeeNames: ["Pat Example"], contactSnapshot: { email: "pat@example.test" }, paymentCollected: false,
-      lineItems: [{ key: "fee", label: "Fee", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1, attendeeLabel: "Pat Example" }],
+      lineItems: [{ key: "attendees.1.fee", label: "Fee — Pat Example", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1, attendeeLabel: "Pat Example" }],
     });
-    expect(snapshot).toEqual({ currency: "USD", totalCents: 100, subtotalCents: 100, processingFeeCents: 0, promoCode: "SAVE", lineItems: [{ key: "fee", label: "Fee", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1 }] });
+    expect(snapshot).toEqual({ currency: "USD", totalCents: 100, subtotalCents: 100, processingFeeCents: 0, promoCode: "SAVE", lineItems: [{ key: "attendees.1.fee", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1 }] });
     expect(moneyOnlyPricingSnapshot(null)).toEqual({});
   });
 
