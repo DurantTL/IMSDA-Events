@@ -12,11 +12,11 @@ and a health view proves the two agree. Later slices (payments, allocations, ref
 | `kind` | `CHARGE`, `DISCOUNT` or `CREDIT`. |
 | `amountCents` | Integer cents, **signed**: `CHARGE >= 0`, `DISCOUNT <= 0`, `CREDIT <= 0` (a database `CHECK`). A registration's total is the plain sum of its entries. |
 | `currency` | `USD` unless the form says otherwise. |
-| `pricingSnapshot` | Required JSON: the pricing facts behind the entry (line items, totals, the promo rule, before and after totals for an amendment). |
+| `pricingSnapshot` | Required JSON: the **money-only** pricing facts behind the entry (line key, label, amount, pricing label and attendee position; totals; the promo rule; before and after totals for an amendment). Built by `moneyOnlyPricingSnapshot` on both the live and backfill paths. Names, attendee labels and contact details never reach a row, because a row can never be erased (`stripPersonalKeys` is a backstop at the write). |
 | `sourceType`, `sourceId` | `REGISTRATION_SUBMISSION` (the registration id), `AMENDMENT` (the `RegistrationOperation` id) or `PROMO_REDEMPTION` (the `PromoCodeRedemption` id). |
 | `origin` | `LIVE` (written with the change) or `BACKFILL` (reconstructed by the script). |
-| `actorType`, `actorId`, `actorNameSnapshot` | An immutable snapshot of who made the change. **No foreign keys**: `SET NULL` would be an UPDATE, and removing a user must not rewrite history. |
-| `reason`, `createdAt` | Optional free text (an amendment's reason) and the time. |
+| `actorType`, `actorId`, `actorNameSnapshot` | An immutable snapshot of who made the change. **No foreign keys**: `SET NULL` would be an UPDATE, and removing a user must not rewrite history. Only a staff member's name is kept; a director or group contact is an id only. |
+| `reason`, `createdAt` | Optional short reason (not used for amendments: their free-text reason stays on the operation) and the time. |
 
 `(sourceType, sourceId, kind)` is unique. It is the idempotency key live writes and the backfill share, so a re-run never
 duplicates. Indexes: `(registrationId, createdAt)` and `(eventId)`.
@@ -58,11 +58,23 @@ entries reproduce today's number. Slice 5 switches reads to it.
 ## Backfill (`backfill.ts`, `npm run ledger:backfill`)
 
 Run by hand, never from the seed, a migration, postinstall, the Docker entrypoint or app start. Dry run by default;
-`--apply` writes; `--event <id>` limits it. It rebuilds history without flattening it: the submission `CHARGE` is the total
-before the first amendment (else today's total) plus the promo discount that applied then, the redemption is a
-`DISCOUNT`, and each amendment whose snapshots show a change in total is a `CHARGE` or `CREDIT`. Existing keys are
-skipped. **It never writes a balancing entry**: when the reconstruction differs from today's total it reports the
-residual and leaves it for the health view. One small transaction per registration.
+`--apply` writes; `--event <id>` limits it. It rebuilds history without flattening it:
+
+- The opening `CHARGE` (and the promo `DISCOUNT`) come from the **original public submission's pricing snapshot**
+  (`PublicRegistrationSubmission.pricingSnapshot.totalCents` and `discountAmountCents`, which equal what was stored in
+  `totalAmount` at creation, waitlisted registrations included). A later change the ledger does not record yet (a staff
+  adjustment, card surcharge, payment-choice change, transfer) is therefore **not** folded into the opening charge: it shows
+  as a residual, the same for old and new registrations. Only when there is no submission snapshot (staff-created,
+  imported, seeded) does it fall back to the total before the first amendment, then today's total.
+- Each amendment whose snapshots show a change in total is a `CHARGE` or `CREDIT`.
+- It **fails closed**: an amendment still to be rebuilt without before and after totals fails that registration and writes
+  nothing for it; a registration whose entries already equal its total is left alone; the promo discount is only planned
+  together with the submission charge.
+- **It never writes a balancing entry.** What is left over is reported as a residual and left for the health view. Expect
+  residuals after the backfill for registrations that had staff adjustments, card surcharges, payment-choice changes,
+  transfers, direct total edits or import updates. They are expected until slices 2 to 5.
+
+One small transaction per registration.
 
 ## Shadow reconciliation (`reconciliation.ts`) and the health view
 
@@ -84,3 +96,13 @@ These still change `Registration.totalAmount` without writing an entry:
 
 Club registrations made through the club form (`club-registrations/`) go through the public submission transaction
 and are covered.
+
+## Why this table cascades (unlike `RegistrationOperation` and the asset ledger)
+
+`RegistrationOperation` and `AssetLedgerEntry` are `RESTRICT` and are removed explicitly by the event deletion service
+under the transaction-local `imsda.event_deletion` setting. Ledger entries instead cascade from the registration and the
+event, and the trigger allows only that cascade (`pg_trigger_depth() > 1`). The reason is that registrations and events are
+already deleted by existing flows (the event deletion service, cleanup scripts, scripts that tidy fixtures), and a
+`RESTRICT` key would break every one of them. The cost is that the cascade is the one way a ledger row can disappear, so
+**a future direct registration delete path must be reviewed**: before one is added, decide whether the ledger should keep
+the money history (and then move this table to the `RESTRICT` plus `imsda.event_deletion` pattern).

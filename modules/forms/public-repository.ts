@@ -83,6 +83,7 @@ import { syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { eventStartDate, planPublicResponsibleAdults } from "@/modules/guardian-authority/domain";
 import { teamNameTakenMessage } from "@/modules/club-teams/domain";
 import { appendSubmissionCharge } from "@/modules/ledger/entries";
+import { moneyOnlyPricingSnapshot } from "@/modules/ledger/domain";
 
 export type PublicRegistrationErrorCode =
   | "FORM_NOT_FOUND"
@@ -1206,6 +1207,7 @@ async function createPublicRegistrationTransaction(
       registrationId: registration.id,
       claimed: claimedPromo,
       appliedDiscountCents: ledgerPromoDiscountCents,
+      currency: definition.payment?.currency ?? "USD",
     });
   }
   // Shadow ledger (#117): the same transaction as the stored total, which stays authoritative.
@@ -1216,14 +1218,10 @@ async function createPublicRegistrationTransaction(
     appliedDiscountCents: ledgerPromoDiscountCents,
     currency: definition.payment?.currency ?? "USD",
     pricingSnapshot: {
+      ...moneyOnlyPricingSnapshot(admittedCalculation),
       pricingDate: prepared.pricingDate,
       formVersionId: version.id,
       waitlisted: isWaitlisted,
-      lineItems: admittedCalculation.lineItems,
-      preDiscountSubtotalCents: admittedCalculation.preDiscountSubtotalCents ?? admittedCalculation.subtotalCents,
-      subtotalCents: admittedCalculation.subtotalCents,
-      processingFeeCents: admittedCalculation.processingFeeCents,
-      promoCode: admittedCalculation.promoCode ?? null,
       attendeePromoDiscountCents: claimedPromo ? 0 : admittedCalculation.discountAmountCents ?? 0,
     },
   });

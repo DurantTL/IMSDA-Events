@@ -7,7 +7,7 @@ import { formatBackfillReport, runLedgerBackfill } from "@/modules/ledger/backfi
 type Entry = { sourceType: string; sourceId: string; kind: string; amountCents: number };
 type Row = {
   id: string; eventId: string; confirmationCode: string; totalAmount: string; submittedAt: Date | null; createdAt: Date;
-  promoCodeRedemption: Record<string, unknown> | null; operations: Array<Record<string, unknown>>; ledgerEntries: Entry[];
+  promoCodeRedemption: Record<string, unknown> | null; publicFormSubmission?: { pricingSnapshot: unknown } | null; operations: Array<Record<string, unknown>>; ledgerEntries: Entry[];
 };
 
 const snap = (total: number, discount = 0) => ({ registration: { totalAmountCents: total }, pricingSnapshot: { discountAmountCents: discount } });
@@ -116,6 +116,25 @@ describe("ledger backfill", () => {
     const again = await runLedgerBackfill(client as never, { apply: true });
     expect(again.entriesWritten).toBe(0);
     expect(again.residuals).toHaveLength(1);
+  });
+
+  it("fails closed for a registration whose amendment has no totals: reported, nothing written, others carry on", async () => {
+    const broken = { ...operation("opx", "2027-02-01T10:00:00Z", 1, 2), beforeSnapshot: {}, afterSnapshot: {} };
+    const rows = [row("a", "100.00", { operations: [broken] }), row("b", "20.00")];
+    const { client, transaction } = fakeClient(rows);
+    const report = await runLedgerBackfill(client as never, { apply: true });
+    expect(report.failures).toEqual([{ registrationId: "a", message: expect.stringContaining("opx") }]);
+    expect(rows[0]!.ledgerEntries).toEqual([]);
+    expect(rows[1]!.ledgerEntries).toHaveLength(1);
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the original submission snapshot, so an outside change shows as a residual", async () => {
+    const rows = [row("s", "185.00", { promoCodeRedemption: redemption("reds", 2_500), publicFormSubmission: { pricingSnapshot: { totalCents: 17_500, discountAmountCents: 2_500 } } })];
+    const { client } = fakeClient(rows);
+    const report = await runLedgerBackfill(client as never, { apply: true });
+    expect(rows[0]!.ledgerEntries.map((entry) => entry.amountCents)).toEqual([20_000, -2_500]);
+    expect(report.residuals).toEqual([expect.objectContaining({ registrationId: "s", residualCents: 1_000 })]);
   });
 
   it("is limited to one event when asked", async () => {

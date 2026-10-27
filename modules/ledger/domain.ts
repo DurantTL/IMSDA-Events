@@ -22,6 +22,59 @@ export type LedgerActor = {
 
 export const systemActor = (name: string): LedgerActor => ({ type: "SYSTEM", id: null, name });
 
+/** An actor as an immutable snapshot. Only a staff member's name is kept; no other person's name is stored (#117 M1). */
+export function ledgerActor(type: LedgerActorType, id: string | null, name: string | null): LedgerActor {
+  return { type, id, name: type === "STAFF" || type === "SYSTEM" ? name : null };
+}
+
+const moneyKeys = [
+  "pricingDate", "formVersionId", "preDiscountSubtotalCents", "discountAmountCents", "promoCode", "subtotalCents",
+  "processingFeeCents", "totalCents", "cardSelected", "depositSelected", "registrationStatus",
+] as const;
+
+/**
+ * The money-only pricing facts that may be kept in an immutable entry: totals, the promo code text and the line items
+ * (key, label, amount, pricing label, attendee position). Names, attendee labels, contact details and every other field of
+ * a stored pricing snapshot are dropped, because a ledger row can never be edited or erased afterwards (#117 M1).
+ */
+export function moneyOnlyPricingSnapshot(value: unknown): Record<string, unknown> {
+  const source = record(value);
+  if (!source) return {};
+  const result: Record<string, unknown> = {};
+  for (const key of moneyKeys) {
+    const item = source[key];
+    if (typeof item === "number" && Number.isFinite(item)) result[key] = item;
+    else if (typeof item === "string" || typeof item === "boolean" || item === null) result[key] = item;
+  }
+  if (typeof source.currency === "string") result.currency = source.currency;
+  if (Array.isArray(source.lineItems)) {
+    result.lineItems = source.lineItems.flatMap((line) => {
+      const item = record(line);
+      if (!item || typeof item.key !== "string" || typeof item.amountCents !== "number") return [];
+      return [{
+        key: item.key,
+        label: typeof item.label === "string" ? item.label : "",
+        amountCents: item.amountCents,
+        ...(typeof item.pricingLabel === "string" ? { pricingLabel: item.pricingLabel } : {}),
+        ...(typeof item.attendeeIndex === "number" ? { attendeeIndex: item.attendeeIndex } : {}),
+      }];
+    });
+  }
+  return result;
+}
+
+const personalKey = /name|email|phone|contact|birth|attendeelabel/i;
+
+/** Backstop at the write: removes any key that looks like a name or contact field, at any depth. */
+export function stripPersonalKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripPersonalKeys);
+  const item = record(value);
+  if (!item) return value;
+  return Object.fromEntries(
+    Object.entries(item).filter(([key]) => !personalKey.test(key)).map(([key, inner]) => [key, stripPersonalKeys(inner)]),
+  );
+}
+
 export type LedgerAmountEntry = { amountCents: number };
 
 /** The one place a registration's total is computed from entries. Nothing user-visible calls it in slice 1. */
@@ -119,6 +172,8 @@ export type BackfillRegistration = {
   createdAt: Date;
   redemption: BackfillRedemption | null;
   amendments: readonly BackfillAmendment[];
+  /** The original public submission's pricing snapshot (never rewritten by amendments), when there is one. */
+  submissionSnapshot?: unknown;
   existingKeys: ReadonlySet<string>;
   existingSumCents: number;
 };
@@ -130,6 +185,8 @@ export type BackfillPlan = {
   /** Current stored total minus the reconstructed total. Not zero when a writer outside this slice changed the total. */
   residualCents: number;
   warnings: string[];
+  /** Set when the history cannot be rebuilt safely: nothing is planned and the registration is reported as failed. */
+  failure: string | null;
 };
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -147,56 +204,83 @@ function snapshotPricing(snapshot: unknown) {
 }
 
 function actorOf(amendment: BackfillAmendment): LedgerActor {
-  if (amendment.actorUserId) return { type: "STAFF", id: amendment.actorUserId, name: amendment.actorNameSnapshot };
-  if (amendment.actorAttendeeAccountId) {
-    return { type: "ATTENDEE_ACCOUNT", id: amendment.actorAttendeeAccountId, name: amendment.actorNameSnapshot };
-  }
-  if (amendment.actorPersonId) return { type: "PERSON", id: amendment.actorPersonId, name: amendment.actorNameSnapshot };
+  if (amendment.actorUserId) return ledgerActor("STAFF", amendment.actorUserId, amendment.actorNameSnapshot);
+  if (amendment.actorAttendeeAccountId) return ledgerActor("ATTENDEE_ACCOUNT", amendment.actorAttendeeAccountId, null);
+  if (amendment.actorPersonId) return ledgerActor("PERSON", amendment.actorPersonId, null);
   return systemActor(amendment.actorNameSnapshot);
 }
 
 export const BACKFILL_ACTOR_NAME = "Ledger backfill";
 
+function snapshotCurrency(...snapshots: unknown[]) {
+  for (const snapshot of snapshots) {
+    const currency = record(snapshot)?.currency;
+    if (typeof currency === "string" && currency) return currency;
+  }
+  return "USD";
+}
+
+function numberField(source: Record<string, unknown> | null, key: string) {
+  const value = source?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+}
+
 /**
  * Reconstructs the history without flattening it, in time order:
- * 1. the submission CHARGE: the total before the first amendment (else today's total) plus the promo discount that
- *    applied at submission (the first amendment's recorded discount, else the redemption's);
- * 2. the promo DISCOUNT;
- * 3. one CHARGE or CREDIT per amendment whose snapshots show a change in total.
- * Keys that already exist are left alone, so a re-run writes nothing. No balancing "plug" entry is ever invented: a
- * total that moved through a writer outside this slice shows as `residualCents` and is left for the health view.
+ * 1. the submission CHARGE and, for a promo registration, its DISCOUNT: from the original public submission's pricing
+ *    snapshot when there is one (so a total moved later by something the ledger does not record yet stays a residual,
+ *    the same for old and new registrations); otherwise from the total before the first amendment, else today's total;
+ * 2. one CHARGE or CREDIT per amendment whose snapshots show a change in total.
+ * It fails closed: an amendment without totals in its snapshots fails the registration and plans nothing; a registration
+ * whose entries already sum to its total plans nothing; and the promo discount is only planned together with the
+ * submission charge. No balancing "plug" entry is ever invented: what is left over is `residualCents`.
  */
 export function planRegistrationBackfill(registration: BackfillRegistration): BackfillPlan {
   const warnings: string[] = [];
+  const empty = (failure: string | null): BackfillPlan => ({
+    entries: [],
+    resultingTotalCents: registration.existingSumCents,
+    residualCents: registration.totalCents - registration.existingSumCents,
+    warnings,
+    failure,
+  });
+  // Already whole: entries exist and equal the stored total.
+  if (registration.existingKeys.size > 0 && registration.existingSumCents === registration.totalCents) return empty(null);
+
   const amendments = [...registration.amendments].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
   );
-  const drafts: LedgerEntryDraft[] = [];
   const base = { eventId: registration.eventId, registrationId: registration.id, origin: "BACKFILL" as const };
   const systemBackfill = systemActor(BACKFILL_ACTOR_NAME);
+  const submissionKey = ledgerEntryKey({ sourceType: "REGISTRATION_SUBMISSION", sourceId: registration.id, kind: "CHARGE" });
+  const submissionExists = registration.existingKeys.has(submissionKey);
 
-  // Amendment deltas, read from the operation snapshots.
+  // Amendment deltas, read from the operation snapshots. Any amendment still to be rebuilt needs both totals.
   const amendmentDrafts: LedgerEntryDraft[] = [];
   for (const amendment of amendments) {
     const before = snapshotTotalCents(amendment.beforeSnapshot);
     const after = snapshotTotalCents(amendment.afterSnapshot);
+    const key = ledgerEntryKey({ sourceType: "AMENDMENT", sourceId: amendment.id, kind: "CHARGE" });
+    const creditKey = ledgerEntryKey({ sourceType: "AMENDMENT", sourceId: amendment.id, kind: "CREDIT" });
+    const alreadyThere = registration.existingKeys.has(key) || registration.existingKeys.has(creditKey);
     if (before === null || after === null) {
-      warnings.push(`Amendment ${amendment.id} has no totals in its snapshots, so it was not reconstructed.`);
-      continue;
+      if (alreadyThere) continue;
+      return empty(`Amendment ${amendment.id} has no before and after totals in its snapshots, so the history cannot be rebuilt.`);
     }
     const delta = amendmentDeltaEntry(before, after);
     if (!delta) continue;
+    const afterPricing = snapshotPricing(amendment.afterSnapshot);
     amendmentDrafts.push({
       ...base,
       kind: delta.kind,
       amountCents: delta.amountCents,
-      currency: "USD",
+      currency: snapshotCurrency(afterPricing),
       pricingSnapshot: {
         reconstructedFrom: "RegistrationOperation snapshots",
         previousTotalCents: before,
         totalCents: after,
         deltaCents: delta.amountCents,
-        pricing: snapshotPricing(amendment.afterSnapshot),
+        pricing: moneyOnlyPricingSnapshot(afterPricing),
       },
       sourceType: "AMENDMENT",
       sourceId: amendment.id,
@@ -206,62 +290,68 @@ export function planRegistrationBackfill(registration: BackfillRegistration): Ba
     });
   }
 
-  // The total before any amendment: the first amendment's "before" (even one that did not move the total), else today's.
-  const firstBefore = amendments.length > 0 ? snapshotTotalCents(amendments[0].beforeSnapshot) : null;
-  const preAmendmentTotalCents = firstBefore ?? registration.totalCents;
-  const redemption = registration.redemption;
-  const firstBeforeDiscount = amendments.length > 0 ? snapshotPricing(amendments[0].beforeSnapshot)?.discountAmountCents : undefined;
-  const submissionDiscountCents = redemption
-    ? Math.max(
-        0,
-        typeof firstBeforeDiscount === "number" && Number.isFinite(firstBeforeDiscount)
-          ? Math.round(firstBeforeDiscount)
-          : redemption.discountAmountCents,
-      )
-    : 0;
-  const split = splitSubmissionTotal({
-    totalCents: preAmendmentTotalCents,
-    appliedDiscountCents: submissionDiscountCents,
-  });
-  drafts.push({
-    ...base,
-    kind: "CHARGE",
-    amountCents: split.chargeCents,
-    currency: "USD",
-    pricingSnapshot: {
-      reconstructedFrom: firstBefore === null ? "Registration.totalAmount" : "first amendment snapshot",
-      totalCents: preAmendmentTotalCents,
-      discountAmountCents: submissionDiscountCents,
-    },
-    sourceType: "REGISTRATION_SUBMISSION",
-    sourceId: registration.id,
-    actor: systemBackfill,
-    reason: null,
-    createdAt: registration.submittedAt ?? registration.createdAt,
-  });
-  if (redemption && split.discountCents !== 0) {
+  const drafts: LedgerEntryDraft[] = [];
+  if (!submissionExists) {
+    const original = record(registration.submissionSnapshot);
+    const originalTotal = numberField(original, "totalCents");
+    const firstBefore = amendments.length > 0 ? snapshotTotalCents(amendments[0].beforeSnapshot) : null;
+    const redemption = registration.redemption;
+    const firstBeforeDiscount = numberField(snapshotPricing(amendments[0]?.beforeSnapshot), "discountAmountCents");
+    let openingTotalCents: number;
+    let discountCents: number;
+    let source: string;
+    if (originalTotal !== null) {
+      openingTotalCents = originalTotal;
+      discountCents = redemption ? numberField(original, "discountAmountCents") ?? redemption.discountAmountCents : 0;
+      source = "original submission snapshot";
+    } else {
+      openingTotalCents = firstBefore ?? registration.totalCents;
+      discountCents = redemption ? firstBeforeDiscount ?? redemption.discountAmountCents : 0;
+      source = firstBefore === null ? "Registration.totalAmount" : "first amendment snapshot";
+    }
+    const split = splitSubmissionTotal({ totalCents: openingTotalCents, appliedDiscountCents: discountCents });
     drafts.push({
       ...base,
-      kind: "DISCOUNT",
-      amountCents: split.discountCents,
-      currency: "USD",
+      kind: "CHARGE",
+      amountCents: split.chargeCents,
+      currency: snapshotCurrency(original),
       pricingSnapshot: {
-        reconstructedFrom: "PromoCodeRedemption",
-        code: redemption.codeSnapshot,
-        discountType: redemption.discountTypeSnapshot,
-        discountValue: redemption.discountValueSnapshot,
-        minimumSubtotalCents: redemption.minimumSubtotalCentsSnapshot,
-        maximumDiscountCents: redemption.maximumDiscountCentsSnapshot,
-        eligibleSubtotalCents: redemption.eligibleSubtotalCents,
-        discountAmountCents: submissionDiscountCents,
-        pricingDate: redemption.pricingDate,
+        reconstructedFrom: source,
+        totalCents: openingTotalCents,
+        discountAmountCents: -split.discountCents,
+        ...(original ? moneyOnlyPricingSnapshot(original) : {}),
       },
-      sourceType: "PROMO_REDEMPTION",
-      sourceId: redemption.id,
+      sourceType: "REGISTRATION_SUBMISSION",
+      sourceId: registration.id,
       actor: systemBackfill,
       reason: null,
-      createdAt: redemption.createdAt,
+      createdAt: registration.submittedAt ?? registration.createdAt,
     });
+    // The discount belongs with the submission charge: never planned on its own.
+    if (redemption && split.discountCents !== 0) {
+      drafts.push({
+        ...base,
+        kind: "DISCOUNT",
+        amountCents: split.discountCents,
+        currency: snapshotCurrency(original),
+        pricingSnapshot: {
+          reconstructedFrom: "PromoCodeRedemption",
+          code: redemption.codeSnapshot,
+          discountType: redemption.discountTypeSnapshot,
+          discountValue: redemption.discountValueSnapshot,
+          minimumSubtotalCents: redemption.minimumSubtotalCentsSnapshot,
+          maximumDiscountCents: redemption.maximumDiscountCentsSnapshot,
+          eligibleSubtotalCents: redemption.eligibleSubtotalCents,
+          discountAmountCents: -split.discountCents,
+          pricingDate: redemption.pricingDate,
+        },
+        sourceType: "PROMO_REDEMPTION",
+        sourceId: redemption.id,
+        actor: systemBackfill,
+        reason: null,
+        createdAt: redemption.createdAt,
+      });
+    }
   }
   drafts.push(...amendmentDrafts);
 
@@ -272,5 +362,6 @@ export function planRegistrationBackfill(registration: BackfillRegistration): Ba
     resultingTotalCents,
     residualCents: registration.totalCents - resultingTotalCents,
     warnings,
+    failure: null,
   };
 }

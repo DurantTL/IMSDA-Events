@@ -48,6 +48,7 @@ type Client = Pick<PrismaClient, "registration" | "$transaction">;
 
 const include = {
   promoCodeRedemption: true,
+  publicFormSubmission: { select: { pricingSnapshot: true } },
   operations: { where: { type: "AMENDMENT" as const }, orderBy: [{ createdAt: "asc" as const }, { id: "asc" as const }] },
   ledgerEntries: { select: { sourceType: true, sourceId: true, kind: true, amountCents: true } },
 } satisfies Prisma.RegistrationInclude;
@@ -61,6 +62,7 @@ function toPlanInput(row: Row) {
     totalCents: moneyToCents(row.totalAmount),
     submittedAt: row.submittedAt,
     createdAt: row.createdAt,
+    submissionSnapshot: row.publicFormSubmission?.pricingSnapshot ?? null,
     redemption: row.promoCodeRedemption
       ? {
           id: row.promoCodeRedemption.id,
@@ -121,6 +123,10 @@ export async function runLedgerBackfill(client: Client, options: BackfillOptions
         plan = planRegistrationBackfill(toPlanInput(row));
       } catch (error) {
         report.failures.push({ registrationId: row.id, message: error instanceof Error ? error.message : String(error) });
+        continue;
+      }
+      if (plan.failure) {
+        report.failures.push({ registrationId: row.id, message: plan.failure });
         continue;
       }
       for (const warning of plan.warnings) report.warnings.push(`${row.confirmationCode}: ${warning}`);

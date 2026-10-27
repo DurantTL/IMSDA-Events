@@ -900,6 +900,7 @@ export async function recordPromoCodeRedemption(
      * DISCOUNT ledger entry is written in the same transaction (#117, shadow mode: the stored total stays authoritative).
      */
     appliedDiscountCents?: number;
+    currency?: string;
   },
 ) {
   const promo = input.claimed.promoCode;
@@ -928,6 +929,7 @@ export async function recordPromoCodeRedemption(
       registrationId: input.registrationId,
       redemptionId: redemption.id,
       appliedDiscountCents: input.appliedDiscountCents,
+      currency: input.currency,
       pricingSnapshot: {
         code: promo.code,
         discountType: promo.discountType,

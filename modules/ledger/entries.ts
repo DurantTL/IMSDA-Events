@@ -3,11 +3,13 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import {
   assertLedgerAmount,
+  ledgerActor,
   amendmentDeltaEntry,
   splitSubmissionTotal,
   systemActor,
   type LedgerActor,
   type LedgerEntryDraft,
+  stripPersonalKeys,
 } from "@/modules/ledger/domain";
 
 /**
@@ -20,7 +22,7 @@ type Tx = Pick<Prisma.TransactionClient, "registrationLedgerEntry">;
 /** A staff user as an immutable actor snapshot: their id and the name they had at the time. No foreign key. */
 export async function staffLedgerActor(tx: Pick<Prisma.TransactionClient, "user">, userId: string): Promise<LedgerActor> {
   const user = await tx.user.findUnique({ where: { id: userId }, select: { displayName: true } });
-  return { type: "STAFF", id: userId, name: user?.displayName ?? null };
+  return ledgerActor("STAFF", userId, user?.displayName ?? null);
 }
 
 const REGISTRATION_FORM_ACTOR = systemActor("Registration form");
@@ -52,7 +54,7 @@ function toRow(draft: LedgerEntryDraft): Prisma.RegistrationLedgerEntryUnchecked
     kind: draft.kind,
     amountCents: draft.amountCents,
     currency: draft.currency,
-    pricingSnapshot: draft.pricingSnapshot as Prisma.InputJsonValue,
+    pricingSnapshot: stripPersonalKeys(draft.pricingSnapshot) as Prisma.InputJsonValue,
     sourceType: draft.sourceType,
     sourceId: draft.sourceId,
     origin: draft.origin,
@@ -117,6 +119,7 @@ export async function appendPromoDiscount(
     appliedDiscountCents: number;
     pricingSnapshot: Record<string, unknown>;
     actor?: LedgerActor;
+    currency?: string;
   },
 ) {
   const { discountCents } = splitSubmissionTotal({ totalCents: 0, appliedDiscountCents: input.appliedDiscountCents });
@@ -126,7 +129,7 @@ export async function appendPromoDiscount(
     registrationId: input.registrationId,
     kind: "DISCOUNT",
     amountCents: discountCents,
-    currency: "USD",
+    currency: input.currency ?? "USD",
     pricingSnapshot: input.pricingSnapshot,
     sourceType: "PROMO_REDEMPTION",
     sourceId: input.redemptionId,
@@ -147,6 +150,7 @@ export async function appendAmendmentDelta(
     finalTotalCents: number;
     actor: LedgerActor;
     pricingSnapshot: Record<string, unknown>;
+    currency?: string;
     reason?: string | null;
   },
 ) {
@@ -157,7 +161,7 @@ export async function appendAmendmentDelta(
     registrationId: input.registrationId,
     kind: delta.kind,
     amountCents: delta.amountCents,
-    currency: "USD",
+    currency: input.currency ?? "USD",
     pricingSnapshot: {
       previousTotalCents: Math.round(input.previousTotalCents),
       totalCents: Math.round(input.finalTotalCents),

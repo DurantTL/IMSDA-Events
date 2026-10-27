@@ -10,6 +10,7 @@ import {
   appendSubmissionCharge,
   staffLedgerActor,
 } from "@/modules/ledger/entries";
+import { ledgerActor } from "@/modules/ledger/domain";
 
 function fakeTx() {
   const rows: Array<Record<string, unknown>> = [];
@@ -60,6 +61,24 @@ describe("ledger entry writers", () => {
       ["CREDIT", -5_000, "op2", "STAFF", "u1", "Staff Sample", "Two fewer"],
     ]);
     expect(tx.rows[0]!.pricingSnapshot).toMatchObject({ previousTotalCents: 10_000, totalCents: 16_000, deltaCents: 6_000 });
+  });
+
+  it("never lets a name reach an entry snapshot, and keeps no free text or non-staff name on an actor", async () => {
+    const tx = fakeTx();
+    await appendSubmissionCharge(tx as never, { eventId: "e1", registrationId: "r1", totalCents: 100, pricingSnapshot: { attendeeNames: ["Pat Example"], lineItems: [{ key: "fee", label: "Fee", amountCents: 100, attendeeLabel: "Pat Example" }] } });
+    await appendAmendmentDelta(tx as never, { eventId: "e1", registrationId: "r1", operationId: "op1", previousTotalCents: 100, finalTotalCents: 200, actor: { type: "STAFF", id: "u1", name: "Staff Sample" }, pricingSnapshot: { pricing: { attendeeNames: ["Pat Example"] }, contactSnapshot: { email: "pat@example.test" } } });
+    await appendPromoDiscount(tx as never, { eventId: "e1", registrationId: "r1", redemptionId: "red1", appliedDiscountCents: 5, pricingSnapshot: { firstName: "Pat", code: "SAVE" } });
+    expect(JSON.stringify(tx.rows.map((row) => row.pricingSnapshot))).not.toMatch(/Pat|attendeeNames|attendeeLabel|pat@example/);
+    expect(ledgerActor("PERSON", "p1", "Pat Example")).toEqual({ type: "PERSON", id: "p1", name: null });
+    expect(ledgerActor("ATTENDEE_ACCOUNT", "a1", "Pat Example").name).toBeNull();
+    expect(ledgerActor("STAFF", "u1", "Staff Sample").name).toBe("Staff Sample");
+  });
+
+  it("passes the real currency through to promo discount and amendment entries", async () => {
+    const tx = fakeTx();
+    await appendPromoDiscount(tx as never, { eventId: "e1", registrationId: "r1", redemptionId: "red1", appliedDiscountCents: 5, pricingSnapshot: {}, currency: "CAD" });
+    await appendAmendmentDelta(tx as never, { eventId: "e1", registrationId: "r1", operationId: "op1", previousTotalCents: 1, finalTotalCents: 2, actor: { type: "SYSTEM", id: null, name: "x" }, pricingSnapshot: {}, currency: "CAD" });
+    expect(tx.rows.map((row) => row.currency)).toEqual(["CAD", "CAD"]);
   });
 
   it("refuses a wrong-signed amount before it reaches the database", async () => {

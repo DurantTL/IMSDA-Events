@@ -1,7 +1,7 @@
 import "server-only";
 
 import { appendAmendmentDelta } from "@/modules/ledger/entries";
-import type { LedgerActor } from "@/modules/ledger/domain";
+import { ledgerActor, moneyOnlyPricingSnapshot, type LedgerActor } from "@/modules/ledger/domain";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
@@ -90,11 +90,11 @@ function amendmentActorUserId(actor: AmendmentActor) {
   return actor.kind === "CLUB_DIRECTOR" || actor.kind === "GROUP_CONTACT" ? null : actor.id;
 }
 
-/** The actor as an immutable ledger snapshot (#117): ids and the display name now, no foreign key. */
+/** The actor as an immutable ledger snapshot (#117): an id, and the name only for a staff member; no foreign key. */
 function amendmentLedgerActor(actor: AmendmentActor): LedgerActor {
-  if (actor.kind === "CLUB_DIRECTOR") return { type: "ATTENDEE_ACCOUNT", id: actor.attendeeAccountId, name: actor.displayName };
-  if (actor.kind === "GROUP_CONTACT") return { type: "PERSON", id: actor.personId, name: actor.displayName };
-  return { type: "STAFF", id: actor.id, name: actor.displayName };
+  if (actor.kind === "CLUB_DIRECTOR") return ledgerActor("ATTENDEE_ACCOUNT", actor.attendeeAccountId, null);
+  if (actor.kind === "GROUP_CONTACT") return ledgerActor("PERSON", actor.personId, null);
+  return ledgerActor("STAFF", actor.id, actor.displayName);
 }
 
 /** Who the audit calls the actor, without a name. */
@@ -1991,11 +1991,13 @@ async function amendRegistrationInner(
           previousTotalCents: cents(prepared.registration.totalAmount),
           finalTotalCents: prepared.finalTotalCents,
           actor: amendmentLedgerActor(actor),
-          reason: input.reason || null,
+          // The free-text reason stays on the operation: a ledger row can never be erased, so it keeps no free text.
+          reason: null,
+          currency: prepared.definition.payment?.currency ?? "USD",
           pricingSnapshot: {
             previousTotalCents: cents(prepared.registration.totalAmount),
             totalCents: prepared.finalTotalCents,
-            pricing: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
+            pricing: moneyOnlyPricingSnapshot(prepared.nextPricingSnapshot),
             adjustmentsCents: prepared.adjustmentsCents,
             mealCreditCents: prepared.mealCreditCents,
           },

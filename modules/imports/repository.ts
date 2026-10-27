@@ -704,6 +704,8 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
     let created = 0;
     let updated = 0;
     let skipped = 0;
+    // The staff actor snapshot for ledger entries, looked up once for the whole import (#117).
+    const ledgerActor = await staffLedgerActor(tx, actorUserId);
 
     for (const record of existing.records.sort((left, right) => left.sourceRow - right.sourceRow)) {
       const data = normalizedData(record.normalizedData);
@@ -752,7 +754,7 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
           eventId,
           registrationId: registration.id,
           totalCents: data.totalAmountCents,
-          actor: await staffLedgerActor(tx, actorUserId),
+          actor: ledgerActor,
           pricingSnapshot: { source: "IMPORT", importRunId },
         });
         registrationId = registration.id;

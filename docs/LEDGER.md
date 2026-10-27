@@ -21,9 +21,12 @@ It never runs on its own: not from the seed, a migration, postinstall, the Docke
 1. `npm run ledger:backfill`: a **dry run**. It prints how many registrations are missing entries, how many entries it
    would write, and any **residuals**. Nothing is written.
 2. **Review the residuals.** A residual is a registration whose reconstructed ledger does not equal its current total,
-   because a total was changed by something the ledger does not record yet (staff adjustments, card fees, payment-choice
-   changes, club transfers, direct total edits, imports that update an existing registration). They are expected. The
-   backfill does not write a balancing entry for them.
+   because a total was changed by something the ledger does not record yet. **Expect residuals** for registrations that
+   had staff adjustments, card surcharges, payment-choice changes, club transfers, direct total edits, or imports that
+   updated an existing registration. The opening charge comes from the original submission, so these changes are never
+   hidden inside it. They are expected until slices 2 to 5 and are not billing errors. The backfill does not write a
+   balancing entry for them. A registration the backfill reports as **FAILED** (an amendment with no totals in its record)
+   is skipped entirely; send the confirmation code to the build team.
 3. `npm run ledger:backfill -- --apply`: writes the missing entries. Add `--event <id>` to do one event at a time. It is
    safe to stop and start again; it commits one registration at a time.
 4. `npm run ledger:backfill`: run the dry run again. It must report **0 entries to write**.

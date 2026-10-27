@@ -11,6 +11,8 @@ import {
   splitSubmissionTotal,
   type BackfillAmendment,
   type BackfillRegistration,
+  moneyOnlyPricingSnapshot,
+  stripPersonalKeys,
 } from "@/modules/ledger/domain";
 import { applyPromoCodeToCalculation, evaluatePromoCode, type PromoCodeRule } from "@/modules/promo-codes/domain";
 
@@ -203,11 +205,77 @@ describe("backfill planning", () => {
     expect(plan.residualCents).toBe(500);
   });
 
-  it("warns about an amendment whose snapshots hold no totals and leaves it out", () => {
+  it("fails closed when an amendment still to be rebuilt has no totals: nothing is planned", () => {
     const broken: BackfillAmendment = { ...amendment("op_x", "2027-02-01T10:00:00Z", 1, 2), beforeSnapshot: {}, afterSnapshot: {} };
-    const plan = planRegistrationBackfill(registration({ amendments: [broken] }));
-    expect(plan.warnings).toHaveLength(1);
+    const plan = planRegistrationBackfill(registration({ amendments: [amendment("op_1", "2027-01-20T10:00:00Z", 10_000, 17_500), broken] }));
+    expect(plan.failure).toMatch(/op_x/);
+    expect(plan.entries).toEqual([]);
+    // Even the first amendment missing its totals must not fall back to today's total.
+    const first = planRegistrationBackfill(registration({ amendments: [broken] }));
+    expect(first.failure).toMatch(/op_x/);
+    expect(first.entries).toEqual([]);
+  });
+
+  it("tolerates a broken snapshot on an amendment that already has its entry", () => {
+    const broken: BackfillAmendment = { ...amendment("op_x", "2027-02-01T10:00:00Z", 1, 2), beforeSnapshot: {}, afterSnapshot: {} };
+    const plan = planRegistrationBackfill(registration({
+      totalCents: 17_500, amendments: [broken], existingKeys: new Set(["AMENDMENT:op_x:CHARGE"]), existingSumCents: 12_000,
+    }));
+    expect(plan.failure).toBeNull();
     expect(plan.entries.map((entry) => entry.sourceType)).toEqual(["REGISTRATION_SUBMISSION"]);
+  });
+
+  it("plans nothing for a registration whose entries already equal its total", () => {
+    const plan = planRegistrationBackfill(registration({
+      redemption, totalCents: 17_500, existingKeys: new Set(["REGISTRATION_SUBMISSION:reg_1:CHARGE"]), existingSumCents: 17_500,
+    }));
+    expect(plan).toMatchObject({ entries: [], residualCents: 0, failure: null });
+  });
+
+  it("never plans a promo discount once the submission charge exists", () => {
+    const plan = planRegistrationBackfill(registration({
+      redemption, totalCents: 17_500, existingKeys: new Set(["REGISTRATION_SUBMISSION:reg_1:CHARGE"]), existingSumCents: 20_000,
+    }));
+    expect(plan.entries).toEqual([]);
+    expect(plan.residualCents).toBe(-2_500);
+  });
+
+  it("bases the opening charge and discount on the original submission snapshot, so later outside changes stay residuals", () => {
+    // Submitted at $175 after a $25 code; staff later added a $10 adjustment outside the ledger (stored total $185).
+    const submissionSnapshot = { totalCents: 17_500, discountAmountCents: 2_500, currency: "USD", attendeeNames: ["Pat Example"], lineItems: [{ key: "fee", label: "Fee", amountCents: 20_000, attendeeLabel: "Pat Example", attendeeIndex: 0 }] };
+    const plan = planRegistrationBackfill(registration({ totalCents: 18_500, redemption, submissionSnapshot }));
+    expect(plan.entries.map((entry) => [entry.kind, entry.amountCents])).toEqual([["CHARGE", 20_000], ["DISCOUNT", -2_500]]);
+    expect(plan.residualCents).toBe(1_000);
+    // Without a snapshot the outside change would have been folded into the opening charge.
+    const folded = planRegistrationBackfill(registration({ totalCents: 18_500, redemption }));
+    expect(folded.entries[0]!.amountCents).toBe(21_000);
+    expect(folded.residualCents).toBe(0);
+  });
+
+  it("keeps the submission snapshot's total for a waitlisted registration (no processing fee) exactly as stored", () => {
+    const plan = planRegistrationBackfill(registration({ totalCents: 7_500, redemption, submissionSnapshot: { totalCents: 7_500, discountAmountCents: 2_500, subtotalCents: 7_500, processingFeeCents: 0 } }));
+    expect(plan.resultingTotalCents).toBe(7_500);
+    expect(plan.residualCents).toBe(0);
+  });
+
+  it("keeps no personal name field in any backfilled snapshot", () => {
+    const named = {
+      registration: { totalAmountCents: 16_000 },
+      pricingSnapshot: { discountAmountCents: 0, totalCents: 16_000, attendeeNames: ["Pat Example"], currency: "USD", lineItems: [{ key: "fee", label: "Fee", amountCents: 16_000, attendeeLabel: "Pat Example" }] },
+    };
+    const plan = planRegistrationBackfill(registration({
+      totalCents: 16_000,
+      submissionSnapshot: { totalCents: 10_000, attendeeNames: ["Pat Example"], lineItems: [{ key: "fee", label: "Fee", amountCents: 10_000, attendeeLabel: "Pat Example" }] },
+      amendments: [{ ...amendment("op_1", "2027-02-01T10:00:00Z", 10_000, 16_000), afterSnapshot: named }],
+    }));
+    const text = JSON.stringify(plan.entries.map((entry) => entry.pricingSnapshot));
+    expect(text).not.toMatch(/Pat Example|attendeeNames|attendeeLabel/);
+    expect(text).toContain("\"label\":\"Fee\"");
+  });
+
+  it("carries the form's currency onto reconstructed entries", () => {
+    const plan = planRegistrationBackfill(registration({ submissionSnapshot: { totalCents: 17_500, currency: "CAD" } }));
+    expect(plan.entries[0]!.currency).toBe("CAD");
   });
 
   it("attributes an amendment to a director's account or a group contact, never a staff id", () => {
@@ -216,5 +284,20 @@ describe("backfill planning", () => {
     const plan = planRegistrationBackfill(registration({ totalCents: 3_000, amendments: [director, contact] }));
     expect(plan.entries[1]).toMatchObject({ actor: { type: "ATTENDEE_ACCOUNT", id: "acct_1" } });
     expect(plan.entries[2]).toMatchObject({ actor: { type: "PERSON", id: "person_1" } });
+  });
+});
+
+describe("money-only snapshots", () => {
+  it("keeps line key, label, amount, pricing label and attendee position, and drops names and everything else", () => {
+    const snapshot = moneyOnlyPricingSnapshot({
+      currency: "USD", totalCents: 100, subtotalCents: 100, processingFeeCents: 0, promoCode: "SAVE", attendeeNames: ["Pat Example"], contactSnapshot: { email: "pat@example.test" }, paymentCollected: false,
+      lineItems: [{ key: "fee", label: "Fee", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1, attendeeLabel: "Pat Example" }],
+    });
+    expect(snapshot).toEqual({ currency: "USD", totalCents: 100, subtotalCents: 100, processingFeeCents: 0, promoCode: "SAVE", lineItems: [{ key: "fee", label: "Fee", amountCents: 100, pricingLabel: "Early", attendeeIndex: 1 }] });
+    expect(moneyOnlyPricingSnapshot(null)).toEqual({});
+  });
+
+  it("strips name and contact keys at any depth as a backstop", () => {
+    expect(stripPersonalKeys({ totalCents: 1, attendeeNames: ["x"], nested: [{ email: "a", amountCents: 2, firstName: "Pat" }] })).toEqual({ totalCents: 1, nested: [{ amountCents: 2 }] });
   });
 });

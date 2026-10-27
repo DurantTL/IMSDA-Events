@@ -129,6 +129,7 @@ function transactionFixture() {
     registrationAccessToken: {
       create: vi.fn().mockResolvedValue({ id: "access-1" }),
     },
+    registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger-1" }) },
     registrationWaitlistEntry: {
       aggregate: vi.fn().mockResolvedValue({ _max: { position: null } }),
       create: vi.fn().mockResolvedValue({ id: "waitlist-1" }),
