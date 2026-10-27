@@ -56,6 +56,16 @@ export type HelpGuide = {
   owner: string;
   /** `YYYY-MM-DD` of the last check against the real pages. */
   lastReviewed: string;
+  /** An optional synthetic screenshot (#1259), a file under `public/`. Shown as "Example with sample data". */
+  screenshot?: GuideScreenshot;
+};
+
+export type GuideScreenshot = {
+  /** Site path of a file under `public/`, such as `/help/example.png`. */
+  src: string;
+  alt: string;
+  /** `YYYY-MM-DD` the picture was taken. A guide reviewed after this date says the picture may be out of date. */
+  capturedFor: string;
 };
 
 export type GlossaryTerm = { term: string; meaning: string };

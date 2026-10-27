@@ -116,6 +116,7 @@ export const portalGuides: readonly PortalGuide[] = [
     keywords: ["monthly record", "monthly records", "report", "reports", "meeting notes", "attendance", "points", "submit", "draft", "due", "10th"],
     owner: "Communication office",
     lastReviewed: "2026-10-27",
+    screenshot: { src: "/help/monthly-records-example.webp", alt: "The Monthly Records page with the month list, meeting notes and the Open Monthly Record button, using sample data.", capturedFor: "2026-10-27" },
   },
   {
     id: "director-year-end-report",

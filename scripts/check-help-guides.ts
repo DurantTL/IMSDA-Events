@@ -8,9 +8,9 @@
  * should prompt a review, not break an unrelated pull request.
  */
 import { checkHelpGuides, maxGuideAgeDays } from "@/modules/help/guide-check";
-import { docFileExists, listPageRoutes } from "@/modules/help/guide-check-files";
+import { docFileExists, listPageRoutes, publicFileExists } from "@/modules/help/guide-check-files";
 
-const problems = checkHelpGuides({ now: new Date(), routes: listPageRoutes(), docExists: (path) => docFileExists(path) });
+const problems = checkHelpGuides({ now: new Date(), routes: listPageRoutes(), docExists: (path) => docFileExists(path), publicFileExists: (path) => publicFileExists(path) });
 
 if (problems.length === 0) {
   console.log(`Help guides are current: every destination has a page, every related doc exists, and every review is within ${maxGuideAgeDays} days.`);

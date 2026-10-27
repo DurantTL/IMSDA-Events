@@ -17,7 +17,8 @@ export type GuideProblemKind =
   | "missing-doc"
   | "stale-review"
   | "invalid-review-date"
-  | "reserved-id";
+  | "reserved-id"
+  | "missing-screenshot";
 
 export type GuideProblem = {
   source: "staff" | "portal";
@@ -32,6 +33,8 @@ export type GuideCheckInput = {
   /** Page routes with route groups removed, such as `/account/clubs/[organizationId]`. */
   routes: readonly string[];
   docExists: (path: string) => boolean;
+  /** Whether a site path such as `/help/example.png` is a file under `public/`. When left out, screenshots are not checked. */
+  publicFileExists?: (path: string) => boolean;
   staffGuides?: readonly HelpGuide[];
   staffDestinations?: Record<string, HelpDestination>;
   portalGuides?: readonly PortalGuide[];
@@ -73,12 +76,15 @@ export function checkHelpGuides(input: GuideCheckInput): GuideProblem[] {
   checkDestinations("staff", staffDestinations);
   checkDestinations("portal", portalDests);
 
-  const checkGuide = (source: GuideProblem["source"], guide: Pick<HelpGuide, "id" | "destinationIds" | "relatedDocs" | "lastReviewed">, destinations: Record<string, unknown>) => {
+  const checkGuide = (source: GuideProblem["source"], guide: Pick<HelpGuide, "id" | "destinationIds" | "relatedDocs" | "lastReviewed" | "screenshot">, destinations: Record<string, unknown>) => {
     for (const id of guide.destinationIds) {
       if (!destinations[id]) add(source, guide.id, "unknown-destination", `Guide "${guide.id}" uses destination "${id}", which is not defined.`);
     }
     for (const doc of guide.relatedDocs) {
       if (!input.docExists(doc)) add(source, guide.id, "missing-doc", `Guide "${guide.id}" links ${doc}, which does not exist.`);
+    }
+    if (guide.screenshot && input.publicFileExists && !input.publicFileExists(guide.screenshot.src)) {
+      add(source, guide.id, "missing-screenshot", `Guide "${guide.id}" shows ${guide.screenshot.src}, which is not a file under public/.`);
     }
     const age = daysSinceReview(guide.lastReviewed, input.now);
     if (age === null) add(source, guide.id, "invalid-review-date", `Guide "${guide.id}" has lastReviewed "${guide.lastReviewed}", which is not a YYYY-MM-DD date.`);

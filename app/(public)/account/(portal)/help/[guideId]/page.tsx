@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { GuideScreenshotFigure } from "@/components/guide-screenshot";
 import { BackLink } from "@/components/back-link";
 import { docLabel, docUrl } from "@/modules/help/guides";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
@@ -59,6 +60,7 @@ export default async function PortalGuidePage({ params }: { params: Promise<{ gu
           <section className={styles.section} aria-labelledby="guide-steps">
             <h2 className={styles.sectionTitle} id="guide-steps">Steps</h2>
             <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>
+            <GuideScreenshotFigure guide={guide} />
           </section>
           <section className={styles.section} aria-labelledby="guide-verify">
             <h2 className={styles.sectionTitle} id="guide-verify">How to check it worked</h2>

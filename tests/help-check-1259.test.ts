@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { checkHelpGuides, daysSinceReview, maxGuideAgeDays, routeHasPage } from "@/modules/help/guide-check";
-import { docFileExists, listPageRoutes } from "@/modules/help/guide-check-files";
+import { docFileExists, listPageRoutes, publicFileExists } from "@/modules/help/guide-check-files";
 import type { HelpDestination, HelpGuide, PortalDestination, PortalGuide } from "@/modules/help/types";
 
 /** Outdated-guide check (#1259). The clock is pinned; nothing here depends on real time. */
@@ -78,12 +78,20 @@ describe("outdated-guide check", () => {
     expect(run({ staffGuides: [staffGuide({ lastReviewed: "soon" })] })).toEqual([expect.objectContaining({ kind: "invalid-review-date" })]);
   });
 
+  it("reports a screenshot whose file is missing, and skips the check when no file lookup is given", () => {
+    const shot = { src: "/help/gone.webp", alt: "x", capturedFor: "2026-10-27" };
+    const guides = [staffGuide({ screenshot: shot })];
+    expect(run({ staffGuides: guides, publicFileExists: () => false })).toEqual([expect.objectContaining({ kind: "missing-screenshot", subject: "g" })]);
+    expect(run({ staffGuides: guides, publicFileExists: (path) => path === "/help/gone.webp" })).toEqual([]);
+    expect(run({ staffGuides: guides })).toEqual([]);
+  });
+
   it("reports a portal guide id that is already a route below /account/help", () => {
     expect(run({ portalGuides: [portalGuide({ id: "authenticator" })] })).toEqual([expect.objectContaining({ kind: "reserved-id", subject: "authenticator" })]);
   });
 
   it("finds no problem in the real registries with the clock pinned", () => {
-    const problems = checkHelpGuides({ now: new Date(), routes: listPageRoutes(), docExists: (path) => docFileExists(path) });
+    const problems = checkHelpGuides({ now: new Date(), routes: listPageRoutes(), docExists: (path) => docFileExists(path), publicFileExists: (path) => publicFileExists(path) });
     expect(problems).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ImportWorkspace } from "@/components/import-workspace";
 import { getImportReconciliation, listImportRuns } from "@/modules/imports/repository";
@@ -14,5 +15,10 @@ export default async function ImportsPage({ searchParams }: { searchParams: Prom
     return <AccessRestricted title="Staging imports are restricted" detail="Only event administrators can preview, reconcile, and commit source snapshots." />;
   }
   const [runs, reconciliation] = await Promise.all([listImportRuns(event.id), getImportReconciliation(event.id)]);
-  return <ImportWorkspace key={event.id} eventId={event.id} eventName={event.name} initialRuns={runs} initialReconciliation={reconciliation} />;
+  return (
+    <>
+      <StaffContextualHelp guideId="import-with-preview" event={requested} />
+      <ImportWorkspace key={event.id} eventId={event.id} eventName={event.name} initialRuns={runs} initialReconciliation={reconciliation} />
+    </>
+  );
 }

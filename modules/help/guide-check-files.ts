@@ -21,3 +21,9 @@ export function listPageRoutes(root = process.cwd()): string[] {
 export function docFileExists(path: string, root = process.cwd()): boolean {
   return existsSync(join(root, path));
 }
+
+/** Whether a site path such as `/help/example.png` is a file under `public/`. */
+export function publicFileExists(sitePath: string, root = process.cwd()): boolean {
+  if (!sitePath.startsWith("/") || sitePath.includes("..")) return false;
+  return existsSync(join(root, "public", sitePath));
+}

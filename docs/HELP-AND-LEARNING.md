@@ -111,3 +111,27 @@ The check itself is the pure function `checkHelpGuides` in `modules/help/guide-c
 way to ask whether a doc exists and the current time, so its tests pin the clock. It is **not part of CI**, on purpose: a
 guide aging past the limit should prompt a review, not fail an unrelated pull request. Run it by hand when menus or routes
 change, and after you re-check a guide, update its `lastReviewed`.
+
+## Contextual help
+
+A working page can show a **Help** button that opens a short guide in a native `<dialog>` without leaving the page, so
+unsaved edits stay. The dialog has an accessible title, a visible Close button, closes on Escape, and returns focus to the
+button. It shows the guide's title, summary and steps, and "Open the full guide" in a new tab. It never replaces inline
+labels or errors.
+
+- Put `StaffContextualHelp` or `PortalContextualHelp` (`components/contextual-help-slot.tsx`) on the working page, with
+  the guide id. Do not put it in a shared header. Wired today: Imports, Emails and the director's Monthly Records.
+- The server picks the guide with the same visibility check as the hub (`guideForViewer`, `portalGuideForViewer`) and
+  shows the button only when the viewer may see it. Only the guide's static text reaches the browser (`modules/help/contextual.ts`).
+- Stay out of settings pages until #1076 settles.
+
+## Screenshots
+
+A guide may carry `screenshot: { src, alt, capturedFor }`. It shows under the steps in a figure captioned "Example with
+sample data". When the guide's `lastReviewed` is later than `capturedFor`, it also says "This picture may be out of date; the
+steps above are current." Keep the steps accurate even when the picture is not.
+
+- Files live in `public/help/`, under about 150 KB, WebP or PNG. Take them of the app running on the synthetic seed only
+  (`npm run db:seed`), and look at each one for anything that looks like a real person or record before committing it.
+- A guide that is re-checked should either get a fresh picture and a new `capturedFor`, or keep the old date so the note shows.
+- `npm run help:check` reports a screenshot whose file is missing.
