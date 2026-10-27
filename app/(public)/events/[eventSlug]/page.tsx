@@ -4,15 +4,11 @@ import { notFound } from "next/navigation";
 import {
   ArrowRight,
   BookOpenText,
-  CalendarDays,
-  CircleHelp,
-  Clock3,
+  CalendarPlus,
   ExternalLink,
   FileDown,
-  MapPin,
   Megaphone,
   Paperclip,
-  UsersRound,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
@@ -26,6 +22,7 @@ import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { EventEmbedFullLoad } from "@/components/event-embed-full-load";
 import { sanitizedHtmlBySection } from "@/modules/events/content-html";
 import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-notice";
+import { EventWhenWhere } from "@/components/event-when-where";
 import { TranslateHint } from "@/components/translate-hint";
 import { AutoEventHeader, AutoEventInfoCards } from "@/components/auto-event-info-cards";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
@@ -76,7 +73,6 @@ export default async function PublicEventPage({
   const landing = await getPublicEventLanding(eventSlug);
   if (!landing) notFound();
 
-  const hasForms = landing.forms.length > 0;
   // Resources sit above the fold, the way the tiles do on the current page;
   // prose reads below the registration options.
   const resourceSections = landing.contentSections.filter(
@@ -85,7 +81,6 @@ export default async function PublicEventPage({
   const proseSections = landing.contentSections.filter(
     (section) => section.kind === "RICH_TEXT" && section.body.trim().length > 0,
   );
-  const canChooseForm = landing.lifecycle.ctaEnabled && hasForms;
   const heroSection = landing.contentSections.find((section) => section.kind === "HERO");
   // The banner only counts when it can draw: invalid banner data renders nothing, so the page keeps its own h1 then.
   const bannerShown = Boolean(heroSection && parseBlockData("HERO", heroSection.data));
@@ -102,23 +97,46 @@ export default async function PublicEventPage({
   const supportContact = landing.event.supportContact?.trim() ?? "";
   const hideSidebarHelp = Boolean(autoCards?.help)
     && (supportContact === "" || supportContact.toLowerCase() === autoCards!.help!.email.trim().toLowerCase());
+  const { lifecycle } = landing;
+  // Registration paths (forms, the club general link, the group form) are listed only when one of them can be used now;
+  // before opening, when full or closed the status block says so, once (#1205).
+  const pathCount = landing.forms.length + (landing.generalLink ? 1 : 0) + (landing.groupRegistration ? 1 : 0);
+  const showPaths = lifecycle.action === "REGISTER" && pathCount > 0;
+  // One path: the status block's button goes straight to it and its card has no second button. Several: the button
+  // jumps to the list and each card has its own, because choosing the right one is the point.
+  const soleHref = pathCount === 1
+    ? (landing.forms[0]?.href ?? landing.generalLink?.href ?? landing.groupRegistration?.href ?? null)
+    : null;
+  const cardCta = (href: string) => (
+    pathCount > 1 ? (
+      <Link className="public-event-form-cta" href={href}>
+        {lifecycle.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
+      </Link>
+    ) : null
+  );
+  const statusBlock = (
+    <section className={`public-event-status-block is-${lifecycle.state.toLowerCase()}`} aria-labelledby="event-status-title">
+      <h2 id="event-status-title">{lifecycle.statusLabel}</h2>
+      <p>{lifecycle.detail}</p>
+      {lifecycle.action === "REGISTER" && showPaths && (
+        <Link className="primary-button public-event-status-action" href={soleHref ?? "#registration-options"}>
+          {lifecycle.ctaLabel} <ArrowRight size={18} aria-hidden="true" />
+        </Link>
+      )}
+      {lifecycle.action === "ADD_TO_CALENDAR" && (
+        <a className="secondary-button public-event-status-action" href={`/events/${encodeURIComponent(landing.event.slug)}/event.ics`}>
+          <CalendarPlus size={18} aria-hidden="true" /> {lifecycle.ctaLabel}
+        </a>
+      )}
+    </section>
+  );
   // On a club event the options come first, right under the director notice; the cards, resources and blocks follow (#1005).
   const optionsLayout = (
-      <div className="public-event-layout">
-        <section className="public-event-main" aria-labelledby="registration-options-title">
-          <div className="public-event-registration-state">
-            <span className={`public-event-status is-${landing.lifecycle.state.toLowerCase()}`}>
-              {landing.lifecycle.statusLabel}
-            </span>
-            <div>
-              <p className="public-registration-eyebrow">Online registration</p>
-              <h2 id="registration-options-title">{landing.lifecycle.formsHeading}</h2>
-              <p>{landing.lifecycle.detail}</p>
-            </div>
-          </div>
-
-          {hasForms ? (
-            <div className="public-event-form-list">
+      <div className="public-event-layout is-single">
+        <section className="public-event-main" aria-label="Registration and event information">
+          {showPaths && (
+            <div className="public-event-form-list" id="registration-options">
+              <h2 className="public-event-paths-heading">{lifecycle.formsHeading}</h2>
               {landing.forms.map((form, index) => (
                 <article className="public-event-form-card" key={form.id}>
                   <div className="public-event-form-number" aria-hidden="true">
@@ -135,63 +153,31 @@ export default async function PublicEventPage({
                       {form.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}
                     </ul>
                   </div>
-                  {canChooseForm ? (
-                    <Link className="public-event-form-cta" href={form.href}>
-                      {landing.lifecycle.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
-                    </Link>
-                  ) : (
-                    <span className="public-event-form-cta is-disabled" aria-disabled="true">
-                      {landing.lifecycle.ctaEnabled ? "Form unavailable" : landing.lifecycle.ctaLabel}
-                    </span>
-                  )}
+                  {cardCta(form.href)}
                 </article>
               ))}
-            </div>
-          ) : (
-            <div className="public-event-empty-forms">
-              <CalendarDays size={28} aria-hidden="true" />
-              <h3>{landing.lifecycle.emptyForms.title}</h3>
-              <p>{landing.lifecycle.emptyForms.body}</p>
-            </div>
-          )}
-
-          {landing.generalLink && (
-            <div className="public-event-form-list">
-              <article className="public-event-form-card">
-                <div className="public-event-form-number" aria-hidden="true">{String(landing.forms.length + 1).padStart(2, "0")}</div>
-                <div className="public-event-form-copy">
-                  <p className="public-registration-eyebrow">Club directors</p>
-                  <h3>{landing.generalLink.title}</h3>
-                  <p>No club account yet? Register a team here without signing in. There is no fee.</p>
-                </div>
-                {landing.lifecycle.ctaEnabled ? (
-                  <Link className="public-event-form-cta" href={landing.generalLink.href}>
-                    {landing.lifecycle.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <span className="public-event-form-cta is-disabled" aria-disabled="true">{landing.lifecycle.ctaLabel}</span>
-                )}
-              </article>
-            </div>
-          )}
-
-          {landing.groupRegistration && (
-            <div className="public-event-form-list">
-              <article className="public-event-form-card">
-                <div className="public-event-form-number" aria-hidden="true">{String(landing.forms.length + (landing.generalLink ? 2 : 1)).padStart(2, "0")}</div>
-                <div className="public-event-form-copy">
-                  <p className="public-registration-eyebrow">{landing.groupRegistration.label}</p>
-                  <h3>{landing.groupRegistration.title}</h3>
-                  <p>Not part of a club? One contact can register several people, each with their own classes. You&apos;ll be billed after the event; there is no payment to make now.</p>
-                </div>
-                {landing.lifecycle.ctaEnabled ? (
-                  <Link className="public-event-form-cta" href={landing.groupRegistration.href}>
-                    {landing.lifecycle.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <span className="public-event-form-cta is-disabled" aria-disabled="true">{landing.lifecycle.ctaLabel}</span>
-                )}
-              </article>
+              {landing.generalLink && (
+                <article className="public-event-form-card">
+                  <div className="public-event-form-number" aria-hidden="true">{String(landing.forms.length + 1).padStart(2, "0")}</div>
+                  <div className="public-event-form-copy">
+                    <p className="public-registration-eyebrow">Club directors</p>
+                    <h3>{landing.generalLink.title}</h3>
+                    <p>No club account yet? Register a team here without signing in. There is no fee.</p>
+                  </div>
+                  {cardCta(landing.generalLink.href)}
+                </article>
+              )}
+              {landing.groupRegistration && (
+                <article className="public-event-form-card">
+                  <div className="public-event-form-number" aria-hidden="true">{String(landing.forms.length + (landing.generalLink ? 2 : 1)).padStart(2, "0")}</div>
+                  <div className="public-event-form-copy">
+                    <p className="public-registration-eyebrow">{landing.groupRegistration.label}</p>
+                    <h3>{landing.groupRegistration.title}</h3>
+                    <p>Not part of a club? One contact can register several people, each with their own classes. You&apos;ll be billed after the event; there is no payment to make now.</p>
+                  </div>
+                  {cardCta(landing.groupRegistration.href)}
+                </article>
+              )}
             </div>
           )}
 
@@ -238,45 +224,28 @@ export default async function PublicEventPage({
             </section>
           ))}
         </section>
-
-        <aside className="public-event-sidebar" aria-label="Event registration help">
-          <section className="public-event-info-card">
-            <span className="public-event-side-icon"><UsersRound size={20} aria-hidden="true" /></span>
-            <p className="public-registration-eyebrow">Current availability</p>
-            <h2>{landing.lifecycle.availability.heading}</h2>
-            <p>{landing.lifecycle.availability.body}</p>
-          </section>
-
-          {/* One help block per page when the auto card already carries the same contact (#1005). */}
-          {!hideSidebarHelp && (
-          <section className="public-event-info-card public-event-help-card">
-            <span className="public-event-side-icon purple"><CircleHelp size={20} aria-hidden="true" /></span>
-            <p className="public-registration-eyebrow">Need help?</p>
-            <h2>Contact the event team</h2>
-            <p>Questions about lodging, accessibility, fees, or which form to use?</p>
-            {landing.event.supportContact && (
-              <strong className="public-event-support-contact">
-                {landing.event.supportContact}
-              </strong>
-            )}
-            <a href={landing.links.supportUrl}>
-              Contact IMSDA <ExternalLink size={15} aria-hidden="true" />
-            </a>
-          </section>
-          )}
-
-          {landing.links.detailsUrl && (
-            <a className="public-event-full-details-card" href={landing.links.detailsUrl}>
-              <span>
-                <small>Schedule, speakers, and full details</small>
-                <strong>View on imsda.org</strong>
-              </span>
-              <ExternalLink size={18} aria-hidden="true" />
-            </a>
-          )}
-        </aside>
       </div>
   );
+
+  // Help and contact: a quiet section at the end of the page (#1205). A club event's auto "Need help?" card already
+  // carries the same contact, so the section drops it then (#1005).
+  const helpSection = (!hideSidebarHelp || landing.links.detailsUrl) ? (
+    <section className="public-event-help-section" aria-labelledby="public-event-help-title">
+      <h2 id="public-event-help-title">Need help?</h2>
+      {!hideSidebarHelp && (
+        <>
+          <p>Questions about lodging, accessibility, fees, or which form to use? Contact the event team.</p>
+          {landing.event.supportContact && (
+            <p><strong className="public-event-support-contact">{landing.event.supportContact}</strong></p>
+          )}
+          <a href={landing.links.supportUrl}>Contact IMSDA <ExternalLink size={15} aria-hidden="true" /></a>
+        </>
+      )}
+      {landing.links.detailsUrl && (
+        <a href={landing.links.detailsUrl}>Schedule, speakers, and full details on imsda.org <ExternalLink size={15} aria-hidden="true" /></a>
+      )}
+    </section>
+  ) : null;
 
   return (
     <main className="public-registration-page public-event-page">
@@ -308,41 +277,34 @@ export default async function PublicEventPage({
       {autoCards ? (
         <AutoEventHeader
           header={autoCards.header}
+          dateLabel={landing.event.dateLabel}
           timeLabel={landing.event.timeLabel}
-          introLine={landing.lifecycle.heroTagline}
+          location={landing.event.location}
           titleMode={!bannerShown ? "h1" : sameName(heroSection!.title, autoCards.header.title) ? "hidden" : "text"}
         />
       ) : bannerShown ? (
         <section className="public-event-facts" aria-label="Event details">
           {/* The banner's title is free text; when it is not the event's name, the name still appears once, as text. */}
           {!sameName(heroSection!.title, landing.event.name) && <p className="public-event-facts-name">{landing.event.name}</p>}
-          <p>{landing.lifecycle.heroTagline}</p>
-          <ul>
-            <li><CalendarDays size={17} aria-hidden="true" /> {landing.event.dateLabel}</li>
-            <li><Clock3 size={17} aria-hidden="true" /> {landing.event.timeLabel}</li>
-            <li><MapPin size={17} aria-hidden="true" /> {landing.event.location ?? "Location details coming soon"}</li>
-          </ul>
+          <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
         </section>
       ) : (
         <section className="public-registration-hero public-event-hero">
           <div>
             <p className="public-registration-eyebrow">Iowa-Missouri Conference event</p>
             <h1>{landing.event.name}</h1>
-            <p>{landing.lifecycle.heroTagline}</p>
-          </div>
-          <div className="public-registration-event-details">
-            <span><CalendarDays size={17} aria-hidden="true" /> {landing.event.dateLabel}</span>
-            <span><Clock3 size={17} aria-hidden="true" /> {landing.event.timeLabel}</span>
-            <span><MapPin size={17} aria-hidden="true" /> {landing.event.location ?? "Location details coming soon"}</span>
+            <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
           </div>
         </section>
       )}
+
+      {statusBlock}
 
       <ClubDirectorSignInNotice
         event={{
           audience: landing.event.audience,
           slug: landing.event.slug,
-          registrationOpen: landing.lifecycle.ctaEnabled,
+          registrationOpen: lifecycle.ctaEnabled,
           hasClubPortalForm: landing.forms.some((form) => form.registrationPath === "CLUB_PORTAL"),
         }}
       />
@@ -455,6 +417,8 @@ export default async function PublicEventPage({
       )}
 
       {!autoCards && optionsLayout}
+
+      {helpSection}
       </div>
     </main>
   );

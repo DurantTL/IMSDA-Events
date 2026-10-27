@@ -89,8 +89,8 @@ describe("one public registration status for the calendar and the event page (#1
     const upcoming = eventRow("e1", { registrationOpensOn: "2027-01-20" });
     const open = await calendarFor([upcoming], ["e1"]);
     expect(open.get("event-e1")).toBe(false);
-    expect(describePublicEventLifecycle(upcoming as never, 0, now, true).statusLabel).toBe("Registration opens January 20, 2027");
-    expect(describePublicEventLifecycle(upcoming as never, 0, now, false).statusLabel).toBe("Registration opens January 20, 2027");
+    expect(describePublicEventLifecycle(upcoming as never, 0, now, true).statusLabel).toBe("Registration opens in January");
+    expect(describePublicEventLifecycle(upcoming as never, 0, now, false).statusLabel).toBe("Registration opens in January");
   });
 
   it("after the close date: closed on both, even with a published form", async () => {

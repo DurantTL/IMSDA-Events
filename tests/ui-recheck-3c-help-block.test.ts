@@ -20,10 +20,8 @@ const landing = (supportContact: string | null) => ({
     location: "Fictitious Hall", capacity: 100, supportContact, dateLabel: "January 17, 2027", timeLabel: "9:00 AM",
   },
   lifecycle: {
-    phase: "OPEN", state: "OPEN", statusLabel: "Registration open", detail: "Choose a form.", ctaLabel: "Start registration",
-    ctaEnabled: true, ended: false, heroTagline: "Tagline.", formsHeading: "Choose how you’re registering",
-    emptyForms: { title: "Forms are being prepared", body: "Soon." },
-    availability: { heading: "Registration open", body: "Spots remain." }, remainingSpots: 10,
+    phase: "OPEN", state: "OPEN", statusLabel: "Registration open", detail: "Choose a form.", ctaLabel: "Register", action: "REGISTER",
+    ctaEnabled: true, ended: false, formsHeading: "Choose how you’re registering", remainingSpots: 10,
   },
   forms: [], contentSections: [], announcements: [],
   links: { detailsUrl: null, supportUrl: "https://imsda.org/contact/" },

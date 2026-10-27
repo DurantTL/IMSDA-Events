@@ -26,7 +26,7 @@ describe("public event landing domain", () => {
     )).toMatchObject({
       state: "UPCOMING",
       ctaEnabled: false,
-      statusLabel: "Registration opens August 1, 2026",
+      statusLabel: "Registration opens in August",
     });
 
     expect(describePublicEventLifecycle(
@@ -118,7 +118,18 @@ describe("public event landing domain", () => {
       "America/Chicago",
     )).toEqual({
       dateLabel: "October 9 – 11, 2026",
-      timeLabel: "Friday, 4:00 PM CDT – Sunday, 12:00 PM CDT",
+      timeLabel: "Fri 4:00 PM – Sun 12:00 PM CDT",
+    });
+  });
+
+  it("reads a one-day event's hours once, and a multi-day event's days next to its times (#1205)", () => {
+    expect(formatPublicEventSchedule(
+      new Date("2026-10-10T14:00:00.000Z"),
+      new Date("2026-10-10T22:00:00.000Z"),
+      "America/Chicago",
+    )).toEqual({
+      dateLabel: "October 10, 2026",
+      timeLabel: "Saturday, 9:00 AM – 5:00 PM CDT",
     });
   });
 

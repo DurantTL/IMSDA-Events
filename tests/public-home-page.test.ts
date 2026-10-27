@@ -52,11 +52,12 @@ beforeEach(() => {
 });
 
 describe("public front page (#373)", () => {
-  it("is public: account, club, and calendar, with no link to staff sign-in", async () => {
+  it("is public: registrations, club and Find a club, with no link to staff sign-in", async () => {
     const html = await render();
     expect(html).toContain('href="/account"');
     expect(html).toContain('href="/account/clubs"');
-    expect(html).toContain('href="/calendar"');
+    expect(html).toContain('<a href="/clubs">');
+    expect(html).toContain("My registrations");
     expect(html).not.toContain('href="/login"');
     expect(html).not.toContain('href="/overview"');
     expect(html).toContain("Nothing is on the calendar yet");
@@ -77,7 +78,38 @@ describe("public front page (#373)", () => {
     expect(mocks.listPublicCalendarItems).toHaveBeenCalledWith("2026-09-23", expect.any(String));
     expect(html).toContain("Fictitious Camp 6");
     expect(html).not.toContain("Fictitious Camp 7");
+    expect(html).toMatch(/<a class="primary-button home-calendar-button" href="\/calendar\?view=list">/);
     expect(html).toContain("See the full calendar");
+  });
+
+  it("puts Coming up right after the banner, before the links and the start-a-club line (#1204)", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([item(1)]);
+    const html = await render();
+    const banner = html.indexOf("public-home-banner");
+    const upcoming = html.indexOf("Coming up");
+    const links = html.indexOf('aria-label="Get started"');
+    const start = html.indexOf("start-a-club-line");
+    expect(banner).toBeGreaterThan(-1);
+    expect(upcoming).toBeGreaterThan(banner);
+    expect(links).toBeGreaterThan(upcoming);
+    expect(start).toBeGreaterThan(links);
+    expect(html).toContain('href="/clubs/register"');
+    expect(html).not.toContain("home-action ");
+  });
+
+  it("words each event's status from the shared helper (#1204)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-23T15:00:00Z"));
+    mocks.listPublicCalendarItems.mockResolvedValue([
+      { ...item(1), registrationOpen: false, registrationStatus: "UPCOMING", registrationOpensOn: "2026-12-01", clubEvent: true },
+      { ...item(2), registrationStatus: "OPEN" },
+      { ...item(3), registrationOpen: false, registrationStatus: "OPENING_SOON" },
+    ]);
+    const html = await render();
+    vi.useRealTimers();
+    expect(html).toContain("Club registration opens in December");
+    expect(html).toContain("Registration open");
+    expect(html).toContain("Registration opening soon");
   });
 
   it("offers the staff workspace to a signed-in staff member", async () => {
@@ -95,7 +127,7 @@ describe("public front page (#373)", () => {
       sessionId: "s-1",
     });
     const html = await render();
-    expect(html).toContain("Go to my account");
+    expect(html).toContain("My registrations");
     expect(html).toContain("Signed in as Pat Example");
   });
 });

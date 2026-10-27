@@ -144,7 +144,7 @@ describe("public event landing repository forms and lifecycle", () => {
     const landing = await landingWith([]);
     expect(landing?.lifecycle.state).toBe("OPEN");
     expect(landing?.lifecycle.statusLabel).toBe("Registration opening soon");
-    expect(landing?.lifecycle.emptyForms.title).toBe("Registration forms are being prepared");
+    expect(landing?.lifecycle.action).toBe("ADD_TO_CALENDAR");
   });
 
   it("treats a form with an invalid definition as not listed", async () => {

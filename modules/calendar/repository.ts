@@ -22,7 +22,7 @@ import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeat
 import type { CalendarBulkRequest, CalendarEntryInput, CalendarEntryUpdate, CalendarEventSettings, CalendarRepeatInput } from "@/modules/calendar/schemas";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
 import { listEventIdsWithPublishedForms } from "@/modules/events/public-forms-repository";
-import { isPublicRegistrationOpen } from "@/modules/events/public-registration-status";
+import { isPublicRegistrationOpen, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 
 export { CalendarError };
 
@@ -40,6 +40,7 @@ const publicEventSelect = {
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
+  audience: true,
 } as const;
 
 /** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
@@ -121,15 +122,23 @@ export async function listPublicCalendarItems(
     ...events.filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
     ...[...publishedLinked.values()].filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
   ])]);
-  const registrationOpenFor = (event: PublicEventWithLinks) =>
-    isPublicRegistrationOpen(evaluateEventRegistrationPhase(event, now), withForms.has(event.id));
+  const registrationFor = (event: PublicEventWithLinks) => {
+    const phase = evaluateEventRegistrationPhase(event, now);
+    const formsListed = withForms.has(event.id);
+    return {
+      registrationOpen: isPublicRegistrationOpen(phase, formsListed),
+      registrationStatus: resolvePublicRegistrationStatus(phase, formsListed),
+      registrationOpensOn: event.registrationOpensOn,
+      clubEvent: event.audience === "CLUB",
+    };
+  };
   const registerItems = entries.flatMap((entry) => {
     const event = entry.linkedEventId ? publishedLinked.get(entry.linkedEventId) : undefined;
     if (!event || !event.showOnCalendar || sharedItemCount(event) < 2 || entry.entryType === "DEADLINE") return [];
-    const registrationOpen = registrationOpenFor(event);
+    const registration = registrationFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
-      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, registrationOpen });
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, ...registration });
   });
 
   const items: CalendarItem[] = [
@@ -145,7 +154,7 @@ export async function listPublicCalendarItems(
       category: event.calendarCategory ?? "",
       href: `/events/${encodeURIComponent(event.slug)}`,
       status: "SCHEDULED" as const,
-      registrationOpen: registrationOpenFor(event),
+      ...registrationFor(event),
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
     ...standalone.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),

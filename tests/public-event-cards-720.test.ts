@@ -456,12 +456,14 @@ describe("public event page layout classes (#720)", () => {
   it("wraps every content section in one shared container", () => {
     const containerStart = page.indexOf('<div className="public-event-container">');
     expect(containerStart).toBeGreaterThan(0);
-    // The options layout (with its sidebar) is one block, placed in the container either first (club events) or in its usual place (#1005).
+    // The options layout is one block, placed in the container either first (club events) or in its usual place (#1005).
     for (const marker of ["<EventInfoCards", "public-event-resources", "{autoCards && optionsLayout}", "{!autoCards && optionsLayout}", "public-event-announcement-feed", "<AutoEventInfoCards"]) {
       expect(page.indexOf(marker, containerStart)).toBeGreaterThan(containerStart);
     }
-    expect(page).toContain('const optionsLayout = (\n      <div className="public-event-layout">');
-    expect(page).toContain("public-event-sidebar");
+    expect(page).toContain('const optionsLayout = (\n      <div className="public-event-layout is-single">');
+    // The sidebar is gone (#1205): one status block after the header, and help as a quiet section at the end.
+    expect(page).not.toContain("public-event-sidebar");
+    expect(page.indexOf("{helpSection}", containerStart)).toBeGreaterThan(page.indexOf("{!autoCards && optionsLayout}", containerStart));
   });
 
   it("gives the container a 1180px max width and 16px gutters, and zeroes the sections' own side margins", () => {
