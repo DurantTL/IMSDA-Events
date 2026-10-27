@@ -90,7 +90,7 @@ export const helpGuides: readonly HelpGuide[] = [
     keywords: ["new event", "start event", "duplicate", "clone", "last year", "rollover", "template", "draft", "blank"],
     owner: "Communication office",
     lastReviewed: "2026-10-27",
-    screenshot: { src: "/help/create-event-example.webp", alt: "The Create an event draft page with the Event basics step and the Publish readiness list, using sample data.", capturedFor: "2026-10-27" },
+    screenshot: { src: "/help/create-event-example.webp", width: 800, height: 744, alt: "The Create an event draft page with the Event basics step and the Publish readiness list, using sample data.", capturedFor: "2026-10-27" },
   },
   {
     id: "invite-staff",
@@ -222,7 +222,7 @@ export const helpGuides: readonly HelpGuide[] = [
     keywords: ["import", "csv", "upload", "preview", "commit", "spreadsheet", "snapshot", "reconcile", "club import", "registrations file"],
     owner: "Communication office",
     lastReviewed: "2026-10-27",
-    screenshot: { src: "/help/imports-example.webp", alt: "The Imports page with the Choose a source snapshot step and the Preview import button, using sample data.", capturedFor: "2026-10-27" },
+    screenshot: { src: "/help/imports-example.webp", width: 800, height: 787, alt: "The Imports page with the Choose a source snapshot step and the Preview import button, using sample data.", capturedFor: "2026-10-27" },
   },
   {
     id: "resolve-email-problem",

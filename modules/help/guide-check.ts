@@ -18,7 +18,8 @@ export type GuideProblemKind =
   | "stale-review"
   | "invalid-review-date"
   | "reserved-id"
-  | "missing-screenshot";
+  | "missing-screenshot"
+  | "invalid-screenshot-size";
 
 export type GuideProblem = {
   source: "staff" | "portal";
@@ -85,6 +86,9 @@ export function checkHelpGuides(input: GuideCheckInput): GuideProblem[] {
     }
     if (guide.screenshot && input.publicFileExists && !input.publicFileExists(guide.screenshot.src)) {
       add(source, guide.id, "missing-screenshot", `Guide "${guide.id}" shows ${guide.screenshot.src}, which is not a file under public/.`);
+    }
+    if (guide.screenshot && !(Number.isInteger(guide.screenshot.width) && guide.screenshot.width > 0 && Number.isInteger(guide.screenshot.height) && guide.screenshot.height > 0)) {
+      add(source, guide.id, "invalid-screenshot-size", `Guide "${guide.id}" has a screenshot without a positive width and height.`);
     }
     const age = daysSinceReview(guide.lastReviewed, input.now);
     if (age === null) add(source, guide.id, "invalid-review-date", `Guide "${guide.id}" has lastReviewed "${guide.lastReviewed}", which is not a YYYY-MM-DD date.`);

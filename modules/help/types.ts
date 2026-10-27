@@ -64,6 +64,9 @@ export type GuideScreenshot = {
   /** Site path of a file under `public/`, such as `/help/example.png`. */
   src: string;
   alt: string;
+  /** The image file's real size in pixels, so the page reserves the right space. */
+  width: number;
+  height: number;
   /** `YYYY-MM-DD` the picture was taken. A guide reviewed after this date says the picture may be out of date. */
   capturedFor: string;
 };

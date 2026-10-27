@@ -82,7 +82,7 @@ describe("the dialog", () => {
 });
 
 describe("guide screenshots", () => {
-  const guide = (lastReviewed: string, capturedFor = "2026-10-27") => ({ lastReviewed, screenshot: { src: "/help/x.webp", alt: "a", capturedFor } });
+  const guide = (lastReviewed: string, capturedFor = "2026-10-27") => ({ lastReviewed, screenshot: { src: "/help/x.webp", alt: "a", width: 800, height: 600, capturedFor } });
 
   it("is stale only when the guide was reviewed after the picture was taken", () => {
     expect(screenshotIsStale(guide("2026-10-27"))).toBe(false);
@@ -107,6 +107,8 @@ describe("guide screenshots", () => {
       if (!guide.screenshot) continue;
       expect(publicFileExists(guide.screenshot.src), guide.id).toBe(true);
       expect(guide.screenshot.alt.length, guide.id).toBeGreaterThan(10);
+      expect(guide.screenshot.width, guide.id).toBeGreaterThan(0);
+      expect(guide.screenshot.height, guide.id).toBeGreaterThan(0);
       expect(guide.screenshot.capturedFor, guide.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(readFileSync(join(root, "public", guide.screenshot.src)).length, guide.id).toBeLessThan(150 * 1024);
     }

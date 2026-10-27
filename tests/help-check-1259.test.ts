@@ -79,11 +79,18 @@ describe("outdated-guide check", () => {
   });
 
   it("reports a screenshot whose file is missing, and skips the check when no file lookup is given", () => {
-    const shot = { src: "/help/gone.webp", alt: "x", capturedFor: "2026-10-27" };
+    const shot = { src: "/help/gone.webp", alt: "x", width: 800, height: 600, capturedFor: "2026-10-27" };
     const guides = [staffGuide({ screenshot: shot })];
     expect(run({ staffGuides: guides, publicFileExists: () => false })).toEqual([expect.objectContaining({ kind: "missing-screenshot", subject: "g" })]);
     expect(run({ staffGuides: guides, publicFileExists: (path) => path === "/help/gone.webp" })).toEqual([]);
     expect(run({ staffGuides: guides })).toEqual([]);
+  });
+
+  it("reports a screenshot without a positive width and height", () => {
+    const shot = { src: "/help/a.webp", alt: "x", capturedFor: "2026-10-27" };
+    for (const size of [{ width: 0, height: 10 }, { width: 10, height: -1 }, { width: 10.5, height: 10 }]) {
+      expect(run({ staffGuides: [staffGuide({ screenshot: { ...shot, ...size } })] })).toEqual([expect.objectContaining({ kind: "invalid-screenshot-size" })]);
+    }
   });
 
   it("reports a portal guide id that is already a route below /account/help", () => {

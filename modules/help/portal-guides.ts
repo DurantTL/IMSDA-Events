@@ -21,7 +21,7 @@ export const portalDestinations: Record<string, PortalDestination> = {
   "club-home": { id: "club-home", label: "Club home", path: "/account/clubs/[organizationId]", audience: "director" },
   "club-records": { id: "club-records", label: "Monthly Records", path: "/account/clubs/[organizationId]/records", audience: "director", capability: "submitReports" },
   "coordinator-clubs": { id: "coordinator-clubs", label: "Clubs", path: "/account/clubs", audience: "coordinator" },
-  "coordinator-overview": { id: "coordinator-overview", label: "Club overview", path: "/account/area-clubs/overview", audience: "coordinator" },
+  "coordinator-overview": { id: "coordinator-overview", label: "Overview", path: "/account/area-clubs/overview", audience: "coordinator" },
   "coordinator-records": { id: "coordinator-records", label: "Monthly Records summary", path: "/account/area-clubs/reports", audience: "coordinator" },
   "coordinator-team-approvals": { id: "coordinator-team-approvals", label: "Team approvals", path: "/account/area-clubs/team-permissions", audience: "coordinator" },
   "coordinator-new-clubs": { id: "coordinator-new-clubs", label: "New clubs (view only)", path: "/account/area-clubs/applications", audience: "coordinator" },
@@ -100,7 +100,7 @@ export const portalGuides: readonly PortalGuide[] = [
     ],
     steps: [
       "Open Monthly Records. In the club menu it is under More. A reporter sees it in the main menu.",
-      "The list of months shows each month of the club year as Due, Draft, its points, or Missing. Choose Open beside the month you need. The month you are on says Viewing.",
+      "The list of months shows each month of the club year as Due, Draft, its points, or Missing. Choose Open beside the month you need (it reads View for a closed month). The month you are on says Viewing.",
       "The month's meeting notes are at the top. The report fills in from them where it can. When Refresh from meeting notes is offered, it asks before it replaces anything.",
       "Choose Open Monthly Record, or Continue report, Edit report or View report, whichever the button says. Fill in Club facts, Points and Signature.",
       "Choose Save draft to keep your answers without filing. Choose Submit report to file it. The button shows the points the report is worth.",
@@ -116,7 +116,7 @@ export const portalGuides: readonly PortalGuide[] = [
     keywords: ["monthly record", "monthly records", "report", "reports", "meeting notes", "attendance", "points", "submit", "draft", "due", "10th"],
     owner: "Communication office",
     lastReviewed: "2026-10-27",
-    screenshot: { src: "/help/monthly-records-example.webp", alt: "The Monthly Records page with the month list, meeting notes and the Open Monthly Record button, using sample data.", capturedFor: "2026-10-27" },
+    screenshot: { src: "/help/monthly-records-example.webp", width: 800, height: 298, alt: "The Monthly Records page with the monthly points summary and the list of months, using sample data.", capturedFor: "2026-10-27" },
   },
   {
     id: "director-year-end-report",

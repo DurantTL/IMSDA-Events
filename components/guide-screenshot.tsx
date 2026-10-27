@@ -10,7 +10,7 @@ export function GuideScreenshotFigure({ guide }: { guide: { lastReviewed: string
     <figure className={styles.figure}>
       {/* A small static file from public/: next/image optimization adds nothing here. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt={shot.alt} className={styles.figureImage} height={450} loading="lazy" src={shot.src} width={800} />
+      <img alt={shot.alt} className={styles.figureImage} height={shot.height} loading="lazy" src={shot.src} width={shot.width} />
       <figcaption className={styles.figureCaption}>
         {screenshotCaption}
         {screenshotIsStale(guide) && <span className={styles.figureStale}> {screenshotStaleNote}</span>}
