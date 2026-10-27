@@ -52,8 +52,8 @@ describe("event view-transition names (#1208)", () => {
   });
 
   it("renders children unwrapped without a name or without ViewTransition in React", () => {
-    expect(renderToStaticMarkup(createElement(EventCardTransition, { name: null, children: createElement("p", null, "x") }))).toBe("<p>x</p>");
-    expect(renderToStaticMarkup(createElement(EventCardTransition, { name: "event-card-x", children: createElement("p", null, "x") }))).toBe("<p>x</p>");
+    expect(renderToStaticMarkup(createElement(EventCardTransition as never, { name: null }, createElement("p", null, "x")))).toBe("<p>x</p>");
+    expect(renderToStaticMarkup(createElement(EventCardTransition as never, { name: "event-card-x" }, createElement("p", null, "x")))).toBe("<p>x</p>");
   });
 });
 
