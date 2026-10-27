@@ -121,6 +121,8 @@ const pbeDraftKey = "0123456789abcdef0123456789abcdef";
 // and the private link opens it), and requests in several states: the registrant's panel and the staff queue (#170).
 const cancelEventId = `${P}_cancel_event`;
 const cancelEventSlug = `${P}-cancel-weekend`;
+// The check-in station (#892) only runs while its event does, so it gets its own event dated around today.
+const stationEventId = `${P}_station_event`;
 // A general event with personal staff invitation links (#804, #1027): the invite list in every status, and a link form that also
 // asks the event's own attendee questions.
 const staffInviteEventId = `${P}_staffinv_event`;
@@ -345,7 +347,7 @@ const pages: PageSpec[] = [
     role: "station",
     expectText: /Check-in station/i,
     prepare: async (page) => {
-      await page.getByLabel(/confirmation code/i).fill("MC-1000");
+      await page.getByLabel(/confirmation code/i).fill("MOBSTA1");
       await page.getByRole("button", { name: /Find family/i }).click();
       await page.getByRole("status").first().waitFor({ timeout: 5000 }).catch(() => undefined);
       await page.waitForTimeout(500);
@@ -837,6 +839,52 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
 }
 
 /** Removes the cancellation event and what hangs off it (requests, their timeline, calculations, the registration and its people). */
+/**
+ * A published event running today with one confirmed three-person registration (long names) that still owes money, so the
+ * check-in station (#892) shows its real family list and payment panel. Idempotent.
+ */
+async function seedStationEvent(prisma: PrismaClient) {
+  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) return;
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  const today = calendarDateIn(new Date());
+  const registrationId = `${P}_reg_station`;
+  await prisma.$transaction(async (tx) => {
+    await tx.event.create({
+      data: {
+        id: stationEventId, slug: `${P}-station-weekend`, name: "Mobilecheck Station Weekend",
+        startsAt: new Date(`${addDays(today, -1)}T12:00:00Z`), endsAt: new Date(`${addDays(today, 1)}T12:00:00Z`), timezone: "America/Chicago",
+        isPublished: true, billingMode: "ATTENDEE_PAY",
+      },
+    });
+    await tx.eventMembership.create({ data: { eventId: stationEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+    const holder = await tx.person.create({ data: { id: `${P}_person_station_0`, firstName: "Bartholomew-Alexander", lastName: "Quillfeather-Hargreaves-Montgomery", normalizedEmail: `${P}.station.0@example.test` } });
+    await tx.registration.create({
+      data: {
+        id: registrationId, eventId: stationEventId, accountHolderPersonId: holder.id, confirmationCode: "MOBSTA1", totalAmount: 525, status: "CONFIRMED", submittedAt: new Date(),
+        contactSnapshot: { firstName: holder.firstName, lastName: holder.lastName, email: `${P}.station.0@example.test`, phone: "" },
+      },
+    });
+    for (const [index, [firstName, lastName]] of [[holder.firstName, holder.lastName], ["Wolfeschlegelsteinhausenbergerdorff", "Oyelaran-Whitcombe"], ["Ng", "Smith"]].entries()) {
+      const personId = index === 0 ? holder.id : (await tx.person.create({ data: { id: `${P}_person_station_${index}`, firstName, lastName } })).id;
+      await tx.registrationAttendee.create({
+        data: { id: `${P}_station_attendee_${index}`, eventId: stationEventId, registrationId, personId, attendeeType: index === 2 ? "CHILD" : "ADULT", position: index, profileSnapshot: { firstName, lastName } },
+      });
+    }
+    await tx.payment.create({ data: { eventId: stationEventId, registrationId, amount: 175, status: "SUCCEEDED", method: "CASH", receivedAt: new Date() } });
+  });
+}
+
+async function cleanupStationEvent(prisma: PrismaClient) {
+  if (!(await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } }))) return;
+  const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
+  await prisma.auditLog.deleteMany({ where: { eventId: stationEventId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await removeEventOwnedRows(tx, stationEventId);
+  }, { timeout: 30_000 });
+}
+
 async function cleanupCancellationEvent(prisma: PrismaClient) {
   if (!(await prisma.event.findUnique({ where: { id: cancelEventId }, select: { id: true } }))) return;
   const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
@@ -1144,6 +1192,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
+  await cleanupStationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic station event: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await cleanupInformationForm(prisma).catch((error: Error) => console.error(`Could not remove the synthetic information form: ${error.message}`));
   await prisma.$transaction([
@@ -1766,7 +1815,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       const token = createOpaqueToken();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await prisma.checkInStation.create({
-        data: { eventId, startedByUserId: admin.id, label: `${P} station`, tokenHash: hashOpaqueToken(token), expiresAt },
+        data: { eventId: stationEventId, startedByUserId: admin.id, label: `${P} station`, tokenHash: hashOpaqueToken(token), expiresAt },
       });
       return { name: CHECK_IN_STATION_COOKIE_NAME, value: token, expires: Math.floor(expiresAt.getTime() / 1000) };
     }
@@ -4012,6 +4061,7 @@ async function main() {
     await seedSynthetic(prisma);
     pages.push(...pbePages(await seedPbeEvent(prisma)));
     pages.push(...await seedCancellationEvent(prisma));
+    await seedStationEvent(prisma);
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedEventTemplatePages(prisma));
