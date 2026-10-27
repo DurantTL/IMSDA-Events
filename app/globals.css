@@ -13488,6 +13488,32 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .draft-restored-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .draft-restored-notice .secondary-button { min-width: 44px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 
+/* Settings ownership follow-up (#1258): per-field ownership notes on Event settings, the Advanced group and environment status on Platform settings. */
+.settings-ownership-note { display: block; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.settings-ownership-note strong { color: var(--ink); }
+.settings-ownership-group { display: grid; gap: 6px; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
+.settings-ownership-group p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.settings-ownership-group .settings-ownership-note { display: inline; margin: 0; }
+.settings-ownership-field { font-weight: 700; }
+.settings-ownership-group a { display: inline-flex; align-items: center; min-height: 44px; }
+.platform-settings-workspace label > small { display: block; overflow-wrap: anywhere; }
+.platform-advanced-details > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.platform-advanced-details[open] > summary { margin-bottom: 8px; }
+.environment-status { display: grid; gap: 8px; border-top: 1px solid #d7dee2; padding-top: 12px; }
+.environment-status h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.environment-status .field-help { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.environment-status .field-help a { display: inline-flex; align-items: center; min-height: 44px; }
+.environment-status-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.environment-status-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.environment-status-name { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.environment-status-badge { border: 1px solid #d7dee2; border-radius: 999px; padding: 2px 10px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.environment-status-badge.is-configured { border-color: #b8d7ca; background: #eef8f2; color: #1c6b4a; }
+.environment-status-badge.is-not-configured { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; }
+.environment-status-badge.is-unknown { border-color: #cfd6dc; background: #f1f4f6; color: #3d4852; }
+.environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

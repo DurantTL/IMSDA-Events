@@ -19,6 +19,8 @@ export function EmailHealthSection({ health }: { health: EmailHealth }) {
           <h2>Is email getting through?</h2>
         </div>
       </div>
+      <h3>Configuration in this environment</h3>
+      <p className="field-help email-health-note">What the server has set. It does not prove mail is getting through; the problems list below does.</p>
       <ul className="notification-event-list" aria-label="Email setup in this environment">
         <li data-health="provider">
           <span>
@@ -48,7 +50,7 @@ export function EmailHealthSection({ health }: { health: EmailHealth }) {
         </li>
       </ul>
       <SuppressedAddressesPanel initial={health.suppressions} />
-      <h3>Problems in the last {health.windowDays} days</h3>
+      <h3>Live delivery health: problems in the last {health.windowDays} days</h3>
       {health.partial && (
         <p className="inline-notice error" role="status">Some checks could not be read, so this list may be missing items.</p>
       )}
