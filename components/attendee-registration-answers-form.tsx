@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, ListChecks, Save } from "lucide-react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
 import { inlineFieldProblem, inputAttributesFor, isUnchangedEmail, isUnchangedFromStored, isUnchangedPhone, valueTypeForFieldType } from "@/lib/field-validation";
@@ -76,7 +76,7 @@ export function AttendeeRegistrationAnswersForm({
   const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(initialExpectedUpdatedAt);
   const [saved, setSaved] = useState(initialAttendees);
   const [attendees, setAttendees] = useState(initialAttendees);
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [saving, setSaving] = useState(false);
   const [clientRequestId, setClientRequestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState("");
@@ -171,7 +171,7 @@ export function AttendeeRegistrationAnswersForm({
         { method: "PUT", idempotent: true },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as { message?: string; attendees?: unknown; expectedUpdatedAt?: string };
@@ -380,7 +380,7 @@ export function AttendeeRegistrationAnswersForm({
         </fieldset>
       ))}
 
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void save()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status"><CheckCircle2 size={16} aria-hidden="true" /> {notice}</p>}
       {!readOnly && <div className="form-actions">

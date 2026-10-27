@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 import { InformationFormFillIn } from "@/components/information-form-fill-in";
 import { PublicRegistrationContactForm } from "@/components/public-registration-contact-form";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
+import { SITE_MAYBE_UPDATING_MESSAGE, SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { buttonByText, click, mount, submitForm, typeInto, type Mounted } from "./helpers/dom-render";
 
@@ -112,7 +112,8 @@ describe("registration contact edit (#1263)", () => {
     await submitForm(container.querySelector("form")!);
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(fetchMock).toHaveBeenCalledTimes(1); // a bare network error on a non-keyed edit is not auto-retried
-    expect(container.querySelector(".submit-retry-notice")!.textContent).toContain(SITE_UPDATING_MESSAGE);
+    // An unkeyed edit may have reached the server: the notice says to check before trying again.
+    expect(container.querySelector(".submit-retry-notice")!.textContent).toContain(SITE_MAYBE_UPDATING_MESSAGE);
     expect(textInputs(container)[0]!.value).toBe("Avery Jo");
     failing = false;
     await click(buttonByText(container, "Try again"));

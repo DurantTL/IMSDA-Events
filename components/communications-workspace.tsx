@@ -4,7 +4,7 @@ import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { EMAIL_PROBLEM, inlineFieldProblem, problemMessage, validateEmail } from "@/lib/field-validation";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -310,7 +310,7 @@ export function CommunicationsWorkspace({
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [saving, setSaving] = useState(false);
   // The site was restarting (#1263): what was typed stays, and Try again re-runs the same request.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const retryRef = useRef<(() => void) | null>(null);
   const [broadcastReview, setBroadcastReview] = useState<{
     announcement: AnnouncementRecord;
@@ -669,7 +669,7 @@ export function CommunicationsWorkspace({
       if (response.unavailable) {
         // A restart: the form keeps what was typed and Try again re-sends it (#1263).
         retryRef.current = () => void messagingRequest(url, init, successMessage);
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return null;
       }
       const result = response.body as ApiResult;
@@ -718,7 +718,7 @@ export function CommunicationsWorkspace({
       // A restart: the composer keeps the draft text and Try again re-sends it (#1263).
       if (response.unavailable) {
         retryRef.current = () => void sendDraft(editId, payload);
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as ApiResult;
@@ -2422,7 +2422,7 @@ export function CommunicationsWorkspace({
             {!draftPrefill && (
               <p className="quiet-copy">Saving creates a draft only. Nothing is published to the feed or sent.</p>
             )}
-            {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => retryRef.current?.()} />}
+            {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => retryRef.current?.()} />}
             {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error} Your edits are still here.</div>}
             <form className="form-stack" onSubmit={createDraft} key={draftPrefill?.editId ? `edit-${draftPrefill.editId}` : draftPrefill ? "correction" : "new"}>
               <label>Title<input id="announcement-title" name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" value={draftValues.title} onChange={(event) => setDraftField("title", event.target.value)} /></label>

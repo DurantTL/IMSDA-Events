@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
-import { submitJson, SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
+import { isUnavailableMessage, submitJson, unavailableMessage } from "@/lib/submit-json";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { Plus, Save } from "lucide-react";
 import { useConfirm } from "@/components/use-confirm";
@@ -79,20 +79,28 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
   // Unsaved edits are backed up in this browser and come back after a reload (#1263); there is no attendee data here.
   const editBackup = useLocalEditDraft({
     storageKey: editDraftKey("form-template-editor", props.templateKey),
-    version: String(props.version),
+    version: String(version),
     value: { name, description, audience, definition },
     dirty,
     onRestore: (stored) => {
       const value = stored as { name?: unknown; description?: unknown; audience?: unknown; definition?: unknown } | null;
       const parsed = registrationFormDefinitionSchema.safeParse(value?.definition);
-      if (!parsed.success) return;
+      if (!parsed.success) return false;
       setDefinition(parsed.data);
       if (typeof value?.name === "string") setName(value.name);
       if (typeof value?.description === "string") setDescription(value.description);
       if (typeof value?.audience === "string") setAudience(value.audience);
       setDirty(true);
+      return true;
     },
   });
+  // Discarding the restored changes goes back to the template as loaded, in place: no reload, no leave prompt.
+  const discardRestored = () => {
+    editBackup.discard();
+    setDefinition(structuredClone(props.definition));
+    setName(props.name); setDescription(props.description); setAudience(props.audience);
+    setDirty(false);
+  };
 
   async function saveTemplate() {
     if (!definition) return;
@@ -101,7 +109,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
     try {
       const response = await submitJson(`/api/admin/form-templates/${encodeURIComponent(props.templateKey)}`, { expectedVersion: version, name, description, audience, definition }, { method: "PUT" });
       // A restart: the template edits stay and Try again saves them (#1263).
-      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); return; }
+      if (response.unavailable) { setError(unavailableMessage(response)); return; }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) {
         setConflict(result.error === "VERSION_CONFLICT");
@@ -141,9 +149,9 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
       {props.repairingUnreadable && <p className="inline-notice error" role="alert">The stored definition could not be read, so this opens the code&apos;s copy. Saving stores a new, readable version.</p>}
       {source === "APP" && !props.appCreated && <p className="field-help">This template was edited in the app, so code updates no longer apply to it.</p>}
     </section>
-    {editBackup.restored && <div className="form-notice draft-restored-notice" role="status"><span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span><button className="secondary-button" type="button" onClick={() => { editBackup.discard(); window.location.reload(); }}>Discard</button></div>}
-    {error === SITE_UPDATING_MESSAGE && <SubmitRetryNotice busy={busy === "save"} onRetry={() => retryRef.current?.()} />}
-    {error && error !== SITE_UPDATING_MESSAGE && <div className="inline-notice error" role="alert">{error}{conflict && <> <button className="text-button" type="button" onClick={() => window.location.reload()}>Reload the template</button></>}</div>}
+    {editBackup.restored && <div className="form-notice draft-restored-notice" role="status"><span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span><button className="secondary-button" type="button" onClick={discardRestored}>Discard</button></div>}
+    {Boolean(error) && isUnavailableMessage(error) && <SubmitRetryNotice message={error} busy={busy === "save"} onRetry={() => retryRef.current?.()} />}
+    {error && !isUnavailableMessage(error) && <div className="inline-notice error" role="alert">{error}{conflict && <> <button className="text-button" type="button" onClick={() => window.location.reload()}>Reload the template</button></>}</div>}
     {notice && <div className="inline-notice" role="status">{notice}</div>}
     {owned.length > 0 && <section className="panel" aria-label="Fields that belong to a module">
       <h3>Module-owned fields</h3>

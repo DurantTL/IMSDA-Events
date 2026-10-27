@@ -28,7 +28,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { shortHash } from "@/modules/forms/answer-draft";
 import {
   canMoveSection,
@@ -315,7 +315,7 @@ export function EventContentWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   // Review before removing a public-content section (#471): what's removed
   // and what stays, before the click that will only take effect once the
   // page is saved.
@@ -330,10 +330,12 @@ export function EventContentWorkspace({
     value: sections,
     dirty,
     onRestore: (stored) => {
-      if (!Array.isArray(stored)) return;
+      if (!Array.isArray(stored)) return false;
       const valid = stored.filter((item): item is SectionDraft => Boolean(item) && typeof item === "object"
         && typeof item.kind === "string" && typeof item.title === "string" && typeof item.body === "string" && typeof item.isPublished === "boolean");
-      if (valid.length === stored.length) setSections(valid);
+      if (valid.length !== stored.length) return false;
+      setSections(valid);
+      return true;
     },
   });
   const pendingImpact = pendingDelete ? localAssetImpact(sections, pendingDelete.id) : null;
@@ -495,7 +497,7 @@ export function EventContentWorkspace({
       const response = await submitJson(`/api/events/${eventId}/content`, { sections: sections.map(sectionPayload) }, { method: "PUT" });
       // A restart: the page edits stay and Try again saves them (#1263).
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -538,7 +540,7 @@ export function EventContentWorkspace({
         </button>
       </div>
 
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void save()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {editBackup.restored && (
         <div className="form-notice draft-restored-notice" role="status">
           <span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span>

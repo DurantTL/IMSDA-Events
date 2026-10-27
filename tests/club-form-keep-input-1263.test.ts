@@ -143,3 +143,19 @@ describe("club form: local draft (#1263)", () => {
     expect(window.localStorage.length).toBe(0);
   });
 });
+
+describe("single-use club form link (#1263)", () => {
+  it("clears the local draft when the link turns out to be already used", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "That link was already used or withdrawn." }), { status: 404 })));
+    mounted = await mount(createElement(ClubFormFillIn, { definition, sectionNotes: {}, sensitiveFieldKeys: [], mode: "link" as const, token: "synthetic-link-token" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    await typeInto(mounted.container.querySelector<HTMLInputElement>('input[type="text"], input:not([type])')!, "Alex Example");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(window.localStorage.length).toBe(1);
+    expect(window.localStorage.key(0)).not.toContain("synthetic-link-token"); // the token is never part of a storage key
+    await submitForm(mounted.container.querySelector("form")!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(mounted.container.textContent).toContain("already used or withdrawn");
+    expect(window.localStorage.length).toBe(0);
+  });
+});

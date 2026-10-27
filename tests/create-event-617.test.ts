@@ -188,7 +188,7 @@ describe("postJson never leaves a spinner (#617)", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("<html>Gateway Timeout</html>", { status: 504 })));
     const result = await postJson("/x", {}, "The event could not be copied.", undefined, { retryDelayMs: 0 });
     expect(result).toMatchObject({ ok: false, unavailable: true });
-    expect(result.body.message).toContain("The site is updating.");
+    expect(result.body.message).toContain("The site may be updating.");
   });
 
   it("gives up on a request that never answers", async () => {
@@ -202,7 +202,7 @@ describe("postJson never leaves a spinner (#617)", () => {
 
   it("reports an unreachable server", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    expect((await postJson("/x", {}, "Failed.")).body.message).toContain("The site is updating.");
+    expect((await postJson("/x", {}, "Failed.")).body.message).toContain("The site may be updating.");
   });
 
   it("the copy screen posts through it, so every path stops the busy state", () => {

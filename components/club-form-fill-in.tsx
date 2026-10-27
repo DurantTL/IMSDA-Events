@@ -6,7 +6,7 @@ import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
 import { useAnswerDraft } from "@/components/use-answer-draft";
 import { shortHash } from "@/modules/forms/answer-draft";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { clubFormIsDirty, dropStaleRankedChoices, clubFormUnsavedMessage, rankLabel, rankedMaximum, toggleRankedChoice, withAutoDateAnswers } from "@/components/club-form-state";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { LockKeyhole } from "lucide-react";
@@ -105,7 +105,7 @@ export function ClubFormFillIn(props: Props) {
   const dirty = !doneMessage && clubFormIsDirty(current, saved);
   const allowNavigation = useUnsavedChangesGuard(dirty, clubFormUnsavedMessage);
   // The site was restarting (#1263): the answers stay in the form and Try again re-sends them with the same key.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const lastSubmitRef = useRef(true);
   // A local draft (#1263) for the anonymous modes only: a signed-in director's form and any page that
   // starts from saved answers never write one, the same rule as the public registration drafts.
@@ -186,7 +186,7 @@ export function ClubFormFillIn(props: Props) {
           }, { idempotent: true })
           : await submitJson(`/api/public/club-forms/${encodeURIComponent(props.token)}`, { answers });
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as {
@@ -333,7 +333,7 @@ export function ClubFormFillIn(props: Props) {
         />
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void send(lastSubmitRef.current)} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void send(lastSubmitRef.current)} />}
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

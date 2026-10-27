@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { shortHash } from "@/modules/forms/answer-draft";
 import {
   AlertTriangle,
@@ -155,7 +155,7 @@ export function EventSettingsWorkspace({
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   // The dates this form was loaded with (or last saved as). A save sends them back, and the server refuses it if the
   // stored dates differ (they were updated from the calendar banner meanwhile), so a stale form can never write the
   // old dates over the new ones. Only dates are guarded: other writes to the event never cause a conflict.
@@ -220,7 +220,7 @@ export function EventSettingsWorkspace({
     value: draft,
     dirty,
     onRestore: (stored) => {
-      if (!stored || typeof stored !== "object" || Array.isArray(stored)) return;
+      if (!stored || typeof stored !== "object" || Array.isArray(stored)) return false;
       setDraft((current) => {
         const next = { ...current } as Record<string, unknown>;
         for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
@@ -228,6 +228,7 @@ export function EventSettingsWorkspace({
         }
         return next as EventSettingsInput;
       });
+      return true;
     },
   });
   const savebarPinned = scrolledPastTop || dirty;
@@ -326,7 +327,7 @@ export function EventSettingsWorkspace({
       );
       // A restart: the settings stay as typed, no navigation happens, and Try again sends them (#1263).
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as EventApiResult;
@@ -770,7 +771,7 @@ export function EventSettingsWorkspace({
         </span>
       </div>
 
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void save()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void save()} />}
       {editBackup.restored && (
         <div className="form-notice draft-restored-notice" role="status">
           <span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span>

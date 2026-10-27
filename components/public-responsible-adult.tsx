@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { RESPONSIBLE_ADULT_NONE } from "@/modules/guardian-authority/domain";
 import type { RegistrationResponsibleAdultView } from "@/modules/guardian-authority/repository";
 
@@ -27,7 +27,7 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [state, setState] = useState<SaveState>({ kind: "idle", message: "" });
   // The site was restarting (#1263): the choices stay as picked and Try again saves them.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   // Shown value: the registrant's change, else what is recorded, else the only adult (preselected, never blank).
   const preselected = view.adults.length === 1 ? view.adults[0]!.attendeeId : (view.adults.find((adult) => adult.isAccountHolder) ?? view.adults[0])?.attendeeId ?? RESPONSIBLE_ADULT_NONE;
   const values = Object.fromEntries(view.minors.map((minor) => [minor.attendeeId, picks[minor.attendeeId] ?? minor.choice ?? preselected]));
@@ -45,7 +45,7 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
         { method: "PUT", init: { cache: "no-store" } },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         setState({ kind: "idle", message: "" });
         return;
       }
@@ -104,7 +104,7 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
           {state.kind === "error" && <AlertCircle size={16} aria-hidden="true" />}
           {state.message}
         </p>
-        {siteUpdating && <SubmitRetryNotice busy={state.kind === "saving"} onRetry={() => void save()} />}
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={state.kind === "saving"} onRetry={() => void save()} />}
       </form>
     </section>
   );

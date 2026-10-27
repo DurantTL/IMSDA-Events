@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SITE_UPDATING_MESSAGE, submitJson } from "@/lib/submit-json";
+import { SITE_MAYBE_UPDATING_MESSAGE, SITE_UPDATING_MESSAGE, submitJson, unavailableMessage } from "@/lib/submit-json";
 
 /**
  * The shared submit helper (#1263): a restart must read as "updating", never as a lost form, and a
@@ -27,8 +27,10 @@ describe("submitJson classification (#1263)", () => {
   it("reports a bare network error as unavailable without retrying a non-idempotent request", async () => {
     const fetchMock = stubFetch(networkError);
     const result = await submitJson("/api/x", body, quick);
-    expect(result).toMatchObject({ ok: false, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
-    expect(SITE_UPDATING_MESSAGE).toBe("The site is updating. Your answers are still here — try again in a minute.");
+    // A bare network error on an unkeyed write may have reached the server: keep the input, say to check first.
+    expect(result).toMatchObject({ ok: false, unavailable: true, body: { message: SITE_MAYBE_UPDATING_MESSAGE } });
+    expect(SITE_MAYBE_UPDATING_MESSAGE).toBe("The site may be updating. Your answers are still here. Check whether it saved before you try again.");
+    expect(unavailableMessage(result)).toBe(SITE_MAYBE_UPDATING_MESSAGE);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -62,8 +64,21 @@ describe("submitJson classification (#1263)", () => {
   it.each([502, 503, 504])("does NOT auto-retry a non-idempotent request after a %i page (the app may have committed)", async (status) => {
     const fetchMock = stubFetch(html(status), json(200, { done: true }));
     const result = await submitJson("/api/x", body, quick);
-    expect(result).toMatchObject({ ok: false, status, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
+    expect(result).toMatchObject({ ok: false, status, unavailable: true, body: { message: SITE_MAYBE_UPDATING_MESSAGE } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the exact issue wording when the request is keyed, because repeating it is safe", async () => {
+    stubFetch(html(502));
+    const result = await submitJson("/api/x", body, { idempotent: true, ...quick });
+    expect(unavailableMessage(result)).toBe("The site is updating. Your answers are still here — try again in a minute.");
+    stubFetch(networkError);
+    expect(unavailableMessage(await submitJson("/api/x", body, { idempotent: true, ...quick }))).toBe(SITE_UPDATING_MESSAGE);
+  });
+
+  it("gives the exact issue wording for the app's own UPDATING answer even without a key", async () => {
+    stubFetch(json(503, { code: "UPDATING", message: SITE_UPDATING_MESSAGE }));
+    expect(unavailableMessage(await submitJson("/api/x", body, quick))).toBe(SITE_UPDATING_MESSAGE);
   });
 
   it("gives the updating message when the idempotent 502 page repeats, after exactly two attempts", async () => {
@@ -75,7 +90,7 @@ describe("submitJson classification (#1263)", () => {
 
   it.each([503, 504])("treats a plain %i page as unavailable", async (status) => {
     stubFetch(html(status));
-    const result = await submitJson("/api/x", body, quick);
+    const result = await submitJson("/api/x", body, { idempotent: true, ...quick });
     expect(result).toMatchObject({ ok: false, status, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
   });
 

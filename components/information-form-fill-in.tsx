@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
 import { useAnswerDraft } from "@/components/use-answer-draft";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { SubmitButton } from "@/components/submit-button";
 import { FieldInput } from "@/components/club-form-fill-in";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
@@ -28,7 +28,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   // The site was restarting (#1263): answers stay, and Try again re-sends them with the same key.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   // A local draft (#1263): the public rules apply, so sensitive, medical, member-list and long-text answers are never written.
   const [edited, setEdited] = useState(false);
   const answerDraft = useAnswerDraft({
@@ -78,7 +78,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
         slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(),
       }, { idempotent: true });
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as { message?: string; issues?: Issue[]; confirmationMessage?: string };
@@ -164,7 +164,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
           </fieldset>
         );
       })}
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void submit()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void submit()} />}
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

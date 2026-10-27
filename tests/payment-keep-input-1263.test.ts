@@ -161,6 +161,56 @@ describe("card payment after a timeout (#1263)", () => {
   });
 });
 
+/** Hangs until aborted (a timeout), then, when `hang` is turned off, answers `success`. */
+function installTimeoutFetch(checkoutBody: unknown, success: () => Response) {
+  const calls: Call[] = [];
+  const state = { hang: true };
+  vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+    if ((init?.method ?? "GET") === "GET") return Promise.resolve(new Response(JSON.stringify({ checkout: checkoutBody }), { status: 200 }));
+    calls.push({ url, method: "POST", body: JSON.parse(String(init!.body)) });
+    if (!state.hang) return Promise.resolve(success());
+    return new Promise<Response>((_resolve, reject) => {
+      init!.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    });
+  }));
+  return { calls, state };
+}
+
+describe("Pay on Square and payment choice after a timeout (#1263)", () => {
+  it("reuses the same link key and return id on the next press", async () => {
+    const { calls, state } = installTimeoutFetch(checkout, () => new Response(JSON.stringify({ message: "No link available." }), { status: 422 }));
+    const container = await open();
+    await click(container.querySelector<HTMLButtonElement>(".public-square-hosted-button")!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(calls).toHaveLength(1);
+    state.hang = false;
+    await click(container.querySelector<HTMLButtonElement>(".public-square-hosted-button")!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.body!.idempotencyKey).toBe(calls[0]!.body!.idempotencyKey);
+    expect(calls[1]!.body!.returnId).toBe(calls[0]!.body!.returnId);
+  });
+
+  it("replays the same payment-choice request id on the next press", async () => {
+    const choiceCheckout = {
+      ...checkout, state: "CHOICE_REQUIRED", hostedLink: false,
+      paymentChoice: { available: true, locked: false, selected: null, currentOperationId: null, baseSubtotalCents: 12_000, cardProcessingFeeCents: 500, cardTotalCents: 12_500, payLaterTotalCents: 12_000 },
+    };
+    const { calls, state } = installTimeoutFetch(choiceCheckout, () => new Response(JSON.stringify({ message: "Not saved." }), { status: 422 }));
+    const container = await open();
+    const choiceButton = () => container.querySelector<HTMLButtonElement>("button[aria-pressed]")!;
+    await click(choiceButton());
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(calls).toHaveLength(1);
+    state.hang = false;
+    await click(choiceButton());
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.body!.clientRequestId).toBe(calls[0]!.body!.clientRequestId);
+    expect(calls.every((call) => call.url.endsWith("/payment-choice"))).toBe(true);
+  });
+});
+
 describe("Pay on Square during a restart (#1263)", () => {
   it("keeps the link key and return id on Try again, and does not leave the page on a failure", async () => {
     const { calls, state } = installFetch(() => new Response("<html>Bad Gateway</html>", { status: 502 }), () => new Response(JSON.stringify({ message: "No link available." }), { status: 422 }));

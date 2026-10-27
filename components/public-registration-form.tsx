@@ -40,7 +40,7 @@ import { RegistrationAccountPrompt } from "@/components/registration-account-pro
 import { SearchableSelect } from "@/components/searchable-select";
 import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { PublicLodgingStep } from "@/components/public-lodging-step";
 import {
@@ -720,7 +720,7 @@ export function PublicRegistrationForm({
   const [promoCodeApplying, setPromoCodeApplying] = useState(false);
   const [promoCodeNotice, setPromoCodeNotice] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const submitInFlight = useRef(false);
   // Club cards tuck roster-known answers away (#853); once a question has been shown (a server issue, or "Change"),
   // it stays shown for the rest of the visit. Keyed by `${clientId}:${fieldKey}`, or `${clientId}:*` for "Change".
@@ -3158,7 +3158,7 @@ export function PublicRegistrationForm({
         if (outcome.ok) club.onSubmitted?.();
         else if (outcome.unavailable) {
           // The site is restarting: nothing was lost; Try again re-sends with the same request id (#1263).
-          setSiteUpdating(true);
+          setSiteUpdating(outcome.message || unavailableMessage({ body: {} }));
         } else {
           setServerIssues(outcome.issues);
           showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
@@ -3212,7 +3212,10 @@ export function PublicRegistrationForm({
       );
       if (submission.unavailable) {
         // The site is restarting: keep every answer, the key and the draft; offer Try again.
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(submission));
+        // The notice sits at the top of the form: bring the host page there too (a cross-origin iframe
+        // cannot be scrolled by focus() alone), and the notice itself takes focus.
+        window.imsdaEmbedScrollTop?.();
         return;
       }
       const response = submission;
@@ -3546,7 +3549,7 @@ export function PublicRegistrationForm({
             )}
           </section>
 
-          {siteUpdating && <SubmitRetryNotice busy={submitting} focusOnShow onRetry={() => void submit()} />}
+          {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
             <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
               <strong><AlertTriangle aria-hidden="true" size={16} /> {error || "Review the highlighted fields."}</strong>

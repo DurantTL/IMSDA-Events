@@ -3,7 +3,7 @@
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
 import { useEffect, useRef } from "react";
-import { submitJson, SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
@@ -103,7 +103,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     try {
       const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}`, { definition: withExplicitSensitiveFlags(definition), expectedUpdatedAt: selectedVersion.updatedAt }, { method: "PATCH" });
       // A restart: the edits stay in the editor, nothing reloads, and Try again saves them (#1263).
-      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); return; }
+      if (response.unavailable) { setError(unavailableMessage(response)); return; }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to save this draft.");
       syncForm(result.form, editsCreateDraft ? `Version ${result.form.activeVersion.versionNumber} was saved as a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "withdrawn version stays withdrawn"} until you publish this draft (a test is optional).` : "Draft saved locally.");
@@ -192,7 +192,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       if (!result.ok && result.unavailable) {
         // A restart: edits stay. If the save landed first, show it as saved and let Try again only publish (#1263).
         if (result.stage === "publish" && result.savedForm) syncForm(result.savedForm);
-        setError(SITE_UPDATING_MESSAGE);
+        setError(result.message);
       } else if (result.ok) syncForm(result.form, `Version ${result.form.activeVersion.versionNumber} is published. The public registration link is now available; future edits create a new draft version.`);
       else if (result.stage === "save") setError(`${result.message} Nothing was published.`);
       else {
@@ -208,7 +208,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     retryRef.current = () => void latest.current.unpublish();
     try {
       const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}/unpublish`, undefined, { method: "POST" });
-      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); return; }
+      if (response.unavailable) { setError(unavailableMessage(response)); return; }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to withdraw this form.");
       syncForm(result.form, "This form is withdrawn: it is no longer offered on the public event page and registration is closed. Registrations already taken keep the exact questions and prices they were submitted under. To offer it again, save a new draft, then publish it. A test is optional.");
@@ -258,7 +258,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     setBusy("restore"); setError(""); setNotice("");
     try {
       const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}`, { definition: withExplicitSensitiveFlags(version.definition), expectedUpdatedAt }, { method: "PATCH" });
-      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); retryRef.current = () => void latest.current.restoreVersion(version); return; }
+      if (response.unavailable) { setError(unavailableMessage(response)); retryRef.current = () => void latest.current.restoreVersion(version); return; }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to restore this version.");
       syncForm(result.form, restoreNotice(version.versionNumber));

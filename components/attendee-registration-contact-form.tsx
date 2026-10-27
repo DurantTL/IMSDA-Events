@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
@@ -28,7 +28,7 @@ export function AttendeeRegistrationContactForm({
   const [requesting, setRequesting] = useState(false);
   const [saving, setSaving] = useState(false);
   // The site was restarting (#1263): the fields and the typed code stay, and Try again sends them as they are.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const retryRef = useRef<(() => void) | null>(null);
   const [notice, setNotice] = useState<{ tone: "idle" | "error" | "saved"; message: string }>({
     tone: "idle",
@@ -48,7 +48,7 @@ export function AttendeeRegistrationContactForm({
     try {
       const response = await submitJson("/api/attendee/step-up", {});
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         retryRef.current = () => void requestCode();
         setNotice({ tone: "idle", message: "" });
         return;
@@ -89,7 +89,7 @@ export function AttendeeRegistrationContactForm({
         { method: "PATCH" },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         retryRef.current = () => void save();
         setNotice({ tone: "idle", message: "" });
         return;
@@ -162,7 +162,7 @@ export function AttendeeRegistrationContactForm({
             {notice.message}
           </p>
         </div>
-        {siteUpdating && <SubmitRetryNotice busy={saving || requesting} onRetry={() => retryRef.current?.()} />}
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving || requesting} onRetry={() => retryRef.current?.()} />}
       </form>
     </details>
   );

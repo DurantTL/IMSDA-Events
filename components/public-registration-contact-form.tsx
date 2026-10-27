@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 
 type Contact = {
   firstName: string;
@@ -33,7 +33,7 @@ export function PublicRegistrationContactForm({
   const [savedPhone, setSavedPhone] = useState(initialContact.phone);
   const [attempted, setAttempted] = useState(false);
   // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [saveState, setSaveState] = useState<SaveState>({
     kind: "idle",
     message: "",
@@ -64,7 +64,7 @@ export function PublicRegistrationContactForm({
         { method: "PATCH", init: { cache: "no-store" } },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         setSaveState({ kind: "idle", message: "" });
         return;
       }
@@ -178,7 +178,7 @@ export function PublicRegistrationContactForm({
           {saveState.message}
         </p>
       </div>
-      {siteUpdating && <SubmitRetryNotice busy={saveState.kind === "saving"} onRetry={() => void saveContact()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saveState.kind === "saving"} onRetry={() => void saveContact()} />}
     </form>
   );
 }

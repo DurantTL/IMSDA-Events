@@ -2,6 +2,8 @@ import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey } from "@/lib/local-edit-draft";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { clearHistory } from "./edit-history";
+import { blankPreviewAttendees, firstPreviewStepId } from "./builder-types";
+import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderWorkspaceProps } from "./builder-types";
 import { useBuilderActions } from "./use-builder-actions";
@@ -24,20 +26,40 @@ export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: Return
   const actions = useBuilderActions(props, state, derived, askConfirm);
   // Unsaved edits to the open form are backed up in this browser and come back after a reload (#1263).
   // The definition holds questions and prices only, never attendee answers.
-  const { setDefinition, setHistory, setDirty } = state;
-  const editBackup = useLocalEditDraft({
+  const { setDefinition, setHistory, setDirty, setResponses, setPreviewAttendees, setPreviewStepId, setTestIssues, setExpandedFieldId, closeModuleLibrary } = state;
+  // The same resets as opening a form (selectForm / chooseForm): a swapped definition starts a clean preview.
+  const applyDefinition = (next: RegistrationFormDefinition) => {
+    setDefinition(next);
+    setHistory(clearHistory(next));
+    setResponses({});
+    setPreviewAttendees(blankPreviewAttendees(next));
+    setPreviewStepId(firstPreviewStepId(next));
+    setTestIssues([]);
+    setExpandedFieldId(null);
+    closeModuleLibrary();
+  };
+  const backup = useLocalEditDraft({
     storageKey: editDraftKey("registration-builder", `${eventId}:${state.selectedFormId ?? ""}`),
     version: state.selectedVersion?.updatedAt ?? "",
     value: state.definition,
     dirty: state.dirty && state.definition !== null,
     onRestore: (stored) => {
       const parsed = registrationFormDefinitionSchema.safeParse(stored);
-      if (!parsed.success) return;
-      setDefinition(parsed.data);
-      setHistory(clearHistory(parsed.data));
+      if (!parsed.success) return false;
+      applyDefinition(parsed.data);
       setDirty(true);
+      return true;
     },
   });
+  // Discarding goes back to the saved version in place: no reload, so no "Leave site?" prompt.
+  const editBackup = {
+    ...backup,
+    discard: () => {
+      backup.discard();
+      if (state.selectedVersion) applyDefinition(structuredClone(state.selectedVersion.definition));
+      setDirty(false);
+    },
+  };
   return { mealPlanPrices, eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions, editBackup };
 }
 

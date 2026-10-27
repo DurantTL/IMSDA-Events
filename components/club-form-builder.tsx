@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ArrowDown, ArrowUp, EyeOff, LockKeyhole, Plus, Save, Send, Trash2 } from "lucide-react";
 import {
   addField,
@@ -100,7 +100,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const dirty = specSignature(spec) !== saved;
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const retryRef = useRef<(() => void) | null>(null);
   // Unsaved edits are backed up in this browser and come back after a reload (#1263).
   const editBackup = useLocalEditDraft({
@@ -110,7 +110,9 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     dirty,
     onRestore: (stored) => {
       const restored = readDraftShape(stored);
-      if (restored) setSpec(restored);
+      if (!restored) return false;
+      setSpec(restored);
+      return true;
     },
   });
   const allowNavigation = useUnsavedChangesGuard(dirty, "You have unsaved changes to this form. Leave this page and discard them?");
@@ -138,7 +140,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
       if (response.unavailable) {
         // The site is restarting: the edits stay as they are, nothing reloads, and Try again re-runs this save (#1263).
         retryRef.current = retry;
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return null;
       }
       const result = response.body as { message?: string; issues?: BuilderIssue[] } & Record<string, unknown>;
@@ -244,7 +246,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
             <button className="secondary-button" type="button" onClick={() => { editBackup.discard(); setSpec(props.initial); }}>Discard</button>
           </div>
         )}
-        {siteUpdating && <SubmitRetryNotice busy={busy} onRetry={() => retryRef.current?.()} />}
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={busy} onRetry={() => retryRef.current?.()} />}
         {message && <div className="inline-notice success" role="status">{message}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         {unplaced.length > 0 && (

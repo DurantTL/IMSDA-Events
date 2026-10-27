@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -378,7 +378,7 @@ export function RegistrationAmendmentEditor({
   const [reason, setReason] = useState("");
   const [clientRequestId] = useState(() => crypto.randomUUID());
   // The site was restarting (#1263): the edits stay; Try again re-sends with the same request id, so it applies once.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [preview, setPreview] = useState<AmendmentPreview | null>(null);
   const [issues, setIssues] = useState<Array<{ path?: string; message?: string }>>([]);
   const [error, setError] = useState("");
@@ -530,7 +530,7 @@ export function RegistrationAmendmentEditor({
         { idempotent: true },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -558,7 +558,7 @@ export function RegistrationAmendmentEditor({
         { idempotent: true },
       );
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -609,7 +609,7 @@ export function RegistrationAmendmentEditor({
           <div className="total"><span>Total</span><strong>{money(preview.totalCents)}</strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
-        {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void confirmAmendment()} />}
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void confirmAmendment()} />}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="secondary-button" type="button" disabled={saving} onClick={() => setPreview(null)}>Back to edit</button>
@@ -730,7 +730,7 @@ export function RegistrationAmendmentEditor({
           <ul>{issues.map((issue, index) => <li key={`${issue.path ?? "issue"}_${index}`}>{issue.message ?? "Invalid value"}</li>)}</ul>
         </div>
       )}
-      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void reviewAmendment()} />}
+      {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void reviewAmendment()} />}
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="form-actions">
         <button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>Cancel</button>

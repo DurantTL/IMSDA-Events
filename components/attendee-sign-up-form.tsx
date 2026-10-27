@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { Eye, EyeOff, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
 import {
@@ -44,7 +44,7 @@ export function AttendeeSignUpForm({
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const emailRef = useRef<HTMLInputElement>(null);
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   /** Only ever set by a development server with no account email configured. */
   const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
 
@@ -73,7 +73,7 @@ export function AttendeeSignUpForm({
     try {
       const response = await submitJson(kind === "details" ? "/api/attendee/sign-up" : "/api/attendee/verify-email", body);
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         setBusy(false);
         return;
       }

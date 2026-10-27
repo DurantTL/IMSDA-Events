@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { CreditCard, ExternalLink, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import {
   paymentChoiceOptionPresentations,
@@ -290,7 +290,7 @@ export function PublicSquarePayment({
     message: string;
   } | null>(null);
   // The site was restarting (#1263): the payment keys and the card token stay, so Try again cannot charge twice.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const retryRef = useRef<(() => void) | null>(null);
 
   // The registrant's own pick between a deposit and the whole balance (#415); null leaves the server to choose.
@@ -520,7 +520,7 @@ export function PublicSquarePayment({
       }, { idempotent: true });
       if (response.unavailable) {
         retryRef.current = () => retryPayment(method);
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const body = response.body as {
@@ -572,7 +572,7 @@ export function PublicSquarePayment({
       }, { idempotent: true });
       if (response.unavailable) {
         retryRef.current = () => void payOnSquare();
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const body = response.body as {
@@ -673,7 +673,7 @@ export function PublicSquarePayment({
       const response = await submitJson(choiceEndpoint, request, { idempotent: true });
       if (response.unavailable) {
         retryRef.current = () => void savePaymentChoice(choice);
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         return;
       }
       const body = response.body as {

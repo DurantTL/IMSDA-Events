@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
-import { submitJson } from "@/lib/submit-json";
+import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
@@ -21,7 +21,7 @@ export function AttendeeProfileForm({
   const [attempted, setAttempted] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
-  const [siteUpdating, setSiteUpdating] = useState(false);
+  const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
 
@@ -47,7 +47,7 @@ export function AttendeeProfileForm({
     try {
       const response = await submitJson("/api/attendee/profile", profile, { method: "PATCH", init: { cache: "no-store" } });
       if (response.unavailable) {
-        setSiteUpdating(true);
+        setSiteUpdating(unavailableMessage(response));
         setState("idle");
         setMessage("");
         return;
@@ -183,7 +183,7 @@ export function AttendeeProfileForm({
             </>
           )}
         </p>
-        {siteUpdating && <SubmitRetryNotice busy={state === "saving"} onRetry={() => void save()} />}
+        {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={state === "saving"} onRetry={() => void save()} />}
       </div>
     </form>
   );

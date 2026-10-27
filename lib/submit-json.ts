@@ -16,6 +16,12 @@ export const submitJsonTimeoutMs = 60_000;
 export const submitJsonRetryDelayMs = 4_000;
 export const SITE_UPDATING_MESSAGE = "The site is updating. Your answers are still here — try again in a minute.";
 export const SITE_UPDATING_CODE = "UPDATING";
+/**
+ * For an unavailable result that is neither the app's UPDATING answer nor keyed: the request may have been
+ * handled before the connection or proxy gave up, so Try again could repeat it. Keep the input, but say so.
+ */
+export const SITE_MAYBE_UPDATING_MESSAGE = "The site may be updating. Your answers are still here. Check whether it saved before you try again.";
+export const SITE_MAYBE_UPDATING_CODE = "UNAVAILABLE";
 
 export type SubmitJsonMethod = "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -47,8 +53,20 @@ type Attempt =
   | { kind: "network" }
   | { kind: "timeout" };
 
-function updatingResult(status: number): SubmitJsonResult {
-  return { ok: false, status, unavailable: true, body: { code: SITE_UPDATING_CODE, message: SITE_UPDATING_MESSAGE } };
+function updatingResult(status: number, safeToRepeat: boolean): SubmitJsonResult {
+  return safeToRepeat
+    ? { ok: false, status, unavailable: true, body: { code: SITE_UPDATING_CODE, message: SITE_UPDATING_MESSAGE } }
+    : { ok: false, status, unavailable: true, body: { code: SITE_MAYBE_UPDATING_CODE, message: SITE_MAYBE_UPDATING_MESSAGE } };
+}
+
+/** The message to show for an unavailable result (exact issue wording, or the cautious one for an unkeyed write). */
+export function unavailableMessage(result: { body: Record<string, unknown> }) {
+  return typeof result.body.message === "string" ? result.body.message : SITE_UPDATING_MESSAGE;
+}
+
+/** True for either wording, so a component that keeps the message in its error text can recognise it. */
+export function isUnavailableMessage(message: string) {
+  return message === SITE_UPDATING_MESSAGE || message === SITE_MAYBE_UPDATING_MESSAGE;
 }
 
 async function attempt(url: string, method: SubmitJsonMethod, payload: unknown, timeoutMs: number, init: SubmitJsonOptions["init"], fetchImpl: typeof fetch): Promise<Attempt> {
@@ -122,8 +140,9 @@ export async function submitJson(
   if (result.kind === "timeout") {
     return { ok: false, status: 0, body: { message: `${prefix}It is taking too long. Check whether it finished before trying again.` } };
   }
-  if (isUnavailable(result)) return updatingResult(result.kind === "response" ? result.status : 0);
-  if (result.kind !== "response") return updatingResult(0);
+  // The exact "your answers are still here, try again" wording is only right when a repeat cannot duplicate work.
+  if (isUnavailable(result)) return updatingResult(result.kind === "response" ? result.status : 0, idempotent || provedUnhandled(result));
+  if (result.kind !== "response") return updatingResult(0, idempotent);
   if (result.body === null) {
     return { ok: false, status: result.status, body: { message: `${prefix}The server answered with an error (${result.status}). Try again in a moment.` } };
   }
