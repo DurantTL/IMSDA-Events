@@ -18,7 +18,7 @@ type Issue = { key?: string; message: string };
  * already decided the visitor may answer; the server checks everything again against the published version, and the
  * same idempotency key is sent on every retry so a double tap stores once.
  */
-export function InformationFormFillIn({ definition, slug, eventSlug }: { definition: RegistrationFormDefinition; slug: string; eventSlug?: string }) {
+export function InformationFormFillIn({ definition, slug, eventSlug, disableDrafts = false }: { definition: RegistrationFormDefinition; slug: string; eventSlug?: string; /** True for a signed-in visitor: no browser draft is read or written (#1263). */ disableDrafts?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
   const [saving, setSaving] = useState(false);
@@ -32,7 +32,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
   // A local draft (#1263): the public rules apply, so sensitive, medical, member-list and long-text answers are never written.
   const [edited, setEdited] = useState(false);
   const answerDraft = useAnswerDraft({
-    enabled: true,
+    enabled: !disableDrafts,
     identity: { scope: "information-form", formId: `${eventSlug ?? ""}/${slug}` },
     definition,
     answers,

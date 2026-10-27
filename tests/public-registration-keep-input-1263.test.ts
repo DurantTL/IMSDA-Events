@@ -84,7 +84,7 @@ describe("public registration: submit during a restart (#1263)", () => {
     expect(container.querySelector(".submit-retry-notice")!.textContent).toContain(SITE_UPDATING_MESSAGE);
     expect(container.querySelector(".submit-retry-notice")!.getAttribute("role")).toBe("alert");
     const failedCalls = fetchMock.mock.calls.length;
-    expect(failedCalls).toBeLessThanOrEqual(2); // the form's key is sent, so one quiet retry is allowed, no more
+    expect(failedCalls).toBe(2); // the key makes exactly one quiet retry safe
 
     failing = false;
     await click(buttonByText(container, "Try again"));
@@ -152,5 +152,28 @@ describe("public registration: submit during a restart (#1263)", () => {
     expect(stored).toContain("Avery Guest");
     expect(stored).not.toContain("synthetic concern");
     expect(stored).not.toMatch(/idempotency/i);
+  });
+
+  it("keeps the key after a timeout, so the next submit replays the same registration", async () => {
+    let hang = true;
+    const fetchMock = vi.fn((_url: string, init: RequestInit) => (hang
+      ? new Promise<Response>((_resolve, reject) => {
+        init.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+      })
+      : Promise.resolve(new Response(JSON.stringify({ confirmation }), { status: 201 }))));
+    vi.stubGlobal("fetch", fetchMock);
+    mounted = await mount(createElement(PublicRegistrationForm, props as never));
+    const { container } = mounted;
+    await reachReview(container);
+    await click(submitButton(container));
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // a timeout is never retried automatically
+    expect(container.querySelector(".submit-retry-notice")).toBeNull();
+    expect(container.textContent).toContain("Check whether it finished before trying again.");
+    hang = false;
+    await click(submitButton(container));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const [first, second] = fetchMock.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
   });
 });

@@ -18,6 +18,7 @@ import {
  * insurance, care, custody or notes, plus conditional follow-ups to those), and also:
  *  - every field the form marks sensitive (`sensitive`, or the template's sealed `sensitiveFieldKeys`)
  *    or whose key, label, help or choices read as sensitive;
+ *  - auto-filled dates (`autoDate`), so a restored draft never overwrites today's signing date;
  *  - member lists (rows hold other people's details) and any non-plain value;
  *  - idempotency keys (they live only in the page session).
  * A restored draft is cut down by the same rules again, so a tampered one cannot inject a key.
@@ -58,7 +59,8 @@ export function answerDraftExcludedKeys(definition: RegistrationFormDefinition, 
   const excluded = new Set<string>(draftExcludedKeys(definition));
   for (const key of sealedKeys) excluded.add(key);
   for (const field of definition.sections.flatMap((section) => section.fields)) {
-    if (field.sensitive || field.type === "MEMBER_LIST" || isSensitiveField(field)) excluded.add(field.key);
+    // An auto-filled signing or application date is set again on submit; a restored one must not overwrite today's.
+    if (field.sensitive || field.type === "MEMBER_LIST" || field.autoDate || isSensitiveField(field)) excluded.add(field.key);
   }
   return excluded;
 }

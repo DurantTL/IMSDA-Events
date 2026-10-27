@@ -24,6 +24,7 @@ export function useLocalEditDraft<T>({
 }) {
   const [restored, setRestored] = useState(false);
   const [ready, setReady] = useState(false);
+  const dirtySeenRef = useRef(false);
   const restoreRef = useRef(onRestore);
   useEffect(() => { restoreRef.current = onRestore; });
 
@@ -43,10 +44,12 @@ export function useLocalEditDraft<T>({
   useEffect(() => {
     if (!ready) return;
     if (!dirty) {
-      // Nothing unsaved, but a just-restored copy must survive until the editor has re-rendered dirty.
-      if (!restored) clearEditDraft(getBrowserEditDraftStorage(), storageKey);
+      // Clean again (saved, or edited back): drop the backup. A just-restored copy survives only until
+      // the editor has rendered dirty once, so a restore that has not been applied yet is not lost.
+      if (!restored || dirtySeenRef.current) clearEditDraft(getBrowserEditDraftStorage(), storageKey);
       return;
     }
+    dirtySeenRef.current = true;
     const timer = window.setTimeout(() => saveEditDraft(getBrowserEditDraftStorage(), storageKey, version, value), 600);
     return () => window.clearTimeout(timer);
   }, [ready, dirty, value, storageKey, version, restored]);

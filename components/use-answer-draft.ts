@@ -38,7 +38,11 @@ export function useAnswerDraft({
   const identityKey = answerDraftKey(identity);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      // Signed in or prefilled: also drop any older anonymous draft.
+      clearAnswerDraft(getBrowserDraftStorage(), identity);
+      return;
+    }
     // Deferred a tick so the restore is an external-storage sync, not a synchronous state cascade in the effect.
     const timer = window.setTimeout(() => {
       const loaded = loadAnswerDraft(getBrowserDraftStorage(), identity, definition, { sealedKeys });

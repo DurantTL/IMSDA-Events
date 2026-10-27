@@ -529,7 +529,8 @@ export function PublicSquarePayment({
         retryable?: boolean;
       };
       if (!response.ok || !body.payment) {
-        if (!body.retryable) clearPaymentAttempt();
+        // A timeout (status 0) may still be running at Square: keep the key and the card token.
+        if (!body.retryable && response.status !== 0) clearPaymentAttempt();
         setNotice({
           tone: body.retryable ? "pending" : "error",
           message: body.message
@@ -580,7 +581,7 @@ export function PublicSquarePayment({
         retryable?: boolean;
       };
       if (!response.ok || !body.link?.url) {
-        if (!body.retryable) {
+        if (!body.retryable && response.status !== 0) {
           hostedKeyRef.current = null;
           hostedReturnRef.current = null;
         }
@@ -684,7 +685,7 @@ export function PublicSquarePayment({
         retryable?: boolean;
       };
       if (!response.ok || !body.paymentChoice) {
-        if (!body.retryable) {
+        if (!body.retryable && response.status !== 0) {
           choiceRequestRef.current = null;
           setPendingChoice(null);
         }

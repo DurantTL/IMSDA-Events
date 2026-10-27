@@ -13430,6 +13430,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 
 /* Submit failed because the site is updating (#1263): the message and a Try again button; the form keeps its values. */
 .submit-retry-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0; border: 1px solid #ddcd9e; border-left: 4px solid #b58a1f; border-radius: 10px; background: var(--imsda-gold-soft); color: #5b4410; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.45; }
+.submit-retry-notice:focus { outline: 3px solid var(--focus-ring, #1d5f9c); outline-offset: 2px; }
 .submit-retry-notice > span { min-width: 0; flex: 1 1 14rem; overflow-wrap: anywhere; }
 .submit-retry-notice .secondary-button { min-width: 44px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 

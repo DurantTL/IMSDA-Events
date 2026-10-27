@@ -5,10 +5,10 @@
  * friendly message. Callers keep their form values and offer "Try again".
  *
  * One quiet automatic retry runs after a short pause, but only when it cannot do harm:
- *  - the response proves the app never handled the request (502/503/504 with a page that is not
- *    JSON, or the `UPDATING` code), or
+ *  - the app answered `UPDATING`, which proves it never handled the request, or
  *  - the caller marked the request `idempotent` (the server dedupes on a key carried in the body),
- *    in which case a bare network error is retried too.
+ *    in which case a bare network error or a gateway page is retried too. A gateway page alone
+ *    proves nothing: the app may have committed the work before the proxy gave up.
  * A timeout is never "unavailable" and never retried: the request may still be running. A 4xx or a
  * JSON answer the app produced (a real 500, a "busy" 503) is passed through untouched.
  */
@@ -47,8 +47,6 @@ type Attempt =
   | { kind: "network" }
   | { kind: "timeout" };
 
-const gatewayStatuses = new Set([502, 503, 504]);
-
 function updatingResult(status: number): SubmitJsonResult {
   return { ok: false, status, unavailable: true, body: { code: SITE_UPDATING_CODE, message: SITE_UPDATING_MESSAGE } };
 }
@@ -86,11 +84,12 @@ function isUpdatingBody(body: Record<string, unknown> | null) {
   return body?.code === SITE_UPDATING_CODE;
 }
 
-/** The response proves the app never handled the request. */
+/**
+ * Only the app's own UPDATING answer proves it never handled the request. A gateway page does not:
+ * a 504 means the proxy gave up while the app may still commit, a 502 can follow a committed transaction.
+ */
 function provedUnhandled(result: Attempt) {
-  if (result.kind !== "response") return false;
-  if (isUpdatingBody(result.body)) return true;
-  return gatewayStatuses.has(result.status) && result.body === null;
+  return result.kind === "response" && isUpdatingBody(result.body);
 }
 
 function isUnavailable(result: Attempt) {

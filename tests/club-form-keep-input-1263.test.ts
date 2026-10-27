@@ -77,7 +77,7 @@ describe("club form: submit during a restart (#1263)", () => {
     expect(container.querySelector<HTMLInputElement>('input[type="text"], input:not([type])')!.value).toBe("Alex Example");
     expect(container.querySelector("select")!.value).toBe("club-a");
     const failedCalls = fetchMock.mock.calls.length;
-    expect(failedCalls).toBeLessThanOrEqual(2); // at most one quiet automatic retry
+    expect(failedCalls).toBe(2); // the key makes exactly one quiet retry safe
 
     failing = false;
     await click(buttonByText(container, "Try again"));

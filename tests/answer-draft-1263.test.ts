@@ -40,6 +40,7 @@ const definition = {
     field("photo_consent", "Photo consent", "CHECKBOX", { required: true }),
     field("mailing_address", "Mailing address", "ADDRESS"),
     field("members", "Member list", "MEMBER_LIST"),
+    field("signing_date", "Signing date", "DATE", { autoDate: "TODAY" }),
   ] }],
 } as unknown as RegistrationFormDefinition;
 
@@ -50,7 +51,7 @@ const everything = {
   club_name: "Synthetic Pathfinders", director_email: "director@example.test", favorite_color: "Blue",
   notes: "long text", medical_conditions: "none", insurance_policy: "X1", date_of_birth: "2010-01-01",
   sealed_answer: "secret", flagged_answer: "flagged", photo_consent: true, mailing_address: "1 Main St",
-  members: [{ name: "A" }], not_a_field: "x", idempotencyKey: "k",
+  members: [{ name: "A" }], signing_date: "2020-01-01", not_a_field: "x", idempotencyKey: "k",
 };
 
 describe("answer drafts (#1263)", () => {
@@ -60,7 +61,7 @@ describe("answer drafts (#1263)", () => {
     const raw = storage.getItem(answerDraftKey(identity))!;
     const stored = JSON.parse(raw);
     expect(Object.keys(stored.answers).sort()).toEqual(["club_name", "director_email", "favorite_color"]);
-    for (const banned of ["secret", "flagged", "none", "X1", "2010-01-01", "long text", "1 Main St", "idempotency", "not_a_field", "Member"]) {
+    for (const banned of ["secret", "flagged", "none", "X1", "2010-01-01", "long text", "1 Main St", "idempotency", "not_a_field", "Member", "2020-01-01"]) {
       expect(raw).not.toContain(banned);
     }
     expect(stored.extras).toEqual({ clubChoice: "club-1" });

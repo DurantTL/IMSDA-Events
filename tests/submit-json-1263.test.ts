@@ -52,16 +52,23 @@ describe("submitJson classification (#1263)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("treats a 502 gateway page as unavailable and retries it once even without a key (the app never saw it)", async () => {
+  it("retries a 502 gateway page once when the request is idempotent", async () => {
     const fetchMock = stubFetch(html(502), json(200, { done: true }));
-    const result = await submitJson("/api/x", body, quick);
+    const result = await submitJson("/api/x", body, { idempotent: true, ...quick });
     expect(result).toMatchObject({ ok: true, body: { done: true } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("gives the updating message when the 502 page repeats", async () => {
-    const fetchMock = stubFetch(html(502));
+  it.each([502, 503, 504])("does NOT auto-retry a non-idempotent request after a %i page (the app may have committed)", async (status) => {
+    const fetchMock = stubFetch(html(status), json(200, { done: true }));
     const result = await submitJson("/api/x", body, quick);
+    expect(result).toMatchObject({ ok: false, status, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the updating message when the idempotent 502 page repeats, after exactly two attempts", async () => {
+    const fetchMock = stubFetch(html(502));
+    const result = await submitJson("/api/x", body, { idempotent: true, ...quick });
     expect(result).toMatchObject({ ok: false, status: 502, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -72,7 +79,7 @@ describe("submitJson classification (#1263)", () => {
     expect(result).toMatchObject({ ok: false, status, unavailable: true, body: { message: SITE_UPDATING_MESSAGE } });
   });
 
-  it("treats the app's own UPDATING answer as unavailable and retries it once", async () => {
+  it("treats the app's own UPDATING answer as unavailable and retries it once, even without a key", async () => {
     const updating = json(503, { code: "UPDATING", message: "The site is updating. Your answers are still here — try again in a minute." });
     const fetchMock = stubFetch(updating, json(201, { created: true }));
     const result = await submitJson("/api/x", body, quick);

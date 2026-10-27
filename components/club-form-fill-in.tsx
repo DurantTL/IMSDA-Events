@@ -196,6 +196,8 @@ export function ClubFormFillIn(props: Props) {
         confirmationMessage?: string;
       };
       if (!response.ok) {
+        // A single-use link that is already used or withdrawn (404): the saved answers have nowhere to go.
+        if (props.mode === "link" && response.status === 404) answerDraft.clear();
         setError(result.message ?? "The form could not be saved.");
         setIssues(result.issues ?? []);
         return;

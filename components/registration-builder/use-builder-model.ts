@@ -1,3 +1,7 @@
+import { useLocalEditDraft } from "@/components/use-local-edit-draft";
+import { editDraftKey } from "@/lib/local-edit-draft";
+import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { clearHistory } from "./edit-history";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderWorkspaceProps } from "./builder-types";
 import { useBuilderActions } from "./use-builder-actions";
@@ -18,7 +22,23 @@ export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: Return
   const edits = useBuilderEdits(state, derived);
   const removal = useBuilderRemoval(state, edits);
   const actions = useBuilderActions(props, state, derived, askConfirm);
-  return { mealPlanPrices, eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions };
+  // Unsaved edits to the open form are backed up in this browser and come back after a reload (#1263).
+  // The definition holds questions and prices only, never attendee answers.
+  const { setDefinition, setHistory, setDirty } = state;
+  const editBackup = useLocalEditDraft({
+    storageKey: editDraftKey("registration-builder", `${eventId}:${state.selectedFormId ?? ""}`),
+    version: state.selectedVersion?.updatedAt ?? "",
+    value: state.definition,
+    dirty: state.dirty && state.definition !== null,
+    onRestore: (stored) => {
+      const parsed = registrationFormDefinitionSchema.safeParse(stored);
+      if (!parsed.success) return;
+      setDefinition(parsed.data);
+      setHistory(clearHistory(parsed.data));
+      setDirty(true);
+    },
+  });
+  return { mealPlanPrices, eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions, editBackup };
 }
 
 export type BuilderModel = ReturnType<typeof useBuilderModel>;

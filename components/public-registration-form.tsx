@@ -3213,7 +3213,6 @@ export function PublicRegistrationForm({
       if (submission.unavailable) {
         // The site is restarting: keep every answer, the key and the draft; offer Try again.
         setSiteUpdating(true);
-        window.imsdaEmbedScrollTop?.();
         return;
       }
       const response = submission;
@@ -3226,7 +3225,8 @@ export function PublicRegistrationForm({
       };
       if (!response.ok || !result.confirmation) {
         // A busy-queue conflict wrote nothing; keep the key so submitting again replays safely (#920).
-        if (response.status < 500 && result.error !== "SUBMISSION_CONFLICT") setIdempotencyKey(null);
+        // A timeout (status 0) may still be running, so it keeps the key too.
+        if (response.status !== 0 && response.status < 500 && result.error !== "SUBMISSION_CONFLICT") setIdempotencyKey(null);
         const nextIssues = Array.isArray(result.issues)
           ? result.issues.filter((issue) => issue && typeof issue.key === "string" && typeof issue.message === "string")
           : [];
@@ -3546,7 +3546,7 @@ export function PublicRegistrationForm({
             )}
           </section>
 
-          {siteUpdating && <SubmitRetryNotice busy={submitting} onRetry={() => void submit()} />}
+          {siteUpdating && <SubmitRetryNotice busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
             <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
               <strong><AlertTriangle aria-hidden="true" size={16} /> {error || "Review the highlighted fields."}</strong>

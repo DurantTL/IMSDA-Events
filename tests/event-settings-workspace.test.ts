@@ -105,8 +105,8 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
   });
 
   it("publishes and unpublishes through their own endpoints, not the settings PATCH", () => {
-    expect(workspaceSource).toContain("/publish`, { method: \"POST\" }");
-    expect(workspaceSource).toContain("/unpublish`, { method: \"POST\" }");
+    expect(workspaceSource).toContain("/publish`, undefined, { method: \"POST\" }");
+    expect(workspaceSource).toContain("/unpublish`, undefined, { method: \"POST\" }");
   });
 
   it("renders the publish/unpublish control as a plain button, never a submit control, inside the settings form", () => {

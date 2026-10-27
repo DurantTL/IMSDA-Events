@@ -1,14 +1,16 @@
 // Save errors, status notices and the duplicate-public-form warning above the editor.
 import { AlertTriangle } from "lucide-react";
+import { LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
 import { DUPLICATE_PUBLIC_FORMS_MESSAGE } from "@/modules/forms/duplicate-public-forms";
 import { useBuilder } from "./builder-context";
 
 export function BuilderNotices() {
-  const { duplicatePublishedGroups, notice, error, retryRef, busy } = useBuilder();
+  const { duplicatePublishedGroups, notice, error, retryRef, busy, editBackup } = useBuilder();
   return (
     <>
+        {editBackup.restored && <div className="form-notice draft-restored-notice" role="status"><span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span><button className="secondary-button" type="button" onClick={() => { editBackup.discard(); window.location.reload(); }}>Discard</button></div>}
         {error === SITE_UPDATING_MESSAGE && <SubmitRetryNotice busy={Boolean(busy)} onRetry={() => retryRef.current?.()} />}
         {error && error !== SITE_UPDATING_MESSAGE && <div className="inline-notice error" role="alert">{error}</div>}
     {notice && <div className="inline-notice" role="status">{notice}</div>}

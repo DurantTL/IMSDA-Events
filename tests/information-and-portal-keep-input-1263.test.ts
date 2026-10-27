@@ -60,7 +60,7 @@ describe("information form (#1263)", () => {
     expect(textInputs(container).map((input) => input.value)).toEqual(["Avery", "synthetic allergy"]);
     expect(window.localStorage.length).toBe(1); // the draft survives a failed submit
     const failed = fetchMock.mock.calls.length;
-    expect(failed).toBeLessThanOrEqual(2);
+    expect(failed).toBe(2); // the key makes exactly one quiet retry safe
 
     failing = false;
     await click(buttonByText(container, "Try again"));
@@ -83,6 +83,17 @@ describe("information form (#1263)", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(10); });
     expect(mounted.container.textContent).toContain("We restored your answers from earlier.");
     expect(textInputs(mounted.container)[0]!.value).toBe("Avery");
+  });
+});
+
+describe("information form for a signed-in visitor (#1263)", () => {
+  it("never writes or restores a browser draft", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    mounted = await mount(createElement(InformationFormFillIn, { definition, slug: "synthetic-info", disableDrafts: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    await typeInto(textInputs(mounted.container)[0]!, "Avery");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(window.localStorage.length).toBe(0);
   });
 });
 

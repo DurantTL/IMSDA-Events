@@ -91,7 +91,7 @@ describe("card payment during a restart (#1263)", () => {
 
     expect(container.querySelector(".submit-retry-notice")!.textContent).toContain(SITE_UPDATING_MESSAGE);
     const failed = calls.length;
-    expect(failed).toBeLessThanOrEqual(2); // the key makes one quiet retry safe
+    expect(failed).toBe(2); // the key makes exactly one quiet retry safe
 
     state.failing = false;
     await click(buttonByText(container, "Try again"));
@@ -131,6 +131,33 @@ describe("card payment during a restart (#1263)", () => {
     expect(calls).toHaveLength(1);
     expect(container.querySelector(".submit-retry-notice")).toBeNull();
     expect(container.textContent).toContain("Square is still confirming.");
+  });
+});
+
+describe("card payment after a timeout (#1263)", () => {
+  it("keeps the key and the card token, so the next press replays the same payment without a second tokenize", async () => {
+    const calls: Call[] = [];
+    let hang = true;
+    vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET") return Promise.resolve(new Response(JSON.stringify({ checkout }), { status: 200 }));
+      calls.push({ url, method: "POST", body: JSON.parse(String(init!.body)) });
+      if (!hang) return Promise.resolve(new Response(JSON.stringify(payment()), { status: 200 }));
+      return new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+      });
+    }));
+    const container = await open();
+    await click(container.querySelector<HTMLButtonElement>(".public-square-pay-button")!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
+    expect(calls).toHaveLength(1);
+    expect(container.querySelector(".submit-retry-notice")).toBeNull();
+    hang = false;
+    await click(container.querySelector<HTMLButtonElement>(".public-square-pay-button")!);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(calls).toHaveLength(2);
+    expect(tokenize).toHaveBeenCalledTimes(1);
+    expect(calls[1]!.body!.idempotencyKey).toBe(calls[0]!.body!.idempotencyKey);
+    expect(calls[1]!.body!.sourceId).toBe(calls[0]!.body!.sourceId);
   });
 });
 
