@@ -75,6 +75,7 @@ stop_standby() {
 
 fail() { # message
   stop_standby
+  docker rm -f imsda-prep >/dev/null 2>&1 || true
   mkdir -p "$(dirname "$FAILED_FILE")" 2>/dev/null && echo "$SHA" > "$FAILED_FILE" || true
   echo "[deploy] $1" >&2
   exit 1
@@ -89,7 +90,11 @@ move_live_tag() {
 
 # Images built before #1263 ignore IMSDA_PREP_ONLY (their prep run would start
 # the app and never exit), so they get the old stop-and-start switch.
-if ! docker run --rm --entrypoint grep "$IMAGE" -q IMSDA_PREP_ONLY /usr/local/bin/docker-entrypoint.sh; then
+# grep answers 1 for "not found"; anything else is a Docker error.
+legacy=0
+docker run --rm --entrypoint grep "$IMAGE" -q IMSDA_PREP_ONLY /usr/local/bin/docker-entrypoint.sh || legacy=$?
+[ "$legacy" -le 1 ] || fail "Could not inspect $IMAGE (docker exit $legacy). Nothing was changed."
+if [ "$legacy" -eq 1 ]; then
   echo "[deploy] $IMAGE predates zero-downtime deploys; restarting the app on it (about a minute offline)."
   move_live_tag
   docker compose -f "$COMPOSE" up -d --no-deps app
@@ -98,7 +103,11 @@ else
   docker tag "$IMAGE" imsda-events:next
 
   echo "[deploy] Applying migrations and syncs for $SHA while the current version keeps serving ..."
-  if ! IMSDA_PREP_ONLY=1 timeout "$PREP_SECONDS" docker compose -f "$COMPOSE" --profile standby run --rm --no-deps standby; then
+  # No terminal (-T, stdin from /dev/null): under `timeout` a run started from
+  # an SSH session would otherwise stop waiting for the terminal.
+  docker rm -f imsda-prep >/dev/null 2>&1 || true
+  if ! IMSDA_PREP_ONLY=1 timeout "$PREP_SECONDS" docker compose -f "$COMPOSE" --profile standby \
+    run -T --rm --no-deps --name imsda-prep standby </dev/null; then
     fail "Migrations or syncs for $SHA failed. The live app was not restarted; any migrations that did apply stay applied."
   fi
 
@@ -111,21 +120,30 @@ else
     fail "$SHA did not become healthy on port 8101. The live app was not restarted (the database is already migrated)."
   fi
 
+  HAD_LIVE=0
+  docker image inspect imsda-events:live >/dev/null 2>&1 && HAD_LIVE=1
   PREVIOUS_SHA="$(docker image inspect imsda-events:live \
     --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)"
   move_live_tag
-  IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" up -d --no-deps app
+  # A failed `up` is caught by the health wait below, which rolls back.
+  IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" up -d --no-deps app \
+    || echo "[deploy] Restarting the app on $SHA failed." >&2
   if ! wait_for_release 8100 "$SHA"; then
     echo "[deploy] $SHA did not come up on port 8100; putting the previous version back." >&2
-    if [ -n "$PREVIOUS_SHA" ]; then
+    if [ "$HAD_LIVE" = 1 ]; then
       docker tag imsda-events:previous imsda-events:live
       # The previous version already ran on this schema: skip the preparation.
-      IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" up -d --no-deps app
+      IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" up -d --no-deps app \
+        || echo "[deploy] Restarting the previous version failed." >&2
       # Keep the standby serving (through the nginx fallback) until it is back.
-      wait_for_release 8100 "$PREVIOUS_SHA" \
-        || echo "[deploy] The previous version $PREVIOUS_SHA is not healthy on 8100 either. Check it now." >&2
+      if [ -n "$PREVIOUS_SHA" ]; then
+        wait_for_release 8100 "$PREVIOUS_SHA" \
+          || echo "[deploy] The previous version $PREVIOUS_SHA is not healthy on 8100 either. Check it now." >&2
+      else
+        sleep 30
+      fi
     fi
-    fail "Deploy of $SHA failed; live is back on ${PREVIOUS_SHA:-nothing (no previous image)}."
+    fail "Deploy of $SHA failed; live is back on ${PREVIOUS_SHA:-the previous image}."
   fi
   stop_standby
   echo "[deploy] Live on $SHA (previous version tagged imsda-events:previous)"

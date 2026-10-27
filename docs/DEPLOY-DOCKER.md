@@ -453,6 +453,8 @@ timer only fetches. (Until xCloud's deploy is turned off, xCloud still pulls
 the commit and restarts the old version briefly.) Once a day GitHub publishes
 the image for the latest `main` ("Prebuilt images from GitHub"), and the timer
 switches to it in the next night window, so the day's merges go live together.
+The timer deploys only the newest commit on `main`: if something merges after
+the day's image was built, that night waits for the next image.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
 on `main`, wait about 10 minutes, then pull and run `imsda-deploy` by hand
 (step 3 under "Deploys without downtime"); otherwise the timer deploys it in

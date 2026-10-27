@@ -126,6 +126,18 @@ describe("deploy.sh zero-downtime switch", () => {
     expect(runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha }).failed).toBeNull();
   });
 
+  it("stops without changing anything when Docker cannot inspect the image", () => {
+    const { status, calls, stderr } = runDeploy({ FAKE_LEGACY_EXIT: "125", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(1);
+    expect(stderr).toContain("Could not inspect");
+    expect(calls.some((c) => c.includes("up -d") || c.includes("imsda-events:live"))).toBe(false);
+  });
+
+  it("runs the preparation without a terminal so a deploy from SSH cannot stall", () => {
+    const { calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(calls.find((c) => c.includes("compose") && c.includes(" run "))).toContain("run -T --rm --no-deps --name imsda-prep standby");
+  });
+
   it("switches an image built before #1263 the old way instead of hanging on its prep run", () => {
     const { status, calls } = runDeploy({ FAKE_LEGACY_EXIT: "1", FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
     expect(status).toBe(0);
