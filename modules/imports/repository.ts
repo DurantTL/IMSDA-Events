@@ -1,4 +1,5 @@
 import "server-only";
+import { appendSubmissionCharge, staffLedgerActor } from "@/modules/ledger/entries";
 import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -745,6 +746,14 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
               },
             }),
           },
+        });
+        // Shadow ledger (#117): the imported total as one charge. The stored total stays authoritative.
+        await appendSubmissionCharge(tx, {
+          eventId,
+          registrationId: registration.id,
+          totalCents: data.totalAmountCents,
+          actor: await staffLedgerActor(tx, actorUserId),
+          pricingSnapshot: { source: "IMPORT", importRunId },
         });
         registrationId = registration.id;
         finalStatus = ImportRecordStatus.CREATED;

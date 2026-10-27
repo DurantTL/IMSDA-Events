@@ -165,6 +165,7 @@ export const staffPageTitles = {
   lodgingAssignments: "Lodging assignments",
   issuedAssets: "Issued assets",
   scheduledEmails: "Scheduled emails",
+  ledgerCheck: "Ledger check (shadow)",
 } as const;
 
 /** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
@@ -206,6 +207,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
+  ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
   ["/events-admin", "exact", "Event administration"],

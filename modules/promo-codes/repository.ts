@@ -1,5 +1,6 @@
 import "server-only";
 
+import { appendPromoDiscount } from "@/modules/ledger/entries";
 import {
   Prisma,
   RegistrationFormStatus,
@@ -894,11 +895,16 @@ export async function recordPromoCodeRedemption(
     eventId: string;
     registrationId: string;
     claimed: ClaimedPromoCode;
+    /**
+     * The discount the registration's stored total actually reflects, in cents (positive). When given, the redemption's
+     * DISCOUNT ledger entry is written in the same transaction (#117, shadow mode: the stored total stays authoritative).
+     */
+    appliedDiscountCents?: number;
   },
 ) {
   const promo = input.claimed.promoCode;
   const evaluation = input.claimed.evaluation;
-  return tx.promoCodeRedemption.create({
+  const redemption = await tx.promoCodeRedemption.create({
     data: {
       eventId: input.eventId,
       promoCodeId: promo.id,
@@ -916,4 +922,24 @@ export async function recordPromoCodeRedemption(
       pricingDate: input.claimed.pricingDate,
     },
   });
+  if (input.appliedDiscountCents !== undefined) {
+    await appendPromoDiscount(tx, {
+      eventId: input.eventId,
+      registrationId: input.registrationId,
+      redemptionId: redemption.id,
+      appliedDiscountCents: input.appliedDiscountCents,
+      pricingSnapshot: {
+        code: promo.code,
+        discountType: promo.discountType,
+        discountValue: promo.discountValue,
+        minimumSubtotalCents: promo.minimumSubtotalCents,
+        maximumDiscountCents: promo.maximumDiscountCents,
+        eligibleSubtotalCents: evaluation.eligibleSubtotalCents,
+        evaluatedDiscountCents: evaluation.discountAmountCents,
+        discountAmountCents: Math.max(0, Math.round(input.appliedDiscountCents)),
+        pricingDate: input.claimed.pricingDate,
+      },
+    });
+  }
+  return redemption;
 }
