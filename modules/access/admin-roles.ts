@@ -6,7 +6,9 @@ import { getPrisma } from "@/lib/prisma";
 import type { AuthenticatedUser } from "@/modules/access/authorization";
 import {
   ADMIN_ROLE_COOKIE_NAME,
+  adminRoleLanding,
   heldAdminRoles,
+  isAdminRole,
   resolveActiveAdminRole,
   type AdminRole,
   type AdminRoles,
@@ -70,4 +72,23 @@ export async function hasClubsAdministration(user: Pick<AuthenticatedUser, "id" 
 export async function resolveAdminRoleView(user: Pick<AuthenticatedUser, "id" | "globalRole">) {
   const roles = await resolveAdminRoles(user);
   return { roles, ...(await currentAdminRoleView(roles)) };
+}
+
+/**
+ * Switches which held admin role is showing (#1225) and returns that role's
+ * home. The choice is remembered for this browser session only (an httpOnly
+ * session cookie, no max age). It changes the view and nothing else: no server
+ * gate reads the cookie, and a role the person does not hold (or an unknown
+ * value) is ignored, so the view stays where it was.
+ */
+export async function switchAdminRoleView(user: Pick<AuthenticatedUser, "id" | "globalRole">, requested: unknown): Promise<string> {
+  const { held, active } = await resolveAdminRoleView(user);
+  if (!isAdminRole(requested) || !held.includes(requested)) return adminRoleLanding(active);
+  (await cookies()).set(ADMIN_ROLE_COOKIE_NAME, requested, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+  return adminRoleLanding(requested);
 }

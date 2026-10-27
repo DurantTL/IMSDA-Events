@@ -13004,9 +13004,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   font-weight: 700;
   line-height: 1.2;
-  cursor: pointer;
+  text-decoration: none;
 }
-.admin-role-pill[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
+.admin-role-pill[aria-current="page"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
 .admin-role-pill:focus-visible { outline: 3px solid var(--imsda-gold, #f0b323); outline-offset: 2px; }
 .admin-role-count {
   min-width: 24px;

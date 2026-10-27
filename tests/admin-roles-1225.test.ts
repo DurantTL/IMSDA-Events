@@ -42,6 +42,7 @@ import {
 } from "@/modules/access/admin-roles-domain";
 import { isActiveClubsAdministrator, resolveAdminRoleView, resolveAdminRoles } from "@/modules/access/admin-roles";
 import { POST as switchRole } from "@/app/api/staff/admin-role/route";
+import { GET as switchRoleLink } from "@/app/(workspace)/admin-role/[role]/route";
 
 const none = { systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: [] as string[] };
 
@@ -178,6 +179,44 @@ describe("the switch route", () => {
     mocks.membershipFindMany.mockResolvedValue([{ eventId: "e1" }]);
     for (const role of ["SYSTEM_ADMIN", "CLUBS_ADMIN", "whatever"]) {
       const response = await post(role);
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe("/events-admin");
+    }
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+});
+
+describe("the switch link (GET /admin-role/<role>)", () => {
+  // The switcher's pills link here instead of posting to /api, which Cloudflare challenged on every click.
+  const get = (role: string) =>
+    switchRoleLink(new Request(`https://events.imsda.test/admin-role/${encodeURIComponent(role)}`), { params: Promise.resolve({ role }) });
+
+  it("sends a signed-out visitor to sign in and sets nothing", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    const response = await get("CLUBS_ADMIN");
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/login");
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("remembers a held role for the session only and goes to its home, uncached", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole: null } });
+    mocks.grantFindFirst.mockResolvedValue({ id: "g1" });
+    mocks.membershipFindMany.mockResolvedValue([{ eventId: "e1" }]);
+    const response = await get("CLUBS_ADMIN");
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/admin/clubs");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(mocks.cookieSet).toHaveBeenCalledWith("imsda_admin_role", "CLUBS_ADMIN", expect.objectContaining({ httpOnly: true, sameSite: "lax", path: "/" }));
+    expect(mocks.cookieSet.mock.calls[0]![2]).not.toHaveProperty("maxAge");
+    expect(mocks.cookieSet.mock.calls[0]![2]).not.toHaveProperty("expires");
+  });
+
+  it("ignores a role the account does not hold or an unknown one, and stays on the current view's home", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole: null } });
+    mocks.membershipFindMany.mockResolvedValue([{ eventId: "e1" }]);
+    for (const role of ["SYSTEM_ADMIN", "CLUBS_ADMIN", "whatever", "clubs_admin"]) {
+      const response = await get(role);
       expect(response.status).toBe(303);
       expect(response.headers.get("location")).toBe("/events-admin");
     }
