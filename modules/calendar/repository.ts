@@ -150,6 +150,7 @@ export async function listPublicCalendarItems(
       registrationStatus: status,
       registrationOpensOn: event.registrationOpensOn,
       clubEvent: event.audience === "CLUB",
+      registrationTimeZone: event.timezone,
       // Clubs register through the portal only for deferred-invoice club events (the club entry page 404s otherwise).
       clubPortal: event.audience === "CLUB" && event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     };

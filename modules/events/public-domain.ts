@@ -203,7 +203,7 @@ function presentPublicEventLifecycle(
     const opens = event.registrationOpensOn ? calendarDateLabel(event.registrationOpensOn) : null;
     return {
       state: "UPCOMING",
-      statusLabel: publicStatusLine({ status: "UPCOMING", opensOn: event.registrationOpensOn, isClubEvent }, now),
+      statusLabel: publicStatusLine({ status: "UPCOMING", opensOn: event.registrationOpensOn, isClubEvent, timeZone: event.timezone }, now),
       detail: opens
         ? `Registration opens ${opens}. Review the event details below in the meantime.`
         : "Review the event details below. Registration dates will be posted here.",

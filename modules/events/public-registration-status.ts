@@ -1,5 +1,5 @@
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
-import type { EventRegistrationPhase } from "@/modules/events/lifecycle";
+import { calendarDateInEventTimeZone, type EventRegistrationPhase } from "@/modules/events/lifecycle";
 
 /**
  * The one public answer to "can someone register for this event right now?" (#1201).
@@ -67,6 +67,19 @@ function conferenceYear(now: Date) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric" }).format(now));
 }
 
+/** Up to this many days away the status line counts days; further out it names the month. */
+const countdownMaxDays = 30;
+
+function wholeDaysUntil(today: string, opensOn: string): number | null {
+  const toUtcDay = (value: string) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86_400_000 : null;
+  };
+  const from = toUtcDay(today);
+  const to = toUtcDay(opensOn);
+  return from === null || to === null ? null : Math.round(to - from);
+}
+
 /**
  * The one plain-language status line the homepage, the calendar and the event page share (#1204, #1205). It comes
  * from the status above, never from a second rule: "Registration open", "Registration opens in February",
@@ -75,7 +88,12 @@ function conferenceYear(now: Date) {
  * "in February" never reads as a month that has already passed.
  */
 export function publicStatusLine(
-  { status, opensOn, isClubEvent = false }: { status: PublicCapacityStatus; opensOn?: string | null; isClubEvent?: boolean },
+  {
+    status,
+    opensOn,
+    isClubEvent = false,
+    timeZone = "America/Chicago",
+  }: { status: PublicCapacityStatus; opensOn?: string | null; isClubEvent?: boolean; timeZone?: string },
   now = new Date(),
 ): string {
   const noun = isClubEvent ? "Club registration" : "Registration";
@@ -87,6 +105,11 @@ export function publicStatusLine(
     const match = opensOn ? /^(\d{4})-(\d{2})-\d{2}$/.exec(opensOn) : null;
     const month = match ? monthNames[Number(match[2]) - 1] : undefined;
     if (!match || !month) return `${noun} opens soon`;
+    // Within a month, count whole calendar days from today in the event's time zone (#1209). Registration opens at the
+    // start of the opening date, so "tomorrow" is the last answer before it is open. Days only, never a ticking clock.
+    const days = wholeDaysUntil(calendarDateInEventTimeZone(now, timeZone), opensOn as string);
+    if (days === 1) return `${noun} opens tomorrow`;
+    if (days !== null && days >= 2 && days <= countdownMaxDays) return `${noun} opens in ${days} days`;
     const year = Number(match[1]);
     return `${noun} opens in ${month}${year > conferenceYear(now) ? ` ${year}` : ""}`;
   }

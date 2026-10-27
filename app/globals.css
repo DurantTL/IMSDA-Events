@@ -13116,6 +13116,21 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-help-section p { margin: 0; line-height: 1.5; }
 .public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
+/* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
+.confirm-check-icon { display: inline-flex; }
+.public-registration-confirmation h1:focus:not(:focus-visible) { outline: none; }
+.add-to-calendar-link.is-added { border-color: var(--green); color: var(--green); }
+.add-to-calendar-link:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .confirm-check-icon svg, .public-registration-confirmation-icon:not(.is-waitlist) svg { animation: confirm-check-pop 0.4s ease-out 1 backwards; }
+  .confirm-check-icon svg path:last-of-type, .public-registration-confirmation-icon:not(.is-waitlist) svg path:last-of-type { stroke-dasharray: 10; animation: confirm-check-draw 0.4s ease-out 0.1s 1 backwards; }
+  @keyframes confirm-check-pop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: none; } }
+  @keyframes confirm-check-draw { from { stroke-dashoffset: 10; } to { stroke-dashoffset: 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirm-check-icon svg, .confirm-check-icon svg path, .public-registration-confirmation-icon svg, .public-registration-confirmation-icon svg path { animation: none; }
+}
+
 /* Open for registration (#1217): filter links and event cards. */
 .open-events-filter { display: flex; flex-wrap: wrap; gap: 8px; }
 .open-events-filter a {

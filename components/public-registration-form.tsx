@@ -518,6 +518,11 @@ function addResponsesToUsage(
   }
 }
 
+/** Moves focus to the confirmation heading once it appears, so screen readers read the result (#1211). Stable, so it runs on mount only. */
+function focusConfirmationHeading(element: HTMLHeadingElement | null) {
+  element?.focus({ preventScroll: true });
+}
+
 export function PublicRegistrationForm({
   event,
   form,
@@ -3292,7 +3297,7 @@ export function PublicRegistrationForm({
           <article className="public-registration-confirmation">
             <span className={`public-registration-confirmation-icon${waitlisted ? " is-waitlist" : ""}`}>{waitlisted ? <Clock3 size={34} aria-hidden="true" /> : <CheckCircle2 size={34} aria-hidden="true" />}</span>
             <p className="public-registration-eyebrow">{waitlisted ? "Waitlist request received" : "Registration received"}</p>
-            <h1>{waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</h1>
+            <h1 ref={focusConfirmationHeading} tabIndex={-1}>{waitlisted ? "You’re on the waitlist" : "Thank you for registering"}</h1>
             <p className="public-registration-confirmation-message">{confirmation.message}</p>
             <div className="public-registration-code">
               <small>{waitlisted ? "Waitlist reference" : "Confirmation code"}</small>
