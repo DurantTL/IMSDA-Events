@@ -404,7 +404,7 @@ deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
 
 **The site never runs an image built on the server.** `.github/workflows/docker-image.yml` publishes
 `ghcr.io/duranttl/imsda-events:<sha>` for the latest `main` once a day at
-6 PM Central, or when started by hand from the Actions tab (see "Prebuilt
+midnight Central, or when started by hand from the Actions tab (see "Prebuilt
 images from GitHub"). Its public build values
 (`APP_BASE_URL`, `EMBED_ALLOWED_ORIGINS`, `SQUARE_ENVIRONMENT`,
 `SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
@@ -443,7 +443,7 @@ already tagged `imsda-events:live`. A systemd timer finishes the job:
   `/run/imsda-deploy.lock`; a failed cleanup never fails a deploy.
 
 So after a merge: xCloud pulls the commit within a minute (and restarts the old
-version briefly) but the site keeps running the old image. At 6 PM Central
+version briefly) but the site keeps running the old image. At midnight Central
 GitHub publishes the image for the latest `main` (about 10 minutes), and the
 timer switches to it within 2 minutes, so the day's merges go live together.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
@@ -878,7 +878,7 @@ admin/ops view separately, but not a reason to roll back.
 ## Prebuilt images from GitHub (no build on the server)
 
 Building the image on the 4 GB server takes about 40 minutes (`next build`).
-`.github/workflows/docker-image.yml` builds it on GitHub once a day at 6 PM
+`.github/workflows/docker-image.yml` builds it on GitHub once a day at midnight
 Central for the latest `main` (skipped when that commit already has an image),
 and by hand from the Actions tab ("Run workflow"), and publishes:
 
