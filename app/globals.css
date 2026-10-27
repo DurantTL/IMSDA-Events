@@ -13105,7 +13105,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
 .confirm-check-icon { display: inline-flex; }
-.public-registration-confirmation h1:focus { outline: none; }
+.public-registration-confirmation h1:focus:not(:focus-visible) { outline: none; }
 .add-to-calendar-link.is-added { border-color: var(--green); color: var(--green); }
 .add-to-calendar-link:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) {
