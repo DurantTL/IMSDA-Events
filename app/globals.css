@@ -13197,6 +13197,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Calendar month page, compact (#1249): a one-line header with the subscribe button, a sticky bar (view tabs, month navigation and
    filter chips), 88px week rows, and the month list beside the grid (below it on a phone). Flat fills only; 16px body text, 14px
    labels, 44px taps; no new motion. */
+/* The sticky bar's height (one row of tabs and month navigation, one row of chips; three rows on a phone), shared by the side panel's
+   offset and the scroll padding that keeps anchors and focus out from under the bar. */
+:root { --calendar-bar-height: 112px; }
+html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-height) + 12px); }
 .calendar-layout { gap: 12px; margin-top: 16px; }
 .calendar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
 .calendar-head h1 { margin: 0; color: var(--imsda-navy); font-size: clamp(1.5rem, 4vw, 1.9rem); line-height: 1.2; letter-spacing: 0; }
@@ -13205,7 +13209,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .calendar-subscribe-compact { position: relative; flex: none; }
 .calendar-subscribe-popover { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; width: min(340px, calc(100vw - 24px)); }
 .calendar-subscribe-popover .calendar-subscribe-options { width: 100%; }
-.calendar-subscribe-popover p { margin: 6px 4px 0; border-radius: 8px; background: #fff; padding: 8px 10px; color: var(--ink); font-size: 0.875rem; line-height: 1.4; box-shadow: var(--shadow); }
+.calendar-subscribe-popover p { margin: 6px 4px 0; border-radius: 8px; background: #fff; padding: 8px 10px; color: var(--ink); font-size: 1rem; line-height: 1.4; box-shadow: var(--shadow); }
 .calendar-subscribe-popover p:empty { display: none; }
 .calendar-sticky-bar {
   position: sticky; top: 0; z-index: 6; display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 8px;
@@ -13214,7 +13218,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .calendar-sticky-bar .calendar-view-toggle { border: 0; background: #f1f4f5; }
 .calendar-sticky-bar .calendar-view-toggle a { min-height: 44px; font-size: 0.875rem; }
 .calendar-sticky-bar .calendar-month-nav h2 { min-width: 150px; font-size: 1.1rem; }
+.calendar-sticky-bar .calendar-categories { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: 2px; }
 .calendar-sticky-bar .calendar-categories a { font-size: 0.875rem; }
+:root .calendar-sticky-bar .calendar-month-nav .secondary-button { width: 44px; min-width: 44px; min-height: 44px; }
 .calendar-sticky-bar .calendar-categories a[aria-current="page"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
 .calendar-sticky-bar a:focus-visible, .calendar-month-more > summary:focus-visible, .calendar-subscribe-toggle:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .calendar-side { display: grid; gap: 10px; align-content: start; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px; }
@@ -13229,14 +13235,27 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .calendar-side { order: 2; }
 @media (min-width: 1001px) {
   .calendar-key { order: 0; grid-column: 1; grid-row: 2; }
-  .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 132px; max-height: calc(100vh - 148px); overflow-y: auto; overscroll-behavior: contain; }
+  .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--calendar-bar-height) + 12px); max-height: calc(100vh - var(--calendar-bar-height) - 28px); overflow-y: auto; overscroll-behavior: contain; }
 }
 @media (max-width: 760px) {
   .calendar-subscribe-compact { width: 100%; }
   .calendar-subscribe-compact .calendar-subscribe-toggle { width: 100%; justify-content: center; }
   .calendar-sticky-bar { padding: 6px; }
-  .calendar-sticky-bar .calendar-categories { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding-bottom: 2px; }
+  :root { --calendar-bar-height: 164px; }
   .calendar-day { min-height: 50px; }
+}
+/* A short viewport (landscape phone, 200% zoom) would be half covered by a stuck bar, so it scrolls away. */
+@media (max-height: 560px) {
+  .calendar-sticky-bar { position: static; }
+  html:has(.calendar-sticky-bar) { scroll-padding-top: 12px; }
+  .calendar-side { position: static; max-height: none; }
+}
+/* Bar hit areas: the bars are 20px tall, so a transparent strip grows each one into the free space around it, never over a day number
+   (top bars reach up into the date row's lower edge, bottom bars down into the next week's top padding) or a neighbouring bar. */
+@media (min-width: 761px) {
+  .calendar-bar::after { content: ""; position: absolute; inset: -1px 0; }
+  .calendar-bar-row-0::after { top: -6px; }
+  .calendar-bar-row-1::after { bottom: -8px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .calendar-sticky-bar .calendar-categories { scroll-behavior: smooth; }

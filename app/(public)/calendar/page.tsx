@@ -47,7 +47,8 @@ import {
   type CalendarItem,
   type CalendarTone,
 } from "@/modules/calendar/domain";
-import { calendarFilterGroups, defaultCalendarFilter, filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
+import { calendarHref, parseCalendarView, type CalendarHrefParams } from "@/modules/calendar/calendar-href";
+import { calendarFilterGroups, filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
 import { buildSubscribeLinks, siteBaseUrl } from "@/modules/calendar/subscribe";
 
@@ -67,20 +68,6 @@ const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** The month list beside the grid shows this many items before "Show N more". */
 const monthListPreview = 3;
 
-type HrefParams = { view?: string; month?: string; filter?: string; category?: string; date?: string };
-
-/** `?filter=` is left out for the default group, so the plain /calendar link is Main events. `category` only carries an old link's unmatched name. */
-function calendarHref(params: HrefParams, hash?: string) {
-  const search = new URLSearchParams();
-  if (params.view && params.view !== "month") search.set("view", params.view);
-  if (params.month) search.set("month", params.month);
-  if (params.filter && params.filter !== defaultCalendarFilter) search.set("filter", params.filter);
-  if (params.category) search.set("category", params.category);
-  if (params.date) search.set("date", params.date);
-  const query = search.toString();
-  return `${query ? `/calendar?${query}` : "/calendar"}${hash ? `#${hash}` : ""}`;
-}
-
 function groupByMonth(items: CalendarItem[], from: string) {
   const groups = new Map<string, CalendarItem[]>();
   for (const item of items) {
@@ -93,7 +80,7 @@ function groupByMonth(items: CalendarItem[], from: string) {
 
 export default async function PublicCalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const view = params.view === "list" ? "list" : "month";
+  const view = parseCalendarView(params.view);
   const { slug: filter, category } = resolveCalendarFilter(params.filter, params.category?.slice(0, 40) || undefined);
   const filterLabel = calendarFilterGroups.find((group) => group.slug === filter)?.label ?? "";
   const today = conferenceToday();
@@ -111,7 +98,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);
   const monthParam = view === "month" ? params.month : undefined;
-  const base: HrefParams = { view, month: monthParam, filter, category };
+  const base: CalendarHrefParams = { view, month: monthParam, filter, category };
   const selectedItems = selectedDate ? itemsOnDate(items, selectedDate) : [];
   const monthName = monthLabel(month).split(" ")[0];
   const previewItems = monthItems.slice(0, monthListPreview);
@@ -235,7 +222,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                       return (
                         <CalendarDayLink
                           aria-label={`${item.isClosure ? `${closureLabel}: ` : ""}${item.title}, ${dates}${item.status !== "SCHEDULED" ? `, ${calendarStatusLabels[item.status]}` : ""}`}
-                          className={`calendar-bar calendar-tone-${calendarItemTone(item, toneMap)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
+                          className={`calendar-bar calendar-bar-row-${bar.row} calendar-tone-${calendarItemTone(item, toneMap)} calendar-status-${item.status.toLowerCase()}${bar.continuesBefore ? " continues-before" : ""}${bar.continuesAfter ? " continues-after" : ""}`}
                           data-calendar-key={item.key}
                           href={dayHrefFor(bar.segmentStart)}
                           key={item.key}

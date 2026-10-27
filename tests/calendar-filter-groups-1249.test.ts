@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { calendarHref, parseCalendarView } from "@/modules/calendar/calendar-href";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { CalendarViewBar } from "@/components/calendar-view-bar";
 import { calendarGridRows, calendarMoreLabel, monthGrid, weekBarLayout, type CalendarItem } from "@/modules/calendar/domain";
@@ -124,5 +126,25 @@ describe("sticky view bar and compact subscribe (#1249)", () => {
     expect(markup).toContain('aria-expanded="false"');
     for (const label of ["Google Calendar", "Outlook.com", "Outlook (work or school)", "Apple Calendar", "ICS link", "Copy link"]) expect(markup).toContain(label);
     expect(markup).not.toContain("<h2");
+  });
+});
+
+describe("calendar URLs and sticky bar css (#1249)", () => {
+  it("builds links that leave out the default view and filter, and reads the view param", () => {
+    expect(calendarHref({})).toBe("/calendar");
+    expect(calendarHref({ view: "month", month: "2026-03", filter: "main" })).toBe("/calendar?month=2026-03");
+    expect(calendarHref({ view: "list", filter: "club", date: "2026-03-02" }, "x")).toBe("/calendar?view=list&filter=club&date=2026-03-02#x");
+    expect(parseCalendarView("list")).toBe("list");
+    expect(parseCalendarView("bogus")).toBe("month");
+    expect(parseCalendarView(undefined)).toBe("month");
+  });
+
+  const css = readFileSync("app/globals.css", "utf8");
+  it("keeps the chips on one line and sizes the side panel and scroll padding from one bar-height variable", () => {
+    expect(css).toMatch(/\.calendar-sticky-bar \.calendar-categories \{ flex-wrap: nowrap; overflow-x: auto;/);
+    expect(css).toContain("html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-height) + 12px); }");
+    expect(css).toContain("top: calc(var(--calendar-bar-height) + 12px)");
+    expect(css).toMatch(/@media \(max-height: 560px\) \{\s*\.calendar-sticky-bar \{ position: static; \}/);
+    expect(css).toMatch(/:root \.calendar-sticky-bar \.calendar-month-nav \.secondary-button \{ width: 44px; min-width: 44px; min-height: 44px; \}/);
   });
 });

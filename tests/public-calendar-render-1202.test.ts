@@ -39,7 +39,7 @@ describe("public calendar month render (#1202)", () => {
     expect(markup).toContain('aria-label="Honors Weekend, February 26 – March 7, 2026"');
     expect(markup).toContain('aria-label="Office closed: Office closed day, March 13, 2026"');
     expect(markup).toContain('aria-label="Called off, March 12, 2026, Cancelled"');
-    expect(markup).toContain("calendar-bar calendar-tone-");
+    expect(markup).toContain("calendar-bar calendar-bar-row-");
     expect(markup).toContain("continues-before");
     expect(markup).toContain("continues-after");
     expect(markup).toContain("‹");

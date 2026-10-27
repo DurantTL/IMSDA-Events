@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CalendarChipScroll } from "@/components/calendar-chip-scroll";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type CalendarViewTab = { key: string; label: string; href: string; icon?: ReactNode };
@@ -57,6 +58,7 @@ export function CalendarViewBar({
         {chips.map((chip) => (
           <Link aria-current={chip.slug === activeFilter ? "page" : undefined} href={chip.href} key={chip.slug}>{chip.label}</Link>
         ))}
+        <CalendarChipScroll active={activeFilter} />
       </nav>
     </div>
   );
