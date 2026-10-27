@@ -13,7 +13,7 @@ export const glossaryTerms: readonly GlossaryTerm[] = [
   { term: "Copy from a past event", meaning: "Starts a new draft from an earlier event's settings and forms. Dates, links to the old event, registrations and payments are not carried over." },
   { term: "Team and event roles", meaning: `Team is where an event's staff and their roles are managed. The event roles are ${roleNames}. A role decides which pages a person can open for that event.` },
   { term: "Staff invitation", meaning: "Adding a person to an event's Team with a role. They get a one-time link to choose a password." },
-  { term: "Club director grant", meaning: "Access to a club, not to an event's staff pages. It is set up for the club by an administrator." },
+  { term: "Club director grant", meaning: "Access to a club, not to an event's staff pages. It is given by an administrator, or by the club's own director or deputy." },
   { term: "Attendee registration", meaning: "A person signing up for an event on the public pages. It never gives staff access." },
   { term: "Registration form", meaning: "The form people fill in to register for one event. It is built, tested and published in Registration forms." },
   { term: "Club form", meaning: "A form clubs fill in for events, such as a membership application, permission slip or passenger list." },

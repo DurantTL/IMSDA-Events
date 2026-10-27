@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import { helpPageTitle } from "@/components/staff-navigation";
+import { helpPageTitle, withCurrentEvent } from "@/components/staff-navigation";
 import { loadHelpViewer } from "@/modules/help/viewer";
 import { visibleGuides } from "@/modules/help/visibility";
 import { HelpSearch } from "./help-search";
@@ -29,9 +29,9 @@ export default async function HelpPage({ searchParams }: { searchParams: Promise
           <strong>Reading a guide is not a task completion</strong>
           <p>Reading or practising here is not a finished task, an approval, verified attendance, a readiness sign-off or a permission. Those happen on the working pages, by the people allowed to do them.</p>
         </div>
-        <HelpSearch guides={guides} />
+        <HelpSearch guides={guides} selectedEventId={viewer.selectedEventId} />
         <div className={styles.glossaryLinkRow}>
-          <Link className={`secondary-button ${styles.linkButton}`} href="/help/glossary">Open the glossary</Link>
+          <Link className={`secondary-button ${styles.linkButton}`} href={withCurrentEvent("/help/glossary", viewer.selectedEventId)}>Open the glossary</Link>
         </div>
       </div>
     </section>

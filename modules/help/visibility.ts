@@ -20,6 +20,14 @@ export type HelpViewer = {
 /** The one line shown where a link is not available. It never names the hidden page. */
 export const askAdministratorText = "Ask an administrator for this event if you need this.";
 
+/** The same line when no event is selected, so it does not mention an event that is not there. */
+export const askSystemAdministratorText = "Ask a system administrator if you need this.";
+
+/** The line for a page the viewer cannot open. */
+export function unavailableText(viewer: Pick<HelpViewer, "selectedEventId">): string {
+  return viewer.selectedEventId ? askAdministratorText : askSystemAdministratorText;
+}
+
 export function canSeeGuide(guide: Pick<HelpGuide, "audience">, viewer: HelpViewer): boolean {
   switch (guide.audience.kind) {
     case "everyone": return true;

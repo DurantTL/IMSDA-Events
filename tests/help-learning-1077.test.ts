@@ -11,6 +11,7 @@ import { glossaryTerms } from "@/modules/help/glossary";
 import { docUrl, helpDestinations, helpGuides } from "@/modules/help/guides";
 import {
   askAdministratorText,
+  unavailableText,
   canSeeGuide,
   filterGuides,
   guideForViewer,
@@ -201,6 +202,8 @@ describe("links to working pages", () => {
     expect(unavailable).toBe(1);
     expect(askAdministratorText).toBe("Ask an administrator for this event if you need this.");
     expect(askAdministratorText).not.toMatch(/\/admin/);
+    expect(unavailableText({ selectedEventId: "evt_synthetic" })).toBe(askAdministratorText);
+    expect(unavailableText({ selectedEventId: "" })).toBe("Ask a system administrator if you need this.");
   });
 
   it("gives no event page without a selected event, and no System page to anyone but a system administrator", () => {
@@ -237,21 +240,21 @@ describe("shell search hook", () => {
   it("adds the hub, the glossary and each visible guide as Help results", () => {
     const help = buildSearchDestinations(adminContext).filter((destination) => destination.scope === "Help");
     expect(help.map((destination) => destination.href)).toEqual([
-      "/help",
-      ...helpGuides.map((guide) => `/help/${guide.id}`),
-      "/help/glossary",
+      "/help?event=evt_synthetic",
+      ...helpGuides.map((guide) => `/help/${guide.id}?event=evt_synthetic`),
+      "/help/glossary?event=evt_synthetic",
     ]);
   });
 
   it("finds the invite guide for a system administrator typing invite", () => {
     const results = find(adminContext, "invite");
-    expect(results.some((result) => result.scope === "Help" && result.href === "/help/invite-staff")).toBe(true);
+    expect(results.some((result) => result.scope === "Help" && result.href === "/help/invite-staff?event=evt_synthetic")).toBe(true);
   });
 
   it("never lists a hidden guide for a narrow viewer", () => {
     const narrow = buildSearchDestinations({ ...base, permissions: ["MANAGE_CHECK_IN"] });
     const helpHrefs = narrow.filter((destination) => destination.scope === "Help").map((destination) => destination.href);
-    expect(helpHrefs).toEqual(["/help", "/help/choose-workspace", "/help/glossary"]);
+    expect(helpHrefs).toEqual(["/help?event=evt_synthetic", "/help/choose-workspace?event=evt_synthetic", "/help/glossary?event=evt_synthetic"]);
     const everything = JSON.stringify(narrow);
     for (const guide of helpGuides.filter((candidate) => candidate.id !== "choose-workspace")) {
       expect(everything).not.toContain(guide.id);
@@ -267,7 +270,7 @@ describe("shell search hook", () => {
   it("ranks a page above the guide for the same word", () => {
     const results = find(adminContext, "email");
     const pageIndex = results.findIndex((result) => result.scope === "System" && result.label === "Email");
-    const guideIndex = results.findIndex((result) => result.scope === "Help" && result.href === "/help/resolve-email-problem");
+    const guideIndex = results.findIndex((result) => result.scope === "Help" && result.href === "/help/resolve-email-problem?event=evt_synthetic");
     expect(pageIndex).toBe(0);
     expect(guideIndex).toBeGreaterThan(pageIndex);
     const eventOnly = find({ ...base, permissions: ["MANAGE_COMMUNICATIONS"] }, "email");

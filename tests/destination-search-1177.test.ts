@@ -107,8 +107,7 @@ describe("destination registry per role", () => {
 
   it("keeps the selected event on every event link and on System links", () => {
     for (const destination of buildSearchDestinations(admin)) {
-      if (destination.scope === "Help") expect(destination.href).toMatch(/^\/help/);
-      else if (destination.scope === "Profile") expect(destination.href).toBe("/profile");
+      if (destination.scope === "Profile") expect(destination.href).toBe("/profile");
       else expect(destination.href).toContain("event=evt_synthetic");
     }
   });

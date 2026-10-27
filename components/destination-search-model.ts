@@ -225,11 +225,11 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
   // Help & learning (#1077): the hub, the glossary and the guides this viewer may see. Static titles and keywords
   // written in code, never event data. They are listed after every matching page (see `searchDestinations`).
   const helpViewer = { isSystemAdmin: context.isSystemAdmin, selectedEventId: context.selectedEventId, permissions: context.permissions };
-  add({ key: "Help:/help", scope: "Help", label: "Help & learning", description: "Short guides for common tasks.", href: "/help", keywords: ["guide", "how to", "learn", "training", "support"] });
+  add({ key: "Help:/help", scope: "Help", label: "Help & learning", description: "Short guides for common tasks.", href: withCurrentEvent("/help", context.selectedEventId), keywords: ["guide", "how to", "learn", "training", "support"] });
   for (const guide of visibleGuides(helpViewer)) {
-    add({ key: `Help:/help/${guide.id}`, scope: "Help", label: guide.title, description: guide.summary, href: `/help/${guide.id}`, keywords: guide.keywords });
+    add({ key: `Help:/help/${guide.id}`, scope: "Help", label: guide.title, description: guide.summary, href: withCurrentEvent(`/help/${guide.id}`, context.selectedEventId), keywords: guide.keywords });
   }
-  add({ key: "Help:/help/glossary", scope: "Help", label: "Glossary", description: "What the words in the workspace mean.", href: "/help/glossary", keywords: ["terms", "words", "meaning", "definitions", "jargon"] });
+  add({ key: "Help:/help/glossary", scope: "Help", label: "Glossary", description: "What the words in the workspace mean.", href: withCurrentEvent("/help/glossary", context.selectedEventId), keywords: ["terms", "words", "meaning", "definitions", "jargon"] });
   return destinations;
 }
 

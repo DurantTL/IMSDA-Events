@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { withCurrentEvent } from "@/components/staff-navigation";
 import { BackLink } from "@/components/back-link";
 import { docLabel, docUrl } from "@/modules/help/guides";
 import { loadHelpViewer } from "@/modules/help/viewer";
-import { askAdministratorText, guideForViewer, guideLinksForViewer } from "@/modules/help/visibility";
+import { guideForViewer, guideLinksForViewer, unavailableText } from "@/modules/help/visibility";
 import styles from "../help.module.css";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
 
   return (
     <section className="page-stack">
-      <BackLink href="/help" variant="staff">Back to Help &amp; learning</BackLink>
+      <BackLink href={withCurrentEvent("/help", viewer.selectedEventId)} variant="staff">Back to Help &amp; learning</BackLink>
       <article className={styles.page}>
         <h2 className={styles.guideTitle}>{guide.title}</h2>
         <div className={styles.badges}>
@@ -71,7 +72,7 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
               ))}
             </ul>
           )}
-          {(unavailable > 0 || links.length === 0) && <p className={styles.empty}>{askAdministratorText}</p>}
+          {(unavailable > 0 || links.length === 0) && <p className={styles.empty}>{unavailableText(viewer)}</p>}
         </section>
         {guide.relatedDocs.length > 0 && (
           <section className={styles.section} aria-labelledby="guide-docs">

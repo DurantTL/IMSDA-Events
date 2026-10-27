@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
+import { withCurrentEvent } from "@/components/staff-navigation";
 import { filterGuides } from "@/modules/help/visibility";
 import styles from "./help.module.css";
 
@@ -14,7 +15,7 @@ const groups: readonly { workspace: HubGuide["workspace"]; title: string }[] = [
 ];
 
 /** The hub's guide list with a plain filter over title, summary and keywords. Nothing is sent as you type. */
-export function HelpSearch({ guides }: { guides: readonly HubGuide[] }) {
+export function HelpSearch({ guides, selectedEventId }: { guides: readonly HubGuide[]; selectedEventId: string }) {
   const inputId = useId();
   const countId = useId();
   const [query, setQuery] = useState("");
@@ -48,7 +49,7 @@ export function HelpSearch({ guides }: { guides: readonly HubGuide[] }) {
             <ul className={styles.list}>
               {inGroup.map((guide) => (
                 <li className={styles.card} key={guide.id}>
-                  <Link className={styles.cardLink} href={`/help/${guide.id}`}>
+                  <Link className={styles.cardLink} href={withCurrentEvent(`/help/${guide.id}`, selectedEventId)}>
                     <span className={styles.cardTitle}>{guide.title}</span>
                     <span className={styles.cardSummary}>{guide.summary}</span>
                   </Link>
