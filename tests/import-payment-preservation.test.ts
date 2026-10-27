@@ -98,6 +98,8 @@ vi.mock("@/lib/prisma", () => ({
     $transaction: async (callback: (tx: unknown) => Promise<void>) => {
       const tx = {
         importRun: { updateMany: mocks.importRunUpdateMany, update: mocks.importRunUpdate },
+        user: { findUnique: vi.fn().mockResolvedValue({ displayName: "Staff Sample" }) },
+        registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger-1" }) },
         registration: {
           findFirst: mocks.registrationFindFirst,
           findUnique: mocks.registrationFindUnique,

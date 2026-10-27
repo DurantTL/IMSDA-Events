@@ -135,6 +135,7 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
       findUnique: vi.fn().mockResolvedValue({ eventId: "event-1", confirmationCode: "REG-CLUB", event: { endsAt: new Date("2026-12-06T20:00:00Z") } }),
     },
     registrationAccessToken: { create: vi.fn().mockResolvedValue({ id: "access-1" }) },
+    registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger-1" }) },
     registrationWaitlistEntry: { aggregate: vi.fn(), create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null), count: vi.fn().mockResolvedValue(0) },
     locationWaitlistChange: { create: vi.fn().mockResolvedValue({ id: "change-1" }) },
     messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },

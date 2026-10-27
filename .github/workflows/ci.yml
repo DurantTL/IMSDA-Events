@@ -271,6 +271,11 @@ jobs:
       # batch approval confirms it and covers every meal under the conference-paid plan, a
       # decline cancels it; the table constraints and event deletion.
       - run: npm run test:staff-invitations
+      # Registration ledger, shadow mode (#117): the backfill over the seeded events is idempotent and dry-run reports
+      # nothing; every seeded registration's ledger equals its stored total; the real submission (with a promo code,
+      # waitlisted, zero total) and amendment paths write entries that reconcile; the append-only trigger refuses a
+      # direct UPDATE or DELETE yet lets a deleted registration or event take its entries along.
+      - run: npm run test:ledger-shadow
 
   db-scripts-2:
     name: Database scripts (2 of 2)

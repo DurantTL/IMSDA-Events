@@ -1,5 +1,6 @@
 import "server-only";
 
+import { appendSubmissionCharge } from "@/modules/ledger/entries";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
@@ -793,6 +794,13 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
         contactSnapshot: { firstName: input.firstName, lastName: input.lastName, email: invitation.email, phone: input.phone },
         submittedAt: null,
       },
+    });
+    // Shadow ledger (#117): a $0 charge, so every registration has an entry. The stored total stays authoritative.
+    await appendSubmissionCharge(tx, {
+      eventId: event.id,
+      registrationId: registration.id,
+      totalCents: 0,
+      pricingSnapshot: { source: "STAFF_INVITATION" },
     });
     for (const [position, member] of party.entries()) {
       const person = member.role === "PRIMARY"

@@ -156,6 +156,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/finance/square-payments", "/finance", "components/finance-workspace.tsx"],
   ["/information-forms/responses", "/information-forms", "modules/information-forms/hub.ts"],
   ["/more/clubs/reports", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
+  ["/more/ledger-health", "/finance", "components/finance-workspace.tsx"],
   ["/more/honors/instructors", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/honors/rosters", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/honors/schedule", "/more/honors", "components/honors-setup-workspace.tsx"],

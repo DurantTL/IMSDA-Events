@@ -100,6 +100,8 @@ function fixture(status: "DRAFT" | "SUBMITTED", submitted: Date | null) {
     registrationAttendee: {
       update: vi.fn().mockResolvedValue({}),
     },
+    registrationLedgerEntry: { create: vi.fn().mockResolvedValue({ id: "ledger_1" }) },
+    user: { findUnique: vi.fn().mockResolvedValue({ displayName: "Staff Sample" }) },
     auditLog: {
       create: vi.fn().mockResolvedValue({}),
     },
