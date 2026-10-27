@@ -6,8 +6,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export type CalendarViewTab = { key: string; label: string; href: string; icon?: ReactNode };
 export type CalendarFilterChip = { slug: string; label: string; href: string };
 export type CalendarBarNav = {
-  /** "March 2026". */
+  /** "March 2026", or "2027" for the Year view. */
   label: string;
+  /** What the arrows step by; Month unless the Year view says otherwise. */
+  unit?: "month" | "year";
   previous: { href: string; label: string };
   next: { href: string; label: string };
   todayHref: string;
@@ -15,7 +17,7 @@ export type CalendarBarNav = {
 
 /**
  * The calendar's sticky bar (#1249): the view tabs, the month navigation and the filter chips. The tabs come in as a list, so the
- * Year view (#1250) is one more entry and nothing else moves. The month navigation is left out for views that have no month.
+ * Year view (#1250) is one more entry and nothing else moves. The navigation steps by month, or by year in the Year view (#1250), and is left out for views with neither.
  * Links only, no buttons, so it never counts as an action bar that covers text.
  */
 export function CalendarViewBar({
@@ -42,15 +44,15 @@ export function CalendarViewBar({
           ))}
         </nav>
         {nav && (
-          <div aria-label="Month" className="calendar-month-nav" role="group">
-            <Link aria-label={`Previous month, ${nav.previous.label}`} className="secondary-button" href={nav.previous.href}>
+          <div aria-label={nav.unit === "year" ? "Year" : "Month"} className="calendar-month-nav" role="group">
+            <Link aria-label={`Previous ${nav.unit ?? "month"}, ${nav.previous.label}`} className="secondary-button" href={nav.previous.href}>
               <ChevronLeft size={16} aria-hidden="true" />
             </Link>
             <h2 aria-live="polite">{nav.label}</h2>
-            <Link aria-label={`Next month, ${nav.next.label}`} className="secondary-button" href={nav.next.href}>
+            <Link aria-label={`Next ${nav.unit ?? "month"}, ${nav.next.label}`} className="secondary-button" href={nav.next.href}>
               <ChevronRight size={16} aria-hidden="true" />
             </Link>
-            <Link className="text-button calendar-today-link" href={nav.todayHref}>Today</Link>
+            <Link className="text-button calendar-today-link" href={nav.todayHref}>{nav.unit === "year" ? "This year" : "Today"}</Link>
           </div>
         )}
       </div>

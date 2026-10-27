@@ -8441,6 +8441,10 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-swatch { flex: none; box-sizing: border-box; width: 16px; height: 16px; border-left: 5px solid var(--cal-edge); border-radius: 4px; background: var(--cal-fill); }
 .calendar-tone-event .calendar-swatch { border-left-width: 0; }
 .calendar-tone-closure .calendar-swatch { border: 1px dashed var(--cal-edge); background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 3px, #fde4cc 3px, #fde4cc 6px); }
+/* Year view (#1250): hover tints and the closure hatch live here, with the other calendar tone rules. */
+a.calendar-year-day:hover { background: #eef3f6; }
+.calendar-year-mark.is-closure, .calendar-year-slot.is-closure { background: repeating-linear-gradient(135deg, #8a4b1f, #8a4b1f 2px, #fde4cc 2px, #fde4cc 4px); }
+.calendar-year-row:hover { background: #f4f7f9; }
 .calendar-key-item { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 12px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; }
 .calendar-board { display: grid; align-items: start; gap: 16px; }
 .calendar-board > * { min-width: 0; }
@@ -13274,6 +13278,69 @@ html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-hei
 }
 @media (prefers-reduced-motion: no-preference) {
   .calendar-sticky-bar .calendar-categories { scroll-behavior: smooth; }
+}
+
+/* Calendar Year view (#1250): twelve mini months beside the side panel from 900px up, twelve one-link rows below it. A marked day is a
+   44px link; every other day is plain text. Marks use the month page's tone colours; flat fills only (closures keep their hatch). */
+.calendar-year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.calendar-year-month { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 2px 8px 8px; }
+.calendar-year-month h3 { margin: 0; }
+.calendar-year-month h3 a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-size: 1.0625rem; font-weight: 800; text-underline-offset: 3px; }
+.calendar-year-weekdays, .calendar-year-week { display: grid; grid-template-columns: repeat(7, minmax(44px, 1fr)); }
+.calendar-year-weekdays span { padding: 2px 0 4px; color: var(--muted); font-size: 0.875rem; font-weight: 700; text-align: center; }
+.calendar-year-day { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 44px; min-height: 44px; padding: 4px 0; color: var(--ink); font-size: 0.875rem; text-decoration: none; }
+.calendar-year-day.is-sabbath { background: #faf7fd; }
+.calendar-year-day.is-sabbath .calendar-year-number { color: var(--imsda-purple); font-weight: 800; }
+.calendar-year-number { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; border: 2px solid transparent; border-radius: 999px; line-height: 1; }
+.calendar-year-day.is-today .calendar-year-number { border-color: var(--imsda-navy); font-weight: 800; }
+.calendar-year-day.has-items { cursor: pointer; font-weight: 700; }
+.calendar-year-day.is-selected { box-shadow: inset 0 0 0 2px var(--imsda-purple); background: var(--imsda-purple-soft); }
+a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
+.calendar-year-marks { display: grid; gap: 3px; width: 100%; }
+.calendar-year-day.has-items { position: relative; }
+.calendar-year-more { position: absolute; top: 2px; right: 4px; color: var(--imsda-navy); font-size: 0.875rem; font-weight: 800; line-height: 1; }
+.calendar-year-mark { display: block; height: 8px; background: var(--cal-edge); }
+.calendar-year-mark.is-empty { background: none; }
+.calendar-year-mark.is-dot, .calendar-year-mark.is-overflow { width: 8px; margin: 0 auto; border-radius: 50%; }
+.calendar-year-mark.is-overflow { background: #5b6b75; }
+.calendar-year-mark.is-bar.is-start { margin-left: 6px; border-radius: 4px 0 0 4px; }
+.calendar-year-mark.is-bar.is-end { margin-right: 6px; border-radius: 0 4px 4px 0; }
+.calendar-year-mark.is-bar.is-start.continues-before { margin-left: 0; border-radius: 0; }
+.calendar-year-mark.is-bar.is-end.continues-after { margin-right: 0; border-radius: 0; }
+.calendar-year-rows { display: none; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.calendar-year-row { display: grid; gap: 6px; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 10px 12px; color: var(--ink); text-decoration: none; }
+.calendar-year-row:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.calendar-year-row-name { color: var(--imsda-navy); font-size: 1.0625rem; font-weight: 800; }
+.calendar-year-strip { display: flex; gap: 1px; height: 16px; }
+.calendar-year-slot { flex: 1 1 0; min-width: 0; border-radius: 2px; background: #e9eef1; }
+.calendar-year-slot.is-sabbath { background: #d3dbe0; }
+.calendar-year-slot.has-mark { background: var(--cal-edge); }
+.calendar-year-slot.is-overflow { background: #5b6b75; }
+.calendar-year-row-items { display: grid; gap: 2px; font-size: 1rem; line-height: 1.4; }
+.calendar-year-row-more, .calendar-year-row-none { color: var(--muted); }
+/* Three 44px-cell months need about 1000px, so the panel sits under the year until the page is wide enough for both side by side. */
+.calendar-layout:has(.calendar-year-board) { max-width: 1440px; }
+.calendar-year-board .calendar-key { order: 1; grid-column: auto; grid-row: auto; }
+.calendar-year-board .calendar-side { order: 2; grid-column: auto; grid-row: auto; position: static; max-height: none; overflow: visible; }
+@media (min-width: 1001px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1500px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr) 320px; }
+  .calendar-year-board .calendar-key { order: 0; grid-column: 1; grid-row: 2; }
+  .calendar-year-board .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--calendar-bar-height) + 12px); max-height: calc(100vh - var(--calendar-bar-height) - 28px); overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (min-width: 1229px) and (max-width: 1488px) {
+  .calendar-layout:has(.calendar-year-board) { margin-right: 24px; margin-left: 24px; }
+}
+@media (max-width: 899px) {
+  .calendar-year-day-hint { display: none; }
+  .calendar-year-grid { display: none; }
+  .calendar-year-rows { display: grid; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .calendar-year-grid, .calendar-year-rows { animation: calendar-year-in 0.2s ease-out; }
+  @keyframes calendar-year-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.

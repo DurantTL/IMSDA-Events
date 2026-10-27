@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { CalendarDays, DoorClosed, List } from "lucide-react";
+import { CalendarDays, CalendarRange, DoorClosed, List } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
@@ -50,6 +50,8 @@ import {
 import { calendarHref, parseCalendarView, type CalendarHrefParams } from "@/modules/calendar/calendar-href";
 import { calendarFilterGroups, filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
+import { buildCalendarYear, parseYearDate, parseYearParam } from "@/modules/calendar/year";
+import { CalendarYearView } from "@/components/calendar-year-view";
 import { buildSubscribeLinks, siteBaseUrl } from "@/modules/calendar/subscribe";
 
 export const dynamic = "force-dynamic";
@@ -61,12 +63,15 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-type SearchParams = Promise<{ view?: string; month?: string; filter?: string; category?: string; date?: string }>;
+type SearchParams = Promise<{ view?: string; month?: string; year?: string; filter?: string; category?: string; date?: string }>;
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** The month list beside the grid shows this many items before "Show N more". */
 const monthListPreview = 3;
+
+/** The year list beside the Year view's grid shows this many items before "Show all N in the list". */
+const yearListPreview = 8;
 
 function groupByMonth(items: CalendarItem[], from: string) {
   const groups = new Map<string, CalendarItem[]>();
@@ -86,11 +91,14 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const today = conferenceToday();
   // A selected date (month view only) shows only that date's items in the month list and decides the month shown, so an
   // adjacent-month date from the grid lands on its own month instead of a list that excludes it.
-  const { selectedDate, month } = resolveMonthAndDate(view, params.month, params.date, today);
+  const { selectedDate: monthDate, month } = resolveMonthAndDate(view, params.month, params.date, today);
+  // The Year view shows one calendar year (#1250); its date is honoured only inside that year.
+  const year = parseYearParam(params.year, today);
+  const selectedDate = view === "year" ? parseYearDate(params.date, year) : monthDate;
 
   const grid = monthGrid(month);
-  const from = view === "month" ? grid[0][0] : today;
-  const to = view === "month" ? grid[grid.length - 1][6] : addDays(today, 365);
+  const from = view === "month" ? grid[0][0] : view === "year" ? `${year}-01-01` : today;
+  const to = view === "month" ? grid[grid.length - 1][6] : view === "year" ? `${year}-12-31` : addDays(today, 365);
   const allItems = await listPublicCalendarItems(from, to);
   // Colours come from every item before any filter, so choosing a chip never changes a colour (#1202).
   const toneMap = calendarToneMap(allItems);
@@ -116,23 +124,27 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const featuredNames = eventTransitionNames(featuredItems, usedTransitionNames);
   const listItems = withoutFeatured(firstPerSeries(items), featuredItems, "item");
   const panelNames = eventTransitionNames(view === "month" ? sortCalendarItems(selectedItems) : [], usedTransitionNames);
-  const agendaNames = eventTransitionNames(view === "month" ? (selectedDate ? [] : monthItems) : listItems, usedTransitionNames);
+  const agendaNames = eventTransitionNames(view === "month" ? (selectedDate ? [] : monthItems) : view === "list" ? listItems : [], usedTransitionNames);
   // A day (or a bar, or "+N more") shows that day alone in the month list; an adjacent-month day lands on its own month.
   const dayHrefFor = (date: string) => calendarHref(
     { view: "month", month: date.slice(0, 7) === currentMonthKey ? (selectedDate ? monthKey(month) : params.month) : date.slice(0, 7), filter, category, date },
     "calendar-day-detail",
   );
   const tabs: CalendarViewTab[] = [
-    { key: "month", label: "Month", href: calendarHref({ view: "month", month: monthParam, filter, category }), icon: <CalendarDays size={15} aria-hidden="true" /> },
+    { key: "month", label: "Month", href: calendarHref({ view: "month", month: view === "year" && year !== Number(today.slice(0, 4)) ? `${year}-01` : monthParam, filter, category }), icon: <CalendarDays size={15} aria-hidden="true" /> },
     { key: "list", label: "Upcoming", href: calendarHref({ view: "list", filter, category }), icon: <List size={15} aria-hidden="true" /> },
+    { key: "year", label: "Year", href: calendarHref({ view: "year", year: String(view === "month" ? month.year : view === "year" ? year : Number(today.slice(0, 4))), filter, category }), icon: <CalendarRange size={15} aria-hidden="true" /> },
   ];
   const chips = calendarFilterGroups.map((group) => ({
     slug: group.slug,
     label: group.label,
-    href: calendarHref({ view, month: monthParam, filter: group.slug, date: selectedDate }),
+    href: calendarHref({ view, month: monthParam, year: view === "year" ? String(year) : undefined, filter: group.slug, date: selectedDate }),
   }));
   // The key names each colour the month shows: a category's own tone, navy for IMSDA events, stripes for closures.
   const keyEntries = view === "month" ? monthKeyEntries(monthItems, toneMap) : [];
+  const calendarYear = view === "year" ? buildCalendarYear(year, items, toneMap) : null;
+  const yearList = view === "year" ? firstPerSeries(itemsOverlapping(items, `${year}-01-01`, `${year}-12-31`)) : [];
+  const yearKeyEntries = view === "year" ? monthKeyEntries(yearList, toneMap) : [];
 
   return (
     <main className="public-registration-page public-calendar-page">
@@ -161,7 +173,13 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
           activeFilter={filter}
           chips={chips}
           currentView={view}
-          nav={view === "month" ? {
+          nav={view === "year" ? {
+            label: String(year),
+            unit: "year",
+            previous: { href: calendarHref({ view: "year", year: String(year - 1), filter, category }), label: String(year - 1) },
+            next: { href: calendarHref({ view: "year", year: String(year + 1), filter, category }), label: String(year + 1) },
+            todayHref: calendarHref({ view: "year", year: today.slice(0, 4), filter, category }),
+          } : view === "month" ? {
             label: monthLabel(month),
             previous: { href: calendarHref({ ...base, month: monthKey(shiftMonth(month, -1)), date: undefined }), label: monthLabel(shiftMonth(month, -1)) },
             next: { href: calendarHref({ ...base, month: monthKey(shiftMonth(month, 1)), date: undefined }), label: monthLabel(shiftMonth(month, 1)) },
@@ -303,6 +321,22 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
               </ul>
             )}
           </div>
+        )}
+
+        {calendarYear && (
+          <CalendarYearView
+            category={category}
+            filter={filter}
+            filterLabel={filterLabel}
+            keyEntries={yearKeyEntries}
+            previewCount={yearListPreview}
+            selectedDate={selectedDate}
+            selectedItems={selectedDate ? sortCalendarItems(itemsOnDate(items, selectedDate)) : []}
+            today={today}
+            toneMap={toneMap}
+            year={calendarYear}
+            yearItems={yearList}
+          />
         )}
 
         {view === "list" && (
