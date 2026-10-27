@@ -13054,6 +13054,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-hero .public-event-summary { color: #fff; }
 .public-event-hero .public-event-summary svg { color: #f9d678; }
 .public-event-facts .public-event-summary svg, .auto-info-header .public-event-summary svg { color: var(--imsda-purple); }
+/* Get directions (#1213) and Share this event (#1214) under the When / Where summary. */
+.public-event-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 20px; margin: 4px 0 0; }
+.public-event-directions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; padding: 0; list-style: none; }
+.public-event-directions a, .public-event-share-button { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--imsda-navy, #003b5c); font: inherit; font-size: 1rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.public-event-directions a:focus-visible, .public-event-share-button:focus-visible, .public-event-share-field input:focus-visible { outline: 3px solid var(--imsda-navy, #003b5c); outline-offset: 2px; }
+.public-event-hero .public-event-directions a, .public-event-hero .public-event-share-button { color: #fff; }
+.public-event-hero .public-event-directions a:focus-visible, .public-event-hero .public-event-share-button:focus-visible { outline-color: #f9d678; }
+.public-event-share { display: grid; gap: 6px; }
+.public-event-share-field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.public-event-share-field input { min-height: 44px; width: min(100%, 28rem); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 400; }
 .public-event-help-section { display: grid; gap: 6px; margin: 8px 0 40px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 1rem; }
 .public-event-help-section h2 { margin: 0; color: var(--ink); font-size: 1.125rem; }
 .public-event-help-section p { margin: 0; line-height: 1.5; }
