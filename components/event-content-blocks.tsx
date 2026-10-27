@@ -5,6 +5,7 @@ import { EventGallery } from "@/components/event-gallery";
 import type { EventContentSectionRecord } from "@/modules/events/content-repository";
 import type { SanitizedHtml } from "@/modules/events/content-html";
 import { formatCountdownTarget, zonedLocalToDate } from "@/modules/events/content-countdown";
+import { variantWidths } from "@/modules/events/asset-variant-widths";
 import { embedSrc } from "@/modules/events/content-embeds";
 import {
   parseMarkdown,
@@ -110,6 +111,11 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
 }
 
+const heroImageWidths = variantWidths;
+function heroVariantUrl(url: string, width: number) {
+  return `${url}${url.includes("?") ? "&" : "?"}w=${width}`;
+}
+
 /**
  * The header banner. One per page, shown first. The title is the page's h1
  * (the page demotes its own heading when a banner is present). The image loads
@@ -133,7 +139,9 @@ export function EventHeroBanner({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="event-hero-image"
-        src={assetUrl(data.assetId)}
+        src={heroVariantUrl(assetUrl(data.assetId), 1280)}
+        srcSet={heroImageWidths.map((width) => `${heroVariantUrl(assetUrl(data.assetId), width)} ${width}w`).join(", ")}
+        sizes="(max-width: 1240px) 100vw, 1200px"
         alt={data.alt}
         loading="eager"
         fetchPriority="high"

@@ -17,18 +17,12 @@ function matches(source: string, pathname: string) {
   return getPathMatch(source, { removeUnnamedParams: true, strict: true })(pathname) !== false;
 }
 
-describe("/events redirects to the public events home (#470)", () => {
-  it("permanently redirects exactly /events to / at the config level", async () => {
-    const eventsRedirect = (await redirectRules()).find((rule) => rule.destination === "/");
-    expect(eventsRedirect).toMatchObject({
-      source: "/events",
-      destination: "/",
-      permanent: true,
-    });
-    expect(matches(eventsRedirect!.source, "/events")).toBe(true);
-    // Event landing pages live under /events/<slug> and must never redirect.
-    expect(matches(eventsRedirect!.source, "/events/some-slug")).toBe(false);
-    expect(matches(eventsRedirect!.source, "/events/some-slug/register")).toBe(false);
+describe("/events is a real page (#1217)", () => {
+  it("is not redirected, and event landing pages under /events/<slug> never are", async () => {
+    const rules = await redirectRules();
+    expect(rules.some((rule) => matches(rule.source, "/events"))).toBe(false);
+    expect(rules.some((rule) => matches(rule.source, "/events/some-slug"))).toBe(false);
+    expect(rules.some((rule) => matches(rule.source, "/events/some-slug/register"))).toBe(false);
   });
 });
 

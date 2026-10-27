@@ -15,6 +15,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "daily" as const,
     priority: 0.9,
   }, {
+    url: `${baseUrl}/events`,
+    changeFrequency: "daily" as const,
+    priority: 0.9,
+  }, {
     url: `${baseUrl}/clubs`,
     changeFrequency: "weekly" as const,
     priority: 0.7,

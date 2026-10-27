@@ -201,6 +201,7 @@ const pages: PageSpec[] = [
   { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
   { name: "public-calendar", path: "/calendar", role: "visitor" },
   { name: "public-home", path: "/", role: "visitor" },
+  { name: "public-events-open", path: "/events", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   // The public Club forms list (#1221).
   { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },
@@ -213,6 +214,8 @@ const pages: PageSpec[] = [
   { name: "staff-archived-events", path: "/archived-events", role: "event-admin" },
   // The public event page with one of each content block (#816), signed out.
   { name: "public-event-page-all-blocks", path: `/events/${blocksEventSlug}`, role: "visitor" },
+  // The same page without a banner image keeps the solid navy header (#1207).
+  { name: "public-event-page-no-banner", path: "/events/womens-retreat-2026", role: "visitor" },
   // Club portal (a director of two clubs).
   { name: "account-overview", path: "/account", role: "director" },
   { name: "account-overview-attendee", path: "/account", role: "attendee" },

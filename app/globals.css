@@ -11215,15 +11215,28 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 }
 .event-hero-image,
 .event-hero-scrim { position: absolute; inset: 0; width: 100%; height: 100%; }
-.event-hero-image { object-fit: cover; }
+.event-hero-image { object-fit: cover; transform-origin: center; }
+/* A very slow one-shot zoom (#1207); never declared when the visitor asks for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .event-hero-image { animation: event-hero-zoom 8s ease-out both; }
+}
+@keyframes event-hero-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
+}
+/* The copy spans the whole banner and carries its own navy fade, so every line of white text sits on at least 78% navy
+   (#003b5c) whatever the photo or the staff overlay: worst case is a white photo, where the text's background is
+   0.78 * #003b5c + 0.22 * white = about #2a627f, and white on that is about 6.2:1 (AA needs 4.5:1). The top 56px
+   fades in from clear and holds only padding, never text. */
 .event-hero-copy {
   position: relative;
   display: grid;
   gap: 8px;
   justify-items: start;
-  max-width: 760px;
-  padding: clamp(18px, 4vw, 40px);
+  padding: calc(clamp(18px, 4vw, 40px) + 56px) clamp(18px, 4vw, 40px) clamp(18px, 4vw, 40px);
+  background: linear-gradient(to bottom, rgba(0, 59, 92, 0) 0, rgba(0, 59, 92, 0.78) 56px, rgba(0, 59, 92, 0.78) 100%);
 }
+.event-hero-copy > * { max-width: 760px; }
 .event-hero-copy h1 {
   margin: 0;
   color: #ffffff;
@@ -13116,6 +13129,35 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 @media (prefers-reduced-motion: reduce) {
   .confirm-check-icon svg, .confirm-check-icon svg path, .public-registration-confirmation-icon svg, .public-registration-confirmation-icon svg path { animation: none; }
+}
+
+/* Open for registration (#1217): filter links and event cards. */
+.open-events-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.open-events-filter a {
+  display: inline-flex; min-height: 44px; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  padding: 8px 18px; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; text-decoration: none;
+}
+.open-events-filter a[aria-current="page"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
+.open-events-filter a:focus-visible, .open-events-card a:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+.open-events-card { display: grid; gap: 6px; border: 1px solid var(--line); border-left: 4px solid var(--imsda-navy); border-radius: 16px; background: #fff; padding: 14px 16px; }
+.open-events-card h3 { margin: 0; font-size: 1.125rem; }
+.open-events-card h3 a { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--ink); text-decoration: none; }
+.open-events-card .calendar-agenda-meta { font-size: 1rem; }
+.open-events-note { margin: 0; color: var(--muted); font-size: 1rem; }
+.open-events-register, .open-events-calendar-link { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; justify-self: start; text-decoration: none; }
+.calendar-empty p { margin: 0 0 8px; font-size: 1rem; }
+.home-events-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 1rem; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .open-events-filter a, .open-events-card a { transition: none; }
+}
+
+/* Event card to event page header morph (#1208). */
+::view-transition-group(.event-card) { animation-duration: 350ms; animation-timing-function: ease-in-out; }
+::view-transition { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
 }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
