@@ -1,4 +1,9 @@
-/* Top tabs on the admin dashboards (#1227, #1228). They wrap instead of scrolling, so nothing overflows at 360px. */
+/* Top tabs on the admin dashboards (#1227, #1228) and the section header (#1274). They wrap on wider screens; on a phone the row scrolls sideways inside itself, so the page never does. */
+.tabs {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .tabs ul {
   display: flex;
   flex-wrap: wrap;
@@ -28,7 +33,7 @@
   overflow-wrap: break-word;
 }
 
-.tabs a[aria-current="page"] {
+.tabs a[aria-current] {
   border-bottom-color: var(--imsda-gold);
   color: var(--imsda-navy);
 }
@@ -36,4 +41,20 @@
 .tabs a:focus-visible {
   outline: 2px solid var(--imsda-navy);
   outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .tabs ul {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .tabs li {
+    flex: none;
+  }
+
+  .tabs a {
+    white-space: nowrap;
+  }
 }

@@ -8,6 +8,7 @@ import { getSignInLinkCheck } from "@/modules/account-merge/sign-in-switch";
 import { getHomepageMinistriesForAdmin } from "@/modules/system-admin/homepage-ministries";
 import { getEnvironmentStatusForViewer } from "@/modules/system-admin/environment-status";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Platform settings" };
 
@@ -18,6 +19,7 @@ export default async function PlatformSettingsPage() {
 
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/settings" section="system" />
       <PlatformSettingsWorkspace
         initialSettings={await getPlatformSettings()}
         initialMinistries={await getHomepageMinistriesForAdmin()}

@@ -7,6 +7,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventTemplates } from "@/modules/event-templates/repository";
 import { ensureStarterEventTemplates } from "@/modules/event-templates/starter-repository";
 import { EventTemplateList } from "@/components/event-template-list";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Event templates" };
 
@@ -26,6 +27,7 @@ export default async function EventTemplatesPage() {
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path="/admin/event-templates" section="system" />
       <StaffPageHeader description="The starting points new events are built from." />
       <EventTemplateList initialTemplates={templates} />
     </section>

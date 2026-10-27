@@ -1,13 +1,13 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { HealthImportWorkspace } from "@/components/health-import-workspace";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { hasAcknowledgedHealthPrivacy } from "@/modules/health-records/acknowledgment";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Import health records", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export default async function HealthImportPage() {
   const acknowledged = await hasAcknowledgedHealthPrivacy({ kind: "SYSTEM_ADMIN", userId: user.id });
   return (
     <>
-      <BackLink href={user.globalRole === "SYSTEM_ADMIN" ? "/admin/organizations" : "/admin/clubs/summary"} variant="staff">{user.globalRole === "SYSTEM_ADMIN" ? "Back to Clubs and churches" : "Back to Clubs"}</BackLink>
+      <AdminPageHeader path="/admin/clubs/health-import" />
       {acknowledged ? <HealthImportWorkspace /> : <HealthPrivacyAcknowledgment as="STAFF" />}
     </>
   );

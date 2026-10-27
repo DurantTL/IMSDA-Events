@@ -1,11 +1,11 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ChurchMapLocationsWorkspace } from "@/components/church-map-locations-workspace";
 import { geocodingEnabled } from "@/integrations/geocoding";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { countGeocodableChurches, listGeocodeReview } from "@/modules/organizations/church-geocoding";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Find map locations" };
 
@@ -17,9 +17,7 @@ export default async function ChurchMapLocationsPage() {
   const [eligible, items] = await Promise.all([countGeocodableChurches(), listGeocodeReview()]);
   return (
     <>
-      <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations/directory" variant="staff">Back to Organization directory</BackLink>
-      </div>
+      <AdminSectionHeaderFor path="/admin/organizations/map-locations" section="system" />
       <section className="page-stack" aria-labelledby="map-locations-title">
         <div className="page-intro">
           <div>

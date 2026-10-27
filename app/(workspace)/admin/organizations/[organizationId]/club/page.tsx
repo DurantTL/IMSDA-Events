@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Award, Eye, IdCard, UserCog } from "lucide-react";
 import { ActAsButton } from "@/components/act-as-button";
-import { BackLink } from "@/components/back-link";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { ClubOverview } from "@/components/club-overview";
@@ -14,6 +13,7 @@ import { listClubImports } from "@/modules/club-imports/move-year";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { getPrisma } from "@/lib/prisma";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Open club" };
 export const dynamic = "force-dynamic";
@@ -39,8 +39,7 @@ export default async function StaffOpenClubPage({
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   // A Clubs Administrator (#1225, #1232) sees and can do what a system administrator can on a club: roster, birth dates,
   // Sterling Volunteers detail, guardians, and the change tools (club admins, profile, honors, act-as, year move).
-  // Only the way back differs, since the Clubs and churches list is system administrators only. Churches 404 below.
-  const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
+  // The way back is in the section header (#1274): Club summary in the Clubs view, Clubs and churches in the System view. Churches 404 below.
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const view = rosterYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
@@ -56,12 +55,8 @@ export default async function StaffOpenClubPage({
 
   return (
     <section className="page-stack">
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/club`} />
       <div className="intro-actions club-admin-links">
-        {isSystemAdmin ? (
-          <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        ) : (
-          <BackLink href="/admin/clubs/summary" variant="staff">Back to Clubs</BackLink>
-        )}
         <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
           <UserCog aria-hidden="true" size={14} /> Club admins
         </Link>
