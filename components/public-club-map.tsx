@@ -31,7 +31,7 @@ const defaultZoom = 6;
  *
  * Nothing the map shows is handed to Leaflet as an HTML string — tooltips
  * are DOM nodes built with textContent (see public-club-map-content), pins
- * are empty divIcons styled in CSS, and the OpenStreetMap attribution is
+ * are empty divIcons styled in CSS (the logo is a file in public/), and the OpenStreetMap attribution is
  * rendered by React beside the map rather than through Leaflet's
  * innerHTML-based attribution control.
  */
@@ -156,11 +156,11 @@ export function PublicClubMap({
       const icon = L.divIcon({
         className: styles.markerIcon,
         html: false,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
+        iconSize: [44, 48],
+        iconAnchor: [22, 48],
       });
       const marker = L.marker([group.latitude, group.longitude], { icon, keyboard: true, riseOnHover: true });
-      marker.bindTooltip(buildTooltipContent(document, group), { direction: "top", offset: [0, -10] });
+      marker.bindTooltip(buildTooltipContent(document, group), { direction: "top", offset: [0, -48] });
       const firstClubId = group.clubs[0].id;
       const select = () => {
         const current = selectedIdRef.current;
