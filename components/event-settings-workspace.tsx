@@ -1054,12 +1054,12 @@ export function EventSettingsWorkspace({
             blockId="public-info"
             onOpenChange={(open) => setBlockOpen("public-info", open)}
             open={openBlocks["public-info"] ?? false}
-            summary={blockSummary("public-info", draft, { publicState: publicPageOverview.isPublic ? "Public" : "Not public yet" })}
+            summary={blockSummary("public-info", draft, { publicState: publicPageOverview.publicState })}
             title={settingsBlockTitles["public-info"]}
           >
             <p className="settings-block-intro">This event&rsquo;s public information lives on IMSDA Events. Link an IMSDA.org page too only if one still exists for this event.</p>
             {publicPageOverview && (
-              <dl className="public-page-overview" aria-label="Public page and links">
+              <dl className="public-page-overview">
                 <div>
                   <dt>{publicPageOverview.status.label}</dt>
                   <dd>{publicPageOverview.status.text}</dd>
@@ -1072,8 +1072,8 @@ export function EventSettingsWorkspace({
                     ) : (
                       <span>{publicPageOverview.page.path}</span>
                     )}
-                    {publicPageOverview.page.note && <small>{publicPageOverview.page.note}</small>}
-                    {publicPageOverview.page.addressNote && <small role="status">{publicPageOverview.page.addressNote}</small>}
+                    {publicPageOverview.page.note && (publicPageOverview.page.path === null ? publicPageOverview.page.note : <small>{publicPageOverview.page.note}</small>)}
+                    {publicPageOverview.page.addressNote && <small>{publicPageOverview.page.addressNote}</small>}
                   </dd>
                 </div>
                 <div>

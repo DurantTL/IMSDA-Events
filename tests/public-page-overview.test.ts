@@ -24,6 +24,8 @@ describe("public page overview", () => {
     expect(o.page.addressNote).toBeNull();
     expect(o.calendar.text).toBe("On the calendar");
     expect(o.calendar.href).toBe("/more/features?event=evt%201");
+    expect(o.calendar.linkLabel).toBe("See Event features");
+    expect(o.publicState).toBe("Public");
   });
 
   it("uses the saved slug and notes an edited one", () => {
@@ -46,6 +48,7 @@ describe("public page overview", () => {
     const o = edit({ archivedAt: "2026-01-01T00:00:00.000Z" });
     expect(o.isPublic).toBe(false);
     expect(o.status.text).toBe("Archived: hidden from the public site.");
+    expect(o.publicState).toBe("Archived");
     expect(o.page.href).toBeNull();
   });
 
@@ -61,6 +64,8 @@ describe("public page overview", () => {
     expect(o.page.href).toBeNull();
     expect(o.calendar.href).toBeNull();
     expect(o.calendar.note).toBe("Chosen in the features step above.");
-    expect(getPublicPageOverview({ mode: "create", typedSlug: " ", showOnCalendar: false }).page.path).toBeNull();
+    const blank = getPublicPageOverview({ mode: "create", typedSlug: " ", showOnCalendar: false });
+    expect(blank.page.path).toBeNull();
+    expect(blank.page.note).toBe("Set a page address in Step 1.");
   });
 });

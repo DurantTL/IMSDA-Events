@@ -13,7 +13,8 @@ export const PUBLIC_TEXT = "Public";
 export const LINK_WORKS_AFTER_PUBLISH_TEXT = "Works once the event is published.";
 export const CREATE_PAGE_ADDRESS_TEXT = "Your page address once saved and published.";
 export const CREATE_CALENDAR_NOTE = "Chosen in the features step above.";
-export const CHANGE_ON_FEATURES_LABEL = "Change on Event features";
+export const CHANGE_ON_FEATURES_LABEL = "See Event features";
+export const CREATE_NO_SLUG_TEXT = "Set a page address in Step 1.";
 
 export type PublicPageOverviewInput =
   | { mode: "create"; typedSlug: string; showOnCalendar: boolean }
@@ -29,6 +30,8 @@ export type PublicPageOverviewInput =
 
 export type PublicPageOverview = {
   isPublic: boolean;
+  /** Short status for the collapsed block summary. */
+  publicState: "Public" | "Not public yet" | "Archived";
   status: { label: string; text: string };
   page: {
     label: string;
@@ -51,12 +54,13 @@ export function getPublicPageOverview(input: PublicPageOverviewInput): PublicPag
     const slug = input.typedSlug.trim();
     return {
       isPublic: false,
+      publicState: "Not public yet",
       status: { label: "Public or not", text: CREATE_NOT_PUBLIC_TEXT },
       page: {
         label: "Page link",
         path: slug ? publicEventPath({ slug }) : null,
         href: null,
-        note: slug ? CREATE_PAGE_ADDRESS_TEXT : null,
+        note: slug ? CREATE_PAGE_ADDRESS_TEXT : CREATE_NO_SLUG_TEXT,
         addressNote: null,
       },
       calendar: {
@@ -78,6 +82,7 @@ export function getPublicPageOverview(input: PublicPageOverviewInput): PublicPag
     : isPublic ? "On the calendar" : "On the calendar once published";
   return {
     isPublic,
+    publicState: archived ? "Archived" : isPublic ? "Public" : "Not public yet",
     status: { label: "Public or not", text: statusText },
     page: {
       label: "Page link",

@@ -130,6 +130,32 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
     expect(markup).toContain("the registration support contact is missing");
   });
 
+  describe("Public page and links overview (#448)", () => {
+    const overview = (event: EventSettingsRecord) => {
+      const markup = renderToStaticMarkup(createElement(EventSettingsWorkspace, { mode: "edit", initialEvent: event }));
+      const start = markup.indexOf('class="public-page-overview"');
+      return markup.slice(start, markup.indexOf("</dl>", start));
+    };
+
+    it("shows no link for a published but archived event", () => {
+      const html = overview({ ...baseEvent, archivedAt: "2027-02-01T00:00:00.000Z" });
+      expect(html).toContain("Archived: hidden from the public site.");
+      expect(html).not.toContain('href="/events/');
+    });
+
+    it("shows the path as plain text for a draft", () => {
+      const html = overview({ ...baseEvent, isPublished: false });
+      expect(html).toContain(`/events/${baseEvent.slug}`);
+      expect(html).toContain("Works once the event is published.");
+      expect(html).not.toContain('href="/events/');
+    });
+
+    it("links the saved page for a published, unarchived event", () => {
+      const html = overview(baseEvent);
+      expect(html).toContain(`href="/events/${baseEvent.slug}"`);
+    });
+  });
+
   it("enables Publish for a ready, saved, unpublished event", () => {
     const markup = renderToStaticMarkup(createElement(EventSettingsWorkspace, {
       mode: "edit",
