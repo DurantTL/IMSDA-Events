@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * #1227: the Events Administrator dashboard. Scope is the security-critical part: only the signed-in person's own
@@ -228,7 +228,14 @@ describe("the page", () => {
   const person = { id: "user-1", displayName: "Synthetic Organizer", email: "organizer@imsda-events.test", globalRole: null };
   const render = async () => renderToStaticMarkup(await EventsAdminPage());
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // The page reads the real clock; pin it to the fixtures' "now" so day counts don't drift.
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
     vi.clearAllMocks();
     mocks.getCurrentSession.mockResolvedValue({ user: person });
     mocks.resolveAdminRoles.mockResolvedValue({ systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: ["event-one", "event-two"] });
