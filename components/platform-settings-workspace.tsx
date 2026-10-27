@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
 import { inlinePhoneProblem } from "@/lib/field-validation";
+import { HomepageMinistriesEditor } from "@/components/homepage-ministries-editor";
+import type { HomepageMinistry } from "@/modules/system-admin/homepage-ministries-domain";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
 
 type Draft = {
@@ -19,6 +21,8 @@ type Draft = {
   invoiceHeaderOrganization: string;
   invoiceHeaderAddress: string;
   invoiceHeaderPhone: string;
+  publicHelpPhone: string;
+  publicHelpEmail: string;
 };
 
 function draftFrom(settings: PlatformSettingsRecord): Draft {
@@ -33,6 +37,8 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     invoiceHeaderOrganization: settings.invoiceHeaderOrganization ?? "",
     invoiceHeaderAddress: settings.invoiceHeaderAddress ?? "",
     invoiceHeaderPhone: settings.invoiceHeaderPhone ?? "",
+    publicHelpPhone: settings.publicHelpPhone ?? "",
+    publicHelpEmail: settings.publicHelpEmail ?? "",
   };
 }
 
@@ -44,9 +50,11 @@ export type SignInSwitchState = {
 export function PlatformSettingsWorkspace({
   initialSettings,
   initialSignIn,
+  initialMinistries,
 }: {
   initialSettings: PlatformSettingsRecord;
   initialSignIn: SignInSwitchState;
+  initialMinistries: { ministries: HomepageMinistry[]; updatedAt: string | null; updatedByName: string | null };
 }) {
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [signIn, setSignIn] = useState(initialSignIn);
@@ -120,6 +128,8 @@ export function PlatformSettingsWorkspace({
   // The invoice phone gets the shared check inline (#1193); the saved phone is the one already stored, which is flagged but never blocks.
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
+  const [helpPhoneTouched, setHelpPhoneTouched] = useState(false);
+  const helpPhoneProblem = inlinePhoneProblem("Phone", draft.publicHelpPhone, settings.publicHelpPhone, helpPhoneTouched);
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(settings));
 
   function field(key: keyof Draft) {
@@ -134,7 +144,8 @@ export function PlatformSettingsWorkspace({
   async function save(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
     setPhoneTouched(true);
-    if (phoneProblem.blocking) {
+    setHelpPhoneTouched(true);
+    if (phoneProblem.blocking || helpPhoneProblem.blocking) {
       setError("Check the highlighted answers and try again.");
       return;
     }
@@ -287,6 +298,24 @@ export function PlatformSettingsWorkspace({
         <section className="panel">
           <div className="section-heading">
             <div>
+              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Public homepage</p>
+              <h2>Homepage help contact</h2>
+            </div>
+          </div>
+          <p className="field-help platform-note">
+            Shown at the bottom of the front page as &ldquo;Need help? Call &hellip; or email &hellip;&rdquo;. Leave a field blank to leave that part out; with both
+            blank no help line shows. This is separate from the alert addresses, which are internal.
+          </p>
+          <label>Help phone
+            <input aria-describedby={helpPhoneProblem.message ? "help-phone-error" : undefined} aria-invalid={helpPhoneProblem.message ? true : undefined} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setHelpPhoneTouched(true)} type="tel" {...field("publicHelpPhone")} />
+            {helpPhoneProblem.message && <small className="field-error" id="help-phone-error" role="alert">{helpPhoneProblem.message}</small>}
+          </label>
+          <label>Help email<input autoComplete="off" maxLength={200} type="email" {...field("publicHelpEmail")} /></label>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <div>
               <p className="eyebrow"><Mail aria-hidden="true" size={14} /> New event defaults</p>
               <h2>What a new event starts from</h2>
             </div>
@@ -328,6 +357,8 @@ export function PlatformSettingsWorkspace({
           {settings.updatedByName ? ` by ${settings.updatedByName}` : ""}.
         </p>
       </form>
+
+      <HomepageMinistriesEditor initial={initialMinistries.ministries} updatedAt={initialMinistries.updatedAt} updatedByName={initialMinistries.updatedByName} />
     </section>
   );
 }

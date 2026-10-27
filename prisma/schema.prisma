@@ -827,6 +827,7 @@ model User {
   createdMessageVersions    MessageTemplateVersion[]  @relation("MessageTemplateVersionCreatedBy")
   createdPaymentInstructionVersions EventPaymentInstructionVersion[] @relation("PaymentInstructionVersionApprovedBy")
   platformSettingsUpdates   PlatformSettings[]        @relation("PlatformSettingsUpdatedBy")
+  homepageMinistryUpdates   HomepageMinistry[]        @relation("HomepageMinistryUpdatedBy")
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
@@ -1525,6 +1526,23 @@ model EventAsset {
   @@index([eventId, createdAt])
 }
 
+/// One of the six "Find your place" tiles on the public homepage (#1251). Exactly six rows, one per `position` (1 to 6),
+/// created by the migration and edited by system administrators in Platform settings. `categories` are the calendar
+/// categories whose next item the tile shows; `linkHref` blank means the calendar filtered to the first category.
+model HomepageMinistry {
+  id              String   @id @default(cuid())
+  position        Int      @unique
+  name            String
+  description     String?
+  linkHref        String?
+  categories      String[]
+  icon            String   @default("Users")
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?
+
+  updatedBy User? @relation("HomepageMinistryUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
 /// Platform-wide identity and the defaults a new event inherits.
 ///
 /// Exactly one row, pinned by `id`. A singleton in a table rather than
@@ -1557,6 +1575,10 @@ model PlatformSettings {
   /// Mailing address, one line per row.
   invoiceHeaderAddress      String?
   invoiceHeaderPhone        String?
+  /// The help line in the public homepage footer (#1251): "Need help? Call ... or email ...". Each is blank when not set.
+  /// Not `supportContact`, which is the internal alert inbox.
+  publicHelpPhone           String?
+  publicHelpEmail           String?
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.

@@ -33,6 +33,8 @@ export type CalendarItem = {
    */
   registrationStatus?: PublicCapacityStatus;
   registrationOpensOn?: string | null;
+  /** Only for events (#1251): the last day registration is open (inclusive), which the homepage's closing-soon flags count down to. */
+  registrationClosesOn?: string | null;
   clubEvent?: boolean;
   /** The event's time zone, so a "opens in N days" count uses the event's own today (#1209). */
   registrationTimeZone?: string;
