@@ -162,7 +162,7 @@ describe("pending invites", () => {
       ["Nia New", "Director of Synthetic Club", "/admin/people/account/a5"],
       ["Stan Staff", "Staff login, not activated yet", "/admin/people/staff/u7"],
     ]);
-    expect(mocks.inviteFindMany.mock.calls[0][0].where).toMatchObject({ status: { in: ["PENDING", "SENT"] }, cancelledAt: null, acceptedAt: null, organization: { type: "CLUB" } });
+    expect(mocks.inviteFindMany.mock.calls[0][0].where).toMatchObject({ status: { in: ["PENDING", "SENT"] }, cancelledAt: null, acceptedAt: null, organization: { type: "CLUB", isActive: true } });
     expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ accountStatus: "PENDING_ACTIVATION" });
 
     mocks.userFindMany.mockClear();

@@ -22,8 +22,7 @@ export type PendingPerson = {
 };
 
 const ROLE_WORD = { DIRECTOR: "Director", DEPUTY: "Deputy", REGISTRAR: "Registrar", REPORTER: "Reporter" } as const;
-export const PENDING_MAX_ROWS = 500;
-const MAX_ROWS = PENDING_MAX_ROWS;
+const MAX_ROWS = 500;
 
 /** Lapsed invites stay listed (staff may resend from the club page) but are labelled. */
 function inviteNote(invite: { status: string; sentAt: Date | null; expiresAt: Date | null }, now: Date): string {
@@ -47,7 +46,7 @@ export async function listPendingPeople(scope: PeopleScope, query = "", now = ne
         status: { in: ["PENDING", "SENT"] },
         cancelledAt: null,
         acceptedAt: null,
-        organization: { type: "CLUB" },
+        organization: { type: "CLUB", isActive: true },
         ...textWhere,
       },
       orderBy: [{ createdAt: "desc" }],
