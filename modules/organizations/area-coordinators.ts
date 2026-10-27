@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { resolveClubsActor } from "@/modules/access/admin-roles";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -79,6 +80,55 @@ export async function listClubsForArea() {
   }));
 }
 
+/** The actor behind an Area Coordinator change (#1275, decision A), read from the database; anyone else is refused with a 403. */
+export async function requireAreaCoordinatorActor(actorUserId: string, client: Prisma.TransactionClient | PrismaClient = getPrisma()) {
+  const actor = await resolveClubsActor(actorUserId, client);
+  if (!actor) {
+    throw new AccessDeniedError("Clubs Administrator or system administrator access is required to change Area Coordinators.", 403, "PERMISSION_DENIED");
+  }
+  return actor;
+}
+
+/**
+ * The grant or removal itself and its audit entry, inside the caller's transaction. Shared by `setAreaCoordinator` and by
+ * accepting an Area Coordinator invite (#1276), so both write the same grant and the same audit entry.
+ */
+export async function applyAreaCoordinatorChange(
+  tx: Prisma.TransactionClient,
+  attendeeAccountId: string,
+  on: boolean,
+  actorUserId: string,
+  now: Date,
+  options: { viaClubsAdministrator?: boolean; viaInviteId?: string } = {},
+) {
+  const account = await tx.attendeeAccount.findUnique({ where: { id: attendeeAccountId }, select: { id: true } });
+  if (!account) throw new AreaCoordinatorError("ACCOUNT_NOT_FOUND", "That account could not be found.");
+  if (on) {
+    await tx.areaCoordinatorGrant.upsert({
+      where: { attendeeAccountId },
+      create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
+      update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now },
+    });
+  } else {
+    await tx.areaCoordinatorGrant.updateMany({
+      where: { attendeeAccountId, revokedAt: null },
+      data: { revokedAt: now, revokedByUserId: actorUserId },
+    });
+  }
+  await writeAuditLog({
+    actorUserId,
+    action: on ? "AREA_COORDINATOR_GRANTED" : "AREA_COORDINATOR_REVOKED",
+    entityType: "AttendeeAccount",
+    entityId: attendeeAccountId,
+    summary: on ? "Made an account an Area Coordinator." : "Removed an Area Coordinator.",
+    metadata: {
+      attendeeAccountId,
+      ...(options.viaClubsAdministrator ? { viaClubsAdministrator: true } : {}),
+      ...(options.viaInviteId ? { viaInviteId: options.viaInviteId } : {}),
+    },
+  }, tx);
+}
+
 /**
  * Grants or removes the Area Coordinator role. The actor is checked here as well as at the route (#1275, decision
  * A): a system administrator or an active Clubs Administrator, read from the database by `actorUserId`; anyone else
@@ -86,34 +136,6 @@ export async function listClubsForArea() {
  */
 export async function setAreaCoordinator(attendeeAccountId: string, on: boolean, actorUserId: string, now = new Date()) {
   const prisma = getPrisma();
-  const actor = await prisma.user.findUnique({ where: { id: actorUserId }, select: { globalRole: true } });
-  const isSystemAdmin = actor?.globalRole === "SYSTEM_ADMIN";
-  const viaClubsAdministrator = !isSystemAdmin && actor !== null && await isActiveClubsAdministrator(actorUserId);
-  if (!isSystemAdmin && !viaClubsAdministrator) {
-    throw new AccessDeniedError("Clubs Administrator or system administrator access is required to change Area Coordinators.", 403, "PERMISSION_DENIED");
-  }
-  await prisma.$transaction(async (tx) => {
-    const account = await tx.attendeeAccount.findUnique({ where: { id: attendeeAccountId }, select: { id: true } });
-    if (!account) throw new AreaCoordinatorError("ACCOUNT_NOT_FOUND", "That account could not be found.");
-    if (on) {
-      await tx.areaCoordinatorGrant.upsert({
-        where: { attendeeAccountId },
-        create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
-        update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now },
-      });
-    } else {
-      await tx.areaCoordinatorGrant.updateMany({
-        where: { attendeeAccountId, revokedAt: null },
-        data: { revokedAt: now, revokedByUserId: actorUserId },
-      });
-    }
-    await writeAuditLog({
-      actorUserId,
-      action: on ? "AREA_COORDINATOR_GRANTED" : "AREA_COORDINATOR_REVOKED",
-      entityType: "AttendeeAccount",
-      entityId: attendeeAccountId,
-      summary: on ? "Made an account an Area Coordinator." : "Removed an Area Coordinator.",
-      metadata: viaClubsAdministrator ? { attendeeAccountId, viaClubsAdministrator: true } : { attendeeAccountId },
-    }, tx);
-  });
+  const actor = await requireAreaCoordinatorActor(actorUserId, prisma);
+  await prisma.$transaction((tx) => applyAreaCoordinatorChange(tx, attendeeAccountId, on, actorUserId, now, { viaClubsAdministrator: actor.viaClubsAdministrator }));
 }

@@ -366,6 +366,20 @@ const pages: PageSpec[] = [
   // People & access (#1275): the list, and one person (the seeded Registration manager, a non-admin staff login with an event membership) with its boxes.
   staff("people", "/admin/people?q=imsda-events.test", "system-admin"),
   staff("people-person", "/admin/people/staff/usr_registration_manager", "system-admin"),
+  // Invite a person (#1276): the dialog open with an event row, a club row and every field error showing. Nothing is submitted
+  // (the empty form is refused in the browser).
+  {
+    ...staff("people-invite", "/admin/people", "system-admin"),
+    prepare: async (page) => {
+      await page.getByRole("button", { name: "Invite a person" }).click({ timeout: 5000 });
+      await page.getByRole("button", { name: "Add an event" }).click({ timeout: 5000 });
+      await page.getByRole("button", { name: "Add a club" }).click({ timeout: 5000 });
+      await page.getByRole("button", { name: "Send invite" }).click({ timeout: 5000 });
+      await page.waitForTimeout(200);
+    },
+  },
+  // The person page opened from an invite with access ready to save (#1276): nothing is saved.
+  staff("people-person-chosen", "/admin/people/staff/usr_registration_manager?grant=sa%2Cca%2Cac%2Ce%3Aevt_wr26%3AEVENT_ADMIN", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),

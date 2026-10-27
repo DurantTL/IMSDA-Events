@@ -21,7 +21,8 @@ vi.mock("@/modules/attendee-accounts/mfa-service", () => ({ getAttendeeMfaStatus
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ listRegistrationsForVerifiedEmail: vi.fn(async () => []) }));
 vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: vi.fn(async () => []) }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: vi.fn(async () => []) }));
-vi.mock("@/components/club-invite-accept", () => ({ ClubInviteAccept: () => null }));
+vi.mock("@/modules/organizations/area-coordinator-invites", () => ({ listAreaCoordinatorInvitesForAccount: vi.fn(async () => []) }));
+vi.mock("@/components/club-invite-accept", () => ({ ClubInviteAccept: () => null, AreaCoordinatorInviteAccept: () => null }));
 vi.mock("@/components/instructor-invite-accept", () => ({ InstructorInviteAccept: () => null }));
 vi.mock("@/modules/honors/instructor-repository", () => ({ listInstructorInvitesForAccount: vi.fn(async () => []), accountIsInstructor: vi.fn(async () => false) }));
 vi.mock("@/components/area-coordinator-card", () => ({

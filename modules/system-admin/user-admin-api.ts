@@ -1,5 +1,10 @@
+import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { AreaCoordinatorError } from "@/modules/organizations/area-coordinators";
+import { AreaCoordinatorInviteError } from "@/modules/organizations/area-coordinator-invites";
+import { clubImportApiError } from "@/modules/club-imports/api-errors";
+import { ClubInviteError } from "@/modules/club-imports/invites";
+import { PeopleInviteError } from "@/modules/system-admin/people-invite";
 import { StaffActAsError } from "@/modules/organizations/staff-act-as";
 import { logError } from "@/lib/logger";
 import { AccessDeniedError } from "@/modules/access/authorization";
@@ -13,6 +18,21 @@ export function userAdminApiError(error: unknown, action: string) {
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof AreaCoordinatorError) {
     return Response.json({ error: error.code, message: error.message }, { status: 404 });
+  }
+  if (error instanceof PeopleInviteError) {
+    return Response.json(
+      { error: error.code, message: error.message, ...(error.personHref ? { personHref: error.personHref } : {}) },
+      { status: error.code === "INVALID_ACCESS" ? 400 : 409 },
+    );
+  }
+  if (error instanceof AreaCoordinatorInviteError) {
+    const status = error.code === "INVITE_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : error.code === "INVITE_RESEND_TOO_SOON" ? 429 : 409;
+    return Response.json({ error: error.code, message: error.message }, { status });
+  }
+  if (error instanceof ClubInviteError) return clubImportApiError(error, action);
+  // Two invites for the same new email racing each other: the second finds the login already there.
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return Response.json({ error: "ALREADY_EXISTS", message: "That email already has an account." }, { status: 409 });
   }
   if (error instanceof StaffActAsError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.code === "ACT_AS_CONFLICT" ? 409 : 404 });

@@ -54,6 +54,7 @@ vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
   },
 }));
 vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: async () => mocks.invites }));
+vi.mock("@/modules/organizations/area-coordinator-invites", () => ({ listAreaCoordinatorInvitesForAccount: async () => [] }));
 vi.mock("@/modules/honors/instructor-repository", () => ({
   accountIsInstructor: async () => false,
   listInstructorInvitesForAccount: async () => mocks.instructorInvites,

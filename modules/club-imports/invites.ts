@@ -1,13 +1,15 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
+import { resolveClubsActor } from "@/modules/access/admin-roles";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { ACT_AS_OWN_ACCOUNT_MESSAGE, isActingAdminsOwnEmail } from "@/modules/organizations/act-as-own-account";
 import { neutralizePlaceholders } from "@/modules/club-applications/email";
-import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { queueAccountInviteMessage } from "@/modules/communications/account-invite-message";
 import {
   clubAssignableRoles,
   clubDirectorRoleLabels,
@@ -98,16 +100,42 @@ export function clubInviteSignUpUrl(email: string) {
   return url.toString();
 }
 
+/** The one outbox write for a club invite email (an import send, a club's own invite, an application invite, a resend). */
+export function queueClubInviteMessage(
+  tx: Prisma.TransactionClient,
+  invite: { id: string; email: string; name: string },
+  content: { subject: string; bodyText: string },
+  correlationId?: string,
+) {
+  return queueAccountInviteMessage(tx, {
+    recipient: { email: invite.email, name: invite.name },
+    content,
+    trigger: "CLUB_INVITE_SENT",
+    reference: { clubInviteId: invite.id },
+    idempotencyPrefix: "club-invite",
+    entityId: invite.id,
+    correlationId,
+  });
+}
+
+/** Where an invite came from: the club import, a club's own director, an approved application, or People & access (#1276). */
+export type ClubInviteSource = "IMPORT" | "CLUB" | "APPLICATION" | "PEOPLE";
+
+/** `ClubInvite.source` is free text in the database; anything unknown behaves as an import invite. */
+function inviteSource(value: string): ClubInviteSource {
+  return value === "CLUB" || value === "APPLICATION" || value === "PEOPLE" ? value : "IMPORT";
+}
+
 function inviteEmail(rawInput: {
   name: string;
   email: string;
   clubName: string;
   role: "DIRECTOR" | "DEPUTY" | "REGISTRAR" | "REPORTER";
-  source: "IMPORT" | "CLUB" | "APPLICATION";
+  source: ClubInviteSource;
 }) {
-  // An application's club and director names are typed by a stranger and the body is scanned for `{{...}}` sentinels at
+  // An application's club and director names are typed by a stranger (a People & access invite's name by staff) and the body is scanned for `{{...}}` sentinels at
   // delivery (the account link one would throw): break any braces up (#817).
-  const input = rawInput.source === "APPLICATION"
+  const input = rawInput.source === "APPLICATION" || rawInput.source === "PEOPLE"
     ? { ...rawInput, name: neutralizePlaceholders(rawInput.name), clubName: neutralizePlaceholders(rawInput.clubName) }
     : rawInput;
   const signUpUrl = clubInviteSignUpUrl(input.email);
@@ -116,8 +144,10 @@ function inviteEmail(rawInput: {
     ? `${input.clubName}'s director or deputy has invited you as the club's ${role} on IMSDA Events.`
     : input.source === "APPLICATION"
       ? `Good news: the Iowa-Missouri Conference approved your application, and ${input.clubName} is now set up on IMSDA Events. You're invited as the club's ${role}.`
-      : `The Iowa-Missouri Conference has set up ${input.clubName} on IMSDA Events and invited you as the club's ${role}.`;
-  const context = input.source === "CLUB" || input.source === "APPLICATION"
+      : input.source === "PEOPLE"
+        ? `The Iowa-Missouri Conference has invited you as ${input.clubName}'s ${role} on IMSDA Events.`
+        : `The Iowa-Missouri Conference has set up ${input.clubName} on IMSDA Events and invited you as the club's ${role}.`;
+  const context = input.source !== "IMPORT"
     ? "Once you accept, you'll see this club under My club when you sign in."
     : "Your club's roster from this year's registration is already there. Please add each person's birth date as you go; until then they're marked \"birth date needed\".";
   // Club-created (#425) and application (#817) invites expire; a staff import invite (reusing this flow, #376) never did.
@@ -158,7 +188,6 @@ export async function sendClubInvites(
   if (!isAccountEmailConfigured()) {
     throw new ClubInviteError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server, so invites can't be sent yet.");
   }
-  const sender = getAccountEmailSender();
   const prisma = getPrisma();
   const where: Prisma.ClubInviteWhereInput = selection.inviteIds
     ? { id: { in: selection.inviteIds }, status: { in: ["PENDING", "SENT"] } }
@@ -177,36 +206,18 @@ export async function sendClubInvites(
       email: invite.email,
       clubName: invite.organization.name,
       role: invite.role,
-      source: invite.source === "CLUB" || invite.source === "APPLICATION" ? invite.source : "IMPORT",
+      source: inviteSource(invite.source),
     });
     const messageId = await prisma.$transaction(async (tx) => {
-      const message = await tx.messageOutbox.create({
-        data: {
-          eventId: null,
-          templateKey: "CLUB_INVITE",
-          recipientKind: "ACCOUNT",
-          recipientEmail: invite.email,
-          recipientName: invite.name || null,
-          senderNameSnapshot: sender.name,
-          senderEmailSnapshot: sender.address,
-          replyToEmailSnapshot: sender.replyTo,
-          subjectSnapshot: content.subject,
-          bodyTextSnapshot: content.bodyText,
-          metadata: { trigger: "CLUB_INVITE_SENT", accountEmail: true, realDelivery: true, clubInviteId: invite.id },
-          idempotencyKey: `club-invite:${invite.id}:${randomUUID()}`,
-          correlationId,
-          status: "PENDING",
-        },
-        select: { id: true },
-      });
+      const queuedId = await queueClubInviteMessage(tx, invite, content, correlationId);
       // Staff import invites (#376) reuse this flow's model and email but keep their prior, unexpiring behavior;
-      // only club-created invites (#425) get the 14-day expiry.
-      const expiresAt = invite.source === "CLUB" || invite.source === "APPLICATION" ? clubInviteExpiry(now) : null;
+      // club-created (#425), application (#817) and People & access (#1276) invites get the 14-day expiry.
+      const expiresAt = inviteSource(invite.source) === "IMPORT" ? null : clubInviteExpiry(now);
       await tx.clubInvite.update({
         where: { id: invite.id },
-        data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, lastMessageId: message.id, expiresAt },
+        data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, lastMessageId: queuedId, expiresAt },
       });
-      return message.id;
+      return queuedId;
     });
     messageIds.push(messageId);
   }
@@ -325,7 +336,6 @@ export async function createClubTeamInvite(
   });
   if (open) throw new ClubInviteError("INVITE_ALREADY_OPEN", "There's already a pending invite for that email.");
 
-  const sender = getAccountEmailSender();
   const name = input.name?.trim() ?? "";
   const content = inviteEmail({ name, email, clubName: club.name, role: input.role, source: "CLUB" });
   const correlationId = randomUUID();
@@ -346,26 +356,8 @@ export async function createClubTeamInvite(
       },
       select: { id: true },
     });
-    const message = await tx.messageOutbox.create({
-      data: {
-        eventId: null,
-        templateKey: "CLUB_INVITE",
-        recipientKind: "ACCOUNT",
-        recipientEmail: email,
-        recipientName: name || null,
-        senderNameSnapshot: sender.name,
-        senderEmailSnapshot: sender.address,
-        replyToEmailSnapshot: sender.replyTo,
-        subjectSnapshot: content.subject,
-        bodyTextSnapshot: content.bodyText,
-        metadata: { trigger: "CLUB_INVITE_SENT", accountEmail: true, realDelivery: true, clubInviteId: invite.id },
-        idempotencyKey: `club-invite:${invite.id}:${randomUUID()}`,
-        correlationId,
-        status: "PENDING",
-      },
-      select: { id: true },
-    });
-    await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: message.id } });
+    const messageId = await queueClubInviteMessage(tx, { id: invite.id, email, name }, content, correlationId);
+    await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
       action: "CLUB_INVITE_CREATED",
@@ -374,7 +366,7 @@ export async function createClubTeamInvite(
       summary: `Club leader invited someone as ${clubDirectorRoleLabels[input.role].toLocaleLowerCase("en-US")}.`,
       metadata: { organizationId, role: input.role, ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }) },
     }, tx);
-    return { inviteId: invite.id, messageId: message.id };
+    return { inviteId: invite.id, messageId };
   });
 }
 
@@ -408,29 +400,70 @@ export async function createApplicationDirectorInvite(
     select: { id: true },
   });
   if (!canSend) return { inviteId: invite.id, messageId: null as string | null };
-  const sender = getAccountEmailSender();
   const content = inviteEmail({ name, email, clubName: input.clubName, role: "DIRECTOR", source: "APPLICATION" });
-  const message = await tx.messageOutbox.create({
+  const messageId = await queueClubInviteMessage(tx, { id: invite.id, email, name }, content);
+  await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
+  return { inviteId: invite.id, messageId: messageId as string | null };
+}
+
+/** An open (pending or sent) invite for this exact email, club and role, expired or not. */
+export function findOpenClubInvite(
+  client: Prisma.TransactionClient | PrismaClient,
+  where: { organizationId: string; email: string; role: ClubRole },
+) {
+  return client.clubInvite.findFirst({
+    where: { ...where, status: { in: ["PENDING", "SENT"] } },
+    select: { id: true },
+  });
+}
+
+/**
+ * A club role invite from People & access (#1276), made inside the caller's transaction. Acceptance is by verified
+ * email and carries no secret, so with account email set up the invite is SENT and emailed (14-day expiry), and
+ * without it the invite is still SENT but nothing is queued: staff pass `clubInviteSignUpUrl(email)` on themselves.
+ * One open invite per email, club and role.
+ */
+export async function createPeopleClubInvite(
+  tx: Prisma.TransactionClient,
+  input: { organizationId: string; clubName: string; email: string; name: string; role: ClubRole; actorUserId: string },
+  now = new Date(),
+) {
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim();
+  if (await findOpenClubInvite(tx, { organizationId: input.organizationId, email, role: input.role })) {
+    throw new ClubInviteError("INVITE_ALREADY_OPEN", `There's already a pending invite for ${email} as ${clubDirectorRoleLabels[input.role].toLocaleLowerCase("en-US")} of ${input.clubName}. Resend or cancel it from People & access.`);
+  }
+  const canSend = isAccountEmailConfigured();
+  const invite = await tx.clubInvite.create({
     data: {
-      eventId: null,
-      templateKey: "CLUB_INVITE",
-      recipientKind: "ACCOUNT",
-      recipientEmail: email,
-      recipientName: name || null,
-      senderNameSnapshot: sender.name,
-      senderEmailSnapshot: sender.address,
-      replyToEmailSnapshot: sender.replyTo,
-      subjectSnapshot: content.subject,
-      bodyTextSnapshot: content.bodyText,
-      metadata: { trigger: "CLUB_INVITE_SENT", accountEmail: true, realDelivery: true, clubInviteId: invite.id },
-      idempotencyKey: `club-invite:${invite.id}:${randomUUID()}`,
-      correlationId: randomUUID(),
-      status: "PENDING",
+      organizationId: input.organizationId,
+      email,
+      name,
+      role: input.role,
+      source: "PEOPLE",
+      createdByUserId: input.actorUserId,
+      status: "SENT",
+      sentAt: now,
+      sentCount: canSend ? 1 : 0,
+      expiresAt: clubInviteExpiry(now),
     },
     select: { id: true },
   });
-  await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: message.id } });
-  return { inviteId: invite.id, messageId: message.id as string | null };
+  let messageId: string | null = null;
+  if (canSend) {
+    const content = inviteEmail({ name, email, clubName: input.clubName, role: input.role, source: "PEOPLE" });
+    messageId = await queueClubInviteMessage(tx, { id: invite.id, email, name }, content);
+    await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
+  }
+  await writeAuditLog({
+    actorUserId: input.actorUserId,
+    action: "CLUB_INVITE_CREATED",
+    entityType: "ClubInvite",
+    entityId: invite.id,
+    summary: `Invited someone as ${clubDirectorRoleLabels[input.role].toLocaleLowerCase("en-US")} from People & access.`,
+    metadata: { organizationId: input.organizationId, role: input.role, source: "PEOPLE", emailQueued: canSend },
+  }, tx);
+  return { inviteId: invite.id, messageId };
 }
 
 /** Statuses from which an invite can still be resent, cancelled, or accepted. */
@@ -448,7 +481,6 @@ export async function resendClubTeamInvite(organizationId: string, inviteId: str
     throw new ClubInviteError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server, so invites can't be sent yet.");
   }
   const prisma = getPrisma();
-  const sender = getAccountEmailSender();
   const correlationId = randomUUID();
 
   return prisma.$transaction(async (tx) => {
@@ -478,26 +510,8 @@ export async function resendClubTeamInvite(organizationId: string, inviteId: str
     });
     if (guarded.count === 0) throw new ClubInviteError("INVITE_NOT_OPEN", "That invite was already accepted or cancelled.");
 
-    const message = await tx.messageOutbox.create({
-      data: {
-        eventId: null,
-        templateKey: "CLUB_INVITE",
-        recipientKind: "ACCOUNT",
-        recipientEmail: invite.email,
-        recipientName: invite.name || null,
-        senderNameSnapshot: sender.name,
-        senderEmailSnapshot: sender.address,
-        replyToEmailSnapshot: sender.replyTo,
-        subjectSnapshot: content.subject,
-        bodyTextSnapshot: content.bodyText,
-        metadata: { trigger: "CLUB_INVITE_SENT", accountEmail: true, realDelivery: true, clubInviteId: invite.id },
-        idempotencyKey: `club-invite:${invite.id}:${randomUUID()}`,
-        correlationId,
-        status: "PENDING",
-      },
-      select: { id: true },
-    });
-    await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: message.id } });
+    const messageId = await queueClubInviteMessage(tx, invite, content, correlationId);
+    await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
     await writeAuditLog({
       ...("userId" in actor ? { actorUserId: actor.userId } : {}),
       action: "CLUB_INVITE_RESENT",
@@ -506,7 +520,7 @@ export async function resendClubTeamInvite(organizationId: string, inviteId: str
       summary: "Resent a club invite.",
       metadata: { organizationId, role: invite.role, ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }) },
     }, tx);
-    return { messageId: message.id };
+    return { messageId };
   });
 }
 
@@ -590,6 +604,12 @@ export async function acceptClubInvite(inviteId: string, account: { id: string; 
     // Defends the club-assignable rule even if a role or a person's standing changed after the invite was sent.
     if (invite.source === "CLUB" && !clubRoleIsAssignableByClub(invite.role)) {
       throw new ClubInviteError("INVITE_ROLE_NOT_ALLOWED", "That invite's role can no longer be accepted this way.");
+    }
+
+    // A People & access invite is only as good as the person who sent it (#1276): if they have since lost the role,
+    // it is no longer open.
+    if (invite.source === "PEOPLE" && !(invite.createdByUserId && await resolveClubsActor(invite.createdByUserId, tx))) {
+      throw new ClubInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
     }
 
     // Guarded before the grant is created: two concurrent accepts of the same invite can't both succeed.
