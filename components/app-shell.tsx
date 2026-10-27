@@ -6,6 +6,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Eye,
+  LifeBuoy,
   Search,
   LayoutDashboard,
   ShieldCheck,
@@ -62,6 +63,7 @@ import {
   clubsAdminActiveHref,
   clubsAdminHealthImportHref,
   clubsAdminNavigation,
+  helpPageTitle,
   staffSubpageTitle,
   systemNavigation,
   withCurrentEvent,
@@ -166,6 +168,8 @@ export function AppShell({
   const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
+  // Help & learning (#1077) is open to every staff member and is no nav item: it lights its own link only.
+  const isHelpRoute = pathname === "/help" || pathname.startsWith("/help/");
   const isSystemRoute = isSystemWorkspacePath(pathname);
   const current = isSystemRoute
     ? systemNavigation
@@ -227,7 +231,7 @@ export function AppShell({
   const canSwitchToAttendee = workspaceContexts.some((context) => context.kind === "attendee");
   // Staff with no events can still open their profile (#623); every event
   // control and event-scoped nav item would dead-end for them, so hide them.
-  const eventlessProfile = isProfileRoute && events.length === 0 && !isSystemAdmin;
+  const eventlessProfile = (isProfileRoute || isHelpRoute) && events.length === 0 && !isSystemAdmin;
   const eventQuery = selectedEventId ? `?event=${encodeURIComponent(selectedEventId)}` : "";
   const moreNavItem = navigation.find((item) => item.href === "/more");
   // More shows when any of its destinations is permitted (#737), not only for
@@ -273,7 +277,7 @@ export function AppShell({
   const drawnSidebarHrefs = new Set(visibleSections.flatMap((view) => view.items.map((item) => item.href)));
   const activeHref = onEventFeatures ? null : sidebarActiveHref(current, visibleHrefs);
   const isItemActive = (item: NavigationItem) => {
-    if (isProfileRoute) return false;
+    if (isProfileRoute || isHelpRoute) return false;
     // Event features lights on its own page, which is under /more but must not light More (#965).
     if (item.href === eventFeaturesItem.href) return onEventFeatures;
     return item.href.startsWith("/admin") ? pathname.startsWith(item.href) : activeHref === item.href;
@@ -533,6 +537,10 @@ export function AppShell({
               </MoreLauncher>
             );
           })()}
+          <GuardedLink className={isHelpRoute ? "nav-item active" : "nav-item"} href={withCurrentEvent("/help", selectedEventId)} aria-current={isHelpRoute ? "page" : undefined} {...tipProps("Help & learning")}>
+            <LifeBuoy aria-hidden="true" size={19} strokeWidth={1.9} />
+            <span>{helpPageTitle}</span>
+          </GuardedLink>
         </nav>
 
         <div className="sidebar-foot">
@@ -626,7 +634,7 @@ export function AppShell({
       </nav>}
       {!showSystemNav && !clubsView && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
         {mobileNavigation.map(({ href, icon: Icon, label }) => {
-          const isActive = !isProfileRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;
+          const isActive = !isProfileRoute && !isHelpRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;
           if (href === "/more") {
             return (
               <MoreLauncher

@@ -47,7 +47,8 @@ const admin: DestinationSearchContext = {
 };
 const limitedStaff: DestinationSearchContext = { ...base, permissions: ["MANAGE_CHECK_IN"] };
 
-const labels = (results: { label: string; scope: string }[]) => results.map((result) => `${result.scope}:${result.label}`);
+// Help guides (#1077) are checked in tests/help-learning-1077.test.ts; the page registry assertions here leave them out.
+const labels = (results: { label: string; scope: string }[]) => results.filter((result) => result.scope !== "Help").map((result) => `${result.scope}:${result.label}`);
 const find = (context: DestinationSearchContext, query: string) => searchDestinations(buildSearchDestinations(context), query);
 
 describe("destination registry per role", () => {
@@ -106,7 +107,8 @@ describe("destination registry per role", () => {
 
   it("keeps the selected event on every event link and on System links", () => {
     for (const destination of buildSearchDestinations(admin)) {
-      if (destination.scope === "Profile") expect(destination.href).toBe("/profile");
+      if (destination.scope === "Help") expect(destination.href).toMatch(/^\/help/);
+      else if (destination.scope === "Profile") expect(destination.href).toBe("/profile");
       else expect(destination.href).toContain("event=evt_synthetic");
     }
   });

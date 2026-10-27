@@ -31,6 +31,22 @@ async function profileRequestQuery(): Promise<URLSearchParams | null> {
 }
 
 /**
+ * Whether the request target is Help & learning (#1077): `/help` or a page below it.
+ * Every staff member may open it, including staff with no event, so the shell lets
+ * them in like `/profile`. Unlike `/profile`, a visitor with no staff session needs
+ * no special redirect: the shell sends them to the staff login.
+ */
+async function isHelpRequest(): Promise<boolean> {
+  try {
+    const target = (await headers()).get(REQUEST_TARGET_HEADER) ?? "";
+    const path = target.split("?", 1)[0].split("#", 1)[0].replace(/\/+$/, "");
+    return path === "/help" || path.startsWith("/help/");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * `/profile` (#646) lives in this group so it keeps the shell. Staff with no
  * event assignment can still open their own profile (#623), so `/profile` lets
  * them in instead of /no-access. The shell would send any visitor without a
@@ -46,5 +62,5 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
     const sessions = await resolveProfileSessions();
     if (!sessions.staff) redirect(profileHomeFor(sessions, twoStepQuery(profileQuery.getAll("twoStep"))));
   }
-  return <WorkspaceShell anyStaffWithoutEvents={Boolean(profileQuery)}>{children}</WorkspaceShell>;
+  return <WorkspaceShell anyStaffWithoutEvents={Boolean(profileQuery) || await isHelpRequest()}>{children}</WorkspaceShell>;
 }
