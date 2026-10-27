@@ -42,6 +42,25 @@ export function isPublicRegistrationOpen(phase: EventRegistrationPhase, formsLis
   return resolvePublicRegistrationStatus(phase, formsListed) === "OPEN";
 }
 
+/**
+ * The status a list or page shows once capacity is known: the dates-and-form status, or FULL / WAITLIST when the event's
+ * places are all taken (#1204). Full with a waitlist and a listed form is WAITLIST (joining is possible); without a listed
+ * form it is FULL, since there is nothing to join. The calendar and the event page both call this.
+ */
+export type PublicCapacityStatus = PublicRegistrationStatus | "FULL" | "WAITLIST";
+
+export function resolvePublicCapacityStatus(
+  phase: EventRegistrationPhase,
+  formsListed: boolean,
+  capacity: { remaining: number | null; waitlistEnabled: boolean },
+): PublicCapacityStatus {
+  if (phase === "OPEN" && capacity.remaining === 0) return capacity.waitlistEnabled && formsListed ? "WAITLIST" : "FULL";
+  return resolvePublicRegistrationStatus(phase, formsListed);
+}
+
+export const eventFullLabel = "Event full";
+export const eventWaitlistLabel = "Event full \u00b7 waitlist open";
+
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function conferenceYear(now: Date) {
@@ -56,11 +75,13 @@ function conferenceYear(now: Date) {
  * "in February" never reads as a month that has already passed.
  */
 export function publicStatusLine(
-  { status, opensOn, isClubEvent = false }: { status: PublicRegistrationStatus; opensOn?: string | null; isClubEvent?: boolean },
+  { status, opensOn, isClubEvent = false }: { status: PublicCapacityStatus; opensOn?: string | null; isClubEvent?: boolean },
   now = new Date(),
 ): string {
   const noun = isClubEvent ? "Club registration" : "Registration";
   if (status === "OPEN") return "Registration open";
+  if (status === "WAITLIST") return eventWaitlistLabel;
+  if (status === "FULL") return eventFullLabel;
   if (status === "OPENING_SOON") return "Registration opening soon";
   if (status === "UPCOMING") {
     const match = opensOn ? /^(\d{4})-(\d{2})-\d{2}$/.exec(opensOn) : null;
@@ -69,6 +90,8 @@ export function publicStatusLine(
     const year = Number(match[1]);
     return `${noun} opens in ${month}${year > conferenceYear(now) ? ` ${year}` : ""}`;
   }
+  // CLOSED and DRAFT: a draft is not public, so it reads as closed.
+  if (status === "CLOSED" || status === "DRAFT") return "Registration closed";
   return "Registration closed";
 }
 

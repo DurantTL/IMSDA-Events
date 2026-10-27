@@ -15,10 +15,10 @@ export function ClubDirectorSignInNotice({ event }: { event: Parameters<typeof c
       <span aria-hidden="true" className="club-director-notice-icon"><AlertTriangle size={24} /></span>
       <div className="club-director-notice-copy">
         <p className="club-director-notice-eyebrow">Important for club directors</p>
-        <h2 id="club-director-sign-in-title">{notice.title}</h2>
+        <p className="club-director-notice-title" id="club-director-sign-in-title"><strong>{notice.title}</strong></p>
         <p>{notice.body}</p>
       </div>
-      <Link className="primary-button club-director-notice-button" href={notice.href}>
+      <Link className="secondary-button club-director-notice-button" href={notice.href}>
         <LogIn aria-hidden="true" size={17} /> {notice.buttonLabel}
       </Link>
     </aside>

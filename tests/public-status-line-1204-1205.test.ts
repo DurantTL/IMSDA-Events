@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calendarItemStatusLine, type CalendarItem } from "@/modules/calendar/domain";
-import { publicStatusLine } from "@/modules/events/public-registration-status";
+import { publicStatusLine, resolvePublicCapacityStatus } from "@/modules/events/public-registration-status";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -37,5 +37,19 @@ describe("one plain-language status line (#1204, #1205)", () => {
     expect(calendarItemStatusLine({ ...base, registrationOpen: true })).toBe("Registration open");
     expect(calendarItemStatusLine({ ...base, kind: "ENTRY", registrationStatus: "OPEN" })).toBeNull();
     expect(calendarItemStatusLine({ ...base, status: "CANCELLED", registrationStatus: "OPEN" })).toBeNull();
+  });
+
+  it("covers full and waitlist, from one place, and a waitlist with no listed form is just full", () => {
+    expect(publicStatusLine({ status: "FULL" })).toBe("Event full");
+    expect(publicStatusLine({ status: "WAITLIST" })).toBe("Event full \u00b7 waitlist open");
+    const full = { remaining: 0, waitlistEnabled: true };
+    expect(resolvePublicCapacityStatus("OPEN", true, full)).toBe("WAITLIST");
+    expect(resolvePublicCapacityStatus("OPEN", false, full)).toBe("FULL");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: 0, waitlistEnabled: false })).toBe("FULL");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: 3, waitlistEnabled: true })).toBe("OPEN");
+    expect(resolvePublicCapacityStatus("OPEN", true, { remaining: null, waitlistEnabled: true })).toBe("OPEN");
+    expect(resolvePublicCapacityStatus("CLOSED", true, full)).toBe("CLOSED");
+    expect(resolvePublicCapacityStatus("UPCOMING", true, full)).toBe("UPCOMING");
+    expect(publicStatusLine({ status: "DRAFT" })).toBe("Registration closed");
   });
 });

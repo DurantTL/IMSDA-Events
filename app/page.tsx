@@ -60,13 +60,11 @@ export default async function Home() {
           ) : (
             <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
           )}
-          {items.length > 0 && (
-            <p className="home-more">
-              <Link className="primary-button home-calendar-button" href="/calendar?view=list">
-                <CalendarDays size={18} aria-hidden="true" /> See the full calendar
-              </Link>
-            </p>
-          )}
+          <p className="home-more">
+            <Link className="primary-button home-calendar-button" href="/calendar?view=list">
+              <CalendarDays size={18} aria-hidden="true" /> See the full calendar
+            </Link>
+          </p>
         </section>
 
         <nav aria-label="Get started" className="home-links">

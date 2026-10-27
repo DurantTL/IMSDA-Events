@@ -4,7 +4,7 @@ import {
   remainingEventCapacity,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
-import { publicStatusLine, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
+import { publicStatusLine, resolvePublicCapacityStatus, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -245,7 +245,7 @@ function presentPublicEventLifecycle(
     if (event.waitlistEnabled) {
       return {
         state: "WAITLIST",
-        statusLabel: "Event full \u00b7 waitlist open",
+        statusLabel: publicStatusLine({ status: resolvePublicCapacityStatus(phase, formsListed, { remaining: 0, waitlistEnabled: true }) }, now),
         detail: formsListed
           ? "The event is currently full, but you can submit a registration to join the waitlist."
           : "The event is currently full. The waitlist form will appear here when it is ready.",
@@ -259,7 +259,7 @@ function presentPublicEventLifecycle(
     }
     return {
       state: "FULL",
-      statusLabel: "Event full",
+      statusLabel: publicStatusLine({ status: "FULL" }, now),
       detail: "All available places are currently filled. Contact the event team with questions.",
       ...noAction("Event full"),
       ended: false,

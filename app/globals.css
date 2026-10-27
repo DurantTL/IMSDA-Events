@@ -11024,7 +11024,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .club-director-notice-copy > * { margin: 0; }
 .club-director-notice-copy > * + * { margin-top: 4px; }
 .club-director-notice-eyebrow { font-size: max(var(--type-staff-floor, 0px), 0.8rem); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-.club-director-notice h2 { font-size: 1.2rem; line-height: 1.25; }
+.club-director-notice h2, .club-director-notice-title { font-size: 1.2rem; line-height: 1.25; }
 .club-director-notice-button { flex: none; min-height: var(--target-cta, 48px); text-decoration: none; }
 @media (max-width: 560px) { .club-director-notice-button { width: 100%; justify-content: center; } }
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn(), formFindMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({ eventFindMany: vi.fn(), entryFindMany: vi.fn(), formFindMany: vi.fn(), attendeeGroupBy: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
@@ -8,13 +8,14 @@ vi.mock("@/lib/prisma", () => ({
     event: { findMany: mocks.eventFindMany },
     calendarEntry: { findMany: mocks.entryFindMany },
     registrationForm: { findMany: mocks.formFindMany },
+    registrationAttendee: { groupBy: mocks.attendeeGroupBy },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 
 import { listPublicCalendarItems } from "@/modules/calendar/repository";
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
-import { resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
+import { publicStatusLine, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 
 const validDefinition = {
   title: "Registration",
@@ -145,5 +146,38 @@ describe("one public registration status for the calendar and the event page (#1
     expect(resolvePublicRegistrationStatus("OPEN", false)).toBe("OPENING_SOON");
     expect(resolvePublicRegistrationStatus("UPCOMING", false)).toBe("UPCOMING");
     expect(resolvePublicRegistrationStatus("CLOSED", true)).toBe("CLOSED");
+  });
+
+  describe("a full event reads the same on the calendar and the event page (#1204)", () => {
+    const calendarItems = async (events: unknown[], counts: Record<string, number>) => {
+      mocks.eventFindMany.mockResolvedValue(events);
+      mocks.formFindMany.mockResolvedValue((events as { id: string }[]).map((event) => ({ eventId: event.id, versions: [{ definition: validDefinition }] })));
+      mocks.attendeeGroupBy.mockResolvedValue(Object.entries(counts).map(([eventId, count]) => ({ eventId, _count: { _all: count } })));
+      return new Map((await listPublicCalendarItems("2027-02-01", "2027-02-28", now)).map((item) => [item.key, item]));
+    };
+
+    it("full with a waitlist: waitlist status, Register still leads somewhere, same words as the page", async () => {
+      const event = eventRow("e1", { capacity: 5, waitlistEnabled: true });
+      const item = (await calendarItems([event], { e1: 5 })).get("event-e1");
+      expect(item).toMatchObject({ registrationStatus: "WAITLIST", registrationOpen: true });
+      expect(publicStatusLine({ status: item!.registrationStatus! })).toBe(describePublicEventLifecycle(event as never, 5, now, true).statusLabel);
+    });
+
+    it("full without a waitlist: full, and no Register", async () => {
+      const event = eventRow("e1", { capacity: 5, waitlistEnabled: false });
+      const item = (await calendarItems([event], { e1: 7 })).get("event-e1");
+      expect(item).toMatchObject({ registrationStatus: "FULL", registrationOpen: false });
+      expect(publicStatusLine({ status: item!.registrationStatus! })).toBe(describePublicEventLifecycle(event as never, 7, now, true).statusLabel);
+    });
+
+    it("places left or no capacity stays open, and one grouped query serves every capped open event", async () => {
+      const events = [eventRow("e1", { capacity: 5 }), eventRow("e2", { capacity: 5 }), eventRow("e3"), eventRow("e4", { capacity: 5, registrationOpensOn: "2027-01-20" })];
+      const items = await calendarItems(events, { e1: 2, e2: 5 });
+      expect([items.get("event-e1")?.registrationStatus, items.get("event-e2")?.registrationStatus, items.get("event-e3")?.registrationStatus, items.get("event-e4")?.registrationStatus])
+        .toEqual(["OPEN", "FULL", "OPEN", "UPCOMING"]);
+      expect(mocks.attendeeGroupBy).toHaveBeenCalledTimes(1);
+      expect(mocks.attendeeGroupBy.mock.calls[0][0].where.eventId).toEqual({ in: ["e1", "e2"] });
+      expect(mocks.attendeeGroupBy.mock.calls[0][0].where.registration.status.in).toEqual(["SUBMITTED", "CONFIRMED"]);
+    });
   });
 });

@@ -4,7 +4,7 @@
  * them out by calendar date in the conference's time zone.
  */
 
-import { publicStatusLine, type PublicRegistrationStatus } from "@/modules/events/public-registration-status";
+import { publicStatusLine, type PublicCapacityStatus } from "@/modules/events/public-registration-status";
 
 export const CONFERENCE_TIME_ZONE = "America/Chicago";
 
@@ -31,7 +31,7 @@ export type CalendarItem = {
    * Only for events (#1204): the shared public status behind `registrationOpen`, the date registration opens and
    * whether the event is for clubs, so every list words the status the same way (`publicStatusLine`).
    */
-  registrationStatus?: PublicRegistrationStatus;
+  registrationStatus?: PublicCapacityStatus;
   registrationOpensOn?: string | null;
   clubEvent?: boolean;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */

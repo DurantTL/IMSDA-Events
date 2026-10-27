@@ -109,4 +109,17 @@ describe("the event page's one status block (#1205)", () => {
     expect(markup.indexOf("public-event-help-section")).toBeGreaterThan(markup.indexOf("public-event-status-block"));
     expect(markup.indexOf("events@example.test")).toBeGreaterThan(markup.indexOf("public-event-layout"));
   });
+
+  it("an open club event with a club-portal form has one status message and one primary action", async () => {
+    const data = landing({ audience: "CLUB" }, 3, "2026-12-05T18:00:00Z", [{ ...form(1), registrationPath: "CLUB_PORTAL", href: "/account/club-registration/synthetic-event" }]);
+    data.event.audience = "CLUB";
+    mocks.getPublicEventLanding.mockResolvedValue(data);
+    const markup = await render();
+    expect(markup).toContain("club-director-sign-in-notice");
+    expect(count(markup, 'id="event-status-title"')).toBe(1);
+    expect(count(markup, "primary-button")).toBe(1);
+    expect(markup).toMatch(/class="secondary-button club-director-notice-button"/);
+    expect(markup).toContain("Sign in to register your club");
+    expect(markup).not.toMatch(/<h2[^>]*id="club-director-sign-in-title"/);
+  });
 });
