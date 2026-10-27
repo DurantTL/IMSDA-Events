@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { CalendarPlus, Check, ChevronDown, Copy, ExternalLink, Link2 } from "lucide-react";
 import type { CalendarSubscribeLinks } from "@/modules/calendar/subscribe";
 
-/** One "Add these dates to my calendar" button that opens the choice of calendar apps for the public feed (#444, #1203). */
-export function CalendarSubscribe({ links }: { links: CalendarSubscribeLinks }) {
+/**
+ * One "Add these dates to my calendar" button that opens the choice of calendar apps for the public feed (#444, #1203).
+ * `variant="button"` (#1249) is the compact page-header form: just "Add to my calendar" with the same choices in a popover
+ * under it, no heading or sentence.
+ */
+export function CalendarSubscribe({ links, variant = "panel" }: { links: CalendarSubscribeLinks; variant?: "panel" | "button" }) {
   const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLElement | HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +42,51 @@ export function CalendarSubscribe({ links }: { links: CalendarSubscribeLinks }) 
     window.setTimeout(() => setCopied(null), 3000);
   }
 
+  const compact = variant === "button";
+  const toggle = (
+    <button
+      aria-controls="calendar-subscribe-options"
+      aria-expanded={open}
+      className="primary-button calendar-subscribe-toggle"
+      onClick={() => setOpen((value) => !value)}
+      ref={button}
+      type="button"
+    >
+      <CalendarPlus size={16} aria-hidden="true" /> {compact ? "Add to my calendar" : "Add these dates to my calendar"} <ChevronDown size={16} aria-hidden="true" />
+    </button>
+  );
+  const options = (
+    <ul className="calendar-subscribe-options" hidden={!open} id="calendar-subscribe-options">
+      <li><a href={links.google} rel="noreferrer" target="_blank">Google Calendar <ExternalLink size={14} aria-hidden="true" /></a></li>
+      <li><a href={links.outlook} rel="noreferrer" target="_blank">Outlook.com <ExternalLink size={14} aria-hidden="true" /></a></li>
+      <li><a href={links.outlookWork} rel="noreferrer" target="_blank">Outlook (work or school) <ExternalLink size={14} aria-hidden="true" /></a></li>
+      <li><a href={links.apple}>Apple Calendar</a></li>
+      <li><a href={links.feedUrl}><Link2 size={14} aria-hidden="true" /> ICS link</a></li>
+      <li>
+        <button onClick={() => void copy()} type="button">
+          {copied === "copied" ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />} Copy link
+        </button>
+      </li>
+    </ul>
+  );
+  const status = (
+    <p aria-live="polite" className="calendar-subscribe-status" role="status">
+      {copied === "copied" ? "Calendar link copied." : copied === "failed" ? `Copy this link instead: ${links.feedUrl}` : ""}
+    </p>
+  );
+
+  if (compact) {
+    return (
+      <div className="calendar-subscribe-compact" id="subscribe" onKeyDown={onKeyDown} ref={panel as RefObject<HTMLDivElement>}>
+        {toggle}
+        <div className="calendar-subscribe-popover" hidden={!open}>
+          {options}
+          {status}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section aria-labelledby="calendar-subscribe-heading" className="calendar-subscribe-panel" id="subscribe" onKeyDown={onKeyDown} ref={panel}>
       <div>
@@ -45,32 +94,10 @@ export function CalendarSubscribe({ links }: { links: CalendarSubscribeLinks }) 
         <p>Subscribe once and every conference date stays up to date in your own calendar app.</p>
       </div>
       <div className="calendar-subscribe-menu">
-        <button
-          aria-controls="calendar-subscribe-options"
-          aria-expanded={open}
-          className="primary-button calendar-subscribe-toggle"
-          onClick={() => setOpen((value) => !value)}
-          ref={button}
-          type="button"
-        >
-          <CalendarPlus size={16} aria-hidden="true" /> Add these dates to my calendar <ChevronDown size={16} aria-hidden="true" />
-        </button>
-        <ul className="calendar-subscribe-options" hidden={!open} id="calendar-subscribe-options">
-          <li><a href={links.google} rel="noreferrer" target="_blank">Google Calendar <ExternalLink size={14} aria-hidden="true" /></a></li>
-          <li><a href={links.outlook} rel="noreferrer" target="_blank">Outlook.com <ExternalLink size={14} aria-hidden="true" /></a></li>
-          <li><a href={links.outlookWork} rel="noreferrer" target="_blank">Outlook (work or school) <ExternalLink size={14} aria-hidden="true" /></a></li>
-          <li><a href={links.apple}>Apple Calendar</a></li>
-          <li><a href={links.feedUrl}><Link2 size={14} aria-hidden="true" /> ICS link</a></li>
-          <li>
-            <button onClick={() => void copy()} type="button">
-              {copied === "copied" ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />} Copy link
-            </button>
-          </li>
-        </ul>
+        {toggle}
+        {options}
       </div>
-      <p aria-live="polite" className="calendar-subscribe-status" role="status">
-        {copied === "copied" ? "Calendar link copied." : copied === "failed" ? `Copy this link instead: ${links.feedUrl}` : ""}
-      </p>
+      {status}
     </section>
   );
 }

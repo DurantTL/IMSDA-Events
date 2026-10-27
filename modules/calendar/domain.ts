@@ -232,6 +232,14 @@ export function calendarKeyTone(category: string, toneMap: Map<string, CalendarT
   return categoryKey(category) === closureCategory.toLowerCase() ? "closure" : (toneMap.get(categoryKey(category)) ?? 1);
 }
 
+/** Rows of bars a month-grid week shows under the date (#1249); anything further is counted as "+N more". */
+export const calendarGridRows = 2;
+
+/** "+3 more": what a crowded day shows after its bars. */
+export function calendarMoreLabel(hidden: number) {
+  return `+${hidden} more`;
+}
+
 export type WeekBar = {
   item: CalendarItem;
   /** 1 to 7, the grid column the bar starts in. */
