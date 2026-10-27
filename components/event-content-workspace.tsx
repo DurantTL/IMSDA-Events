@@ -25,6 +25,11 @@ import {
 } from "@/modules/events/content-schemas";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { useLocalEditDraft } from "@/components/use-local-edit-draft";
+import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
+import { submitJson } from "@/lib/submit-json";
+import { shortHash } from "@/modules/forms/answer-draft";
 import {
   canMoveSection,
   localAssetImpact,
@@ -310,12 +315,27 @@ export function EventContentWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [siteUpdating, setSiteUpdating] = useState(false);
   // Review before removing a public-content section (#471): what's removed
   // and what stays, before the click that will only take effect once the
   // page is saved.
   const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null);
 
   const dirty = JSON.stringify(sections) !== JSON.stringify(saved);
+  // Unsaved page edits are backed up in this browser and come back after a reload (#1263).
+  const [backupVersion] = useState(() => shortHash(JSON.stringify(initialSections)));
+  const editBackup = useLocalEditDraft({
+    storageKey: editDraftKey("event-content", eventId),
+    version: backupVersion,
+    value: sections,
+    dirty,
+    onRestore: (stored) => {
+      if (!Array.isArray(stored)) return;
+      const valid = stored.filter((item): item is SectionDraft => Boolean(item) && typeof item === "object"
+        && typeof item.kind === "string" && typeof item.title === "string" && typeof item.body === "string" && typeof item.isPublished === "boolean");
+      if (valid.length === stored.length) setSections(valid);
+    },
+  });
   const pendingImpact = pendingDelete ? localAssetImpact(sections, pendingDelete.id) : null;
   // The server only knows the saved page; an unsaved resource-links section
   // whose only tile is this file would be left unsaveable, so wait for the
@@ -464,18 +484,21 @@ export function EventContentWorkspace({
     }
   }
 
-  async function save(submitEvent: React.FormEvent<HTMLFormElement>) {
-    submitEvent.preventDefault();
+  async function save(submitEvent?: React.FormEvent<HTMLFormElement>) {
+    submitEvent?.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError("");
     setNotice("");
+    setSiteUpdating(false);
     try {
-      const response = await fetch(`/api/events/${eventId}/content`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sections: sections.map(sectionPayload) }),
-      });
-      const result = await response.json().catch(() => ({}));
+      const response = await submitJson(`/api/events/${eventId}/content`, { sections: sections.map(sectionPayload) }, { method: "PUT" });
+      // A restart: the page edits stay and Try again saves them (#1263).
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok || !result.sections) {
         throw new Error(result.message ?? "The event page could not be saved.");
       }
@@ -515,6 +538,13 @@ export function EventContentWorkspace({
         </button>
       </div>
 
+      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void save()} />}
+      {editBackup.restored && (
+        <div className="form-notice draft-restored-notice" role="status">
+          <span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span>
+          <button className="secondary-button" type="button" onClick={() => { editBackup.discard(); setSections(saved); }}>Discard</button>
+        </div>
+      )}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 

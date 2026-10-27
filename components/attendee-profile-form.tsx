@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
@@ -18,6 +20,8 @@ export function AttendeeProfileForm({
   const [savedProfile, setSavedProfile] = useState(initialProfile);
   const [attempted, setAttempted] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
+  const [siteUpdating, setSiteUpdating] = useState(false);
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
 
@@ -27,8 +31,10 @@ export function AttendeeProfileForm({
     setMessage("");
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (state === "saving") return;
+    setSiteUpdating(false);
     setAttempted(true);
     if (phoneBlocks("Phone", profile.phone, savedProfile.phone) || phoneBlocks("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone)) {
       setState("error");
@@ -39,13 +45,14 @@ export function AttendeeProfileForm({
     setMessage("Saving profile…");
     setNeedsSecondStep(false);
     try {
-      const response = await fetch("/api/attendee/profile", {
-        method: "PATCH",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(profile),
-      });
-      const payload = await response.json().catch(() => null) as {
+      const response = await submitJson("/api/attendee/profile", profile, { method: "PATCH", init: { cache: "no-store" } });
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        setState("idle");
+        setMessage("");
+        return;
+      }
+      const payload = response.body as {
         profile?: AttendeeProfileInput;
         message?: string;
         code?: string;
@@ -176,6 +183,7 @@ export function AttendeeProfileForm({
             </>
           )}
         </p>
+        {siteUpdating && <SubmitRetryNotice busy={state === "saving"} onRetry={() => void save()} />}
       </div>
     </form>
   );

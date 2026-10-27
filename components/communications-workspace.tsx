@@ -3,6 +3,8 @@
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { EMAIL_PROBLEM, inlineFieldProblem, problemMessage, validateEmail } from "@/lib/field-validation";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -307,6 +309,9 @@ export function CommunicationsWorkspace({
   const [draftUploading, setDraftUploading] = useState(false);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [saving, setSaving] = useState(false);
+  // The site was restarting (#1263): what was typed stays, and Try again re-runs the same request.
+  const [siteUpdating, setSiteUpdating] = useState(false);
+  const retryRef = useRef<(() => void) | null>(null);
   const [broadcastReview, setBroadcastReview] = useState<{
     announcement: AnnouncementRecord;
     preview: AnnouncementBroadcastPreview | null;
@@ -650,13 +655,24 @@ export function CommunicationsWorkspace({
     };
   }, [view, canManage, queuedOrSending, eventId]);
 
-  async function messagingRequest(url: string, init: RequestInit, successMessage: string) {
+  async function messagingRequest(url: string, init: RequestInit, successMessage: string): Promise<MessagingWorkspaceData | null> {
     setSaving(true);
     setError("");
     setNotice("");
+    setSiteUpdating(false);
     try {
-      const response = await fetch(url, init);
-      const result = await response.json().catch(() => ({})) as ApiResult;
+      const response = await submitJson(
+        url,
+        typeof init.body === "string" ? JSON.parse(init.body) : undefined,
+        { method: (init.method ?? "POST") as "POST" | "PUT" | "PATCH" | "DELETE" },
+      );
+      if (response.unavailable) {
+        // A restart: the form keeps what was typed and Try again re-sends it (#1263).
+        retryRef.current = () => void messagingRequest(url, init, successMessage);
+        setSiteUpdating(true);
+        return null;
+      }
+      const result = response.body as ApiResult;
       if (!response.ok || !result.messaging) {
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The communication request could not be completed.");
       }
@@ -679,19 +695,33 @@ export function CommunicationsWorkspace({
     setNotice("");
     const form = new FormData(submitEvent.currentTarget);
     const editId = draftPrefill?.editId;
+    const payload = {
+      title: form.get("title"),
+      body: form.get("body"),
+      preheader: (draftValues.preheader ?? "").trim() || null,
+      priority: form.get("priority"),
+      attachmentFileIds: draftAttachments.map((file) => file.id),
+    };
+    await sendDraft(editId, payload);
+  }
+
+  async function sendDraft(editId: string | undefined, payload: Record<string, unknown>) {
+    setSaving(true);
+    setError("");
+    setSiteUpdating(false);
     try {
-      const response = await fetch(editId ? `/api/events/${eventId}/announcements/${editId}` : `/api/events/${eventId}/announcements`, {
-        method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.get("title"),
-          body: form.get("body"),
-          preheader: (draftValues.preheader ?? "").trim() || null,
-          priority: form.get("priority"),
-          attachmentFileIds: draftAttachments.map((file) => file.id),
-        }),
-      });
-      const result = await response.json().catch(() => ({})) as ApiResult;
+      const response = await submitJson(
+        editId ? `/api/events/${eventId}/announcements/${editId}` : `/api/events/${eventId}/announcements`,
+        payload,
+        { method: editId ? "PUT" : "POST" },
+      );
+      // A restart: the composer keeps the draft text and Try again re-sends it (#1263).
+      if (response.unavailable) {
+        retryRef.current = () => void sendDraft(editId, payload);
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as ApiResult;
       if (!response.ok || !result.announcement) {
         throw new Error(result.message ?? result.issues?.[0]?.message ?? (editId ? "Unable to save the draft." : "Unable to create the draft."));
       }
@@ -1464,6 +1494,7 @@ export function CommunicationsWorkspace({
         </nav>
       )}
 
+      {siteUpdating && !draftOpen && <SubmitRetryNotice busy={saving} onRetry={() => retryRef.current?.()} />}
       {error && !draftOpen && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
@@ -2391,6 +2422,7 @@ export function CommunicationsWorkspace({
             {!draftPrefill && (
               <p className="quiet-copy">Saving creates a draft only. Nothing is published to the feed or sent.</p>
             )}
+            {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => retryRef.current?.()} />}
             {error && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error} Your edits are still here.</div>}
             <form className="form-stack" onSubmit={createDraft} key={draftPrefill?.editId ? `edit-${draftPrefill.editId}` : draftPrefill ? "correction" : "new"}>
               <label>Title<input id="announcement-title" name="title" minLength={3} maxLength={120} required placeholder="Friday arrival information" value={draftValues.title} onChange={(event) => setDraftField("title", event.target.value)} /></label>

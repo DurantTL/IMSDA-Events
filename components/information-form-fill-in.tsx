@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { DraftRestoredNotice } from "@/components/draft-restored-notice";
+import { useAnswerDraft } from "@/components/use-answer-draft";
+import { submitJson } from "@/lib/submit-json";
 import { SubmitButton } from "@/components/submit-button";
 import { FieldInput } from "@/components/club-form-fill-in";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
@@ -23,6 +27,19 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
   const [doneMessage, setDoneMessage] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // The site was restarting (#1263): answers stay, and Try again re-sends them with the same key.
+  const [siteUpdating, setSiteUpdating] = useState(false);
+  // A local draft (#1263): the public rules apply, so sensitive, medical, member-list and long-text answers are never written.
+  const [edited, setEdited] = useState(false);
+  const answerDraft = useAnswerDraft({
+    enabled: true,
+    identity: { scope: "information-form", formId: `${eventSlug ?? ""}/${slug}` },
+    definition,
+    answers,
+    dirty: edited,
+    done: Boolean(doneMessage),
+    onRestore: (draft) => setAnswers((current) => ({ ...current, ...draft.answers })),
+  });
 
   const problemFor = (field: RegistrationFormField) => {
     const raw = field.type === "MEMBER_LIST" ? (memberListProblems(field, withoutBlankMemberRows(answers[field.key]))[0] ?? "") : typedAnswerProblem(field, answers[field.key]);
@@ -51,16 +68,20 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
       setIssues([]);
       return;
     }
+    if (saving) return;
     setSaving(true);
     setError("");
     setIssues([]);
+    setSiteUpdating(false);
     try {
-      const response = await fetch("/api/public/information-forms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers() }),
-      });
-      const result = await response.json().catch(() => ({})) as { message?: string; issues?: Issue[]; confirmationMessage?: string };
+      const response = await submitJson("/api/public/information-forms", {
+        slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(),
+      }, { idempotent: true });
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as { message?: string; issues?: Issue[]; confirmationMessage?: string };
       if (!response.ok) {
         setError(result.message ?? "Your answers could not be sent.");
         setIssues(result.issues ?? []);
@@ -71,6 +92,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
         });
         return;
       }
+      answerDraft.clear();
       setDoneMessage(result.confirmationMessage || "Thank you. Your answers have been received.");
     } catch {
       setError("Your answers could not be sent. Check your connection and try again.");
@@ -89,6 +111,13 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
 
   return (
     <form className="club-form-fill information-form-fill" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+      {answerDraft.notice && (
+        <DraftRestoredNotice
+          kind={answerDraft.notice}
+          onDismiss={answerDraft.dismissNotice}
+          onDiscard={() => { answerDraft.clear(); answerDraft.dismissNotice(); setAnswers({}); setEdited(false); }}
+        />
+      )}
       {definition.sections.map((section) => {
         const fields = section.fields.filter((field) => isFieldVisible(field, answers));
         if (fields.length === 0) return null;
@@ -101,7 +130,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
                 <InformationMemberListInput
                   field={field}
                   key={field.id}
-                  onChange={(rows) => setAnswers((current) => ({ ...current, [field.key]: rows }))}
+                  onChange={(rows) => { setEdited(true); setAnswers((current) => ({ ...current, [field.key]: rows })); }}
                   problem={problemFor(field)}
                   value={answers[field.key]}
                 />
@@ -114,6 +143,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
                   lockedDate={false}
                   onBlur={() => setTouched((current) => ({ ...current, [field.key]: true }))}
                   onChange={(value) => {
+                    setEdited(true);
                     setAnswers((current) => ({ ...current, [field.key]: value }));
                     // Editing clears the server's message for this field; format errors still wait for blur.
                     setIssues((current) => current.filter((issue) => issue.key !== field.key));
@@ -134,6 +164,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug }: { definit
           </fieldset>
         );
       })}
+      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void submit()} />}
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

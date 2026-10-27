@@ -2,7 +2,8 @@
 // from a template, save, test, publish, withdraw, slug sync, and switching form
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { submitJson, SITE_UPDATING_MESSAGE } from "@/lib/submit-json";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
@@ -15,8 +16,10 @@ import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
 
 export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceProps, "eventId" | "eventSlug">, state: BuilderState, derived: BuilderDerived, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
-  const { setHistory, setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setFocusRequest, setNotice, setError, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
+  const { setHistory, setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setFocusRequest, setNotice, setError, retryRef, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
   const { roster, previewSteps, editsCreateDraft, slugMayNeedSync } = derived;
+  // Try again always runs the newest copy of the action, never a render's stale one.
+  const latest = useRef({} as { saveDraft: () => Promise<unknown>; publish: () => Promise<unknown>; unpublish: () => Promise<unknown>; restoreVersion: (version: FormVersionView) => Promise<unknown> });
   function syncForm(form: FormView, message?: string, preserveTestResponses = false) {
     setForms((current) => [form, ...current.filter((item) => item.id !== form.id)]);
     setSelectedFormId(form.id);
@@ -96,12 +99,12 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     if (state.information) return info.saveInformationDraft();
     if (!selectedForm || !selectedVersion || !definition) return;
     setBusy("save"); setError(""); setNotice("");
+    retryRef.current = () => void latest.current.saveDraft();
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ definition: withExplicitSensitiveFlags(definition), expectedUpdatedAt: selectedVersion.updatedAt }),
-      });
-      const result = await response.json();
+      const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}`, { definition: withExplicitSensitiveFlags(definition), expectedUpdatedAt: selectedVersion.updatedAt }, { method: "PATCH" });
+      // A restart: the edits stay in the editor, nothing reloads, and Try again saves them (#1263).
+      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); return; }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to save this draft.");
       syncForm(result.form, editsCreateDraft ? `Version ${result.form.activeVersion.versionNumber} was saved as a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "withdrawn version stays withdrawn"} until you publish this draft (a test is optional).` : "Draft saved locally.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save this draft."); }
@@ -183,9 +186,14 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     publishingRef.current = true;
     const saveFirst = dirty;
     setBusy("publish"); setError(""); setNotice(""); setConfirmingPublish(false);
+    retryRef.current = () => void latest.current.publish();
     try {
       const result = await runPublishFlow({ eventId, formId: selectedForm.id, saveFirst, definition, expectedUpdatedAt: selectedVersion.updatedAt });
-      if (result.ok) syncForm(result.form, `Version ${result.form.activeVersion.versionNumber} is published. The public registration link is now available; future edits create a new draft version.`);
+      if (!result.ok && result.unavailable) {
+        // A restart: edits stay. If the save landed first, show it as saved and let Try again only publish (#1263).
+        if (result.stage === "publish" && result.savedForm) syncForm(result.savedForm);
+        setError(SITE_UPDATING_MESSAGE);
+      } else if (result.ok) syncForm(result.form, `Version ${result.form.activeVersion.versionNumber} is published. The public registration link is now available; future edits create a new draft version.`);
       else if (result.stage === "save") setError(`${result.message} Nothing was published.`);
       else {
         if (result.savedForm) syncForm(result.savedForm);
@@ -197,9 +205,11 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   async function unpublish() {
     if (!selectedForm) return;
     setBusy("unpublish"); setError(""); setNotice(""); setConfirmingUnpublish(false);
+    retryRef.current = () => void latest.current.unpublish();
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/unpublish`, { method: "POST" });
-      const result = await response.json();
+      const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}/unpublish`, undefined, { method: "POST" });
+      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); return; }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to withdraw this form.");
       syncForm(result.form, "This form is withdrawn: it is no longer offered on the public event page and registration is closed. Registrations already taken keep the exact questions and prices they were submitted under. To offer it again, save a new draft, then publish it. A test is optional.");
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to withdraw this form."); }
@@ -247,11 +257,9 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     }))) return;
     setBusy("restore"); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ definition: withExplicitSensitiveFlags(version.definition), expectedUpdatedAt }),
-      });
-      const result = await response.json();
+      const response = await submitJson(`/api/events/${eventId}/forms/${selectedForm.id}`, { definition: withExplicitSensitiveFlags(version.definition), expectedUpdatedAt }, { method: "PATCH" });
+      if (response.unavailable) { setError(SITE_UPDATING_MESSAGE); retryRef.current = () => void latest.current.restoreVersion(version); return; }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to restore this version.");
       syncForm(result.form, restoreNotice(version.versionNumber));
       // Focus follows the draft's chip; the effect in use-builder-state moves it once the chip is rendered.
@@ -259,5 +267,6 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore this version."); setFocusRequest({ kind: "restore-button", versionId: version.id }); }
     finally { setBusy(null); }
   }
+  useEffect(() => { latest.current = { saveDraft, publish, unpublish, restoreVersion }; });
   return { saveInformationSettings: info.saveInformationSettings, setInformationStatus: info.setInformationStatus, createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion, restoreVersion };
 }

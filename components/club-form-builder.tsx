@@ -1,7 +1,11 @@
 "use client";
 
 import { useConfirm } from "@/components/use-confirm";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { useLocalEditDraft } from "@/components/use-local-edit-draft";
+import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
+import { submitJson } from "@/lib/submit-json";
 import { ArrowDown, ArrowUp, EyeOff, LockKeyhole, Plus, Save, Send, Trash2 } from "lucide-react";
 import {
   addField,
@@ -22,7 +26,7 @@ import {
 } from "@/components/club-form-builder-state";
 import { ClubFormRosterMapping } from "@/components/club-form-roster-mapping";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
-import type { BuilderIssue, ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
+import { readDraftShape, type BuilderIssue, type ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
 import { conditionPhrase } from "@/modules/forms/visibility-rule";
 import { conditionOperators, fieldDisplayLabel, formFieldTypes, isChoiceFieldType, type RegistrationFormField } from "@/modules/forms/definition";
 
@@ -96,6 +100,19 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const dirty = specSignature(spec) !== saved;
+  const [siteUpdating, setSiteUpdating] = useState(false);
+  const retryRef = useRef<(() => void) | null>(null);
+  // Unsaved edits are backed up in this browser and come back after a reload (#1263).
+  const editBackup = useLocalEditDraft({
+    storageKey: editDraftKey("club-form-builder", props.templateKey),
+    version: String(props.version),
+    value: spec,
+    dirty,
+    onRestore: (stored) => {
+      const restored = readDraftShape(stored);
+      if (restored) setSpec(restored);
+    },
+  });
   const allowNavigation = useUnsavedChangesGuard(dirty, "You have unsaved changes to this form. Leave this page and discard them?");
   const lockedSensitive = useMemo(() => new Set(props.lockedSensitiveKeys), [props.lockedSensitiveKeys]);
   const lockedBirth = useMemo(() => new Set(props.lockedBirthDateKeys), [props.lockedBirthDateKeys]);
@@ -111,13 +128,20 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     setMessage("");
   }
 
-  async function call(url: string, init: RequestInit) {
+  async function call(url: string, init: RequestInit & { method: "PUT" | "POST" | "DELETE" }, retry: () => void) {
     setBusy(true);
     setError("");
     setMessage("");
+    setSiteUpdating(false);
     try {
-      const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json" } });
-      const result = await response.json().catch(() => ({})) as { message?: string; issues?: BuilderIssue[] } & Record<string, unknown>;
+      const response = await submitJson(url, typeof init.body === "string" ? JSON.parse(init.body) : undefined, { method: init.method });
+      if (response.unavailable) {
+        // The site is restarting: the edits stay as they are, nothing reloads, and Try again re-runs this save (#1263).
+        retryRef.current = retry;
+        setSiteUpdating(true);
+        return null;
+      }
+      const result = response.body as { message?: string; issues?: BuilderIssue[] } & Record<string, unknown>;
       if (!response.ok) {
         setIssues(result.issues ?? []);
         setError(result.message ?? "That could not be completed.");
@@ -140,7 +164,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     const result = await call(`${base}/draft`, {
       method: "PUT",
       body: JSON.stringify({ draft: spec, baseVersion: props.version, expectedDraftUpdatedAt: draftStamp }),
-    });
+    }, () => void saveDraft());
     if (!result) return null;
     const warnings = Array.isArray(result.warnings) ? result.warnings as BuilderIssue[] : [];
     setSaved(specSignature(spec));
@@ -166,7 +190,11 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
       body: <p>New fills will use it right away. Forms already filled in keep the version they were filled in on.</p>,
       confirmLabel: `Publish version ${props.version + 1}`,
     }))) return;
-    const result = await call(`${base}/publish`, { method: "POST", body: JSON.stringify({ baseVersion: props.version }) });
+    await runPublish();
+  }
+
+  async function runPublish() {
+    const result = await call(`${base}/publish`, { method: "POST", body: JSON.stringify({ baseVersion: props.version }) }, () => void runPublish());
     if (!result) return;
     allowNavigation();
     window.location.reload();
@@ -179,7 +207,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
       confirmLabel: "Discard draft",
       destructive: true,
     }))) return;
-    const result = await call(`${base}/draft`, { method: "DELETE" });
+    const result = await call(`${base}/draft`, { method: "DELETE" }, () => void discard());
     if (!result) return;
     allowNavigation();
     window.location.reload();
@@ -210,6 +238,13 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
             {dirty ? " · unsaved changes" : hasDraft ? " · draft saved" : ""}
           </small>
         </div>
+        {editBackup.restored && (
+          <div className="form-notice draft-restored-notice" role="status">
+            <span>{LOCAL_EDIT_DRAFT_RESTORED_NOTICE}</span>
+            <button className="secondary-button" type="button" onClick={() => { editBackup.discard(); setSpec(props.initial); }}>Discard</button>
+          </div>
+        )}
+        {siteUpdating && <SubmitRetryNotice busy={busy} onRetry={() => retryRef.current?.()} />}
         {message && <div className="inline-notice success" role="status">{message}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         {unplaced.length > 0 && (

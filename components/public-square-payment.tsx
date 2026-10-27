@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { CreditCard, ExternalLink, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import {
   paymentChoiceOptionPresentations,
@@ -287,6 +289,9 @@ export function PublicSquarePayment({
     tone: "success" | "error" | "pending";
     message: string;
   } | null>(null);
+  // The site was restarting (#1263): the payment keys and the card token stay, so Try again cannot charge twice.
+  const [siteUpdating, setSiteUpdating] = useState(false);
+  const retryRef = useRef<(() => void) | null>(null);
 
   // The registrant's own pick between a deposit and the whole balance (#415); null leaves the server to choose.
   const kindRef = useRef<"BALANCE" | "DEPOSIT" | null>(initialKind ?? null);
@@ -471,7 +476,16 @@ export function PublicSquarePayment({
     }
     setSubmittingMethod(method);
     setNotice(null);
+    setSiteUpdating(false);
     void completePayment(method, tokenization);
+  }
+
+  function retryPayment(method: PaymentMethodKind) {
+    if (submittingMethod || !sourceIdRef.current) return;
+    setSubmittingMethod(method);
+    setNotice(null);
+    setSiteUpdating(false);
+    void completePayment(method, null);
   }
 
   async function completePayment(
@@ -499,16 +513,17 @@ export function PublicSquarePayment({
       }
 
       idempotencyKeyRef.current ??= crypto.randomUUID();
-      const response = await fetch(paymentEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceId,
-          idempotencyKey: idempotencyKeyRef.current,
-          kind: checkout?.paymentKind,
-        }),
-      });
-      const body = await response.json() as {
+      const response = await submitJson(paymentEndpoint, {
+        sourceId,
+        idempotencyKey: idempotencyKeyRef.current,
+        kind: checkout?.paymentKind,
+      }, { idempotent: true });
+      if (response.unavailable) {
+        retryRef.current = () => retryPayment(method);
+        setSiteUpdating(true);
+        return;
+      }
+      const body = response.body as {
         payment?: { status: string; message: string };
         message?: string;
         retryable?: boolean;
@@ -545,19 +560,21 @@ export function PublicSquarePayment({
     if (!checkout || checkout.state !== "READY" || submittingMethod || hostedSubmitting) return;
     setHostedSubmitting(true);
     setNotice(null);
+    setSiteUpdating(false);
     try {
       hostedKeyRef.current ??= crypto.randomUUID();
       hostedReturnRef.current ??= newReturnId();
-      const response = await fetch(`${manageEndpoint}/payment-link`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idempotencyKey: hostedKeyRef.current,
-          returnId: hostedReturnRef.current,
-          kind: checkout.paymentKind,
-        }),
-      });
-      const body = await response.json() as {
+      const response = await submitJson(`${manageEndpoint}/payment-link`, {
+        idempotencyKey: hostedKeyRef.current,
+        returnId: hostedReturnRef.current,
+        kind: checkout.paymentKind,
+      }, { idempotent: true });
+      if (response.unavailable) {
+        retryRef.current = () => void payOnSquare();
+        setSiteUpdating(true);
+        return;
+      }
+      const body = response.body as {
         link?: { url: string };
         message?: string;
         retryable?: boolean;
@@ -650,13 +667,15 @@ export function PublicSquarePayment({
     setPendingChoice(choice);
     setChoiceSubmitting(choice);
     setNotice(null);
+    setSiteUpdating(false);
     try {
-      const response = await fetch(choiceEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
-      const body = await response.json() as {
+      const response = await submitJson(choiceEndpoint, request, { idempotent: true });
+      if (response.unavailable) {
+        retryRef.current = () => void savePaymentChoice(choice);
+        setSiteUpdating(true);
+        return;
+      }
+      const body = response.body as {
         paymentChoice?: {
           choice: "CARD" | "PAY_LATER";
           totalCents: number;
@@ -744,6 +763,12 @@ export function PublicSquarePayment({
         : <TriangleAlert size={18} aria-hidden="true" />}
       <span>{notice.message}</span>
     </div>
+  );
+  const retryElement = siteUpdating && (
+    <SubmitRetryNotice
+      busy={Boolean(submittingMethod) || hostedSubmitting || Boolean(choiceSubmitting)}
+      onRetry={() => retryRef.current?.()}
+    />
   );
   const returnElement = returnId && (
     <div
@@ -835,6 +860,7 @@ export function PublicSquarePayment({
         </p>
       )}
       {noticeElement}
+      {retryElement}
     </section>
   );
 
@@ -863,6 +889,7 @@ export function PublicSquarePayment({
           </div>
         </div>
         {!paymentChoice && noticeElement}
+      {!paymentChoice && retryElement}
       </div>
     );
   }
@@ -986,6 +1013,7 @@ export function PublicSquarePayment({
         </div>
       )}
       {!paymentChoice && noticeElement}
+      {!paymentChoice && retryElement}
       </div>
     </div>
   );

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { CheckCircle2, ListChecks, Save } from "lucide-react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
 import { inlineFieldProblem, inputAttributesFor, isUnchangedEmail, isUnchangedFromStored, isUnchangedPhone, valueTypeForFieldType } from "@/lib/field-validation";
@@ -74,6 +76,7 @@ export function AttendeeRegistrationAnswersForm({
   const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(initialExpectedUpdatedAt);
   const [saved, setSaved] = useState(initialAttendees);
   const [attendees, setAttendees] = useState(initialAttendees);
+  const [siteUpdating, setSiteUpdating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [clientRequestId, setClientRequestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState("");
@@ -119,8 +122,10 @@ export function AttendeeRegistrationAnswersForm({
     setNotice("");
   }
 
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (saving) return;
+    setSiteUpdating(false);
     setAttempted(true);
     const blocked = attendees.some((attendee) => fields.some((field) => (
       valueTypeForFieldType(field.type) !== null
@@ -152,29 +157,31 @@ export function AttendeeRegistrationAnswersForm({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(
+      // The request id is kept until the save is answered, so Try again after a restart is replayed (#1263).
+      const response = await submitJson(
         endpoint,
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientRequestId,
-            expectedUpdatedAt,
-            attendees: attendees.map((attendee) => ({
-              attendeeId: attendee.attendeeId,
-              responses: attendee.responses,
-            })),
-          }),
+          clientRequestId,
+          expectedUpdatedAt,
+          attendees: attendees.map((attendee) => ({
+            attendeeId: attendee.attendeeId,
+            responses: attendee.responses,
+          })),
         },
+        { method: "PUT", idempotent: true },
       );
-      const result = await response.json().catch(() => ({}));
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as { message?: string; attendees?: unknown; expectedUpdatedAt?: string };
       if (!response.ok || !Array.isArray(result.attendees)) {
         throw new Error(result.message ?? "The attendee choices could not be saved.");
       }
       const next = result.attendees as EditableAttendee[];
       setAttendees(next);
       setSaved(next);
-      setExpectedUpdatedAt(result.expectedUpdatedAt);
+      setExpectedUpdatedAt(result.expectedUpdatedAt as string);
       setClientRequestId(crypto.randomUUID());
       setNotice("Attendee choices saved.");
     } catch (caught) {
@@ -373,6 +380,7 @@ export function AttendeeRegistrationAnswersForm({
         </fieldset>
       ))}
 
+      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void save()} />}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status"><CheckCircle2 size={16} aria-hidden="true" /> {notice}</p>}
       {!readOnly && <div className="form-actions">

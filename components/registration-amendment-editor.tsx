@@ -8,6 +8,8 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -375,6 +377,8 @@ export function RegistrationAmendmentEditor({
   }, [eventId, registration.id, hasAcknowledgments]);
   const [reason, setReason] = useState("");
   const [clientRequestId] = useState(() => crypto.randomUUID());
+  // The site was restarting (#1263): the edits stay; Try again re-sends with the same request id, so it applies once.
+  const [siteUpdating, setSiteUpdating] = useState(false);
   const [preview, setPreview] = useState<AmendmentPreview | null>(null);
   const [issues, setIssues] = useState<Array<{ path?: string; message?: string }>>([]);
   const [error, setError] = useState("");
@@ -490,8 +494,10 @@ export function RegistrationAmendmentEditor({
     };
   }
 
-  async function reviewAmendment(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function reviewAmendment(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (saving) return;
+    setSiteUpdating(false);
     setAttempted(true);
     const storedRegistration = registration.publicSubmission?.responses ?? {};
     const blockedRegistration = allFields.some((field) => (
@@ -518,15 +524,16 @@ export function RegistrationAmendmentEditor({
     setError("");
     setIssues([]);
     try {
-      const response = await fetch(
+      const response = await submitJson(
         `/api/events/${eventId}/registrations/${registration.id}/amendment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload(true)),
-        },
+        payload(true),
+        { idempotent: true },
       );
-      const result = await response.json();
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok || !result.preview) {
         setIssues(Array.isArray(result.issues) ? result.issues : []);
         throw new Error(result.message ?? "Unable to review this amendment.");
@@ -540,19 +547,21 @@ export function RegistrationAmendmentEditor({
   }
 
   async function confirmAmendment() {
-    if (!preview) return;
+    if (!preview || saving) return;
     setSaving(true);
     setError("");
+    setSiteUpdating(false);
     try {
-      const response = await fetch(
+      const response = await submitJson(
         `/api/events/${eventId}/registrations/${registration.id}/amendment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload(false, preview.quoteFingerprint)),
-        },
+        payload(false, preview.quoteFingerprint),
+        { idempotent: true },
       );
-      const result = await response.json();
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        return;
+      }
+      const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok || !result.registration) {
         setPreview(null);
         setIssues(Array.isArray(result.issues) ? result.issues : []);
@@ -600,6 +609,7 @@ export function RegistrationAmendmentEditor({
           <div className="total"><span>Total</span><strong>{money(preview.totalCents)}</strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
+        {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void confirmAmendment()} />}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions">
           <button className="secondary-button" type="button" disabled={saving} onClick={() => setPreview(null)}>Back to edit</button>
@@ -720,6 +730,7 @@ export function RegistrationAmendmentEditor({
           <ul>{issues.map((issue, index) => <li key={`${issue.path ?? "issue"}_${index}`}>{issue.message ?? "Invalid value"}</li>)}</ul>
         </div>
       )}
+      {siteUpdating && <SubmitRetryNotice busy={saving} onRetry={() => void reviewAmendment()} />}
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="form-actions">
         <button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>Cancel</button>

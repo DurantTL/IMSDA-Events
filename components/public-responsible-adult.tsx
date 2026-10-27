@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 import { RESPONSIBLE_ADULT_NONE } from "@/modules/guardian-authority/domain";
 import type { RegistrationResponsibleAdultView } from "@/modules/guardian-authority/repository";
 
@@ -24,22 +26,30 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
   const [view, setView] = useState(initialView);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [state, setState] = useState<SaveState>({ kind: "idle", message: "" });
+  // The site was restarting (#1263): the choices stay as picked and Try again saves them.
+  const [siteUpdating, setSiteUpdating] = useState(false);
   // Shown value: the registrant's change, else what is recorded, else the only adult (preselected, never blank).
   const preselected = view.adults.length === 1 ? view.adults[0]!.attendeeId : (view.adults.find((adult) => adult.isAccountHolder) ?? view.adults[0])?.attendeeId ?? RESPONSIBLE_ADULT_NONE;
   const values = Object.fromEntries(view.minors.map((minor) => [minor.attendeeId, picks[minor.attendeeId] ?? minor.choice ?? preselected]));
   const editable = !readOnly && view.minors.some((minor) => !minor.lockedByStaff);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (state.kind === "saving") return;
+    setSiteUpdating(false);
     setState({ kind: "saving", message: "Saving…" });
     try {
-      const response = await fetch(`/api/public/manage/${encodeURIComponent(token)}/responsible-adult`, {
-        method: "PUT",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ choices: Object.fromEntries(view.minors.filter((minor) => !minor.lockedByStaff).map((minor) => [minor.attendeeId, values[minor.attendeeId]])) }),
-      });
-      const payload = await response.json().catch(() => null) as { message?: string; view?: RegistrationResponsibleAdultView | null; outcome?: { sentToReview: number } } | null;
+      const response = await submitJson(
+        `/api/public/manage/${encodeURIComponent(token)}/responsible-adult`,
+        { choices: Object.fromEntries(view.minors.filter((minor) => !minor.lockedByStaff).map((minor) => [minor.attendeeId, values[minor.attendeeId]])) },
+        { method: "PUT", init: { cache: "no-store" } },
+      );
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        setState({ kind: "idle", message: "" });
+        return;
+      }
+      const payload = response.body as { message?: string; view?: RegistrationResponsibleAdultView | null; outcome?: { sentToReview: number } } | null;
       if (!response.ok) throw new Error(payload?.message ?? "The responsible adult could not be saved. Try again.");
       if (payload?.view) {
         setView(payload.view);
@@ -94,6 +104,7 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
           {state.kind === "error" && <AlertCircle size={16} aria-hidden="true" />}
           {state.message}
         </p>
+        {siteUpdating && <SubmitRetryNotice busy={state.kind === "saving"} onRetry={() => void save()} />}
       </form>
     </section>
   );

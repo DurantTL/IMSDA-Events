@@ -3,6 +3,7 @@
 import { inlineFieldProblem } from "@/lib/field-validation";
 import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { submitJson } from "@/lib/submit-json";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { ClubLocationPicker } from "@/components/club-location-picker";
@@ -62,6 +63,7 @@ export function revealRosterSection(
  * runs the change through the same amendment engine staff use.
  */
 export function ClubRegistrationEditor({ organizationId, workspace }: { organizationId: string; workspace: Workspace }) {
+  const requestIdRef = useRef<{ id: string; signature: string } | null>(null);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"who" | "form">("who");
@@ -245,13 +247,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
   ), [workspace.roster, selectedMemberIds, rosterAges]);
 
   const submitEdit = useCallback(async (attendees: RosterAttendee[]) => {
-    const response = await fetch(
-      `/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(workspace.event.id)}/registration`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientRequestId: crypto.randomUUID(),
+    const body = {
           expectedUpdatedAt: workspace.registration.updatedAt,
           selectedMemberIds,
           keptOffRosterAttendeeIds: keptOffRosterIds,
@@ -264,11 +260,20 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
           ...(locationId && locationId !== currentLocationId ? { locationId } : {}),
           // Which of the club's teams this edit is for (#809); empty, so left out, on an event without teams.
           ...(workspace.registration.teamKey ? { teamKey: workspace.registration.teamKey } : {}),
-        }),
-      },
+    };
+    // One request id for an unchanged edit until it gets an answer, so Try again after a restart is
+    // replayed, not repeated; a changed edit gets a new id (#1263).
+    const signature = JSON.stringify(body);
+    if (requestIdRef.current?.signature !== signature) requestIdRef.current = { id: crypto.randomUUID(), signature };
+    const response = await submitJson(
+      `/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(workspace.event.id)}/registration`,
+      { clientRequestId: requestIdRef.current.id, ...body },
+      { method: "PATCH", idempotent: true },
     );
+    if (response.unavailable) return { ok: false as const, unavailable: true as const, message: String(response.body.message ?? ""), issues: [] as FormIssue[] };
+    requestIdRef.current = null;
     if (response.ok) return { ok: true as const };
-    const result = await response.json().catch(() => ({})) as {
+    const result = response.body as {
       message?: string;
       issues?: Array<{ key?: unknown; message?: unknown; clientId?: unknown }>;
     };

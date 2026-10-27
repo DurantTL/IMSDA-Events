@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { submitJson } from "@/lib/submit-json";
 
 type Contact = {
   firstName: string;
@@ -30,6 +32,8 @@ export function PublicRegistrationContactForm({
   // The saved phone (#871): the same number is an old one left alone and never blocks the save.
   const [savedPhone, setSavedPhone] = useState(initialContact.phone);
   const [attempted, setAttempted] = useState(false);
+  // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
+  const [siteUpdating, setSiteUpdating] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({
     kind: "idle",
     message: "",
@@ -42,8 +46,10 @@ export function PublicRegistrationContactForm({
     }
   }
 
-  async function saveContact(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveContact(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (saveState.kind === "saving") return;
+    setSiteUpdating(false);
     setAttempted(true);
     if (phoneBlocks("Phone", contact.phone, savedPhone)) {
       setSaveState({ kind: "error", message: "Fix the highlighted phone number and save again." });
@@ -52,16 +58,17 @@ export function PublicRegistrationContactForm({
     setSaveState({ kind: "saving", message: "Saving contact details…" });
 
     try {
-      const response = await fetch(
+      const response = await submitJson(
         `/api/public/manage/${encodeURIComponent(token)}`,
-        {
-          method: "PATCH",
-          cache: "no-store",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(contact),
-        },
+        contact,
+        { method: "PATCH", init: { cache: "no-store" } },
       );
-      const payload = await response.json().catch(() => null) as {
+      if (response.unavailable) {
+        setSiteUpdating(true);
+        setSaveState({ kind: "idle", message: "" });
+        return;
+      }
+      const payload = response.body as {
         message?: string;
         registration?: { contact?: Contact };
       } | null;
@@ -171,6 +178,7 @@ export function PublicRegistrationContactForm({
           {saveState.message}
         </p>
       </div>
+      {siteUpdating && <SubmitRetryNotice busy={saveState.kind === "saving"} onRetry={() => void saveContact()} />}
     </form>
   );
 }

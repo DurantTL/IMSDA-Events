@@ -177,11 +177,18 @@ describe("postJson never leaves a spinner (#617)", () => {
   });
 
   it("turns a non-JSON error page into a readable message", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>Gateway Timeout</html>", { status: 504 })));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>Not Found</html>", { status: 404 })));
     const result = await postJson("/x", {}, "The event could not be copied.");
     expect(result.ok).toBe(false);
     expect(result.body.message).toContain("The event could not be copied.");
-    expect(result.body.message).toContain("504");
+    expect(result.body.message).toContain("404");
+  });
+
+  it("calls a gateway page 'updating' rather than a failure (#1263)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("<html>Gateway Timeout</html>", { status: 504 })));
+    const result = await postJson("/x", {}, "The event could not be copied.", undefined, { retryDelayMs: 0 });
+    expect(result).toMatchObject({ ok: false, unavailable: true });
+    expect(result.body.message).toContain("The site is updating.");
   });
 
   it("gives up on a request that never answers", async () => {
@@ -195,7 +202,7 @@ describe("postJson never leaves a spinner (#617)", () => {
 
   it("reports an unreachable server", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    expect((await postJson("/x", {}, "Failed.")).body.message).toContain("could not be reached");
+    expect((await postJson("/x", {}, "Failed.")).body.message).toContain("The site is updating.");
   });
 
   it("the copy screen posts through it, so every path stops the busy state", () => {
