@@ -13116,6 +13116,26 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-help-section p { margin: 0; line-height: 1.5; }
 .public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
+/* Open for registration (#1217): filter links and event cards. */
+.open-events-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.open-events-filter a {
+  display: inline-flex; min-height: 44px; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  padding: 8px 18px; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; text-decoration: none;
+}
+.open-events-filter a[aria-current="page"] { border-color: var(--imsda-navy); background: var(--imsda-navy); color: #fff; }
+.open-events-filter a:focus-visible, .open-events-card a:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+.open-events-card { display: grid; gap: 6px; border: 1px solid var(--line); border-left: 4px solid var(--imsda-navy); border-radius: 16px; background: #fff; padding: 14px 16px; }
+.open-events-card h3 { margin: 0; font-size: 1.125rem; }
+.open-events-card h3 a { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--ink); text-decoration: none; }
+.open-events-card .calendar-agenda-meta { font-size: 1rem; }
+.open-events-note { margin: 0; color: var(--muted); font-size: 1rem; }
+.open-events-register, .open-events-calendar-link { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; justify-self: start; text-decoration: none; }
+.calendar-empty p { margin: 0 0 8px; font-size: 1rem; }
+.home-events-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 1rem; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .open-events-filter a, .open-events-card a { transition: none; }
+}
+
 /* Event card to event page header morph (#1208). */
 ::view-transition-group(.event-card) { animation-duration: 350ms; animation-timing-function: ease-in-out; }
 ::view-transition { pointer-events: none; }
