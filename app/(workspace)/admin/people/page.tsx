@@ -3,6 +3,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { InvitePerson } from "@/components/invite-person";
 import { PeopleDirectory } from "@/components/people-directory";
 import { PendingInvites } from "@/components/pending-invites";
@@ -34,6 +35,7 @@ export default async function PeopleAccessPage({
   ]);
   return (
     <>
+      <AdminPageHeader path="/admin/people" />
       <StaffPageHeader
         description="Everyone with a staff login or a website account, and what each person can reach."
         primary={(

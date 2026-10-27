@@ -1,7 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ClubReportForm } from "@/components/club-report-form";
 import { ClubReportReview } from "@/components/club-report-review";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
@@ -13,6 +12,7 @@ import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, reportDu
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
 import { getClubReportReview } from "@/modules/club-reports/review";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club Monthly Record" };
 export const dynamic = "force-dynamic";
@@ -43,11 +43,10 @@ export default async function StaffClubReportPage({
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
   const clubHref = `/admin/organizations/${organizationId}/club`;
-  const backHref = allowedReturnTo(from, [clubHref], `/admin/clubs/reports?year=${clubYear}`);
-  const backLabel = backHref === clubHref ? `Back to ${club.name}` : "Back to Monthly Records";
+  const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
   return (
     <section className="page-stack">
-      <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
+      <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} parentName={club.name} viaParent={viaParent} back={viaParent ? undefined : { href: `/admin/clubs/reports?year=${clubYear}`, label: "Back to Monthly Records" }} />
       <div className="page-intro"><div><p className="eyebrow">Monthly Record</p><h2 translate="no">{club.name}</h2></div></div>
       {report?.status === "SUBMITTED" && (
         <section className="panel club-report-review-panel" aria-labelledby="club-report-review-heading">

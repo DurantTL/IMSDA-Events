@@ -11,6 +11,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary, listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   };
   return (
     <section className="page-stack">
+      <AdminPageHeader path="/admin/clubs/summary" year={clubYear} />
       <StaffPageHeader
         description={`Club year ${clubYear}: every active club's reports and points, as Area Coordinators see them. Sterling Volunteers shows counts only.`}
         primary={(

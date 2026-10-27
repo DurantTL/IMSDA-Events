@@ -172,9 +172,9 @@ describe("email page, with the staff alerts (#1016, #1043)", () => {
     const element = await EmailPage();
     const children = (element as { props: { children: Array<{ type: unknown; props: Record<string, unknown> }> } }).props.children
       .filter((child) => child && typeof child === "object" && "type" in child && typeof child.type === "function");
-    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection"]);
-    expect(children[2]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
-    expect(children[1]!.props).toMatchObject({ sender: { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
+    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection"]);
+    expect(children[3]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
+    expect(children[2]!.props).toMatchObject({ sender: { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
   });
 
   it("keeps the old Notifications address working by sending it to Email", () => {

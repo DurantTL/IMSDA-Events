@@ -8,6 +8,7 @@ import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: staffPageTitles.emails };
 
@@ -103,6 +104,7 @@ export default async function CommunicationsPage({
     : "announcements";
   return (
     <>
+      <AdminPageHeader path="/communications" eventId={event.id} />
     <StaffContextualHelp guideId="resolve-email-problem" event={requested} />
     <CommunicationsWorkspace
       key={event.id}

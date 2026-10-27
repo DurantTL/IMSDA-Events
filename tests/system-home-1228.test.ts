@@ -161,7 +161,7 @@ describe("common tasks", () => {
   });
 
   it("keeps the tab destinations real", () => {
-    expect(systemHomeTabs.map((tab) => tab.label)).toEqual(["Overview", "Events", "Clubs", "People", "Forms", "System health"]);
+    expect(systemHomeTabs.map((tab) => tab.label)).toEqual(["Overview", "Events", "Clubs", "People", "Forms", "Settings", "System health"]);
     for (const tab of systemHomeTabs) expect(tab.href.startsWith("#") || navHrefs.has(tab.href) || tab.href === "/admin", tab.href).toBe(true);
   });
 });

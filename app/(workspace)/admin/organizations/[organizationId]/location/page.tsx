@@ -1,10 +1,10 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ChurchLocationForm } from "@/components/church-location-form";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getChurchLocation } from "@/modules/organizations/church-location-repository";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Church location" };
 
@@ -25,9 +25,11 @@ export default async function StaffChurchLocationPage({
   const { organizationId } = await params;
   const location = await getChurchLocation(organizationId);
   if (!location) notFound();
+  // The header is told which page this is; it is a pathname for choosing tabs, not a link to the page (#542).
+  const headerPath = ["/admin/organizations", organizationId, "location"].join("/");
   return (
     <section className="page-stack">
-      <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
+      <AdminSectionHeaderFor path={headerPath} section="system" />
       <ChurchLocationForm
         endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/location`}
         initialLocation={location}

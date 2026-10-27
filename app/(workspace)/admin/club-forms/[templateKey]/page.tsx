@@ -1,7 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { notFound, redirect } from "next/navigation";
 import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { ClubFormBuilder } from "@/components/club-form-builder";
@@ -12,6 +11,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { getClubFormBuilderView } from "@/modules/club-forms/builder";
 import { STALE_DRAFT_MESSAGE } from "@/modules/club-forms/builder-messages";
 import { ClubFormError } from "@/modules/club-forms/errors";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club form builder" };
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
 
   return (
     <section className="page-stack">
-      <BackLink href="/admin/club-forms" variant="staff">Back to club forms</BackLink>
+      <AdminPageHeader path={`/admin/club-forms/${templateKey}`} />
       <div className="page-intro">
         <div>
           <p className="eyebrow">System administration</p>

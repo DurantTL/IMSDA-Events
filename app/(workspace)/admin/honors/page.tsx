@@ -5,6 +5,7 @@ import { HonorCatalogWorkspace } from "@/components/honor-catalog-workspace";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listHonors } from "@/modules/honors/repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Honor catalog" };
 
@@ -15,6 +16,7 @@ export default async function HonorCatalogPage() {
 
   return (
     <>
+      <AdminPageHeader path="/admin/honors" />
       <HonorCatalogWorkspace initialHonors={await listHonors()} />
     </>
   );

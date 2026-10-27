@@ -6,6 +6,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { listPendingReminderBatches } from "@/modules/calendar/deadline-reminders";
 import { listCalendarFeeds } from "@/modules/calendar/feeds";
 import { listCalendarEntries, listCalendarEvents } from "@/modules/calendar/repository";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Conference calendar" };
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function CalendarAdminPage() {
 
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/calendar" section="system" />
       <CalendarAdminWorkspace initialEntries={entries} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} />
     </>
   );

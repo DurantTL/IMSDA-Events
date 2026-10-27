@@ -6,6 +6,7 @@ import { sanitizedHtmlBySection } from "@/modules/events/content-html";
 import { listEventContentSections } from "@/modules/events/content-repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: staffPageTitles.eventContent };
 
@@ -29,6 +30,7 @@ export default async function EventContentPage({
   const sections = await listEventContentSections(event.id);
   return (
     <>
+      <AdminPageHeader path="/more/event-content" eventId={event.id} />
       <EventContentWorkspace
         key={event.id}
         eventId={event.id}

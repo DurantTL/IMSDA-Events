@@ -10,6 +10,8 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The section header (#1274) is async and has its own tests; these pages are tested without it.
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
 vi.mock("@/modules/event-locations/filter", () => ({ resolveLocationFilter: dependencies.resolveLocationFilter }));

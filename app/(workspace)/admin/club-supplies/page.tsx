@@ -5,6 +5,7 @@ import { ClubSupplyCatalogWorkspace } from "@/components/club-supply-catalog-wor
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubSupplyItems } from "@/modules/club-supplies/repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club supply catalog" };
 
@@ -16,6 +17,7 @@ export default async function ClubSupplyCatalogPage() {
 
   return (
     <>
+      <AdminPageHeader path="/admin/club-supplies" />
       <ClubSupplyCatalogWorkspace initialItems={await listClubSupplyItems()} />
     </>
   );

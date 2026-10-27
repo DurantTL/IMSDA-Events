@@ -1,13 +1,13 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ClubDirectorsWorkspace } from "@/components/club-directors-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { allowedReturnTo } from "@/lib/return-to";
 import { listDirectorGrants } from "@/modules/organizations/director-grants-repository";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club directors" };
 
@@ -36,12 +36,11 @@ export default async function ClubDirectorsPage({
     throw error;
   }
   const clubHref = `/admin/organizations/${organizationId}/club`;
-  const backHref = allowedReturnTo(from, [clubHref], user.globalRole === "SYSTEM_ADMIN" ? "/admin/organizations" : clubHref);
-  const backLabel = backHref === clubHref ? `Back to ${initial.club.name}` : "Back to Clubs and churches";
+  const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
 
   return (
     <>
-      <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/directors`} parentName={initial.club.name} viaParent={viaParent} />
       <ClubDirectorsWorkspace club={initial.club} initialGrants={initial.grants} />
     </>
   );

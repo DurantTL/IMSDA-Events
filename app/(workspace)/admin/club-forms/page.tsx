@@ -20,6 +20,7 @@ import { listClosedOpenApplicationKeys } from "@/modules/club-forms/open-applica
 import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club forms" };
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
 
   return (
     <section className="page-stack">
+      <AdminPageHeader path="/admin/club-forms" />
       <StaffPageHeader
         description="Forms clubs fill in for their members or send by private link. Every form starts off. A form that is on shows in each club's Forms tab for its director and deputy. Wording that is drafted from the conference's summaries should be checked against the official forms before you turn a form on."
         primary={<Link className="secondary-button" href="/more/club-forms">See submitted forms</Link>}

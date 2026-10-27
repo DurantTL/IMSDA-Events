@@ -10,6 +10,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-repository";
 import { loadServedReport } from "@/modules/meals/scanner-import-repository";
 import { loadKitchenReport } from "@/modules/registrations/kitchen-report-loader";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
 
@@ -29,6 +30,7 @@ export default async function KitchenReportPage({ searchParams }: { searchParams
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   return (
     <div className="page-stack">
+      <AdminPageHeader path="/more/kitchen-report" eventId={event.id} />
       {/* Meal money closeout (#212) holds amounts, so only finance access sees the way in; the page checks it again on the server. */}
       {permissions.includes("MANAGE_FINANCE") && (
         <p><Link className="secondary-button" href={`/more/kitchen-report/closeout?${eventQuery}`}>Meal money closeout</Link></p>

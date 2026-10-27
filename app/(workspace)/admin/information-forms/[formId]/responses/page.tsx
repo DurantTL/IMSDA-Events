@@ -5,6 +5,7 @@ import { InformationFormResponsesView } from "@/components/information-form-resp
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { loadInformationFormResponsesPage } from "@/modules/information-forms/responses-page";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: staffPageTitles.formResponses };
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export default async function GeneralInformationFormResponsesPage({ params, sear
   if (!data) notFound();
   const base = `/admin/information-forms/${encodeURIComponent(formId)}/responses`;
   return (
+    <>
+    <AdminSectionHeaderFor path={`/admin/information-forms/${formId}/responses`} section="system" parentName={data.name} />
     <InformationFormResponsesView
       closeHref={base}
       exportHref={`/api/admin/information-forms/${encodeURIComponent(formId)}/responses/export`}
@@ -34,5 +37,6 @@ export default async function GeneralInformationFormResponsesPage({ params, sear
       selected={data.selected}
       total={data.total}
     />
+    </>
   );
 }

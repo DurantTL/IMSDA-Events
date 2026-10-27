@@ -33,11 +33,10 @@ import {
   groupWorkRows,
   nextEventNote,
   readTimeLabel,
-  systemHomeTabs,
 } from "@/modules/system-admin/home-model";
 import type { SetupWarningKind } from "@/modules/system-admin/dashboard";
 import { ActionsMenu } from "@/components/actions-menu";
-import { DashboardTabs } from "@/components/dashboard-tabs";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { registrationStatusLabel } from "@/modules/events/public-registration-status";
 import { listPendingModuleRequests } from "@/modules/event-modules/requests";
 import { getReleaseIdentity } from "@/lib/release";
@@ -176,7 +175,7 @@ export default async function SystemAdminPage({
 
   return (
     <section className={`page-stack ${styles.workspace}`}>
-      <DashboardTabs label="System administration sections" tabs={systemHomeTabs} currentKey="overview" />
+      <AdminSectionHeaderFor path="/admin" section="system" />
       {unavailable && (
         <div className="inline-notice error" role="status">
           <span>That event isn&rsquo;t available. It may not exist, or this account may not have access to it. Choose an event below to continue.</span>
