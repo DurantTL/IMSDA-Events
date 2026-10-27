@@ -223,7 +223,8 @@ export async function recordStationPayment(
   const eventId = station.station.eventId;
   // A retry after a lost response must get the saved payment back, whatever the balance is now: decided first,
   // before the paid, club and amount checks that a retry would otherwise fail.
-  if (await findPaymentReplay(getPrisma(), eventId, input.registrationId, input)) {
+  const reference = input.method === "CHECK" ? input.checkNumber : "";
+  if (await findPaymentReplay(getPrisma(), eventId, input.registrationId, { ...input, reference })) {
     return paymentSummaryFor(eventId, input.registrationId);
   }
   const summary = await requirePayableRegistration(station, input.registrationId);
@@ -237,7 +238,7 @@ export async function recordStationPayment(
     {
       amountCents: input.amountCents,
       method: input.method,
-      reference: input.method === "CHECK" ? input.checkNumber : "",
+      reference,
       idempotencyKey: input.idempotencyKey,
     },
     { station: { id: station.station.id, label: station.station.label } },

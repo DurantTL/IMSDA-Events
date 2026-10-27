@@ -4,18 +4,18 @@ import { PaymentOperationError } from "@/modules/payments/repository";
 
 /**
  * True when `key` already saved this same payment for this registration. Throws when another registration owns the
- * key, or when the saved payment's amount or method differs: a reused key never silently stands for other money.
+ * key, or when the saved payment's amount, method or reference (check number) differs: a reused key never silently stands for other money.
  */
 export async function findPaymentReplay(
   client: Pick<Prisma.TransactionClient, "payment">,
   eventId: string,
   registrationId: string,
-  input: { idempotencyKey?: string; amountCents: number; method: string },
+  input: { idempotencyKey?: string; amountCents: number; method: string; reference: string },
 ) {
   if (!input.idempotencyKey) return false;
   const existing = await client.payment.findUnique({
     where: { idempotencyKey: input.idempotencyKey },
-    select: { eventId: true, registrationId: true, amount: true, method: true },
+    select: { eventId: true, registrationId: true, amount: true, method: true, externalReference: true },
   });
   if (!existing) return false;
   if (
@@ -23,6 +23,7 @@ export async function findPaymentReplay(
     || existing.registrationId !== registrationId
     || Math.round(Number(existing.amount) * 100) !== input.amountCents
     || existing.method !== input.method
+    || (existing.externalReference ?? "") !== input.reference
   ) {
     throw new PaymentOperationError("PAYMENT_IDEMPOTENCY_KEY_REUSED");
   }

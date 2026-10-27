@@ -19,7 +19,7 @@ export class PaymentOperationError extends Error {
   constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | "PAYMENT_IDEMPOTENCY_KEY_REUSED" | StaffDepositProblem) {
     super(
       code === "PAYMENT_IDEMPOTENCY_KEY_REUSED"
-        ? "This payment key was already used for a different registration. Start the payment again."
+        ? "This payment key was already used for a different payment. Start the payment again."
         : code === "PAYMENT_CONFLICT"
         ? "Another payment changed this registration at the same time. Review the registration and try again."
         : code === "DEPOSIT_NOT_OFFERED"

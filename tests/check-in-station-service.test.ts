@@ -275,18 +275,19 @@ describe("station payments (#892)", () => {
   it("replays a retry after a partial payment even though the amount now exceeds the balance", async () => {
     // Total 100, 40 paid earlier plus this 40 saved: balance 20, and the retried 40 is over it.
     const prisma = prismaFor(registrationRow({ payments: [{ amount: 40, refunds: [] }, { amount: 40, refunds: [] }] }));
-    prisma.payment.findUnique = vi.fn().mockResolvedValue({ eventId: "event_1", registrationId: "registration_1", amount: 40, method: "CHECK" });
+    prisma.payment.findUnique = vi.fn().mockResolvedValue({ eventId: "event_1", registrationId: "registration_1", amount: 40, method: "CHECK", externalReference: "1042" });
     const summary = await recordStationPayment(station, { registrationId: "registration_1", method: "CHECK", amountCents: 4000, checkNumber: "1042", idempotencyKey: keyA });
     expect(summary).toMatchObject({ state: "DUE", balanceCents: 2000 });
     expect(mocks.recordManualPayment).not.toHaveBeenCalled();
   });
 
-  it("rejects a key that belongs to another registration, or to a different amount or method", async () => {
+  it("rejects a key that belongs to another registration, or to a different amount, method or check number", async () => {
     const prisma = prismaFor();
     for (const saved of [
       { eventId: "event_1", registrationId: "registration_other", amount: 25, method: "CASH" },
       { eventId: "event_1", registrationId: "registration_1", amount: 30, method: "CASH" },
       { eventId: "event_1", registrationId: "registration_1", amount: 25, method: "CHECK" },
+      { eventId: "event_1", registrationId: "registration_1", amount: 25, method: "CASH", externalReference: "1042" },
     ]) {
       prisma.payment.findUnique = vi.fn().mockResolvedValue(saved);
       await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 2500, checkNumber: "", idempotencyKey: keyA }))
