@@ -25,6 +25,7 @@ async function postHandler(request: Request) {
       invitationEmailed: result.invitationEmailed,
       setupUrl: result.setupUrl,
       setupExpiresAt: result.setupExpiresAt,
+      activationFailed: result.activationFailed ?? false,
     }, { status: 201 });
   } catch (error) {
     return userAdminApiError(error, "Creating a staff login");

@@ -141,7 +141,7 @@ function familyGrantItems(access: Pick<Access, "areaCoordinator" | "clubs">): Gr
 }
 
 export type StaffLoginInviteResult =
-  | ({ outcome: "created"; userId: string } & StaffActivationDelivery)
+  | ({ outcome: "created"; userId: string; activationFailed?: true } & StaffActivationDelivery)
   | { outcome: "exists"; staffId: string; accountId: string | null; personHref: string };
 
 /**
@@ -186,8 +186,15 @@ export async function createStaffLoginInvite(
     if (!current.staffId) throw error;
     return { outcome: "exists", staffId: current.staffId, accountId: current.accountId, personHref: deferredPersonHref(current, staffGrantItems(input.access)) };
   }
-  const delivery = await deliverStaffActivation({ userId, email, displayName });
-  return { outcome: "created", userId, ...delivery };
+  // The login and its access are committed above. A failed activation email must not read as "nothing was created":
+  // report it, and the pending invite's Resend sends a new link.
+  try {
+    const delivery = await deliverStaffActivation({ userId, email, displayName });
+    return { outcome: "created", userId, ...delivery };
+  } catch (error) {
+    logError("Inviting a person: the staff login was created but its activation link could not be sent.", error);
+    return { outcome: "created", userId, invitationEmailed: false, activationFailed: true };
+  }
 }
 
 export type PeopleInviteResult = {
@@ -202,7 +209,7 @@ export type PeopleInviteResult = {
     signUpUrl?: string;
   };
   deferred: { personHref: string } | null;
-  /** Set when the family invites went out but the staff login could not be created; no staff access was applied. */
+  /** Set when the family invites were made but the staff login could not be created; no staff access was applied. */
   staffError?: string;
   /** Queued invite emails for the route to deliver after the response. */
   messageIds: string[];
@@ -289,7 +296,13 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
       // the dialog shows what was done and that the staff part failed. No staff access was applied.
       if (result.messageIds.length === 0 && result.created.clubInviteIds.length === 0 && !result.created.areaCoordinatorInviteId) throw error;
       logError("Inviting a person: the staff login could not be created after the family invites were sent.", error);
-      result.staffError = "The club and Area Coordinator invites were sent, but the staff login couldn't be created. Try again from Invite a person with only the staff access ticked.";
+      const made = [
+        ...(result.created.clubInviteIds.length > 0 ? ["club"] : []),
+        ...(result.created.areaCoordinatorInviteId ? ["Area Coordinator"] : []),
+      ].join(" and ");
+      const plural = result.created.clubInviteIds.length + (result.created.areaCoordinatorInviteId ? 1 : 0) > 1;
+      const done = result.created.signUpUrl ? `${plural ? "were" : "was"} created (copy the sign-up link below)` : `${plural ? "were" : "was"} sent`;
+      result.staffError = `The ${made} invite${plural ? "s" : ""} ${done}, but the staff login couldn't be created. Try again from Invite a person with only the staff access ticked.`;
       return result;
     }
     if (staff?.outcome === "created") {

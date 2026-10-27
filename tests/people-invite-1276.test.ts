@@ -423,6 +423,21 @@ describe("validation happens before anything is written", () => {
     expect((await retry.json()).created.staffLogin).toBe(true);
   });
 
+  it("names only the invites actually made when the staff step fails", async () => {
+    mocks.membershipCreate.mockRejectedValueOnce(new Error("synthetic failure"));
+    const body = await (await invite({ events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], areaCoordinator: true })).json();
+    expect(body.staffError).toBe("The Area Coordinator invite was sent, but the staff login couldn't be created. Try again from Invite a person with only the staff access ticked.");
+  });
+
+  it("reports the login as created, not failed, when only its activation email throws", async () => {
+    mocks.sendStaffInvitationEmail.mockRejectedValueOnce(new Error("synthetic outbox failure"));
+    const response = await invite({ systemAdmin: true });
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.created).toMatchObject({ staffLogin: true, invitationEmailed: false });
+    expect(body.staffError).toBeUndefined();
+  });
+
   it("maps the open-invite unique index to ALREADY_INVITED and creates no staff login", async () => {
     const { Prisma } = await import("@prisma/client");
     mocks.acCreate.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "x" }));
