@@ -41,9 +41,9 @@ describe("the shared staff page header", () => {
 
 describe("back buttons that repeat the sidebar or More are gone", () => {
   const sidebarEntryPages = [
-    "app/(workspace)/admin/readiness/page.tsx", "app/(workspace)/admin/team/page.tsx", "app/(workspace)/admin/settings/page.tsx",
+    "app/(workspace)/admin/readiness/page.tsx", "app/(workspace)/admin/people/page.tsx", "app/(workspace)/admin/settings/page.tsx",
     "app/(workspace)/admin/club-forms/page.tsx", "app/(workspace)/admin/club-supplies/page.tsx", "app/(workspace)/admin/master-award-rules/page.tsx",
-    "app/(workspace)/admin/accounts/page.tsx", "app/(workspace)/admin/honors/page.tsx", "app/(workspace)/admin/calendar/page.tsx",
+    "app/(workspace)/admin/honors/page.tsx", "app/(workspace)/admin/calendar/page.tsx",
     "app/(workspace)/admin/organizations/page.tsx", "app/(workspace)/admin/clubs/summary/page.tsx", "app/(workspace)/admin/clubs/reports/page.tsx",
     "app/(workspace)/admin/clubs/transfers/page.tsx", "app/(workspace)/admin/clubs/applications/page.tsx", "app/(workspace)/admin/organizations/background-checks/page.tsx",
   ];

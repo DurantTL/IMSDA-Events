@@ -18,7 +18,7 @@ export const helpDestinations: Record<string, HelpDestination> = {
   "event-templates": { id: "event-templates", label: "Event templates", path: "/admin/event-templates", scope: "System" },
   "event-settings": { id: "event-settings", label: "Event settings", path: "/more/event-settings", scope: "Event", permission: "CONFIGURE_EVENT" },
   "event-team": { id: "event-team", label: "Team", path: "/staff", scope: "Event", permission: "MANAGE_STAFF" },
-  "system-team": { id: "system-team", label: "Team (all events)", path: "/admin/team", scope: "System" },
+  "system-team": { id: "system-team", label: "People & access", path: "/admin/people", scope: "System" },
   "club-applications": { id: "club-applications", label: "New club applications and invites", path: "/admin/clubs/applications", scope: "System" },
   "club-invites": { id: "club-invites", label: "Club invites", path: "/admin/clubs/invites", scope: "System" },
   "registration-forms": { id: "registration-forms", label: "Registration forms", path: "/registration-builder", scope: "Event", permission: "MANAGE_FORMS" },

@@ -1,23 +1,15 @@
-import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { TeamDirectoryWorkspace } from "@/components/team-directory-workspace";
-import { getCurrentSession } from "@/modules/access/current-session";
-import { getTeamDirectory } from "@/modules/system-admin/team-directory";
 
-export const metadata: Metadata = { title: "Team" };
+export const metadata: Metadata = { title: "People & access" };
 
-export default async function TeamDirectoryPage() {
-  const { user } = await getCurrentSession();
-  if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
-
-  return (
-    <>
-      <TeamDirectoryWorkspace
-        initialDirectory={await getTeamDirectory()}
-        currentUserId={user.id}
-      />
-    </>
-  );
+/** Team moved into People & access (#1275); the search carries over. */
+export default async function TeamDirectoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>;
+}) {
+  const { q } = await searchParams;
+  const query = (Array.isArray(q) ? q[0] : q)?.trim().slice(0, 120);
+  redirect(query ? `/admin/people?q=${encodeURIComponent(query)}` : "/admin/people");
 }

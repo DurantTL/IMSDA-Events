@@ -267,7 +267,7 @@ export const systemHomeTabs: readonly HomeTab[] = [
   { key: "overview", label: "Overview", href: "/admin" },
   { key: "events", label: "Events", href: "#upcoming-events" },
   { key: "clubs", label: "Clubs", href: "/admin/clubs/summary" },
-  { key: "people", label: "People", href: "/admin/team" },
+  { key: "people", label: "People", href: "/admin/people" },
   { key: "forms", label: "Forms", href: "/admin/forms" },
   { key: "health", label: "System health", href: "#system-health" },
 ];
@@ -293,8 +293,7 @@ export const commonTaskHrefs: ReadonlyArray<{ href: string; heading: string; lab
   { href: "/admin/form-templates", heading: "Forms" },
   { href: "/admin/question-library", heading: "Forms" },
   { href: "/admin/information-forms", heading: "Forms" },
-  { href: "/admin/team", heading: "People" },
-  { href: "/admin/accounts", heading: "People" },
+  { href: "/admin/people", heading: "People" },
   { href: "/admin/email", heading: "Settings" },
   { href: "/admin/settings", heading: "Settings" },
 ];

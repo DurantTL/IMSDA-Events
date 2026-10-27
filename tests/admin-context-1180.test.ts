@@ -73,7 +73,7 @@ function render(role: Role, pathname: string, options: { events?: boolean; searc
 
 describe("distinct work contexts", () => {
   it("names System, the event and the account page, and only an administrator is ever in System", () => {
-    expect(activeWorkContext({ pathname: "/admin/team", isSystemAdmin: true, eventName: "Synthetic Event One" })).toMatchObject({ kind: "system", label: "System administration", detail: "All events" });
+    expect(activeWorkContext({ pathname: "/admin/people", isSystemAdmin: true, eventName: "Synthetic Event One" })).toMatchObject({ kind: "system", label: "System administration", detail: "All events" });
     expect(activeWorkContext({ pathname: "/event-setup", isSystemAdmin: true })).toMatchObject({ kind: "system" });
     expect(activeWorkContext({ pathname: "/people", isSystemAdmin: true, eventName: "Synthetic Event One" })).toMatchObject({ kind: "event", label: "Synthetic Event One" });
     expect(activeWorkContext({ pathname: "/profile", isSystemAdmin: false })).toMatchObject({ kind: "profile", label: "Your account" });
@@ -93,7 +93,7 @@ describe("distinct work contexts", () => {
   });
 
   it("shows the active context in the header for System, an event and the profile page", () => {
-    const system = render("admin", "/admin/team");
+    const system = render("admin", "/admin/people");
     expect(system).toContain('class="work-context" data-context="system"');
     expect(system).toContain("System administration");
     expect(system).toContain("All events");
@@ -159,15 +159,15 @@ describe("deliberate entry and return", () => {
 
 describe("phone System menu", () => {
   it("lists exactly the desktop System destinations, grouped the same way", () => {
-    const groups = systemMenuGroups({ isSystemAdmin: true, pathname: "/admin/team", selectedEventId: "evt_one" });
+    const groups = systemMenuGroups({ isSystemAdmin: true, pathname: "/admin/people", selectedEventId: "evt_one" });
     expect(groups.map((group) => [group.label, group.items.map((item) => item.label)])).toEqual(
       systemNavGroups.map((group) => [group.label, group.items.map((item) => item.label)]),
     );
-    expect(groups.flatMap((group) => group.items).filter((item) => item.active).map((item) => item.label)).toEqual(["Team"]);
+    expect(groups.flatMap((group) => group.items).filter((item) => item.active).map((item) => item.label)).toEqual(["People & access"]);
   });
 
   it("replaces the event tabs on a System page and keeps them on event pages", () => {
-    const system = render("admin", "/admin/team");
+    const system = render("admin", "/admin/people");
     const bar = system.slice(system.indexOf('aria-label="Mobile navigation"'));
     expect(bar).toContain("System menu");
     expect(bar).toContain("All events");
@@ -227,7 +227,7 @@ describe("role separation", () => {
   });
 
   it.each(["attendee-like", "director", "coordinator", "limited"] as const)("gives a %s no system sidebar or menu, even on a System address", (role) => {
-    for (const pathname of ["/overview", "/admin", "/admin/team"]) {
+    for (const pathname of ["/overview", "/admin", "/admin/people"]) {
       const markup = render(role, pathname);
       expect(markup, `${role} ${pathname}`).not.toContain("System menu");
       expect(markup, `${role} ${pathname}`).not.toContain("Platform settings");
@@ -247,7 +247,9 @@ describe("distinct tool collections", () => {
   it("keeps System and Event destinations in separate scopes", () => {
     const destinations = buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "evt_one", permissions: eventPermissions, clubOversight: true, clubEvent: true, clubFormsAccess: true });
     const teams = destinations.filter((entry) => entry.label === "Team");
-    expect(teams.map((entry) => `${entry.scope}:${entry.href.split("?")[0]}`).sort()).toEqual(["Event:/staff", "System:/admin/team"]);
+    expect(teams.map((entry) => `${entry.scope}:${entry.href.split("?")[0]}`).sort()).toEqual(["Event:/staff"]);
+    const people = destinations.filter((entry) => entry.label === "People & access");
+    expect(people.map((entry) => `${entry.scope}:${entry.href.split("?")[0]}`)).toEqual(["System:/admin/people"]);
   });
 });
 
@@ -265,7 +267,7 @@ describe("old to new route mapping", () => {
 
   it("is a frozen list: the named routes are all in it", () => {
     const frozen = [
-      "/admin/team", "/staff", "/imports", "/more/promo-codes", "/admin/readiness", "/archived-events", "/more",
+      "/admin/people", "/staff", "/imports", "/more/promo-codes", "/admin/readiness", "/archived-events", "/more",
       "/admin/honors", "/admin/club-supplies", "/admin/master-award-rules", "/admin/club-forms",
       "/admin/organizations", "/admin/clubs/reports", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/transfers",
       "/more/clubs", "/more/club-forms", "/more/club-assignments",
@@ -275,7 +277,9 @@ describe("old to new route mapping", () => {
       "/finance/square-payments", "/check-in/badges", "/check-in/passes", "/check-in/assets",
     ];
     for (const route of frozen) expect(routeOf(route), route).toBeDefined();
-    expect(routeOf("/admin/team", "System")).toMatchObject({ group: "People", label: "Team" });
+    expect(routeOf("/admin/people", "System")).toMatchObject({ group: "People", label: "People & access" });
+    expect(routeOf("/admin/team")?.destinationPath).toBe("/admin/people");
+    expect(routeOf("/admin/accounts")?.destinationPath).toBe("/admin/people");
     expect(routeOf("/staff", "Event")).toMatchObject({ label: "Team" });
     expect(routeOf("/admin/clubs/invites")?.destinationPath).toBe("/admin/clubs/applications");
   });
@@ -288,15 +292,16 @@ describe("old to new route mapping", () => {
 
   it("fails when a route is removed from a registry", () => {
     const live = liveRegistries();
-    const withoutTeam = { ...live, systemGroups: live.systemGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.href !== "/admin/team") })) };
-    expect(missingFromRegistries(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/team"]);
+    const withoutTeam = { ...live, systemGroups: live.systemGroups.map((group) => ({ ...group, items: group.items.filter((item) => item.href !== "/admin/people") })) };
+    expect(missingFromRegistries(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/people"]);
     const withoutImports = { ...live, navigationHrefs: live.navigationHrefs.filter((href) => href !== "/imports"), cardPaths: live.cardPaths.filter((path) => path !== "/imports") };
     expect(missingFromRegistries(rows, withoutImports).map((row) => row.route)).toEqual(["/imports"]);
   });
 
   it("fails when a destination stops being reachable", () => {
-    const withoutTeam = sets.map((set) => set.filter((destination) => !destination.href.startsWith("/admin/team")));
-    expect(unreachableRoutes(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/team"]);
+    const withoutTeam = sets.map((set) => set.filter((destination) => !destination.href.startsWith("/admin/people")));
+    // The old Team and Accounts addresses are aliases of the same destination, so they go with it.
+    expect(unreachableRoutes(rows, withoutTeam).map((row) => row.route)).toEqual(["/admin/people", "/admin/team", "/admin/accounts"]);
     const planned = { route: "/planned/feature", kind: "menu", oldPlace: "More directory", scope: "Event", destinationPath: "/planned/feature", label: "Planned", group: "Event tools" } as const;
     expect(unreachableRoutes([...rows, planned], sets).map((row) => row.route)).toEqual(["/planned/feature"]);
   });
@@ -488,7 +493,7 @@ describe("phone search on System pages", () => {
     expect(read("components/app-shell.tsx")).toContain("destinations={searchDestinations}");
     expect(source).toMatch(/focusableSelector = "input:not\(\[disabled\]\)/);
     const admin = buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
-    expect(searchDestinations(admin, "invite staff").map((entry) => entry.label)).toContain("Team");
+    expect(searchDestinations(admin, "invite staff").map((entry) => entry.label)).toContain("People & access");
     const other = buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
     expect(other.some((entry) => entry.scope === "System")).toBe(false);
   });

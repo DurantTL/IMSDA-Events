@@ -182,7 +182,9 @@ describe("account sorting (#738)", () => {
     expect(workspace).toContain("window.history.replaceState");
     expect(workspace).toContain('params.set("sort"');
     expect(read("app/api/admin/accounts/route.ts")).toContain('parseAccountSort(params.get("sort"), params.get("dir"))');
-    expect(read("app/(workspace)/admin/accounts/page.tsx")).toContain("parseAccountSort(params.sort, params.dir)");
+    // The Accounts page now redirects to People & access (#1275), which keeps its search and page in the URL.
+    expect(read("app/(workspace)/admin/accounts/page.tsx")).toContain("encodeURIComponent(query)");
+    expect(read("app/(workspace)/admin/people/page.tsx")).toContain("parsePeopleQuery(params.q)");
   });
 });
 

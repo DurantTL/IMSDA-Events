@@ -52,7 +52,7 @@ describe("the Clubs sidebar", () => {
     expect([...clubsAdminNavigation.map((item) => item.href)].sort()).toEqual([
       "/admin/club-forms", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
       "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
-      "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks",
+      "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks", "/admin/people",
     ]);
     // Never a page a Clubs Administrator cannot open.
     for (const href of clubsAdminNavigation.map((item) => item.href)) {

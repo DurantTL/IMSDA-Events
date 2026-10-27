@@ -1,0 +1,31 @@
+import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { PeopleDirectory } from "@/components/people-directory";
+import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
+import { searchPeople } from "@/modules/system-admin/people-directory";
+import { parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+
+export const metadata: Metadata = { title: "People & access" };
+export const dynamic = "force-dynamic";
+
+export default async function PeopleAccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
+}) {
+  const viewer = await resolvePeopleViewer();
+  if (!viewer.user) redirect(await staffLoginRedirectPath());
+  if (!viewer.scope) redirect("/no-access");
+  // Search and page live in the URL, so a reload or shared link keeps them.
+  const params = await searchParams;
+  const query = parsePeopleQuery(params.q);
+  const result = await searchPeople(query, parsePeoplePage(params.page));
+  return (
+    <>
+      <StaffPageHeader description="Everyone with a staff login or a website account, and what each person can reach." />
+      <PeopleDirectory page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total} />
+    </>
+  );
+}

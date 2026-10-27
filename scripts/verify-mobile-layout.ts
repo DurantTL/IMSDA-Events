@@ -363,8 +363,9 @@ const pages: PageSpec[] = [
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),
-  staff("team", "/admin/team", "system-admin"),
-  staff("accounts", "/admin/accounts", "system-admin"),
+  // People & access (#1275): the list, and one person (the seeded system administrator) with its boxes.
+  staff("people", "/admin/people", "system-admin"),
+  staff("people-person", "/admin/people/staff/usr_system_admin", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),

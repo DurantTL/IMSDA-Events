@@ -68,8 +68,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/clubs/summary", "System", "System management", "Clubs", "Club summary"],
   ["/admin/clubs/applications", "System", "System management", "Clubs", "New club applications"],
   ["/admin/clubs/transfers", "System", "System management", "Clubs", "Club member transfers"],
-  ["/admin/team", "System", "System management", "People", "Team"],
-  ["/admin/accounts", "System", "System management", "People", "Accounts"],
+  ["/admin/people", "System", "System management", "People", "People & access"],
   ["/admin/forms", "System", "System management", "Forms", "All forms"],
   ["/admin/club-forms", "System", "System management", "Forms", "Club forms"],
   ["/admin/form-templates", "System", "System management", "Forms", "Form templates"],
@@ -128,6 +127,9 @@ const aliasRoutes: readonly (readonly [route: string, destinationPath: string])[
   ["/admin/clubs/invites", "/admin/clubs/applications"],
   ["/admin/notifications", "/admin/email"],
   ["/admin/background-checks", "/admin/organizations/background-checks"],
+  // Team and Accounts became People & access (#1275); both old addresses redirect to it.
+  ["/admin/team", "/admin/people"],
+  ["/admin/accounts", "/admin/people"],
 ];
 
 /** Sub-pages reached from a parent page: [route, parent route, source file that links to it]. */
@@ -215,6 +217,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/organizations/[organizationId]/location": "A church location, from Clubs and churches.",
   "/admin/organizations/[organizationId]/pastor": "A pastor contact, from Clubs and churches.",
   "/admin/organizations/[organizationId]/profile": "A club profile, from Clubs and churches.",
+  "/admin/people/[kind]/[id]": "One person's access, opened from People & access.",
   "/finance/invoices/[invoiceId]": "One invoice, opened from Invoices.",
   "/finance/invoices/[invoiceId]/send": "Send one invoice, from the invoice.",
   "/finance/invoices/statements/[partyId]": "One party's statement, from Statements.",
