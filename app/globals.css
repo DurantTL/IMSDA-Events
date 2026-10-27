@@ -13214,6 +13214,28 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .event-featured-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 }
 
+/* Settings ownership, change impact and save status (#1076). */
+.settings-scope-note, .settings-ownership, .settings-changes, .settings-changes li span, .settings-conflict, .settings-save-status, .settings-saved-detail {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+.settings-fields { min-width: 0; margin: 0; border: 0; padding: 0; }
+.settings-scope-note { margin: 0; color: var(--muted); }
+.settings-scope-note a, .settings-ownership a { display: inline-flex; align-items: center; min-height: 44px; }
+.settings-ownership { margin: 0; color: var(--muted); }
+.settings-changes, .settings-conflict { border: 1px solid #ddcd9e; border-radius: 12px; background: var(--imsda-gold-soft); color: #6f5316; padding: 12px 14px; }
+.settings-conflict { border-color: #e9c7c2; background: #fff1ef; color: var(--coral); }
+.settings-conflict p { margin: 0 0 6px; }
+.settings-conflict ul, .settings-changes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.settings-changes h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.settings-changes li { overflow-wrap: anywhere; }
+.settings-changes li span { display: block; }
+.settings-save-row { flex-wrap: wrap; align-items: center; }
+.settings-save-row .form-error { flex-basis: 100%; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.settings-save-status { display: flex; flex-direction: column; gap: 2px; flex: 1 1 220px; min-width: 0; font-weight: 700; }
+.settings-saved-detail { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.settings-save-row :is(.primary-button, .secondary-button) { min-height: 44px; }
+.platform-settings-workspace .field-error { display: block; margin: 4px 0 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 /* The club year picker in the Clubs sidebar (#1245): a real GET form under the search. Hidden when the sidebar is icons-only. */
 .clubs-year-form { flex-shrink: 0; display: grid; gap: 6px; margin: 0 4px 14px; }
 .clubs-year-form label { margin: 0 0 0 5px; color: #b6cbd5; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }

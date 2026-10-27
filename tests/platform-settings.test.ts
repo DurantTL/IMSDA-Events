@@ -72,6 +72,7 @@ describe("platform settings homepage help contact (#1251)", () => {
 
   function helpDatabase(storedPhone: string | null) {
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       platformSettings: { findUnique: vi.fn().mockResolvedValue({ id: "platform", organizationName: "IMSDA", publicHelpPhone: storedPhone, publicHelpEmail: null }), upsert: vi.fn().mockResolvedValue({}) },
       auditLog: { create: vi.fn().mockResolvedValue({}) },
     };
@@ -219,6 +220,7 @@ describe("clearing the passkey domain", () => {
         }),
         upsert: vi.fn().mockResolvedValue({}),
       },
+      $queryRaw: vi.fn().mockResolvedValue([]),
       user: { count: vi.fn().mockResolvedValue(options.passkeyOnlyStaff) },
       auditLog: { create: vi.fn().mockResolvedValue({}) },
     };
@@ -307,5 +309,146 @@ describe("clearing the passkey domain", () => {
 
     expect(tx.user.count).not.toHaveBeenCalled();
     expect(tx.platformSettings.upsert).toHaveBeenCalled();
+  });
+});
+
+describe("stale-write baseline (#1076)", () => {
+  function baselineDatabase() {
+    const tx = {
+      platformSettings: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "platform",
+          organizationName: "IMSDA",
+          logoUrl: null,
+          publicWebsiteUrl: "https://imsda.org",
+          defaultTimezone: "America/Chicago",
+          defaultAttendeeEditPolicy: "VERIFY_EVERY_EDIT",
+          passkeyRpId: null,
+          invoiceHeaderPhone: null,
+        }),
+        upsert: vi.fn().mockResolvedValue({}),
+      },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      user: { count: vi.fn().mockResolvedValue(0) },
+      auditLog: { create: vi.fn().mockResolvedValue({}) },
+    };
+    database.getPrisma.mockReturnValue({
+      $transaction: vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
+      platformSettings: {
+        upsert: vi.fn().mockResolvedValue({ organizationName: "IMSDA", updatedAt: new Date("2026-09-25T00:00:00Z"), updatedBy: null }),
+      },
+    });
+    return tx;
+  }
+
+  const matching = {
+    organizationName: "IMSDA",
+    logoUrl: "",
+    publicWebsiteUrl: "https://imsda.org",
+    defaultTimezone: "America/Chicago",
+    defaultAttendeeEditPolicy: "VERIFY_EVERY_EDIT",
+  };
+
+  it("refuses the save and names the fields when someone else changed them since the page loaded", async () => {
+    const tx = baselineDatabase();
+    const attempt = updatePlatformSettings(
+      {
+        ...platformSettingsInputSchema.parse(validInput({ organizationName: "IMSDA Mine", defaultTimezone: "America/Denver" })),
+        baseline: { ...matching, organizationName: "Old name", defaultTimezone: "UTC" },
+      },
+      "admin-1",
+    );
+    await expect(attempt).rejects.toMatchObject({
+      code: "PLATFORM_SETTINGS_CONFLICT",
+      fields: ["organizationName", "defaultTimezone"],
+    });
+    expect(tx.platformSettings.upsert).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("is no conflict when someone else already saved the same value this save sends", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: { ...matching, organizationName: "Old name", defaultTimezone: "UTC" } },
+      "admin-1",
+    );
+    expect(tx.platformSettings.upsert).toHaveBeenCalled();
+  });
+
+  it("saves when the baseline still matches, and never writes the baseline to the row or the audit", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput({ organizationName: "IMSDA Renamed" })), baseline: matching },
+      "admin-1",
+    );
+    const upsertCall = tx.platformSettings.upsert.mock.calls[0][0];
+    expect(upsertCall.update).not.toHaveProperty("baseline");
+    expect(upsertCall.create).not.toHaveProperty("baseline");
+    expect(JSON.stringify(tx.auditLog.create.mock.calls[0][0])).not.toContain("baseline");
+  });
+
+  it("locks the settings row before reading it", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: matching },
+      "admin-1",
+    );
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(String(tx.$queryRaw.mock.calls[0][0].join(" "))).toContain("FOR UPDATE");
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.platformSettings.findUnique.mock.invocationCallOrder[0]);
+  });
+
+  it("treats a stored null as matching a blank baseline", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: { logoUrl: "", passkeyRpId: "", invoiceHeaderPhone: "" } },
+      "admin-1",
+    );
+    expect(tx.platformSettings.upsert).toHaveBeenCalled();
+  });
+
+  it("writes only the fields this save edited, so another admin's newer value survives", async () => {
+    const tx = baselineDatabase();
+    // Stored now: timezone America/Chicago (admin B saved it). This admin opened the page when it was UTC and edited only the logo.
+    await updatePlatformSettings(
+      {
+        ...platformSettingsInputSchema.parse(validInput({
+          logoUrl: "https://example.test/logo.png",
+          publicWebsiteUrl: "https://imsda.org",
+          defaultTimezone: "UTC",
+        })),
+        baseline: { ...matching, defaultTimezone: "UTC" },
+      },
+      "admin-2",
+    );
+    const call = tx.platformSettings.upsert.mock.calls[0][0];
+    expect(call.update).toEqual({ logoUrl: "https://example.test/logo.png", updatedByUserId: "admin-2" });
+    expect(tx.auditLog.create.mock.calls[0][0].data.metadata.after).toMatchObject({ defaultTimezone: "America/Chicago" });
+  });
+
+  it("conflicts only on a field this save edited that is stale", async () => {
+    const tx = baselineDatabase();
+    await expect(updatePlatformSettings(
+      {
+        ...platformSettingsInputSchema.parse(validInput({ publicWebsiteUrl: "https://imsda.org", defaultTimezone: "Asia/Tokyo" })),
+        baseline: { ...matching, defaultTimezone: "UTC" },
+      },
+      "admin-2",
+    )).rejects.toMatchObject({ code: "PLATFORM_SETTINGS_CONFLICT", fields: ["defaultTimezone"] });
+    expect(tx.platformSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps today's behaviour when no baseline is sent", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(platformSettingsInputSchema.parse(validInput({ organizationName: "Anything" })), "admin-1");
+    expect(tx.platformSettings.upsert).toHaveBeenCalled();
+    expect(Object.keys(tx.platformSettings.upsert.mock.calls[0][0].update)).toContain("defaultTimezone");
+  });
+
+  it("the request schema accepts a string-valued baseline and still refuses unknown fields", async () => {
+    const { platformSettingsRequestSchema } = await import("@/modules/system-admin/platform-settings");
+    expect(platformSettingsRequestSchema.safeParse(validInput({ baseline: { organizationName: "IMSDA" } })).success).toBe(true);
+    expect(platformSettingsRequestSchema.safeParse(validInput({ baseline: { organizationName: 1 } })).success).toBe(false);
+    expect(platformSettingsRequestSchema.safeParse(validInput({ deliveryMode: "x" })).success).toBe(false);
   });
 });

@@ -69,6 +69,15 @@ export const platformSettingsInputSchema = z.object({
 export type PlatformSettingsInput = z.infer<typeof platformSettingsInputSchema>;
 
 /**
+ * What the form sent: the settings plus, optionally, the values the page loaded (#1076). When present, a save is refused if
+ * any of those fields has changed in the database since, so one administrator cannot silently overwrite another's edit.
+ * Compared field by field rather than by `updatedAt`, because the Email page and the sign-in switch write the same row.
+ */
+export const platformSettingsRequestSchema = platformSettingsInputSchema.extend({
+  baseline: z.record(z.string(), z.string()).optional(),
+}).strict();
+
+/**
  * The three addresses automatic alerts are sent to (#1016). They are edited on
  * System management > Notifications and nowhere else, so the platform settings
  * form above cannot clear them by leaving them out of its request.
@@ -154,8 +163,10 @@ export async function getPublicHelpContact(): Promise<{ phone: string | null; em
 
 export class PlatformSettingsError extends Error {
   constructor(
-    public readonly code: "PASSKEY_ONLY_STAFF_WOULD_BE_LOCKED_OUT" | "INVALID_SETTING",
+    public readonly code: "PASSKEY_ONLY_STAFF_WOULD_BE_LOCKED_OUT" | "INVALID_SETTING" | "PLATFORM_SETTINGS_CONFLICT",
     message: string,
+    /** The form fields someone else changed, for `PLATFORM_SETTINGS_CONFLICT`. */
+    public readonly fields: string[] = [],
   ) {
     super(message);
     this.name = "PlatformSettingsError";
@@ -185,24 +196,64 @@ async function countPasskeyOnlyStaff(tx: Pick<ReturnType<typeof getPrisma>, "use
   });
 }
 
+const BASELINE_FIELDS = [
+  "organizationName",
+  "logoUrl",
+  "publicWebsiteUrl",
+  "defaultTimezone",
+  "defaultAttendeeEditPolicy",
+  "passkeyRpId",
+  "invoiceHeaderDepartment",
+  "invoiceHeaderOrganization",
+  "invoiceHeaderAddress",
+  "invoiceHeaderPhone",
+  "publicHelpPhone",
+  "publicHelpEmail",
+] as const;
+
 export async function updatePlatformSettings(
-  rawInput: PlatformSettingsInput,
+  rawInput: PlatformSettingsInput & { baseline?: Record<string, string> },
   actorUserId: string,
 ): Promise<PlatformSettingsRecord> {
   const prisma = getPrisma();
-  let input = rawInput;
+  const { baseline, ...rest } = rawInput;
+  let input: PlatformSettingsInput = rest;
   await prisma.$transaction(async (tx) => {
+    // Held until commit, so two saves with the same baseline cannot both pass the compare below.
+    await tx.$queryRaw`SELECT "id" FROM "PlatformSettings" WHERE "id" = ${PLATFORM_SETTINGS_ID} FOR UPDATE`;
     const before = await tx.platformSettings.findUnique({
       where: { id: PLATFORM_SETTINGS_ID },
     });
+    // With a baseline, only the fields this save actually edited are compared and written, so a field someone else saved
+    // meanwhile is neither reported as a conflict nor written back stale (#1076).
+    const normalize = (key: string, value: unknown) => {
+      const text = String(value ?? "").trim();
+      return key === "passkeyRpId" || key === "publicHelpEmail" ? text.toLowerCase() : text;
+    };
+    let edited: readonly (typeof BASELINE_FIELDS)[number][] = BASELINE_FIELDS;
+    if (baseline && before) {
+      edited = BASELINE_FIELDS.filter((key) => key in baseline && normalize(key, input[key]) !== baseline[key]);
+      const stale = edited.filter((key) => normalize(key, before[key]) !== baseline[key] && normalize(key, before[key]) !== normalize(key, input[key]));
+      if (stale.length > 0) {
+        throw new PlatformSettingsError(
+          "PLATFORM_SETTINGS_CONFLICT",
+          "Someone else saved platform settings since you opened this page.",
+          [...stale],
+        );
+      }
+      // The merged row: this save's edits over whatever is stored now.
+      const merged: Record<string, unknown> = { ...input };
+      for (const key of BASELINE_FIELDS) if (!edited.includes(key)) merged[key] = before[key];
+      input = merged as PlatformSettingsInput;
+    }
     // The invoice phone must pass the shared check unless it is the phone already stored (#1193), decided here from the
     // stored row. Valid phones are stored in one form. The message never carries the phone.
-    if (input.invoiceHeaderPhone) {
+    if (input.invoiceHeaderPhone && edited.includes("invoiceHeaderPhone")) {
       const phone = resolvePhoneChange(input.invoiceHeaderPhone, before?.invoiceHeaderPhone);
       if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Invoice phone: ${phone.message}`);
       input = { ...input, invoiceHeaderPhone: phone.value };
     }
-    if (input.publicHelpPhone) {
+    if (input.publicHelpPhone && edited.includes("publicHelpPhone")) {
       const phone = resolvePhoneChange(input.publicHelpPhone, before?.publicHelpPhone);
       if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Help phone: ${phone.message}`);
       input = { ...input, publicHelpPhone: phone.value };
@@ -221,7 +272,10 @@ export async function updatePlatformSettings(
     }
     await tx.platformSettings.upsert({
       where: { id: PLATFORM_SETTINGS_ID },
-      update: { ...input, updatedByUserId: actorUserId },
+      update: {
+        ...(baseline && before ? Object.fromEntries(edited.map((key) => [key, input[key]])) : input),
+        updatedByUserId: actorUserId,
+      },
       create: { id: PLATFORM_SETTINGS_ID, ...input, updatedByUserId: actorUserId },
     });
     await tx.auditLog.create({

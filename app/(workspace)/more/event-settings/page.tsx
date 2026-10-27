@@ -38,7 +38,7 @@ export default async function EventSettingsPage({
       {linkNotice && <CalendarLinkBanner key={`calendar-link-${event.id}`} eventId={event.id} notice={linkNotice} />}
       {/* Keyed on the event's dates too: after Update from the calendar banner the form remounts with the new dates,
           so a later save can't write the old ones back (the server also refuses a save over a newer version). */}
-      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed} />
+      <EventSettingsWorkspace key={`${event.id}:${settings.startsOn}:${settings.endsOn}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canOpenPlatformSettings={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed} />
       {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
       {settings.audience === "CLUB" && generalLink && (
         <EventGeneralLinkPanel

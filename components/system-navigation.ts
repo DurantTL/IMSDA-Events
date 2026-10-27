@@ -115,7 +115,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/master-award-rules", label: "Master Award rules", description: "What it takes to earn a Master Award.", icon: Trophy },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
       { href: "/admin/email", label: "Email", description: "The central sender, paused events, staff alerts, and email health.", icon: Bell, alsoActiveFor: ["/admin/notifications"] },
-      { href: "/admin/settings", label: "Platform settings", description: "Sign-in, email and payment settings.", icon: CloudCog },
+      { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
     ],
   },
