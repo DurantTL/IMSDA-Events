@@ -171,8 +171,8 @@ describe("the More cards still reach every page whose back button went", () => {
 });
 
 describe("operational guidance kept after the header change", () => {
-  it("keeps the Accounts two-step and forgotten-password guidance as helper text", () => {
-    const source = read("components/attendee-accounts-workspace.tsx");
+  it("keeps the Accounts two-step and forgotten-password guidance as helper text (now on the person page)", () => {
+    const source = read("components/person-access.tsx");
     expect(source).toContain("Nobody can turn it off themselves.");
     expect(source).toContain("Forgotten passwords are reset by the person with");
     expect(source).toContain("Every action here is recorded.");

@@ -156,6 +156,8 @@ export type PersonClubRow = {
 export type PersonDetail = {
   name: string;
   email: string;
+  staffEmail: string | null;
+  accountEmail: string | null;
   staffId: string | null;
   accountId: string | null;
   systemAdministrator: boolean;
@@ -164,6 +166,11 @@ export type PersonDetail = {
   staff: null | {
     status: string;
     signInDisabled: boolean;
+    displayName: string;
+    jobTitle: string;
+    phone: string;
+    bio: string;
+    /** "On", "Pending" or "Not set up". */
     twoStep: string;
     lastSignedInAt: string | null;
   };
@@ -216,6 +223,9 @@ export async function getPersonDetail(
       select: {
         email: true,
         displayName: true,
+        jobTitle: true,
+        phone: true,
+        bio: true,
         globalRole: true,
         accountStatus: true,
         credential: { select: { disabledAt: true } },
@@ -252,6 +262,8 @@ export async function getPersonDetail(
   return {
     name: user?.displayName ?? account?.displayName ?? "",
     email: user?.email ?? account?.email ?? "",
+    staffEmail: user?.email ?? null,
+    accountEmail: account?.email ?? null,
     staffId: user ? staffId : null,
     accountId: account ? accountId : null,
     systemAdministrator: user?.globalRole === "SYSTEM_ADMIN",
@@ -260,6 +272,10 @@ export async function getPersonDetail(
     staff: full && user ? {
       status: user.accountStatus,
       signInDisabled: Boolean(user.credential?.disabledAt),
+      displayName: user.displayName,
+      jobTitle: user.jobTitle ?? "",
+      phone: user.phone ?? "",
+      bio: user.bio ?? "",
       twoStep: user.mfaEnrollment?.status === "ACTIVE" ? "On" : user.mfaEnrollment?.status === "PENDING" ? "Pending" : "Not set up",
       lastSignedInAt: user.sessions[0]?.createdAt.toISOString() ?? null,
     } : null,
@@ -291,4 +307,26 @@ export async function getPersonDetail(
       }))
       : [],
   };
+}
+
+export type EventOption = { id: string; name: string };
+export type ClubOption = { id: string; name: string };
+
+/** Events a person can be added to: not archived, newest first. Names only. */
+export async function listEventOptions(): Promise<EventOption[]> {
+  return getPrisma().event.findMany({
+    where: { archivedAt: null },
+    orderBy: { startsAt: "desc" },
+    take: 300,
+    select: { id: true, name: true },
+  });
+}
+
+/** Active clubs a director role can be given for. CLUB-type only; the route still decides. */
+export async function listClubOptions(): Promise<ClubOption[]> {
+  return getPrisma().organization.findMany({
+    where: { type: "CLUB", isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
 }

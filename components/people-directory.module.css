@@ -36,3 +36,16 @@
 .who { display: grid; gap: 2px; min-width: 0; }
 .who strong { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.1rem); overflow-wrap: anywhere; }
 .who span { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+/* Controls (#1275 round b). */
+.controlsStack { display: grid; gap: 10px; min-width: 0; }
+.control { display: grid; gap: 8px; min-width: 0; border-top: 1px solid var(--line); padding-top: 10px; list-style: none; }
+.control:first-child { border-top: 0; padding-top: 0; }
+.controlTitle { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.95rem); overflow-wrap: anywhere; }
+.inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; min-width: 0; }
+.inline :global(.secondary-button), .inline :global(.primary-button), .factValue :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.field { display: grid; flex: 1 1 180px; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.field select, .field input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 6px 8px; font-size: 16px; }
+.note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.status { min-width: 0; flex: 1 1 100%; }
+.status p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.statusError { color: var(--coral); font-weight: 700; }

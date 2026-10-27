@@ -13,11 +13,15 @@ const mocks = vi.hoisted(() => ({
   grantCreate: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
   getCurrentSession: vi.fn(),
+  userFindUnique: vi.fn(),
+  clubsGrantFindFirst: vi.fn(),
 }));
 
 const client = {
   areaCoordinatorGrant: { findUnique: mocks.grantFindUnique, upsert: mocks.grantUpsert, updateMany: mocks.grantUpdateMany },
   attendeeAccount: { findUnique: mocks.accountFindUnique },
+  user: { findUnique: mocks.userFindUnique },
+  clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst },
   organization: { findUnique: mocks.orgFindUnique },
   clubDirectorGrant: { findFirst: mocks.grantFindFirst, create: mocks.grantCreate },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
@@ -37,6 +41,9 @@ import { currentAreaCoordinator, setAreaCoordinator } from "@/modules/organizati
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.accountFindUnique.mockResolvedValue({ id: "account-1" });
+  // The actor, read by id: "admin-1" is a system administrator (#1275 checks it inside setAreaCoordinator too).
+  mocks.userFindUnique.mockResolvedValue({ globalRole: "SYSTEM_ADMIN" });
+  mocks.clubsGrantFindFirst.mockResolvedValue(null);
   mocks.grantFindUnique.mockResolvedValue({ revokedAt: null });
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "account-1" }, via: "attendee", sessionId: "session-1" });
   mocks.accountNeedsSecondStep.mockResolvedValue("OK");

@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({ findMany: vi.fn() }));
@@ -12,7 +10,6 @@ vi.mock("@/modules/attendee-accounts/session-store", () => ({ revokeAllAttendeeS
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/communications/account-email-dispatch", () => ({ sendAccountRecoveryEmail: vi.fn() }));
 
-import { AttendeeAccountsWorkspace } from "@/components/attendee-accounts-workspace";
 import { namedIssueMessage } from "@/modules/forms/roster-cards";
 import { ariaSortFor, nextAccountSort, parseAccountSort, sortAccounts } from "@/modules/system-admin/account-sort";
 import { listAttendeeAccounts, listAttendeeAccountsWithCap, type AttendeeAccountSummary } from "@/modules/system-admin/user-admin";
@@ -119,14 +116,6 @@ describe("account sorting (#738)", () => {
     expect(parseAccountSort("status", "asc")).toEqual({ key: "status", direction: "asc" });
   });
 
-  it("reuses the submitted search, ignores stale responses, locks sorting while busy, and flags the cap", () => {
-    const workspace = read("components/attendee-accounts-workspace.tsx");
-    expect(workspace).toContain("const effectiveQuery = event ? query : submittedQuery;");
-    expect(workspace).toContain("requestId !== latestRequest.current");
-    expect(workspace).toContain('disabled={busy !== ""}');
-    expect(workspace).toContain("Sorted the newest 5,000 matches — narrow your search.");
-  });
-
   it("reports when a sort hit the ceiling", async () => {
     prismaMock.findMany.mockResolvedValue(Array.from({ length: 5000 }, (_, index) => ({
       id: `c${index}`, email: `c${index}@example.test`, displayName: `C ${index}`, status: "ACTIVE", disabledAt: null,
@@ -164,23 +153,7 @@ describe("account sorting (#738)", () => {
     expect(unsorted).toHaveLength(120);
   });
 
-  it("renders sortable headers with aria-sort and the direction visible", () => {
-    const html = renderToStaticMarkup(createElement(AttendeeAccountsWorkspace, {
-      initialAccounts: [account("zed"), account("amy")],
-      initialQuery: "",
-      initialSort: { key: "name", direction: "desc" },
-    }));
-    expect(html).toContain('aria-sort="descending"');
-    expect(html.match(/aria-sort="none"/g)).toHaveLength(3);
-    expect(html).toContain("table-sort-button");
-    expect(html).toContain("Sort by");
-    expect(html).toContain("Descending");
-  });
-
-  it("keeps search and sort together in the URL and the API", () => {
-    const workspace = read("components/attendee-accounts-workspace.tsx");
-    expect(workspace).toContain("window.history.replaceState");
-    expect(workspace).toContain('params.set("sort"');
+  it("keeps the account list API sorting, and the search in the URL on People & access", () => {
     expect(read("app/api/admin/accounts/route.ts")).toContain('parseAccountSort(params.get("sort"), params.get("dir"))');
     // The Accounts page now redirects to People & access (#1275), which keeps its search and page in the URL.
     expect(read("app/(workspace)/admin/accounts/page.tsx")).toContain("encodeURIComponent(query)");
