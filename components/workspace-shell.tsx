@@ -57,8 +57,8 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   ).isStaff;
   const adminRoleCounts: AdminRoleCounts = {};
   await Promise.all([
-    adminRoleView.roles.clubsAdministrator
-      ? countWaitingNewClubApplications("CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
+    adminRoleView.roles.clubsAdministrator || isSystemAdmin
+      ? countWaitingNewClubApplications(isSystemAdmin ? "SYSTEM_ADMIN" : "CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
       : undefined,
     isSystemAdmin
       ? getAdminAttentionSummary().then((summary) => { adminRoleCounts.SYSTEM_ADMIN = summary.total; }).catch(() => undefined)
