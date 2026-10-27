@@ -90,7 +90,7 @@ describe("public front page (#373)", () => {
     expect(mocks.listPublicCalendarItems).toHaveBeenCalledWith("2026-09-23", "2027-09-23");
     expect(html).toMatch(/<a class="primary-button home-calendar-button" href="\/calendar\?view=list">/);
     expect(html).toContain("See the full calendar");
-    expect(html).toContain("See the full year");
+    expect(html).toMatch(/href="\/calendar\?view=year">See the full year/);
     expect(html).not.toContain("Coming up");
   });
 

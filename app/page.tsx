@@ -26,6 +26,7 @@ export const metadata: Metadata = {
 };
 
 const fullCalendarHref = "/calendar?view=list";
+const fullYearHref = "/calendar?view=year";
 
 /**
  * The public front door (#373, #1251). Members, club leaders, and visitors start here. The header offers Sign in
@@ -103,7 +104,7 @@ export default async function Home() {
         <section aria-labelledby="home-season-heading" className="home-season home-season-ribbon">
           <div className="home-season-head">
             <h2 id="home-season-heading">Next six months</h2>
-            <Link className="event-photo-see-all" href={fullCalendarHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></Link>
+            <Link className="event-photo-see-all" href={fullYearHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></Link>
           </div>
           <div className="season-ribbon">
             <div aria-hidden="true" className="season-months-row">
