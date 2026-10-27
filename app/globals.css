@@ -13520,7 +13520,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .public-page-overview dt { font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .public-page-overview dd { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
 .public-page-overview dd small { display: block; margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
-.public-page-overview a { display: inline-flex; align-items: center; min-height: 44px; }
+.public-page-overview a { display: flex; width: fit-content; align-items: center; min-height: 44px; color: var(--imsda-purple); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
