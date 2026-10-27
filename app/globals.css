@@ -13224,7 +13224,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .season-closing-register:focus-visible { outline: 3px solid var(--imsda-navy-deep); outline-offset: 3px; }
 @media (max-width: 760px) {
   .public-home-page .season-band { flex-direction: column; align-items: stretch; }
-  .season-closing { flex: 0 0 auto; }
+  .season-band-text, .season-closing { flex: 0 0 auto; }
 }
 .home-season { display: grid; gap: 12px; min-width: 0; }
 .home-season-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
