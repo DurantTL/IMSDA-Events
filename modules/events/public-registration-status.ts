@@ -19,6 +19,28 @@ export function resolvePublicRegistrationStatus(
 }
 
 /**
+ * The public status once capacity is known (#1215). WAITLIST: the event is full and takes waitlist
+ * registrations. FULL: the event is full and does not.
+ */
+export type PublicRegistrationState = PublicRegistrationStatus | "WAITLIST" | "FULL";
+
+/**
+ * The single capacity-aware decision behind the event page, the homepage and the calendar. A full event is
+ * checked before forms, as the event page always has: with no seats left it reads full (or waitlist) even if no
+ * form is listed. `remainingSpots` is null when the event has no capacity limit.
+ */
+export function resolvePublicRegistrationState(
+  phase: EventRegistrationPhase,
+  formsListed: boolean,
+  remainingSpots: number | null,
+  waitlistEnabled: boolean,
+): PublicRegistrationState {
+  if (phase !== "OPEN") return phase;
+  if (remainingSpots === 0) return waitlistEnabled ? "WAITLIST" : "FULL";
+  return resolvePublicRegistrationStatus(phase, formsListed);
+}
+
+/**
  * What staff dashboards call each public status (#1227, #1228). Both dashboards read the status from
  * `resolvePublicRegistrationStatus`, so an open event with no listed form says "Opens soon", the same as the public page.
  */
@@ -36,7 +58,7 @@ export function registrationStatusLabel(phase: EventRegistrationPhase, formsList
 
 /**
  * True for open dates with at least one listed form. Capacity, a full event and the waitlist are
- * handled separately (not part of #1201); this only answers the dates-plus-form question.
+ * not considered here (#1215): use `resolvePublicRegistrationState` for the public answer.
  */
 export function isPublicRegistrationOpen(phase: EventRegistrationPhase, formsListed: boolean) {
   return resolvePublicRegistrationStatus(phase, formsListed) === "OPEN";

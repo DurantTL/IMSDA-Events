@@ -4,7 +4,7 @@ import {
   remainingEventCapacity,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
-import { resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
+import { resolvePublicRegistrationState } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -263,8 +263,9 @@ function presentPublicEventLifecycle(
     };
   }
 
-  if (remainingSpots === 0) {
-    if (event.waitlistEnabled) {
+  const registrationState = resolvePublicRegistrationState(phase, formsListed, remainingSpots, event.waitlistEnabled);
+  if (registrationState === "WAITLIST" || registrationState === "FULL") {
+    if (registrationState === "WAITLIST") {
       return {
         state: "WAITLIST",
         statusLabel: "Event full · waitlist open",
@@ -314,7 +315,7 @@ function presentPublicEventLifecycle(
     : `${spotsPhrase(remainingSpots)} currently remain.`;
   // Open with no forms to choose from yet: say so, rather than "Registration open"
   // beside "Registration forms are being prepared".
-  if (resolvePublicRegistrationStatus("OPEN", formsListed) === "OPENING_SOON") {
+  if (registrationState === "OPENING_SOON") {
     return {
       state: "OPEN",
       statusLabel: "Registration opening soon",

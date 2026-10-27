@@ -23,8 +23,10 @@ export type CalendarItem = {
   /** Where the item links: an event page on this site, or an entry's own link. */
   href: string | null;
   status: CalendarItemStatus;
-  /** Only for events: whether registration is open right now. */
+  /** Only for events: whether a Register (or Join the waitlist) button is offered right now. */
   registrationOpen: boolean;
+  /** Only for events at capacity (#1215): the waitlist is open (registrationOpen is then true) or the event is full. */
+  registrationFull?: "WAITLIST" | "FULL" | null;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */
   isClosure?: boolean;
   /**

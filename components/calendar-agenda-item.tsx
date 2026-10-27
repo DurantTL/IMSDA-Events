@@ -10,6 +10,18 @@ export function ItemLink({ item, children, className, tabIndex }: { item: Calend
   return <a className={className} href={item.href} rel="noreferrer" tabIndex={tabIndex} target="_blank">{children}</a>;
 }
 
+/** The chip for an event at capacity (#1215): full with the waitlist open, or full. */
+export function fullEventChip(item: CalendarItem) {
+  if (item.registrationFull === "WAITLIST") return <span className="status-chip green">Event full · waitlist open</span>;
+  if (item.registrationFull === "FULL") return <span className="status-chip">Event full</span>;
+  return null;
+}
+
+function registrationActionLabel(item: CalendarItem) {
+  if (!item.registrationOpen) return "Details";
+  return item.registrationFull === "WAITLIST" ? "Join the waitlist" : "Register";
+}
+
 export function AgendaItem({ item }: { item: CalendarItem }) {
   const [, month, day] = item.startsOn.split("-").map(Number);
   return (
@@ -27,7 +39,8 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           )}
           {item.category && <span className="calendar-category-tag">{item.category}</span>}
           {item.status !== "SCHEDULED" && <span className="status-chip coral">{calendarStatusLabels[item.status]}</span>}
-          {item.registrationOpen && <span className="status-chip green">Registration open</span>}
+          {item.registrationOpen && !item.registrationFull && <span className="status-chip green">Registration open</span>}
+          {fullEventChip(item)}
         </div>
         <h3><ItemLink item={item}>{item.title}</ItemLink></h3>
         <p className="calendar-agenda-meta">
@@ -42,7 +55,7 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           className={`${item.registrationOpen ? "primary-button" : "secondary-button"} calendar-agenda-action`}
           item={item}
         >
-          {item.kind === "EVENT" ? (item.registrationOpen ? "Register" : "Details") : "More info"}
+          {item.kind === "EVENT" ? registrationActionLabel(item) : "More info"}
           {item.href.startsWith("/") ? <ChevronRight size={14} aria-hidden="true" /> : <ExternalLink size={14} aria-hidden="true" />}
         </ItemLink>
       )}
