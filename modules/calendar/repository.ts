@@ -20,9 +20,9 @@ import { feedLockKey } from "@/modules/calendar/feed-plan";
 import { importedFieldNames } from "@/modules/calendar/ics-import";
 import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarBulkRequest, CalendarEntryInput, CalendarEntryUpdate, CalendarEventSettings, CalendarRepeatInput } from "@/modules/calendar/schemas";
-import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
+import { activeRegistrationStatuses, evaluateEventRegistrationPhase, remainingEventCapacity } from "@/modules/events/lifecycle";
 import { listEventIdsWithPublishedForms } from "@/modules/events/public-forms-repository";
-import { isPublicRegistrationOpen } from "@/modules/events/public-registration-status";
+import { resolvePublicCapacityStatus } from "@/modules/events/public-registration-status";
 
 export { CalendarError };
 
@@ -40,6 +40,8 @@ const publicEventSelect = {
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
+  capacity: true,
+  audience: true,
 } as const;
 
 /** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
@@ -121,15 +123,41 @@ export async function listPublicCalendarItems(
     ...events.filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
     ...[...publishedLinked.values()].filter((event) => evaluateEventRegistrationPhase(event, now) === "OPEN").map((event) => event.id),
   ])]);
-  const registrationOpenFor = (event: PublicEventWithLinks) =>
-    isPublicRegistrationOpen(evaluateEventRegistrationPhase(event, now), withForms.has(event.id));
+  // Places taken, for open events with a capacity: one grouped query, counted exactly as the event page counts them (#1204).
+  const openWithCapacity = [...new Set([...events, ...publishedLinked.values()]
+    .filter((event) => event.capacity !== null && event.capacity !== undefined && evaluateEventRegistrationPhase(event, now) === "OPEN")
+    .map((event) => event.id))];
+  const occupiedByEvent = new Map<string, number>();
+  if (openWithCapacity.length > 0) {
+    const rows = await prisma.registrationAttendee.groupBy({
+      by: ["eventId"],
+      where: { eventId: { in: openWithCapacity }, registration: { status: { in: [...activeRegistrationStatuses] } } },
+      _count: { _all: true },
+    });
+    for (const row of rows) occupiedByEvent.set(row.eventId, row._count._all);
+  }
+  const registrationFor = (event: PublicEventWithLinks) => {
+    const phase = evaluateEventRegistrationPhase(event, now);
+    const formsListed = withForms.has(event.id);
+    const status = resolvePublicCapacityStatus(phase, formsListed, {
+      remaining: remainingEventCapacity(event.capacity ?? null, occupiedByEvent.get(event.id) ?? 0),
+      waitlistEnabled: event.waitlistEnabled,
+    });
+    return {
+      // Register shows when it leads somewhere: open, or a waitlist to join. Not when the event is full.
+      registrationOpen: status === "OPEN" || status === "WAITLIST",
+      registrationStatus: status,
+      registrationOpensOn: event.registrationOpensOn,
+      clubEvent: event.audience === "CLUB",
+    };
+  };
   const registerItems = entries.flatMap((entry) => {
     const event = entry.linkedEventId ? publishedLinked.get(entry.linkedEventId) : undefined;
     if (!event || !event.showOnCalendar || sharedItemCount(event) < 2 || entry.entryType === "DEADLINE") return [];
-    const registrationOpen = registrationOpenFor(event);
+    const registration = registrationFor(event);
     return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
-      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, registrationOpen });
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, ...registration });
   });
 
   const items: CalendarItem[] = [
@@ -145,7 +173,7 @@ export async function listPublicCalendarItems(
       category: event.calendarCategory ?? "",
       href: `/events/${encodeURIComponent(event.slug)}`,
       status: "SCHEDULED" as const,
-      registrationOpen: registrationOpenFor(event),
+      ...registrationFor(event),
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
     ...standalone.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),

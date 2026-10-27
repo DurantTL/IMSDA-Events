@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, MapPin, UserRound, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { AgendaItem } from "@/components/calendar-agenda-item";
@@ -45,55 +45,14 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="public-registration-hero calendar-hero">
+      <section className="public-registration-hero calendar-hero public-home-banner">
         <div>
           <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
           <h1>Events and registration</h1>
-          <p>Register for camps and conventions, manage your club, and see what&apos;s coming up across Iowa and Missouri.</p>
         </div>
       </section>
 
       <div className="calendar-layout">
-        <nav aria-label="Get started" className="home-actions">
-          <Link className="home-action" href="/account">
-            <UserRound size={22} aria-hidden="true" />
-            <span>
-              <strong>{signedInName ? "Go to my account" : "My account"}</strong>
-              <small>{signedInName ? `Signed in as ${signedInName}` : "Your registrations, profile, and sign-in"}</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </Link>
-          <Link className="home-action" href="/account/clubs">
-            <UsersRound size={22} aria-hidden="true" />
-            <span>
-              <strong>My club</strong>
-              <small>Directors and club leaders: roster and club registrations</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </Link>
-          <Link className="home-action" href="/calendar">
-            <CalendarDays size={22} aria-hidden="true" />
-            <span>
-              <strong>Conference calendar</strong>
-              <small>Every camp, convention, and ministry date</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </Link>
-          {/* A full page load, not a client-side <Link>: /clubs is the only
-              page whose Content-Security-Policy admits the map tiles, and a
-              soft navigation would keep this page's policy. */}
-          <a className="home-action" href="/clubs">
-            <MapPin size={22} aria-hidden="true" />
-            <span>
-              <strong>Find a club</strong>
-              <small>Pathfinder and Adventurer clubs near you</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </a>
-        </nav>
-
-        <StartAClubCallout />
-
         <section aria-labelledby="home-upcoming-heading" className="calendar-agenda">
           <h2 id="home-upcoming-heading">Coming up</h2>
           {upcoming.length === 0 ? (
@@ -101,10 +60,43 @@ export default async function Home() {
           ) : (
             <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
           )}
-          {items.length > 0 && (
-            <p className="home-more"><Link href="/calendar?view=list">See the full calendar</Link></p>
-          )}
+          <p className="home-more">
+            <Link className="primary-button home-calendar-button" href="/calendar?view=list">
+              <CalendarDays size={18} aria-hidden="true" /> See the full calendar
+            </Link>
+          </p>
         </section>
+
+        <nav aria-label="Get started" className="home-links">
+          <ul>
+            <li>
+              <Link href="/account">
+                <span>
+                  <strong>My registrations</strong>
+                  {signedInName && <small>Signed in as {signedInName}</small>}
+                </span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </Link>
+            </li>
+            <li>
+              <Link href="/account/clubs">
+                <span><strong>My club</strong></span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </Link>
+            </li>
+            <li>
+              {/* A full page load, not a client-side <Link>: /clubs is the only
+                  page whose Content-Security-Policy admits the map tiles, and a
+                  soft navigation would keep this page's policy. */}
+              <a href="/clubs">
+                <span><strong>Find a club</strong></span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </a>
+            </li>
+          </ul>
+        </nav>
+
+        <StartAClubCallout variant="line" />
       </div>
     </main>
   );

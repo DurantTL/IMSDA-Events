@@ -240,7 +240,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
     const panelItem = read("components/calendar-panel-item.tsx");
     expect(panelItem).toContain("ItemLink");
     expect(panelItem).toContain("formatDateRange");
-    expect(panelItem).toContain("Registration open");
+    expect(panelItem).toContain("calendarItemStatusLine");
     expect(css).toMatch(/@media \(min-width: 1001px\) \{\s*\.calendar-board \{ grid-template-columns: minmax\(0, 1fr\) 320px; \}/);
   });
 

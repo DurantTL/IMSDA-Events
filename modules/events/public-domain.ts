@@ -4,7 +4,7 @@ import {
   remainingEventCapacity,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
-import { resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
+import { publicStatusLine, resolvePublicCapacityStatus, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -15,22 +15,28 @@ export type PublicEventRegistrationState =
   | "FULL"
   | "CLOSED";
 
+/**
+ * The one primary action the event page's status block offers (#1205): Register (or Join the waitlist) when
+ * registration can be used now, Add to my calendar while it is not open yet, nothing once it is closed, full or over.
+ */
+export type PublicEventStatusAction = "REGISTER" | "ADD_TO_CALENDAR" | "NONE";
+
 export type PublicEventLifecycleSummary = {
   phase: EventRegistrationPhase;
   state: PublicEventRegistrationState;
+  /** The page's single status message. Open/upcoming/opening-soon/closed wording is `publicStatusLine`, shared with the homepage and calendar. */
   statusLabel: string;
+  /** One supporting sentence under the status message (the exact date, the closing date, spots left). */
   detail: string;
+  /** The primary action's label (Register, Join the waitlist, Add to my calendar), or the status when there is none. */
   ctaLabel: string;
+  /** Registration can be used now (the Register / Join the waitlist action is offered). */
   ctaEnabled: boolean;
+  action: PublicEventStatusAction;
   /** The event itself is over (registration is closed for good). */
   ended: boolean;
-  heroTagline: string;
-  /** Heading above the form list; never invites a choice when none can be made. */
+  /** Heading above the list of registration forms, shown only when `action` is REGISTER. */
   formsHeading: string;
-  /** Shown when no forms are listed; "being prepared" only when that is true. */
-  emptyForms: { title: string; body: string };
-  /** Sidebar card text; carries the capacity number only when one may be shown. */
-  availability: { heading: string; body: string };
   /** Null on closed or ended events. */
   remainingSpots: number | null;
 };
@@ -68,6 +74,8 @@ type PublicEventLifecycleInput = {
   registrationClosesOn: string | null;
   waitlistEnabled: boolean;
   endsAt?: Date | null;
+  /** "CLUB" words the opening month as "Club registration opens in ..." (#1204). */
+  audience?: string | null;
 };
 
 export const publicAnnouncementPriorityRank: Record<
@@ -166,10 +174,8 @@ type LifecyclePresentation = Pick<
   | "ctaLabel"
   | "ctaEnabled"
   | "ended"
-  | "heroTagline"
+  | "action"
   | "formsHeading"
-  | "emptyForms"
-  | "availability"
 > & { showCapacity: boolean };
 
 function spotsPhrase(remainingSpots: number) {
@@ -189,29 +195,21 @@ function presentPublicEventLifecycle(
   now: Date,
   formsListed: boolean,
 ): LifecyclePresentation {
-  const preparing = {
-    title: "Registration forms are being prepared",
-    body: "Event details are available now. Please check back or contact the event team for registration help.",
-  };
+  const isClubEvent = event.audience === "CLUB";
+  const calendarAction = { action: "ADD_TO_CALENDAR" as const, ctaLabel: "Add to my calendar", ctaEnabled: false };
+  const noAction = (label: string) => ({ action: "NONE" as const, ctaLabel: label, ctaEnabled: false });
 
   if (phase === "UPCOMING") {
-    const opens = event.registrationOpensOn
-      ? calendarDateLabel(event.registrationOpensOn)
-      : "soon";
+    const opens = event.registrationOpensOn ? calendarDateLabel(event.registrationOpensOn) : null;
     return {
       state: "UPCOMING",
-      statusLabel: `Registration opens ${opens}`,
-      detail: "Review the event details now and return when online registration opens.",
-      ctaLabel: `Opens ${opens}`,
-      ctaEnabled: false,
+      statusLabel: publicStatusLine({ status: "UPCOMING", opensOn: event.registrationOpensOn, isClubEvent }, now),
+      detail: opens
+        ? `Registration opens ${opens}. Review the event details below in the meantime.`
+        : "Review the event details below. Registration dates will be posted here.",
+      ...calendarAction,
       ended: false,
-      heroTagline: `Registration opens ${opens}. Review the details below in the meantime.`,
       formsHeading: "Registration options",
-      emptyForms: preparing,
-      availability: {
-        heading: `Registration opens ${opens}`,
-        body: "Online registration has not opened yet.",
-      },
       showCapacity: true,
     };
   }
@@ -220,20 +218,10 @@ function presentPublicEventLifecycle(
     return {
       state: "CLOSED",
       statusLabel: "This event has ended",
-      detail: "This event has ended. Contact the event team if you need help.",
-      ctaLabel: "This event has ended",
-      ctaEnabled: false,
+      detail: "Online registration is no longer available. Contact the event team if you need help.",
+      ...noAction("This event has ended"),
       ended: true,
-      heroTagline: "This event has ended.",
       formsHeading: "Registration is closed",
-      emptyForms: {
-        title: "This event has ended",
-        body: "Online registration is no longer available. Contact the event team if you need help.",
-      },
-      availability: {
-        heading: "This event has ended",
-        body: "Online registration is no longer available.",
-      },
       showCapacity: false,
     };
   }
@@ -244,21 +232,11 @@ function presentPublicEventLifecycle(
       : "";
     return {
       state: "CLOSED",
-      statusLabel: "Registration closed",
+      statusLabel: publicStatusLine({ status: "CLOSED" }, now),
       detail: `Online registration is no longer available${closed}. Contact the event team if you need help.`,
-      ctaLabel: "Registration closed",
-      ctaEnabled: false,
+      ...noAction("Registration closed"),
       ended: false,
-      heroTagline: "Online registration is closed.",
       formsHeading: "Registration is closed",
-      emptyForms: {
-        title: "Registration closed",
-        body: "Online registration is no longer available. Contact the event team if you need help.",
-      },
-      availability: {
-        heading: "Registration closed",
-        body: "Online registration is no longer available.",
-      },
       showCapacity: false,
     };
   }
@@ -267,41 +245,38 @@ function presentPublicEventLifecycle(
     if (event.waitlistEnabled) {
       return {
         state: "WAITLIST",
-        statusLabel: "Event full · waitlist open",
-        detail: "The event is currently full, but you can submit a registration to join the waitlist.",
-        ctaLabel: "Join the waitlist",
-        ctaEnabled: true,
+        statusLabel: publicStatusLine({ status: resolvePublicCapacityStatus(phase, formsListed, { remaining: 0, waitlistEnabled: true }) }, now),
+        detail: formsListed
+          ? "The event is currently full, but you can submit a registration to join the waitlist."
+          : "The event is currently full. The waitlist form will appear here when it is ready.",
+        ...(formsListed
+          ? { action: "REGISTER" as const, ctaLabel: "Join the waitlist", ctaEnabled: true }
+          : noAction("Waitlist opening soon")),
         ended: false,
-        heroTagline: "The event is full, but you can join the waitlist.",
         formsHeading: "Join the waitlist",
-        emptyForms: {
-          title: "Waitlist opening soon",
-          body: "The waitlist form will appear here when it's ready.",
-        },
-        availability: {
-          heading: "Event full · waitlist open",
-          body: "The event-wide capacity has been reached. You can join the waitlist.",
-        },
         showCapacity: true,
       };
     }
     return {
       state: "FULL",
-      statusLabel: "Event full",
+      statusLabel: publicStatusLine({ status: "FULL" }, now),
       detail: "All available places are currently filled. Contact the event team with questions.",
-      ctaLabel: "Event full",
-      ctaEnabled: false,
+      ...noAction("Event full"),
       ended: false,
-      heroTagline: "This event is full.",
       formsHeading: "Event full",
-      emptyForms: {
-        title: "Event full",
-        body: "All available places are filled. Contact the event team with questions.",
-      },
-      availability: {
-        heading: "Event full",
-        body: "The event-wide capacity has been reached.",
-      },
+      showCapacity: true,
+    };
+  }
+
+  // Open dates with no forms to choose from yet: say so, never "Registration open" without a way to register.
+  if (resolvePublicRegistrationStatus("OPEN", formsListed) === "OPENING_SOON") {
+    return {
+      state: "OPEN",
+      statusLabel: publicStatusLine({ status: "OPENING_SOON", isClubEvent }, now),
+      detail: "Registration forms are not listed yet. Check back soon, or add the event to your calendar.",
+      ...calendarAction,
+      ended: false,
+      formsHeading: "Registration options",
       showCapacity: true,
     };
   }
@@ -309,45 +284,15 @@ function presentPublicEventLifecycle(
   const closes = event.registrationClosesOn
     ? ` through ${calendarDateLabel(event.registrationClosesOn)}`
     : "";
-  const availability = remainingSpots === null
-    ? "Choose the form that best matches who you are registering."
-    : `${spotsPhrase(remainingSpots)} currently remain.`;
-  // Open with no forms to choose from yet: say so, rather than "Registration open"
-  // beside "Registration forms are being prepared".
-  if (resolvePublicRegistrationStatus("OPEN", formsListed) === "OPENING_SOON") {
-    return {
-      state: "OPEN",
-      statusLabel: "Registration opening soon",
-      detail: "Registration forms are not listed yet. Check back soon.",
-      ctaLabel: "Registration opening soon",
-      ctaEnabled: false,
-      ended: false,
-      heroTagline: "Event details are available now. Registration forms are coming soon.",
-      formsHeading: "Registration options",
-      emptyForms: preparing,
-      availability: {
-        heading: "Registration opening soon",
-        body: "Registration forms are not listed yet.",
-      },
-      showCapacity: true,
-    };
-  }
   return {
     state: "OPEN",
-    statusLabel: "Registration open",
-    detail: `Online registration is available${closes}. ${availability}`,
-    ctaLabel: "Start registration",
+    statusLabel: publicStatusLine({ status: "OPEN", isClubEvent }, now),
+    detail: `Online registration is available${closes}.${remainingSpots === null ? "" : ` ${spotsPhrase(remainingSpots)} currently remain.`}`,
+    action: "REGISTER",
+    ctaLabel: "Register",
     ctaEnabled: true,
     ended: false,
-    heroTagline: "Everything you need to choose the right registration path.",
     formsHeading: "Choose how you\u2019re registering",
-    emptyForms: preparing,
-    availability: {
-      heading: "Registration open",
-      body: remainingSpots === null
-        ? "No event-wide capacity limit is listed."
-        : `${spotsPhrase(remainingSpots)} currently remain.`,
-    },
     showCapacity: true,
   };
 }
@@ -421,17 +366,26 @@ export function formatPublicEventSchedule(
     year: "numeric",
     timeZone,
   });
-  const times = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-    timeZoneName: "short",
-  });
+  const dayKey = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone });
+  const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone });
+  const zoneOf = (date: Date) => new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(date).find((part) => part.type === "timeZoneName")?.value ?? "";
+  const weekday = (date: Date, style: "long" | "short") => new Intl.DateTimeFormat("en-US", { weekday: style, timeZone }).format(date);
+
+  // One day: "Saturday, 9:00 AM \u2013 5:00 PM CST". Several days: "Fri 9:00 AM \u2013 Sun 12:00 PM CST", so the days
+  // always agree with the date range beside it and the zone is stated once (#1205).
+  const startZone = zoneOf(startsAt);
+  const endZone = zoneOf(endsAt);
+  const zones = startZone === endZone ? ` ${endZone}` : "";
+  const startClock = `${clock.format(startsAt)}${zones ? "" : ` ${startZone}`}`;
+  const endClock = `${clock.format(endsAt)}${zones ? "" : ` ${endZone}`}`;
+  const timeLabel = dayKey.format(startsAt) === dayKey.format(endsAt)
+    ? `${weekday(startsAt, "long")}, ${startClock} \u2013 ${endClock}${zones}`
+    : `${weekday(startsAt, "short")} ${startClock} \u2013 ${weekday(endsAt, "short")} ${endClock}${zones}`;
 
   return {
     dateLabel: dates.formatRange(startsAt, endsAt),
-    timeLabel: `${times.format(startsAt)} – ${times.format(endsAt)}`,
+    timeLabel,
   };
 }
 

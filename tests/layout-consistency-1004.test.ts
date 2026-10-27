@@ -95,14 +95,14 @@ describe("orders (#1004 item 7)", () => {
 describe("one hero on the public event page (#1004 item 8)", () => {
   it("does not repeat the event title in the club event header when a banner shows it", () => {
     const header = { eyebrow: "Club event", title: "Synthetic Camporee", tagline: "A weekend away" } as never;
-    const withBanner = renderToStaticMarkup(createElement(AutoEventHeader, { header, titleMode: "hidden" }));
+    const withBanner = renderToStaticMarkup(createElement(AutoEventHeader, { header, dateLabel: "January 1, 2027", titleMode: "hidden" }));
     expect(withBanner).not.toContain("Synthetic Camporee");
     expect(withBanner).not.toContain("<h1");
     expect(withBanner).not.toContain("<h2");
-    const asText = renderToStaticMarkup(createElement(AutoEventHeader, { header, titleMode: "text" }));
+    const asText = renderToStaticMarkup(createElement(AutoEventHeader, { header, dateLabel: "January 1, 2027", titleMode: "text" }));
     expect(asText).toContain('<p class="auto-info-name">Synthetic Camporee</p>');
     expect(asText).not.toContain("<h1");
-    const alone = renderToStaticMarkup(createElement(AutoEventHeader, { header }));
+    const alone = renderToStaticMarkup(createElement(AutoEventHeader, { header, dateLabel: "January 1, 2027" }));
     expect(alone).toContain("<h1 id=\"auto-info-title\">Synthetic Camporee</h1>");
   });
 

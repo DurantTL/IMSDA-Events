@@ -33,18 +33,31 @@ describe("StartAClubCallout (#1014)", () => {
   });
 });
 
+describe("the one-line version (#1204)", () => {
+  const markup = renderToStaticMarkup(createElement(StartAClubCallout, { variant: "line" }));
+
+  it("is one line with a link to the same place, and no heading or button", () => {
+    expect(markup).toContain("Start a new club");
+    expect(markup).toMatch(/<a href="\/clubs\/register">Start a new club<\/a>/);
+    expect(markup).not.toContain("<h2");
+    expect(markup).not.toContain("primary-button");
+  });
+
+  it("has a 44px link and is hidden in print", () => {
+    const css = read("app/globals.css");
+    expect(css).toMatch(/\.start-a-club-line a \{[^}]*min-height: 44px/);
+    expect(css).toMatch(/@media print\s*{[\s\S]*?\.start-a-club-line { display: none; }/);
+  });
+});
+
 describe("pages that show the callout (#1014)", () => {
-  it("home renders it under the action tiles, before the agenda", () => {
+  it("home shows the one-line version at the bottom, after Coming up and the links", () => {
     const source = read("app/page.tsx");
     expect(source).toContain('import { StartAClubCallout } from "@/components/start-a-club-callout"');
-    const nav = source.indexOf("</nav>");
-    const callout = source.indexOf("<StartAClubCallout />");
-    expect(nav).toBeGreaterThan(-1);
-    expect(callout).toBeGreaterThan(nav);
-    expect(callout).toBeLessThan(source.indexOf('aria-labelledby="home-upcoming-heading"'));
-    // Not a fifth tile, and not gated on sign-in.
-    expect(source.slice(source.indexOf('className="home-actions"'), nav)).not.toContain("StartAClubCallout");
-    expect(source.slice(source.indexOf("<StartAClubCallout />") - 80, callout)).not.toContain("session.user &&");
+    const callout = source.indexOf('<StartAClubCallout variant="line" />');
+    expect(callout).toBeGreaterThan(source.indexOf('aria-labelledby="home-upcoming-heading"'));
+    expect(callout).toBeGreaterThan(source.indexOf("</nav>"));
+    expect(source.slice(callout - 80, callout)).not.toContain("session.user &&");
   });
 
   it("Find a club renders it above the club list and drops the old text link", () => {
@@ -56,6 +69,6 @@ describe("pages that show the callout (#1014)", () => {
   });
 
   it("the home page still reaches /clubs by a full page load", () => {
-    expect(read("app/page.tsx")).toMatch(/<a className="home-action" href="\/clubs">/);
+    expect(read("app/page.tsx")).toMatch(/<a href="\/clubs">/);
   });
 });

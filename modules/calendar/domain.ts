@@ -4,6 +4,8 @@
  * them out by calendar date in the conference's time zone.
  */
 
+import { publicStatusLine, type PublicCapacityStatus } from "@/modules/events/public-registration-status";
+
 export const CONFERENCE_TIME_ZONE = "America/Chicago";
 
 export type CalendarItemStatus = "SCHEDULED" | "POSTPONED" | "CANCELLED";
@@ -25,6 +27,13 @@ export type CalendarItem = {
   status: CalendarItemStatus;
   /** Only for events: whether registration is open right now. */
   registrationOpen: boolean;
+  /**
+   * Only for events (#1204): the shared public status behind `registrationOpen`, the date registration opens and
+   * whether the event is for clubs, so every list words the status the same way (`publicStatusLine`).
+   */
+  registrationStatus?: PublicCapacityStatus;
+  registrationOpensOn?: string | null;
+  clubEvent?: boolean;
   /** An office closure ("Conference office closed"), shown with its own label and icon. */
   isClosure?: boolean;
   /**
@@ -35,6 +44,16 @@ export type CalendarItem = {
   /** Set on every occurrence of a repeating entry, so lists can show a series once. */
   seriesId?: string;
 };
+
+/**
+ * The plain-language registration status of an event item ("Registration open", "Registration opens in February"), or
+ * null for anything that is not a registration-taking event. Every list words it with `publicStatusLine` (#1204).
+ */
+export function calendarItemStatusLine(item: CalendarItem, now = new Date()): string | null {
+  if (item.kind !== "EVENT" || item.isClosure || item.status === "CANCELLED") return null;
+  if (!item.registrationStatus) return item.registrationOpen ? "Registration open" : null;
+  return publicStatusLine({ status: item.registrationStatus, opensOn: item.registrationOpensOn, isClubEvent: item.clubEvent }, now);
+}
 
 /** The first occurrence of each repeating entry; one-off items all stay. Items must already be in date order. */
 export function firstPerSeries(items: CalendarItem[]) {

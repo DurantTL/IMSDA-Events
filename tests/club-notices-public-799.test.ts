@@ -145,7 +145,7 @@ describe("the club-director sign-in notice (G8)", () => {
     expect(markup).toContain(CLUB_DIRECTOR_SIGN_IN_BUTTON);
     expect(markup).toContain("<svg");
     // Above the registration options, not buried below them.
-    expect(markup.indexOf("club-director-sign-in-notice")).toBeLessThan(markup.indexOf("registration-options-title"));
+    expect(markup.indexOf("club-director-sign-in-notice")).toBeLessThan(markup.indexOf("public-event-layout"));
   });
 
   it("sits above the form on the public registration page of a club event", async () => {

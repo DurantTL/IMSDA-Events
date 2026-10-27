@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Clock3, DoorClosed, ExternalLink, MapPin } from "lucide-react";
-import { calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
+import { calendarItemStatusLine, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -12,6 +12,7 @@ export function ItemLink({ item, children, className, tabIndex }: { item: Calend
 
 export function AgendaItem({ item }: { item: CalendarItem }) {
   const [, month, day] = item.startsOn.split("-").map(Number);
+  const statusLine = calendarItemStatusLine(item);
   return (
     <li className={`calendar-agenda-item calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}>
       <span className="calendar-date-badge" aria-hidden="true">
@@ -27,7 +28,6 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           )}
           {item.category && <span className="calendar-category-tag">{item.category}</span>}
           {item.status !== "SCHEDULED" && <span className="status-chip coral">{calendarStatusLabels[item.status]}</span>}
-          {item.registrationOpen && <span className="status-chip green">Registration open</span>}
         </div>
         <h3><ItemLink item={item}>{item.title}</ItemLink></h3>
         <p className="calendar-agenda-meta">
@@ -35,6 +35,7 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           {item.timeLabel && <span><Clock3 size={14} aria-hidden="true" /> {item.timeLabel}</span>}
           {item.location && <span><MapPin size={14} aria-hidden="true" /> {item.location}</span>}
         </p>
+        {statusLine && <p className={`calendar-agenda-status${item.registrationOpen ? " is-open" : ""}`}>{statusLine}</p>}
         {item.description && <p className="calendar-agenda-description">{item.description}</p>}
       </div>
       {item.href && item.status !== "CANCELLED" && (
@@ -42,7 +43,7 @@ export function AgendaItem({ item }: { item: CalendarItem }) {
           className={`${item.registrationOpen ? "primary-button" : "secondary-button"} calendar-agenda-action`}
           item={item}
         >
-          {item.kind === "EVENT" ? (item.registrationOpen ? "Register" : "Details") : "More info"}
+          {item.kind === "EVENT" ? (item.registrationOpen ? (item.registrationStatus === "WAITLIST" ? "Join the waitlist" : "Register") : "Details") : "More info"}
           {item.href.startsWith("/") ? <ChevronRight size={14} aria-hidden="true" /> : <ExternalLink size={14} aria-hidden="true" />}
         </ItemLink>
       )}

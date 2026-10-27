@@ -1,3 +1,4 @@
+import { EventWhenWhere } from "@/components/event-when-where";
 import { formatCardMoney, type EventInfoCards } from "@/modules/event-info-cards/domain";
 
 /**
@@ -7,8 +8,9 @@ import { formatCardMoney, type EventInfoCards } from "@/modules/event-info-cards
 
 export function AutoEventHeader({
   header,
+  dateLabel,
   timeLabel,
-  introLine,
+  location,
   titleMode = "h1",
 }: {
   /**
@@ -17,20 +19,18 @@ export function AutoEventHeader({
    */
   titleMode?: "h1" | "hidden" | "text";
   header: EventInfoCards["header"];
-  /** Time range line, e.g. "Friday, 4:00 PM CDT – Sunday, 12:00 PM CDT". */
+  /** The When / Where summary under the title (#1205): the date range, the time range ("Fri 4:00 PM – Sun 12:00 PM CDT") and the place. */
+  dateLabel: string;
   timeLabel?: string;
-  /** The lifecycle sentence that used to sit under the title. */
-  introLine?: string;
+  location?: string | null;
 }) {
   return (
     <section className="auto-info-header" {...(titleMode === "h1" ? { "aria-labelledby": "auto-info-title" } : { "aria-label": "Event details" })}>
       <p className="public-registration-eyebrow">{header.eyebrow}</p>
       {titleMode === "h1" ? <h1 id="auto-info-title">{header.title}</h1> : titleMode === "text" ? <p className="auto-info-name">{header.title}</p> : null}
       {header.tagline && <p className="auto-info-tagline">{header.tagline}</p>}
-      {header.meta && <p className="auto-info-meta">{header.meta}</p>}
-      {timeLabel && <p className="auto-info-meta">{timeLabel}</p>}
+      <EventWhenWhere dateLabel={dateLabel} timeLabel={timeLabel} location={location} />
       {header.subtitle && <p className="auto-info-subtitle">{header.subtitle}</p>}
-      {introLine && <p className="auto-info-subtitle">{introLine}</p>}
     </section>
   );
 }

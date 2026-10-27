@@ -8575,6 +8575,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 }
 @media print {
   .start-a-club-callout { display: none; }
+  .start-a-club-line { display: none; }
 }
 .home-more a { display: inline-flex; align-items: center; min-height: 44px; }
 .home-more { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.82rem); font-weight: 700; }
@@ -11023,7 +11024,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .club-director-notice-copy > * { margin: 0; }
 .club-director-notice-copy > * + * { margin-top: 4px; }
 .club-director-notice-eyebrow { font-size: max(var(--type-staff-floor, 0px), 0.8rem); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-.club-director-notice h2 { font-size: 1.2rem; line-height: 1.25; }
+.club-director-notice h2, .club-director-notice-title { font-size: 1.2rem; line-height: 1.25; }
 .club-director-notice-button { flex: none; min-height: var(--target-cta, 48px); text-decoration: none; }
 @media (max-width: 560px) { .club-director-notice-button { width: 100%; justify-content: center; } }
 
@@ -12989,6 +12990,74 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .mobile-nav.mobile-nav-scroll::-webkit-scrollbar { display: none; }
   .mobile-nav.mobile-nav-scroll a { flex: 0 0 auto; min-width: 84px; min-height: 52px; padding-inline: 8px; }
 }
+
+/* Public homepage (#1204) and event page status (#1205). Solid navy, no gradient or glass; body text 1rem, labels 0.875rem,
+   taps 44px, visible focus. Scoped to the two pages so the calendar and the event heroes keep their own look. */
+.public-home-page .public-home-banner {
+  min-height: 0; margin: 16px auto 18px; border-radius: 16px; background: var(--imsda-navy); box-shadow: none; padding: 20px 24px;
+}
+.public-home-page .public-home-banner::after { display: none; }
+.public-home-page .public-home-banner h1 { max-width: none; margin: 2px 0 0; font-size: clamp(1.6rem, 6vw, 2.25rem); line-height: 1.15; letter-spacing: 0; }
+.public-home-page .public-home-banner .public-registration-eyebrow { margin: 0; font-size: 0.875rem; letter-spacing: 0.08em; }
+@media (max-width: 580px) {
+  .public-home-page .public-home-banner { margin: 12px 12px 14px; padding: 16px 18px; }
+}
+.public-home-page .calendar-layout { gap: 20px; }
+.public-home-page .calendar-agenda > h2 { margin: 0; font-size: 1.25rem; }
+.public-home-page .calendar-agenda-body h3 { font-size: 1.125rem; }
+.public-home-page .calendar-agenda-meta { font-size: 1rem; }
+.public-home-page .calendar-kind-label { font-size: 0.875rem; }
+.calendar-agenda-status { margin: 0; color: var(--muted); font-size: 1rem; font-weight: 700; }
+.calendar-agenda-status.is-open { color: var(--green); }
+.public-home-page .home-more { margin: 4px 0 0; font-size: 1rem; }
+.home-calendar-button { min-height: 48px; gap: 8px; padding: 12px 22px; text-decoration: none; }
+@media (max-width: 580px) {
+  .home-calendar-button { width: 100%; justify-content: center; }
+}
+.home-links { border-top: 1px solid var(--line); }
+.home-links ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.home-links li { border-bottom: 1px solid var(--line); }
+.home-links a {
+  display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px;
+  color: var(--ink); font-size: 1rem; text-decoration: none;
+}
+.home-links a > span { display: grid; gap: 2px; min-width: 0; }
+.home-links a strong { font-weight: 700; }
+.home-links a small { color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.home-links a > svg { flex: 0 0 auto; color: var(--imsda-navy); }
+.home-links a:focus-visible, .start-a-club-line a:focus-visible, .home-calendar-button:focus-visible, .public-event-status-block a:focus-visible {
+  outline: 3px solid var(--imsda-purple); outline-offset: 2px;
+}
+.start-a-club-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; color: var(--muted); font-size: 1rem; }
+.start-a-club-line a { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
+
+/* One status block on the event page (#1205): one message, one supporting line, at most one primary action. */
+.public-event-status-block {
+  display: grid; gap: 8px; border: 1px solid var(--line); border-left: 6px solid var(--green); border-radius: 12px; background: #fff; padding: 18px 20px;
+}
+.public-event-status-block.is-upcoming { border-left-color: var(--imsda-gold); }
+.public-event-status-block.is-waitlist { border-left-color: var(--imsda-purple); }
+.public-event-status-block.is-full, .public-event-status-block.is-closed { border-left-color: var(--coral); }
+.public-event-status-block h2 { margin: 0; color: var(--ink); font-size: 1.35rem; line-height: 1.25; }
+.public-event-status-block > p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.5; }
+.public-event-status-action { width: fit-content; min-height: 48px; gap: 8px; padding: 12px 22px; text-decoration: none; }
+@media (max-width: 580px) {
+  .public-event-status-action { width: 100%; justify-content: center; }
+}
+.public-event-layout.is-single { grid-template-columns: minmax(0, 1fr); padding-bottom: 24px; }
+.public-event-paths-heading { margin: 0; color: var(--ink); font-size: 1.35rem; }
+/* When / Where under the title, in all three header variants. */
+.public-event-summary { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 1rem; }
+.public-event-summary li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.public-event-summary svg { flex: 0 0 auto; margin-top: 3px; }
+.public-event-summary strong { font-weight: 800; }
+.public-event-hero .public-event-summary { color: #fff; }
+.public-event-hero .public-event-summary svg { color: #f9d678; }
+.public-event-facts .public-event-summary svg, .auto-info-header .public-event-summary svg { color: var(--imsda-purple); }
+.public-event-help-section { display: grid; gap: 6px; margin: 8px 0 40px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 1rem; }
+.public-event-help-section h2 { margin: 0; color: var(--ink); font-size: 1.125rem; }
+.public-event-help-section p { margin: 0; line-height: 1.5; }
+.public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
