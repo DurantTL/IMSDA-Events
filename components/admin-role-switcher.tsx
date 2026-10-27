@@ -5,13 +5,18 @@ import {
   type AdminRoleCounts,
 } from "@/modules/access/admin-roles-domain";
 
-export const ADMIN_ROLE_ENDPOINT = "/api/staff/admin-role";
+/** Where a pill goes: a GET route outside /api (`app/(workspace)/admin-role/[role]/route.ts`). */
+export function adminRoleSwitchHref(role: AdminRole): string {
+  return `/admin-role/${role}`;
+}
 
 /**
  * The admin role switcher (#1225): one pill per admin role the person holds,
- * the showing one highlighted, each with the count waiting in that role. A real
- * form with real buttons, so it works by keyboard and without scripts. It only
- * changes the view: server gates never read the choice.
+ * the showing one highlighted, each with the count waiting in that role. Plain
+ * links, so they work by keyboard and without scripts. Not next/link: the GET
+ * sets the view cookie, so it must never be prefetched. A form POST to /api
+ * drew a Cloudflare challenge on every click. It only changes the view: server
+ * gates never read the choice.
  */
 export function AdminRoleSwitcher({
   held,
@@ -26,17 +31,15 @@ export function AdminRoleSwitcher({
   const note = adminRoleSwitchNote(held);
   return (
     <section className="admin-role-bar" aria-label="Admin role">
-      <form action={ADMIN_ROLE_ENDPOINT} className="admin-role-pills" method="post">
+      <div className="admin-role-pills">
         {held.map((role) => {
           const count = counts[role];
           return (
-            <button
-              aria-pressed={role === active}
+            <a
+              aria-current={role === active ? "page" : undefined}
               className="admin-role-pill"
+              href={adminRoleSwitchHref(role)}
               key={role}
-              name="role"
-              type="submit"
-              value={role}
             >
               <span>{ADMIN_ROLE_LABELS[role]}</span>
               {typeof count === "number" && count > 0 && (
@@ -45,10 +48,10 @@ export function AdminRoleSwitcher({
                   <span className="sr-only">{count} waiting</span>
                 </>
               )}
-            </button>
+            </a>
           );
         })}
-      </form>
+      </div>
       {note && <p className="admin-role-note">{note}</p>}
     </section>
   );

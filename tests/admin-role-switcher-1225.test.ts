@@ -6,21 +6,25 @@ import { describe, expect, it } from "vitest";
 import { AdminRoleSwitcher } from "@/components/admin-role-switcher";
 import { clubsAdminActiveHref, clubsAdminNavigation } from "@/components/staff-navigation";
 
-/** #1225: the switcher shows only the roles held, marks the current one, and is a real form with real buttons. */
+/** #1225: the switcher shows only the roles held, marks the current one, and is plain links (no /api form POST). */
 
 const render = (props: Parameters<typeof AdminRoleSwitcher>[0]) => renderToStaticMarkup(createElement(AdminRoleSwitcher, props));
 
 describe("AdminRoleSwitcher", () => {
-  it("shows only the roles held, in order, as submit buttons, with the current one pressed", () => {
+  it("shows only the roles held, in order, as plain links, with the current one marked as the page", () => {
     const html = render({ held: ["EVENTS_ADMIN", "CLUBS_ADMIN"], active: "CLUBS_ADMIN", counts: { CLUBS_ADMIN: 3 } });
     expect(html).toContain("Events Administrator");
     expect(html).toContain("Clubs Administrator");
     expect(html).not.toContain("System Administrator");
-    expect(html.match(/type="submit"/g)).toHaveLength(2);
-    expect(html).toMatch(/aria-pressed="true"[^>]*name="role"[^>]*value="CLUBS_ADMIN"|value="CLUBS_ADMIN"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*value="CLUBS_ADMIN"/);
-    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
-    expect(html).toContain('method="post"');
-    expect(html).toContain('action="/api/staff/admin-role"');
+    expect(html.match(/<a /g)).toHaveLength(2);
+    expect(html.indexOf('href="/admin-role/EVENTS_ADMIN"')).toBeLessThan(html.indexOf('href="/admin-role/CLUBS_ADMIN"'));
+    expect(html).toMatch(/<a aria-current="page" class="admin-role-pill" href="\/admin-role\/CLUBS_ADMIN">/);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    // No form, no button, nothing posting to /api: Cloudflare challenged that on every click.
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("/api/");
+    expect(html).not.toContain("aria-pressed");
   });
 
   it("says how many roles are held when there is a choice, and counts what is waiting", () => {
@@ -73,6 +77,8 @@ describe("the switcher styles", () => {
     expect(block).toMatch(/\.admin-role-pill \{[^}]*min-height: 44px/);
     expect(block).toMatch(/\.admin-role-pill \{[^}]*font-size: max\(var\(--type-staff-floor, 0px\), 0\.875rem\)/);
     expect(block).toMatch(/\.admin-role-pills \{[^}]*flex-wrap: wrap/);
+    expect(block).toMatch(/\.admin-role-pill \{[^}]*text-decoration: none/);
+    expect(block).toContain('.admin-role-pill[aria-current="page"]');
     expect(block).not.toContain(":hover");
   });
 });
