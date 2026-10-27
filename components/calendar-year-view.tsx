@@ -102,6 +102,7 @@ export function CalendarYearView({
                       key={day.date}
                     >
                       <span className="calendar-year-number">{day.day}</span>
+                      {day.marks.every((mark) => mark.shape !== "overflow") && day.count > day.marks.length && <span aria-hidden="true" className="calendar-year-more">+</span>}
                       <Marks day={day} />
                     </CalendarDayLink>
                   );
@@ -148,7 +149,7 @@ export function CalendarYearView({
               : `${calendarItemCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)} in ${scope}.`}
           </p>
           {selectedItems.length > 0 && (
-            <ul className="calendar-panel-list" key={selectedDate}>
+            <ul className="calendar-panel-list" key={`list-${selectedDate}`}>
               {selectedItems.map((item, index) => <CalendarPanelItem index={index} item={item} key={item.key} toneMap={toneMap} />)}
             </ul>
           )}
@@ -166,7 +167,7 @@ export function CalendarYearView({
             <p className="calendar-empty">Nothing is on the calendar for {year.year} in {scope}.</p>
           ) : (
             <>
-              <p className="calendar-day-prompt">{calendarItemCountLabel(yearItems.length)} in {scope}. Select a marked day to see only that day.</p>
+              <p className="calendar-day-prompt">{calendarItemCountLabel(yearItems.length)} in {scope}.<span className="calendar-year-day-hint"> Select a marked day to see only that day.</span></p>
               <ul className="calendar-panel-list">
                 {preview.map((item, index) => <CalendarPanelItem index={index} item={item} key={item.key} toneMap={toneMap} />)}
               </ul>

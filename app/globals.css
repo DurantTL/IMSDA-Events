@@ -13294,6 +13294,8 @@ html:has(.calendar-sticky-bar) { scroll-padding-top: calc(var(--calendar-bar-hei
 a.calendar-year-day:hover { background: #eef3f6; }
 a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
 .calendar-year-marks { display: grid; gap: 3px; width: 100%; }
+.calendar-year-day.has-items { position: relative; }
+.calendar-year-more { position: absolute; top: 2px; right: 4px; color: var(--imsda-navy); font-size: 0.875rem; font-weight: 800; line-height: 1; }
 .calendar-year-mark { display: block; height: 8px; background: var(--cal-edge); }
 .calendar-year-mark.is-empty { background: none; }
 .calendar-year-mark.is-dot, .calendar-year-mark.is-overflow { width: 8px; margin: 0 auto; border-radius: 50%; }
@@ -13315,7 +13317,23 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .calendar-year-slot.is-overflow { background: #5b6b75; }
 .calendar-year-row-items { display: grid; gap: 2px; font-size: 1rem; line-height: 1.4; }
 .calendar-year-row-more, .calendar-year-row-none { color: var(--muted); }
+/* Three 44px-cell months need about 1000px, so the panel sits under the year until the page is wide enough for both side by side. */
+.calendar-layout:has(.calendar-year-board) { max-width: 1440px; }
+.calendar-year-board .calendar-key { order: 1; grid-column: auto; grid-row: auto; }
+.calendar-year-board .calendar-side { order: 2; grid-column: auto; grid-row: auto; position: static; max-height: none; overflow: visible; }
+@media (min-width: 1001px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1500px) {
+  .calendar-year-board { grid-template-columns: minmax(0, 1fr) 320px; }
+  .calendar-year-board .calendar-key { order: 0; grid-column: 1; grid-row: 2; }
+  .calendar-year-board .calendar-side { order: 0; grid-column: 2; grid-row: 1 / span 2; position: sticky; top: calc(var(--calendar-bar-height) + 12px); max-height: calc(100vh - var(--calendar-bar-height) - 28px); overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (min-width: 1229px) and (max-width: 1488px) {
+  .calendar-layout:has(.calendar-year-board) { margin-right: 24px; margin-left: 24px; }
+}
 @media (max-width: 899px) {
+  .calendar-year-day-hint { display: none; }
   .calendar-year-grid { display: none; }
   .calendar-year-rows { display: grid; }
 }

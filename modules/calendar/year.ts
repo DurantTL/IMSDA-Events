@@ -101,7 +101,7 @@ export function buildCalendarYear(year: number, items: CalendarItem[], toneMap: 
   });
   const indexOf = (date: string) => Math.round((Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) - yearStart) / dayMs);
 
-  const inYear = items.filter((item) => item.startsOn <= last && item.endsOn >= first);
+  const inYear = items.filter((item) => item.startsOn <= item.endsOn && item.startsOn <= last && item.endsOn >= first);
   // Lanes: earliest start first, longer first, so a multi-day item takes lane 0 before a short one that starts the same day.
   const ordered = [...inYear].sort((a, b) =>
     a.startsOn.localeCompare(b.startsOn) || b.endsOn.localeCompare(a.endsOn) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));

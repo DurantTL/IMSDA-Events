@@ -11,6 +11,9 @@ const make = (key: string, startsOn: string, endsOn: string, overrides: Partial<
 const items = [
   make("camp", "2027-03-06", "2027-03-06", { title: "Synthetic Camp Day" }),
   make("retreat", "2027-03-06", "2027-03-08", { title: "Synthetic Retreat", category: "Ministries" }),
+  make("busy-long", "2028-03-01", "2028-03-10", { title: "Synthetic Busy Break" }),
+  make("busy-a", "2028-03-04", "2028-03-04", { title: "Synthetic Busy A" }),
+  make("busy-b", "2028-03-04", "2028-03-04", { title: "Synthetic Busy B" }),
   make("pathfinders", "2027-04-10", "2027-04-10", { title: "Synthetic Pathfinder Day", category: "Pathfinders" }),
   make("school", "2027-03-29", "2027-04-02", { title: "Synthetic Spring Break", category: "Schools" }),
   make("closed", "2027-05-31", "2027-05-31", { title: "Synthetic Office closed", isClosure: true, category: "Office closure" }),
@@ -150,5 +153,12 @@ describe("public calendar Year view render (#1250)", () => {
   it("keeps the year in the chips", async () => {
     const markup = await render({ view: "year", year: "2027", date: "2027-03-06" });
     expect(markup).toContain('href="/calendar?view=year&amp;year=2027&amp;filter=club&amp;date=2027-03-06"');
+  });
+
+  it("adds a + to a day whose items outnumber its two marks", async () => {
+    const markup = grid(await render({ view: "year", year: "2028" }));
+    const day = (label: string) => markup.slice(markup.indexOf(label), markup.indexOf("</a>", markup.indexOf(label)));
+    expect(day('aria-label="Saturday, March 4, 2028, 3 items"')).toContain('class="calendar-year-more"');
+    expect(day('aria-label="Friday, March 3, 2028, 1 item"')).not.toContain("calendar-year-more");
   });
 });
