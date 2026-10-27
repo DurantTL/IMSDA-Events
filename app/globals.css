@@ -13514,6 +13514,14 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
 
+/* Public page and links overview (#448): the short read-only summary at the top of Step 3. */
+.public-page-overview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
+.public-page-overview > div { display: grid; gap: 2px; }
+.public-page-overview dt { font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.public-page-overview dd { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.public-page-overview dd small { display: block; margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.public-page-overview a { display: inline-flex; align-items: center; min-height: 44px; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

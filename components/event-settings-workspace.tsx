@@ -22,6 +22,7 @@ import { RadioCardGroup } from "@/components/radio-card-group";
 import { EventLocationsPanel } from "@/components/event-locations-panel";
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
 import type { EventSettingsRecord } from "@/modules/events/repository";
+import { getPublicPageOverview } from "@/modules/events/public-page-overview";
 import {
   eventKindFromAudience,
   resolveSectionPlacement,
@@ -205,6 +206,21 @@ export function EventSettingsWorkspace({
   // `unpublish()` below.
   const [published, setPublished] = useState(initialEvent?.isPublished ?? false);
   const [publishing, setPublishing] = useState(false);
+  const publicPageOverview = useMemo(
+    () =>
+      mode === "edit" && initialEvent
+        ? getPublicPageOverview({
+            mode: "edit",
+            eventId: initialEvent.id,
+            published,
+            archivedAt: initialEvent.archivedAt,
+            savedSlug: savedDraft.slug,
+            typedSlug: draft.slug,
+            showOnCalendar: initialEvent.showOnCalendar,
+          })
+        : getPublicPageOverview({ mode: "create", typedSlug: draft.slug, showOnCalendar }),
+    [mode, initialEvent, published, savedDraft.slug, draft.slug, showOnCalendar],
+  );
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -1038,10 +1054,38 @@ export function EventSettingsWorkspace({
             blockId="public-info"
             onOpenChange={(open) => setBlockOpen("public-info", open)}
             open={openBlocks["public-info"] ?? false}
-            summary={blockSummary("public-info", draft)}
+            summary={blockSummary("public-info", draft, { publicState: publicPageOverview.isPublic ? "Public" : "Not public yet" })}
             title={settingsBlockTitles["public-info"]}
           >
-            <p className="settings-block-intro">Event information lives on IMSDA Events. Link an IMSDA.org page too only if one still exists for this event.</p>
+            <p className="settings-block-intro">This event&rsquo;s public information lives on IMSDA Events. Link an IMSDA.org page too only if one still exists for this event.</p>
+            {publicPageOverview && (
+              <dl className="public-page-overview" aria-label="Public page and links">
+                <div>
+                  <dt>{publicPageOverview.status.label}</dt>
+                  <dd>{publicPageOverview.status.text}</dd>
+                </div>
+                <div>
+                  <dt>{publicPageOverview.page.label}</dt>
+                  <dd>
+                    {publicPageOverview.page.path === null ? null : publicPageOverview.page.href ? (
+                      <a href={publicPageOverview.page.href} target="_blank" rel="noreferrer">{publicPageOverview.page.path}</a>
+                    ) : (
+                      <span>{publicPageOverview.page.path}</span>
+                    )}
+                    {publicPageOverview.page.note && <small>{publicPageOverview.page.note}</small>}
+                    {publicPageOverview.page.addressNote && <small role="status">{publicPageOverview.page.addressNote}</small>}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{publicPageOverview.calendar.label}</dt>
+                  <dd>
+                    {publicPageOverview.calendar.text}
+                    {publicPageOverview.calendar.note && <small>{publicPageOverview.calendar.note}</small>}
+                    {publicPageOverview.calendar.href && <Link href={publicPageOverview.calendar.href}>{publicPageOverview.calendar.linkLabel}</Link>}
+                  </dd>
+                </div>
+              </dl>
+            )}
             <label>
               IMSDA.org event page (optional)
               <input id={settingsFieldDomId("publicInfoUrl")} {...fieldAria("publicInfoUrl")} type="url" value={draft.publicInfoUrl ?? ""} maxLength={500} placeholder="https://imsda.org/event/your-event/" onChange={(event) => update("publicInfoUrl", event.target.value || null)} />
