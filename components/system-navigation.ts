@@ -114,7 +114,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/calendar", label: "Manage public calendar", description: "Add, edit and publish the calendar visitors see. Same page as creating an event from a calendar item.", icon: CalendarDays },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
       { href: "/admin/email", label: "Email", description: "The central sender, paused events, staff alerts, and email health.", icon: Bell, alsoActiveFor: ["/admin/notifications"] },
-      { href: "/admin/settings", label: "Platform settings", description: "Sign-in, email and payment settings.", icon: CloudCog },
+      { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
     ],
   },

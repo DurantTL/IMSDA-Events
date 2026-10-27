@@ -4,7 +4,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import {
   getPlatformSettings,
   PlatformSettingsError,
-  platformSettingsInputSchema,
+  platformSettingsRequestSchema,
   updatePlatformSettings,
 } from "@/modules/system-admin/platform-settings";
 import { logError } from "@/lib/logger";
@@ -44,7 +44,7 @@ async function patchHandler(request: Request) {
   const user = await requireSystemAdmin();
   if (!user) return forbidden();
   try {
-    const input = platformSettingsInputSchema.parse(await request.json());
+    const input = platformSettingsRequestSchema.parse(await request.json());
     return Response.json({ settings: await updatePlatformSettings(input, user.id) });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -55,6 +55,12 @@ async function patchHandler(request: Request) {
           issues: error.issues,
         },
         { status: 400 },
+      );
+    }
+    if (error instanceof PlatformSettingsError && error.code === "PLATFORM_SETTINGS_CONFLICT") {
+      return Response.json(
+        { error: error.code, message: error.message, fields: error.fields, settings: await getPlatformSettings() },
+        { status: 409 },
       );
     }
     if (error instanceof PlatformSettingsError) {

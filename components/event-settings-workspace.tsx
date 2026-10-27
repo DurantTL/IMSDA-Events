@@ -87,6 +87,8 @@ type EventSettingsWorkspaceProps = {
   areaCoordinators?: ActiveAreaCoordinator[];
   /** Whether to offer Delete event: system administrators only. The server decides again. */
   canDeleteEvent?: boolean;
+  /** Show the link to platform-wide settings; only a system administrator can open that page. */
+  canOpenPlatformSettings?: boolean;
   /** Create mode, opened from a calendar item (#445): what the form starts with. The item's id travels with the save. */
   calendarPrefill?: CalendarPrefill;
   /** Whether to offer Archive / Unarchive: system administrators and the event's Event Admin (#635). The server decides again. */
@@ -145,6 +147,7 @@ export function EventSettingsWorkspace({
   initialLocations,
   areaCoordinators,
   canDeleteEvent = false,
+  canOpenPlatformSettings = false,
   calendarPrefill,
   canArchiveEvent = false,
 }: EventSettingsWorkspaceProps) {
@@ -725,6 +728,14 @@ export function EventSettingsWorkspace({
     <section className="page-stack event-settings-workspace">
       {mode === "edit" && initialEvent && (
         <DraftCreatedGuideBanner eventId={initialEvent.id} />
+      )}
+      {mode === "edit" && (
+        <p className="settings-scope-note">
+          These settings apply to this event only.
+          {canOpenPlatformSettings && (
+            <> Platform-wide defaults live on <Link className="text-button" href="/admin/settings">Platform settings</Link>.</>
+          )}
+        </p>
       )}
       <div className="page-intro">
         <div>

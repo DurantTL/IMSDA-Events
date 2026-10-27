@@ -62,6 +62,15 @@ export const platformSettingsInputSchema = z.object({
 export type PlatformSettingsInput = z.infer<typeof platformSettingsInputSchema>;
 
 /**
+ * What the form sent: the settings plus, optionally, the values the page loaded (#1076). When present, a save is refused if
+ * any of those fields has changed in the database since, so one administrator cannot silently overwrite another's edit.
+ * Compared field by field rather than by `updatedAt`, because the Email page and the sign-in switch write the same row.
+ */
+export const platformSettingsRequestSchema = platformSettingsInputSchema.extend({
+  baseline: z.record(z.string(), z.string()).optional(),
+}).strict();
+
+/**
  * The three addresses automatic alerts are sent to (#1016). They are edited on
  * System management > Notifications and nowhere else, so the platform settings
  * form above cannot clear them by leaving them out of its request.
@@ -128,8 +137,10 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
 
 export class PlatformSettingsError extends Error {
   constructor(
-    public readonly code: "PASSKEY_ONLY_STAFF_WOULD_BE_LOCKED_OUT" | "INVALID_SETTING",
+    public readonly code: "PASSKEY_ONLY_STAFF_WOULD_BE_LOCKED_OUT" | "INVALID_SETTING" | "PLATFORM_SETTINGS_CONFLICT",
     message: string,
+    /** The form fields someone else changed, for `PLATFORM_SETTINGS_CONFLICT`. */
+    public readonly fields: string[] = [],
   ) {
     super(message);
     this.name = "PlatformSettingsError";
@@ -159,16 +170,42 @@ async function countPasskeyOnlyStaff(tx: Pick<ReturnType<typeof getPrisma>, "use
   });
 }
 
+const BASELINE_FIELDS = [
+  "organizationName",
+  "logoUrl",
+  "publicWebsiteUrl",
+  "defaultTimezone",
+  "defaultAttendeeEditPolicy",
+  "passkeyRpId",
+  "invoiceHeaderDepartment",
+  "invoiceHeaderOrganization",
+  "invoiceHeaderAddress",
+  "invoiceHeaderPhone",
+] as const;
+
 export async function updatePlatformSettings(
-  rawInput: PlatformSettingsInput,
+  rawInput: PlatformSettingsInput & { baseline?: Record<string, string> },
   actorUserId: string,
 ): Promise<PlatformSettingsRecord> {
   const prisma = getPrisma();
-  let input = rawInput;
+  const { baseline, ...rest } = rawInput;
+  let input: PlatformSettingsInput = rest;
   await prisma.$transaction(async (tx) => {
     const before = await tx.platformSettings.findUnique({
       where: { id: PLATFORM_SETTINGS_ID },
     });
+    if (baseline && before) {
+      const changed = BASELINE_FIELDS.filter((key) => (
+        key in baseline && String(before[key] ?? "") !== baseline[key]
+      ));
+      if (changed.length > 0) {
+        throw new PlatformSettingsError(
+          "PLATFORM_SETTINGS_CONFLICT",
+          "Someone else saved platform settings since you opened this page.",
+          [...changed],
+        );
+      }
+    }
     // The invoice phone must pass the shared check unless it is the phone already stored (#1193), decided here from the
     // stored row. Valid phones are stored in one form. The message never carries the phone.
     if (input.invoiceHeaderPhone) {
