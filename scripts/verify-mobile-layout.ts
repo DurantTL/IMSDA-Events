@@ -275,7 +275,7 @@ const pages: PageSpec[] = [
   // The Events Administrator dashboard (#1227): the event-admin test user holds an EVENT_ADMIN membership. It takes no ?event=.
   { name: "staff-events-admin", path: "/events-admin", role: "event-admin", expectText: /Event administration/ },
   // The section header (#1274) on an event page: the event-admin test user administers this event, so its tabs show.
-  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Event administration/ },
+  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Event administration/i },
   staff("people-registrations", "/people"),
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),

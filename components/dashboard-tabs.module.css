@@ -1,4 +1,9 @@
 /* Top tabs on the admin dashboards (#1227, #1228) and the section header (#1274). They wrap on wider screens; on a phone the row scrolls sideways inside itself, so the page never does. */
+.tabs {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .tabs ul {
   display: flex;
   flex-wrap: wrap;

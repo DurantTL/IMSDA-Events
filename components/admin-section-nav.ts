@@ -49,10 +49,6 @@ const clubsCapablePatterns: readonly RegExp[] = [
   /^\/admin\/organizations\/[^/]+\/(club|honors|directors|profile)(\/|$)/,
 ];
 
-export function isEventPagePath(pathname: string): boolean {
-  return pathname === "/events-admin" || eventPagePaths.includes(pathname);
-}
-
 /**
  * Which section header a page shows, or null for none.
  * - The three dashboards always show their own header.
@@ -94,6 +90,8 @@ function systemAreaKey(pathname: string): string | null {
   if (group) return systemGroupTab[group.key];
   // Club pages with no System sidebar item (the club dashboard, imports, a club's own pages) belong to Clubs.
   if (pathname === "/admin/clubs" || pathname.startsWith("/admin/clubs/") || pathname.startsWith("/admin/organizations")) return "clubs";
+  // Feature requests are not in the sidebar; they sit with the platform settings.
+  if (pathname === "/admin/feature-requests") return "settings";
   return null;
 }
 
@@ -116,7 +114,7 @@ function clubsAreaKey(pathname: string): string | null {
   return null;
 }
 
-const eventsAreaKeys: Record<string, string> = { "/overview": "my-events", "/finance": "overview" };
+const eventsAreaKeys: Record<string, string> = { "/overview": "my-events" };
 
 function eventsAreaKey(pathname: string): string | null {
   return eventsAreaKeys[pathname] ?? null;

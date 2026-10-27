@@ -25,9 +25,11 @@ export default async function StaffChurchLocationPage({
   const { organizationId } = await params;
   const location = await getChurchLocation(organizationId);
   if (!location) notFound();
+  // The header is told which page this is; it is a pathname for choosing tabs, not a link to the page (#542).
+  const headerPath = ["/admin/organizations", organizationId, "location"].join("/");
   return (
     <section className="page-stack">
-      <AdminSectionHeaderFor path={`/admin/organizations/${organizationId}/location`} section="system" />
+      <AdminSectionHeaderFor path={headerPath} section="system" />
       <ChurchLocationForm
         endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/location`}
         initialLocation={location}

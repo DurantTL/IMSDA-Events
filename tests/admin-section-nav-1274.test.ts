@@ -95,7 +95,7 @@ describe("System tabs", () => {
     expect(marked(nav("system", "/admin/settings").tabs)).toEqual([["settings", "page"]]);
     expect(marked(nav("system", "/admin/master-award-rules").tabs)).toEqual([["settings", "true"]]);
     expect(marked(nav("system", "/admin/email").tabs)).toEqual([["settings", "true"]]);
-    expect(marked(nav("system", "/admin/feature-requests").tabs)).toEqual([]);
+    expect(marked(nav("system", "/admin/feature-requests").tabs)).toEqual([["settings", "true"]]);
   });
 });
 
@@ -143,14 +143,14 @@ describe("Events tabs", () => {
     expect(nav("events", "/events-admin", { eventId: "event_two" }).tabs[1].href).toBe("#your-events");
   });
 
-  it("marks the page's own tab, and Overview and My events as the area of the dashboard pages", () => {
+  it("marks the page's own tab, and My events for the dashboard page", () => {
     expect(marked(nav("events", "/events-admin").tabs)).toEqual([["overview", "page"]]);
     expect(marked(nav("events", "/people").tabs)).toEqual([["registrations", "page"]]);
     expect(marked(nav("events", "/more/event-content").tabs)).toEqual([["schedule", "page"]]);
     expect(marked(nav("events", "/more/kitchen-report").tabs)).toEqual([["kitchen", "page"]]);
     expect(marked(nav("events", "/communications").tabs)).toEqual([["messages", "page"]]);
     expect(marked(nav("events", "/overview").tabs)).toEqual([["my-events", "true"]]);
-    expect(marked(nav("events", "/finance").tabs)).toEqual([["overview", "true"]]);
+    expect(marked(nav("events", "/finance").tabs)).toEqual([]);
   });
 
   it("draws no back link on an event page", () => {
