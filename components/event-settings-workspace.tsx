@@ -51,6 +51,16 @@ import {
   publicEventPath,
   shareAddressDiffers,
 } from "@/modules/events/share-links";
+import { classifySettingsSaveFailure, settingsSaveState } from "@/components/settings-save-state";
+import {
+  attendeeEditPolicyOwnership,
+  emailDisplayNameOwnership,
+  emailReplyToOwnership,
+  timezoneOwnership,
+  type EventEmailSender,
+  type EventPlatformDefaults,
+  type SettingOwnership,
+} from "@/modules/events/settings-ownership";
 import { setEventSettingsDirty } from "@/components/event-settings-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -69,7 +79,6 @@ import {
   blockSummary,
   fieldErrorsFromIssues,
   firstFieldWithError,
-  saveStatusLabel,
   settingsBlockDomId,
   settingsBlockIds,
   effectiveBlockForField,
@@ -98,7 +107,23 @@ type EventSettingsWorkspaceProps = {
   calendarPrefill?: CalendarPrefill;
   /** Whether to offer Archive / Unarchive: system administrators and the event's Event Admin (#635). The server decides again. */
   canArchiveEvent?: boolean;
+  /** Edit mode: the Platform settings defaults a new event is seeded from, to label timezone and edit verification (#1258). */
+  platformDefaults?: EventPlatformDefaults;
+  /** Edit mode: the event's email sender against the central one, to label display name and reply-to (#1258). */
+  emailSender?: EventEmailSender;
 };
+
+/** The code `PATCH /api/events/{id}` answers 409 with when the dates changed after the page opened (#445): the stale write. */
+const eventConflictCodes = ["EVENT_CHANGED"] as const;
+
+/** A per-field ownership label (#1258): the badge and one sentence, text so it never depends on colour. */
+function OwnershipNote({ ownership, id }: { ownership: SettingOwnership; id?: string }) {
+  return (
+    <small className="settings-ownership-note" data-ownership={ownership.source} id={id}>
+      <strong>{ownership.label}.</strong> {ownership.detail}
+    </small>
+  );
+}
 
 export type CalendarPrefill = { entryId: string; title: string; startsOn: string; endsOn: string; location: string };
 
@@ -155,6 +180,8 @@ export function EventSettingsWorkspace({
   canOpenPlatformSettings = false,
   calendarPrefill,
   canArchiveEvent = false,
+  platformDefaults,
+  emailSender,
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
@@ -188,7 +215,7 @@ export function EventSettingsWorkspace({
   const [slugWasEdited, setSlugWasEdited] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   // Save and Publish report separately: this is the Save result, shown in the sticky bar.
-  const [saveMessage, setSaveMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ kind: "success" | "error" | "conflict"; text: string } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState<{ eventSlug: string; formSlug: string } | null>(null);
@@ -290,7 +317,8 @@ export function EventSettingsWorkspace({
     clearFieldError(key);
     setError("");
     setNotice("");
-    setSaveMessage(null);
+    // A stale "Saved" must not outlive an edit; a failure or conflict stays until the next save (#1258).
+    setSaveMessage((current) => (current?.kind === "success" ? null : current));
   }
 
   function updateName(name: string) {
@@ -302,7 +330,7 @@ export function EventSettingsWorkspace({
     clearFieldError("name");
     setError("");
     setNotice("");
-    setSaveMessage(null);
+    setSaveMessage((current) => (current?.kind === "success" ? null : current));
   }
 
   async function save(event?: React.FormEvent<HTMLFormElement>) {
@@ -335,13 +363,22 @@ export function EventSettingsWorkspace({
       }
       const result = response.body as EventApiResult;
       if (!response.ok || !result.event) {
-        const errors = fieldErrorsFromIssues(result.issues);
-        if (Object.keys(errors).length > 0) showFieldErrors(errors);
-        throw new Error(
-          result.message
-          ?? result.issues?.[0]?.message
-          ?? "The event could not be saved.",
-        );
+        // The existing contract's 409 EVENT_CHANGED is the Conflict state; a 401 or 403 means access was revoked mid-edit.
+        // Either way nothing was saved and the form keeps every edit (#1258).
+        const failure = classifySettingsSaveFailure({
+          scope: "event",
+          status: response.status,
+          code: (response.body as { error?: unknown }).error,
+          message: result.message ?? result.issues?.[0]?.message,
+          conflictCodes: eventConflictCodes,
+          fallback: "The event could not be saved.",
+        });
+        if (failure.kind === "failed") {
+          const errors = fieldErrorsFromIssues(result.issues);
+          if (Object.keys(errors).length > 0) showFieldErrors(errors);
+        }
+        setSaveMessage({ kind: failure.kind === "conflict" ? "conflict" : "error", text: failure.message });
+        return;
       }
       if (mode === "create") {
         allowNextNavigation();
@@ -559,7 +596,9 @@ export function EventSettingsWorkspace({
       help={<><small>
         Contact changes, cancellations, and transfers always require a fresh emailed
         code. Medical and club data always require an authenticator.
-      </small>{fieldNote("attendeeEditPolicy")}</>}
+      </small>
+      {mode === "edit" && platformDefaults && <OwnershipNote ownership={attendeeEditPolicyOwnership(draft.attendeeEditPolicy ?? "VERIFY_EVERY_EDIT", platformDefaults)} />}
+      {fieldNote("attendeeEditPolicy")}</>}
     />
   );
   const paymentInstructionsField = (
@@ -729,7 +768,14 @@ export function EventSettingsWorkspace({
         : id === "more" ? optionalFields.more.length > 0 || lodgingInMore
           : true
   ));
-  const saveStatus = saveStatusLabel({ saving, dirty });
+  const saveState = settingsSaveState({
+    saving,
+    dirty,
+    outcome: saveMessage ? (saveMessage.kind === "success" ? "saved" : saveMessage.kind === "conflict" ? "conflict" : "failed") : null,
+    cleanLabel: "No unsaved changes",
+  });
+  const saveStatus = saveState.label;
+  const saveStatusNeedsAttention = saveState.state !== "saved" && saveState.state !== "clean" && saveState.state !== "saving";
   const errorItems = Object.entries(fieldErrors)
     .filter(([key]) => key in settingsFieldBlock)
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
@@ -793,8 +839,8 @@ export function EventSettingsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       <nav aria-label="Jump to a settings section" className="settings-jump-bar">
-        <span aria-live="polite" className={`settings-save-status ${dirty ? "is-dirty" : "is-clean"}`} role="status">
-          {dirty ? <AlertTriangle aria-hidden="true" size={14} /> : <CheckCircle2 aria-hidden="true" size={14} />}
+        <span aria-live="polite" className={`settings-save-status ${saveStatusNeedsAttention ? "is-dirty" : "is-clean"}`} data-save-state={saveState.state} role="status">
+          {saveStatusNeedsAttention ? <AlertTriangle aria-hidden="true" size={14} /> : <CheckCircle2 aria-hidden="true" size={14} />}
           <strong>{saveStatus}</strong>
         </span>
         <ul>
@@ -863,6 +909,9 @@ export function EventSettingsWorkspace({
                 {eventTimeZones.map((zone) => <option value={zone} key={zone}>{timeZoneLabels[zone]} ({zone})</option>)}
               </select>
               <small>Registration opening, closing, and late-price dates use this timezone.</small>
+              {mode === "edit" && platformDefaults && (
+                <OwnershipNote ownership={timezoneOwnership(draft.timezone, platformDefaults, (zone) => (zone in timeZoneLabels ? `${timeZoneLabels[zone as keyof typeof timeZoneLabels]} (${zone})` : zone))} />
+              )}
             {fieldNote("timezone")}</label>
             <div className="form-grid two-column">
               <label>
@@ -1003,6 +1052,13 @@ export function EventSettingsWorkspace({
               <input {...fieldAria("supportContact")} id="event-field-support-contact" value={draft.supportContact ?? ""} maxLength={200} placeholder="registration@imsda.org or conference office phone" onChange={(event) => update("supportContact", event.target.value || null)} />
               <small>Enter the email, phone number, or office name attendees should use for help.</small>
             {fieldNote("supportContact")}</label>
+            {mode === "edit" && emailSender && (
+              <div className="settings-ownership-group" role="group" aria-label="Where this event's email sender comes from">
+                <p><strong>Email sender for this event.</strong> Not edited on this page: the From address is always the central one, and an event overrides only its display name and reply-to on <Link className="text-button" href={`/communications?event=${encodeURIComponent(initialEvent?.id ?? "")}`}>Emails</Link>.</p>
+                <p><span className="settings-ownership-field">Email display name</span> <OwnershipNote ownership={emailDisplayNameOwnership(emailSender)} /></p>
+                <p><span className="settings-ownership-field">Reply-to</span> <OwnershipNote ownership={emailReplyToOwnership(emailSender)} /></p>
+              </div>
+            )}
             <label>
               Event theme or tagline (optional)
               <input id={settingsFieldDomId("tagline")} {...fieldAria("tagline")} value={draft.tagline ?? ""} maxLength={120} placeholder="Lest We Forget" onChange={(event) => update("tagline", event.target.value || null)} />
@@ -1251,13 +1307,13 @@ export function EventSettingsWorkspace({
 
         </aside>
         <div className={`event-savebar${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
-          <p className="event-savebar-status" aria-live={saveMessage?.kind === "error" ? "assertive" : "polite"}>
+          <p className="event-savebar-status" aria-live={saveMessage && saveMessage.kind !== "success" ? "assertive" : "polite"}>
             {saveMessage
-              ? <span className={saveMessage.kind === "error" ? "event-savebar-error" : "event-savebar-ok"} >{saveMessage.text}</span>
+              ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.kind === "conflict" ? "Conflict: not saved. " : saveMessage.kind === "error" ? "Failed: not saved. " : ""}{saveMessage.text}</span>
               : saving
                 ? "Saving…"
                 : dirty
-                  ? <span className="unsaved-dot">Changes not saved</span>
+                  ? <span className="unsaved-dot">Unsaved changes</span>
                   : mode === "create"
                     ? "No unsaved changes. Nothing is public when this draft is created."
                     : published ? "No unsaved changes. Saving never changes whether this event is published." : "No unsaved changes. Saving never publishes the event."}
