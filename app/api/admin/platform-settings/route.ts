@@ -58,8 +58,13 @@ async function patchHandler(request: Request) {
       );
     }
     if (error instanceof PlatformSettingsError && error.code === "PLATFORM_SETTINGS_CONFLICT") {
+      // The latest values are a convenience; the conflict itself still stands if reading them fails.
+      const latest = await getPlatformSettings().catch((readError) => {
+        logError("Reading platform settings after a conflict failed", readError);
+        return undefined;
+      });
       return Response.json(
-        { error: error.code, message: error.message, fields: error.fields, settings: await getPlatformSettings() },
+        { error: error.code, message: error.message, fields: error.fields, ...(latest ? { settings: latest } : {}) },
         { status: 409 },
       );
     }

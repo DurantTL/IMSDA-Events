@@ -44,6 +44,10 @@ describe("platform settings change preview (#1076)", () => {
     expect(changes[3].effect).toContain("earlier PDFs keep their header");
   });
 
+  it("ignores surrounding spaces and passkey letter case", () => {
+    expect(platformSettingsChanges(saved, { ...saved, organizationName: " Synthetic Conference ", passkeyRpId: "Events.Example.Test " })).toEqual([]);
+  });
+
   it("states each effect once", () => {
     const changes = platformSettingsChanges(saved, { ...saved, organizationName: "New", publicWebsiteUrl: "https://other.test" });
     expect(platformSettingsEffects(changes)).toEqual(["Shown everywhere the organization appears, right away."]);

@@ -42,6 +42,21 @@ describe("PATCH /api/admin/platform-settings conflicts (#1076)", () => {
     });
   });
 
+  it("still returns 409 without settings when reading the latest fails", async () => {
+    mocks.update.mockRejectedValue(new PlatformSettingsError("PLATFORM_SETTINGS_CONFLICT", "Someone else saved.", ["organizationName"]));
+    mocks.get.mockRejectedValue(new Error("db down"));
+    const response = await (PATCH as unknown as (request: Request) => Promise<Response>)(request(body));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "PLATFORM_SETTINGS_CONFLICT", message: "Someone else saved.", fields: ["organizationName"] });
+  });
+
+  it("refuses a signed-in user who is not a system administrator", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", globalRole: "NONE" } });
+    const response = await (PATCH as unknown as (request: Request) => Promise<Response>)(request(body));
+    expect(response.status).toBe(403);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
   it("passes the baseline through to the update and still returns the saved settings", async () => {
     mocks.update.mockResolvedValue({ organizationName: "IMSDA" });
     const response = await (PATCH as unknown as (request: Request) => Promise<Response>)(request(body));

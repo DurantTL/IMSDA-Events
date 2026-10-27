@@ -191,6 +191,8 @@ export async function updatePlatformSettings(
   const { baseline, ...rest } = rawInput;
   let input: PlatformSettingsInput = rest;
   await prisma.$transaction(async (tx) => {
+    // Held until commit, so two saves with the same baseline cannot both pass the compare below.
+    await tx.$queryRaw`SELECT "id" FROM "PlatformSettings" WHERE "id" = ${PLATFORM_SETTINGS_ID} FOR UPDATE`;
     const before = await tx.platformSettings.findUnique({
       where: { id: PLATFORM_SETTINGS_ID },
     });

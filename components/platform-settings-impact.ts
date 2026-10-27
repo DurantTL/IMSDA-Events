@@ -51,10 +51,16 @@ export type PlatformSettingsChange = {
   effect: string;
 };
 
+/** Surrounding spaces are not a change (the server trims), and the passkey domain is lower-cased there too. */
+export function normalizePlatformSettingValue(field: PlatformSettingsField, value: string) {
+  const trimmed = value.trim();
+  return field === "passkeyRpId" ? trimmed.toLowerCase() : trimmed;
+}
+
 /** Every field whose draft value differs from the saved one, in form order, with its plain-language effect. */
 export function platformSettingsChanges(saved: PlatformSettingsDraft, draft: PlatformSettingsDraft): PlatformSettingsChange[] {
   return platformSettingsFields
-    .filter((field) => saved[field] !== draft[field])
+    .filter((field) => normalizePlatformSettingValue(field, saved[field]) !== normalizePlatformSettingValue(field, draft[field]))
     .map((field) => ({
       field,
       label: platformSettingsFieldInfo[field].label,

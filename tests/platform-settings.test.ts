@@ -172,6 +172,7 @@ describe("clearing the passkey domain", () => {
         }),
         upsert: vi.fn().mockResolvedValue({}),
       },
+      $queryRaw: vi.fn().mockResolvedValue([]),
       user: { count: vi.fn().mockResolvedValue(options.passkeyOnlyStaff) },
       auditLog: { create: vi.fn().mockResolvedValue({}) },
     };
@@ -279,6 +280,7 @@ describe("stale-write baseline (#1076)", () => {
         }),
         upsert: vi.fn().mockResolvedValue({}),
       },
+      $queryRaw: vi.fn().mockResolvedValue([]),
       user: { count: vi.fn().mockResolvedValue(0) },
       auditLog: { create: vi.fn().mockResolvedValue({}) },
     };
@@ -323,6 +325,26 @@ describe("stale-write baseline (#1076)", () => {
     expect(upsertCall.update).not.toHaveProperty("baseline");
     expect(upsertCall.create).not.toHaveProperty("baseline");
     expect(JSON.stringify(tx.auditLog.create.mock.calls[0][0])).not.toContain("baseline");
+  });
+
+  it("locks the settings row before reading it", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: matching },
+      "admin-1",
+    );
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(String(tx.$queryRaw.mock.calls[0][0].join(" "))).toContain("FOR UPDATE");
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.platformSettings.findUnique.mock.invocationCallOrder[0]);
+  });
+
+  it("treats a stored null as matching a blank baseline", async () => {
+    const tx = baselineDatabase();
+    await updatePlatformSettings(
+      { ...platformSettingsInputSchema.parse(validInput()), baseline: { logoUrl: "", passkeyRpId: "", invoiceHeaderPhone: "" } },
+      "admin-1",
+    );
+    expect(tx.platformSettings.upsert).toHaveBeenCalled();
   });
 
   it("keeps today's behaviour when no baseline is sent", async () => {

@@ -9,6 +9,7 @@ import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
 import { inlinePhoneProblem } from "@/lib/field-validation";
 import {
   displayPlatformSettingValue,
+  normalizePlatformSettingValue,
   platformSettingsChanges,
   platformSettingsEffects,
   platformSettingsFieldInfo,
@@ -135,12 +136,13 @@ export function PlatformSettingsWorkspace({
   const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
   const changes = platformSettingsChanges(draftFrom(settings), draft);
   const dirty = changes.length > 0;
+  const shownOutcome = outcome?.kind === "conflict" && !dirty ? null : outcome;
   useUnsavedChangesGuard(dirty, "These platform settings have not been saved. Leave and discard the changes?");
 
   function edit(key: keyof Draft, value: string) {
     setDraft((current) => ({ ...current, [key]: value }));
     // A stale "Saved" must not outlive the next edit; a failure or conflict stays until the next save or Cancel.
-    setOutcome((current) => (current?.kind === "saved" ? null : current));
+    setOutcome((current) => (current?.kind === "saved" || current?.kind === "conflict" ? null : current));
     setFieldErrors((current) => {
       if (!(key in current)) return current;
       const next = { ...current };
@@ -189,7 +191,8 @@ export function PlatformSettingsWorkspace({
       focusFirstInvalid(["invoiceHeaderPhone"]);
       return;
     }
-    if (settings.passkeyRpId && draft.passkeyRpId !== settings.passkeyRpId) {
+    if (settings.passkeyRpId
+      && normalizePlatformSettingValue("passkeyRpId", draft.passkeyRpId) !== normalizePlatformSettingValue("passkeyRpId", settings.passkeyRpId)) {
       const confirmed = await askConfirm({
         title: "Change the passkey domain",
         confirmLabel: "Change passkey domain",
@@ -204,7 +207,10 @@ export function PlatformSettingsWorkspace({
     }
     // Computed before the request, so the success message names what was actually saved.
     const saved = changes;
-    const baseline = draftFrom(settings);
+    // Only what this person changed is checked, so someone else's edit to a different field is no conflict.
+    const savedValues = draftFrom(settings);
+    const baseline = Object.fromEntries(changes.map((change) => [change.field, savedValues[change.field]]));
+    const edited = new Set<string>(changes.map((change) => change.field));
     setSaving(true);
     setOutcome(null);
     setFieldErrors({});
@@ -227,9 +233,16 @@ export function PlatformSettingsWorkspace({
         setOutcome({ kind: "saved", fields: saved.map((change) => change.label), effects: platformSettingsEffects(saved) });
         return;
       }
-      if (response.status === 409 && result.error === "PLATFORM_SETTINGS_CONFLICT" && result.settings) {
-        // The change list now compares against the newer values; the draft is kept, so saving again is a deliberate overwrite.
-        setSettings(result.settings);
+      if (response.status === 409 && result.error === "PLATFORM_SETTINGS_CONFLICT") {
+        // Rebase: untouched fields follow the latest saved values, this person's edits stay, so saving again is a deliberate
+        // overwrite of only the fields that collided.
+        if (result.settings) {
+          const latest = draftFrom(result.settings);
+          setSettings(result.settings);
+          setDraft((current) => Object.fromEntries(
+            platformSettingsFields.map((key) => [key, edited.has(key) ? current[key] : latest[key]]),
+          ) as Draft);
+        }
         setOutcome({
           kind: "conflict",
           message: result.message ?? "Someone else saved platform settings since you opened this page.",
@@ -258,7 +271,7 @@ export function PlatformSettingsWorkspace({
 
   const statusLabel = saving
     ? "Saving…"
-    : outcome?.kind === "conflict"
+    : shownOutcome?.kind === "conflict"
       ? "Conflict: not saved"
       : outcome?.kind === "failed"
         ? "Failed: not saved"
@@ -313,6 +326,7 @@ export function PlatformSettingsWorkspace({
       </section>
 
       <form className="form-stack" onSubmit={save}>
+        <fieldset className="settings-fields" disabled={saving}>
         <section className="panel">
           <div className="section-heading">
             <div>
@@ -447,13 +461,14 @@ export function PlatformSettingsWorkspace({
             A new event still starts on local capture, so nothing reaches a registrant until someone turns real delivery on for that event.
           </p>
         </section>
+        </fieldset>
 
-        {outcome?.kind === "conflict" && (
+        {shownOutcome?.kind === "conflict" && (
           <div className="settings-conflict" role="alert">
-            <p><strong>{outcome.message}</strong> Your edits are still here and were not saved.</p>
-            {outcome.fields.length > 0 && (
+            <p><strong>{shownOutcome.message}</strong> Your edits are still here and were not saved. These edits of yours collided with the other change:</p>
+            {shownOutcome.fields.length > 0 && (
               <ul>
-                {outcome.fields.map((key) => (
+                {shownOutcome.fields.map((key) => (
                   <li key={key}>
                     {platformSettingsFieldInfo[key].label} is now saved as <strong>{displayPlatformSettingValue(key, draftFrom(settings)[key])}</strong>
                     {draft[key] !== draftFrom(settings)[key] && <> (you have <strong>{displayPlatformSettingValue(key, draft[key])}</strong>)</>}.
@@ -461,7 +476,7 @@ export function PlatformSettingsWorkspace({
                 ))}
               </ul>
             )}
-            <p>Saving again replaces those values with yours. Cancel loads the latest saved values instead.</p>
+            <p>Save again replaces the other person&apos;s value for those fields only. Cancel loads the latest saved values instead.</p>
           </div>
         )}
 
