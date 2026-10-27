@@ -32,20 +32,25 @@ const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf
 const defaults = { defaultTimezone: "America/Chicago", defaultAttendeeEditPolicy: "VERIFY_EVERY_EDIT" as const };
 
 describe("event settings ownership labels (#1258)", () => {
-  it("labels a value that still matches the platform default as a template copy, and one that differs as an override", () => {
-    expect(timezoneOwnership("America/Chicago", defaults)).toMatchObject({ source: "template", label: "Template copy" });
+  it("says only what can be checked: same as the platform default, or different from it", () => {
+    expect(timezoneOwnership("America/Chicago", defaults)).toMatchObject({ source: "central", label: "Same as central" });
+    expect(timezoneOwnership("America/Chicago", defaults).detail).toContain("Same as the platform default (America/Chicago)");
     expect(timezoneOwnership("America/Denver", defaults)).toMatchObject({ source: "override", label: "Event override" });
-    expect(timezoneOwnership("America/Denver", defaults).detail).toContain("America/Chicago");
-    expect(attendeeEditPolicyOwnership("VERIFY_EVERY_EDIT", defaults).source).toBe("template");
+    expect(timezoneOwnership("America/Denver", defaults).detail).toContain("Differs from the platform default (America/Chicago)");
+    expect(attendeeEditPolicyOwnership("VERIFY_EVERY_EDIT", defaults).source).toBe("central");
     expect(attendeeEditPolicyOwnership("TIERED", defaults).source).toBe("override");
+    // No claim about when or how the value was set.
+    for (const text of [timezoneOwnership("America/Denver", defaults).detail, timezoneOwnership("America/Chicago", defaults).detail]) {
+      expect(text).not.toMatch(/copied|created|its own timezone/i);
+    }
   });
 
   it("follows the platform default, so changing the default changes the label", () => {
     expect(timezoneOwnership("America/Chicago", { ...defaults, defaultTimezone: "America/Denver" }).source).toBe("override");
-    expect(attendeeEditPolicyOwnership("TIERED", { ...defaults, defaultAttendeeEditPolicy: "TIERED" }).source).toBe("template");
+    expect(attendeeEditPolicyOwnership("TIERED", { ...defaults, defaultAttendeeEditPolicy: "TIERED" }).source).toBe("central");
   });
 
-  it("labels the email display name and reply-to as central unless the event has its own", () => {
+  it("labels the email display name and reply-to by comparison with the central sender", () => {
     const central: EventEmailSender["central"] = { name: "IMSDA Events", replyTo: "reply@example.test" };
     const inherit: EventEmailSender = { senderName: "IMSDA Events", replyToOverride: null, central };
     expect(emailDisplayNameOwnership(inherit).source).toBe("central");
@@ -53,8 +58,13 @@ describe("event settings ownership labels (#1258)", () => {
     expect(emailReplyToOwnership(inherit).detail).toContain("reply@example.test");
     const own: EventEmailSender = { senderName: "Synthetic Women's Retreat", replyToOverride: "retreat@example.test", central };
     expect(emailDisplayNameOwnership(own)).toMatchObject({ source: "override" });
+    expect(emailDisplayNameOwnership(own).detail).toContain("Differs from the central sender name (IMSDA Events)");
     expect(emailReplyToOwnership(own)).toMatchObject({ source: "override" });
     expect(emailReplyToOwnership(own).detail).toContain("retreat@example.test");
+    // A reply-to equal to the central one is not an override.
+    expect(emailReplyToOwnership({ ...own, replyToOverride: "reply@example.test" }).source).toBe("central");
+    // Renaming the central sender makes a stored copy differ; the wording claims only the difference.
+    expect(emailDisplayNameOwnership({ ...inherit, central: { ...central, name: "Renamed Sender" } }).detail).not.toMatch(/overrid|chose|set/i);
   });
 
   it("says so when there is no reply-to anywhere", () => {
@@ -85,8 +95,8 @@ describe("event settings ownership labels (#1258)", () => {
       emailSender: { senderName: "Synthetic Retreat Team", replyToOverride: null, central: { name: "IMSDA Events", replyTo: null } },
     }));
     // Timezone differs from the platform default (Chicago), edit verification matches it.
-    expect(markup).toMatch(/data-ownership="override"[^>]*><strong>Event override\.<\/strong> This event uses its own timezone/);
-    expect(markup).toMatch(/data-ownership="template"[^>]*><strong>Template copy\.<\/strong>/);
+    expect(markup).toMatch(/data-ownership="override"[^>]*><strong>Event override\.<\/strong> Differs from the platform default/);
+    expect(markup).toMatch(/data-ownership="central"[^>]*><strong>Same as central\.<\/strong> Same as the platform default/);
     expect(markup).toMatch(/Email display name<\/span>[\s\S]*?data-ownership="override"/);
     expect(markup).toMatch(/Reply-to<\/span>[\s\S]*?data-ownership="central"/);
   });
@@ -139,6 +149,10 @@ describe("settings save states (#1258)", () => {
     expect(read("components/event-settings-workspace.tsx")).toContain("settingsSaveState({");
     expect(read("components/event-settings-workspace.tsx")).toContain('conflictCodes: eventConflictCodes');
     expect(read("components/platform-settings-workspace.tsx")).toContain("settingsSaveState({");
+    // Labels compare the saved event, not the live draft.
+    expect(read("components/event-settings-workspace.tsx")).toContain("timezoneOwnership(savedDraft.timezone");
+    expect(read("components/event-settings-workspace.tsx")).toContain("attendeeEditPolicyOwnership(savedDraft.attendeeEditPolicy");
+    expect(read("components/platform-settings-workspace.tsx")).toContain("<summary>Advanced settings</summary>");
     // The conflict code is the one the route really answers with.
     expect(read("modules/events/repository.ts")).toContain('"EVENT_CHANGED"');
     expect(read("app/api/events/[eventId]/route.ts")).toContain('error.code === "EVENT_NOT_FOUND" ? 404 : 409');
@@ -147,7 +161,7 @@ describe("settings save states (#1258)", () => {
 
 describe("environment-managed provider status (#1258)", () => {
   const secrets = {
-    RESEND_API_KEY: "re_SECRET_VALUE_1", SQUARE_ACCESS_TOKEN: "sq-SECRET-TOKEN-2", SQUARE_APPLICATION_ID: "sq-app-3",
+    RESEND_API_KEY: "re_SECRET_VALUE_1", SQUARE_ACCESS_TOKEN: "sq-SECRET-TOKEN-2", SQUARE_APPLICATION_ID: "sandbox-sq-app-3",
     SQUARE_LOCATION_ID: "LOC-4", SQUARE_WEBHOOK_SIGNATURE_KEY: "sig-SECRET-5", GOOGLE_OAUTH_CLIENT_SECRET: "g-SECRET-6",
     GOOGLE_OAUTH_CLIENT_ID: "g-id-7", ALERT_WEBHOOK_URL: "https://hooks.example.test/SECRET8", OUTBOX_SWEEP_TOKEN: "sweep-SECRET-9",
     ACCOUNT_EMAIL_SENDER_ADDRESS: "accounts@example.test",
@@ -160,7 +174,8 @@ describe("environment-managed provider status (#1258)", () => {
     expect(byId["email-provider"].status).toBe("configured");
     expect(byId["email-reports"].status).toBe("not-configured");
     expect(byId.payments.status).toBe("configured");
-    expect(byId["payment-webhook"]).toMatchObject({ status: "not-configured", missing: ["SQUARE_WEBHOOK_NOTIFICATION_URL"] });
+    // APP_BASE_URL is not set here, so the app's own reader derives the localhost URL: the webhook URL is not "blank".
+    expect(byId["payment-webhook"]).toMatchObject({ status: "configured", missing: [] });
     expect(byId["google-sign-in"].status).toBe("configured");
     expect(byId["encryption-key"].status).toBe("configured");
     const unreadable = buildEnvironmentStatus({}, { emailAvailability: () => { throw new Error("boom"); }, encryptionKey: () => { throw new Error("boom"); } });
@@ -173,11 +188,31 @@ describe("environment-managed provider status (#1258)", () => {
     const status = buildEnvironmentStatus(secrets, readers);
     const json = JSON.stringify(status) + renderToStaticMarkup(createElement(EnvironmentStatusPanel, { status }));
     for (const value of Object.values(secrets)) expect(json).not.toContain(value);
-    for (const service of status.services) expect(Object.keys(service).sort()).toEqual(["id", "label", "missing", "status"]);
+    for (const service of status.services) expect(Object.keys(service).sort()).toEqual(["id", "label", "missing", "note", "status"]);
     // Blank variables are named so an administrator knows what to set, but nothing here is editable.
     const empty = renderToStaticMarkup(createElement(EnvironmentStatusPanel, { status: buildEnvironmentStatus({}, { ...readers, emailAvailability: () => ({ deliveryConfigured: false, webhookConfigured: false }) }) }));
     expect(empty).toContain("SQUARE_ACCESS_TOKEN");
     expect(empty).not.toMatch(/<input|<textarea|<select/);
+  });
+
+  it("judges Square by the payment module's rules: webhook secret alias, derived URL, production unlock", () => {
+    const square = (extra: Record<string, string>) => {
+      const status = buildEnvironmentStatus({ SQUARE_APPLICATION_ID: "sandbox-sq0idb-x", SQUARE_ACCESS_TOKEN: "tok", SQUARE_LOCATION_ID: "L1", ...extra }, readers);
+      return { payments: status.services.find((s) => s.id === "payments")!, webhook: status.services.find((s) => s.id === "payment-webhook")! };
+    };
+    // No signature key under either name: not configured, and the alias is named.
+    expect(square({}).webhook).toMatchObject({ status: "not-configured", missing: ["SQUARE_WEBHOOK_SIGNATURE_KEY (or SQUARE_WEBHOOK_SECRET)"] });
+    // The SQUARE_WEBHOOK_SECRET alias counts, and the URL is derived from APP_BASE_URL.
+    expect(square({ SQUARE_WEBHOOK_SECRET: "alias", APP_BASE_URL: "https://events.example.test" }).webhook).toMatchObject({ status: "configured", missing: [] });
+    // An explicit URL is not required.
+    expect(square({ SQUARE_WEBHOOK_SIGNATURE_KEY: "k" }).webhook.status).toBe("configured");
+    // Production without the unlock is not configured, and says why without a value.
+    const production = square({ SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-x", SQUARE_WEBHOOK_SIGNATURE_KEY: "k" });
+    expect(production.payments).toMatchObject({ status: "not-configured", missing: [], note: "Production is selected but not unlocked." });
+    expect(square({ SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-x", SQUARE_ENABLE_PRODUCTION: "true" }).payments.status).toBe("configured");
+    // Blank credentials are named.
+    const blank = buildEnvironmentStatus({}, readers).services.find((s) => s.id === "payments")!;
+    expect(blank.missing).toEqual(["SQUARE_APPLICATION_ID", "SQUARE_ACCESS_TOKEN", "SQUARE_LOCATION_ID"]);
   });
 
   it("is only computed for a system administrator", () => {

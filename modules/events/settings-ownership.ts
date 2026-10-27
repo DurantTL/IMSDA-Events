@@ -1,14 +1,14 @@
 /**
- * Where each Event settings value comes from (#1258, from #1076). Derived from the real data on every render, never
- * hardcoded per field:
- * - "central": the event has no value of its own and uses the one set on Platform settings or Email.
- * - "override": the event's own value differs from the central one, so the event's value is used.
- * - "template": the platform default was copied into the event when it was created, and the event still matches it.
- *   Changing Platform settings later never rewrites the event (see `createEvent`), so it is a copy, not a link.
+ * How each saved Event settings value relates to the central one (#1258, from #1076). Derived from the real data on every
+ * render, and it only says what can be checked by comparing values: the data does not record whether a value was copied
+ * at creation or chosen later, so nothing here claims when or how it was set.
+ * - "central": the event's saved value is the same as the central value (Platform settings or the central sender).
+ * - "override": the event's saved value differs from the central one, so the event's own value is used.
+ * Compared against the SAVED event, never the unsaved draft, so a label never describes something not yet saved.
  *
- * Pure and client-safe: it only compares values the page already has.
+ * Pure and client-safe.
  */
-export type SettingOwnershipSource = "central" | "override" | "template";
+export type SettingOwnershipSource = "central" | "override";
 
 export type SettingOwnership = {
   source: SettingOwnershipSource;
@@ -19,9 +19,8 @@ export type SettingOwnership = {
 };
 
 export const settingOwnershipLabels: Record<SettingOwnershipSource, string> = {
-  central: "Central value",
+  central: "Same as central",
   override: "Event override",
-  template: "Template copy",
 };
 
 function ownership(source: SettingOwnershipSource, detail: string): SettingOwnership {
@@ -46,28 +45,30 @@ const policyLabels: Record<EventPlatformDefaults["defaultAttendeeEditPolicy"], s
   TIERED: "allow low-risk answers without a code",
 };
 
-export function timezoneOwnership(value: string, defaults: EventPlatformDefaults, describe: (zone: string) => string = (zone) => zone): SettingOwnership {
-  return value === defaults.defaultTimezone
-    ? ownership("template", `Copied from the platform default (${describe(defaults.defaultTimezone)}) when the event was created. Changing the platform default later does not change this event.`)
-    : ownership("override", `This event uses its own timezone; the platform default is ${describe(defaults.defaultTimezone)}.`);
+const aheadOfChange = "Changing the platform default does not change an existing event.";
+
+export function timezoneOwnership(savedValue: string, defaults: EventPlatformDefaults, describe: (zone: string) => string = (zone) => zone): SettingOwnership {
+  return savedValue === defaults.defaultTimezone
+    ? ownership("central", `Same as the platform default (${describe(defaults.defaultTimezone)}). ${aheadOfChange}`)
+    : ownership("override", `Differs from the platform default (${describe(defaults.defaultTimezone)}). ${aheadOfChange}`);
 }
 
-export function attendeeEditPolicyOwnership(value: EventPlatformDefaults["defaultAttendeeEditPolicy"], defaults: EventPlatformDefaults): SettingOwnership {
-  return value === defaults.defaultAttendeeEditPolicy
-    ? ownership("template", `Copied from the platform default (${policyLabels[defaults.defaultAttendeeEditPolicy]}) when the event was created. Changing the platform default later does not change this event.`)
-    : ownership("override", `This event's own choice; the platform default is to ${policyLabels[defaults.defaultAttendeeEditPolicy]}.`);
+export function attendeeEditPolicyOwnership(savedValue: EventPlatformDefaults["defaultAttendeeEditPolicy"], defaults: EventPlatformDefaults): SettingOwnership {
+  return savedValue === defaults.defaultAttendeeEditPolicy
+    ? ownership("central", `Same as the platform default (${policyLabels[defaults.defaultAttendeeEditPolicy]}). ${aheadOfChange}`)
+    : ownership("override", `Differs from the platform default (${policyLabels[defaults.defaultAttendeeEditPolicy]}). ${aheadOfChange}`);
 }
 
 export function emailDisplayNameOwnership(sender: EventEmailSender): SettingOwnership {
   return sender.senderName.trim() === sender.central.name.trim()
-    ? ownership("central", `Email uses the central sender name, ${sender.central.name}. The From address is always the central one.`)
-    : ownership("override", `Email from this event shows ${sender.senderName} instead of the central sender name, ${sender.central.name}.`);
+    ? ownership("central", `Same as the central sender name, ${sender.central.name}. The From address is always the central one.`)
+    : ownership("override", `Differs from the central sender name (${sender.central.name}): email from this event shows ${sender.senderName}.`);
 }
 
 export function emailReplyToOwnership(sender: EventEmailSender): SettingOwnership {
   const override = sender.replyToOverride?.trim() ?? "";
-  if (override) {
-    return ownership("override", `Replies go to ${override} instead of ${sender.central.replyTo ? `the central reply-to, ${sender.central.replyTo}` : "no central reply-to"}.`);
+  if (override && override !== (sender.central.replyTo ?? "").trim()) {
+    return ownership("override", `Differs from the central reply-to (${sender.central.replyTo || "none set"}): replies go to ${override}.`);
   }
-  return ownership("central", sender.central.replyTo ? `Replies go to the central reply-to, ${sender.central.replyTo}.` : "No reply-to is set, so replies go to the central From address.");
+  return ownership("central", sender.central.replyTo ? `Same as the central reply-to, ${sender.central.replyTo}.` : "No reply-to is set, so replies go to the central From address.");
 }

@@ -597,7 +597,7 @@ export function EventSettingsWorkspace({
         Contact changes, cancellations, and transfers always require a fresh emailed
         code. Medical and club data always require an authenticator.
       </small>
-      {mode === "edit" && platformDefaults && <OwnershipNote ownership={attendeeEditPolicyOwnership(draft.attendeeEditPolicy ?? "VERIFY_EVERY_EDIT", platformDefaults)} />}
+      {mode === "edit" && platformDefaults && <OwnershipNote ownership={attendeeEditPolicyOwnership(savedDraft.attendeeEditPolicy ?? "VERIFY_EVERY_EDIT", platformDefaults)} />}
       {fieldNote("attendeeEditPolicy")}</>}
     />
   );
@@ -910,7 +910,7 @@ export function EventSettingsWorkspace({
               </select>
               <small>Registration opening, closing, and late-price dates use this timezone.</small>
               {mode === "edit" && platformDefaults && (
-                <OwnershipNote ownership={timezoneOwnership(draft.timezone, platformDefaults, (zone) => (zone in timeZoneLabels ? `${timeZoneLabels[zone as keyof typeof timeZoneLabels]} (${zone})` : zone))} />
+                <OwnershipNote ownership={timezoneOwnership(savedDraft.timezone, platformDefaults, (zone) => (zone in timeZoneLabels ? `${timeZoneLabels[zone as keyof typeof timeZoneLabels]} (${zone})` : zone))} />
               )}
             {fieldNote("timezone")}</label>
             <div className="form-grid two-column">

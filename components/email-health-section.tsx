@@ -20,7 +20,7 @@ export function EmailHealthSection({ health }: { health: EmailHealth }) {
         </div>
       </div>
       <h3>Configuration in this environment</h3>
-      <p className="field-help">What the server has set. It does not prove mail is getting through; the problems list below does.</p>
+      <p className="field-help email-health-note">What the server has set. It does not prove mail is getting through; the problems list below does.</p>
       <ul className="notification-event-list" aria-label="Email setup in this environment">
         <li data-health="provider">
           <span>

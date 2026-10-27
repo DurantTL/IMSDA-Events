@@ -28,6 +28,7 @@ export function EnvironmentStatusPanel({ status }: { status: EnvironmentStatus }
             {service.status === "not-configured" && service.missing.length > 0 && (
               <small className="environment-status-missing">Blank: {service.missing.join(", ")}</small>
             )}
+            {service.note && <small className="environment-status-missing">{service.note}</small>}
             {service.status === "unknown" && (
               <small className="environment-status-missing">It could not be read from here.</small>
             )}

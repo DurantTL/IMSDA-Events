@@ -13511,6 +13511,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .environment-status-badge.is-not-configured { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; }
 .environment-status-badge.is-unknown { border-color: #cfd6dc; background: #f1f4f6; color: #3d4852; }
 .environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.

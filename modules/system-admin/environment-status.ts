@@ -2,6 +2,7 @@ import "server-only";
 
 import { getEncryptionKeyStatus } from "@/lib/env";
 import { getEmailAvailability } from "@/integrations/email/provider";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 
 /**
  * Environment-managed provider status for System management > Platform settings (#1258). These services are set in the
@@ -21,6 +22,8 @@ export type EnvironmentServiceStatus = {
   status: EnvironmentStatusValue;
   /** Variable names (never values) that are blank, for a service that is not configured. */
   missing: string[];
+  /** A fixed sentence for a state the variable names cannot explain (such as Production not unlocked), never a value. */
+  note: string | null;
 };
 
 export type EnvironmentStatus = { services: EnvironmentServiceStatus[] };
@@ -32,15 +35,42 @@ const present = (source: Source, key: string) => Boolean(source[key]?.trim());
 /** Configured when every required variable is set; otherwise not configured, naming the blank ones. */
 function allOf(source: Source, id: string, label: string, keys: readonly string[]): EnvironmentServiceStatus {
   const missing = keys.filter((key) => !present(source, key));
-  return { id, label, status: missing.length === 0 ? "configured" : "not-configured", missing };
+  return { id, label, status: missing.length === 0 ? "configured" : "not-configured", missing, note: null };
 }
 
-const unknownService = (id: string, label: string): EnvironmentServiceStatus => ({ id, label, status: "unknown", missing: [] });
+const unknownService = (id: string, label: string): EnvironmentServiceStatus => ({ id, label, status: "unknown", missing: [], note: null });
 
 /** An email provider other than the two known ones is a typo, which this page cannot judge. */
 function emailProviderRecognized(source: Source) {
   const value = source.EMAIL_PROVIDER?.trim().toLowerCase() ?? "";
   return value === "" || value === "resend" || value === "ses";
+}
+
+const squareNotes: Record<string, string> = {
+  INVALID_ENVIRONMENT: "SQUARE_ENVIRONMENT must be sandbox or production.",
+  PRODUCTION_DISABLED: "Production is selected but not unlocked.",
+  INVALID_API_URL: "The Square API address is not valid for this environment.",
+  CREDENTIAL_ENVIRONMENT_MISMATCH: "The application id does not match the selected environment.",
+};
+
+/** Square, judged by the payment module's own reader so this page and the app agree (alias, derived URL, production unlock). */
+function squareServices(source: Source): EnvironmentServiceStatus[] {
+  const config = getSquareConfiguration(source);
+  const missing = [
+    ...(config.applicationId ? [] : ["SQUARE_APPLICATION_ID"]),
+    ...(config.accessToken ? [] : ["SQUARE_ACCESS_TOKEN"]),
+    ...(config.locationId ? [] : ["SQUARE_LOCATION_ID"]),
+  ];
+  const note = config.issue ? squareNotes[config.issue] ?? null : null;
+  const paymentsOk = missing.length === 0 && !note;
+  const webhookMissing = [
+    ...(config.webhookSignatureKey ? [] : ["SQUARE_WEBHOOK_SIGNATURE_KEY (or SQUARE_WEBHOOK_SECRET)"]),
+    ...(config.webhookNotificationUrl ? [] : ["SQUARE_WEBHOOK_NOTIFICATION_URL or APP_BASE_URL"]),
+  ];
+  return [
+    { id: "payments", label: "Square payments", status: paymentsOk ? "configured" : "not-configured", missing, note },
+    { id: "payment-webhook", label: "Square payment confirmations (webhook)", status: webhookMissing.length === 0 ? "configured" : "not-configured", missing: webhookMissing, note: null },
+  ];
 }
 
 export type EmailAvailabilityReader = () => { deliveryConfigured: boolean; webhookConfigured: boolean };
@@ -67,19 +97,18 @@ export function buildEnvironmentStatus(
   const provider = source.EMAIL_PROVIDER?.trim().toLowerCase() === "ses" ? "Amazon SES" : "Resend";
   services.push(
     email
-      ? { id: "email-provider", label: `Email provider (${provider})`, status: email.deliveryConfigured ? "configured" : "not-configured", missing: [] }
+      ? { id: "email-provider", label: `Email provider (${provider})`, status: email.deliveryConfigured ? "configured" : "not-configured", missing: [], note: null }
       : unknownService("email-provider", "Email provider"),
     email
-      ? { id: "email-reports", label: "Email bounce and complaint reports", status: email.webhookConfigured ? "configured" : "not-configured", missing: [] }
+      ? { id: "email-reports", label: "Email bounce and complaint reports", status: email.webhookConfigured ? "configured" : "not-configured", missing: [], note: null }
       : unknownService("email-reports", "Email bounce and complaint reports"),
     allOf(source, "account-email", "Account email sender", ["ACCOUNT_EMAIL_SENDER_ADDRESS"]),
-    allOf(source, "payments", "Square payments", ["SQUARE_APPLICATION_ID", "SQUARE_ACCESS_TOKEN", "SQUARE_LOCATION_ID"]),
-    allOf(source, "payment-webhook", "Square payment confirmations (webhook)", ["SQUARE_WEBHOOK_SIGNATURE_KEY", "SQUARE_WEBHOOK_NOTIFICATION_URL"]),
+    ...squareServices(source),
     allOf(source, "google-sign-in", "Google sign-in", ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"]),
   );
 
   try {
-    services.push({ id: "encryption-key", label: "Secret encryption key", status: readKey(source).configured ? "configured" : "not-configured", missing: [] });
+    services.push({ id: "encryption-key", label: "Secret encryption key", status: readKey(source).configured ? "configured" : "not-configured", missing: [], note: null });
   } catch {
     services.push(unknownService("encryption-key", "Secret encryption key"));
   }

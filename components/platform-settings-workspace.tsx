@@ -538,7 +538,7 @@ export function PlatformSettingsWorkspace({
             Provider and technical details that most administrators never change. Open this only when you know why.
           </p>
           <details className="platform-advanced-details" open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
-            <summary>Show advanced settings</summary>
+            <summary>Advanced settings</summary>
             <div className="form-stack">
               <p className="settings-ownership">
                 <strong>Central value.</strong> Changing the passkey domain invalidates every existing passkey. The server refuses the
