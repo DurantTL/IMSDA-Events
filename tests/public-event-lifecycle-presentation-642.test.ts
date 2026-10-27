@@ -16,14 +16,14 @@ describe("one lifecycle presentation per state (#642)", () => {
 
   it("UPCOMING says when registration opens, once, and offers Add to my calendar", () => {
     const summary = describePublicEventLifecycle(baseEvent, 10, new Date("2026-07-31T18:00:00.000Z"));
-    expect(summary.statusLabel).toBe("Registration opens in August");
+    expect(summary.statusLabel).toBe("Registration opens tomorrow");
     expect(summary.detail).toContain("August 1, 2026");
     expect(summary).toMatchObject({ action: "ADD_TO_CALENDAR", ctaLabel: "Add to my calendar", ctaEnabled: false, ended: false });
   });
 
   it("UPCOMING for a club event says club registration", () => {
     const summary = describePublicEventLifecycle({ ...baseEvent, audience: "CLUB" }, 10, new Date("2026-07-31T18:00:00.000Z"));
-    expect(summary.statusLabel).toBe("Club registration opens in August");
+    expect(summary.statusLabel).toBe("Club registration opens tomorrow");
   });
 
   it("OPEN shows forms guidance and the remaining capacity", () => {

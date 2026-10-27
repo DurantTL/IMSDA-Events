@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import { AddToCalendarLink } from "@/components/add-to-calendar-link";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
   BookOpenText,
-  CalendarPlus,
   ExternalLink,
   FileDown,
   Megaphone,
@@ -138,9 +138,7 @@ export default async function PublicEventPage({
         </Link>
       )}
       {lifecycle.action === "ADD_TO_CALENDAR" && (
-        <a className="secondary-button public-event-status-action" href={`/events/${encodeURIComponent(landing.event.slug)}/event.ics`}>
-          <CalendarPlus size={18} aria-hidden="true" /> {lifecycle.ctaLabel}
-        </a>
+        <AddToCalendarLink href={`/events/${encodeURIComponent(landing.event.slug)}/event.ics`} label={lifecycle.ctaLabel} />
       )}
     </section>
   );
