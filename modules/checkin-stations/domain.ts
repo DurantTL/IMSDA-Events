@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { EventPermission } from "@/modules/access/permissions";
+import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 
 /** The device cookie for a check-in station (#892). It is never read by any staff route. */
 export const CHECK_IN_STATION_COOKIE_NAME = "imsda_check_in_station";
@@ -24,12 +25,30 @@ export const STATION_INACTIVE_MESSAGE =
 
 export type StationStartProblem = "TOO_EARLY" | "EVENT_ENDED";
 
+/**
+ * When a station must stop: the end of the event's last calendar day in its own time zone. Event dates are stored as
+ * noon UTC of the calendar day, so `endsAt` itself is the morning of the last day; the app treats an event as ended
+ * only once that calendar day has passed (`hasEventEnded`). Pure; found by searching for the first instant whose
+ * calendar date in the zone is after the last day.
+ */
+export function stationEndsAt(event: { endsAt: Date; timezone: string }): Date {
+  const lastDay = calendarDateInEventTimeZone(event.endsAt, event.timezone);
+  let low = event.endsAt.getTime();
+  let high = low + 50 * 60 * 60 * 1000;
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    if (calendarDateInEventTimeZone(new Date(mid), event.timezone) > lastDay) high = mid;
+    else low = mid;
+  }
+  return new Date(high);
+}
+
 /** Pure: whether a station may be started for this event right now. Null means it may. */
 export function stationStartProblem(
-  event: { startsAt: Date; endsAt: Date },
+  event: { startsAt: Date; endsAt: Date; timezone: string },
   now: Date,
 ): StationStartProblem | null {
-  if (now.getTime() >= event.endsAt.getTime()) return "EVENT_ENDED";
+  if (now.getTime() >= stationEndsAt(event).getTime()) return "EVENT_ENDED";
   if (now.getTime() < event.startsAt.getTime() - STATION_START_LEAD_MS) return "TOO_EARLY";
   return null;
 }
@@ -45,6 +64,8 @@ export type StationRecordState = {
   expiresAt: Date;
   revokedAt: Date | null;
   stoppedAt: Date | null;
+  /** True once the event's current dates say it is over (dates edited after the station started move this). */
+  eventEnded?: boolean;
   starter: {
     accountStatus: string;
     hasCredential: boolean;
@@ -64,7 +85,7 @@ export function stationInvalidReason(
 ): StationInvalidReason | null {
   if (station.revokedAt) return "REVOKED";
   if (station.stoppedAt) return "STOPPED";
-  if (station.expiresAt.getTime() <= now.getTime()) return "EXPIRED";
+  if (station.expiresAt.getTime() <= now.getTime() || station.eventEnded) return "EXPIRED";
   if (
     !station.starter.hasCredential
     || station.starter.credentialDisabledAt
@@ -135,6 +156,8 @@ export const stationPaymentSchema = z.strictObject({
   method: z.enum(["CASH", "CHECK"]),
   amountCents: z.number().int().positive().max(10_000_000),
   checkNumber: z.string().trim().max(40).default(""),
+  /** One per submission attempt of the payment form; kept across retries of that attempt. */
+  idempotencyKey: z.uuid(),
 }).refine((value) => value.method !== "CHECK" || value.checkNumber.length > 0, {
   path: ["checkNumber"],
   message: "Enter the check number.",
@@ -215,4 +238,10 @@ export function stationResultLabel(status: StationCheckInResultStatus) {
 /** "ADULT" to "Adult"; whatever the attendee-type value is, it is shown as plain words. */
 export function stationAttendeeTypeLabel(type: string) {
   return type.toLowerCase().replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+/** "(check-in station "Front desk tablet")", or just "(check-in station)" without a label. */
+export function stationSummarySuffix(label: string) {
+  const clean = label.trim().slice(0, STATION_LABEL_MAX_LENGTH);
+  return clean ? ` (check-in station "${clean}")` : " (check-in station)";
 }

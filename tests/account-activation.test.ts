@@ -31,6 +31,7 @@ function prismaFixture(overrides: {
     authCredential: { update: vi.fn().mockResolvedValue({}) },
     user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     userSession: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    checkInStation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     userPasskey: { updateMany: vi.fn().mockResolvedValue({ count: overrides.activePasskeys ?? 0 }) },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     // The one-sign-in switch (#554): no settings row means off.
@@ -232,6 +233,23 @@ describe("completing a token activates the account", () => {
       data: { accountStatus: "ACTIVE", activatedAt: expect.any(Date) },
     });
     expect(tx.userSession.updateMany).toHaveBeenCalledOnce();
+  });
+
+  it("revokes the person's check-in stations with their sessions (#892)", async () => {
+    const { tx } = prismaFixture({
+      resetToken: {
+        id: "tok-1",
+        userId: "user-1",
+        purpose: "PASSWORD_RESET",
+        expiresAt: new Date(Date.now() + 60_000),
+        usedAt: null,
+      },
+    });
+    expect(await resetPassword("raw-token", knownPassword)).toBe(true);
+    expect(tx.checkInStation.updateMany).toHaveBeenCalledWith({
+      where: { startedByUserId: "user-1", revokedAt: null, stoppedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
   });
 
   it("revokes every staff passkey on a password reset, and audits the count (#453)", async () => {

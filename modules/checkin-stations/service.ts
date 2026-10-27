@@ -13,6 +13,7 @@ import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
 import { CheckInOperationError, checkInAttendee } from "@/modules/checkin/repository";
 import {
   stationPaymentSummary,
+  stationSummarySuffix,
   type StationCheckInResult,
   type StationFamily,
   type StationPaymentSummary,
@@ -147,11 +148,22 @@ export async function lookupStationFamily(
  * uses (screening gate, duplicate safety, audit). The station passes no override, so a held person is reported as
  * needing the desk instead of being checked in.
  */
+/** A club registration is worked at the desk, wherever the request came from. */
+async function refuseClubRegistration(eventId: string, registrationId: string) {
+  const registration = await getPrisma().registration.findFirst({
+    where: { id: registrationId, eventId },
+    select: { clubRegistration: { select: { id: true } } },
+  });
+  if (!registration) throw new StationServiceError("NOT_FOUND");
+  if (registration.clubRegistration) throw new StationServiceError("SEND_TO_DESK");
+}
+
 export async function checkInStationFamily(
   station: ResolvedStation,
   input: { registrationId: string; items: Array<{ attendeeId: string; idempotencyKey: string }> },
 ): Promise<StationCheckInResult[]> {
   const eventId = station.station.eventId;
+  await refuseClubRegistration(eventId, input.registrationId);
   const ids = [...new Set(input.items.map((item) => item.attendeeId))];
   const found = await getPrisma().registrationAttendee.findMany({
     where: { id: { in: ids }, eventId, registrationId: input.registrationId },
@@ -197,6 +209,7 @@ export async function checkInStationFamily(
 }
 
 async function requirePayableRegistration(station: ResolvedStation, registrationId: string) {
+  await refuseClubRegistration(station.station.eventId, registrationId);
   const summary = await paymentSummaryFor(station.station.eventId, registrationId);
   if (summary.state === "BILLED_TO_GROUP") throw new StationServiceError("BILLED_TO_GROUP");
   if (summary.state === "PAID") throw new StationServiceError("NOTHING_DUE");
@@ -206,7 +219,7 @@ async function requirePayableRegistration(station: ResolvedStation, registration
 /** Cash or check received at the station, recorded by the existing audited service under the starter's account. */
 export async function recordStationPayment(
   station: ResolvedStation,
-  input: { registrationId: string; method: "CASH" | "CHECK"; amountCents: number; checkNumber: string },
+  input: { registrationId: string; method: "CASH" | "CHECK"; amountCents: number; checkNumber: string; idempotencyKey: string },
 ): Promise<StationPaymentSummary> {
   const eventId = station.station.eventId;
   const summary = await requirePayableRegistration(station, input.registrationId);
@@ -221,6 +234,7 @@ export async function recordStationPayment(
       amountCents: input.amountCents,
       method: input.method,
       reference: input.method === "CHECK" ? input.checkNumber : "",
+      idempotencyKey: input.idempotencyKey,
     },
     { station: { id: station.station.id, label: station.station.label } },
   );
@@ -236,7 +250,10 @@ export async function noteStationSquareAppPayment(
   input: { registrationId: string; amountCents: number; receiptNumber: string },
 ): Promise<StationPaymentSummary> {
   const eventId = station.station.eventId;
-  await requirePayableRegistration(station, input.registrationId);
+  const summary = await requirePayableRegistration(station, input.registrationId);
+  if (summary.state === "DUE" && input.amountCents > summary.balanceCents) {
+    throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
+  }
   const registration = await getPrisma().registration.findFirst({
     where: { id: input.registrationId, eventId },
     select: { confirmationCode: true },
@@ -248,7 +265,7 @@ export async function noteStationSquareAppPayment(
     action: squareNoteAction,
     entityType: "Registration",
     entityId: input.registrationId,
-    summary: `Noted a card payment taken in the Square app on registration ${registration.confirmationCode} (check-in station); finance still needs to match it.`,
+    summary: `Noted a card payment taken in the Square app on registration ${registration.confirmationCode}${stationSummarySuffix(station.station.label)}; finance still needs to match it.`,
     metadata: {
       amountCents: input.amountCents,
       ...(input.receiptNumber ? { receiptNumber: input.receiptNumber } : {}),

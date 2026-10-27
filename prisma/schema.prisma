@@ -3474,6 +3474,9 @@ model Payment {
   /// reservation counts as held exactly while a deposit payment's net amount is above zero.
   isDeposit         Boolean       @default(false)
   receivedAt        DateTime?
+  /// A check-in station's cash/check entry (#892): one key per submission attempt, so a retry after a lost
+  /// response replays the saved payment instead of recording a second. Null for every other payment.
+  idempotencyKey    String?       @unique
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

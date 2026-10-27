@@ -236,47 +236,47 @@ describe("station check-in (#892)", () => {
 describe("station payments (#892)", () => {
   it("records cash through the audited service with the station context", async () => {
     prismaFor();
-    await recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 2500, checkNumber: "" });
+    await recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 2500, checkNumber: "", idempotencyKey: keyA });
     expect(mocks.recordManualPayment).toHaveBeenCalledWith(
       "event_1", "registration_1", "user_1",
-      { amountCents: 2500, method: "CASH", reference: "" },
+      { amountCents: 2500, method: "CASH", reference: "", idempotencyKey: keyA },
       { station: { id: "station_1", label: "Front desk tablet" } },
     );
   });
 
   it("stores the check number as the reference", async () => {
     prismaFor();
-    await recordStationPayment(station, { registrationId: "registration_1", method: "CHECK", amountCents: 6000, checkNumber: "1042" });
-    expect(mocks.recordManualPayment.mock.calls[0][3]).toEqual({ amountCents: 6000, method: "CHECK", reference: "1042" });
+    await recordStationPayment(station, { registrationId: "registration_1", method: "CHECK", amountCents: 6000, checkNumber: "1042", idempotencyKey: keyA });
+    expect(mocks.recordManualPayment.mock.calls[0][3]).toEqual({ amountCents: 6000, method: "CHECK", reference: "1042", idempotencyKey: keyA });
   });
 
   it("rejects an amount over the balance before recording anything", async () => {
     prismaFor();
-    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 6001, checkNumber: "" }))
+    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 6001, checkNumber: "", idempotencyKey: keyA }))
       .rejects.toMatchObject({ code: "PAYMENT_EXCEEDS_BALANCE" });
     expect(mocks.recordManualPayment).not.toHaveBeenCalled();
   });
 
   it("collects nothing for a church-billed or fully paid registration", async () => {
     prismaFor(registrationRow({ event: { billingMode: "DEFERRED_ORGANIZATION_INVOICE" } }));
-    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "" }))
+    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "", idempotencyKey: keyA }))
       .rejects.toMatchObject({ code: "BILLED_TO_GROUP" });
     prismaFor(registrationRow({ payments: [{ amount: 100, refunds: [] }] }));
-    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "" }))
+    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "", idempotencyKey: keyA }))
       .rejects.toMatchObject({ code: "NOTHING_DUE" });
     expect(mocks.recordManualPayment).not.toHaveBeenCalled();
   });
 
   it("scopes the registration to the station's event", async () => {
     const prisma = prismaFor(null);
-    await expect(recordStationPayment(station, { registrationId: "registration_other_event", method: "CASH", amountCents: 100, checkNumber: "" }))
+    await expect(recordStationPayment(station, { registrationId: "registration_other_event", method: "CASH", amountCents: 100, checkNumber: "", idempotencyKey: keyA }))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(prisma.registration.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "registration_other_event", eventId: "event_1" } }));
   });
 
   it("notes a Square-app card payment as an audit entry only, never a Payment row", async () => {
     const prisma = prismaFor();
-    await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6200, receiptNumber: "R-1234" });
+    await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6000, receiptNumber: "R-1234" });
     expect(mocks.recordManualPayment).not.toHaveBeenCalled();
     expect(prisma.payment.create).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
@@ -286,7 +286,7 @@ describe("station payments (#892)", () => {
       entityType: "Registration",
       entityId: "registration_1",
       metadata: {
-        amountCents: 6200,
+        amountCents: 6000,
         receiptNumber: "R-1234",
         needsReconciliation: true,
         channel: "CHECK_IN_STATION",
@@ -295,9 +295,35 @@ describe("station payments (#892)", () => {
     }));
   });
 
+  it("caps a Square-app note at the balance", async () => {
+    prismaFor();
+    await expect(noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6001, receiptNumber: "" }))
+      .rejects.toMatchObject({ code: "PAYMENT_EXCEEDS_BALANCE" });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("names the station in the Square-app note summary", async () => {
+    prismaFor();
+    await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6000, receiptNumber: "" });
+    expect(mocks.writeAuditLog.mock.calls[0][0].summary).toContain('(check-in station "Front desk tablet")');
+  });
+
+  it("refuses a club registration for check-in, payment and Square notes, not only lookup", async () => {
+    prismaFor(registrationRow({ clubRegistration: { id: "club_1" } }));
+    await expect(checkInStationFamily(station, { registrationId: "registration_1", items: [{ attendeeId: "attendee_1", idempotencyKey: keyA }] }))
+      .rejects.toMatchObject({ code: "SEND_TO_DESK" });
+    await expect(recordStationPayment(station, { registrationId: "registration_1", method: "CASH", amountCents: 100, checkNumber: "", idempotencyKey: keyA }))
+      .rejects.toMatchObject({ code: "SEND_TO_DESK" });
+    await expect(noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 100, receiptNumber: "" }))
+      .rejects.toMatchObject({ code: "SEND_TO_DESK" });
+    expect(mocks.checkInAttendee).not.toHaveBeenCalled();
+    expect(mocks.recordManualPayment).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("omits an empty receipt number from the note", async () => {
     prismaFor();
-    await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6200, receiptNumber: "" });
+    await noteStationSquareAppPayment(station, { registrationId: "registration_1", amountCents: 6000, receiptNumber: "" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).not.toHaveProperty("receiptNumber");
   });
 });

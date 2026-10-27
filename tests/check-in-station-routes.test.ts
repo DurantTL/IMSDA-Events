@@ -121,7 +121,7 @@ describe("check-in station API: access (#892)", () => {
   it.each([
     ["lookup", lookupPost, { kind: "confirmation", value: "CM27-ONE" }],
     ["check-in", checkInPost, { registrationId: "r1", items: [{ attendeeId: "a1", idempotencyKey: key }] }],
-    ["payment", paymentPost, { registrationId: "r1", method: "CASH", amountCents: 100 }],
+    ["payment", paymentPost, { registrationId: "r1", method: "CASH", amountCents: 100, idempotencyKey: key }],
     ["square-app-note", squareNotePost, { registrationId: "r1", amountCents: 100 }],
     ["stop", stopPost, {}],
   ] as const)("rejects a revoked, expired or missing station on %s and clears its cookie", async (_name, handler, body) => {
@@ -208,7 +208,7 @@ describe("check-in station API: scope and results (#892)", () => {
 });
 
 describe("check-in station API: payments (#892)", () => {
-  const cash = { registrationId: "registration_1", method: "CASH", amountCents: 2500 };
+  const cash = { registrationId: "registration_1", method: "CASH", amountCents: 2500, idempotencyKey: key };
 
   it("answers 403 when the starter lacks MANAGE_FINANCE, without recording", async () => {
     const response = await paymentPost(post("/api/check-in-station/payment", cash));

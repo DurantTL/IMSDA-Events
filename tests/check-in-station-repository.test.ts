@@ -24,8 +24,9 @@ import {
   stopStation,
 } from "@/modules/checkin-stations/repository";
 
-const now = new Date("2026-10-31T15:00:00.000Z");
-const endsAt = new Date("2026-11-01T18:00:00.000Z");
+const now = new Date("2026-11-01T15:00:00.000Z");
+const endsAt = new Date("2026-11-02T06:00:00.000Z");
+const eventDates = { endsAt: new Date("2026-11-01T12:00:00.000Z"), timezone: "America/Chicago" };
 
 function stationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -36,7 +37,7 @@ function stationRow(overrides: Record<string, unknown> = {}) {
     lastSeenAt: new Date(now.getTime() - 10_000),
     revokedAt: null,
     stoppedAt: null,
-    event: { name: "Synthetic Camp Meeting" },
+    event: { name: "Synthetic Camp Meeting", ...eventDates },
     startedBy: {
       id: "user_1",
       email: "checkin.staff@example.test",
@@ -58,7 +59,7 @@ function prismaFor(row: Record<string, unknown> | null) {
       create: vi.fn().mockResolvedValue({ id: "station_new", label: "Back table", expiresAt: endsAt }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    event: { findUnique: vi.fn().mockResolvedValue({ id: "event_1", startsAt: new Date("2026-10-30T14:00:00.000Z"), endsAt }) },
+    event: { findUnique: vi.fn().mockResolvedValue({ id: "event_1", startsAt: new Date("2026-10-30T12:00:00.000Z"), ...eventDates }) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return prisma;
@@ -105,6 +106,14 @@ describe("resolveStationToken (#892)", () => {
   ])("rejects a %s station", async (_name, overrides, reason) => {
     prismaFor(stationRow(overrides));
     expect(await resolveStationToken("device-token", now)).toEqual({ ok: false, reason });
+  });
+
+  it("stays valid at 9 PM Central on the last day and not once the event's dates say it ended", async () => {
+    prismaFor(stationRow());
+    expect((await resolveStationToken("device-token", new Date("2026-11-02T03:00:00.000Z"))).ok).toBe(true);
+    // Dates edited after the station started: the event now ended on Oct 30, though expiresAt is still later.
+    prismaFor(stationRow({ event: { name: "Synthetic Camp Meeting", endsAt: new Date("2026-10-30T12:00:00.000Z"), timezone: "America/Chicago" } }));
+    expect(await resolveStationToken("device-token", now)).toEqual({ ok: false, reason: "EXPIRED" });
   });
 
   it("rejects a station whose starter was disabled", async () => {
@@ -171,11 +180,17 @@ describe("start, stop, revoke and list (#892)", () => {
     }));
   });
 
+  it("can still start on the event's last day after 07:00 Central", async () => {
+    prismaFor(null);
+    const user = { id: "user_1", email: "a@example.test", displayName: "A" };
+    await expect(startStation("event_1", user, "", new Date("2026-11-02T03:00:00.000Z"))).resolves.toBeTruthy();
+  });
+
   it("refuses to start too early or after the event", async () => {
     prismaFor(null);
     const user = { id: "user_1", email: "a@example.test", displayName: "A" };
     await expect(startStation("event_1", user, "", new Date("2026-10-20T00:00:00.000Z"))).rejects.toMatchObject({ code: "TOO_EARLY" });
-    await expect(startStation("event_1", user, "", new Date("2026-11-02T00:00:00.000Z"))).rejects.toMatchObject({ code: "EVENT_ENDED" });
+    await expect(startStation("event_1", user, "", new Date("2026-11-02T07:00:00.000Z"))).rejects.toMatchObject({ code: "EVENT_ENDED" });
   });
 
   it("stops from the device once and audits once", async () => {

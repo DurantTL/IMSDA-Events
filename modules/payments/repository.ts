@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { runSerializableTransaction } from "@/modules/payments/serializable";
 import { getRegistrationById } from "@/modules/registrations/repository";
@@ -7,6 +8,7 @@ import {
 } from "@/modules/payments/deposit-domain";
 import { enqueueRefundNoticeMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
+import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { logError } from "@/lib/logger";
 import {
   flushHostedDeletionsAfterResponse,
@@ -14,9 +16,11 @@ import {
 } from "@/modules/payments/square-hosted-invalidation";
 
 export class PaymentOperationError extends Error {
-  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | StaffDepositProblem) {
+  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | "PAYMENT_IDEMPOTENCY_KEY_REUSED" | StaffDepositProblem) {
     super(
-      code === "PAYMENT_CONFLICT"
+      code === "PAYMENT_IDEMPOTENCY_KEY_REUSED"
+        ? "This payment key was already used for a different registration. Start the payment again."
+        : code === "PAYMENT_CONFLICT"
         ? "Another payment changed this registration at the same time. Review the registration and try again."
         : code === "DEPOSIT_NOT_OFFERED"
         ? "This registration's form does not offer a reservation deposit."
@@ -40,11 +44,30 @@ export class PaymentOperationError extends Error {
   }
 }
 
+/** True when `key` already saved a payment for this registration; throws when another registration owns it. */
+async function findPaymentReplay(
+  client: Pick<Prisma.TransactionClient, "payment">,
+  eventId: string,
+  registrationId: string,
+  key: string | undefined,
+) {
+  if (!key) return false;
+  const existing = await client.payment.findUnique({
+    where: { idempotencyKey: key },
+    select: { eventId: true, registrationId: true },
+  });
+  if (!existing) return false;
+  if (existing.eventId !== eventId || existing.registrationId !== registrationId) {
+    throw new PaymentOperationError("PAYMENT_IDEMPOTENCY_KEY_REUSED");
+  }
+  return true;
+}
+
 export async function recordManualPayment(
   eventId: string,
   registrationId: string,
   actorUserId: string,
-  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean },
+  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean; idempotencyKey?: string },
   /** #892: set by a check-in station; the entry stays under the starter's account and names the station. */
   auditContext?: { station: { id: string; label: string } },
 ) {
@@ -52,7 +75,11 @@ export async function recordManualPayment(
   const stationMetadata = auditContext
     ? { channel: "CHECK_IN_STATION", station: { id: auditContext.station.id, label: auditContext.station.label } }
     : null;
-  const stationSummary = stationMetadata ? " (check-in station)" : "";
+  const stationSummary = auditContext ? stationSummarySuffix(auditContext.station.label) : "";
+  // A retry of a payment that was already saved answers with the registration as it stands: no second Payment row, no
+  // second audit entry, and no balance check (the first save already used the balance up).
+  const replayed = await findPaymentReplay(prisma, eventId, registrationId, input.idempotencyKey);
+  if (replayed) return getRegistrationById(eventId, registrationId);
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
     include: {
@@ -101,6 +128,8 @@ export async function recordManualPayment(
       WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
       FOR NO KEY UPDATE
     `;
+    // Two submissions of one attempt racing each other: the loser sees the winner's row here and does nothing.
+    if (await findPaymentReplay(tx, eventId, registrationId, input.idempotencyKey)) return;
     const locked = await tx.registration.findFirst({
       where: { id: registrationId, eventId },
       select: { status: true, totalAmount: true },
@@ -124,6 +153,7 @@ export async function recordManualPayment(
         method: input.method,
         externalReference: input.reference || null,
         receivedAt: new Date(),
+        idempotencyKey: input.idempotencyKey ?? null,
       },
     });
     await tx.auditLog.create({

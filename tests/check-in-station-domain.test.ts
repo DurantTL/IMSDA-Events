@@ -3,6 +3,7 @@ import {
   classifyStationEntry,
   parseDollarsToCents,
   shouldTouchStation,
+  stationEndsAt,
   stationCapabilities,
   stationCookieOptions,
   stationInvalidReason,
@@ -13,14 +14,17 @@ import {
 } from "@/modules/checkin-stations/domain";
 
 const now = new Date("2026-10-27T15:00:00.000Z");
+// Event dates are stored as noon UTC of the calendar day (07:00 or 06:00 Central).
 const event = {
-  startsAt: new Date("2026-10-30T14:00:00.000Z"),
-  endsAt: new Date("2026-11-01T18:00:00.000Z"),
+  startsAt: new Date("2026-10-30T12:00:00.000Z"),
+  endsAt: new Date("2026-11-01T12:00:00.000Z"),
+  timezone: "America/Chicago",
 };
+const stationEnd = stationEndsAt(event);
 
 function station(overrides: Partial<StationRecordState> = {}): StationRecordState {
   return {
-    expiresAt: event.endsAt,
+    expiresAt: stationEnd,
     revokedAt: null,
     stoppedAt: null,
     starter: { accountStatus: "ACTIVE", hasCredential: true, credentialDisabledAt: null },
@@ -29,13 +33,26 @@ function station(overrides: Partial<StationRecordState> = {}): StationRecordStat
 }
 
 describe("check-in station start window (#892)", () => {
-  it("opens two days before the event starts", () => {
-    expect(stationStartProblem(event, new Date("2026-10-28T13:59:59.000Z"))).toBe("TOO_EARLY");
-    expect(stationStartProblem(event, new Date("2026-10-28T14:00:00.000Z"))).toBeNull();
+  it("ends with the event's last calendar day in its own time zone, not at its noon-UTC date", () => {
+    // Nov 1 2026 is the day daylight time ends; midnight Central is 06:00 UTC on Nov 2.
+    expect(stationEnd.toISOString()).toBe("2026-11-02T06:00:00.000Z");
+    expect(stationEndsAt({ endsAt: new Date("2026-07-10T12:00:00.000Z"), timezone: "America/Chicago" }).toISOString()).toBe("2026-07-11T05:00:00.000Z");
   });
-  it("stays open until the event ends, then closes", () => {
-    expect(stationStartProblem(event, new Date("2026-11-01T17:59:59.000Z"))).toBeNull();
-    expect(stationStartProblem(event, event.endsAt)).toBe("EVENT_ENDED");
+  it("opens two days before the event starts", () => {
+    expect(stationStartProblem(event, new Date("2026-10-28T11:59:59.000Z"))).toBe("TOO_EARLY");
+    expect(stationStartProblem(event, new Date("2026-10-28T12:00:00.000Z"))).toBeNull();
+  });
+  it("lets a one-day event start at 8 AM Central and stay valid at 9 PM, but not the next morning", () => {
+    const oneDay = { startsAt: new Date("2026-07-10T12:00:00.000Z"), endsAt: new Date("2026-07-10T12:00:00.000Z"), timezone: "America/Chicago" };
+    expect(stationStartProblem(oneDay, new Date("2026-07-10T13:00:00.000Z"))).toBeNull(); // 8 AM CDT
+    expect(stationStartProblem(oneDay, new Date("2026-07-11T02:00:00.000Z"))).toBeNull(); // 9 PM CDT, still the last day
+    const record = station({ expiresAt: stationEndsAt(oneDay) });
+    expect(stationInvalidReason(record, ["MANAGE_CHECK_IN"], new Date("2026-07-11T02:00:00.000Z"))).toBeNull();
+    expect(stationInvalidReason(record, ["MANAGE_CHECK_IN"], new Date("2026-07-11T13:00:00.000Z"))).toBe("EXPIRED");
+    expect(stationStartProblem(oneDay, new Date("2026-07-11T13:00:00.000Z"))).toBe("EVENT_ENDED");
+  });
+  it("expires a station once the event's current dates say it ended", () => {
+    expect(stationInvalidReason(station({ eventEnded: true }), ["MANAGE_CHECK_IN"], now)).toBe("EXPIRED");
   });
 });
 
@@ -99,12 +116,16 @@ describe("check-in station entry and money helpers (#892)", () => {
     expect(stationPaymentSummary({ balanceCents: 5000, isDeferredOrganizationBilling: true, squareAppNote: null })).toEqual({ state: "BILLED_TO_GROUP" });
     expect(stationPaymentSummary({ balanceCents: 5000, isDeferredOrganizationBilling: false, squareAppNote: null })).toEqual({ state: "DUE", balanceCents: 5000, squareAppNote: null });
   });
+  it("requires a payment key", () => {
+    expect(stationPaymentSchema.safeParse({ registrationId: "r1", amountCents: 100, method: "CASH" }).success).toBe(false);
+  });
   it("requires a check number for a check but not for cash", () => {
     const base = { registrationId: "registration_1", amountCents: 2500 };
-    expect(stationPaymentSchema.safeParse({ ...base, method: "CHECK", checkNumber: "" }).success).toBe(false);
+    const key = { idempotencyKey: "d67776d0-f79d-4e8f-bec2-ee61abb7337c" };
+    expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "CHECK", checkNumber: "" }).success).toBe(false);
     expect(stationPaymentSchema.safeParse({ ...base, method: "CHECK" }).success).toBe(false);
-    expect(stationPaymentSchema.safeParse({ ...base, method: "CHECK", checkNumber: "1042" }).success).toBe(true);
-    expect(stationPaymentSchema.safeParse({ ...base, method: "CASH" }).success).toBe(true);
-    expect(stationPaymentSchema.safeParse({ ...base, method: "MANUAL" }).success).toBe(false);
+    expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "CHECK", checkNumber: "1042" }).success).toBe(true);
+    expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "CASH" }).success).toBe(true);
+    expect(stationPaymentSchema.safeParse({ ...base, ...key, method: "MANUAL" }).success).toBe(false);
   });
 });

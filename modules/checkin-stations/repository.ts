@@ -16,11 +16,13 @@ import {
   shouldTouchStation,
   stationCapabilities,
   stationInvalidReason,
+  stationEndsAt,
   stationStartProblem,
   type StationCapabilities,
   type StationInvalidReason,
   type StationStartProblem,
 } from "@/modules/checkin-stations/domain";
+import { hasEventEnded } from "@/modules/events/lifecycle";
 import { findActiveMembership } from "@/modules/events/repository";
 
 export class CheckInStationError extends Error {
@@ -62,7 +64,7 @@ export async function startStation(
   const prisma = getPrisma();
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    select: { id: true, startsAt: true, endsAt: true },
+    select: { id: true, startsAt: true, endsAt: true, timezone: true },
   });
   if (!event) throw new CheckInStationError("EVENT_NOT_FOUND");
   const problem = stationStartProblem(event, now);
@@ -75,7 +77,7 @@ export async function startStation(
       startedByUserId: starter.id,
       label,
       tokenHash: hashOpaqueToken(token),
-      expiresAt: event.endsAt,
+      expiresAt: stationEndsAt(event),
       lastSeenAt: now,
     },
     select: { id: true, label: true, expiresAt: true },
@@ -130,7 +132,7 @@ export async function resolveStationToken(
       lastSeenAt: true,
       revokedAt: true,
       stoppedAt: true,
-      event: { select: { name: true } },
+      event: { select: { name: true, endsAt: true, timezone: true } },
       startedBy: {
         select: {
           id: true,
@@ -155,6 +157,8 @@ export async function resolveStationToken(
     expiresAt: row.expiresAt,
     revokedAt: row.revokedAt,
     stoppedAt: row.stoppedAt,
+    // The event's current dates decide too, so editing them after the station started moves its end.
+    eventEnded: hasEventEnded({ endsAt: row.event.endsAt, timezone: row.event.timezone }, now),
     starter: {
       accountStatus: row.startedBy.accountStatus,
       hasCredential: Boolean(row.startedBy.credential),

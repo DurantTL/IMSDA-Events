@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/prisma";
 import { checkInBlocksForAttendees } from "@/modules/background-checks/repository";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
+import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { Prisma } from "@prisma/client";
 
 const activeRegistrationStatusSet = new Set<string>(activeRegistrationStatuses);
@@ -178,7 +179,7 @@ export async function checkInAttendee(
             entityType: "RegistrationAttendee",
             entityId: attendeeId,
             correlationId,
-            summary: stationMetadata ? "Checked in an attendee (check-in station)." : "Checked in an attendee.",
+            summary: options.auditContext ? `Checked in an attendee${stationSummarySuffix(options.auditContext.station.label)}.` : "Checked in an attendee.",
             ...(stationMetadata ? { metadata: stationMetadata } : {}),
           },
         });

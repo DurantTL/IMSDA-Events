@@ -1,5 +1,5 @@
--- Staff-run check-in station (#892). ADDITIVE ONLY: one new table with its indexes and foreign keys. No existing table
--- or column is touched, so the code from before this deploy keeps working against the new schema. Applying it in
+-- Staff-run check-in station (#892). ADDITIVE ONLY: one new table with its indexes and foreign keys, and one nullable
+-- "Payment"."idempotencyKey" column with a unique index (a station's cash/check retry key). No existing column is changed, so the code from before this deploy keeps working against the new schema. Applying it in
 -- production is a human step (back up first).
 
 -- CreateTable
@@ -39,3 +39,9 @@ ALTER TABLE "CheckInStation" ADD CONSTRAINT "CheckInStation_startedByUserId_fkey
 
 -- AddForeignKey
 ALTER TABLE "CheckInStation" ADD CONSTRAINT "CheckInStation_revokedByUserId_fkey" FOREIGN KEY ("revokedByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AlterTable
+ALTER TABLE "Payment" ADD COLUMN "idempotencyKey" TEXT;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Payment_idempotencyKey_key" ON "Payment"("idempotencyKey");

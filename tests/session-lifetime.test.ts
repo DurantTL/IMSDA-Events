@@ -30,6 +30,8 @@ function prismaFixture(rows: Array<Record<string, unknown>> = []) {
       findMany: vi.fn().mockResolvedValue(rows),
       updateMany: vi.fn().mockResolvedValue({ count: rows.length }),
     },
+    // Check-in stations (#892) end with the sessions.
+    checkInStation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
   dependencies.getPrisma.mockReturnValue(prisma);
   return prisma;

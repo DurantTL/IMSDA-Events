@@ -155,6 +155,13 @@ export function CheckInStationScreen({
     setSelected(new Set());
   }
 
+  // After a network error on a payment: ask the server for the registration's current balance.
+  async function refreshPayment() {
+    if (!family) return;
+    const response = await post<{ family: StationFamily }>("/api/check-in-station/lookup", { kind: "confirmation", value: family.confirmationCode });
+    if (response.ok) setFamily((current) => (current ? { ...current, payment: response.data.family.payment } : current));
+  }
+
   async function stopStation() {
     setBusy("stop");
     setStopError("");
@@ -272,6 +279,7 @@ export function CheckInStationScreen({
             family={family}
             canRecordPayments={canRecordPayments}
             onPayment={(payment) => setFamily((current) => (current ? { ...current, payment } : current))}
+            onRefresh={refreshPayment}
             busy={busy === "payment"}
             setBusy={(value) => setBusy(value ? "payment" : "")}
           />
@@ -299,12 +307,14 @@ function PaymentPanel({
   family,
   canRecordPayments,
   onPayment,
+  onRefresh,
   busy,
   setBusy,
 }: {
   family: StationFamily;
   canRecordPayments: boolean;
   onPayment: (payment: StationPaymentSummary) => void;
+  onRefresh: () => Promise<void>;
   busy: boolean;
   setBusy: (busy: boolean) => void;
 }) {
@@ -317,6 +327,15 @@ function PaymentPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const payment = family.payment;
+  // One key per submission attempt: kept across retries of the same attempt, replaced after a success or when the
+  // form changes, so a lost response never records the same money twice.
+  const attemptKey = useRef<string | null>(null);
+  function changed<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      attemptKey.current = null;
+      setter(value);
+    };
+  }
 
   async function recordReceived(event: FormEvent) {
     event.preventDefault();
@@ -326,14 +345,22 @@ function PaymentPanel({
     if (!cents) return setError("Enter the amount received, like 25.00.");
     if (method === "CHECK" && !checkNumber.trim()) return setError("Enter the check number.");
     setBusy(true);
+    attemptKey.current ??= crypto.randomUUID();
     const response = await post<{ payment: StationPaymentSummary }>("/api/check-in-station/payment", {
       registrationId: family.registrationId,
       method,
       amountCents: cents,
       checkNumber: method === "CHECK" ? checkNumber.trim() : "",
+      idempotencyKey: attemptKey.current,
     });
     setBusy(false);
-    if (!response.ok) return setError(response.message);
+    if (!response.ok) {
+      setError(response.message);
+      // No answer came back: the payment may or may not have been saved. Refresh the balance from the server.
+      if (response.status === 0) await onRefresh();
+      return;
+    }
+    attemptKey.current = null;
     onPayment(response.data.payment);
     setNotice(`${method === "CASH" ? "Cash" : "Check"} of ${formatCents(cents)} recorded.`);
     setAmount("");
@@ -345,7 +372,7 @@ function PaymentPanel({
     setError("");
     setNotice("");
     const cents = parseDollarsToCents(squareAmount);
-    if (!cents) return setError("Enter the amount charged in the Square app, like 25.00.");
+    if (!cents) return setError("Enter the amount applied to the balance, like 25.00.");
     setBusy(true);
     const response = await post<{ payment: StationPaymentSummary }>("/api/check-in-station/square-app-note", {
       registrationId: family.registrationId,
@@ -386,8 +413,8 @@ function PaymentPanel({
               <fieldset>
                 <legend>Cash or check received</legend>
                 <div className="cis-choice">
-                  <label><input type="radio" name="cis-method" checked={method === "CASH"} onChange={() => setMethod("CASH")} /> Cash</label>
-                  <label><input type="radio" name="cis-method" checked={method === "CHECK"} onChange={() => setMethod("CHECK")} /> Check</label>
+                  <label><input type="radio" name="cis-method" checked={method === "CASH"} onChange={() => changed(setMethod)("CASH")} /> Cash</label>
+                  <label><input type="radio" name="cis-method" checked={method === "CHECK"} onChange={() => changed(setMethod)("CHECK")} /> Check</label>
                 </div>
                 <label htmlFor="cis-amount">Amount received</label>
                 <input
@@ -396,7 +423,7 @@ function PaymentPanel({
                   autoComplete="off"
                   value={amount}
                   placeholder={(payment.balanceCents / 100).toFixed(2)}
-                  onChange={(event) => setAmount(event.target.value)}
+                  onChange={(event) => changed(setAmount)(event.target.value)}
                 />
                 {method === "CHECK" && (
                   <>
@@ -406,7 +433,7 @@ function PaymentPanel({
                       autoComplete="off"
                       value={checkNumber}
                       maxLength={40}
-                      onChange={(event) => setCheckNumber(event.target.value)}
+                      onChange={(event) => changed(setCheckNumber)(event.target.value)}
                       required
                     />
                   </>
@@ -427,7 +454,7 @@ function PaymentPanel({
               <fieldset>
                 <legend>Paid by card in Square app</legend>
                 <p className="cis-help">This only notes the payment. Finance attaches the real Square payment, so nothing is counted twice.</p>
-                <label htmlFor="cis-square-amount">Amount charged in Square</label>
+                <label htmlFor="cis-square-amount">Amount applied to the balance (without the card fee)</label>
                 <input id="cis-square-amount" inputMode="decimal" autoComplete="off" value={squareAmount} onChange={(event) => setSquareAmount(event.target.value)} />
                 <label htmlFor="cis-square-receipt">Receipt number (optional)</label>
                 <input id="cis-square-receipt" autoComplete="off" value={receipt} maxLength={60} onChange={(event) => setReceipt(event.target.value)} />
