@@ -29,6 +29,8 @@ const dashboardEventSelect = {
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
+  // Keep these filters in step with `countEventsAdminWaiting` (modules/events/events-admin-home-repository.ts, #1245):
+  // the Events Administrator pill must equal the dashboard's Need attention total.
   registrations: {
     where: { status: { in: ["SUBMITTED", "CONFIRMED"] } },
     select: {

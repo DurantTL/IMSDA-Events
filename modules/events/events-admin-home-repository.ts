@@ -56,6 +56,7 @@ export async function countEventsAdminWaiting(eventIds: readonly string[], now =
   if (eventIds.length === 0) return 0;
   const prisma = getPrisma();
   const scope = { id: { in: [...eventIds] }, archivedAt: null, endsAt: { gte: now } };
+  // The status, payment and refund filters mirror `dashboardEventSelect` (modules/system-admin/repository.ts); change both together.
   const [drafts, registrations] = await Promise.all([
     prisma.registration.count({ where: { status: "DRAFT", event: scope } }),
     prisma.registration.findMany({
