@@ -129,6 +129,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
       </section>
 
       <div className="calendar-layout">
+        <p className="home-more"><Link className="home-events-link" href="/events">See all events open for registration</Link></p>
         <div className="calendar-toolbar">
           <nav aria-label="Calendar view" className="calendar-view-toggle">
             <Link aria-current={view === "month" ? "page" : undefined} href={calendarHref({ ...base, view: "month" })}>

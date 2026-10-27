@@ -221,6 +221,7 @@ export function ClubHomeEvents({
           ))}
         </ul>
       )}
+      <p className="home-more"><Link className="home-events-link" href="/events">See all events open for registration</Link></p>
     </section>
   );
 }

@@ -201,6 +201,7 @@ const pages: PageSpec[] = [
   { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
   { name: "public-calendar", path: "/calendar", role: "visitor" },
   { name: "public-home", path: "/", role: "visitor" },
+  { name: "public-events-open", path: "/events", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   // The public Club forms list (#1221).
   { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },

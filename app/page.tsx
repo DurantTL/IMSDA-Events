@@ -61,6 +61,9 @@ export default async function Home() {
             <ul className="calendar-agenda-list">{upcoming.map((item) => <AgendaItem item={item} key={item.key} />)}</ul>
           )}
           <p className="home-more">
+            <Link className="home-events-link" href="/events">See all events open for registration</Link>
+          </p>
+          <p className="home-more">
             <Link className="primary-button home-calendar-button" href="/calendar?view=list">
               <CalendarDays size={18} aria-hidden="true" /> See the full calendar
             </Link>
