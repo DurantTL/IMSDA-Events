@@ -1,10 +1,10 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { OrganizationBillingContact } from "@/components/organization-billing-contact";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getOrganizationBillingContactAdminView } from "@/modules/billing-responsibility/repository";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Billing contact" };
 
@@ -22,7 +22,7 @@ export default async function StaffOrganizationBillingContactPage({ params }: { 
   if (!view) notFound();
   return (
     <section className="page-stack">
-      <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
+      <AdminSectionHeaderFor path={`/admin/organizations/${organizationId}/billing`} section="system" />
       <div className="page-intro">
         <div>
           <p className="eyebrow">Billing</p>

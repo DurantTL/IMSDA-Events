@@ -7,6 +7,7 @@ import { RegistrationBuilderWorkspace } from "@/components/registration-builder-
 import { loadInformationFormView } from "@/components/information-forms-page-data";
 import { generalInformationConfig } from "@/components/registration-builder/information-mode";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Information form" };
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function AdminInformationFormPage({ params }: { params: Pro
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path={`/admin/information-forms/${formId}`} section="system" />
       <BuilderPhoneNotice backHref="/admin/information-forms" backLabel="Back to information forms" builderName="information form builder" />
       <div className="builder-phone-hidden">
         <BuilderDeviceHint />

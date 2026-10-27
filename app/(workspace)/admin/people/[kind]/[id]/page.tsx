@@ -1,14 +1,12 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 import { PersonAccess } from "@/components/person-access";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { getPersonDetail, listClubOptions, listEventOptions } from "@/modules/system-admin/people-directory";
-import styles from "@/components/people-directory.module.css";
 
 export const metadata: Metadata = { title: "People & access" };
 export const dynamic = "force-dynamic";
@@ -37,8 +35,9 @@ export default async function PersonAccessPage({
   ]);
   return (
     <>
-      <StaffPageHeader
-        description={<Link className={styles.back} href={from ? `/admin/people?q=${encodeURIComponent(from)}` : "/admin/people"}>Back to People &amp; access</Link>}
+      <AdminPageHeader
+        path={`/admin/people/${kind}/${id}`}
+        back={{ href: from ? `/admin/people?q=${encodeURIComponent(from)}` : "/admin/people", label: "Back to People & access" }}
       />
       <PersonAccess
         clubOptions={clubOptions}

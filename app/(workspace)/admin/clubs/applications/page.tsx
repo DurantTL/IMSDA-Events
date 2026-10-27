@@ -7,6 +7,7 @@ import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listNewClubApplications, listNewClubInvites, listPublicSponsorOptions } from "@/modules/club-applications/repository";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "New club applications" };
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function NewClubApplicationsAdminPage() {
   ]);
   return (
     <>
+      <AdminPageHeader path="/admin/clubs/applications" />
       <StaffPageHeader
         description="Directors apply from the public “Register a new club” page or a private link you send. Approving creates the club under its sponsoring church or company and emails the director the club invite. The Sterling Volunteers status is a flag to review, not a block."
         tools={[

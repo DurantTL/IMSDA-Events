@@ -10,9 +10,8 @@ import {
   WORK_NOT_ADDED_NOTE,
   acrossYourEventsLabel,
   buildEventsAdminHome,
-  eventsAdminTabs,
 } from "@/modules/events/events-admin-home-model";
-import { DashboardTabs } from "@/components/dashboard-tabs";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import styles from "./events-admin.module.css";
 
 export const metadata: Metadata = { title: "Event administration" };
@@ -43,11 +42,10 @@ export default async function EventsAdminPage() {
   const sources = await getEventsAdminEventSources(eventAdminEventIds, now);
   const home = buildEventsAdminHome(sources, now);
   const { counts, events, next } = home;
-  const tabs = eventsAdminTabs(next?.id ?? null);
 
   return (
     <section className={`page-stack ${styles.workspace}`}>
-      <DashboardTabs label="Event administration sections" tabs={tabs} currentKey="overview" />
+      <AdminSectionHeaderFor path="/events-admin" section="events" eventId={next?.id ?? null} />
 
       <section className={styles.hero} aria-labelledby="events-admin-heading">
         <p className="eyebrow">Your events</p>

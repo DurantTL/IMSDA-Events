@@ -5,6 +5,7 @@ import { ClubTransferQueue } from "@/components/club-transfer-queue";
 import { RegistrationMoveApprovals } from "@/components/registration-move-approvals";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club member transfers" };
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function ClubTransfersAdminPage() {
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   return (
     <>
+      <AdminPageHeader path="/admin/clubs/transfers" />
       <ClubTransferQueue />
       {user.globalRole === "SYSTEM_ADMIN" && <RegistrationMoveApprovals />}
     </>

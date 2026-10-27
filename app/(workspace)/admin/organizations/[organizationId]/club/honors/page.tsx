@@ -2,13 +2,13 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Eye } from "lucide-react";
-import { BackLink } from "@/components/back-link";
 import { ClubHonorsWorkspace } from "@/components/club-honors-workspace";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club honors" };
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function StaffClubHonorsPage({
   ]);
   return (
     <section className="page-stack">
-      <BackLink href={`/admin/organizations/${organizationId}/club`} variant="staff">Back to {club.name}</BackLink>
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/club/honors`} parentName={club.name} />
       <div className="page-intro">
         <div>
           <p className="eyebrow">Club honors · staff</p>

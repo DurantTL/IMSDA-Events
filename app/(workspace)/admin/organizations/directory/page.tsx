@@ -2,7 +2,6 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { OrganizationListPager, OrganizationSearchControls } from "@/components/organization-search-controls";
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
@@ -11,6 +10,7 @@ import { listDirectoryContacts } from "@/modules/organizations/contacts-reposito
 import { disbandedNotice, organizationKindLabels, safeWebsiteHref } from "@/modules/organizations/eadventist-import";
 import { listDirectoryOrganizations, type DirectoryStatusFilter } from "@/modules/organizations/eadventist-import-repository";
 import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Organization directory" };
 
@@ -39,8 +39,8 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
 
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/organizations/directory" section="system" />
       <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
         <Link className="secondary-button" href="/admin/organizations/import">Import from eAdventist</Link>
         <Link className="secondary-button" href="/admin/organizations/map-locations">Find map locations</Link>
       </div>

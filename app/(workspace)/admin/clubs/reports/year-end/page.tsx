@@ -2,12 +2,12 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ClubYearEndConference } from "@/components/club-year-end-conference";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isReportYear, latestStartedReportYear, reportYearLabel, reportYearStart } from "@/modules/club-reports/year-end-domain";
 import { listYearEndReportsForYear } from "@/modules/club-reports/year-end-repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club Year-End Reports" };
 export const dynamic = "force-dynamic";
@@ -24,8 +24,8 @@ export default async function ClubYearEndReportsAdminPage({ searchParams }: { se
   const clubs = await listYearEndReportsForYear(reportYear);
   return (
     <>
+      <AdminPageHeader path="/admin/clubs/reports/year-end" />
       <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/clubs/reports" variant="staff">Back to Monthly Records</BackLink>
         <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start - 1)}`}>← {reportYearLabel(start - 1)}</Link>
         {reportYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start + 1)}`}>{reportYearLabel(start + 1)} →</Link>}
       </div>

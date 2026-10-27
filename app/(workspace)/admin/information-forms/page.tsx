@@ -6,6 +6,7 @@ import { InformationFormsHome } from "@/components/information-forms-home";
 import { loadInformationFormsHome } from "@/components/information-forms-page-data";
 import { generalInformationConfig } from "@/components/registration-builder/information-mode";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Information forms" };
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function AdminInformationFormsPage() {
 
   return (
     <section className="page-stack">
+      <AdminSectionHeaderFor path="/admin/information-forms" section="system" />
       <StaffPageHeader description="Surveys and interest forms that belong to no event. Open one to build it in the form builder." />
       <InformationFormsHome config={generalInformationConfig()} forms={forms} templates={templates} />
     </section>

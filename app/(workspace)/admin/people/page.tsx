@@ -3,6 +3,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
+import { AdminPageHeader } from "@/components/admin-page-header";
 import { PeopleDirectory } from "@/components/people-directory";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { searchPeople } from "@/modules/system-admin/people-directory";
@@ -25,6 +26,7 @@ export default async function PeopleAccessPage({
   const result = await searchPeople(query, parsePeoplePage(params.page), viewer.scope);
   return (
     <>
+      <AdminPageHeader path="/admin/people" />
       <StaffPageHeader
         description="Everyone with a staff login or a website account, and what each person can reach."
         primary={viewer.scope === "full" ? (

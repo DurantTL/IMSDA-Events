@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The section header (#1274) is async and has its own tests; these pages are tested without it.
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({ areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique }, event: { findUnique: mocks.eventFindUnique } }),

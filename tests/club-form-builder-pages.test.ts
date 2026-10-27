@@ -19,6 +19,8 @@ class Redirect extends Error {
 }
 
 vi.mock("server-only", () => ({}));
+// The section header (#1274) is async and has its own tests; these pages are tested without it.
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => { throw new Redirect(to); },
   notFound: () => { throw new Error("NOT_FOUND"); },

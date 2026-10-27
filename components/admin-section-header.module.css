@@ -1,0 +1,29 @@
+/* The section header on every admin page (#1274): the section name, the section's tab row, and a back link on a deeper page. */
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.header .name {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+/* Inside a page's own `.page-stack` the stack already spaces its children; on a bare page the header spaces itself. */
+.header {
+  padding-top: 20px;
+  margin-bottom: 14px;
+}
+
+:global(.page-stack) > .header {
+  padding-top: 0;
+  margin-bottom: 0;
+}
+
+.header > * {
+  min-width: 0;
+  max-width: 100%;
+}

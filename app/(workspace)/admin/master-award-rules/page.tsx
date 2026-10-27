@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { MasterAwardRulesWorkspace } from "@/components/master-award-rules-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listMasterAwardRules, listRuleChoices } from "@/modules/earned-awards/rules-repository";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Master Award rules" };
 
@@ -16,6 +17,7 @@ export default async function MasterAwardRulesPage() {
   const [rules, choices] = await Promise.all([listMasterAwardRules(), listRuleChoices()]);
   return (
     <>
+      <AdminSectionHeaderFor path="/admin/master-award-rules" section="system" />
       <MasterAwardRulesWorkspace choices={choices} initialRules={rules} />
     </>
   );

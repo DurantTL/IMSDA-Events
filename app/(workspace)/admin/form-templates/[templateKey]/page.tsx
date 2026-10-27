@@ -1,12 +1,12 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import { BackLink } from "@/components/back-link";
 import { notFound, redirect } from "next/navigation";
 import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { FormTemplateEditor } from "@/components/form-template-editor";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getFormTemplateForEditor } from "@/modules/forms/form-template-library";
 import { FormTemplateError } from "@/modules/forms/form-template-library-domain";
+import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: "Form template" };
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function FormTemplateEditorPage({ params }: { params: Promi
 
   return (
     <section className="page-stack">
-      <BackLink href="/admin/form-templates" variant="staff">Back to form templates</BackLink>
+      <AdminSectionHeaderFor path={`/admin/form-templates/${templateKey}`} section="system" />
       <div className="page-intro">
         <div>
           <p className="eyebrow">System administration</p>

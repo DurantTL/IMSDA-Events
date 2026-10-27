@@ -32,7 +32,6 @@
 .fact strong { min-width: 0; overflow-wrap: anywhere; }
 .factValue { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
-.back { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; }
 .who { display: grid; gap: 2px; min-width: 0; }
 .who strong { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.1rem); overflow-wrap: anywhere; }
 .who span { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }

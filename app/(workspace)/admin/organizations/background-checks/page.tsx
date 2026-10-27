@@ -10,6 +10,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Sterling Volunteers" };
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function BackgroundChecksPage() {
   ];
   return (
     <section className="page-stack">
+      <AdminPageHeader path="/admin/organizations/background-checks" />
       <StaffPageHeader
         description="Upload the roster export (matched by name and club or church; no email or birth date needed) or the older Sterling Volunteers list. The newest upload replaces whatever was on file for a person."
         primary={<BackgroundCheckImportPanel />}
