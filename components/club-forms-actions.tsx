@@ -16,6 +16,8 @@ export function SendClubFormLink({
   defaultDays,
   asAreaCoordinator = false,
   primary = false,
+  defaultRosterMemberId = "",
+  triggerLabel,
 }: {
   organizationId: string;
   templateKey: string;
@@ -26,11 +28,15 @@ export function SendClubFormLink({
   asAreaCoordinator?: boolean;
   /** The main action of its group (#1229): a filled button labelled "Send link". */
   primary?: boolean;
+  /** The member the link is for, picked already (#1246: sending from a member's missing form). */
+  defaultRosterMemberId?: string;
+  /** Overrides the trigger button's words, for a row that needs to say who the link is for. */
+  triggerLabel?: React.ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [rosterMemberId, setRosterMemberId] = useState("");
+  const [rosterMemberId, setRosterMemberId] = useState(defaultRosterMemberId);
   const [subjectName, setSubjectName] = useState("");
   const [days, setDays] = useState(String(defaultDays));
   const [saving, setSaving] = useState(false);
@@ -57,7 +63,7 @@ export function SendClubFormLink({
       setNotice("Link sent. It works once and then stops working.");
       setEmail("");
       setSubjectName("");
-      setRosterMemberId("");
+      setRosterMemberId(defaultRosterMemberId);
       router.refresh();
     } catch {
       setError("The link could not be sent. Check your connection and try again.");
@@ -70,7 +76,7 @@ export function SendClubFormLink({
     return (
       <div className="club-form-send">
         <button className={primary ? "primary-button" : "secondary-button"} onClick={() => setOpen(true)} type="button">
-          <Send aria-hidden="true" size={14} /> {primary ? "Send link" : "Send a private link"}
+          <Send aria-hidden="true" size={14} /> {triggerLabel ?? (primary ? "Send link" : "Send a private link")}
         </button>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
       </div>

@@ -1,0 +1,64 @@
+.row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+}
+
+.trigger,
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  border: 1px solid var(--line, #d9dde3);
+  border-radius: 14px;
+  padding: 0;
+  background: var(--surface, #fff);
+  color: var(--ink, #1b2430);
+  overflow: auto;
+}
+
+.dialog::backdrop {
+  background: rgba(20, 24, 32, 0.55);
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.title {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.25rem);
+  overflow-wrap: anywhere;
+}
+
+.text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.4em;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

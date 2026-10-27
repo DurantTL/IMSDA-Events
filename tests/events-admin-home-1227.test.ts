@@ -232,11 +232,10 @@ describe("the page", () => {
     vi.useRealTimers();
   });
 
-  // The page reads the real clock; pin it to the fixtures' "now" so day counts don't drift.
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(now);
-    vi.clearAllMocks();
     mocks.getCurrentSession.mockResolvedValue({ user: person });
     mocks.resolveAdminRoles.mockResolvedValue({ systemAdmin: false, clubsAdministrator: false, eventAdminEventIds: ["event-one", "event-two"] });
     mocks.getEventsAdminEventSources.mockResolvedValue([

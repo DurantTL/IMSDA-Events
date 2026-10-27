@@ -3,14 +3,19 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClubsFormsMissingList } from "@/components/clubs-forms-missing-list";
 import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormFillMode } from "@/components/club-form-fill-mode";
+import { ClubFormRequirement } from "@/components/club-form-requirement";
 import { ClubFormTemplateToggle } from "@/components/club-forms-actions";
 import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getServerEnv } from "@/lib/env";
+import { getRequiredFormsStatus } from "@/modules/club-forms/required";
+import { clubsWithFormsMissing } from "@/modules/club-forms/required-domain";
+import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { listClosedOpenApplicationKeys } from "@/modules/club-forms/open-applications";
 import { openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { listClubFormTemplatesForAdmin } from "@/modules/club-forms/templates";
@@ -25,10 +30,15 @@ export const dynamic = "force-dynamic";
  * that was filled in is deleted. Each form can be edited in the builder, and new
  * forms created there (#712).
  */
-export default async function AdminClubFormsPage() {
+export default async function AdminClubFormsPage({ searchParams }: { searchParams: Promise<{ view?: string; year?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
+  // ?view=missing (#1246): the clubs behind the dashboard's "Clubs with forms missing" card, same gate as this page.
+  const { view, year } = await searchParams;
+  if (view === "missing") {
+    return <ClubsFormsMissingList clubYear={resolveAreaClubYear(year)} clubs={clubsWithFormsMissing(await getRequiredFormsStatus(resolveAreaClubYear(year)))} />;
+  }
   const templates = await listClubFormTemplatesForAdmin();
   const closedKeys = await listClosedOpenApplicationKeys();
   const clubYear = clubYearFor(new Date());
@@ -44,11 +54,11 @@ export default async function AdminClubFormsPage() {
         ? <ClubFormSync pendingCount={templates.filter((template) => template.needsSync).length} />
         : <p className="inline-notice" role="status">Bringing form templates up to date with the code is done by a system administrator.</p>}
       <section className="panel">
-        <div className="report-table-wrap">
-          <table role="table" className="report-table table-cards">
+        <div className="report-table-wrap card-box">
+          <table role="table" className="report-table table-cards table-cards-tablet">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Required</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
               {templates.map((template) => (
@@ -65,6 +75,19 @@ export default async function AdminClubFormsPage() {
                           fillMode={template.fillMode}
                           key={`${template.key}-${template.fillMode}-${closedKeys.has(template.key)}`}
                           name={template.name}
+                          templateKey={template.key}
+                        />
+                      )
+                      : <small className="quiet-copy">Sync first</small>}
+                  </td>
+                  <td {...cardCell("Required")}>
+                    {template.version > 0
+                      ? (
+                        <ClubFormRequirement
+                          key={`${template.key}-${template.requirement}-${template.requiredRoles.join(",")}`}
+                          name={template.name}
+                          requiredRoles={template.requiredRoles}
+                          requirement={template.requirement}
                           templateKey={template.key}
                         />
                       )

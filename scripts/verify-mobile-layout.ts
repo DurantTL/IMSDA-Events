@@ -226,6 +226,12 @@ const pages: PageSpec[] = [
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },
+  // Portal help (#1259): the hub for each portal role, and a guide for the club roles and the coordinator.
+  { name: "account-help-attendee", path: "/account/help", role: "attendee" },
+  { name: "account-help-director", path: "/account/help", role: "director" },
+  { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
+  { name: "account-help-area", path: "/account/help", role: "area" },
+  { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
   club("home", ""),
   club("roster", "/roster"),
   club("roster-inactive", "/roster?inactive=1"),
@@ -300,6 +306,11 @@ const pages: PageSpec[] = [
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
   staff("more-launcher-admin", "/overview", "system-admin"),
+  // Help & learning (#1077): the hub, a guide and the glossary, for a system admin and for event staff.
+  staff("help-hub-admin", "/help", "system-admin"),
+  staff("help-guide-admin", "/help/create-or-copy-event", "system-admin"),
+  staff("help-glossary", "/help/glossary"),
+  staff("help-hub-event-staff", "/help", "kitchen"),
   staff("reports", "/more/reports"),
   staff("reports-clubs", "/more/reports/clubs"),
   staff("clubs-oversight", "/more/clubs"),
@@ -346,6 +357,8 @@ const pages: PageSpec[] = [
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),
   staff("club-reports", "/admin/clubs/reports", "system-admin"),
+  staff("club-reports-to-review", `/admin/clubs/reports?year=2026-27&month=${reportMonth}&review=to-review`, "system-admin"),
+  staff("clubs-forms-missing", "/admin/club-forms?view=missing&year=2026-27", "system-admin"),
   staff("club-transfers", "/admin/clubs/transfers", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
@@ -1093,6 +1106,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 
 /** MOBILE_LAYOUT_CLEANUP=1: deletes every row the audit created, children before parents. */
 async function cleanupSynthetic(prisma: PrismaClient) {
+  await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
   const accountIds = [`${P}_account_director`, `${P}_account_area`, `${P}_account_attendee`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
@@ -1298,6 +1312,8 @@ async function seedSynthetic(prisma: PrismaClient) {
 
   // #1221: the Can Collecting Report is turned on here so its fill-in page can be audited (the sync creates it off).
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { enabled: true } });
+  // #1246: make the Can Collecting Report required once per club, so the forms-missing view and the director's Required forms section have rows. The filed record above is submitted and unreviewed, for the to-review view. Both are undone in cleanupSynthetic.
+  await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "ONCE_PER_CLUB_YEAR", requiredRoles: [] } });
   // #1229: the director's Forms page has both groups (a family form and a club form), the TLT Application as an open application, and its public page is open.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: ["off_premises_permission_slip", "club_tlt_application"] } }, data: { enabled: true } });
 
