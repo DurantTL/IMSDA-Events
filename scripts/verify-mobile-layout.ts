@@ -213,6 +213,8 @@ const pages: PageSpec[] = [
   { name: "staff-archived-events", path: "/archived-events", role: "event-admin" },
   // The public event page with one of each content block (#816), signed out.
   { name: "public-event-page-all-blocks", path: `/events/${blocksEventSlug}`, role: "visitor" },
+  // The same page without a banner image keeps the solid navy header (#1207).
+  { name: "public-event-page-no-banner", path: "/events/womens-retreat-2026", role: "visitor" },
   // Club portal (a director of two clubs).
   { name: "account-overview", path: "/account", role: "director" },
   { name: "account-overview-attendee", path: "/account", role: "attendee" },

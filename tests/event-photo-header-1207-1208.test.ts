@@ -10,7 +10,7 @@ vi.mock("@/modules/events/asset-storage", () => ({ readAsset: storage.readAsset 
 
 import { EventCardTransition } from "@/components/event-card-transition";
 import { EventHeroBanner } from "@/components/event-content-blocks";
-import { eventAssetVariantResponse } from "@/modules/events/asset-image-variants";
+import { ByteLruCache, createLimiter, eventAssetVariantResponse } from "@/modules/events/asset-image-variants";
 import { parseVariantWidth, variantWidths } from "@/modules/events/asset-variant-widths";
 import { eventSlugFromHref, eventTransitionNames, eventViewTransitionName } from "@/modules/events/view-transition";
 
@@ -127,5 +127,56 @@ describe("asset image variants (#1207)", () => {
     storage.readAsset.mockResolvedValue(small);
     const kept = await eventAssetVariantResponse({ displayName: "s.png", contentType: "image/png", storageKey: "k" }, "1920");
     expect((await sharp(Buffer.from(await kept.arrayBuffer())).metadata()).width).toBe(100);
+  });
+});
+
+describe("asset variant cache and limiter", () => {
+  it("serves a repeated request from memory without reading or resizing again", async () => {
+    const sharp = (await import("sharp")).default;
+    const png = await sharp({ create: { width: 800, height: 400, channels: 3, background: "#003b5c" } }).png().toBuffer();
+    storage.readAsset.mockClear();
+    storage.readAsset.mockResolvedValue(png);
+    const asset = { displayName: "c.png", contentType: "image/png", storageKey: "cache-key-1" };
+    const first = Buffer.from(await (await eventAssetVariantResponse(asset, "640")).arrayBuffer());
+    const second = Buffer.from(await (await eventAssetVariantResponse(asset, "640")).arrayBuffer());
+    expect(storage.readAsset).toHaveBeenCalledTimes(1);
+    expect(second.equals(first)).toBe(true);
+  });
+
+  it("does not cache a failed resize", async () => {
+    storage.readAsset.mockClear();
+    storage.readAsset.mockResolvedValue(Buffer.from("not an image"));
+    const asset = { displayName: "bad.png", contentType: "image/png", storageKey: "cache-key-bad" };
+    const response = await eventAssetVariantResponse(asset, "640");
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    await eventAssetVariantResponse(asset, "640");
+    // Each attempt reads once to resize (failing) and once to serve the original; a cached failure would skip the first.
+    expect(storage.readAsset).toHaveBeenCalledTimes(4);
+  });
+
+  it("evicts the least recently used entry by bytes and by count", () => {
+    const cache = new ByteLruCache(10, 3);
+    cache.set("a", Buffer.alloc(4));
+    cache.set("b", Buffer.alloc(4));
+    cache.get("a");
+    cache.set("c", Buffer.alloc(4));
+    expect(cache.get("b")).toBeUndefined();
+    expect(cache.get("a")).toBeDefined();
+    expect(cache.totalBytes).toBe(8);
+    cache.set("big", Buffer.alloc(11));
+    expect(cache.get("big")).toBeUndefined();
+    const small = new ByteLruCache(100, 2);
+    small.set("x", Buffer.alloc(1)); small.set("y", Buffer.alloc(1)); small.set("z", Buffer.alloc(1));
+    expect(small.size).toBe(2);
+    expect(small.get("x")).toBeUndefined();
+  });
+
+  it("runs at most the limit of tasks at once", async () => {
+    const run = createLimiter(2);
+    let active = 0;
+    let peak = 0;
+    const task = async () => { active += 1; peak = Math.max(peak, active); await new Promise((r) => setTimeout(r, 5)); active -= 1; };
+    await Promise.all(Array.from({ length: 6 }, () => run(task)));
+    expect(peak).toBe(2);
   });
 });
