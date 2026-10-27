@@ -13,7 +13,7 @@ import {
   issueAccountToken,
   resetPassword,
 } from "@/modules/access/auth-service";
-import { hashPassword } from "@/modules/access/passwords";
+import { lowCostPasswordHash } from "@/tests/support/low-cost-password-hash";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 
 const knownPassword = "correct-horse-battery-staple";
@@ -62,7 +62,7 @@ beforeEach(() => {
 
 describe("password sign-in for an admin whose second factor is a passkey (#429)", () => {
   it("won't finish sign-in or offer authenticator enrolment on the password alone", async () => {
-    const passwordHash = await hashPassword(knownPassword);
+    const passwordHash = lowCostPasswordHash(knownPassword);
     const { prisma } = prismaFixture({
       user: {
         id: "user-1",
@@ -81,7 +81,7 @@ describe("password sign-in for an admin whose second factor is a passkey (#429)"
   });
 
   it("still asks an admin with no second factor at all to enrol one", async () => {
-    const passwordHash = await hashPassword(knownPassword);
+    const passwordHash = lowCostPasswordHash(knownPassword);
     prismaFixture({
       user: {
         id: "user-1",
@@ -101,7 +101,7 @@ describe("password sign-in for an admin whose second factor is a passkey (#429)"
 
 describe("invited accounts stay pending until activated", () => {
   it("refuses sign-in for a pending account even with the right password", async () => {
-    const passwordHash = await hashPassword(knownPassword);
+    const passwordHash = lowCostPasswordHash(knownPassword);
     prismaFixture({
       user: {
         id: "user-1",
@@ -120,7 +120,7 @@ describe("invited accounts stay pending until activated", () => {
   });
 
   it("admits the same account once it is active", async () => {
-    const passwordHash = await hashPassword(knownPassword);
+    const passwordHash = lowCostPasswordHash(knownPassword);
     const { prisma } = prismaFixture({
       user: {
         id: "user-1",

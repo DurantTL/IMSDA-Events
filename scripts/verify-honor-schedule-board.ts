@@ -269,7 +269,14 @@ async function main() {
   const r1 = await room("Race room", 30, siteA.id);
   const x = await cls(hE, s1.id, 5);
   const y = await cls(hF, s1.id, 5);
-  const raced = await Promise.allSettled([move(x.id, r1.id), move(y.id, r1.id)]);
+  let raced = await Promise.allSettled([move(x.id, r1.id), move(y.id, r1.id)]);
+  // Two serializable moves can each lose a conflict on every retry when the machine is busy. Each then answers
+  // SCHEDULE_BUSY ("nothing was changed, try again") and neither class moved, so the same race is run again. This
+  // does not hide a failure: a double win, any other refusal, or a room holding two classes still fails below.
+  for (let again = 0; again < 5 && raced.every((result) => result.status === "rejected" && result.reason instanceof HonorConfigurationError && result.reason.code === "SCHEDULE_BUSY"); again += 1) {
+    assert((await prisma.honorOffering.count({ where: { roomId: r1.id, sessionId: s1.id } })) === 0, "a move refused as busy changed nothing");
+    raced = await Promise.allSettled([move(x.id, r1.id), move(y.id, r1.id)]);
+  }
   assert(raced.filter((result) => result.status === "fulfilled").length === 1, "exactly one of two moves into the same room and session wins");
   const loser = raced.find((result) => result.status === "rejected") as PromiseRejectedResult;
   assert(loser.reason instanceof HonorConfigurationError && ["ROOM_BOOKED", "SCHEDULE_BUSY"].includes(loser.reason.code), `the loser gets a clean refusal, got ${String(loser.reason)}`);
