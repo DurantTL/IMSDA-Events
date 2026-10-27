@@ -33,18 +33,18 @@ const actionSchema = z.discriminatedUnion("action", [
 
 /**
  * Actions on an attendee account (#386). Audited. Every action is for system administrators only, except
- * "area-coordinator" (#1275, decision A), which an active Clubs Administrator may also do. The body is parsed first
- * so the gate can follow the action; a non-admin sending a bad body gets the 400, never any data.
+ * "area-coordinator" (#1275, decision A), which an active Clubs Administrator may also do. Order: cross-origin check,
+ * then the role gate that admits both roles, then the body, then the system administrator gate for every other action.
  */
 async function postHandler(request: Request, context: { params: Promise<{ accountId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
+    // Access first: a signed-out caller gets 401 and anyone else without a club-area role 403, whatever the body.
+    const admitted = await requireClubsAdministration("Clubs Administrator or system administrator access is required to change Area Coordinators.");
     const { accountId } = await context.params;
     const input = actionSchema.parse(await request.json());
-    const actor = input.action === "area-coordinator"
-      ? await requireClubsAdministration("Clubs Administrator or system administrator access is required to change Area Coordinators.")
-      : await requireSystemAdministrator();
+    const actor = input.action === "area-coordinator" ? admitted : await requireSystemAdministrator();
     if (input.action === "reset-two-step") {
       await resetAttendeeTwoStep(accountId, actor.id);
       return Response.json({ message: "Two-step sign-in reset and signed out everywhere. Club roles will set it up again at their next sign-in." });

@@ -129,8 +129,12 @@ export function PersonAccess({
             {person.clubs.map((club) => (
               <Fact key={club.grantId} label={club.clubName}>
                 <Chip>{clubDirectorRoleLabels[club.role as ClubRole] ?? club.role}</Chip>
-                <Chip tone={club.active ? "green" : "coral"}>{club.active ? "Active" : "Revoked"}</Chip>
-                {club.active ? (
+                <Chip tone={club.status === "active" ? "green" : club.status === "scheduled" ? undefined : "coral"}>
+                  {club.status === "active" ? "Active"
+                    : club.status === "scheduled" ? `Scheduled (starts ${new Date(club.effectiveFrom).toLocaleDateString("en-US", { timeZone: "UTC" })})`
+                      : club.status === "ended" ? "Ended" : "Revoked"}
+                </Chip>
+                {club.status === "active" || club.status === "scheduled" ? (
                   <RevokeClubRole
                     clubName={club.clubName}
                     grantId={club.grantId}

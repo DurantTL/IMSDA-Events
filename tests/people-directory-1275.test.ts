@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PEOPLE_PAGE_SIZE,
+  clubRoleStatus,
   mergePeopleCandidates,
   pagePeople,
   parsePeoplePage,
@@ -91,5 +92,24 @@ describe("access summary (#1275)", () => {
 
   it("is empty when the person has no access", () => {
     expect(summarizePeopleAccess(none)).toEqual([]);
+  });
+});
+
+describe("club role status (#1275)", () => {
+  const now = new Date("2026-10-27T12:00:00Z");
+  const day = (offset: number) => new Date(now.getTime() + offset * 86_400_000);
+
+  it("counts a role as active only when started, not revoked and not ended, like the rest of the app", () => {
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(-5), effectiveTo: null }, now)).toBe("active");
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(-5), effectiveTo: day(5) }, now)).toBe("active");
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(0), effectiveTo: null }, now)).toBe("active");
+  });
+
+  it("calls a future start Scheduled, a past end Ended and a revoked role Revoked", () => {
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(3), effectiveTo: null }, now)).toBe("scheduled");
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(-9), effectiveTo: day(-1) }, now)).toBe("ended");
+    expect(clubRoleStatus({ revokedAt: null, effectiveFrom: day(-9), effectiveTo: day(0) }, now)).toBe("ended");
+    expect(clubRoleStatus({ revokedAt: day(-1), effectiveFrom: day(-9), effectiveTo: null }, now)).toBe("revoked");
+    expect(clubRoleStatus({ revokedAt: day(-1), effectiveFrom: day(3), effectiveTo: null }, now)).toBe("revoked");
   });
 });

@@ -80,7 +80,7 @@ const roleCopy: Record<RoleKind, { grantBody: string; revokeBody: string; noun: 
   },
   "clubs-administrator": {
     noun: "Clubs Administrator",
-    grantBody: "They get the club areas for every club: reports, points, forms, rosters including birth dates, new club applications, health records (with the same reasons and recorded access), imports, invites, transfers, catalogs and club roles. Not churches, the conference, settings, accounts or events. Every change is recorded under their name.",
+    grantBody: "They get the club areas for every club: reports, points, forms, rosters including birth dates, new club applications, health records (with the same reasons and recorded access), imports, invites, transfers, catalogs and club roles. Not churches, the conference, settings, accounts or events, except that they can make someone an Area Coordinator or give club roles. Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
   },
   "area-coordinator": {

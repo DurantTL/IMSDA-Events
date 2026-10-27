@@ -189,6 +189,27 @@ describe("the Area Coordinator gate (decision A)", () => {
   });
 });
 
+describe("access is checked before the body is read", () => {
+  const badJson = () => accountAction(new Request("https://events.imsda.test/api/admin/accounts/acct-1", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "https://events.imsda.test" },
+    body: "{not json",
+  }), ctx({ accountId: "acct-1" }));
+
+  it("answers a signed-out caller with bad JSON 401, not 500, and an Event Admin 403", async () => {
+    signInAs("areaCoordinator");
+    expect((await badJson()).status).toBe(401);
+    signInAs("eventAdmin");
+    expect((await badJson()).status).toBe(403);
+  });
+
+  it("still answers an admitted caller's bad body with an error, not access", async () => {
+    signInAs("clubsAdmin");
+    expect((await badJson()).status).toBeGreaterThanOrEqual(400);
+    expect(mocks.areaUpsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("every other account action stays system administrator only", () => {
   const actions: Array<[string, unknown, () => ReturnType<typeof vi.fn>]> = [
     ["reset-two-step", { action: "reset-two-step" }, () => mocks.resetAttendeeTwoStep],

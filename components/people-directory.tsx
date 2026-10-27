@@ -18,7 +18,9 @@ export function PeopleDirectory({
   page,
   pageCount,
   total,
+  scope = "full",
 }: {
+  scope?: "full" | "clubs";
   query: string;
   rows: readonly PeopleRow[];
   page: number;
@@ -44,11 +46,11 @@ export function PeopleDirectory({
         <ul className={styles.list}>
           {rows.map((row) => (
             <li className={styles.row} key={row.key}>
-              <Link className={styles.rowLink} href={personPath(row)}>
+              <Link className={styles.rowLink} href={`${personPath(row)}${query ? `?from=${encodeURIComponent(query)}` : ""}`}>
                 <strong translate="no">{row.name || row.email}</strong>
                 <small translate="no">{row.email}</small>
               </Link>
-              <ul aria-label="Account kinds and sign-in" className={styles.chips}>
+              <ul aria-label={scope === "full" ? "Account kinds and sign-in" : "Account kinds"} className={styles.chips}>
                 {row.kinds.map((kind) => <li className={`${styles.chip} ${styles.kind}`} key={kind}>{kind}</li>)}
                 {row.signIn.map((chip) => (
                   <li className={`${styles.chip} ${styles[chip.tone]}`} key={chip.side}>
@@ -56,7 +58,7 @@ export function PeopleDirectory({
                   </li>
                 ))}
               </ul>
-              <p className={styles.access}>{row.access.length > 0 ? row.access.join(" · ") : "No access yet"}</p>
+              <p className={styles.access}>{row.access.length > 0 ? row.access.join(" · ") : scope === "full" ? "No access yet" : "No Area Coordinator or club roles"}</p>
             </li>
           ))}
         </ul>

@@ -2,8 +2,11 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import {
+  clubRoleStatus,
   mergePeopleCandidates,
   pagePeople,
+  type ClubRoleStatus,
+  type PeopleScope,
   summarizePeopleAccess,
   type MergedPerson,
   type PeopleCandidate,
@@ -47,7 +50,14 @@ export function isGrantCurrent(grant: { revokedAt: Date | null; effectiveTo?: Da
   return true;
 }
 
-/** Every person matching `query` (name or email), merged and sorted. Ids and names only. */
+/**
+ * Every person matching `query` (name or email), merged and sorted. Ids and names only.
+ *
+ * This loads every match (ids, names, emails) from both tables and merges and pages them in memory, so a linked pair
+ * is one row and the page count is exact. That is fine at the conference's size (thousands of rows, a few bytes
+ * each). Move to database paging (a SQL union ordered by name) if the two tables grow to hundreds of thousands of
+ * rows or a search without a query becomes slow.
+ */
 export async function findPeople(query: string): Promise<MergedPerson[]> {
   const prisma = getPrisma();
   const text = query.trim().slice(0, 120);
@@ -70,10 +80,15 @@ export async function findPeople(query: string): Promise<MergedPerson[]> {
   return mergePeopleCandidates(staff, website);
 }
 
-/** Row details (status and access summary) for one page of people only. */
-export async function loadPeopleRows(people: readonly MergedPerson[], now = new Date()): Promise<PeopleRow[]> {
+/**
+ * Row details (status and access summary) for one page of people only. For a Clubs Administrator (`clubs`) nothing
+ * about sign-in, events or system roles is loaded: only the Area Coordinator status and the count of current roles
+ * in CLUB-type organizations.
+ */
+export async function loadPeopleRows(people: readonly MergedPerson[], scope: PeopleScope = "full", now = new Date()): Promise<PeopleRow[]> {
   const prisma = getPrisma();
-  const staffIds = people.flatMap((person) => (person.staffId ? [person.staffId] : []));
+  const full = scope === "full";
+  const staffIds = full ? people.flatMap((person) => (person.staffId ? [person.staffId] : [])) : [];
   const accountIds = people.flatMap((person) => (person.accountId ? [person.accountId] : []));
   const [users, accounts] = await Promise.all([
     staffIds.length === 0 ? [] : prisma.user.findMany({
@@ -94,7 +109,10 @@ export async function loadPeopleRows(people: readonly MergedPerson[], now = new 
         status: true,
         disabledAt: true,
         areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } },
-        clubDirectorGrants: { select: { revokedAt: true, effectiveTo: true } },
+        clubDirectorGrants: {
+          where: full ? undefined : { organization: { type: "CLUB" } },
+          select: { revokedAt: true, effectiveFrom: true, effectiveTo: true },
+        },
       },
     }),
   ]);
@@ -106,33 +124,29 @@ export async function loadPeopleRows(people: readonly MergedPerson[], now = new 
     const account = person.accountId ? accountById.get(person.accountId) : undefined;
     const kinds: PeopleRow["kinds"] = [];
     const signIn: SignInChip[] = [];
-    if (user) {
-      kinds.push("Staff login");
-      signIn.push(staffChip(user.accountStatus, Boolean(user.credential?.disabledAt)));
-    }
-    if (account) {
-      kinds.push("Website account");
-      signIn.push(accountChip(account.status, Boolean(account.disabledAt)));
-    }
+    if (person.staffId) kinds.push("Staff login");
+    if (person.accountId) kinds.push("Website account");
+    if (full && user) signIn.push(staffChip(user.accountStatus, Boolean(user.credential?.disabledAt)));
+    if (full && account) signIn.push(accountChip(account.status, Boolean(account.disabledAt)));
     return {
       ...person,
       kinds,
       signIn,
       access: summarizePeopleAccess({
-        systemAdministrator: user?.globalRole === "SYSTEM_ADMIN",
-        clubsAdministrator: Boolean(user?.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
+        systemAdministrator: full && user?.globalRole === "SYSTEM_ADMIN",
+        clubsAdministrator: full && Boolean(user?.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
         areaCoordinator: Boolean(account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now)),
-        activeEventCount: user?._count.memberships ?? 0,
-        activeClubRoleCount: account ? account.clubDirectorGrants.filter((grant) => isGrantCurrent(grant, now)).length : 0,
+        activeEventCount: full ? user?._count.memberships ?? 0 : 0,
+        activeClubRoleCount: account ? account.clubDirectorGrants.filter((grant) => clubRoleStatus(grant, now) === "active").length : 0,
       }),
     };
   });
 }
 
-export async function searchPeople(query: string, requestedPage: number) {
+export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full") {
   const matches = await findPeople(query);
   const page = pagePeople(matches, requestedPage);
-  return { ...page, rows: await loadPeopleRows(page.items) };
+  return { ...page, rows: await loadPeopleRows(page.items, scope) };
 }
 
 export type PersonEventRow = {
@@ -150,7 +164,10 @@ export type PersonClubRow = {
   organizationId: string;
   clubName: string;
   role: string;
-  active: boolean;
+  /** Only "active" counts as current. */
+  status: ClubRoleStatus;
+  /** When the role starts, for a scheduled one. */
+  effectiveFrom: string;
 };
 
 export type PersonDetail = {
@@ -250,7 +267,7 @@ export async function getPersonDetail(
           where: full ? undefined : { organization: { type: "CLUB" } },
           orderBy: [{ revokedAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
           select: {
-            id: true, role: true, revokedAt: true, effectiveTo: true,
+            id: true, role: true, revokedAt: true, effectiveFrom: true, effectiveTo: true,
             organization: { select: { id: true, name: true } },
           },
         },
@@ -303,7 +320,8 @@ export async function getPersonDetail(
         organizationId: grant.organization.id,
         clubName: grant.organization.name,
         role: grant.role,
-        active: isGrantCurrent(grant, now),
+        status: clubRoleStatus(grant, now),
+        effectiveFrom: grant.effectiveFrom.toISOString(),
       }))
       : [],
   };

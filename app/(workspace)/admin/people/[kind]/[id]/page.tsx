@@ -3,9 +3,9 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 import { PersonAccess } from "@/components/person-access";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
-import { ActAsButton } from "@/components/act-as-button";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { getPersonDetail, listClubOptions, listEventOptions } from "@/modules/system-admin/people-directory";
 import styles from "@/components/people-directory.module.css";
@@ -15,13 +15,17 @@ export const dynamic = "force-dynamic";
 
 export default async function PersonAccessPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ kind: string; id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const viewer = await resolvePeopleViewer();
   if (!viewer.user) redirect(await staffLoginRedirectPath());
   if (!viewer.scope) redirect("/no-access");
   const { kind, id } = await params;
+  // The search this person was opened from, so Back returns to it (same parsing as the list).
+  const from = parsePeopleQuery((await searchParams).from);
   if ((kind !== "staff" && kind !== "account") || id.length > 64) notFound();
   const person = await getPersonDetail(kind, id, viewer.scope);
   if (!person) notFound();
@@ -34,16 +38,7 @@ export default async function PersonAccessPage({
   return (
     <>
       <StaffPageHeader
-        description={<Link className={styles.back} href="/admin/people">Back to People &amp; access</Link>}
-        primary={full ? (
-          <ActAsButton
-            access="View only"
-            endpoint="/api/admin/act-as/area-coordinator"
-            label="Act as Area Coordinator (2 hours)"
-            resultAction="Open the coordinator view"
-            role="Area Coordinator"
-          />
-        ) : undefined}
+        description={<Link className={styles.back} href={from ? `/admin/people?q=${encodeURIComponent(from)}` : "/admin/people"}>Back to People &amp; access</Link>}
       />
       <PersonAccess
         clubOptions={clubOptions}

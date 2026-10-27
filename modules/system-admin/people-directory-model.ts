@@ -128,3 +128,22 @@ export function summarizePeopleAccess(input: AccessSummaryInput): string[] {
 export function personPath(person: Pick<MergedPerson, "staffId" | "accountId">): string {
   return person.staffId ? `/admin/people/staff/${person.staffId}` : `/admin/people/account/${person.accountId}`;
 }
+
+export type ClubRoleStatus = "active" | "scheduled" | "ended" | "revoked";
+
+/**
+ * Where a club role stands now, by the same rule the rest of the app uses (`listDirectedClubs`, `listClubTeam`):
+ * current only when it is not revoked, has started (`effectiveFrom <= now`) and has not ended (`effectiveTo > now`).
+ */
+export function clubRoleStatus(
+  grant: { revokedAt: Date | null; effectiveFrom: Date; effectiveTo: Date | null },
+  now = new Date(),
+): ClubRoleStatus {
+  if (grant.revokedAt) return "revoked";
+  if (grant.effectiveFrom > now) return "scheduled";
+  if (grant.effectiveTo && grant.effectiveTo <= now) return "ended";
+  return "active";
+}
+
+/** Who is looking: a system administrator sees everything, a Clubs Administrator only Area Coordinator and club roles. */
+export type PeopleScope = "full" | "clubs";
