@@ -25,13 +25,16 @@ export function eventCardImage(item: CalendarItem, images: ReadonlyMap<string, {
  * decorative (empty alt) because the title beside it names the event.
  */
 export function EventPhotoCard({
-  item, image, variant = "strip", transitionName,
+  item, image, variant = "strip", transitionName, headingLevel = 3,
 }: {
   item: CalendarItem;
   image?: { src: string; srcSet: string } | null;
   variant?: "strip" | "featured";
   transitionName?: string | null;
+  /** 3 under an h2 (the homepage), 4 under the calendar list's Featured h3. */
+  headingLevel?: 3 | 4;
 }) {
+  const Heading = headingLevel === 4 ? "h4" : "h3";
   const [, month, day] = item.startsOn.split("-").map(Number);
   const statusLine = calendarItemStatusLine(item);
   const flag = item.isClosure ? closureLabel : item.status !== "SCHEDULED" ? calendarStatusLabels[item.status] : null;
@@ -52,7 +55,7 @@ export function EventPhotoCard({
         </div>
         <div className="event-photo-card-body">
           <p className="event-photo-card-date">{formatDateRange(item.startsOn, item.endsOn)}</p>
-          <h3><ItemLink className="event-photo-card-link" item={item}>{item.title}</ItemLink></h3>
+          <Heading><ItemLink className="event-photo-card-link" item={item}>{item.title}</ItemLink></Heading>
           {flag && <p className="event-photo-card-flag">{flag}</p>}
           {statusLine && <p className={`event-photo-card-status${item.registrationOpen ? " is-open" : ""}`}>{statusLine}</p>}
         </div>

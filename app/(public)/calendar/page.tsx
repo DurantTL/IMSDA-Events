@@ -321,10 +321,10 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             <>
             {featuredItems.length > 0 && (
               <div className="event-featured">
-                <h3 id="calendar-featured-heading">Featured</h3>
+                <h3 className="event-featured-heading" id="calendar-featured-heading">Featured</h3>
                 <ul aria-labelledby="calendar-featured-heading" className="event-featured-list">
                   {featuredItems.map((item) => (
-                    <EventPhotoCard image={eventCardImage(item, featuredImages)} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
+                    <EventPhotoCard image={eventCardImage(item, featuredImages)} headingLevel={4} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
                   ))}
                 </ul>
               </div>

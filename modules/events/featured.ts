@@ -8,12 +8,12 @@ import { activeFeaturedRows, type FeaturedEventRow } from "@/modules/events/feat
 /**
  * Events staff have featured that may still show today (#1218). Published, shown on the calendar and not archived are
  * checked in the query, so unpublishing or archiving removes an event at once; expiry is applied on the same read. A
- * `limit` cuts the ordered list (the homepage shows three).
+ * `limit` cuts the ordered list. The homepage passes none: a row with no public calendar item must not take a slot, so it matches rows to items first and then keeps three.
  */
 export async function listFeaturedEventRows(today: string, limit?: number): Promise<FeaturedEventRow[]> {
   const events = await getPrisma().event.findMany({
     where: { featured: true, isPublished: true, archivedAt: null, showOnCalendar: true },
-    select: { slug: true, startsAt: true, timezone: true, featuredOrder: true, featureUntil: true },
+    select: { slug: true, startsAt: true, endsAt: true, timezone: true, featuredOrder: true, featureUntil: true },
   });
   return activeFeaturedRows(
     events.map((event) => ({
@@ -21,6 +21,7 @@ export async function listFeaturedEventRows(today: string, limit?: number): Prom
       featuredOrder: event.featuredOrder,
       featureUntil: event.featureUntil,
       startsOn: calendarDateIn(event.startsAt, event.timezone),
+      endsOn: calendarDateIn(event.endsAt, event.timezone),
     })),
     today,
     limit,

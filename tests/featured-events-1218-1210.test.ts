@@ -39,7 +39,7 @@ const actualRepository = await vi.importActual<typeof import("@/modules/events/r
 const css = readFileSync("app/globals.css", "utf8");
 
 const row = (slug: string, overrides: Partial<FeaturedEventRow> = {}): FeaturedEventRow => ({
-  slug, featuredOrder: null, featureUntil: null, startsOn: "2026-12-05", ...overrides,
+  slug, featuredOrder: null, featureUntil: null, startsOn: "2026-12-05", endsOn: "2026-12-06", ...overrides,
 });
 
 const item = (slug: string, overrides: Partial<CalendarItem> = {}): CalendarItem => ({
@@ -62,6 +62,11 @@ describe("featured rules (#1218)", () => {
     expect(isFeaturedOn(row("a", { featureUntil: "2026-11-30" }), "2026-12-01")).toBe(false);
     expect(isFeaturedOn(row("a"), "2026-12-05")).toBe(true);
     expect(isFeaturedOn(row("a"), "2026-12-06")).toBe(false);
+  });
+
+  it("stops featuring once the event has ended, even with a later feature-until date", () => {
+    expect(isFeaturedOn(row("a", { featureUntil: "2027-01-31" }), "2026-12-06")).toBe(true);
+    expect(isFeaturedOn(row("a", { featureUntil: "2027-01-31" }), "2026-12-07")).toBe(false);
   });
 
   it("shows at most three on the homepage, after dropping expired ones", () => {
@@ -89,14 +94,25 @@ describe("featured rules (#1218)", () => {
   it("removes featured items from a list so no card shows twice", () => {
     expect(withoutFeatured([item("a"), item("b")], [item("a")]).map((i) => i.key)).toEqual(["event-b"]);
   });
+
+  it("removes every item of a featured event, such as its other linked dates (#1086)", () => {
+    const other = item("a", { key: "entry-2", kind: "ENTRY" });
+    expect(withoutFeatured([item("a"), other, item("b")], [item("a")]).map((i) => i.key)).toEqual(["event-b"]);
+  });
+
+  it("keeps three eligible events when a top-ranked row has no calendar item", () => {
+    const rows = [row("ghost", { featuredOrder: 1 }), row("a", { featuredOrder: 2 }), row("b", { featuredOrder: 3 }), row("c", { featuredOrder: 4 }), row("d", { featuredOrder: 5 })];
+    const picked = featuredItemsFor([item("a"), item("b"), item("c"), item("d")], activeFeaturedRows(rows, "2026-10-27")).slice(0, homeFeaturedLimit);
+    expect(picked.map((i) => i.key)).toEqual(["event-a", "event-b", "event-c"]);
+  });
 });
 
 describe("featured query (#1218)", () => {
   it("asks only for published, calendar-visible, unarchived featured events, and filters expiry at read time", async () => {
     const findMany = vi.fn().mockResolvedValue([
-      { slug: "live", startsAt: new Date("2026-12-05T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 2, featureUntil: null },
-      { slug: "first", startsAt: new Date("2026-12-12T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 1, featureUntil: "2026-12-01" },
-      { slug: "expired", startsAt: new Date("2026-10-01T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 1, featureUntil: null },
+      { slug: "live", startsAt: new Date("2026-12-05T18:00:00Z"), endsAt: new Date("2026-12-06T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 2, featureUntil: null },
+      { slug: "first", startsAt: new Date("2026-12-12T18:00:00Z"), endsAt: new Date("2026-12-13T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 1, featureUntil: "2026-12-01" },
+      { slug: "expired", startsAt: new Date("2026-10-01T18:00:00Z"), endsAt: new Date("2026-10-02T18:00:00Z"), timezone: "America/Chicago", featuredOrder: 1, featureUntil: null },
     ]);
     dependencies.getPrisma.mockReturnValue({ event: { findMany } });
     const rows = await listFeaturedEventRows("2026-10-27");
@@ -246,11 +262,16 @@ describe("featured changes are audited (#1218)", () => {
 describe("photo cards and the Coming up strip (#1210, #1218)", () => {
   const render = (node: React.ReactNode) => renderToStaticMarkup(createElement("ul", null, node));
 
+  it("styles the strip and Featured headings like the old Coming up heading", () => {
+    expect(css).toMatch(/\.event-featured > h2, \.event-photo-strip-head h2 \{ margin: 0; color: var\(--ink\); font-size: 1\.25rem; \}/);
+  });
+
   it("renders a linked card with date, title and the shared status, and a decorative resized photo", () => {
     const images = new Map([["fall", { assetId: "asset-1" }]]);
     const open = item("fall", { registrationOpen: true, registrationStatus: "OPEN" });
     const html = render(createElement(EventPhotoCard, { item: open, image: eventCardImage(open, images) }));
     expect(html).toContain('<a class="event-photo-card-link" href="/events/fall">Title fall</a>');
+    expect(html).toContain("<h3>");
     expect(html).toContain("December 5–6, 2026");
     expect(html).toContain("Registration open");
     expect(html).toContain('alt=""');
@@ -266,6 +287,12 @@ describe("photo cards and the Coming up strip (#1210, #1218)", () => {
     expect(html).toContain("is-plain");
     expect(html).toContain("event-photo-card-date-block");
     expect(html).not.toContain("<img");
+  });
+
+  it("uses an h4 title under the calendar's Featured h3", () => {
+    const html = render(createElement(EventPhotoCard, { item: item("x"), headingLevel: 4 }));
+    expect(html).toContain("<h4>");
+    expect(html).not.toContain("<h3>");
   });
 
   it("marks a cancelled item and keeps a link-less item as plain text", () => {
@@ -305,6 +332,7 @@ describe("calendar list view pins featured events (#1218)", () => {
     const page = readFileSync("app/(public)/calendar/page.tsx", "utf8");
     expect(page).toContain('view === "list" ? featuredItemsFor(items, await listFeaturedEventRows(today)) : []');
     expect(page).toContain('<ul aria-labelledby="calendar-featured-heading" className="event-featured-list">');
+    expect(page).toContain("headingLevel={4}");
     expect(page).toContain("groupByMonth(listItems, today)");
     expect(page.indexOf("calendar-featured-heading")).toBeLessThan(page.indexOf("groupByMonth(listItems"));
   });

@@ -148,7 +148,7 @@ describe("featured events and the Coming up strip (#1218, #1210)", () => {
 
   it("leads with featured events and leaves them out of Coming up", async () => {
     mocks.listPublicCalendarItems.mockResolvedValue([item(1), item(2), item(3)]);
-    featured.rows.mockResolvedValue([{ slug: "camp-2", featuredOrder: 1, featureUntil: null, startsOn: "2026-10-02" }]);
+    featured.rows.mockResolvedValue([{ slug: "camp-2", featuredOrder: 1, featureUntil: null, startsOn: "2026-10-02", endsOn: "2026-10-02" }]);
     featured.images.mockResolvedValue(new Map([["camp-2", { assetId: "asset-9" }]]));
     const html = await render();
     expect(html.indexOf("home-featured-heading")).toBeLessThan(html.indexOf("home-upcoming-heading"));

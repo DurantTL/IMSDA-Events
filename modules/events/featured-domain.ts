@@ -17,6 +17,8 @@ export type FeaturedEventRow = {
   featureUntil: string | null;
   /** The event's first day (YYYY-MM-DD), in its own time zone. */
   startsOn: string;
+  /** The event's last day (YYYY-MM-DD); an ended event is never featured, whatever the feature-until date. */
+  endsOn: string;
 };
 
 /** The last day an event is featured: the chosen date, else the day the event starts. */
@@ -25,8 +27,8 @@ export function featuredLastDay(row: Pick<FeaturedEventRow, "featureUntil" | "st
 }
 
 /** Featured through the last day, inclusive; `today` is a conference-calendar date. */
-export function isFeaturedOn(row: Pick<FeaturedEventRow, "featureUntil" | "startsOn">, today: string) {
-  return today <= featuredLastDay(row);
+export function isFeaturedOn(row: Pick<FeaturedEventRow, "featureUntil" | "startsOn" | "endsOn">, today: string) {
+  return today <= featuredLastDay(row) && today <= row.endsOn;
 }
 
 /** Order 1 first; events without an order after those with one; ties by earlier start, then slug (stable). */
@@ -58,8 +60,19 @@ export function featuredItemsFor(items: readonly CalendarItem[], rows: readonly 
   return result;
 }
 
-/** Items that are not already shown as featured, so a card never appears twice on a page. */
-export function withoutFeatured<T extends { key: string }>(items: readonly T[], featured: readonly { key: string }[]): T[] {
-  const taken = new Set(featured.map((item) => item.key));
-  return items.filter((item) => !taken.has(item.key));
+/**
+ * Items that are not already shown as featured, so a card never appears twice on a page. Matched by event page, so an
+ * event with several linked calendar entries (#1086) has all of them left out, not only the featured one.
+ */
+export function withoutFeatured<T extends { key: string; href?: string | null }>(items: readonly T[], featured: readonly { key: string; href?: string | null }[]): T[] {
+  const keys = new Set(featured.map((item) => item.key));
+  const slugs = new Set(featured.flatMap((item) => {
+    const slug = eventSlugFromHref(item.href);
+    return slug ? [slug] : [];
+  }));
+  return items.filter((item) => {
+    if (keys.has(item.key)) return false;
+    const slug = eventSlugFromHref(item.href);
+    return !(slug && slugs.has(slug));
+  });
 }

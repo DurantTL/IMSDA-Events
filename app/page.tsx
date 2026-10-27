@@ -32,10 +32,10 @@ export default async function Home() {
   const [items, attendee, featuredRows] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, 365)),
     getCurrentAttendee(),
-    listFeaturedEventRows(today, homeFeaturedLimit),
+    listFeaturedEventRows(today),
   ]);
   // Featured events lead the page as larger cards (#1218) and are left out of "Coming up", so no card shows twice.
-  const featured = featuredItemsFor(items, featuredRows);
+  const featured = featuredItemsFor(items, featuredRows).slice(0, homeFeaturedLimit);
   const upcoming = withoutFeatured(firstPerSeries(items), featured).slice(0, upcomingLimit);
   const cardImages = await listEventCardImages([...featured, ...upcoming].flatMap((item) => {
     const slug = eventSlugFromHref(item.href);
