@@ -13153,7 +13153,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .event-photo-card-body p { margin: 0; }
 .event-photo-card-date { color: var(--imsda-purple); font-size: 0.875rem; font-weight: 800; letter-spacing: 0.02em; }
 .event-photo-card-body :is(h3, h4) { margin: 0; font-size: 1.125rem; line-height: 1.25; }
-.event-photo-card-link { color: var(--imsda-navy); text-decoration: none; }
+.event-photo-card-link { display: flex; align-items: center; min-height: 44px; color: var(--imsda-navy); text-decoration: none; }
 .event-photo-card-link::after { content: ""; position: absolute; inset: 0; }
 .event-photo-card-link:focus-visible { outline: none; text-decoration: underline; }
 .event-photo-card-flag { color: #8a2d12; font-size: 0.875rem; font-weight: 800; }
