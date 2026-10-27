@@ -1,4 +1,4 @@
-/* Clubs Administrator dashboard (#1226), from the Events Administrator layout (#1227): tabs, a header card, four count cards, one card per event, then separate work rows. */
+/* Clubs Administrator dashboard (#1226), from the Events Administrator layout (#1227): tabs, a header card, five count cards in a three-column grid, one card per event, then separate work rows. */
 .workspace {
   padding-bottom: 32px;
 }
@@ -42,7 +42,7 @@
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 

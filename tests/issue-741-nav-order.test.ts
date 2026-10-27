@@ -74,6 +74,8 @@ const withoutClosedGroups = (nav: string) => nav.replace(/<div class="nav-group-
 function tokensOf(nav: string): string[] {
   const tokens: string[] = [];
   for (const match of nav.matchAll(/<button [^>]*class="nav-group-toggle"[^>]*><span>([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)) {
+    // The pinned Help & learning link (#1077) follows More for everyone; tests/help-learning-1077.test.ts covers it.
+    if (match[2] === "Help &amp; learning") continue;
     tokens.push(match[1] ? `# ${match[1]}` : match[2]);
   }
   return tokens;

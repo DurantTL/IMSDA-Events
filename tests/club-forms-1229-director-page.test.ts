@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   listRoster: vi.fn(),
   listSubmissions: vi.fn(),
   listLinks: vi.fn(),
+  getRequired: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -17,6 +18,7 @@ vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: m
 vi.mock("@/modules/club-forms/access", () => ({ clubLeaderViewerFromAccess: () => ({ kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } }) }));
 vi.mock("@/modules/club-forms/templates", () => ({ listEnabledClubFormTemplates: mocks.listTemplates }));
 vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.listRoster, listSubmissionsForViewer: mocks.listSubmissions }));
+vi.mock("@/modules/club-forms/required", () => ({ getRequiredFormsStatus: mocks.getRequired }));
 vi.mock("@/modules/club-forms/links", () => ({ listClubFormLinks: mocks.listLinks }));
 
 import ClubFormsPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/forms/page";
@@ -30,6 +32,7 @@ beforeEach(() => {
   mocks.listRoster.mockResolvedValue([]);
   mocks.listSubmissions.mockResolvedValue([]);
   mocks.listLinks.mockResolvedValue([]);
+  mocks.getRequired.mockResolvedValue([{ id: "club-a", name: "Alpha", church: "", items: [] }]);
   mocks.listTemplates.mockResolvedValue([
     template("permission", "Permission Slip", "FAMILY"),
     template("can", "Can Collecting Report", "CLUB"),
@@ -93,5 +96,36 @@ describe("the director's Forms page groups (#1229)", () => {
     const families = html.slice(html.indexOf("club-forms-families"), html.indexOf("club-forms-club"));
     expect(families).toContain("Private links you sent");
     expect(families).toContain("parent@example.test");
+  });
+});
+
+describe("required forms on the director's Forms page (#1246)", () => {
+  const item = (overrides: Record<string, unknown>) => ({ templateKey: "permission", name: "Permission Slip", requirement: "PER_ROLE_MEMBER_YEAR", roles: ["YOUTH"], status: "MISSING", missingMembers: [], memberCount: 0, ...overrides });
+
+  it("shows nothing when no form is required", async () => {
+    expect(await render()).not.toContain("Required forms for");
+  });
+
+  it("shows Missing and lists the members without one, each with a send-link action", async () => {
+    mocks.listRoster.mockResolvedValue([{ id: "m1", name: "Amy Youth" }, { id: "m2", name: "Bo Youth" }]);
+    mocks.getRequired.mockResolvedValue([{ id: "club-a", name: "Alpha", church: "", items: [item({ missingMembers: [{ id: "m2", name: "Bo Youth" }], memberCount: 2 })] }]);
+    const html = await render();
+    const required = html.slice(html.indexOf("club-forms-required"), html.indexOf("club-forms-families"));
+    expect(required).toContain("Missing");
+    expect(required).toContain("1 of 2 members are missing this form");
+    expect(required).toContain("Bo Youth");
+    expect(required).not.toContain("Amy Youth");
+    expect(required).toContain("Send link");
+  });
+
+  it("shows Done when everyone has one, and Missing with Fill in for a club-level form", async () => {
+    mocks.getRequired.mockResolvedValue([{ id: "club-a", name: "Alpha", church: "", items: [
+      item({ status: "DONE", memberCount: 3 }),
+      item({ templateKey: "can", name: "Can Collecting Report", requirement: "ONCE_PER_CLUB_YEAR", roles: [], status: "MISSING" }),
+    ] }]);
+    const html = await render();
+    expect(html).toContain("Done");
+    expect(html).toContain("All 3 members have one.");
+    expect(html).toContain("/account/clubs/club-a/forms/can/new");
   });
 });

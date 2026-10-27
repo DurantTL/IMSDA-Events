@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CLUB_FORM_FILL_MODES } from "@/modules/club-forms/definitions";
+import { CLUB_FORM_REQUIREMENTS, REQUIRED_ROLE_TYPES } from "@/modules/club-forms/required-domain";
 import { CLUB_FORM_LINK_MAX_DAYS, CLUB_FORM_LINK_MIN_DAYS } from "@/modules/club-forms/domain";
 import { rosterMemberInputSchema } from "@/modules/club-rosters/schemas";
 
@@ -49,6 +50,15 @@ export const rosterAddSchema = z.discriminatedUnion("action", [
 
 /** System administrators choose who fills a form in (#1229). */
 export const templateFillModeSchema = z.object({ fillMode: z.enum(CLUB_FORM_FILL_MODES) }).strict();
+
+/** System administrators and Clubs Administrators set whether a form is required (#1246). A per-member form needs at least one role. */
+export const templateRequirementSchema = z.object({
+  requirement: z.enum(CLUB_FORM_REQUIREMENTS),
+  requiredRoles: z.array(z.enum(REQUIRED_ROLE_TYPES)).max(REQUIRED_ROLE_TYPES.length).default([]),
+}).strict().refine((value) => value.requirement !== "PER_ROLE_MEMBER_YEAR" || value.requiredRoles.length > 0, {
+  message: "Choose at least one role.",
+  path: ["requiredRoles"],
+});
 
 /** System administrators close or reopen an open application for the current club year (#1229). */
 export const openLinkClosedSchema = z.object({ closed: z.boolean() }).strict();
