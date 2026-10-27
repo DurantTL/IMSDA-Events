@@ -52,7 +52,7 @@ describe("the person page's Chosen in the invite rows (#1276)", () => {
     { type: "club", organizationId: "org-1", role: "DIRECTOR" },
   ];
   const base: GrantPlanPerson = {
-    hasStaff: true, hasAccount: true, systemAdministrator: false, clubsAdministrator: false, areaCoordinator: false, activeEventIds: [], clubOrganizationIds: [],
+    hasStaff: true, hasAccount: true, systemAdministrator: false, clubsAdministrator: false, areaCoordinator: false, activeEvents: [], clubRoles: [],
   };
 
   it("marks everything saveable for a person with both logins and none of it", () => {
@@ -60,8 +60,13 @@ describe("the person page's Chosen in the invite rows (#1276)", () => {
   });
 
   it("marks what the person already has", () => {
-    const rows = planGrantItems(items, "full", { ...base, systemAdministrator: true, areaCoordinator: true, activeEventIds: ["evt_1"], clubOrganizationIds: ["org-1"] });
+    const rows = planGrantItems(items, "full", { ...base, systemAdministrator: true, areaCoordinator: true, activeEvents: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], clubRoles: [{ organizationId: "org-1", role: "DIRECTOR" }] });
     expect(rows.map((row) => row.state)).toEqual(["has", "has", "has", "has"]);
+  });
+
+  it("compares the role too: a different event role can be saved, a different club role cannot", () => {
+    const rows = planGrantItems(items, "full", { ...base, activeEvents: [{ eventId: "evt_1", role: "READ_ONLY_STAFF" }], clubRoles: [{ organizationId: "org-1", role: "REPORTER" }] });
+    expect(rows.map((row) => row.state)).toEqual(["save", "save", "change", "other-role"]);
   });
 
   it("does not offer staff-side items on an account-only person, or family-side on a staff-only one", () => {

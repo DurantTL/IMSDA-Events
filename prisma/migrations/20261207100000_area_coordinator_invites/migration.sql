@@ -29,3 +29,7 @@ ALTER TABLE "AreaCoordinatorInvite" ADD CONSTRAINT "AreaCoordinatorInvite_create
 
 -- AddForeignKey
 ALTER TABLE "AreaCoordinatorInvite" ADD CONSTRAINT "AreaCoordinatorInvite_acceptedAccountId_fkey" FOREIGN KEY ("acceptedAccountId") REFERENCES "AttendeeAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- One open (pending or sent) invite per email. A partial unique index, which Prisma's schema cannot express; it is the
+-- backstop for two invites for the same email racing each other.
+CREATE UNIQUE INDEX "AreaCoordinatorInvite_email_open_key" ON "AreaCoordinatorInvite"("email") WHERE "status" IN ('PENDING', 'SENT');

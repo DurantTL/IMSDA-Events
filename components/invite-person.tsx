@@ -186,7 +186,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </fieldset>
 
                 {full ? (
-                  <fieldset>
+                  <fieldset aria-describedby={errors.events ? "invite-events-error" : undefined}>
                     <legend>Events</legend>
                     {events.map((row, index) => (
                       <div className={styles.rowPair} key={row.key}>
@@ -206,14 +206,14 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                         <button aria-label={`Remove event ${index + 1}`} className="secondary-button" onClick={() => setEvents(events.filter((entry) => entry.key !== row.key))} type="button">Remove</button>
                       </div>
                     ))}
-                    {errors.events ? <p className={styles.fieldError} role="alert">{errors.events}</p> : null}
+                    {errors.events ? <p className={styles.fieldError} id="invite-events-error" role="alert">{errors.events}</p> : null}
                     <div>
                       <button className="secondary-button" onClick={() => { setEvents([...events, { key: nextKey, eventId: "", role: "READ_ONLY_STAFF" }]); setNextKey(nextKey + 1); }} type="button">Add an event</button>
                     </div>
                   </fieldset>
                 ) : null}
 
-                <fieldset>
+                <fieldset aria-describedby={errors.clubs ? "invite-clubs-error" : undefined}>
                   <legend>Clubs</legend>
                   {clubs.map((row, index) => (
                     <div className={styles.rowPair} key={row.key}>
@@ -233,7 +233,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                       <button aria-label={`Remove club ${index + 1}`} className="secondary-button" onClick={() => setClubs(clubs.filter((entry) => entry.key !== row.key))} type="button">Remove</button>
                     </div>
                   ))}
-                  {errors.clubs ? <p className={styles.fieldError} role="alert">{errors.clubs}</p> : null}
+                  {errors.clubs ? <p className={styles.fieldError} id="invite-clubs-error" role="alert">{errors.clubs}</p> : null}
                   <div>
                     <button className="secondary-button" onClick={() => { setClubs([...clubs, { key: nextKey, organizationId: "", role: "DIRECTOR" }]); setNextKey(nextKey + 1); }} type="button">Add a club</button>
                   </div>

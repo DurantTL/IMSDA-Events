@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   userCreate: vi.fn(),
   userUpdate: vi.fn(),
   userFindMany: vi.fn(),
+  userCount: vi.fn(),
   sessionUpdateMany: vi.fn(),
   accountFindUnique: vi.fn(),
   eventFindMany: vi.fn(),
@@ -52,6 +53,7 @@ const client = {
     create: mocks.userCreate,
     update: mocks.userUpdate,
     findMany: mocks.userFindMany,
+    count: mocks.userCount,
   },
   authCredential: { updateMany: mocks.credentialUpdateMany, create: vi.fn() },
   passwordResetToken: { updateMany: mocks.tokenUpdateMany },
@@ -282,6 +284,29 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     expect(body.deferred.personHref).toBe("/admin/people/staff/u-other?grant=sa");
   });
 
+  it("never uses a login that appeared after the check: it rolls back and defers instead", async () => {
+    // The first lookups (actor, existing person) see nothing; by the write the login exists and is not newly created.
+    let sawEmail = 0;
+    users.push({ id: "u-raced", email: "other@example.test", globalRole: null, attendeeAccountId: null, credential: { id: "c" } });
+    const real = client.user.findUnique;
+    client.user.findUnique = async (args: { where: { id?: string; email?: string } }) => {
+      if (args.where.email === "pat@example.test" && ++sawEmail > 2) return { id: "u-raced", email: "pat@example.test", globalRole: null, attendeeAccountId: null, credential: { id: "c" } } as never;
+      return real(args);
+    };
+    try {
+      const body = await (await invite({ systemAdmin: true, events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }] })).json();
+      expect(body.created.staffLogin).toBe(false);
+      expect(body.deferred.personHref).toBe("/admin/people/staff/u-raced?grant=" + encodeURIComponent("sa,e:evt_1:EVENT_ADMIN"));
+      expect(mocks.userCreate).not.toHaveBeenCalled();
+      // No role was applied and nothing was emailed (the rename inside the transaction is rolled back with it).
+      expect(mocks.userUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ data: { globalRole: "SYSTEM_ADMIN" } }));
+      expect(mocks.membershipCreate).not.toHaveBeenCalled();
+      expect(mocks.sendStaffInvitationEmail).not.toHaveBeenCalled();
+    } finally {
+      client.user.findUnique = real;
+    }
+  });
+
   it("POST /api/admin/users answers an existing login with 409 and the person's page", async () => {
     users.push({ id: "u-pat", email: "pat@example.test", globalRole: null, credential: { id: "c" } });
     const response = await usersRoute(post("/api/admin/users", { ...person, access: { systemAdmin: true } }));
@@ -371,6 +396,16 @@ describe("validation happens before anything is written", () => {
     expect(await response.json()).toMatchObject({ error: "ALREADY_INVITED" });
     expect(mocks.userCreate).not.toHaveBeenCalled();
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
+  });
+
+  it("maps the open-invite unique index to ALREADY_INVITED and creates no staff login", async () => {
+    const { Prisma } = await import("@prisma/client");
+    mocks.acCreate.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "x" }));
+    const response = await invite({ systemAdmin: true, areaCoordinator: true });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "ALREADY_INVITED" });
+    expect(mocks.userCreate).not.toHaveBeenCalled();
+    expect(mocks.sendStaffInvitationEmail).not.toHaveBeenCalled();
   });
 
   it("refuses a second open Area Coordinator invite for the same email", async () => {
@@ -463,6 +498,7 @@ describe("accepting an Area Coordinator invite", () => {
     const ok = await areaInviteAccept(post("/api/attendee/area-coordinator-invites/aci-1/accept", {}), ctx({ inviteId: "aci-1" }));
     expect(ok.status).toBe(200);
     expect(mocks.areaUpsert).toHaveBeenCalledTimes(1);
+    expect(await ok.json()).toEqual({ ok: true, nextUrl: "/account/area-clubs/overview" });
   });
 });
 
@@ -527,7 +563,24 @@ describe("resending and cancelling a staff invite", () => {
     expect(await resendStaffInvite("u-pend", "u-sys")).toMatchObject({ invitationEmailed: false, setupUrl: "https://events.imsda.test/reset-password?token=one-time-token" });
   });
 
-  it("cancels by spending unused links and switching the sign-in off, leaving roles alone", async () => {
+  it("removes a system administrator and Clubs Administrator role on cancel, audited, when another working admin exists", async () => {
+    users.push({ id: "u-pend-admin", email: "pa@example.test", displayName: "Pa", globalRole: "SYSTEM_ADMIN", accountStatus: "PENDING_ACTIVATION", credential: { id: "c", disabledAt: null } });
+    mocks.userCount.mockResolvedValue(1);
+    mocks.clubsGrantFindFirst.mockResolvedValue(null);
+    await cancelStaffInvite("u-pend-admin", "u-sys", now);
+    expect(mocks.userUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "u-pend-admin" }, data: { globalRole: null } }));
+    expect(mocks.userCount).toHaveBeenCalledWith({ where: expect.objectContaining({ globalRole: "SYSTEM_ADMIN", id: { not: "u-pend-admin" }, NOT: { credential: { is: { disabledAt: { not: null } } } } }) });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "SYSTEM_ADMIN_REVOKED" }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "STAFF_INVITE_CANCELLED" }), expect.anything());
+  });
+
+  it("refuses to cancel when it would leave no working system administrator", async () => {
+    users.push({ id: "u-pend-admin", email: "pa@example.test", displayName: "Pa", globalRole: "SYSTEM_ADMIN", accountStatus: "PENDING_ACTIVATION", credential: { id: "c", disabledAt: null } });
+    mocks.userCount.mockResolvedValue(0);
+    await expect(cancelStaffInvite("u-pend-admin", "u-sys", now)).rejects.toMatchObject({ code: "LAST_SYSTEM_ADMIN" });
+  });
+
+  it("cancels by spending unused links and switching the sign-in off", async () => {
     await cancelStaffInvite("u-pend", "u-sys", now);
     expect(mocks.tokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "u-pend", usedAt: null }, data: { usedAt: now } });
     expect(mocks.credentialUpdateMany).toHaveBeenCalledWith({ where: { userId: "u-pend", disabledAt: null }, data: { disabledAt: now } });

@@ -48,8 +48,8 @@ export default async function PersonAccessPage({
     systemAdministrator: person.systemAdministrator,
     clubsAdministrator: person.clubsAdministrator,
     areaCoordinator: person.areaCoordinator,
-    activeEventIds: (person.events ?? []).filter((event) => event.active).map((event) => event.eventId),
-    clubOrganizationIds: person.clubs.filter((club) => club.status === "active" || club.status === "scheduled").map((club) => club.organizationId),
+    activeEvents: (person.events ?? []).filter((event) => event.active).map((event) => ({ eventId: event.eventId, role: event.role })),
+    clubRoles: person.clubs.filter((club) => club.status === "active" || club.status === "scheduled").map((club) => ({ organizationId: club.organizationId, role: club.role })),
   });
   const cleanHref = `/admin/people/${kind}/${encodeURIComponent(id)}${from ? `?from=${encodeURIComponent(from)}` : ""}`;
   return (

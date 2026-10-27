@@ -36,7 +36,7 @@ async function postHandler(request: Request, context: { params: Promise<{ userId
       return Response.json({ message, setupUrl: delivery.setupUrl, setupExpiresAt: delivery.setupExpiresAt, directory: await getTeamDirectory() });
     } else if (input.action === "cancel-invite") {
       await cancelStaffInvite(userId, actor.id);
-      message = "Invite cancelled. Their sign-in is switched off; roles and event assignments are kept.";
+      message = "Invite cancelled. Their sign-in is switched off and any system administrator or Clubs Administrator role is removed; event assignments are kept.";
     } else {
       await changeStaffEmail(userId, input.email, actor.id);
       message = "Email changed.";

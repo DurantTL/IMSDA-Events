@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useConfirm } from "@/components/use-confirm";
+import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
 import type { PendingInvite } from "@/modules/system-admin/pending-invites";
 import styles from "./people-directory.module.css";
 
@@ -15,7 +16,7 @@ async function post(url: string, init: { method: string; json: unknown }, fallba
 }
 
 const cancelCopy: Record<PendingInvite["kind"], string> = {
-  staff: "Their sign-in is switched off and the activation link stops working. Any roles and event assignments made with the invite are kept; \"Allow sign-in\" on their page undoes this.",
+  staff: "Their sign-in is switched off and the activation link stops working. A system administrator or Clubs Administrator role given with the invite is removed (refused if it would leave no working system administrator); event assignments are kept. \"Allow sign-in\" on their page turns the sign-in back on, not the roles.",
   club: "The invite can no longer be accepted. Nothing else changes.",
   area: "The invite can no longer be accepted. Nothing else changes.",
 };
@@ -99,14 +100,14 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
         {invites.map((invite) => {
           const who = invite.name || invite.email;
           // A family-side invite carries no secret, so without email staff pass the sign-up link on themselves.
-          const copyInstead = !emailConfigured && invite.kind !== "staff" && invite.signUpUrl;
+          const copyInstead = !emailConfigured && invite.kind !== "staff" && !invite.expired && invite.signUpUrl;
           return (
             <li className={styles.pendingRow} key={`${invite.kind}-${invite.id}`}>
               <strong translate="no">{who}</strong>
               {invite.name ? <small translate="no">{invite.email}</small> : null}
               <p>{invite.what}</p>
               <p className={invite.expired ? styles.fieldError : styles.note}>
-                {invite.expired ? "Expired" : invite.sentAt ? `Sent ${new Date(invite.sentAt).toLocaleDateString("en-US", { timeZone: "UTC" })}` : "Not sent yet"}
+                {invite.expired ? "Expired" : invite.sentAt ? `Sent ${new Date(invite.sentAt).toLocaleDateString("en-US", { timeZone: CONFERENCE_TIME_ZONE })}` : "Not sent yet"}
               </p>
               <div className={styles.pendingActions}>
                 {copyInstead ? (

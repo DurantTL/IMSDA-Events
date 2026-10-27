@@ -20,7 +20,9 @@ function itemLabel(row: GrantPlanRow, eventNames: Names, clubNames: Names) {
 
 const stateText: Record<GrantPlanState, string> = {
   save: "Ready to save",
+  change: "Will change their role here",
   has: "Already has this",
+  "other-role": "Has another role here. Revoke it first to change it.",
   "needs-staff": "Needs a staff login",
   "needs-account": "Needs a website account",
 };
@@ -52,7 +54,7 @@ export function PersonGrantPanel({ rows, person, eventNames, clubNames, cleanHre
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<Array<{ key: string; label: string; message: string }>>([]);
   const [saved, setSaved] = useState(0);
-  const saveable = rows.filter((row) => row.state === "save");
+  const saveable = rows.filter((row) => row.state === "save" || row.state === "change");
 
   async function apply(row: GrantPlanRow) {
     const { item } = row;

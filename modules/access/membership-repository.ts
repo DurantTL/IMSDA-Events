@@ -143,6 +143,7 @@ export async function findOrCreatePendingStaffUser(
   const email = input.email.trim().toLowerCase();
   let user = await tx.user.findUnique({ where: { email }, select: { id: true, credential: { select: { id: true } } } });
   let credentialCreated = false;
+  const created = !user;
   if (!user) {
     user = await tx.user.create({
       data: {
@@ -165,7 +166,7 @@ export async function findOrCreatePendingStaffUser(
       credentialCreated = true;
     }
   }
-  return { userId: user.id, email, credentialCreated };
+  return { userId: user.id, email, credentialCreated, created };
 }
 
 /** Gives a staff login a role on an event (creating or reactivating its membership) and writes the audit entry. */
@@ -285,7 +286,8 @@ export async function applyGlobalRole(
 
   if (target.globalRole === "SYSTEM_ADMIN" && globalRole === null) {
     const remaining = await tx.user.count({
-      where: { globalRole: "SYSTEM_ADMIN", id: { not: target.id } },
+      // A login whose sign-in is switched off (a cancelled invite, say) cannot administer anything, so it doesn't count.
+      where: { globalRole: "SYSTEM_ADMIN", id: { not: target.id }, NOT: { credential: { is: { disabledAt: { not: null } } } } },
     });
     if (remaining === 0) {
       throw new MembershipOperationError(

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { AreaCoordinatorError } from "@/modules/organizations/area-coordinators";
 import { AreaCoordinatorInviteError } from "@/modules/organizations/area-coordinator-invites";
+import { MembershipOperationError } from "@/modules/access/membership-repository";
 import { clubImportApiError } from "@/modules/club-imports/api-errors";
 import { ClubInviteError } from "@/modules/club-imports/invites";
 import { PeopleInviteError } from "@/modules/system-admin/people-invite";
@@ -28,6 +29,9 @@ export function userAdminApiError(error: unknown, action: string) {
   if (error instanceof AreaCoordinatorInviteError) {
     const status = error.code === "INVITE_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : error.code === "INVITE_RESEND_TOO_SOON" ? 429 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
+  }
+  if (error instanceof MembershipOperationError) {
+    return Response.json({ error: error.code, message: error.message }, { status: error.code === "USER_NOT_FOUND" || error.code === "MEMBERSHIP_NOT_FOUND" ? 404 : 409 });
   }
   if (error instanceof ClubInviteError) return clubImportApiError(error, action);
   // Two invites for the same new email racing each other: the second finds the login already there.

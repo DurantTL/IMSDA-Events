@@ -15,7 +15,7 @@ async function postHandler(request: Request, context: { params: Promise<{ invite
     }
     const { inviteId } = await context.params;
     await acceptAreaCoordinatorInvite(inviteId, { id: account.id, verifiedEmail: account.verifiedEmail });
-    return Response.json({ ok: true, nextUrl: "/account/area" });
+    return Response.json({ ok: true, nextUrl: "/account/area-clubs/overview" });
   } catch (error) {
     return userAdminApiError(error, "Accepting an Area Coordinator invite");
   }

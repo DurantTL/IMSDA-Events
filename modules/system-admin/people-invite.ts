@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { resolveClubsActor } from "@/modules/access/admin-roles";
@@ -162,15 +163,28 @@ export async function createStaffLoginInvite(
   }
 
   const unusableHash = await createUnusableCredentialHash();
-  const userId = await getPrisma().$transaction(async (tx) => {
-    const user = await findOrCreatePendingStaffUser(tx, { email, displayName }, unusableHash);
-    if (input.access.systemAdmin) await applyGlobalRole(tx, user.userId, actorUserId, "SYSTEM_ADMIN");
-    if (input.access.clubsAdministrator) await applyClubsAdministrator(tx, user.userId, true, actorUserId);
-    for (const event of input.access.events) {
-      await assignEventMembership(tx, event.eventId, actorUserId, user, { displayName, role: event.role });
-    }
-    return user.userId;
-  });
+  let userId: string;
+  try {
+    userId = await getPrisma().$transaction(async (tx) => {
+      const user = await findOrCreatePendingStaffUser(tx, { email, displayName }, unusableHash);
+      // A login that appeared between the check above and this write belongs to someone else: never give it roles,
+      // rename it or email it an activation link. Throwing rolls the whole transaction back.
+      if (!user.created) throw new PeopleInviteError("STAFF_LOGIN_EXISTS", "That email already has a staff login.");
+      if (input.access.systemAdmin) await applyGlobalRole(tx, user.userId, actorUserId, "SYSTEM_ADMIN");
+      if (input.access.clubsAdministrator) await applyClubsAdministrator(tx, user.userId, true, actorUserId);
+      for (const event of input.access.events) {
+        await assignEventMembership(tx, event.eventId, actorUserId, user, { displayName, role: event.role });
+      }
+      return user.userId;
+    });
+  } catch (error) {
+    const raced = (error instanceof PeopleInviteError && error.code === "STAFF_LOGIN_EXISTS")
+      || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002");
+    if (!raced) throw error;
+    const current = await findExistingPerson(email);
+    if (!current.staffId) throw error;
+    return { outcome: "exists", staffId: current.staffId, accountId: current.accountId, personHref: deferredPersonHref(current, staffGrantItems(input.access)) };
+  }
   const delivery = await deliverStaffActivation({ userId, email, displayName });
   return { outcome: "created", userId, ...delivery };
 }
@@ -227,8 +241,41 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
   }
 
   const result: PeopleInviteResult = { created: { staffLogin: false, invitationEmailed: false, clubInviteIds: [] }, deferred: null, messageIds: [] };
-  const deferredItems: GrantItem[] = [];
+  const staffDeferred: GrantItem[] = [];
+  const familyDeferred: GrantItem[] = [];
   let personAfter = existing;
+
+  // The family invites go first: they are validated above and are the part that can still be refused (a racing
+  // duplicate), so a failure here leaves no staff login created and emailed behind an error message.
+  if (familyItems && !inviteFamily) {
+    familyDeferred.push(...familyGrantItems(access));
+  } else if (inviteFamily) {
+    const clubs = access.clubs.length > 0
+      ? await getPrisma().organization.findMany({ where: { id: { in: access.clubs.map((entry) => entry.organizationId) } }, select: { id: true, name: true } })
+      : [];
+    const clubNames = new Map(clubs.map((entry) => [entry.id, entry.name]));
+    try {
+      await getPrisma().$transaction(async (tx) => {
+        for (const entry of access.clubs) {
+          const invite = await createPeopleClubInvite(tx, { organizationId: entry.organizationId, clubName: clubNames.get(entry.organizationId) ?? "the club", email, name, role: entry.role, actorUserId }, now);
+          result.created.clubInviteIds.push(invite.inviteId);
+          if (invite.messageId) result.messageIds.push(invite.messageId);
+        }
+        if (access.areaCoordinator) {
+          const invite = await createAreaCoordinatorInvite(tx, { email, name, actorUserId }, now);
+          result.created.areaCoordinatorInviteId = invite.inviteId;
+          if (invite.messageId) result.messageIds.push(invite.messageId);
+        }
+      });
+    } catch (error) {
+      // The partial unique index on open Area Coordinator invites: two invites for one email racing each other.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new PeopleInviteError("ALREADY_INVITED", `There's already a pending invite for ${email}. Resend or cancel it from People & access.`);
+      }
+      throw error;
+    }
+    if (!isAccountEmailConfigured()) result.created.signUpUrl = clubInviteSignUpUrl(email);
+  }
 
   if (staffItems) {
     const staff = createStaff ? await createStaffLoginInvite(actorUserId, { name, email, access }) : null;
@@ -236,33 +283,12 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
       result.created = { ...result.created, staffLogin: true, invitationEmailed: staff.invitationEmailed, setupUrl: staff.setupUrl, setupExpiresAt: staff.setupExpiresAt };
       personAfter = { ...personAfter, staffId: staff.userId };
     } else {
-      deferredItems.push(...staffGrantItems(access));
+      staffDeferred.push(...staffGrantItems(access));
       if (staff?.outcome === "exists") personAfter = { staffId: staff.staffId, accountId: staff.accountId ?? personAfter.accountId };
     }
   }
 
-  if (familyItems && !inviteFamily) {
-    deferredItems.push(...familyGrantItems(access));
-  } else if (inviteFamily) {
-    const club = access.clubs.length > 0
-      ? await getPrisma().organization.findMany({ where: { id: { in: access.clubs.map((entry) => entry.organizationId) } }, select: { id: true, name: true } })
-      : [];
-    const clubNames = new Map(club.map((entry) => [entry.id, entry.name]));
-    await getPrisma().$transaction(async (tx) => {
-      for (const entry of access.clubs) {
-        const invite = await createPeopleClubInvite(tx, { organizationId: entry.organizationId, clubName: clubNames.get(entry.organizationId) ?? "the club", email, name, role: entry.role, actorUserId }, now);
-        result.created.clubInviteIds.push(invite.inviteId);
-        if (invite.messageId) result.messageIds.push(invite.messageId);
-      }
-      if (access.areaCoordinator) {
-        const invite = await createAreaCoordinatorInvite(tx, { email, name, actorUserId }, now);
-        result.created.areaCoordinatorInviteId = invite.inviteId;
-        if (invite.messageId) result.messageIds.push(invite.messageId);
-      }
-    });
-    if (!isAccountEmailConfigured()) result.created.signUpUrl = clubInviteSignUpUrl(email);
-  }
-
+  const deferredItems = [...staffDeferred, ...familyDeferred];
   if (deferredItems.length > 0) result.deferred = { personHref: deferredPersonHref(personAfter, deferredItems) };
   return result;
 }

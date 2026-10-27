@@ -208,7 +208,12 @@ export function parseGrantParam(value: unknown): GrantItem[] {
   return items;
 }
 
-export type GrantPlanState = "save" | "has" | "needs-staff" | "needs-account";
+/**
+ * save: ready. change: the person has a different active role on this event; saving changes it (the memberships route
+ * does). other-role: the person has a different role at this club; the club roles route refuses an overlapping role, so
+ * it is not saved (revoke the old one first).
+ */
+export type GrantPlanState = "save" | "change" | "has" | "other-role" | "needs-staff" | "needs-account";
 export type GrantPlanRow = { key: string; item: GrantItem; state: GrantPlanState };
 
 /** What the person already has, for marking the chosen items. */
@@ -218,10 +223,10 @@ export type GrantPlanPerson = {
   systemAdministrator: boolean;
   clubsAdministrator: boolean;
   areaCoordinator: boolean;
-  /** Events with an active membership, whatever the role. */
-  activeEventIds: readonly string[];
-  /** Clubs with a current or scheduled role, whatever the role. */
-  clubOrganizationIds: readonly string[];
+  /** Events with an active membership, with the role. */
+  activeEvents: ReadonlyArray<{ eventId: string; role: string }>;
+  /** Clubs with a current or scheduled role, with the role. */
+  clubRoles: ReadonlyArray<{ organizationId: string; role: string }>;
 };
 
 /**
@@ -238,8 +243,13 @@ export function planGrantItems(items: readonly GrantItem[], scope: PeopleScope, 
     else if (item.type === "sa") state = person.systemAdministrator ? "has" : "save";
     else if (item.type === "ca") state = person.clubsAdministrator ? "has" : "save";
     else if (item.type === "ac") state = person.areaCoordinator ? "has" : "save";
-    else if (item.type === "event") state = person.activeEventIds.includes(item.eventId) ? "has" : "save";
-    else state = person.clubOrganizationIds.includes(item.organizationId) ? "has" : "save";
+    else if (item.type === "event") {
+      const current = person.activeEvents.find((entry) => entry.eventId === item.eventId);
+      state = !current ? "save" : current.role === item.role ? "has" : "change";
+    } else {
+      const current = person.clubRoles.filter((entry) => entry.organizationId === item.organizationId);
+      state = current.length === 0 ? "save" : current.some((entry) => entry.role === item.role) ? "has" : "other-role";
+    }
     rows.push({ key: grantKey(item), item, state });
   }
   return rows;

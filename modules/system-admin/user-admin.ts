@@ -12,6 +12,8 @@ import { beginAdminVerification } from "@/modules/attendee-accounts/account-serv
 import { queueAttendeeVerificationEmail } from "@/modules/attendee-accounts/attendee-email-dispatch";
 import { checkAdminVerificationEmailRateLimit } from "@/modules/rate-limit/service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
+import { applyClubsAdministrator } from "@/modules/access/clubs-administrator";
+import { applyGlobalRole } from "@/modules/access/membership-repository";
 import { deliverStaffActivation } from "@/modules/communications/staff-activation";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
 
@@ -204,8 +206,9 @@ export async function resendStaffInvite(userId: string, actorUserId: string) {
 }
 
 /**
- * Cancels a pending staff invite: unused activation links are spent and the sign-in is switched off. The roles and
- * event assignments made with the invite are left as they are; "Allow sign-in" on the person's page undoes this.
+ * Cancels a pending staff invite: unused activation links are spent, the sign-in is switched off, and a system
+ * administrator or Clubs Administrator role given with the invite is removed. Event assignments are kept.
+ * "Allow sign-in" on the person's page undoes the sign-in part, not the roles.
  */
 export async function cancelStaffInvite(userId: string, actorUserId: string, now = new Date()) {
   await getPrisma().$transaction(async (tx) => {
@@ -213,6 +216,12 @@ export async function cancelStaffInvite(userId: string, actorUserId: string, now
     await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: now } });
     const guarded = await tx.authCredential.updateMany({ where: { userId, disabledAt: null }, data: { disabledAt: now } });
     if (guarded.count === 0) throw new UserAdminError("ACCOUNT_NOT_USABLE", "That login isn't waiting to be activated.");
+    // The roles that came with the invite go too: a login that can't sign in must not keep system administrator or
+    // Clubs Administrator access (and, with its sign-in off, it no longer counts toward the last-administrator rule).
+    // Refused, rolling the whole cancel back, only if it is the last working system administrator. Event
+    // assignments are kept.
+    await applyGlobalRole(tx, userId, actorUserId, null);
+    await applyClubsAdministrator(tx, userId, false, actorUserId);
     await writeAuditLog({
       actorUserId,
       action: "STAFF_INVITE_CANCELLED",
