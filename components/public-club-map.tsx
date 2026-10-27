@@ -31,9 +31,9 @@ const defaultZoom = 6;
  *
  * Nothing the map shows is handed to Leaflet as an HTML string — tooltips
  * are DOM nodes built with textContent (see public-club-map-content), pins
- * are empty divIcons styled in CSS (the logo is a file in public/), and the OpenStreetMap attribution is
- * rendered by React beside the map rather than through Leaflet's
- * innerHTML-based attribution control.
+ * are empty divIcons styled in CSS (the logo is a file in public/), and
+ * the OpenStreetMap attribution is rendered by React beside the map rather
+ * than through Leaflet's innerHTML-based attribution control.
  */
 export type PublicClubMapStatus = "loading" | "ready" | "tiles-failed" | "unavailable";
 
