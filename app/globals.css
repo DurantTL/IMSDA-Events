@@ -8509,14 +8509,13 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 /* Calendar motion (#1206). Linked highlight of one event across weeks (hover and keyboard focus alike, set by components/calendar-motion.tsx),
    the day panel rising in, the first-load intro, the month slide. Every animation lives in the no-preference block; under reduced motion the
    linked event only gets a static outline. Text and borders are visible from the first frame of each animation. */
-@media (min-width: 761px) {
+@media (prefers-reduced-motion: reduce) {
   .calendar-bar.is-linked:not(:focus-visible), .calendar-bar.is-selected-event:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
+  .calendar-chip.is-linked a:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
 }
-.calendar-chip.is-linked a:not(:focus-visible) { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
 @media (prefers-reduced-motion: no-preference) {
-  .calendar-chip { transition: opacity 0.2s ease; }
-  .calendar-month[data-calendar-active] [data-calendar-key]:not(.is-linked) { opacity: 0.55; }
-  .calendar-chip.is-linked a { outline: 0; }
+  .calendar-chip { transition: filter 0.2s ease; }
+  .calendar-month[data-calendar-active] [data-calendar-key]:not(.is-linked) { filter: saturate(0.35); }
   .calendar-panel-item { animation: calendar-rise 0.3s ease-out backwards; animation-delay: min(calc(var(--i, 0) * 50ms), 250ms); }
   @keyframes calendar-rise { from { transform: translateY(14px); } to { transform: none; } }
   .calendar-month[data-calendar-slide="next"] .calendar-week { animation: calendar-slide-next 0.3s ease-out; }
@@ -8525,8 +8524,8 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   @keyframes calendar-slide-prev { from { transform: translateX(-24px); } to { transform: none; } }
 }
 @media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
-  .calendar-bar { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease; }
-  .calendar-bar.is-linked, .calendar-bar.is-selected-event { outline: 0; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 59, 92, 0.22); }
+  .calendar-bar { transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease; }
+  .calendar-bar.is-linked, .calendar-bar.is-selected-event { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 59, 92, 0.22); }
   .calendar-bar.is-linked:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
   /* First page load only (the client component sets data-calendar-intro-done on <html>): the fill sweeps in from the left behind the
      text, which stays readable throughout, and today gives one soft gold pulse. */

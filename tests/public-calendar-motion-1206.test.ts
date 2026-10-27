@@ -116,11 +116,14 @@ describe("public calendar motion css (#1206)", () => {
     expect(outside).not.toMatch(/@keyframes|animation\s*:|transition\s*:/);
   });
 
-  it("never fades text below 0.4 opacity and adds no hover rules or pointer-events changes", () => {
+  it("fades others by saturation only (never opacity) and adds no hover rules or pointer-events changes", () => {
     expect(block).not.toMatch(/:hover/);
     expect(block).not.toMatch(/pointer-events/);
     expect(block).not.toMatch(/animation:[^;]*infinite/);
-    for (const [, value] of block.matchAll(/opacity:\s*([\d.]+)/g)) expect(Number(value)).toBeGreaterThanOrEqual(0.4);
+    expect(block).not.toMatch(/[^-]opacity:/);
+    expect(block).toMatch(/:not\(\.is-linked\) \{ filter: saturate\(0\.35\); \}/);
+    // The static outline belongs to the reduced-motion branch only.
+    expect(block).not.toMatch(/outline: 0/);
   });
 
   it("gates the intro on the html attribute and runs the gold pulse once", () => {

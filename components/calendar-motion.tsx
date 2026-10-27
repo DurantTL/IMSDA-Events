@@ -19,7 +19,7 @@ import {
 
 const MONTH = ".calendar-month";
 const KEYED = "[data-calendar-key]";
-const SNAPSHOT_TTL_MS = 5000;
+const SNAPSHOT_TTL_MS = 1500;
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -106,6 +106,14 @@ export function CalendarMotion({ month, category, selectedDate }: { month: strin
     };
     const over = (event: Event) => {
       if (event instanceof PointerEvent && event.pointerType === "touch") return;
+      if (event.type === "focusin") {
+        // Only keyboard-style focus links; a tap that focuses a link must not leave the grid dimmed.
+        try {
+          if (!(event.target instanceof Element) || !event.target.matches(":focus-visible")) return;
+        } catch {
+          return;
+        }
+      }
       const key = keyOf(event.target);
       if (key) setLinked(key);
     };
@@ -113,6 +121,7 @@ export function CalendarMotion({ month, category, selectedDate }: { month: strin
       if (keyOf(event.target)) setLinked(null);
     };
     const click = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target instanceof Element ? event.target : null;
       const element = target?.closest<HTMLElement>(`${MONTH} ${KEYED}`);
       const date = calendarDateFromHref(element?.closest("a")?.getAttribute("href") ?? element?.querySelector("a")?.getAttribute("href"));
@@ -133,9 +142,20 @@ export function CalendarMotion({ month, category, selectedDate }: { month: strin
   useEffect(() => {
     const capture = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (!target?.closest(".calendar-categories a")) return;
+      const link = target?.closest<HTMLAnchorElement>(".calendar-categories a");
+      if (!link) return;
+      const plain = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+      if (!plain || link.getAttribute("aria-current") === "page") {
+        flip.current = null;
+        return;
+      }
       const board = document.querySelector(MONTH);
-      if (board && !reducedMotion()) flip.current = { at: Date.now(), rects: snapshot(board) };
+      if (board && !reducedMotion()) {
+        const entry = { at: Date.now(), rects: snapshot(board) };
+        flip.current = entry;
+        // A snapshot only serves the navigation it was taken for; drop it quickly so back/forward cannot reuse it.
+        window.setTimeout(() => { if (flip.current === entry) flip.current = null; }, SNAPSHOT_TTL_MS);
+      }
     };
     document.addEventListener("click", capture, true);
     return () => document.removeEventListener("click", capture, true);
@@ -143,6 +163,7 @@ export function CalendarMotion({ month, category, selectedDate }: { month: strin
 
   // The selected event follows the day panel: it stays while that day is open and clears when the panel closes or changes.
   useLayoutEffect(() => {
+    setLinked(null);
     const stored = selection.current ?? readStoredSelection();
     const key = calendarSelectedKey(stored, selectedDate || null);
     if (!key) {
