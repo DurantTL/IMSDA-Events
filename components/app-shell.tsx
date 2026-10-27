@@ -15,6 +15,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { ClubsYearSelector } from "@/components/clubs-year-selector";
+import { requestedClubYear } from "@/components/clubs-year-selector-model";
 import { DestinationSearch } from "@/components/destination-search";
 import { GuardedLink } from "@/components/guarded-link";
 import { SystemPhoneMenu } from "@/components/system-phone-menu";
@@ -61,8 +63,12 @@ import {
   sidebarActiveHref,
   sidebarSections,
   clubsAdminActiveHref,
+  clubsAdminGroups,
   clubsAdminHealthImportHref,
+  clubsAdminHomeItem,
+  clubsAdminHrefForYear,
   clubsAdminNavigation,
+  eventsAdminHomeItem,
   helpPageTitle,
   staffSubpageTitle,
   systemNavigation,
@@ -214,7 +220,11 @@ export function AppShell({
   const clubsOnly = clubsView && events.length === 0;
   const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname) : null;
   // The health record import page only exists while the Health Record feature is on (#1232).
-  const clubsNavItems = clubsAdminNavigation.filter((item) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false);
+  const showClubsItem = (item: NavigationItem) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false;
+  const clubsNavItems = clubsAdminNavigation.filter(showClubsItem);
+  // The year-aware Clubs links keep the club year the URL has (#1245).
+  const clubsLinkYear = clubsView ? requestedClubYear(searchParams.get("year")) : null;
+  const onEventsAdminHome = pathname === eventsAdminHomeItem.href;
   // The phone Clubs bar scrolls sideways (#1232): bring the page's own item into view when the page changes.
   const clubsMobileNavRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -318,6 +328,7 @@ export function AppShell({
     clubEvent: Boolean(selectedEvent?.clubEvent),
     clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
     hiddenCardKeys: selectedHiddenCardKeys,
+    clubsAdmin: clubsView ? { healthImport: adminRoleView?.healthImport !== false } : undefined,
   });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
@@ -423,13 +434,56 @@ export function AppShell({
           </button>
         </div>
 
+        {clubsView && <ClubsYearSelector />}
+
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
-          {clubsView && clubsNavItems.map(({ href, icon: Icon, label }) => (
-            <GuardedLink key={href} className={activeClubsHref === href ? "nav-item active" : "nav-item"} href={href} aria-current={activeClubsHref === href ? "page" : undefined} {...tipProps(label)}>
-              <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-              <span>{label}</span>
+          {sidebarKind === "events" && (
+            <GuardedLink className={onEventsAdminHome ? "nav-item active" : "nav-item"} href={eventsAdminHomeItem.href} aria-current={onEventsAdminHome ? "page" : undefined} {...tipProps(eventsAdminHomeItem.label)}>
+              <eventsAdminHomeItem.icon aria-hidden="true" size={19} strokeWidth={1.9} />
+              <span>{eventsAdminHomeItem.label}</span>
             </GuardedLink>
-          ))}
+          )}
+          {clubsView && (
+            <>
+              <GuardedLink className={activeClubsHref === clubsAdminHomeItem.href ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(clubsAdminHomeItem.href, clubsLinkYear)} aria-current={activeClubsHref === clubsAdminHomeItem.href ? "page" : undefined} {...tipProps(clubsAdminHomeItem.label)}>
+                <clubsAdminHomeItem.icon aria-hidden="true" size={19} strokeWidth={1.9} />
+                <span>{clubsAdminHomeItem.label}</span>
+              </GuardedLink>
+              {clubsAdminGroups.map((group) => {
+                const items = group.items.filter(showClubsItem);
+                // A hash item never lights (it opens a section of a page another item owns), so it never matches the active href.
+                const isActive = (item: NavigationItem) => activeClubsHref === item.href;
+                const open = resolveSidebarGroupOpen({
+                  saved: savedGroups[group.key],
+                  containsCurrentPage: items.some(isActive),
+                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
+                });
+                return (
+                  <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
+                    <button
+                      type="button"
+                      className="nav-group-toggle"
+                      id={`nav-group-${group.key}-toggle`}
+                      aria-expanded={open}
+                      aria-controls={`nav-group-${group.key}`}
+                      onClick={() => toggleGroup(group.key, open)}
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown aria-hidden="true" size={14} />
+                    </button>
+                    <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
+                      {items.map((item) => (
+                        <GuardedLink key={item.href} className={isActive(item) ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(item.href, clubsLinkYear)} aria-current={isActive(item) ? "page" : undefined} {...tipProps(item.label)}>
+                          <item.icon aria-hidden="true" size={19} strokeWidth={1.9} />
+                          <span>{item.label}</span>
+                        </GuardedLink>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
           {showSystemNav && (
             <>
               <GuardedLink className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
@@ -451,7 +505,6 @@ export function AppShell({
                   saved: savedGroups[group.key],
                   containsCurrentPage: group.items.some((item) => activeSystemEntry === systemNavEntryKey(group, item)),
                   dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
-                  defaultOpen: !group.collapsedByDefault,
                 });
                 return (
                   <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
@@ -627,7 +680,7 @@ export function AppShell({
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
       {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation" ref={clubsMobileNavRef}>
         {clubsNavItems.map(({ href, icon: Icon, label }) => (
-          <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={href} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
+          <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={clubsAdminHrefForYear(href, clubsLinkYear)} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
             <Icon aria-hidden="true" size={22} /><span>{label}</span>
           </GuardedLink>
         ))}

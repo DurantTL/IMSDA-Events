@@ -418,20 +418,26 @@ to 99% (#943). `imsda-cleanup` (below) removes them after every deploy and
 once a day.
 
 **How a new version goes live.** xCloud does not run the Git page's Deploy
-Script on this site: its deploy pulls `main` into `/var/www/events.imsda.org`
-and then runs `down` / `up` on the base file, which only restarts the image
-already tagged `imsda-events:live`. A systemd timer finishes the job:
+Script on this site. Its own deploy pulls `main` into `/var/www/events.imsda.org`
+and then runs `down` / `up` on the base file, which restarts the app on every
+merge. That restart drops anyone who is submitting a form, so it should be
+turned off (see "Deploys without downtime" below); the timer then fetches
+`main` itself. A systemd timer does the deploy:
 
 - [`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh), installed as
   `/usr/local/bin/imsda-deploy`, waits up to 20 minutes for
-  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, keeps the outgoing image as
-  `imsda-events:previous`, tags the new one `imsda-events:live` and runs
-  `up -d app`. If the image never appears it stops without changing anything.
+  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, then switches to it
+  without stopping the site (next section). If the image never appears, or the
+  new version does not start, it leaves the live version running.
 - [`deploy/xcloud/autodeploy.sh`](../deploy/xcloud/autodeploy.sh), installed as
   `/usr/local/bin/imsda-autodeploy`, runs every 2 minutes from
-  `imsda-autodeploy.timer`. When the checked-out commit differs from the live
-  image's `org.opencontainers.image.revision` label and that commit's image is
-  published, it runs `imsda-deploy`.
+  `imsda-autodeploy.timer`. It fetches `origin/main` as the checkout's owner
+  (`u_events`). When that commit differs from the live image's
+  `org.opencontainers.image.revision` label, its image is published, and the
+  time is inside the deploy window (`IMSDA_DEPLOY_WINDOW`, default `00-05`:
+  midnight to 5 AM Central), it fast-forwards the checkout to it and runs
+  `imsda-deploy`. Outside the window it waits; running `imsda-deploy` by hand
+  deploys the checked-out commit at any time.
 - [`deploy/xcloud/cleanup.sh`](../deploy/xcloud/cleanup.sh), installed as
   `/usr/local/bin/imsda-cleanup`, runs after each successful `imsda-deploy` and
   daily from `imsda-cleanup.timer`. It removes all
@@ -442,16 +448,116 @@ already tagged `imsda-events:live`. A systemd timer finishes the job:
   stays. Cleanup and deploy take turns through `flock` on
   `/run/imsda-deploy.lock`; a failed cleanup never fails a deploy.
 
-So after a merge: xCloud pulls the commit within a minute (and restarts the old
-version briefly) but the site keeps running the old image. At midnight Central
-GitHub publishes the image for the latest `main` (about 10 minutes), and the
-timer switches to it within 2 minutes, so the day's merges go live together.
+So after a merge nothing changes on the server until the night window: the
+timer only fetches. (Until xCloud's deploy is turned off, xCloud still pulls
+the commit and restarts the old version briefly.) At midnight Central GitHub
+publishes the image for the latest `main` (about 10 minutes, "Prebuilt images
+from GitHub"), and the timer switches to it in that night's window, so the
+day's merges go live together. The timer deploys only the newest commit on
+`main`: if something merges after the day's image was built, that night waits
+for the next image.
 For a change that can't wait, open Actions → "Docker image" → "Run workflow"
-on `main`; the timer deploys it about 12 minutes later. Additive database
+on `main`, wait about 10 minutes, then pull and run `imsda-deploy` by hand
+(step 3 under "Deploys without downtime"); otherwise the timer deploys it in
+the next night window. Additive database
 migrations can be run as soon as their PR merges: the old code ignores new
-tables and columns until the evening deploy. Watch it with
+tables and columns until the night deploy. Watch it with
 `journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
 `imsda-deploy` as `root`.
+
+### Deploys without downtime (#1263)
+
+Before #1263 every deploy stopped the app, ran migrations and template syncs,
+then started it: about a minute in which nginx showed a 502 page and a form
+submitted in that window failed. Now:
+
+1. **The old version keeps serving** while a one-off container of the new
+   image runs migrations and syncs (`IMSDA_PREP_ONLY=1`). From then on the old
+   code runs on the new schema, so **every migration must be additive**: new
+   tables, new nullable columns or columns with a default. Never a `NOT NULL`
+   column without a default, a rename or a drop in the same release as the
+   code that stops using it; split those over two releases.
+2. **The new version starts next to it** as the `standby` service on
+   `127.0.0.1:8101` and must report the new SHA on `/api/health`. If it never
+   does, the deploy stops and the live app is not restarted (the database is
+   already migrated, which is why migrations must be additive).
+3. **The live tag moves and `app` restarts on 8100** with the preparation
+   skipped (`IMSDA_SKIP_DB_PREP=1`), so it answers within a few seconds. If it
+   does not come back on the new SHA, the script puts `imsda-events:previous`
+   back and keeps the standby running until it is healthy.
+4. **The standby is removed.**
+
+A commit that fails is written to `/var/lib/imsda/failed-sha` and the timer
+does not retry it; the next merge to `main` is tried as usual. Running
+`imsda-deploy` by hand always tries. An image built before #1263 (for example
+when deploying an older commit by hand) does not support this, so the script
+switches to it the old way, with about a minute offline.
+
+Whenever the container does run the preparation itself (a manual `up`, a
+rollback), it answers with a short 503 "The site is updating" response (JSON
+for `/api/*`) until the app starts, instead of nginx's 502 page. The forms
+change that keeps what was typed and offers **Try again** on such an answer
+is a separate PR for #1263.
+
+**What Caleb does once on the server (human steps):**
+
+1. **Copy the new compose file and scripts in** (as `root`, from an up-to-date
+   checkout of `main`):
+
+   ```bash
+   install -m 644 -o u_events -g u_events deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml
+   install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+   install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+   docker compose -f /home/u_events/239298/docker-compose.yml --profile standby config --quiet && echo config-ok
+   ```
+
+2. **Check the timer can fetch** (it uses the same Git access xCloud set up
+   for `u_events`):
+
+   ```bash
+   runuser -u u_events -- git -C /var/www/events.imsda.org fetch origin main && echo fetch-ok
+   ```
+
+   If this asks for a password or fails, stop here and leave xCloud's deploy on
+   (step 3) until the Git access is fixed.
+
+3. **Turn off xCloud's deploy on merge.** In the xCloud dashboard open the
+   events.imsda.org site, then its **Git** settings, and turn off the automatic
+   deploy on push (xCloud calls it "Push to Deploy" or "Auto Deploy"; the
+   wording may differ). After that a merge no longer pulls code or restarts
+   the app. The timer fetches `main` every 2 minutes and deploys between
+   midnight and 5 AM Central once the image is published. Check it the next
+   morning:
+
+   ```bash
+   systemctl list-timers imsda-autodeploy.timer        # next run is listed
+   journalctl -u imsda-autodeploy.service --since today | grep Deploying
+   curl -s http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
+   ```
+
+   To use a different window, add `Environment=IMSDA_DEPLOY_WINDOW=01-04` under
+   `[Service]` in `/etc/systemd/system/imsda-autodeploy.service`, then
+   `systemctl daemon-reload` (a window may cross midnight, like `22-02`). For a change that can't wait, run
+   `imsda-deploy` by hand after `runuser -u u_events -- git -C
+   /var/www/events.imsda.org pull --ff-only origin main`.
+
+4. **Optional, for no gap at all: let nginx fall back to the standby.** Only if
+   xCloud lets you add custom Nginx config for the site. Replace the
+   `proxy_pass http://127.0.0.1:8100;` target with an upstream that has 8101 as
+   a backup:
+
+   ```nginx
+   upstream imsda_events_app {
+       server 127.0.0.1:8100 max_fails=1 fail_timeout=5s;
+       server 127.0.0.1:8101 backup;
+   }
+   # in the location block:
+   proxy_pass http://imsda_events_app;
+   proxy_next_upstream error timeout http_502 http_503;
+   ```
+
+   Without it, the only gap is the few seconds while `app` restarts in step 3
+   above.
 
 Install or update (as `root`, from a checkout of `main`):
 
@@ -507,7 +613,7 @@ By hand, as `root`:
 ```bash
 B=/home/u_events/239298/docker-compose.yml
 docker compose -f $B config --quiet && echo config-ok
-docker compose -f $B up -d app                        # restart on the live image
+IMSDA_SKIP_DB_PREP=1 docker compose -f $B up -d app   # restart on the live image
 curl -s http://127.0.0.1:8100/api/health
 docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
@@ -517,12 +623,16 @@ docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println
 
 ```bash
 docker tag imsda-events:previous imsda-events:live
-docker compose -f /home/u_events/239298/docker-compose.yml up -d app
+IMSDA_SKIP_DB_PREP=1 docker compose -f /home/u_events/239298/docker-compose.yml up -d app
 ```
 
+`IMSDA_SKIP_DB_PREP=1` keeps the container from re-running migrations and
+syncs that already ran. Without it, `up -d` recreates the container and the
+site shows "updating" for about a minute.
+
 Stop the autodeploy timer before a rollback (`systemctl stop imsda-autodeploy.timer`),
-otherwise autodeploy redeploys the checked-out version within 2 minutes; start it
-again once `main` is fixed.
+otherwise autodeploy redeploys `main` in the next night window; start it again
+once `main` is fixed.
 
 Migrations only move forward; rolling back the image does not undo them.
 

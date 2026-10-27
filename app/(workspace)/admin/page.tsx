@@ -358,8 +358,8 @@ export default async function SystemAdminPage({
               <strong>No upcoming events</strong>
               <p>Start by creating an event, or copy a past one. This page does not show email, payment or readiness as set up: check Email, Platform settings and System readiness for that.</p>
               <p className={styles.starterLinks}>
-                <Link className="primary-button" href="/event-setup">Create event</Link>
-                <Link href="/event-setup/copy">Copy a past event</Link>
+                <Link className="primary-button" href="/event-setup">Create an event</Link>
+                <Link href="/event-setup/copy">Copy from a past event</Link>
                 <Link href="/admin/form-templates">Form templates</Link>
               </p>
             </div>

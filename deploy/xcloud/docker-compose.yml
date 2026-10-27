@@ -14,7 +14,7 @@
 # See docs/DEPLOY-DOCKER.md, "xCloud site setup".
 name: xcloud-site-239298
 services:
-  app:
+  app: &app
     image: imsda-events:live
     pull_policy: never
     ports:
@@ -27,6 +27,8 @@ services:
     environment:
       PORT: '3100'
       ASSET_STORAGE_DIR: /app/storage/event-assets
+      # Set to 1 only by deploy.sh, after it already ran migrations and syncs.
+      IMSDA_SKIP_DB_PREP: ${IMSDA_SKIP_DB_PREP:-}
     volumes:
       # Uploaded event files; without this every uploaded file returns 404.
       - imsda_events_assets:/app/storage/event-assets
@@ -34,6 +36,21 @@ services:
       - default
       - postgresql
     restart: unless-stopped
+
+  # The new version, started by deploy.sh on port 8101 next to the running one
+  # until the switch is done (#1263). Never started by xCloud (profile).
+  standby:
+    <<: *app
+    image: imsda-events:${IMSDA_STANDBY_TAG:-next}
+    profiles: ['standby']
+    ports:
+      - '127.0.0.1:8101:3100'
+    environment:
+      PORT: '3100'
+      ASSET_STORAGE_DIR: /app/storage/event-assets
+      IMSDA_SKIP_DB_PREP: ${IMSDA_SKIP_DB_PREP:-}
+      IMSDA_PREP_ONLY: ${IMSDA_PREP_ONLY:-}
+    restart: 'no'
 
 volumes:
   imsda_events_assets:

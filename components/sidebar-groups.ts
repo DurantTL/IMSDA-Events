@@ -1,4 +1,4 @@
-import type { SidebarSection } from "@/components/staff-navigation";
+import type { ClubsNavGroupKey, SidebarSection } from "@/components/staff-navigation";
 import type { SystemNavGroupKey } from "@/components/system-navigation";
 
 /**
@@ -9,8 +9,8 @@ import type { SystemNavGroupKey } from "@/components/system-navigation";
  */
 export const sidebarGroupsStorageKey = "imsda-staff-sidebar-groups";
 
-/** A collapsible group: an event workspace section, or a system management group (#966). */
-export type SidebarGroupKey = SidebarSection | SystemNavGroupKey;
+/** A collapsible group: an event workspace section, a system management group (#966) or a Clubs group (#1245). */
+export type SidebarGroupKey = SidebarSection | SystemNavGroupKey | ClubsNavGroupKey;
 
 export type SidebarGroupChoices = Readonly<Partial<Record<SidebarGroupKey, boolean>>>;
 
@@ -54,8 +54,9 @@ export function writeSidebarGroups(choices: SidebarGroupChoices, storage?: Pick<
 /**
  * Whether a group is open. A group opens by itself when the current page is
  * inside it, unless the viewer just closed it on this very page (`dismissed`);
- * otherwise the saved choice decides, then `defaultOpen` (closed unless a group
- * says otherwise; the system groups of #966 start open except Catalogs and settings).
+ * otherwise the saved choice decides, then `defaultOpen`. Every sidebar group
+ * starts closed (#1245), so no caller passes `defaultOpen` for them; it stays for
+ * a group that must open before the viewer has chosen.
  */
 export function resolveSidebarGroupOpen({
   saved,

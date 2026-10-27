@@ -24,14 +24,14 @@ describe("the Clubs view and event access", () => {
   it("keeps the event picker and event sidebar for a Clubs Administrator who holds an event membership (any role)", () => {
     const html = shell([{ id: "evt_a", slug: "a", name: "Event A", permissions: ["VIEW_SENSITIVE_DATA"] }]);
     expect(html).toContain('id="event-picker"');
-    expect(html).toContain("Clubs summary");
+    expect(html).toContain("Club summary");
     expect(html).toContain('href="/people?event=evt_a"');
   });
 
   it("hides the event picker and event sidebar only when there is no event at all", () => {
     const html = shell([]);
     expect(html).not.toContain('id="event-picker"');
-    expect(html).toContain("Clubs summary");
+    expect(html).toContain("Club summary");
     expect(html).not.toContain('href="/people');
   });
 });
