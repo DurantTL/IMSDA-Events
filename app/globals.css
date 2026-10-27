@@ -13063,7 +13063,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-hero .public-event-directions a:focus-visible, .public-event-hero .public-event-share-button:focus-visible { outline-color: #f9d678; }
 .public-event-share { display: grid; gap: 6px; }
 .public-event-share-field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.public-event-share-field input { min-height: 44px; width: min(100%, 28rem); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 400; }
+.public-event-share-field input { min-height: 44px; width: min(100%, 28rem); padding: 8px 10px; border: 1px solid var(--field-border); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 400; }
 .public-event-help-section { display: grid; gap: 6px; margin: 8px 0 40px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 1rem; }
 .public-event-help-section h2 { margin: 0; color: var(--ink); font-size: 1.125rem; }
 .public-event-help-section p { margin: 0; line-height: 1.5; }
