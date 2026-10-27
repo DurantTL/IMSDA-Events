@@ -29,6 +29,8 @@ import { TranslateHint } from "@/components/translate-hint";
 import { AutoEventHeader, AutoEventInfoCards } from "@/components/auto-event-info-cards";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { contentBlocks, parseBlockData } from "@/modules/events/content-schemas";
+import { getServerEnv } from "@/lib/env";
+import { directionsTargets } from "@/modules/events/directions";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +76,14 @@ export default async function PublicEventPage({
   const { eventSlug } = await params;
   const landing = await getPublicEventLanding(eventSlug);
   if (!landing) notFound();
+
+  // Directions come from the typed place only (#1213). The share link is the canonical address built from the saved
+  // slug, never the route param or the visitor's own URL, and only for an event others can open (#1214).
+  const directions = directionsTargets({ location: landing.event.location, sites: landing.event.sites });
+  const shareUrl = landing.event.isPublished && !landing.event.archivedAt
+    ? new URL(`/events/${encodeURIComponent(landing.event.slug)}`, getServerEnv().APP_BASE_URL).toString()
+    : null;
+  const whereProps = { directions, shareUrl, shareTitle: landing.event.name };
 
   // Resources sit above the fold, the way the tiles do on the current page;
   // prose reads below the registration options.
@@ -285,6 +295,7 @@ export default async function PublicEventPage({
           dateLabel={landing.event.dateLabel}
           timeLabel={landing.event.timeLabel}
           location={landing.event.location}
+          {...whereProps}
           titleMode={!bannerShown ? "h1" : sameName(heroSection!.title, autoCards.header.title) ? "hidden" : "text"}
         />
         </EventCardTransition>
@@ -292,7 +303,7 @@ export default async function PublicEventPage({
         <section className="public-event-facts" aria-label="Event details">
           {/* The banner's title is free text; when it is not the event's name, the name still appears once, as text. */}
           {!sameName(heroSection!.title, landing.event.name) && <p className="public-event-facts-name">{landing.event.name}</p>}
-          <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
+          <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
         </section>
       ) : (
         <EventCardTransition name={cardTransitionName}>
@@ -300,7 +311,7 @@ export default async function PublicEventPage({
           <div>
             <p className="public-registration-eyebrow">Iowa-Missouri Conference event</p>
             <h1>{landing.event.name}</h1>
-            <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} />
+            <EventWhenWhere dateLabel={landing.event.dateLabel} timeLabel={landing.event.timeLabel} location={landing.event.location} {...whereProps} />
           </div>
         </section>
         </EventCardTransition>
