@@ -48,9 +48,9 @@ describe("event setup pages sit in the staff workspace (#981 batch 3)", () => {
     }
     expect(isSystemWorkspacePath("/event-setup/copy")).toBe(true);
     expect(isSystemWorkspacePath("/event-setupx")).toBe(false);
-    expect(systemNavActiveItem("/event-setup")?.label).toBe("Create event");
-    expect(systemNavActiveItem("/event-setup/from-template")?.label).toBe("Create event");
-    expect(systemNavActiveItem("/event-setup/copy")?.label).toBe("Copy a past event");
+    expect(systemNavActiveItem("/event-setup")?.label).toBe("Create an event");
+    expect(systemNavActiveItem("/event-setup/from-template")?.label).toBe("Create an event");
+    expect(systemNavActiveItem("/event-setup/copy")?.label).toBe("Copy from a past event");
   });
 });
 
