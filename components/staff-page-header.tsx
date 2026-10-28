@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { ActionsMenu } from "@/components/actions-menu";

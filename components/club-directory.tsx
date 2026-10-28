@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { ArrowRight, UsersRound } from "lucide-react";
 import { clubDirectoryClubHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
 import styles from "./club-directory.module.css";

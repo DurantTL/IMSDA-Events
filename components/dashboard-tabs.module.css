@@ -31,6 +31,12 @@
   font-weight: 700;
   text-decoration: none;
   overflow-wrap: break-word;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.tabs a:hover {
+  background-color: var(--imsda-navy-soft);
+  color: var(--imsda-navy);
 }
 
 .tabs a[aria-current] {

@@ -20,6 +20,7 @@ import { ClubsYearSelector } from "@/components/clubs-year-selector";
 import { requestedClubYear } from "@/components/clubs-year-selector-model";
 import { DestinationSearch } from "@/components/destination-search";
 import { GuardedLink } from "@/components/guarded-link";
+import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { SystemPhoneMenu } from "@/components/system-phone-menu";
 import { moduleDestinationStates } from "@/components/module-destination-states";
 import { activeWorkContext, returnToSystemHref, showsSystemChrome, systemMenuGroups, workContextSwitches } from "@/components/work-context-model";
@@ -677,7 +678,7 @@ export function AppShell({
             </label>
           )}
         </header>
-        <div className="workspace-content" id="workspace-content">
+        <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
           {showAutoSelectNotice && defaultEvent && (
             <EventAutoSelectNotice
               eventName={defaultEvent.name}
@@ -685,7 +686,7 @@ export function AppShell({
             />
           )}
           {children}
-        </div>
+        </WorkspaceContent>
       </main>
 
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}

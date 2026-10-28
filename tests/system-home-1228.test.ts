@@ -170,7 +170,7 @@ describe("the refreshed page", () => {
   it("shows the tabs with Overview current, the header sentence and an Updated stamp", async () => {
     const html = await renderHome();
     expect(html).toContain('aria-label="System administration sections"');
-    expect(html).toMatch(/<a aria-current="page" href="\/admin">Overview<\/a>/);
+    expect(html).toMatch(/<a aria-current="page" href="\/admin">Overview</);
     for (const tab of systemHomeTabs) expect(html).toContain(`href="${tab.href}"`);
     expect(html).toContain("Everything waiting across every event. Each link opens the page that can change the record");
     expect(html).toContain("Updated 6:00 PM UTC");
@@ -215,7 +215,7 @@ describe("the refreshed page", () => {
     const tasks = html.slice(html.indexOf('data-testid="common-tasks"'), html.indexOf('id="system-health"'));
     for (const heading of ["Events", "Clubs", "Forms", "People", "Settings"]) expect(tasks).toContain(`<h3>${heading}</h3>`);
     for (const label of ["Create an event", "Conference calendar", "Copy from a past event", "Event templates", "Archived events", "Clubs and churches", "Club Monthly Records", "Club summary", "New club applications", "Club member transfers", "All forms", "Club forms", "Form templates", "Question library", "Information forms", "People & access", "Email", "Platform settings"]) {
-      expect(tasks, label).toContain(`>${label.replace("&", "&amp;")}</a>`);
+      expect(tasks, label).toContain(`>${label.replace("&", "&amp;")}<`);
     }
   });
 

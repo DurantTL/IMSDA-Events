@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "./dashboard-tabs.module.css";
 
 export type DashboardTab = { key: string; label: string; href: string };

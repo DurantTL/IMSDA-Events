@@ -177,7 +177,7 @@ type PageSpec = {
   /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
   prepare?: (page: Page, width: number) => Promise<void>;
   /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
-  flow?: "general-link" | "pending-teams";
+  flow?: "general-link" | "pending-teams" | "workspace-navigation";
 };
 
 const staff = (name: string, route: string, role: Role = "event-admin"): PageSpec => ({
@@ -395,7 +395,7 @@ const pages: PageSpec[] = [
   staff("system-home", "/admin", "system-admin"),
   staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
-  { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/ },
+  { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/, flow: "workspace-navigation" },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
@@ -3687,6 +3687,53 @@ async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, 
   }
 }
 
+/** Real client navigation (#1300): rapid tab clicks, browser Back, stable shell and reduced motion. */
+async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: number) {
+  const before = page.url();
+  try {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.evaluate(() => {
+      const content = document.getElementById("workspace-content")!;
+      content.dataset.navigationAudit = "0";
+      const animate = content.animate.bind(content);
+      content.animate = (keyframes, options) => {
+        content.dataset.navigationAudit = String(Number(content.dataset.navigationAudit) + 1);
+        return animate(keyframes, options);
+      };
+    });
+    // Two genuine links in the same browser turn: the last destination must win,
+    // even when the first route has not finished fetching. No router mocks or fake product delays.
+    const destination = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-section-header"] nav a[href]'))
+        .filter((link) => new URL(link.href).pathname !== location.pathname && !link.hash);
+      if (links.length < 2) throw new Error("The dashboard needs two navigation destinations for the rapid-click check");
+      links[0]!.click();
+      links[1]!.click();
+      return links[1]!.href;
+    });
+    await page.waitForURL(destination, { timeout: 30_000 });
+    await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading], .shell-loading'), undefined, { timeout: 30_000 });
+    await page.waitForFunction(() => Number(document.getElementById("workspace-content")?.dataset.navigationAudit) > 0, undefined, { timeout: 5000 });
+    const arrivals = await page.locator("#workspace-content").getAttribute("data-navigation-audit");
+    if (arrivals === null) throw new Error("Client navigation remounted the workspace shell or reloaded the document");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goBack({ waitUntil: "load" });
+    await page.waitForURL(before, { timeout: 30_000 });
+    await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading], .shell-loading'), undefined, { timeout: 30_000 });
+    if (await page.locator("#workspace-content").getAttribute("data-navigation-audit") !== arrivals) {
+      throw new Error("Browser Back animated despite the reduced-motion preference, or remounted the shell");
+    }
+    console.log(`  navigation  ${spec.name} @${width}: rapid clicks, pending cleanup, Back and reduced motion passed`);
+  } catch (error) {
+    record("audit-failed", `${spec.name} (workspace navigation)`, width, (error as Error).message.split("\n")[0] ?? "failed");
+  } finally {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Restore the instrumented method and leave the next page a fresh document.
+    await page.goto(before, { waitUntil: "load" });
+  }
+}
+
 /** Waits for the shell's "Loading IMSDA Events…" fallback to go away (#996); true when it did. */
 async function waitForShell(page: Page) {
   return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMSDA Events/.test(document.body.innerText), undefined, { timeout: 20_000 })
@@ -4209,6 +4256,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   if (spec.flow === "general-link") await auditGeneralLinkFlow(page, spec, width, prefix);
   if (spec.flow === "pending-teams") await auditPendingTeamsFlow(page, spec, width, prefix);
+  if (spec.flow === "workspace-navigation") await auditWorkspaceNavigationFlow(page, spec, width);
   pagesVisited.push(`${spec.name}@${width}`);
 }
 

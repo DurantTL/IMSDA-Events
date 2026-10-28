@@ -36,7 +36,7 @@ function render(pathname: string, permissions: EventPermission[], events = true)
 }
 
 const nav = (markup: string) => markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
-const activeItems = (markup: string) => [...nav(markup).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+const activeItems = (markup: string) => [...nav(markup).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
 
 describe("Help & learning in the shell", () => {
   it("pins one Help & learning link after the other items, for staff with only check-in", () => {

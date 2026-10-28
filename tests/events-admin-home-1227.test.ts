@@ -271,7 +271,7 @@ describe("the page", () => {
   it("shows the tabs, header, four cards, the summary line, the event cards and the work rows", async () => {
     const html = await render();
     expect(html).toContain('aria-label="Event administration sections"');
-    expect(html).toMatch(/<a aria-current="page" href="\/events-admin">Overview<\/a>/);
+    expect(html).toMatch(/<a aria-current="page" href="\/events-admin">Overview</);
     for (const href of ["#your-events", "/people?event=event-one", "/more/event-content?event=event-one", "/more/kitchen-report?event=event-one", "/communications?event=event-one"]) expect(html).toContain(`href="${href}"`);
     expect(html).toContain("Event administration");
     expect(html).toContain("Your role: Events Administrator. Runs only the events where they are an Event administrator; club records and club events are not part of it.");
