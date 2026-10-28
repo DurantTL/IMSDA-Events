@@ -426,6 +426,7 @@ describe("custom message on the selected-audience path (#850)", () => {
       includedCount: 1,
       attachmentProblem: null,
       carriesFiles: true,
+      sentByBackgroundMailer: false,
       attachments: [{ filename: "schedule.pdf", sizeBytes: 1_024 }],
     });
     expect(preview.skipped.map((entry) => [entry.confirmationCode, entry.code])).toEqual([

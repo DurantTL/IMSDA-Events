@@ -18,7 +18,7 @@ const fields = {
   timezone: "America/Chicago", location: "Camp Heritage", capacity: 350, publicInfoUrl: null, supportContact: "registration@imsda.org",
   tagline: null, subtitle: null, helpEmail: null, hubTitle: null, hubIntro: null, refundPolicy: null,
   hotelName: null, hotelBookingUrl: null, hotelPhone: null, hotelGroupName: null, hotelRate: null, hotelInstructions: null,
-  approvedPaymentInstructions: null, isPublished: false, archivedAt: null,
+  approvedPaymentInstructions: null, isPublished: false, archivedAt: null, showOnCalendar: true,
   registrationOpensOn: "2027-05-01", registrationClosesOn: "2027-10-01", paymentDueOn: null, waitlistEnabled: false,
   collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLinkEnabled: false,
   attendeeEditPolicy: "VERIFY_EVERY_EDIT" as const, billingMode: "ATTENDEE_PAY" as const, audience: "GENERAL" as const,

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   runHealthSnapshotSweep: vi.fn(),
   expireStalePendingTeams: vi.fn(),
   prunePublicMetrics: vi.fn(),
+  sweepMessageFiles: vi.fn(),
+  messageFileSweepDeletes: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -34,6 +36,9 @@ vi.mock("@/modules/public-metrics/repository", () => ({ prunePublicMetrics: mock
 vi.mock("@/modules/calendar/feeds", () => ({ refreshDueCalendarFeeds: mocks.refreshDueCalendarFeeds }));
 vi.mock("@/modules/event-locations/waitlist-digest", () => ({ sendDueLocationWaitlistDigests: mocks.sendDueLocationWaitlistDigests }));
 
+vi.mock("@/modules/communications/message-file-sweep", () => ({ sweepMessageFiles: mocks.sweepMessageFiles }));
+vi.mock("@/modules/communications/message-file-config", () => ({ messageFileSweepDeletes: mocks.messageFileSweepDeletes }));
+
 import { POST } from "@/app/api/internal/outbox/sweep/route";
 
 /**
@@ -54,6 +59,12 @@ beforeEach(() => {
   mocks.runHealthSnapshotSweep.mockResolvedValue(null);
   mocks.expireStalePendingTeams.mockResolvedValue({ expired: 0, events: 0 });
   mocks.prunePublicMetrics.mockResolvedValue(0);
+  mocks.messageFileSweepDeletes.mockReturnValue(false);
+  mocks.sweepMessageFiles.mockImplementation(async (options: { mode: string }) => ({
+    mode: options.mode, graceHours: 72, candidates: { count: 2, bytes: 300, byEvent: [{ eventId: "event-1", count: 2, bytes: 300 }] },
+    deleted: { count: 0, bytes: 0 }, keptAtRecheck: 0, bytesRemoved: { count: 0, bytes: 0 }, cleanup: { pending: 0, retried: 0, succeeded: 0, failed: 0 },
+    reservations: { expired: 0, reconciled: 0 }, wouldDelete: [{ id: "f1", eventId: "event-1", filename: "x.pdf", sizeBytes: 1, createdAt: "2026-01-01T00:00:00.000Z" }],
+  }));
   mocks.sendDueLocationWaitlistDigests.mockResolvedValue({ status: "QUEUED", dateKey: "2026-10-06", changesCovered: 4, recipients: 2, messageIds: ["m1", "m2"], delivered: 2 });
 });
 
@@ -68,6 +79,32 @@ describe("the sweep and sealed health copies (#924)", () => {
     const failed = await POST(request());
     expect(failed.status).toBe(200);
     expect((await failed.json()).healthSnapshots).toBeNull();
+  });
+});
+
+describe("the sweep and the message file sweep (#845)", () => {
+  it("is a dry run unless MESSAGE_FILE_SWEEP_DELETE is true, and reports counts only", async () => {
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mocks.sweepMessageFiles).toHaveBeenCalledWith({ mode: "dry-run" });
+    const body = await response.json();
+    expect(body.messageFiles).toMatchObject({ mode: "dry-run", candidates: 2, candidateBytes: 300, deleted: 0 });
+    expect(JSON.stringify(body.messageFiles)).not.toContain("x.pdf");
+  });
+
+  it("applies only when the setting says so", async () => {
+    mocks.messageFileSweepDeletes.mockReturnValue(true);
+    await POST(request());
+    expect(mocks.sweepMessageFiles).toHaveBeenCalledWith({ mode: "apply" });
+  });
+
+  it("stays a successful sweep when the message file sweep fails", async () => {
+    mocks.sweepMessageFiles.mockRejectedValueOnce(new Error("synthetic message file fault"));
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).messageFiles).toBeNull();
+    expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("message file sweep failed"), expect.any(Error));
+    expect(mocks.recordSweepHeartbeat).toHaveBeenCalledWith("SUCCEEDED");
   });
 });
 

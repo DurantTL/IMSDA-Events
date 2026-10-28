@@ -5073,6 +5073,41 @@ model MessageFile {
   @@index([eventId, createdAt])
 }
 
+/// An upload in progress (#845). Written, with the event's quota checked, before the bytes are written, and deleted in the
+/// transaction that records the MessageFile row, so concurrent uploads count each other's bytes. A reservation that is
+/// still here after `expiresAt` was abandoned (the process died or the delete of the bytes failed); the sweep reconciles it.
+/// `eventId` is a plain column, not a foreign key, so a reservation never blocks deleting an event.
+model MessageFileUploadReservation {
+  id         String   @id @default(cuid())
+  eventId    String
+  storageKey String   @unique
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([eventId])
+  @@index([expiresAt])
+}
+
+/// A stored message file whose row is already gone but whose bytes still have to be removed (#845): written in the
+/// transaction that deletes the row, so a failed disk delete can be retried and keeps counting against the event's
+/// quota until it succeeds. `reason` is SWEEP, REMOVED or UPLOAD_ABORTED. `eventId` is a plain column, not a foreign
+/// key, so the record survives the event's deletion. Metadata only: never file content or a hash.
+model MessageFileStorageCleanup {
+  id            String    @id @default(cuid())
+  eventId       String
+  storageKey    String    @unique
+  sizeBytes     Int
+  reason        String
+  attempts      Int       @default(0)
+  /// The operating-system error code of the last failed attempt (for example EACCES), never a path.
+  lastErrorCode String?
+  lastAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([eventId])
+}
+
 model MessageTemplateVersionFile {
   templateVersionId String
   fileId            String

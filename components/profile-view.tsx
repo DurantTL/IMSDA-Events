@@ -107,7 +107,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
             {data.showTwoStepOn && <p className="auth-success" role="status">Two-step verification is on.</p>}
             {!secondStepPending && (
               <p className="field-help">
-                Signed in as <strong>{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
+                Signed in as <strong className="profile-account-email" translate="no">{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
               </p>
             )}
             {!secondStepPending && attendeeAccount.verifiedEmail && <VerifiedEmailExplainer email={attendeeAccount.verifiedEmail} />}
@@ -147,7 +147,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
               {data.showTwoStepOn && <p className="auth-success" role="status">Two-step verification is on.</p>}
               {!secondStepPending && (
                 <p className="field-help">
-                  Signed in as <strong>{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
+                  Signed in as <strong className="profile-account-email" translate="no">{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
                 </p>
               )}
               {!secondStepPending && attendeeAccount.verifiedEmail && <VerifiedEmailExplainer email={attendeeAccount.verifiedEmail} />}

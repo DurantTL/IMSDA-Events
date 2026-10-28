@@ -27,7 +27,7 @@ export type PendingInvite = {
   signUpUrl?: string;
 };
 
-const LIST_CAP = 50;
+export const PENDING_INVITES_CAP = 50;
 
 export async function listPendingInvites(
   options: { query?: string; emails?: readonly string[]; scope: PeopleScope },
@@ -53,20 +53,20 @@ export async function listPendingInvites(
     prisma.clubInvite.findMany({
       where: { ...open, source: "PEOPLE", organization: { type: "CLUB" }, ...match() },
       orderBy: { createdAt: "desc" },
-      take: LIST_CAP,
+      take: PENDING_INVITES_CAP,
       select: { id: true, email: true, name: true, role: true, sentAt: true, createdAt: true, expiresAt: true, organization: { select: { name: true } } },
     }),
     prisma.areaCoordinatorInvite.findMany({
       where: { ...open, ...match() },
       orderBy: { createdAt: "desc" },
-      take: LIST_CAP,
+      take: PENDING_INVITES_CAP,
       select: { id: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true },
     }),
     options.scope === "full"
       ? prisma.user.findMany({
         where: { ...userMatch, accountStatus: "PENDING_ACTIVATION", credential: { is: { disabledAt: null } } },
         orderBy: { createdAt: "desc" },
-        take: LIST_CAP,
+        take: PENDING_INVITES_CAP,
         select: {
           id: true, email: true, displayName: true, createdAt: true,
           resetTokens: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, expiresAt: true, usedAt: true } },
@@ -110,5 +110,5 @@ export async function listPendingInvites(
     }),
   ];
   invites.sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? "") || a.email.localeCompare(b.email));
-  return { invites: invites.slice(0, LIST_CAP), emailConfigured };
+  return { invites: invites.slice(0, PENDING_INVITES_CAP), emailConfigured };
 }

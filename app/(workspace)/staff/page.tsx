@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
 import { StaffWorkspace } from "@/components/staff-workspace";
 import { listStaffMemberships } from "@/modules/access/membership-repository";
+import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
 
@@ -13,5 +14,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   if (!permissions.includes("MANAGE_STAFF")) {
     return <AccessRestricted title="Staff access is restricted" detail="Your event role can use its assigned operational tools, but only event administrators can manage staff assignments." />;
   }
-  return <StaffWorkspace key={event.id} eventId={event.id} eventName={event.name} initialMemberships={await listStaffMemberships(event.id)} currentUserId={user.id} currentUserIsSystemAdmin={user.globalRole === "SYSTEM_ADMIN"} canAddStaff={permissions.includes("MANAGE_STAFF")} />;
+  const canOpenPeople = (await resolvePeopleViewer()).scope !== null;
+  return <StaffWorkspace key={event.id} eventId={event.id} eventName={event.name} initialMemberships={await listStaffMemberships(event.id)} currentUserId={user.id} currentUserIsSystemAdmin={user.globalRole === "SYSTEM_ADMIN"} canAddStaff={permissions.includes("MANAGE_STAFF")} canOpenPeople={canOpenPeople} />;
 }

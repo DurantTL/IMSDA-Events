@@ -4,6 +4,12 @@ import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
 import { eventCardDates, registrationAnchorId, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
+/** A waitlisted record has asked for places, not taken them, so it never says "registered" (#1111). */
+function peopleLabel(people: number, waitlisted: boolean) {
+  if (waitlisted) return people === 1 ? "1 place requested" : `${people} places requested`;
+  return people === 1 ? "1 person registered" : `${people} people registered`;
+}
+
 export type AccountRegistrationCardData = Pick<
   AttendeeRegistrationSummary,
   | "id" | "confirmationCode" | "lifecycle" | "status" | "event" | "attendeeNames" | "balanceCents" | "totalCents"
@@ -65,7 +71,7 @@ export function AccountRegistrationCard({
         </ul>
         <p className="attendee-ov-meta">
           <span>Registration <span translate="no">#{registration.confirmationCode}</span></span>
-          {people > 0 && <span>{people === 1 ? "1 person registered" : `${people} people registered`}</span>}
+          {people > 0 && <span>{peopleLabel(people, registration.lifecycle === "WAITLISTED")}</span>}
         </p>
         {showPeople && people > 0 && (
           <p className="attendee-ov-people"><span className="attendee-ov-people-label">Included: </span><span translate="no">{registration.attendeeNames.join(", ")}</span></p>

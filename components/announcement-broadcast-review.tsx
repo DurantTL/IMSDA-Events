@@ -8,13 +8,13 @@ export function deliveryTimingLabel(mode: AnnouncementBroadcastPreview["delivery
   return "Recorded as suppressed — immediately, delivery is off";
 }
 
-/** The background mailer sends 50 a pass and passes run every 5 minutes. */
-export const WORKER_BATCH_SIZE = 50;
-export const WORKER_SWEEP_MINUTES = 5;
-
-export function workerDeliveryLabel(recipientCount: number) {
-  const minutes = Math.max(1, Math.ceil(recipientCount / WORKER_BATCH_SIZE)) * WORKER_SWEEP_MINUTES;
-  return `Sent by the background mailer in batches of ${WORKER_BATCH_SIZE} every few minutes (this message carries files) — about ${minutes} minutes for this audience`;
+/** The batch size and sweep interval come from the server with the preview (#847), so this never drifts from the worker. */
+export function workerDeliveryLabel(
+  recipientCount: number,
+  timing: { workerBatchSize: number; workerSweepSeconds: number },
+) {
+  const minutes = Math.max(1, Math.ceil(recipientCount / timing.workerBatchSize)) * Math.max(1, Math.round(timing.workerSweepSeconds / 60));
+  return `Sent by the background mailer in batches of ${timing.workerBatchSize} every few minutes (this message's files are large) — about ${minutes} minutes for this audience`;
 }
 
 export type AnnouncementBroadcastReviewState = {
@@ -119,8 +119,8 @@ export function AnnouncementBroadcastReviewFacts({
         <div>
           <dt>Delivery</dt>
           <dd>
-            {preview.deliveryMode === "EXTERNAL_EMAIL" && preview.carriesFiles
-              ? workerDeliveryLabel(preview.recipientCount)
+            {preview.sentByBackgroundMailer
+              ? workerDeliveryLabel(preview.recipientCount, preview)
               : deliveryTimingLabel(preview.deliveryMode)}
           </dd>
         </div>
