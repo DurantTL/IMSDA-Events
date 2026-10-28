@@ -1,4 +1,5 @@
 import { eventRoles } from "@/modules/access/permissions";
+import { eventExtraText, systemRoleText } from "@/modules/access/role-descriptions";
 import { roleDetails } from "@/modules/access/role-display";
 import type { HelpDestination, HelpGuide } from "@/modules/help/types";
 
@@ -141,8 +142,8 @@ export const helpGuides: readonly HelpGuide[] = [
       "Open Team and scroll to Role boundaries. Each role lists what it can do.",
       ...roleLines,
       "Pick the smallest role that covers the work. Read-only staff can look at the event workspace and change nothing.",
-      "Some access is not a role. Health information access and the permission to finalize invoices are given one person at a time by a system administrator, and no role carries them.",
-      "Clubs Administrator and system administrator are not event roles. You never need either one to follow this guide.",
+      `Some access is not a role. ${eventExtraText.VIEW_HEALTH_INFORMATION.name} and ${eventExtraText.FINALIZE_INVOICES.name} are given one person at a time by a ${systemRoleText.SYSTEM_ADMIN.name.toLowerCase()}, and no role carries them.`,
+      `${systemRoleText.CLUBS_ADMIN.name} and ${systemRoleText.SYSTEM_ADMIN.name.toLowerCase()} are not event roles. You never need either one to follow this guide.`,
       "To change a role, open the person's row, choose a new Event role, then Save access.",
     ],
     verify: [

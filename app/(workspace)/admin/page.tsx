@@ -1,5 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -183,7 +184,7 @@ export default async function SystemAdminPage({
       )}
       <section className={styles.hero} aria-labelledby="system-home-heading">
         <div>
-          <span className={styles.adminBadge}><ShieldCheck aria-hidden="true" size={16} /> System administrator</span>
+          <span className={styles.adminBadge}><ShieldCheck aria-hidden="true" size={16} /> {systemRoleText.SYSTEM_ADMIN.name}</span>
           <p className="eyebrow">All events</p>
           <h2 id="system-home-heading">System administration</h2>
           <p>Everything waiting across every event. Each link opens the page that can change the record; nothing on this page approves or changes anything.</p>
