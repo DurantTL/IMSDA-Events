@@ -201,3 +201,14 @@ describe("granting and revoking the role", () => {
     expect(mocks.setSiteContentEditor).not.toHaveBeenCalled();
   });
 });
+
+describe("the sidebar link for editors who are not system administrators", () => {
+  it("is drawn only when the shell says the viewer is such an editor, and points at the editor page", async () => {
+    const { readFileSync } = await import("node:fs");
+    const shell = readFileSync("components/app-shell.tsx", "utf8");
+    expect(shell).toContain("siteContentEditor && (");
+    expect(shell).toContain('href="/admin/site-content"');
+    const workspace = readFileSync("components/workspace-shell.tsx", "utf8");
+    expect(workspace).toContain("const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));");
+  });
+});

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/access/site-content-editor", () => ({ canManageSiteContent: async () => false }));
 vi.mock("@/modules/events/selection", () => ({ loadWorkspaceEventContext: mocks.loadWorkspaceEventContext }));
 vi.mock("@/modules/access/membership-repository", () => ({
   listActiveEventPermissionsForUser: mocks.listActiveEventPermissionsForUser,

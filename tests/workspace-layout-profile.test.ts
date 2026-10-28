@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/access/site-content-editor", () => ({ canManageSiteContent: async () => false }));
 vi.mock("@/modules/account-merge/person", () => ({
   // The one-sign-in switch is off here (#554): no link is ever resolved.
   resolvePersonFrom: async ({ staff, attendee }: { staff: unknown; attendee: { account: unknown } }) => ({
@@ -131,5 +132,17 @@ describe("(workspace) layout for /profile without a staff session", () => {
     mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
     expect(await redirectedTo("/help")).toBe("/login?next=%2Fhelp");
     expect(await redirectedTo("/help/invite-staff")).toBe("/login?next=%2Fhelp%2Finvite-staff");
+  });
+
+  it("lets staff with no events through to Homepage & site content (#111), and nothing that only starts with it", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", email: "riley@imsda-events.test", globalRole: null } });
+    mocks.getCurrentAttendee.mockResolvedValue(nobody);
+    mocks.listEventsForUser.mockResolvedValue([]);
+    for (const target of ["/admin/site-content", "/admin/site-content/preview"]) {
+      mocks.requestTarget = target;
+      await expect(renderLayout()).resolves.toBeTruthy();
+    }
+    expect(await redirectedTo("/admin/site-contents")).toBe("/no-access");
+    expect(await redirectedTo("/admin/settings")).toBe("/no-access");
   });
 });

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Eye,
   LifeBuoy,
+  Megaphone,
   Search,
   LayoutDashboard,
   ShieldCheck,
@@ -111,6 +112,7 @@ export function AppShell({
   events,
   user,
   adminRoleView = null,
+  siteContentEditor = false,
 }: {
   attendeeAccountAvailable?: boolean;
   /** The default event was chosen automatically (#465): show the notice on pages without `?event=`. */
@@ -129,6 +131,8 @@ export function AppShell({
    * sidebar and home only; no server gate reads it.
    */
   adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
+  /** An active Site content editor who is not a system administrator (#111): adds a link to Homepage & site content. System administrators have it in their System sidebar. */
+  siteContentEditor?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -590,6 +594,12 @@ export function AppShell({
               </MoreLauncher>
             );
           })()}
+          {siteContentEditor && (
+            <GuardedLink className={pathname.startsWith("/admin/site-content") ? "nav-item active" : "nav-item"} href="/admin/site-content" aria-current={pathname.startsWith("/admin/site-content") ? "page" : undefined} {...tipProps("Homepage & site content")}>
+              <Megaphone aria-hidden="true" size={19} strokeWidth={1.9} />
+              <span>Homepage &amp; site content</span>
+            </GuardedLink>
+          )}
           <GuardedLink className={isHelpRoute ? "nav-item active" : "nav-item"} href={withCurrentEvent("/help", selectedEventId)} aria-current={isHelpRoute ? "page" : undefined} {...tipProps("Help & learning")}>
             <LifeBuoy aria-hidden="true" size={19} strokeWidth={1.9} />
             <span>{helpPageTitle}</span>
