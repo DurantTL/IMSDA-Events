@@ -1,10 +1,13 @@
 import { unstable_rethrow } from "next/navigation";
 import { PublicHeaderLinks } from "@/components/public-header-links";
+import { PublicHeaderNavLinks } from "@/components/public-header-nav-links";
 import { logError } from "@/lib/logger";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { isStaffSessionTimedOutForLinkedAttendee } from "@/modules/account-merge/staff-timeout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import { getPublishedHubContent } from "@/modules/site-content/hub-content";
+import type { HubLink } from "@/modules/site-content/hub-content-domain";
 
 /**
  * Reads who is signed in and the single sign-in switch for the public header
@@ -15,7 +18,9 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
  * own control-flow errors are rethrown. The switch is only read for a
  * signed-out visitor.
  */
-export async function PublicHeaderSessionLinks() {
+export async function PublicHeaderSessionLinks({ navLinks }: { navLinks?: readonly HubLink[] } = {}) {
+  // The preview passes the draft's links; every other page shows the published ones (#111). Never fails the header.
+  const extraLinks = navLinks ?? (await getPublishedHubContent()).navLinks;
   let staffSignedIn = false;
   let attendeeSignedIn = false;
   let unifiedSignInEnabled = false;
@@ -34,5 +39,10 @@ export async function PublicHeaderSessionLinks() {
     attendeeSignedIn = false;
     unifiedSignInEnabled = false;
   }
-  return <PublicHeaderLinks staffSignedIn={staffSignedIn} attendeeSignedIn={attendeeSignedIn} unifiedSignInEnabled={unifiedSignInEnabled} staffTimedOut={staffTimedOut} />;
+  return (
+    <>
+      <PublicHeaderNavLinks links={extraLinks} />
+      <PublicHeaderLinks staffSignedIn={staffSignedIn} attendeeSignedIn={attendeeSignedIn} unifiedSignInEnabled={unifiedSignInEnabled} staffTimedOut={staffTimedOut} />
+    </>
+  );
 }

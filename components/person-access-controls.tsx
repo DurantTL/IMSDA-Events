@@ -72,9 +72,9 @@ function Chip({ tone, children }: { tone?: "green" | "coral"; children: ReactNod
 
 // ---------------------------------------------------------------- System-wide
 
-type RoleKind = "system-administrator" | "clubs-administrator" | "area-coordinator";
+type RoleKind = "system-administrator" | "clubs-administrator" | "site-content-editor" | "area-coordinator";
 
-const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "area-coordinator": "AREA_COORDINATOR" } as const;
+const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR" } as const;
 
 const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
@@ -86,6 +86,11 @@ const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string;
     noun: systemRoleText.CLUBS_ADMIN.name,
     grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
+  },
+  "site-content-editor": {
+    noun: systemRoleText.SITE_CONTENT_EDITOR.name,
+    grantNote: "Every change is recorded under their name.",
+    revokeBody: "They lose access to the homepage and site content on their next page. Nothing they published is undone.",
   },
   "area-coordinator": {
     noun: systemRoleText.AREA_COORDINATOR.name,
@@ -127,6 +132,10 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
       if (kind === "clubs-administrator") {
         await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/clubs-administrator`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
         return grant ? `${name} is now a Clubs Administrator.` : `${name} is no longer a Clubs Administrator.`;
+      }
+      if (kind === "site-content-editor") {
+        await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/site-content-editor`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
+        return grant ? `${name} is now a Site content editor.` : `${name} is no longer a Site content editor.`;
       }
       const result = await callJson(`/api/admin/accounts/${encodeURIComponent(accountId ?? "")}`, { method: "POST", json: { action: "area-coordinator", on: grant } }, "That role could not be changed.");
       return result.message ?? (grant ? "Now an Area Coordinator." : "No longer an Area Coordinator.");

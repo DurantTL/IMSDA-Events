@@ -17,6 +17,7 @@ import { loadWorkspaceEventContext } from "@/modules/events/selection";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { canManageSiteContent } from "@/modules/access/site-content-editor";
 
 /**
  * The staff workspace chrome (sidebar, header, act-as banner), shared by the
@@ -48,6 +49,8 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   // The admin role switcher (#1225): the roles held (read from the database now, so a revoke applies at once) and what is
   // waiting in each. The counts are for the pills only; a count that cannot be read is left off, never shown as zero.
   const adminRoleView = await resolveAdminRoleView(user);
+  // A Site content editor who is not a system administrator reaches Homepage & site content from the sidebar (#111).
+  const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));
   const clubFormsAccess = staffClubFormsAccess(
     user,
     events
@@ -97,6 +100,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
         defaultEventId={defaultEventId}
         events={shellEvents}
         user={user}
+        siteContentEditor={siteContentEditor}
         adminRoleView={adminRoleView.held.length > 0 ? { held: adminRoleView.held, active: adminRoleView.active, counts: adminRoleCounts, healthImport: healthRecordsEnabled() } : null}
       >
         {children}

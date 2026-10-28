@@ -213,6 +213,7 @@ export type PersonDetail = {
   accountId: string | null;
   systemAdministrator: boolean;
   clubsAdministrator: boolean;
+  siteContentEditor: boolean;
   areaCoordinator: boolean;
   staff: null | {
     status: string;
@@ -281,6 +282,7 @@ export async function getPersonDetail(
         accountStatus: true,
         credential: { select: { disabledAt: true } },
         clubsAdministratorGrant: { select: { revokedAt: true } },
+        siteContentEditorGrant: { select: { revokedAt: true } },
         mfaEnrollment: { select: { status: true } },
         sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
       },
@@ -319,6 +321,7 @@ export async function getPersonDetail(
     accountId: account ? accountId : null,
     systemAdministrator: user?.globalRole === "SYSTEM_ADMIN",
     clubsAdministrator: Boolean(user?.clubsAdministratorGrant && !user.clubsAdministratorGrant.revokedAt),
+    siteContentEditor: Boolean(user?.siteContentEditorGrant && !user.siteContentEditorGrant.revokedAt),
     areaCoordinator: Boolean(account?.areaCoordinatorGrant && isGrantCurrent(account.areaCoordinatorGrant, now)),
     staff: full && user ? {
       status: user.accountStatus,

@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }), unstable_rethrow: () => {} }));
 
 const mocks = vi.hoisted(() => ({

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
   listDirectedClubs: vi.fn(),
   listFeaturedEventRows: vi.fn(),
+  hubContent: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -17,10 +18,12 @@ vi.mock("@/modules/calendar/repository", () => ({
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: mocks.listFeaturedEventRows }));
+vi.mock("@/modules/site-content/hub-content", () => ({ getPublishedHubContent: mocks.hubContent }));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 
 import OpenForRegistrationPage from "@/app/(public)/events/page";
 import type { CalendarItem } from "@/modules/calendar/domain";
+import { defaultHubContent } from "@/modules/site-content/hub-content-domain";
 import {
   applyEventDirectoryFilters,
   eventDirectoryHref,
@@ -146,6 +149,7 @@ describe("the page (#106)", () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
     mocks.listDirectedClubs.mockResolvedValue([]);
     mocks.listFeaturedEventRows.mockResolvedValue([]);
+    mocks.hubContent.mockResolvedValue(defaultHubContent());
     mocks.listPublicCalendarItems.mockResolvedValue([
       item("camp", { title: "Camp Meeting", category: "Camp", location: "Lake Site" }),
       item("retreat", { title: "Women's Retreat", category: "Retreat", location: "Hill Lodge", clubEvent: true }),
@@ -168,6 +172,32 @@ describe("the page (#106)", () => {
     expect(html).toContain("2 events");
     expect(html).toMatch(/class="events-directory-count" role="status"/);
     expect(html).toMatch(/id="events-from" max="\d{4}-\d{2}-\d{2}" min="2026-10-27"/);
+  });
+
+  it("lets staff order and hide the Category choices (#111) without removing any event from the list", async () => {
+    mocks.hubContent.mockResolvedValue({ ...defaultHubContent(), calendarCategories: { order: ["Retreat"], hidden: ["Camp"] } });
+    const html = await render();
+    const select = html.slice(html.indexOf('id="events-category"'), html.indexOf("</select>", html.indexOf('id="events-category"')));
+    expect(select).toContain('<option value="Retreat">Retreat</option>');
+    expect(select).not.toContain('value="Camp"');
+    expect(html).toContain("2 events");
+    expect(html).toContain("Camp Meeting");
+    // A category already chosen in the address stays in the choices so the form still shows it.
+    expect((await render({ category: "Camp" }))).toContain('<option value="Camp" selected="">Camp</option>');
+  });
+
+  it("shows the notices staff published above the list, and not an expired one (#111)", async () => {
+    mocks.hubContent.mockResolvedValue({
+      ...defaultHubContent(),
+      notices: [
+        { id: "a", level: "URGENT", message: "Fictitious office closed Friday." },
+        { id: "b", level: "INFO", message: "Fictitious old news.", endsOn: "2026-10-01" },
+      ],
+    });
+    const html = await render();
+    expect(html).toContain('aria-label="Site notices"');
+    expect(html).toContain("Urgent: </strong>Fictitious office closed Friday.");
+    expect(html).not.toContain("Fictitious old news.");
   });
 
   it("reflects URL values, filters, and counts in words", async () => {

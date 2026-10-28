@@ -1,3 +1,4 @@
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 import { generalLinkApiError } from "@/modules/general-link-registrations/api-errors";
@@ -51,6 +52,8 @@ async function postHandler(request: Request, context: Context) {
     const { locationId, teamName, ...answers } = generalLinkExtrasSchema.loose().parse(JSON.parse(body)) as Record<string, unknown> & { locationId?: string | null; teamName?: string | null };
     const input = publicRegistrationInputSchema.parse(answers);
     const confirmation = await submitGeneralLinkRegistration(eventSlug, input, { locationId: locationId ?? null, teamName: teamName ?? null, requestContext: { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) } });
+    // Counted per public event only, with no registration or person attached (#111).
+    countPublicMetric(request, "REGISTRATION_COMPLETE", eventSlug);
     return applyRateLimitHeaders(Response.json({ confirmation }, { status: 201, headers: noStoreHeaders }), rateLimit);
   } catch (error) {
     const response = generalLinkApiError(error, "Submitting the team registration");

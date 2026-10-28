@@ -4,6 +4,10 @@ import Link from "next/link";
 import { CalendarDays, CalendarRange, DoorClosed, List } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
+import { SiteNoticesView } from "@/components/site-notices-view";
+import { getPublishedHubContent } from "@/modules/site-content/hub-content";
+import { activeNotices } from "@/modules/site-content/hub-content-domain";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { CalendarViewBar, type CalendarViewTab } from "@/components/calendar-view-bar";
 import { AgendaItem } from "@/components/calendar-agenda-item";
@@ -99,7 +103,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const grid = monthGrid(month);
   const from = view === "month" ? grid[0][0] : view === "year" ? `${year}-01-01` : today;
   const to = view === "month" ? grid[grid.length - 1][6] : view === "year" ? `${year}-12-31` : addDays(today, 365);
-  const allItems = await listPublicCalendarItems(from, to);
+  const [allItems, hubContent] = await Promise.all([listPublicCalendarItems(from, to), getPublishedHubContent()]);
   // Colours come from every item before any filter, so choosing a chip never changes a colour (#1202).
   const toneMap = calendarToneMap(allItems);
   const items = filterByCategory(filterByGroup(allItems, filter), category);
@@ -159,6 +163,9 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
           </div>
         </div>
       </header>
+
+      <PublicMetricsBeacon />
+      <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
       <div className="calendar-layout">
         <div className="calendar-head">

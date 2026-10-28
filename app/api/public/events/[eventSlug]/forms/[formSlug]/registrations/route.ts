@@ -15,6 +15,7 @@ import {
 import { checkPublicFormRoommateLookupRateLimit, checkPublicRegistrationRateLimit, publicRequestClientHash } from "@/modules/rate-limit/service";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { logError } from "@/lib/logger";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
 
 const maximumBodyBytes = 512 * 1024;
@@ -141,6 +142,8 @@ async function postHandler(request: Request, context: { params: Promise<{ eventS
       }
       throw error;
     }
+    // Counted per public event only, with no registration or person attached (#111).
+    countPublicMetric(request, "REGISTRATION_COMPLETE", eventSlug);
     return applyRateLimitHeaders(
       Response.json({ confirmation }, { status: 201, headers: noStoreHeaders }),
       rateLimit

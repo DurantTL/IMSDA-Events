@@ -311,7 +311,7 @@ describe("photo cards and the Coming up strip (#1210, #1218)", () => {
   });
 
   it("builds the homepage's Featured list as labelled, and the season replaces the Coming up strip (#1251)", () => {
-    const page = readFileSync("app/page.tsx", "utf8");
+    const page = readFileSync("components/public-home-page.tsx", "utf8");
     expect(page).toContain('<ul aria-labelledby="home-featured-heading"');
     expect(page).toContain('id="home-season-heading"');
     expect(page).not.toContain("home-upcoming-heading");

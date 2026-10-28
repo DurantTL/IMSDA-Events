@@ -809,6 +809,9 @@ model User {
 
   memberships               EventMembership[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
+  siteContentEditorGrant    SiteContentEditorGrant?
+  siteContentRevisionsCreated   SiteContentRevision[] @relation("SiteContentRevisionCreatedBy")
+  siteContentRevisionsPublished SiteContentRevision[] @relation("SiteContentRevisionPublishedBy")
   credential                AuthCredential?
   sessions                  UserSession[]
   resetTokens               PasswordResetToken[]
@@ -2783,6 +2786,77 @@ model ClubsAdministratorGrant {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([revokedAt])
+}
+
+/// A Site content editor (#111): staff who edit the public homepage, notices,
+/// navigation and footer. Separate from event-level content editing and from
+/// CONFIGURE_EVENT. Given and taken away by system administrators; one row per
+/// staff user, kept after removal for the record. Read on every request.
+model SiteContentEditorGrant {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt])
+}
+
+enum SiteContentStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+/// One version of the public hub's curated content (#111): a single JSON document
+/// (notices, announcements, sections, featured events, navigation, footer,
+/// calendar categories). At most one DRAFT (the working copy) and one PUBLISHED
+/// row exist; earlier published versions are kept as SUPERSEDED for rollback.
+model SiteContentRevision {
+  id                String            @id @default(cuid())
+  content           Json
+  status            SiteContentStatus @default(DRAFT)
+  note              String?
+  createdByUserId   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  publishedByUserId String?
+  publishedAt       DateTime?
+  restoredFromId    String?
+
+  createdBy   User? @relation("SiteContentRevisionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  publishedBy User? @relation("SiteContentRevisionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+}
+
+enum PublicMetric {
+  EVENT_PAGE_VIEW
+  DIRECTORY_SEARCH
+  DIRECTORY_FILTER
+  REGISTRATION_START
+  REGISTRATION_COMPLETE
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  NOT_FOUND
+  IMAGE_ERROR
+  WEB_VITAL
+}
+
+/// Privacy-safe public analytics (#111): a count per day, metric and allowlisted dimension, and nothing else. No
+/// person, session, address, device, search text, URL or referrer is ever stored here (docs/PUBLIC-ANALYTICS.md).
+model PublicMetricDaily {
+  day       DateTime     @db.Date
+  metric    PublicMetric
+  dimension String       @default("")
+  count     Int          @default(0)
+
+  @@id([day, metric, dimension])
+  @@index([metric, day])
 }
 
 model ClubInvite {
