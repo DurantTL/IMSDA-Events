@@ -51,6 +51,22 @@ const limitedStaff: DestinationSearchContext = { ...base, permissions: ["MANAGE_
 const labels = (results: { label: string; scope: string }[]) => results.filter((result) => result.scope !== "Help").map((result) => `${result.scope}:${result.label}`);
 const find = (context: DestinationSearchContext, query: string) => searchDestinations(buildSearchDestinations(context), query);
 
+describe("Homepage & site content for a Site content editor (#111)", () => {
+  const siteContent = (context: DestinationSearchContext) => buildSearchDestinations(context).filter((destination) => destination.href.split("?")[0] === "/admin/site-content");
+
+  it("is searchable for an editor who is not a system administrator", () => {
+    const editor = { ...limitedStaff, siteContentEditor: true };
+    expect(siteContent(editor).map((destination) => destination.label)).toEqual(["Homepage & site content"]);
+    expect(find(editor, "homepage").map((result) => result.label)).toContain("Homepage & site content");
+    expect(siteContent(limitedStaff)).toEqual([]);
+  });
+
+  it("is listed once for a system administrator, even one who is also flagged as an editor", () => {
+    expect(siteContent(admin)).toHaveLength(1);
+    expect(siteContent({ ...admin, siteContentEditor: true })).toHaveLength(1);
+  });
+});
+
 describe("destination registry per role", () => {
   it("gives a system administrator every System destination, with the calendar listed once", () => {
     const destinations = buildSearchDestinations(admin);

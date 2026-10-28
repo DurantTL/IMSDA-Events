@@ -72,7 +72,6 @@ async function postHandler(request: Request) {
     });
 
     if (result.kind === "attendee") {
-      countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
       cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -82,10 +81,10 @@ async function postHandler(request: Request) {
         maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
         priority: "high",
       });
+      countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
       return applyRateLimitHeaders(Response.json({ ok: true, attendee: true, redirectTo: attendeeReturnDestination(next, "/account") }), rateLimit);
     }
 
-    countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
     cookieStore.set(SESSION_COOKIE_NAME, result.session.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -95,6 +94,7 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
     // A user-verified staff passkey also earns the linked attendee session, marked as having
     // passed the second step (one account per person, #554). Null with no usable link.
     const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });

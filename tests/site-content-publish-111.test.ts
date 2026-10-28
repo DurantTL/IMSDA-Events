@@ -301,6 +301,16 @@ describe("changes that race a publish or another save (#111 review)", () => {
     expect(actions()).not.toContain("SITE_CONTENT_DRAFT_DISCARDED");
   });
 
+  it("discard is guarded by the updatedAt it read: a save that lands before the delete is a 409 and the draft survives", async () => {
+    await saveHubDraft(content("One"), null, "editor");
+    interleave("deleteMany", () => { rows[0].updatedAt = new Date(2030, 0, 1); rows[0].content = content("Saved just now"); });
+    await expect(discardHubDraft("editor")).rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("DRAFT");
+    expect((rows[0].content as any).navLinks[0].label).toBe("Saved just now");
+    expect(actions()).not.toContain("SITE_CONTENT_DRAFT_DISCARDED");
+  });
+
   it("refuses to discard a draft that changed since the editor saw it", async () => {
     const seen = await saveHubDraft(content("One"), null, "editor");
     await saveHubDraft(content("Two"), null, "other-editor");

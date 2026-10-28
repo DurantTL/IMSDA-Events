@@ -287,7 +287,7 @@ export async function discardHubDraft(actorUserId: string, base?: DraftBase): Pr
     const draft = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true, updatedAt: true } });
     if (!draft) throw new SiteContentError("NO_DRAFT", "There is no draft to discard.", 409);
     if (!matchesBase(draft, base)) throw staleDraft();
-    const removed = await tx.siteContentRevision.deleteMany({ where: { id: draft.id, status: "DRAFT" } });
+    const removed = await tx.siteContentRevision.deleteMany({ where: { id: draft.id, status: "DRAFT", updatedAt: draft.updatedAt } });
     if (removed.count !== 1) throw staleDraft();
     await writeAuditLog({
       actorUserId,
