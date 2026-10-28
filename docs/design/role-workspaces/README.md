@@ -9,6 +9,7 @@ The reference is **one visual language with four distinct workspaces**. The earl
 - [Five-page corrected comparison PDF](comparison.pdf)
 - [Download the offline interactive prototype](interactive-prototype.zip) — extract and open `role-design-samples.html`; no build or server is required.
 - [Source-based role and permission contract](evidence/role-contract.md)
+- [Director portal implementation evidence (#1112)](evidence/director-implementation.md)
 - [Design notes and current versus proposed distinctions](design-notes.md)
 - [Detailed per-role specifications](specs/)
 
