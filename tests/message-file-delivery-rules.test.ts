@@ -155,16 +155,15 @@ describe("assertAnnouncementFits (#824)", () => {
   function client(options: { pictureRows?: Array<{ sizeBytes: number }>; templateBody?: string; fileRows?: Array<{ id: string; sizeBytes: number }> }) {
     return {
       messageTemplateVersion: { findFirst: vi.fn(async () => (options.templateBody === undefined ? null : { bodyTemplate: options.templateBody, files: [] })) },
-      messageFile: {
-        findMany: vi.fn(async (args: { where: { isInlineImage?: boolean } }) => (args.where.isInlineImage ? options.pictureRows ?? [] : options.fileRows ?? [])),
-      },
+      // The files are locked FOR SHARE through raw SQL (#845); the last two values are the event and the picture flag.
+      $queryRaw: vi.fn(async (query: { sql: string; values: unknown[] }) => (query.values[query.values.length - 1] ? options.pictureRows ?? [] : options.fileRows ?? [])),
     };
   }
 
   it("does nothing, and asks the database nothing, for an announcement with no files and no pictures", async () => {
     const db = client({});
     await assertAnnouncementFits(db as never, "event-1", { body: "Plain text.", fileIds: [] });
-    expect(db.messageFile.findMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("refuses a picture that is not this event's own inline image (another event's, or an attachment)", async () => {
@@ -172,7 +171,10 @@ describe("assertAnnouncementFits (#824)", () => {
     const db = client({ pictureRows: [] });
     await expect(assertAnnouncementFits(db as never, "event-1", { body: `![x](msgfile:${picture})`, fileIds: [] }))
       .rejects.toBeInstanceOf(MessageFileError);
-    expect(db.messageFile.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ eventId: "event-1", isInlineImage: true }) }));
+    const [query] = db.$queryRaw.mock.calls[0] as unknown as [{ sql: string; values: unknown[] }];
+    expect(query.values.slice(-2)).toEqual(["event-1", true]);
+    // Held until the saving transaction ends, so the sweep cannot delete it in between (#845).
+    expect(query.sql).toContain("FOR SHARE");
   });
 
   it("counts the template's pictures with the announcement's, against 6 MB and 30", async () => {

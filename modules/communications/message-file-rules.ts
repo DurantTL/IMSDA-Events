@@ -131,6 +131,24 @@ export function attachmentSetIssue(files: ReadonlyArray<{ sizeBytes: number }>):
 /** The most attachments and pictures one event may store, so an upload loop cannot fill the disk (#824). */
 export const MAX_MESSAGE_FILES_PER_EVENT = 200;
 
+/**
+ * The default size, in MB, of everything one event may keep as message files (#845). This is an operating choice, not a
+ * rule of the system, so `MESSAGE_FILE_EVENT_QUOTA_MB` changes it; this is only what a deployment gets when it sets nothing.
+ */
+export const DEFAULT_MESSAGE_FILE_EVENT_QUOTA_MB = 200;
+/** How long an unreferenced file is left alone before the sweep may remove it. `MESSAGE_FILE_SWEEP_GRACE_HOURS` changes it. */
+export const DEFAULT_MESSAGE_FILE_SWEEP_GRACE_HOURS = 72;
+/** The shortest grace period any setting can produce, so a form someone has had open overnight keeps its uploads. */
+export const MIN_MESSAGE_FILE_SWEEP_GRACE_HOURS = 24;
+/** How long an upload may hold its reservation before the sweep treats it as abandoned. */
+export const MESSAGE_FILE_RESERVATION_TTL_MS = 60 * 60 * 1000;
+
+/** The grace period a setting asks for, never below the floor. A missing or unusable value gives the default. */
+export function effectiveSweepGraceHours(configured: number | null | undefined) {
+  if (configured === null || configured === undefined || !Number.isFinite(configured)) return DEFAULT_MESSAGE_FILE_SWEEP_GRACE_HOURS;
+  return Math.max(MIN_MESSAGE_FILE_SWEEP_GRACE_HOURS, Math.floor(configured));
+}
+
 /** Whether the pictures a body embeds fit the per-message count and total. Checked when staff save, so delivery never drops one. */
 export function inlineImageSetIssue(files: ReadonlyArray<{ sizeBytes: number }>): AttachmentTotalsIssue | null {
   if (files.length > MAX_INLINE_IMAGES_PER_MESSAGE) {

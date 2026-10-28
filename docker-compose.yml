@@ -89,6 +89,10 @@ services:
       # SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       ALERT_REPEAT_MINUTES: ${ALERT_REPEAT_MINUTES:-60}
+      # Message files (#845): blank keeps the defaults (200 MB per event, 72 hour grace, sweep reports only).
+      MESSAGE_FILE_EVENT_QUOTA_MB: ${MESSAGE_FILE_EVENT_QUOTA_MB:-}
+      MESSAGE_FILE_SWEEP_GRACE_HOURS: ${MESSAGE_FILE_SWEEP_GRACE_HOURS:-}
+      MESSAGE_FILE_SWEEP_DELETE: ${MESSAGE_FILE_SWEEP_DELETE:-}
       PASSWORD_BREACH_CHECK: ${PASSWORD_BREACH_CHECK:-}
       PASSWORD_BREACH_CHECK_URL: ${PASSWORD_BREACH_CHECK_URL:-https://api.pwnedpasswords.com/range/}
       # Church map locations (#724): off unless exactly true.

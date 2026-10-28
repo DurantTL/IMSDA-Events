@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { EmailDeliverySection } from "@/components/email-delivery-section";
 import { EmailHealthSection } from "@/components/email-health-section";
+import { MessageFileStorageSection } from "@/components/message-file-storage-section";
+import { getMessageFileStorageUsage } from "@/modules/communications/message-file-usage";
 import { NotificationsWorkspace } from "@/components/notifications-workspace";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -30,13 +32,14 @@ export default async function EmailPage() {
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
 
-  const [switches, settings, eventLists, emailEvents, attention, suppressions] = await Promise.all([
+  const [switches, settings, eventLists, emailEvents, attention, suppressions, fileUsage] = await Promise.all([
     listNotificationSwitches(),
     getPlatformSettings(),
     listEventStaffListSummaries(),
     listEventEmailStates(),
     getAdminAttentionSummary(),
     listActiveSuppressions(),
+    getMessageFileStorageUsage(),
   ]);
   const availability = getEmailAvailability();
   const health = buildEmailHealth(attention, {
@@ -78,6 +81,7 @@ export default async function EmailPage() {
         switches={switches}
       />
       <EmailHealthSection health={health} />
+      <MessageFileStorageSection usage={fileUsage} />
     </section>
   );
 }
