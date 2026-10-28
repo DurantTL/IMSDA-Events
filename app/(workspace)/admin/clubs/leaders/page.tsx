@@ -4,6 +4,7 @@ import { AdminPageHeader } from "@/components/admin-page-header";
 import { ClubLeadersList } from "@/components/club-leaders-list";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
+import { clubRoleText } from "@/modules/access/role-descriptions";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { listClubLeaders } from "@/modules/system-admin/club-leaders";
@@ -28,7 +29,7 @@ export default async function ClubLeadersPage({
   return (
     <>
       <AdminPageHeader path="/admin/clubs/leaders" />
-      <StaffPageHeader description="Everyone who currently leads a club: Directors, Deputies, Registrars and Reporters." />
+      <StaffPageHeader description={`Everyone who currently leads a club as ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name}, ${clubRoleText.REGISTRAR.name} or ${clubRoleText.REPORTER.name}.`} />
       <ClubLeadersList canOpenPeople={viewer.scope !== null} clubs={clubs} filters={filters} leaders={leaders} />
     </>
   );

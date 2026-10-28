@@ -5,6 +5,7 @@
 
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
+import { clubRoleText, eventRoleText, systemRoleText } from "@/modules/access/role-descriptions";
 
 export const PEOPLE_PAGE_SIZE = 25;
 
@@ -119,9 +120,9 @@ export type AccessSummaryInput = {
 /** The short access line on a list row: "System administrator", "3 events", "2 club roles". */
 export function summarizePeopleAccess(input: AccessSummaryInput): string[] {
   const parts: string[] = [];
-  if (input.systemAdministrator) parts.push("System administrator");
-  if (input.clubsAdministrator) parts.push("Clubs Administrator");
-  if (input.areaCoordinator) parts.push("Area Coordinator");
+  if (input.systemAdministrator) parts.push(systemRoleText.SYSTEM_ADMIN.name);
+  if (input.clubsAdministrator) parts.push(systemRoleText.CLUBS_ADMIN.name);
+  if (input.areaCoordinator) parts.push(systemRoleText.AREA_COORDINATOR.name);
   if (input.activeEventCount > 0) parts.push(`${input.activeEventCount} ${input.activeEventCount === 1 ? "event" : "events"}`);
   if (input.activeClubRoleCount > 0) parts.push(`${input.activeClubRoleCount} club ${input.activeClubRoleCount === 1 ? "role" : "roles"}`);
   return parts;
@@ -161,19 +162,19 @@ export const CLUB_ROLE_VALUES = ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] 
 export type ClubRoleValue = (typeof CLUB_ROLE_VALUES)[number];
 
 export const EVENT_ROLE_LABELS: Record<EventRoleValue, string> = {
-  EVENT_ADMIN: "Event Administrator",
-  REGISTRATION_MANAGER: "Registration Manager",
-  FINANCE_MANAGER: "Finance Manager",
-  COMMUNICATIONS_MANAGER: "Communications Manager",
-  CHECK_IN_STAFF: "Check-in Staff",
-  READ_ONLY_STAFF: "Read-only Staff",
-  KITCHEN_STAFF: "Kitchen Staff",
+  EVENT_ADMIN: eventRoleText.EVENT_ADMIN.name,
+  REGISTRATION_MANAGER: eventRoleText.REGISTRATION_MANAGER.name,
+  FINANCE_MANAGER: eventRoleText.FINANCE_MANAGER.name,
+  COMMUNICATIONS_MANAGER: eventRoleText.COMMUNICATIONS_MANAGER.name,
+  CHECK_IN_STAFF: eventRoleText.CHECK_IN_STAFF.name,
+  READ_ONLY_STAFF: eventRoleText.READ_ONLY_STAFF.name,
+  KITCHEN_STAFF: eventRoleText.KITCHEN_STAFF.name,
 };
 export const CLUB_ROLE_LABELS: Record<ClubRoleValue, string> = {
-  DIRECTOR: "Director",
-  DEPUTY: "Deputy",
-  REGISTRAR: "Registrar",
-  REPORTER: "Reporter",
+  DIRECTOR: clubRoleText.DIRECTOR.name,
+  DEPUTY: clubRoleText.DEPUTY.name,
+  REGISTRAR: clubRoleText.REGISTRAR.name,
+  REPORTER: clubRoleText.REPORTER.name,
 };
 
 export type PeopleRoleFilter =
@@ -195,9 +196,9 @@ export function peopleRoleKey(filter: PeopleRoleFilter): string {
 
 export function peopleRoleLabel(filter: PeopleRoleFilter): string {
   switch (filter.kind) {
-    case "system-admin": return "System administrator";
-    case "clubs-admin": return "Clubs Administrator";
-    case "area-coordinator": return "Area Coordinator";
+    case "system-admin": return systemRoleText.SYSTEM_ADMIN.name;
+    case "clubs-admin": return systemRoleText.CLUBS_ADMIN.name;
+    case "area-coordinator": return systemRoleText.AREA_COORDINATOR.name;
     case "pending": return "Pending invites";
     case "event": return EVENT_ROLE_LABELS[filter.role];
     case "club": return CLUB_ROLE_LABELS[filter.role];

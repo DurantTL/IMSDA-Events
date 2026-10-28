@@ -2052,6 +2052,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-record small { margin-top: 3px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.61rem); line-height: 1.45; }
 .staff-record > span:last-child { color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), 0.67rem); font-weight: 700; }
 .staff-person { display: flex; align-items: center; gap: 10px; }
+.staff-person > span { min-width: 0; }
+.staff-person small { overflow-wrap: anywhere; }
 .permission-matrix { overflow: hidden; }
 .role-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .role-grid article { border: 1px solid var(--line); border-radius: 13px; background: #fbfcfd; padding: 14px; }
@@ -13525,6 +13527,23 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .message-file-storage-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
+/* Club roster and Honors name search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. */
+.roster-search-panel, .roster-search-field, .honor-name-search { grid-template-columns: minmax(0, 1fr); }
+.roster-search-row, .roster-search-input, .honor-name-search-field { min-width: 0; }
+/* Coordinator pages at 200% text on a phone (#1113): an Open club button sits under its card label, as other
+   controls do, instead of beside a gutter that grows with the text; a long leader email wraps in the club's list (only the unclassed text span, so badges and buttons keep their width). */
+@media screen and (max-width: 600px) {
+  /* When enlarged text makes a card narrow for its text, every label moves above its value instead of squeezing it. */
+  :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) { container-type: inline-size; }
+  @container (max-width: 15em) {
+    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label] { padding-left: 0; }
+    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+  }
+  :is(.coordinator-overview, .coordinator-destination) table.table-cards.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button) { padding-left: 0; }
+  :is(.coordinator-overview, .coordinator-destination) table.table-cards.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button)::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+}
+.public-manage-club-list { grid-template-columns: minmax(0, 1fr); }
+.public-manage-club-list li > span:not([class]) { min-width: 0; overflow-wrap: anywhere; }
 
 /* Typed-name signature records on a staff registration (#1265). */
 .registration-signature-record { display: grid; gap: 4px; border-top: 1px solid var(--line, #d2dfe4); padding-top: 10px; }
@@ -13533,6 +13552,14 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .registration-signature-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .registration-signature-record .registration-signature-text { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }
 
+/* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
+.role-details { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.role-details > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.role-details > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.role-details .role-details-body { display: grid; gap: 8px; min-width: 0; padding: 0 0 6px; }
+.role-details .role-details-body .role-details-label { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.role-details .role-details-body ul { display: block; margin: 2px 0 0; padding-left: 20px; list-style: disc; }
+.role-details .role-details-body li { display: list-item; color: inherit; text-transform: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 /* Public page and links overview (#448): the short read-only summary at the top of Step 3. */
 .public-page-overview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
 .public-page-overview > div { display: grid; gap: 2px; }

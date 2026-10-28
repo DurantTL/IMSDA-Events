@@ -3,6 +3,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { ACT_AS_MINUTES, actAsAreaCoordinator } from "@/modules/organizations/staff-act-as";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { withRequestContext } from "@/lib/request-context";
 
 /** A system administrator acts as an Area Coordinator, inside their own staff session, for a while (#442). */
@@ -20,7 +21,7 @@ async function postHandler(request: Request) {
     await actAsAreaCoordinator(actor, sessionId);
     return Response.json({
       href: "/account/clubs",
-      message: `You're acting as an Area Coordinator for the next ${ACT_AS_MINUTES / 60} hours, view only.`,
+      message: `You're acting as an ${systemRoleText.AREA_COORDINATOR.name} for the next ${ACT_AS_MINUTES / 60} hours, view only.`,
     });
   } catch (error) {
     return userAdminApiError(error, "Acting as an Area Coordinator");

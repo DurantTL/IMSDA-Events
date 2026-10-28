@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { cardCell } from "@/components/table-card-labels";
 import Link from "next/link";
 import { useState } from "react";
+import { clubRoleText } from "@/modules/access/role-descriptions";
 import { Ban, UserCog, UserPlus } from "lucide-react";
 import {
   clubDirectorRoleLabels,
@@ -120,10 +121,11 @@ export function ClubDirectorsWorkspace({
           <p className="eyebrow">Club admins</p>
           <h2 translate="no">{club.name}</h2>
           <p>
-            Directors, deputies, registrars, and reporters sign in with their own
-            attendee account. Directors and deputies can also give and remove the
-            Registrar and Reporter roles themselves. Every grant and revocation is
-            recorded in the audit log.
+            {clubRoleText.DIRECTOR.name}, {clubRoleText.DEPUTY.name}, {clubRoleText.REGISTRAR.name}
+            and {clubRoleText.REPORTER.name} sign in with their own attendee account.
+            A {clubRoleText.DIRECTOR.name} or {clubRoleText.DEPUTY.name} can also give and remove the{" "}
+            {clubRoleText.REGISTRAR.name} and {clubRoleText.REPORTER.name} roles themselves.
+            Every grant and revocation is recorded in the audit log.
           </p>
         </div>
       </div>

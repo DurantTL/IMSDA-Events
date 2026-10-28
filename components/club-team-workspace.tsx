@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Mail, RefreshCw, UserMinus, UserPlus, X, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RoleDetails } from "@/components/role-details";
+import { clubRoleText } from "@/modules/access/role-descriptions";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ClubTeamInvite } from "@/modules/club-imports/invites";
 import {
   clubAssignableRoles,
   clubDirectorRoleLabels,
-  clubRoleDescriptions,
 } from "@/modules/organizations/director-grants-domain";
 import type { ClubTeamMember } from "@/modules/organizations/director-grants-repository";
 
@@ -251,7 +252,7 @@ export function ClubTeamWorkspace({
               </div>
               <ul className="field-help club-role-help">
                 {clubAssignableRoles.map((role) => (
-                  <li key={role}><strong>{clubDirectorRoleLabels[role]}:</strong> {clubRoleDescriptions[role]}</li>
+                  <li key={role}><strong>{clubRoleText[role].name}:</strong> {clubRoleText[role].summary}<RoleDetails role={clubRoleText[role]} /></li>
                 ))}
               </ul>
               <p className="field-help">
