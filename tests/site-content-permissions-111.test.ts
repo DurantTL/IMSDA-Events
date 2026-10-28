@@ -137,7 +137,7 @@ describe("the hub content routes", () => {
   it("passes the signed-in editor's id and the body to the store, and shows store errors as plain 4xx messages", async () => {
     signInAs("editor");
     await saveDraft(request("/api/admin/site-content/draft", "PUT", { content: { a: 1 }, note: "why" }));
-    expect(mocks.saveHubDraft).toHaveBeenCalledWith({ a: 1 }, "why", "u-editor");
+    expect(mocks.saveHubDraft).toHaveBeenCalledWith({ a: 1 }, "why", "u-editor", undefined);
     const { SiteContentError } = await import("@/modules/site-content/hub-content");
     mocks.publishHubDraft.mockRejectedValue(new SiteContentError("NO_DRAFT", "There is no draft to publish. Save a draft first.", 409));
     const response = await publish(request("/api/admin/site-content/publish", "POST"));

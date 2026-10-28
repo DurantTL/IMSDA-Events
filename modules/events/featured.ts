@@ -68,12 +68,6 @@ export async function listCuratedFeaturedRows(ids: readonly string[], today: str
   return activeFeaturedRows(rows, today);
 }
 
-/** The homepage's featured rows: the curated choice when any of it still qualifies, otherwise the events flagged featured (#1218). */
-export async function listHomeFeaturedRows(curatedIds: readonly string[], today: string): Promise<FeaturedEventRow[]> {
-  const curated = await listCuratedFeaturedRows(curatedIds, today);
-  return curated.length > 0 ? curated : listFeaturedEventRows(today);
-}
-
 /** Public events staff can choose to feature: published, on the calendar, not archived and not ended. Titles and dates only. */
 export async function listFeaturableEvents(today: string): Promise<Array<{ id: string; name: string; startsOn: string; endsOn: string }>> {
   const events = await getPrisma().event.findMany({

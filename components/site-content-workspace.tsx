@@ -112,6 +112,8 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
   const [content, setContent] = useState<HubContent>(initialContent);
   const [savedJson, setSavedJson] = useState(JSON.stringify(initialContent));
   const [hasDraft, setHasDraft] = useState(Boolean(draft));
+  // The draft as last seen (its id and updatedAt), sent with every change so a change made by someone else is a conflict, not a silent overwrite.
+  const [base, setBase] = useState<{ id: string; updatedAt: string } | null>(draft ? { id: draft.id, updatedAt: draft.updatedAt } : null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -136,10 +138,13 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
   }
 
   async function saveDraft() {
-    await send("/api/admin/site-content/draft", "PUT", { content, note });
+    const result = await send("/api/admin/site-content/draft", "PUT", { content, note, base }) as { draft?: { id: string; updatedAt: string } };
+    const next = result.draft ? { id: result.draft.id, updatedAt: result.draft.updatedAt } : base;
+    setBase(next);
     setSavedJson(JSON.stringify(content));
     setSavedNote(note);
     setHasDraft(true);
+    return next;
   }
 
   const onSave = () => run(async () => {
@@ -154,9 +159,10 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
       confirmLabel: "Publish now",
     }))) return;
     await run(async () => {
-      if (dirty || !hasDraft) await saveDraft();
-      await send("/api/admin/site-content/publish", "POST");
+      const seen = dirty || !hasDraft ? await saveDraft() : base;
+      await send("/api/admin/site-content/publish", "POST", { base: seen });
       setHasDraft(false);
+      setBase(null);
       return "Published. Visitors now see this version.";
     });
   }
@@ -169,8 +175,9 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
       destructive: true,
     }))) return;
     await run(async () => {
-      await send("/api/admin/site-content/draft", "DELETE");
+      await send("/api/admin/site-content/draft", "DELETE", { base });
       setHasDraft(false);
+      setBase(null);
       return "Draft discarded. Reload the page to start again from what is published.";
     });
   }

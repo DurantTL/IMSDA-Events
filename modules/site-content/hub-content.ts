@@ -56,6 +56,21 @@ export type SiteContentAdminState = {
 
 const historyLimit = 50;
 
+/**
+ * What the editor last saw of the draft: its id and `updatedAt` (as returned by a save), or null for "there was no
+ * draft". A save or publish carrying it is refused with 409 when the draft has since changed, so two editors cannot
+ * silently overwrite each other. Omitted by callers that do not track it.
+ */
+export type DraftBase = { id: string; updatedAt: string } | null;
+
+const staleDraft = () => new SiteContentError("CONFLICT", "Someone else changed the draft. Reload the page to see their changes.", 409);
+
+function matchesBase(draft: { id: string; updatedAt: Date } | null, base: DraftBase | undefined) {
+  if (base === undefined) return true;
+  if (base === null) return draft === null;
+  return draft !== null && draft.id === base.id && draft.updatedAt.toISOString() === base.updatedAt;
+}
+
 const withActors = { createdBy: { select: { displayName: true } }, publishedBy: { select: { displayName: true } } } as const;
 type RevisionRow = Prisma.SiteContentRevisionGetPayload<{ include: typeof withActors }>;
 
@@ -139,52 +154,67 @@ export async function getSiteContentAdminState(): Promise<SiteContentAdminState>
   };
 }
 
-/** Saves the working draft (creating it on the first save) and audits it. */
-export async function saveHubDraft(input: unknown, note: string | null | undefined, actorUserId: string): Promise<RevisionSummary> {
+/**
+ * Saves the working draft (creating it on the first save) and audits it. The row is only changed while it is still the
+ * draft and unchanged since it was read, so a publish or another save in between can never be overwritten: that is a
+ * 409, not a lost update. The last person to save is recorded as the draft's author.
+ */
+export async function saveHubDraft(input: unknown, note: string | null | undefined, actorUserId: string, base?: DraftBase): Promise<RevisionSummary> {
   const content = validateHubContent(input);
   const cleanedNote = cleanNote(note);
-  const run = () => getPrisma().$transaction(async (tx) => {
-    const live = await tx.siteContentRevision.findFirst({ where: { status: "PUBLISHED" }, select: { content: true } });
-    const before = live ? parseHubContent(live.content) : null;
-    const existing = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true } });
-    const row = existing
-      ? await tx.siteContentRevision.update({ where: { id: existing.id }, data: { content: asJson(content), note: cleanedNote }, include: withActors })
-      : await tx.siteContentRevision.create({ data: { content: asJson(content), status: "DRAFT", note: cleanedNote, createdByUserId: actorUserId }, include: withActors });
-    await writeAuditLog({
-      actorUserId,
-      action: "SITE_CONTENT_DRAFT_SAVED",
-      entityType: "SiteContentRevision",
-      entityId: row.id,
-      summary: "Saved the homepage and site content draft.",
-      metadata: { revisionId: row.id, changedKeys: changedHubKeys(before, content) },
-    }, tx);
-    return summarize(row);
-  });
   try {
-    return await run();
+    return await getPrisma().$transaction(async (tx) => {
+      const live = await tx.siteContentRevision.findFirst({ where: { status: "PUBLISHED" }, select: { content: true } });
+      const before = live ? parseHubContent(live.content) : null;
+      const existing = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true, updatedAt: true } });
+      if (!matchesBase(existing, base)) throw staleDraft();
+      let id: string;
+      if (existing) {
+        const changed = await tx.siteContentRevision.updateMany({
+          where: { id: existing.id, status: "DRAFT", updatedAt: existing.updatedAt },
+          data: { content: asJson(content), note: cleanedNote, createdByUserId: actorUserId },
+        });
+        if (changed.count !== 1) throw staleDraft();
+        id = existing.id;
+      } else {
+        id = (await tx.siteContentRevision.create({ data: { content: asJson(content), status: "DRAFT", note: cleanedNote, createdByUserId: actorUserId } })).id;
+      }
+      const row = await tx.siteContentRevision.findUniqueOrThrow({ where: { id }, include: withActors });
+      await writeAuditLog({
+        actorUserId,
+        action: "SITE_CONTENT_DRAFT_SAVED",
+        entityType: "SiteContentRevision",
+        entityId: row.id,
+        summary: "Saved the homepage and site content draft.",
+        metadata: { revisionId: row.id, changedKeys: changedHubKeys(before, content) },
+      }, tx);
+      return summarize(row);
+    });
   } catch (error) {
-    // Two first saves at once: the second finds the draft the first made.
-    if (isUniqueViolation(error)) return run();
+    // A second first save at the same moment: the database allows one draft only.
+    if (isUniqueViolation(error)) throw staleDraft();
     throw error;
   }
 }
 
 /** Publishes the draft: it becomes the one PUBLISHED version and the previous one is kept as SUPERSEDED, in one transaction. */
-export async function publishHubDraft(actorUserId: string, now = new Date()): Promise<RevisionSummary> {
+export async function publishHubDraft(actorUserId: string, now = new Date(), base?: DraftBase): Promise<RevisionSummary> {
   try {
     return await getPrisma().$transaction(async (tx) => {
       const draft = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" } });
       if (!draft) throw new SiteContentError("NO_DRAFT", "There is no draft to publish. Save a draft first.", 409);
+      if (!matchesBase(draft, base)) throw staleDraft();
       const content = parseHubContent(draft.content);
       if (!content) throw new SiteContentError("INVALID_CONTENT", "The draft no longer fits the rules. Fix it and save again before publishing.");
       const previous = await tx.siteContentRevision.findFirst({ where: { status: "PUBLISHED" }, select: { id: true, content: true } });
       if (previous) await tx.siteContentRevision.updateMany({ where: { id: previous.id, status: "PUBLISHED" }, data: { status: "SUPERSEDED" } });
-      // Conditional on still being the draft: a second publish at the same moment changes nothing and reports a conflict.
+      // Conditional on still being the draft we read, unchanged: a second publish or a save at the same moment changes
+      // nothing and reports a conflict, so what goes live is exactly the content the audit row describes.
       const claimed = await tx.siteContentRevision.updateMany({
-        where: { id: draft.id, status: "DRAFT" },
+        where: { id: draft.id, status: "DRAFT", updatedAt: draft.updatedAt },
         data: { status: "PUBLISHED", publishedByUserId: actorUserId, publishedAt: now },
       });
-      if (claimed.count !== 1) throw new SiteContentError("CONFLICT", "Someone else just published or discarded this draft. Reload the page.", 409);
+      if (claimed.count !== 1) throw staleDraft();
       const row = await tx.siteContentRevision.findUniqueOrThrow({ where: { id: draft.id }, include: withActors });
       await writeAuditLog({
         actorUserId,
@@ -251,12 +281,14 @@ export async function restoreHubRevision(revisionId: string, actorUserId: string
   }
 }
 
-/** Throws the working draft away (the published version is untouched). */
-export async function discardHubDraft(actorUserId: string): Promise<void> {
+/** Throws the working draft away (the published version is untouched). Only a row that is still the draft can be deleted. */
+export async function discardHubDraft(actorUserId: string, base?: DraftBase): Promise<void> {
   await getPrisma().$transaction(async (tx) => {
-    const draft = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true } });
+    const draft = await tx.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true, updatedAt: true } });
     if (!draft) throw new SiteContentError("NO_DRAFT", "There is no draft to discard.", 409);
-    await tx.siteContentRevision.delete({ where: { id: draft.id } });
+    if (!matchesBase(draft, base)) throw staleDraft();
+    const removed = await tx.siteContentRevision.deleteMany({ where: { id: draft.id, status: "DRAFT" } });
+    if (removed.count !== 1) throw staleDraft();
     await writeAuditLog({
       actorUserId,
       action: "SITE_CONTENT_DRAFT_DISCARDED",

@@ -136,7 +136,10 @@ export const linkSchema = z.object({
 });
 export type HubLink = z.infer<typeof linkSchema>;
 
-const categoryName = z.string().trim().min(1).max(limits.categoryName, `A category can be at most ${limits.categoryName} characters.`);
+const categoryName = z.string().trim().min(1, "A category name cannot be blank.").max(limits.categoryName, `A category can be at most ${limits.categoryName} characters.`);
+
+/** One entry per line in the editor: blank lines (a trailing newline, a gap) are dropped before anything is checked or counted. */
+const withoutBlankLines = (value: unknown) => (Array.isArray(value) ? value.filter((line) => !(typeof line === "string" && line.trim() === "")) : value);
 
 const hubContentShape = z.object({
   version: z.literal(hubContentVersion).default(hubContentVersion),
@@ -147,15 +150,13 @@ const hubContentShape = z.object({
   navLinks: z.array(linkSchema).max(limits.navLinks, `Use at most ${limits.navLinks} navigation links.`).default([]),
   footer: z.object({
     verse: optionalText(limits.verse, "The verse"),
-    contactLines: z.array(z.preprocess((value) => (typeof value === "string" ? value.trim() : value), z.string().max(limits.contactLine, `A contact line can be at most ${limits.contactLine} characters.`)))
-      .max(limits.footerContactLines, `Use at most ${limits.footerContactLines} contact lines.`)
-      .default([])
-      .transform((lines) => lines.filter((line) => line !== "")),
+    contactLines: z.preprocess(withoutBlankLines, z.array(z.preprocess((value) => (typeof value === "string" ? value.trim() : value), z.string().max(limits.contactLine, `A contact line can be at most ${limits.contactLine} characters.`)))
+      .max(limits.footerContactLines, `Use at most ${limits.footerContactLines} contact lines.`)).default([]),
     links: z.array(linkSchema).max(limits.footerLinks, `Use at most ${limits.footerLinks} footer links.`).default([]),
   }).default({ contactLines: [], links: [] }),
   calendarCategories: z.object({
-    order: z.array(categoryName).max(limits.categories).default([]),
-    hidden: z.array(categoryName).max(limits.categories).default([]),
+    order: z.preprocess(withoutBlankLines, z.array(categoryName).max(limits.categories, `Use at most ${limits.categories} categories.`)).default([]),
+    hidden: z.preprocess(withoutBlankLines, z.array(categoryName).max(limits.categories, `Use at most ${limits.categories} categories.`)).default([]),
   }).default({ order: [], hidden: [] }),
 });
 

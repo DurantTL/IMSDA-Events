@@ -31,6 +31,7 @@ type Row = {
 };
 let rows: Row[];
 let counter: number;
+let tick: number;
 
 function uniqueViolation() {
   return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" });
@@ -38,6 +39,7 @@ function uniqueViolation() {
 const withActors = (row: Row) => ({ ...row, createdBy: row.createdByUserId ? { displayName: "Editor One" } : null, publishedBy: row.publishedByUserId ? { displayName: "Editor One" } : null });
 const matches = (row: Row, where: any = {}) =>
   (where.id === undefined || row.id === where.id)
+  && (where.updatedAt === undefined || row.updatedAt.getTime() === where.updatedAt.getTime())
   && (where.status === undefined || (typeof where.status === "string" ? row.status === where.status : where.status.in.includes(row.status)));
 
 function fakeDb() {
@@ -47,7 +49,7 @@ function fakeDb() {
     findUnique: async ({ where }: any) => { const row = rows.find((candidate) => candidate.id === where.id); return row ? withActors(row) : null; },
     findUniqueOrThrow: async ({ where }: any) => withActors(rows.find((candidate) => candidate.id === where.id)!),
     create: async ({ data }: any) => {
-      const row: Row = { note: null, createdByUserId: null, publishedByUserId: null, publishedAt: null, restoredFromId: null, ...data, id: `rev${++counter}`, createdAt: new Date(2026, 9, counter), updatedAt: new Date() };
+      const row: Row = { note: null, createdByUserId: null, publishedByUserId: null, publishedAt: null, restoredFromId: null, ...data, id: `rev${++counter}`, createdAt: new Date(2026, 9, counter), updatedAt: new Date(2026, 9, 28, 0, 0, ++tick) };
       if (row.status !== "SUPERSEDED" && rows.some((other) => other.status === row.status)) throw uniqueViolation();
       rows.push(row);
       return withActors(row);
@@ -55,10 +57,14 @@ function fakeDb() {
     update: async ({ where, data }: any) => { const row = rows.find((candidate) => candidate.id === where.id)!; Object.assign(row, data); return withActors(row); },
     updateMany: async ({ where, data }: any) => {
       const hits = rows.filter((candidate) => matches(candidate, where));
-      hits.forEach((row) => Object.assign(row, data));
+      hits.forEach((row) => Object.assign(row, data, { updatedAt: new Date(2026, 9, 28, 0, 0, ++tick) }));
       return { count: hits.length };
     },
-    delete: async ({ where }: any) => { rows = rows.filter((candidate) => candidate.id !== where.id); },
+    deleteMany: async ({ where }: any) => {
+      const hits = rows.filter((candidate) => matches(candidate, where));
+      rows = rows.filter((candidate) => !hits.includes(candidate));
+      return { count: hits.length };
+    },
   };
   const client = { siteContentRevision: table };
   return { ...client, $transaction: async (fn: (tx: unknown) => unknown) => fn(client) };
@@ -72,6 +78,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   rows = [];
   counter = 0;
+  tick = 0;
   mocks.getPrisma.mockReturnValue(fakeDb());
 });
 
@@ -146,6 +153,19 @@ describe("publishing", () => {
   });
 });
 
+/** Runs `before` once, just before the named table call, to stand for another request that got in first. */
+function interleave(method: "updateMany" | "deleteMany", before: () => void) {
+  const original = getPrisma();
+  let done = false;
+  mocks.getPrisma.mockReturnValue({
+    ...original,
+    $transaction: (fn: (tx: any) => unknown) => original.$transaction((tx: any) => fn({
+      ...tx,
+      siteContentRevision: { ...tx.siteContentRevision, [method]: async (args: any) => { if (!done) { done = true; before(); } return tx.siteContentRevision[method](args); } },
+    })),
+  });
+}
+
 function getPrisma() {
   return mocks.getPrisma() as ReturnType<typeof fakeDb>;
 }
@@ -218,5 +238,73 @@ describe("what visitors get", () => {
   it("is the default when the database cannot be read", async () => {
     mocks.getPrisma.mockImplementation(() => { throw new Error("database down"); });
     expect(await getPublishedHubContent()).toEqual(defaultHubContent());
+  });
+});
+
+describe("changes that race a publish or another save (#111 review)", () => {
+  it("guards a save by status and the updatedAt it read, so a publish in between cannot be overwritten (409)", async () => {
+    const draft = await saveHubDraft(content("One"), null, "editor");
+    interleave("updateMany", () => { rows[0].status = "PUBLISHED"; });
+    await expect(saveHubDraft(content("Two"), null, "editor")).rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: draft.id, status: "PUBLISHED" });
+    expect((rows[0].content as any).navLinks[0].label).toBe("One");
+  });
+
+  it("refuses a save made from a stale view of the draft, and from a view that saw no draft", async () => {
+    const first = await saveHubDraft(content("One"), null, "editor");
+    const second = await saveHubDraft(content("Two"), null, "other-editor", { id: first.id, updatedAt: first.updatedAt });
+    await expect(saveHubDraft(content("Three"), null, "editor", { id: first.id, updatedAt: first.updatedAt })).rejects.toMatchObject({ code: "CONFLICT", status: 409, message: expect.stringContaining("Someone else changed the draft") });
+    await expect(saveHubDraft(content("Three"), null, "editor", null)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((rows[0].content as any).navLinks[0].label).toBe("Two");
+    // The current view saves fine.
+    await expect(saveHubDraft(content("Three"), null, "editor", { id: second.id, updatedAt: second.updatedAt })).resolves.toMatchObject({ id: first.id });
+  });
+
+  it("records the last saver, not the first", async () => {
+    await saveHubDraft(content("One"), null, "first-editor");
+    await saveHubDraft(content("Two"), null, "second-editor");
+    expect(rows[0].createdByUserId).toBe("second-editor");
+  });
+
+  it("publishes only the draft the editor saw: a changed draft is a 409 and nothing goes live", async () => {
+    const seen = await saveHubDraft(content("One"), null, "editor");
+    await saveHubDraft(content("Two"), null, "other-editor");
+    await expect(publishHubDraft("editor", new Date(), { id: seen.id, updatedAt: seen.updatedAt })).rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+    expect(published()).toHaveLength(0);
+  });
+
+  it("claims the draft only while it is unchanged since it was read, so what goes live is what the audit row describes", async () => {
+    await saveHubDraft(content("One"), null, "editor");
+    // A save lands between the publish's read and its claim (the first updateMany call is the claim: nothing was live yet).
+    const original = getPrisma();
+    let claimWhere: any;
+    mocks.getPrisma.mockReturnValue({
+      ...original,
+      $transaction: (fn: (tx: any) => unknown) => original.$transaction((tx: any) => fn({
+        ...tx,
+        siteContentRevision: { ...tx.siteContentRevision, updateMany: async (args: any) => { claimWhere = args.where; rows[0].updatedAt = new Date(2030, 0, 1); return tx.siteContentRevision.updateMany(args); } },
+      })),
+    });
+    await expect(publishHubDraft("editor")).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(claimWhere).toMatchObject({ status: "DRAFT", updatedAt: expect.any(Date) });
+    expect(rows[0].status).toBe("DRAFT");
+    expect(published()).toHaveLength(0);
+  });
+
+  it("discard deletes only a row that is still the draft: a publish in between leaves the live row alone (409)", async () => {
+    await saveHubDraft(content("One"), null, "editor");
+    interleave("deleteMany", () => { rows[0].status = "PUBLISHED"; });
+    await expect(discardHubDraft("editor")).rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("PUBLISHED");
+    expect(actions()).not.toContain("SITE_CONTENT_DRAFT_DISCARDED");
+  });
+
+  it("refuses to discard a draft that changed since the editor saw it", async () => {
+    const seen = await saveHubDraft(content("One"), null, "editor");
+    await saveHubDraft(content("Two"), null, "other-editor");
+    await expect(discardHubDraft("editor", { id: seen.id, updatedAt: seen.updatedAt })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(rows).toHaveLength(1);
   });
 });

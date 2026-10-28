@@ -2,7 +2,7 @@ import { logError } from "@/lib/logger";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireSiteContentEditor } from "@/modules/access/site-content-editor";
-import { SiteContentError } from "@/modules/site-content/hub-content";
+import { SiteContentError, type DraftBase } from "@/modules/site-content/hub-content";
 
 const noStore = { "Cache-Control": "no-store" };
 
@@ -48,4 +48,19 @@ export async function readJsonBody(request: Request): Promise<Record<string, unk
   } catch {
     return {};
   }
+}
+
+/**
+ * The draft the editor last saw, from a body's `base` ({ id, updatedAt }, or null for "no draft"); undefined when the
+ * caller sent none, which skips the check (#111).
+ */
+export function readDraftBase(body: Record<string, unknown>): DraftBase | undefined {
+  if (!("base" in body)) return undefined;
+  const base = body.base;
+  if (base === null) return null;
+  if (base && typeof base === "object" && typeof (base as Record<string, unknown>).id === "string" && typeof (base as Record<string, unknown>).updatedAt === "string") {
+    return { id: (base as { id: string }).id, updatedAt: (base as { updatedAt: string }).updatedAt };
+  }
+  // A malformed base can never match, so it is a conflict rather than a skipped check.
+  return { id: "", updatedAt: "" };
 }

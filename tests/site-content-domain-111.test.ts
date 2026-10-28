@@ -99,6 +99,22 @@ describe("limits", () => {
   });
 });
 
+describe("one entry per line (#111 review)", () => {
+  const base = defaultHubContent();
+  it("drops blank lines before checking, so a trailing newline saves and blanks do not count toward the limit", () => {
+    const parsed = hubContentSchema.parse({ ...base, footer: { contactLines: ["a", "", "b", "c", "d", "  ", ""], links: [] }, calendarCategories: { order: ["Camp", "", " "], hidden: ["Youth", ""] } });
+    expect(parsed.footer.contactLines).toEqual(["a", "b", "c", "d"]);
+    expect(parsed.calendarCategories).toEqual({ order: ["Camp"], hidden: ["Youth"] });
+    expect(hubContentSchema.safeParse({ ...base, footer: { contactLines: ["a", "b", "c", "d", "e"], links: [] } }).success).toBe(false);
+  });
+
+  it("says plainly when a category name is too long, and has no blank-name error to show", () => {
+    const result = hubContentSchema.safeParse({ ...base, calendarCategories: { order: ["x".repeat(41)], hidden: [] } });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe("A category can be at most 40 characters.");
+  });
+});
+
 describe("sections", () => {
   it("needs exactly one entry per key", () => {
     const sections = sectionKeys.map((key) => ({ key, visible: true }));

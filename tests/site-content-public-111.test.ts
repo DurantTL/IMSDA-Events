@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
   ministries: vi.fn(),
   help: vi.fn(),
-  homeRows: vi.fn(),
+  curated: vi.fn(),
+  flagged: vi.fn(),
   images: vi.fn(),
   eventFindMany: vi.fn(),
 }));
@@ -28,13 +29,13 @@ vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSession
 // The homepage test below swaps the real featured query for a stub so only the content's own rules are under test.
 vi.mock("@/modules/events/featured", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/modules/events/featured")>();
-  return { ...original, listHomeFeaturedRows: mocks.homeRows, listEventCardImages: mocks.images };
+  return { ...original, listCuratedFeaturedRows: mocks.curated, listFeaturedEventRows: mocks.flagged, listEventCardImages: mocks.images };
 });
 
 import { PublicHomePage } from "@/components/public-home-page";
 import { PublicHeaderNavLinks } from "@/components/public-header-nav-links";
 import { SiteNoticesView } from "@/components/site-notices-view";
-import { listCuratedFeaturedRows, listHomeFeaturedRows } from "@/modules/events/featured";
+const realFeatured = () => vi.importActual<typeof import("@/modules/events/featured")>("@/modules/events/featured");
 import { fallbackHomepageMinistries } from "@/modules/system-admin/homepage-ministries-domain";
 import { defaultHubContent, type HubContent } from "@/modules/site-content/hub-content-domain";
 
@@ -48,7 +49,8 @@ beforeEach(() => {
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
   mocks.ministries.mockResolvedValue(fallbackHomepageMinistries);
   mocks.help.mockResolvedValue({ phone: null, email: null });
-  mocks.homeRows.mockResolvedValue([]);
+  mocks.curated.mockResolvedValue([]);
+  mocks.flagged.mockResolvedValue([]);
   mocks.images.mockResolvedValue(new Map());
 });
 
@@ -67,9 +69,9 @@ describe("the homepage with nothing curated", () => {
     expect(html).not.toContain("home-footer-contact");
   });
 
-  it("asks for the featured events with no chosen ids, which keeps today's Event.featured behaviour", async () => {
+  it("asks for no chosen events, which keeps today's Event.featured behaviour", async () => {
     await render(defaultHubContent());
-    expect(mocks.homeRows).toHaveBeenCalledWith([], "2026-10-28");
+    expect(mocks.curated).toHaveBeenCalledWith([], "2026-10-28");
   });
 });
 
@@ -149,6 +151,34 @@ describe("the homepage with curated content", () => {
   });
 });
 
+describe("featured events on the homepage", () => {
+  const calendarItem = (slug: string) => ({
+    key: `event-${slug}`, kind: "EVENT", title: `Fictitious ${slug}`, startsOn: "2026-11-05", endsOn: "2026-11-06", timeLabel: "", location: "", description: "", category: "Youth",
+    status: "SCHEDULED", href: `/events/${slug}`, registrationOpen: true,
+  });
+  const row = (slug: string) => ({ slug, featuredOrder: 1, featureUntil: null, startsOn: "2026-11-05", endsOn: "2026-11-06" });
+
+  it("shows the chosen events when they have calendar cards, and not the flagged ones", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([calendarItem("chosen"), calendarItem("flagged")]);
+    mocks.curated.mockResolvedValue([row("chosen")]);
+    mocks.flagged.mockResolvedValue([row("flagged")]);
+    const html = await render(withContent({ featuredEventIds: ["e1"] }));
+    expect(html).toContain("Fictitious chosen");
+    expect(mocks.flagged).not.toHaveBeenCalled();
+    expect(html).toContain("home-featured-heading");
+  });
+
+  it("falls back to the flagged events when no chosen event has a public calendar card, even though the chosen events still qualify", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([calendarItem("flagged")]);
+    mocks.curated.mockResolvedValue([row("outside-the-calendar-window")]);
+    mocks.flagged.mockResolvedValue([row("flagged")]);
+    const html = await render(withContent({ featuredEventIds: ["e1"] }));
+    expect(mocks.flagged).toHaveBeenCalledTimes(1);
+    expect(html).toContain("Fictitious flagged");
+    expect(html).not.toContain("outside-the-calendar-window");
+  });
+});
+
 describe("pieces shared by the public pages", () => {
   it("draws nothing for no notices and no header links, so the pages are unchanged", () => {
     expect(renderToStaticMarkup(createElement(SiteNoticesView, { notices: [] }))).toBe("");
@@ -183,24 +213,15 @@ describe("featured events chosen by staff", () => {
   });
 
   it("keeps the chosen order and drops private, unpublished, archived, ended and unknown events without a trace", async () => {
+    const { listCuratedFeaturedRows } = await realFeatured();
     const rows = await listCuratedFeaturedRows(["b", "hidden", "nope", "draft", "old", "past", "a"], "2026-10-28");
     expect(rows.map((row) => row.slug)).toEqual(["slug-b", "slug-a"]);
     expect(JSON.stringify(rows)).not.toMatch(/hidden|draft|nope|Fictitious/);
   });
 
   it("is empty for no ids and does not query at all", async () => {
+    const { listCuratedFeaturedRows } = await realFeatured();
     expect(await listCuratedFeaturedRows([], "2026-10-28")).toEqual([]);
     expect(mocks.eventFindMany).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the events flagged featured when none of the chosen ones survive, and when none are chosen", async () => {
-    const flagged = [{ slug: "flagged", featuredOrder: 1, featureUntil: null, startsOn: "2026-11-10", endsOn: "2026-11-12" }];
-    mocks.eventFindMany.mockImplementation(async ({ where }: any) => (where.featured ? flagged.map((row) => ({ ...event("f"), slug: row.slug, featuredOrder: 1, featureUntil: null })) : store.filter((row) => where.id.in.includes(row.id) && row.showOnCalendar && row.isPublished)));
-    const { listHomeFeaturedRows: real } = await vi.importActual<typeof import("@/modules/events/featured")>("@/modules/events/featured");
-    expect((await real(["hidden", "draft"], "2026-10-28")).map((row) => row.slug)).toEqual(["flagged"]);
-    expect((await real([], "2026-10-28")).map((row) => row.slug)).toEqual(["flagged"]);
-    expect((await real(["a"], "2026-10-28")).map((row) => row.slug)).toEqual(["slug-a"]);
-    // The module-level stub is what the homepage tests above use; the real one is exercised just here.
-    expect(listHomeFeaturedRows).toBe(mocks.homeRows);
   });
 });

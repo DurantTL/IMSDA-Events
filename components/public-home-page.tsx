@@ -13,7 +13,7 @@ import { addDays } from "@/modules/calendar/domain";
 import { helpContactLinks, ministryTiles, nextClosingSoon, nextMonthsList, seasonRibbon, seasonWindow } from "@/modules/calendar/home-season";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
 import { homeFeaturedLimit, featuredItemsFor } from "@/modules/events/featured-domain";
-import { listEventCardImages, listHomeFeaturedRows } from "@/modules/events/featured";
+import { listCuratedFeaturedRows, listEventCardImages, listFeaturedEventRows } from "@/modules/events/featured";
 import { activeAnnouncements, activeNotices, linkText, orderedSections, splitVerse, type HubContent, type SectionKey } from "@/modules/site-content/hub-content-domain";
 import { listHomepageMinistries } from "@/modules/system-admin/homepage-ministries";
 import { getPublicHelpContact } from "@/modules/system-admin/platform-settings";
@@ -34,15 +34,17 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
   const Wrapper = preview ? "div" : "main";
   const now = new Date();
   const today = conferenceToday(now);
-  const [items, attendee, featuredRows, ministries, help] = await Promise.all([
+  const [items, attendee, curatedRows, ministries, help] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, 365)),
     getCurrentAttendee(),
-    listHomeFeaturedRows(content.featuredEventIds, today),
+    listCuratedFeaturedRows(content.featuredEventIds, today),
     listHomepageMinistries(),
     getPublicHelpContact(),
   ]);
   // Featured events lead the page as larger cards (#1218). Staff's own choice (#111) wins while any of it still qualifies.
-  const featured = featuredItemsFor(items, featuredRows).slice(0, homeFeaturedLimit);
+  let featured = featuredItemsFor(items, curatedRows).slice(0, homeFeaturedLimit);
+  // When none of the chosen events has a card on the public calendar, the homepage uses the events flagged featured instead.
+  if (featured.length === 0) featured = featuredItemsFor(items, await listFeaturedEventRows(today)).slice(0, homeFeaturedLimit);
   const cardImages = await listEventCardImages(featured.flatMap((item) => {
     const slug = eventSlugFromHref(item.href);
     return slug ? [slug] : [];

@@ -58,6 +58,8 @@ export type DestinationSearchContext = {
    * destinations become searchable. `healthImport` is false when the Health Record feature is off, as in the sidebar.
    */
   clubsAdmin?: { healthImport: boolean };
+  /** An active Site content editor who is not a system administrator (#111): Homepage & site content is searchable. */
+  siteContentEditor?: boolean;
 };
 
 /** What each scope means, for the label beside a result. */
@@ -189,6 +191,17 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
         });
       }
     }
+  }
+
+  if (context.siteContentEditor && !context.isSystemAdmin) {
+    add({
+      key: "System:site-content:/admin/site-content",
+      scope: "System",
+      label: "Homepage & site content",
+      description: "Notices, announcements, featured events, header links and the footer on the public pages.",
+      href: "/admin/site-content",
+      keywords: destinationKeywords["/admin/site-content"] ?? [],
+    });
   }
 
   if (context.clubsAdmin) {

@@ -333,6 +333,7 @@ export function AppShell({
     clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
     hiddenCardKeys: selectedHiddenCardKeys,
     clubsAdmin: clubsView ? { healthImport: adminRoleView?.healthImport !== false } : undefined,
+    siteContentEditor,
   });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
