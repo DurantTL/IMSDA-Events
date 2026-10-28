@@ -89,6 +89,10 @@ services:
       # SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       ALERT_REPEAT_MINUTES: ${ALERT_REPEAT_MINUTES:-60}
+      # Message files (#845): blank keeps the defaults (200 MB per event, 72 hour grace, sweep reports only).
+      MESSAGE_FILE_EVENT_QUOTA_MB: ${MESSAGE_FILE_EVENT_QUOTA_MB:-}
+      MESSAGE_FILE_SWEEP_GRACE_HOURS: ${MESSAGE_FILE_SWEEP_GRACE_HOURS:-}
+      MESSAGE_FILE_SWEEP_DELETE: ${MESSAGE_FILE_SWEEP_DELETE:-}
       PASSWORD_BREACH_CHECK: ${PASSWORD_BREACH_CHECK:-}
       PASSWORD_BREACH_CHECK_URL: ${PASSWORD_BREACH_CHECK_URL:-https://api.pwnedpasswords.com/range/}
       # Church map locations (#724): off unless exactly true.
@@ -102,6 +106,8 @@ services:
       SQUARE_WEBHOOK_SIGNATURE_KEY: ${SQUARE_WEBHOOK_SIGNATURE_KEY:-}
       SQUARE_WEBHOOK_NOTIFICATION_URL: ${SQUARE_WEBHOOK_NOTIFICATION_URL:-}
       SQUARE_ENABLE_PRODUCTION: ${SQUARE_ENABLE_PRODUCTION:-false}
+      # The app also reads the interval, only to show the broadcast dialog's time estimate.
+      OUTBOX_SWEEP_INTERVAL_SECONDS: ${OUTBOX_SWEEP_INTERVAL_SECONDS:-300}
       # New requirement. An existing deployment that has never set this will not
       # start until it is added — the sweep endpoint is never open by omission.
       OUTBOX_SWEEP_TOKEN: ${OUTBOX_SWEEP_TOKEN?set this to at least 32 random characters (openssl rand -base64 48); it authorises the scheduled outbox sweep}

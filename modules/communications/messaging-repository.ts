@@ -46,7 +46,7 @@ import {
   setTemplateVersionFiles,
 } from "@/modules/communications/message-files";
 import { BATCH_TRANSACTION_MAX_WAIT_MS, BATCH_TRANSACTION_TIMEOUT_MS } from "@/modules/communications/batch-transaction";
-import { inlineImageSetIssue, messageFileIdsInMarkdown, type MessageFileRecord } from "@/modules/communications/message-file-rules";
+import { filesNeedBackgroundMailer, inlineImageSetIssue, messageFileIdsInMarkdown, type MessageFileRecord } from "@/modules/communications/message-file-rules";
 import type {
   BalanceReminderBatchInput,
   ClubAssignmentBatchInput,
@@ -3368,7 +3368,7 @@ export async function processQueuedMessageIdsAfterCommit(
     failedIds: [] as string[],
     rescheduledIds: [] as string[],
     skippedIds: [] as string[],
-    /** Real email that carries files, left to the outbox worker (the sweep) rather than sent inside this request. */
+    /** Real email whose files total over the size threshold, left to the outbox worker (the sweep) rather than sent inside this request. */
     deferredIds: [] as string[],
   };
   if (uniqueMessageIds.length === 0) return result;
@@ -3382,8 +3382,8 @@ export async function processQueuedMessageIdsAfterCommit(
     select: {
       id: true,
       eventId: true,
-      // Whether the message carries any file (attachment or picture), for the rule below.
-      files: { select: { fileId: true }, take: 1 },
+      // The size of every file the message carries (attachment or picture), for the rule below.
+      files: { select: { file: { select: { sizeBytes: true } } } },
     },
   });
   const externalByEvent = new Map<string, string[]>();
@@ -3411,10 +3411,10 @@ export async function processQueuedMessageIdsAfterCommit(
     }
     if (mode === "EXTERNAL_EMAIL") {
       // Reading and sending several megabytes per message must not hold a registrant's or a staff member's request
-      // open, so real email with files waits for the outbox worker (`sweepOutbox` runs `processPendingMessages` for
-      // every event holding due messages). Messages without files go out here, as they always have. Local capture
-      // sends nothing, so it is unaffected.
-      if ((message.files ?? []).length > 0) {
+      // open, so real email whose files total over the threshold waits for the outbox worker (`sweepOutbox` runs
+      // `processPendingMessages` for every event holding due messages). Messages without files, or with only a small
+      // logo (#847), go out here. Local capture sends nothing, so it is unaffected.
+      if (filesNeedBackgroundMailer((message.files ?? []).map((link) => link.file))) {
         result.deferredIds.push(message.id);
         continue;
       }
@@ -3870,11 +3870,13 @@ async function loadSelectedAudienceState(
   const customAttachments = isCustom ? (staticVersion?.files ?? []).map((link) => link.file) : [];
   const customPictureIds = isCustom ? messageFileIdsInMarkdown(staticVersion?.bodyTemplate ?? "") : [];
   let pictureProblem: string | null = null;
+  let customPictureBytes = 0;
   if (customPictureIds.length > 0) {
     const pictures = await client.messageFile.findMany({
       where: { id: { in: customPictureIds }, eventId, isInlineImage: true },
       select: { sizeBytes: true },
     });
+    customPictureBytes = pictures.reduce((sum, picture) => sum + picture.sizeBytes, 0);
     pictureProblem = pictures.length !== new Set(customPictureIds).size
       ? "A picture in this message is no longer available. Edit the template and insert the picture again."
       : inlineImageSetIssue(pictures)?.message ?? null;
@@ -3905,6 +3907,7 @@ async function loadSelectedAudienceState(
     attachments: customAttachments,
     pictureIds: customPictureIds,
     pictureProblem,
+    pictureBytes: customPictureBytes,
     confirmationTemplates,
   }, now);
 

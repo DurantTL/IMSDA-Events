@@ -35,7 +35,7 @@ export function messagingApiError(error: unknown, operation: string) {
   if (error instanceof MessageFileError) {
     return Response.json(
       { error: error.code, message: error.message },
-      { status: error.code === "FILE_NOT_FOUND" ? 404 : error.code === "FILE_TOO_LARGE" ? 413 : 400 }
+      { status: error.code === "FILE_NOT_FOUND" ? 404 : error.code === "FILE_TOO_LARGE" ? 413 : error.code === "FILE_LIMIT_REACHED" || error.code === "FILE_QUOTA_REACHED" || error.code === "UPLOAD_EXPIRED" ? 409 : 400 }
     );
   }
   if (error instanceof MessagingError) {

@@ -17,6 +17,8 @@ import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
 import { withRequestContext } from "@/lib/request-context";
+import { sweepMessageFiles } from "@/modules/communications/message-file-sweep";
+import { messageFileSweepDeletes } from "@/modules/communications/message-file-config";
 
 /**
  * The scheduled caller for the message outbox.
@@ -121,6 +123,26 @@ async function postHandler(request: Request) {
       logError("The general link retention sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // Message files (#845): uploads nothing refers to. It only REPORTS what it would delete unless a human set
+    // MESSAGE_FILE_SWEEP_DELETE=true, never touches a file inside the grace period (24 hours at the least) or one
+    // anything refers to, and returns counts only. Its failure must not make a successful sweep look failed.
+    const messageFiles = await sweepMessageFiles({ mode: messageFileSweepDeletes() ? "apply" : "dry-run" })
+      .then((report) => ({
+        mode: report.mode,
+        graceHours: report.graceHours,
+        candidates: report.candidates.count,
+        candidateBytes: report.candidates.bytes,
+        deleted: report.deleted.count,
+        bytesRemoved: report.bytesRemoved.bytes,
+        cleanupPending: report.cleanup.pending,
+        cleanupFailed: report.cleanup.failed,
+        reservationsExpired: report.reservations.expired,
+        reservationsReconciled: report.reservations.reconciled,
+      }))
+      .catch((error) => {
+        logError("The message file sweep failed after a successful outbox sweep", error);
+        return null;
+      });
     return Response.json({
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,
@@ -143,6 +165,7 @@ async function postHandler(request: Request) {
       honorWatchSummaries,
       healthSnapshots,
       generalLinkRetention,
+      messageFiles,
       locationWaitlistDigest: locationWaitlistDigest && {
         status: locationWaitlistDigest.status,
         changesCovered: locationWaitlistDigest.changesCovered,

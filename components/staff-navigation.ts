@@ -31,6 +31,7 @@ import {
   Trophy,
   UserCog,
   UserPlus,
+  Users,
   UsersRound,
   WalletCards,
 } from "lucide-react";
@@ -308,7 +309,10 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
   {
     key: "clubs-people",
     label: "People",
-    items: [{ href: "/admin/people", label: "People & access", icon: UsersRound }],
+    items: [
+      { href: "/admin/clubs/leaders", label: "Club leaders", icon: Users },
+      { href: "/admin/people", label: "People & access", icon: UsersRound },
+    ],
   },
 ];
 
