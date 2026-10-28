@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { cardCell } from "@/components/table-card-labels";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { conferenceToday } from "@/modules/calendar/repository";
@@ -13,14 +14,17 @@ export const dynamic = "force-dynamic";
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "No data");
 
 function Table({ caption, head, rows, empty = "Nothing counted yet." }: { caption: string; head: string[]; rows: string[][]; empty?: string }) {
+  // Stacked cards on phones (table-cards, #686): each cell carries its column name.
   return (
     <div className={`report-table-wrap ${styles.tableWrap}`}>
-      <table className={`report-table ${styles.table}`}>
+      <table role="table" className={`report-table table-cards ${styles.table}`}>
         <caption>{caption}</caption>
-        <thead><tr>{head.map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody>
-          {rows.length === 0 ? <tr><td colSpan={head.length}>{empty}</td></tr> : rows.map((row, index) => (
-            <tr key={index}>{row.map((cell, cellIndex) => (cellIndex === 0 ? <th key={cellIndex} scope="row">{cell}</th> : <td key={cellIndex}>{cell}</td>))}</tr>
+        <thead role="rowgroup"><tr role="row">{head.map((label) => <th key={label} role="columnheader" scope="col">{label}</th>)}</tr></thead>
+        <tbody role="rowgroup">
+          {rows.length === 0 ? <tr role="row"><td role="cell" colSpan={head.length}>{empty}</td></tr> : rows.map((row, index) => (
+            <tr role="row" key={index}>{row.map((cell, cellIndex) => (cellIndex === 0
+              ? <th key={cellIndex} role="rowheader" scope="row">{cell}</th>
+              : <td key={cellIndex} {...cardCell(head[cellIndex] ?? null)}>{cell}</td>))}</tr>
           ))}
         </tbody>
       </table>

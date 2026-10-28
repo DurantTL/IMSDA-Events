@@ -375,6 +375,10 @@ const pages: PageSpec[] = [
   // The person page opened from an invite with access ready to save (#1276): nothing is saved.
   staff("people-person-chosen", "/admin/people/staff/usr_registration_manager?grant=sa%2Cca%2Cac%2Ce%3Aevt_wr26%3AEVENT_ADMIN", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
+  // Homepage & site content (#111): the editor, its preview of the draft, and the analytics view. seedHubContent fills both.
+  staff("site-content", "/admin/site-content", "system-admin"),
+  staff("site-content-preview", "/admin/site-content/preview", "system-admin"),
+  staff("analytics", "/admin/analytics", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
@@ -922,6 +926,8 @@ async function cleanupStaffInviteEvent(prisma: PrismaClient) {
   const registrations = await prisma.registration.findMany({ where: { eventId: staffInviteEventId }, select: { id: true, accountHolderPersonId: true, attendees: { select: { personId: true } } } });
   const registrationIds = registrations.map((row) => row.id);
   const personIds = [...new Set(registrations.flatMap((row) => [row.accountHolderPersonId, ...row.attendees.map((attendee) => attendee.personId)]).filter((id): id is string => Boolean(id)))];
+  await prisma.siteContentRevision.deleteMany({ where: { id: { in: [`${P}_site_published`, `${P}_site_draft`] } } })
+    .catch((error: Error) => console.error(`Could not remove the synthetic hub content: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.messageOutbox.deleteMany({ where: { OR: [{ eventId: staffInviteEventId }, { registrationId: { in: registrationIds } }] } }),
@@ -1113,6 +1119,39 @@ async function seedScheduledEmails(prisma: PrismaClient) {
  * at the end of the run, whether or not MOBILE_LAYOUT_CLEANUP is set.
  */
 let launcherModuleCreated = false;
+/**
+ * Hub content at its longest (#111): three notices (one of each level), six announcements, six header links and a full
+ * footer. Published only when nothing is published yet, so every public page in the run shows the notices and links;
+ * the same content is the draft the preview page renders. Both rows are the audit's own and cleanup removes them.
+ */
+async function seedHubContent(prisma: PrismaClient) {
+  const long = (text: string, size: number) => text.padEnd(size, " and more words").slice(0, size).trim();
+  const content = {
+    version: 1,
+    notices: (["EMERGENCY", "URGENT", "INFO"] as const).map((level, index) => ({
+      id: `${P}-notice-${index}`, level, message: long(`Mobile check ${level.toLowerCase()} notice: camp roads are closed`, 280), linkHref: "/events", linkLabel: "See the latest event updates now",
+    })),
+    announcements: Array.from({ length: 6 }, (_, index) => ({
+      id: `${P}-announcement-${index}`, title: long(`Mobile check announcement number ${index + 1}`, 80), body: long("A synthetic announcement body", 500), linkHref: "/calendar", linkLabel: "Read more",
+    })),
+    sections: ["closing-soon", "announcements", "featured", "season-ribbon", "find-your-place"].map((key) => ({ key, visible: true })),
+    featuredEventIds: [],
+    navLinks: ["Pathfinders", "Adventurers", "Camp Meeting", "Women's Ministries", "Youth and young adults", "Contact"].map((label) => ({ label, href: "/events" })),
+    footer: {
+      verse: long("Not forsaking the assembling of ourselves together", 200),
+      contactLines: ["Mobile Check Conference Office", "1 Example Road, Des Moines, IA 50301", "(515) 555-0100", "office@imsda-events.test"],
+      links: ["Calendar", "Events", "Clubs", "Privacy", "Contact us", "Sign in"].map((label) => ({ label, href: "/calendar" })),
+    },
+    calendarCategories: { order: [], hidden: [] },
+  };
+  if (!(await prisma.siteContentRevision.findFirst({ where: { status: "PUBLISHED" }, select: { id: true } }))) {
+    await prisma.siteContentRevision.create({ data: { id: `${P}_site_published`, status: "PUBLISHED", content, publishedAt: new Date() } });
+  }
+  if (!(await prisma.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true } }))) {
+    await prisma.siteContentRevision.create({ data: { id: `${P}_site_draft`, status: "DRAFT", content } });
+  }
+}
+
 async function seedLauncherModule(prisma: PrismaClient) {
   const existing = await prisma.eventModule.findUnique({ where: { eventId_moduleKey: { eventId, moduleKey: "attendee-community" } }, select: { id: true } });
   if (existing) return;
@@ -1438,6 +1477,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedScheduledEmails(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
+  await seedHubContent(prisma);
   await seedIssuedAssets(prisma);
   await seedKitchenCounts(prisma);
   await seedClubsAdministrator(prisma);
