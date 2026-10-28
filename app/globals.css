@@ -13519,6 +13519,9 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
+/* Club roster and Honors name search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. */
+.roster-search-panel, .roster-search-field, .honor-name-search { grid-template-columns: minmax(0, 1fr); }
+.roster-search-row, .roster-search-input, .honor-name-search-field { min-width: 0; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.

@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({
   redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
   notFound: () => { throw new Error("NOT_FOUND"); },
   usePathname: () => "/account/clubs/club-1/records",
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: vi.fn() }));
