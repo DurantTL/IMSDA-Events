@@ -91,7 +91,7 @@ export const portalGuides: readonly PortalGuide[] = [
     summary: "File your club's report for a month, from meeting notes to Submit report.",
     audience: "director",
     needs: [
-      `A club role that can submit reports: ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}. A ${clubRoleText.REGISTRAR.name} cannot, and sees a note saying Monthly Records are kept by the club's director, deputy or reporter.`,
+      `A club role that can submit reports: ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}. A ${clubRoleText.REGISTRAR.name} cannot, and sees a note saying Monthly Records are kept by the club's ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}.`,
       "The month's numbers: attendance, staff, honors worked on and class levels.",
     ],
     changes: [

@@ -12,13 +12,13 @@ export function RoleDetails({ role }: { role: RoleText }) {
       <div className="role-details-body">
         {role.can.length > 0 ? (
           <div>
-            <h4>Can</h4>
+            <p className="role-details-label">Can</p>
             <ul>{role.can.map((line) => <li key={line}>{line}</li>)}</ul>
           </div>
         ) : null}
         {role.cannot.length > 0 ? (
           <div>
-            <h4>Can&apos;t</h4>
+            <p className="role-details-label">Can&apos;t</p>
             <ul>{role.cannot.map((line) => <li key={line}>{line}</li>)}</ul>
           </div>
         ) : null}

@@ -78,17 +78,17 @@ const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator"
 
 const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
-    noun: "system administrator",
+    noun: systemRoleText.SYSTEM_ADMIN.name.toLowerCase(),
     grantNote: "Grant this only to someone who must.",
     revokeBody: "They lose system administrator access on their next request. The last system administrator cannot be removed.",
   },
   "clubs-administrator": {
-    noun: "Clubs Administrator",
+    noun: systemRoleText.CLUBS_ADMIN.name,
     grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
   },
   "area-coordinator": {
-    noun: "Area Coordinator",
+    noun: systemRoleText.AREA_COORDINATOR.name,
     grantNote: null,
     revokeBody: "They'll no longer see other clubs.",
   },
