@@ -71,7 +71,7 @@ function BannerItem({
         <p className="account-announcement-event" translate="no">{announcement.eventName}</p>
         <h2>{announcement.title}</h2>
         {/* Plain text child, exactly as the event hub renders it: no HTML injection. */}
-        {splitParagraphs(text).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+        {text && splitParagraphs(text).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
         {long && <Link href={announcement.href}>Read more</Link>}
       </div>
       {announcement.priority !== "URGENT" && (

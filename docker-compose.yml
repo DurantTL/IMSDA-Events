@@ -104,6 +104,8 @@ services:
       SQUARE_ENABLE_PRODUCTION: ${SQUARE_ENABLE_PRODUCTION:-false}
       # New requirement. An existing deployment that has never set this will not
       # start until it is added — the sweep endpoint is never open by omission.
+      # The app also reads the interval, only to show the broadcast dialog's time estimate.
+      OUTBOX_SWEEP_INTERVAL_SECONDS: ${OUTBOX_SWEEP_INTERVAL_SECONDS:-300}
       OUTBOX_SWEEP_TOKEN: ${OUTBOX_SWEEP_TOKEN?set this to at least 32 random characters (openssl rand -base64 48); it authorises the scheduled outbox sweep}
     volumes:
       - imsda_events_assets:/app/storage/event-assets

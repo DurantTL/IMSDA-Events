@@ -276,7 +276,7 @@ export type AnnouncementBroadcastPreview = {
   attachments: Array<{ filename: string; sizeBytes: number }>;
   /** Set when the files together are over the per-message limits, which blocks the send. */
   attachmentProblem: string | null;
-  /** True when any message carries an attachment or an embedded picture; real email then goes out through the background worker. */
+  /** True when any message carries an attachment or an embedded picture. Only real email whose files total over the size threshold goes through the background worker; see `sentByBackgroundMailer`. */
   carriesFiles: boolean;
   /** Real email whose files total over the size threshold (#847): sent by the background mailer, not at once. */
   sentByBackgroundMailer: boolean;
