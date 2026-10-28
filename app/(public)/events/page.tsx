@@ -4,12 +4,18 @@ import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { addDays, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
+import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
+import {
+  applyEventDirectoryFilters,
+  eventDirectoryHref,
+  eventDirectoryOptions,
+  hasActiveDirectoryFilters,
+  parseEventDirectoryFilters,
+  type EventDirectorySearchParams,
+} from "@/modules/calendar/event-directory";
 import {
   openRegistrationFilters,
-  openRegistrationHref,
   openRegistrationWindowDays,
-  parseOpenRegistrationFilter,
   selectOpenRegistrationItems,
   type OpenRegistrationFilter,
 } from "@/modules/calendar/open-registration";
@@ -67,16 +73,23 @@ function EventCard({ item, directsClub, featured }: { item: CalendarItem; direct
 }
 
 /** Events people can register for now or soon (#1217): exactly what the public calendar shows, narrowed by status. */
-export default async function OpenForRegistrationPage({ searchParams }: { searchParams: Promise<{ for?: string | string[] }> }) {
-  const filter = parseOpenRegistrationFilter((await searchParams).for);
+export default async function OpenForRegistrationPage({ searchParams }: { searchParams: Promise<EventDirectorySearchParams> }) {
+  const filters = parseEventDirectoryFilters(await searchParams);
+  const filter = filters.audience;
+  const filtering = hasActiveDirectoryFilters(filters);
   const today = conferenceToday();
+  const windowEnd = addDays(today, openRegistrationWindowDays);
   const [calendarItems, directsClub, featuredRows] = await Promise.all([
-    listPublicCalendarItems(today, addDays(today, openRegistrationWindowDays)),
+    listPublicCalendarItems(today, windowEnd),
     visitorRegistersClubs(),
     listFeaturedEventRows(today),
   ]);
   // Featured events (#1218) are pinned to the top of this list, each keeping its own card.
-  const { items, pinned } = pinFeatured(selectOpenRegistrationItems(calendarItems, filter), featuredRows);
+  // Search and filters (#106) narrow the open list first, so pinning only ever lifts events that matched.
+  const openItems = selectOpenRegistrationItems(calendarItems, filter);
+  const { categories, locations } = eventDirectoryOptions(openItems, filters);
+  const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
+  const clearHref = eventDirectoryHref({ audience: filter });
 
   return (
     <main className="public-registration-page public-calendar-page public-home-page">
@@ -100,15 +113,51 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
       <div className="calendar-layout">
         <nav aria-label="Who the events are for" className="open-events-filter">
           {openRegistrationFilters.map((value) => (
-            <Link aria-current={filter === value ? "page" : undefined} href={openRegistrationHref(value)} key={value}>{filterLabels[value]}</Link>
+            <Link aria-current={filter === value ? "page" : undefined} href={eventDirectoryHref({ ...filters, audience: value })} key={value}>{filterLabels[value]}</Link>
           ))}
         </nav>
+
+        <form action="/events" className="events-directory-form" method="get" role="search" aria-label="Search and filter events">
+          {filter !== "all" && <input name="for" type="hidden" value={filter} />}
+          <div className="events-directory-field events-directory-search">
+            <label htmlFor="events-q">Search events</label>
+            <input defaultValue={filters.q} id="events-q" maxLength={100} name="q" type="search" />
+          </div>
+          <div className="events-directory-field">
+            <label htmlFor="events-from">From</label>
+            <input defaultValue={filters.from} id="events-from" max={windowEnd} min={today} name="from" type="date" />
+          </div>
+          <div className="events-directory-field">
+            <label htmlFor="events-to">To</label>
+            <input defaultValue={filters.to} id="events-to" max={windowEnd} min={today} name="to" type="date" />
+          </div>
+          <div className="events-directory-field">
+            <label htmlFor="events-category">Category</label>
+            <select defaultValue={filters.category} id="events-category" name="category">
+              <option value="">Any</option>
+              {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <div className="events-directory-field">
+            <label htmlFor="events-location">Location</label>
+            <select defaultValue={filters.location} id="events-location" name="location">
+              <option value="">Any</option>
+              {locations.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <div className="events-directory-actions">
+            <button className="primary-button" type="submit">Show events</button>
+            {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
+          </div>
+        </form>
+        <p className="events-directory-count" role="status">{calendarCountLabel(items.length)}</p>
 
         <section aria-labelledby="open-events-heading" className="calendar-agenda">
           <h2 className="sr-only" id="open-events-heading">Events open for registration</h2>
           {items.length === 0 ? (
             <div className="calendar-empty">
-              <p>{emptyWording[filter]}</p>
+              <p>{filtering ? "No events match these filters." : emptyWording[filter]}</p>
+              {filtering && <p><Link className="secondary-button open-events-calendar-link" href={clearHref}>Clear filters</Link></p>}
               <p><Link className="secondary-button open-events-calendar-link" href="/calendar">See the calendar</Link></p>
             </div>
           ) : (
