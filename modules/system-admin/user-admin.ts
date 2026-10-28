@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { revokeAllUserSessions } from "@/modules/access/session-store";
 import { revokeAllAttendeeSessions } from "@/modules/attendee-accounts/session-store";
@@ -11,6 +12,9 @@ import { beginAdminVerification } from "@/modules/attendee-accounts/account-serv
 import { queueAttendeeVerificationEmail } from "@/modules/attendee-accounts/attendee-email-dispatch";
 import { checkAdminVerificationEmailRateLimit } from "@/modules/rate-limit/service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
+import { applyClubsAdministrator } from "@/modules/access/clubs-administrator";
+import { MembershipOperationError, applyGlobalRole } from "@/modules/access/membership-repository";
+import { deliverStaffActivation } from "@/modules/communications/staff-activation";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
 
 /**
@@ -168,6 +172,71 @@ export async function sendStaffPasswordReset(userId: string, actorUserId: string
     summary: "A system administrator sent a team member a password reset link.",
   });
   return { queued: result.queued };
+}
+
+/** A staff login that was invited and has not activated yet, with its sign-in not switched off (#1276). */
+async function requirePendingStaffInvite(userId: string, client: Prisma.TransactionClient | PrismaClient = getPrisma()) {
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, displayName: true, accountStatus: true, credential: { select: { disabledAt: true } } },
+  });
+  if (!user) throw new UserAdminError("ACCOUNT_NOT_FOUND", "That team account could not be found.");
+  if (user.accountStatus !== "PENDING_ACTIVATION" || !user.credential || user.credential.disabledAt) {
+    throw new UserAdminError("ACCOUNT_NOT_USABLE", "That login isn't waiting to be activated.");
+  }
+  return user;
+}
+
+/**
+ * Sends a pending staff invite again: a new activation link by email (or, where email isn't configured, a one-time
+ * link to hand over). A new link retires the earlier one.
+ */
+export async function resendStaffInvite(userId: string, actorUserId: string) {
+  const user = await requirePendingStaffInvite(userId);
+  const delivery = await deliverStaffActivation({ userId: user.id, email: user.email, displayName: user.displayName });
+  await writeAuditLog({
+    actorUserId,
+    action: "STAFF_INVITE_RESENT",
+    entityType: "User",
+    entityId: userId,
+    summary: "A system administrator resent a team member's activation invite.",
+    metadata: { emailed: delivery.invitationEmailed, linkHandedOver: Boolean(delivery.setupUrl) },
+  });
+  return delivery;
+}
+
+/**
+ * Cancels a pending staff invite: unused activation links are spent, the sign-in is switched off, and a system
+ * administrator or Clubs Administrator role given with the invite is removed. Event assignments are kept.
+ * "Allow sign-in" on the person's page undoes the sign-in part, not the roles.
+ */
+export async function cancelStaffInvite(userId: string, actorUserId: string, now = new Date()) {
+  await getPrisma().$transaction(async (tx) => {
+    await requirePendingStaffInvite(userId, tx);
+    await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: now } });
+    const guarded = await tx.authCredential.updateMany({ where: { userId, disabledAt: null }, data: { disabledAt: now } });
+    if (guarded.count === 0) throw new UserAdminError("ACCOUNT_NOT_USABLE", "That login isn't waiting to be activated.");
+    // The roles that came with the invite go too: a login that can't sign in must not keep system administrator or
+    // Clubs Administrator access (and, with its sign-in off, it no longer counts toward the last-administrator rule).
+    // Refused, rolling the whole cancel back, only if it is the last working system administrator. Event
+    // assignments are kept.
+    try {
+      await applyGlobalRole(tx, userId, actorUserId, null);
+    } catch (error) {
+      if (error instanceof MembershipOperationError && error.code === "LAST_SYSTEM_ADMIN") {
+        throw new MembershipOperationError("LAST_SYSTEM_ADMIN", "Give another active account system administrator access before cancelling this invite.");
+      }
+      throw error;
+    }
+    await applyClubsAdministrator(tx, userId, false, actorUserId);
+    await writeAuditLog({
+      actorUserId,
+      action: "STAFF_INVITE_CANCELLED",
+      entityType: "User",
+      entityId: userId,
+      summary: "A system administrator cancelled a team member's activation invite.",
+    }, tx);
+  });
 }
 
 // ---- Attendee accounts ----------------------------------------------------

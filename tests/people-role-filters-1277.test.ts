@@ -8,14 +8,12 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   accountFindMany: vi.fn(),
-  inviteFindMany: vi.fn(),
   grantFindMany: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     user: { findMany: mocks.userFindMany },
     attendeeAccount: { findMany: mocks.accountFindMany },
-    clubInvite: { findMany: mocks.inviteFindMany },
     clubDirectorGrant: { findMany: mocks.grantFindMany },
   }),
 }));
@@ -36,7 +34,6 @@ import {
   type PeopleFilters,
 } from "@/modules/system-admin/people-directory-model";
 import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
-import { listPendingPeople } from "@/modules/system-admin/pending-people";
 
 const now = new Date("2026-10-27T12:00:00.000Z");
 const none = { role: null, eventId: null, clubId: null } satisfies PeopleFilters;
@@ -150,52 +147,6 @@ describe("findPeopleByRole", () => {
   });
 });
 
-describe("pending invites", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("shows open CLUB invites to both scopes and unactivated staff logins to a system administrator only", async () => {
-    mocks.inviteFindMany.mockResolvedValue([{ id: "i1", email: "new@example.test", name: "Nia New", role: "DIRECTOR", organization: { name: "Synthetic Club" } }]);
-    mocks.accountFindMany.mockResolvedValue([{ id: "a5", email: "NEW@example.test" }]);
-    mocks.userFindMany.mockResolvedValue([{ id: "u7", email: "staff@example.test", displayName: "Stan Staff" }]);
-    const full = (await listPendingPeople("full")).rows;
-    expect(full.map((row) => [row.name, row.what, row.href])).toEqual([
-      ["Nia New", "Director of Synthetic Club", "/admin/people/account/a5"],
-      ["Stan Staff", "Staff login, not activated yet", "/admin/people/staff/u7"],
-    ]);
-    expect(mocks.inviteFindMany.mock.calls[0][0].where).toMatchObject({ status: { in: ["PENDING", "SENT"] }, cancelledAt: null, acceptedAt: null, organization: { type: "CLUB", isActive: true } });
-    expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ accountStatus: "PENDING_ACTIVATION" });
-
-    mocks.userFindMany.mockClear();
-    const clubs = (await listPendingPeople("clubs")).rows;
-    expect(clubs.map((row) => row.what)).toEqual(["Director of Synthetic Club"]);
-    expect(mocks.userFindMany).not.toHaveBeenCalled();
-  });
-});
-
-describe("pending invite labels", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("labels expired and never-sent invites and keeps them listed", async () => {
-    const base = { name: "", role: "REGISTRAR", organization: { name: "Synthetic Club" } };
-    mocks.inviteFindMany.mockResolvedValue([
-      { ...base, id: "i1", email: "a@example.test", status: "SENT", sentAt: new Date("2026-09-01"), expiresAt: new Date("2026-10-01") },
-      { ...base, id: "i2", email: "b@example.test", status: "PENDING", sentAt: null, expiresAt: null },
-      { ...base, id: "i3", email: "c@example.test", status: "SENT", sentAt: new Date("2026-10-20"), expiresAt: new Date("2026-11-20") },
-    ]);
-    mocks.accountFindMany.mockResolvedValue([]);
-    const { rows } = await listPendingPeople("clubs", "", now);
-    expect(rows.map((row) => row.what)).toEqual([
-      "Registrar of Synthetic Club (expired)", "Registrar of Synthetic Club (not sent yet)", "Registrar of Synthetic Club",
-    ]);
-  });
-
-  it("flags a capped list", async () => {
-    mocks.inviteFindMany.mockResolvedValue(Array.from({ length: 500 }, (_, i) => ({ id: `i${i}`, email: `p${i}@example.test`, name: "", role: "DIRECTOR", status: "SENT", sentAt: now, expiresAt: null, organization: { name: "C" } })));
-    mocks.accountFindMany.mockResolvedValue([]);
-    expect((await listPendingPeople("clubs", "", now)).capped).toBe(true);
-  });
-});
-
 describe("the People list with filters", () => {
   const render = (props: Partial<Parameters<typeof PeopleDirectory>[0]>) => renderToStaticMarkup(createElement(PeopleDirectory, {
     query: "", rows: [], page: 1, pageCount: 1, total: 0, eventOptions: [{ id: "evt_1", name: "Synthetic Event" }], clubOptions: [{ id: "org_1", name: "Synthetic Club" }], ...props,
@@ -220,17 +171,18 @@ describe("the People list with filters", () => {
     expect(html).toContain('href="/admin/people"');
   });
 
-  it("renders pending invites read only, linking only when the person exists", () => {
-    const html = render({ filters: filtersFor("pending"), pending: [
-      { key: "k1", name: "Nia New", email: "new@example.test", what: "Director of Synthetic Club", href: null },
-      { key: "k2", name: "Stan Staff", email: "staff@example.test", what: "Staff login, not activated yet", href: "/admin/people/staff/u7" },
-    ], total: 2 });
-    expect(html).toContain("Director of Synthetic Club");
-    expect(html).toContain('href="/admin/people/staff/u7"');
-    expect(html).not.toContain("Resend");
-    expect(html).toContain("2 pending invites");
-    expect(render({ filters: filtersFor("pending"), pending: [], total: 1 })).toContain("1 pending invite.");
-    expect(render({ filters: filtersFor("pending"), pending: [], total: 500, pendingCapped: true })).toContain("Showing the first 500 pending invites");
+  it("shows the Pending invites section (#1276) above an unfiltered list and as the Pending filter's results, and hides it for other roles", () => {
+    const section = createElement("section", { id: "pending-section" }, "Resend");
+    expect(render({ pending: section, pendingCount: 1 })).toContain('id="pending-section"');
+    expect(render({ filters: filtersFor("club-director"), pending: section, pendingCount: 1 })).not.toContain('id="pending-section"');
+    const html = render({ filters: filtersFor("pending"), pending: section, pendingCount: 2 });
+    expect(html).toContain('id="pending-section"');
+    expect(html).toContain("2 pending invites.");
+    expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 1 })).toContain("1 pending invite.");
+    expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 50, pendingCapped: true })).toContain("Showing the newest 50 pending invites");
+    const empty = render({ filters: filtersFor("pending"), pending: null, pendingCount: 0 });
+    expect(empty).toContain("No pending invites.");
+    expect(empty).not.toContain("No people found.");
   });
 });
 

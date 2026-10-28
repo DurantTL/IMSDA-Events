@@ -3,6 +3,9 @@
  * accounts into one list of people and paging it. No database, so it is unit tested directly.
  */
 
+import { eventRoles, type EventRole } from "@/modules/access/permissions";
+import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
+
 export const PEOPLE_PAGE_SIZE = 25;
 
 export type PeopleCandidate = {
@@ -328,4 +331,108 @@ export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now =
 /** True when the chosen role needs an event and none is picked yet. */
 export function needsEventPick(filters: PeopleFilters): boolean {
   return filters.role?.kind === "event" && !filters.eventId;
+}
+
+// ---------------------------------------------------------------- Chosen in the invite (#1276)
+
+/** One piece of access chosen in the Invite a person dialog. */
+export type GrantItem =
+  | { type: "sa" }
+  | { type: "ca" }
+  | { type: "ac" }
+  | { type: "event"; eventId: string; role: EventRole }
+  | { type: "club"; organizationId: string; role: ClubRole };
+
+/** The most items one `?grant=` link carries. */
+export const GRANT_ITEM_CAP = 20;
+
+const idPattern = /^[A-Za-z0-9_-]{1,64}$/;
+const clubRoles = Object.keys(clubDirectorRoleLabels) as ClubRole[];
+
+export function grantKey(item: GrantItem): string {
+  if (item.type === "event") return `e:${item.eventId}:${item.role}`;
+  if (item.type === "club") return `c:${item.organizationId}:${item.role}`;
+  return item.type;
+}
+
+/** System administrator, Clubs Administrator and event roles live on a staff login; Area Coordinator and club roles on a website account. */
+export function isStaffSideGrant(item: GrantItem): boolean {
+  return item.type === "sa" || item.type === "ca" || item.type === "event";
+}
+
+/** `sa,ca,ac,e:<eventId>:<ROLE>,c:<organizationId>:<ROLE>`: what the person page is opened with to save the chosen access. */
+export function formatGrantParam(items: readonly GrantItem[]): string {
+  return items.map(grantKey).join(",");
+}
+
+/**
+ * Reads `?grant=`. Anything unknown, malformed or repeated is dropped, and at most {@link GRANT_ITEM_CAP} items are
+ * kept, so a hand-edited link can only ever ask for a short list of known kinds of access.
+ */
+export function parseGrantParam(value: unknown): GrantItem[] {
+  const text = Array.isArray(value) ? value[0] : value;
+  if (typeof text !== "string") return [];
+  const items: GrantItem[] = [];
+  const seen = new Set<string>();
+  for (const part of text.slice(0, 2000).split(",")) {
+    if (items.length >= GRANT_ITEM_CAP) break;
+    const [kind, id, role, ...extra] = part.trim().split(":");
+    let item: GrantItem | null = null;
+    if (extra.length === 0) {
+      if ((kind === "sa" || kind === "ca" || kind === "ac") && id === undefined) item = { type: kind };
+      else if (kind === "e" && id && idPattern.test(id) && (eventRoles as readonly string[]).includes(role ?? "")) item = { type: "event", eventId: id, role: role as EventRole };
+      else if (kind === "c" && id && idPattern.test(id) && (clubRoles as string[]).includes(role ?? "")) item = { type: "club", organizationId: id, role: role as ClubRole };
+    }
+    if (!item || seen.has(grantKey(item))) continue;
+    seen.add(grantKey(item));
+    items.push(item);
+  }
+  return items;
+}
+
+/**
+ * save: ready. change: the person has a different active role on this event; saving changes it (the memberships route
+ * does). other-role: the person has a different role at this club; the club roles route refuses an overlapping role, so
+ * it is not saved (revoke the old one first).
+ */
+export type GrantPlanState = "save" | "change" | "has" | "other-role" | "needs-staff" | "needs-account";
+export type GrantPlanRow = { key: string; item: GrantItem; state: GrantPlanState };
+
+/** What the person already has, for marking the chosen items. */
+export type GrantPlanPerson = {
+  hasStaff: boolean;
+  hasAccount: boolean;
+  systemAdministrator: boolean;
+  clubsAdministrator: boolean;
+  areaCoordinator: boolean;
+  /** Events with an active membership, with the role. */
+  activeEvents: ReadonlyArray<{ eventId: string; role: string }>;
+  /** Clubs with a current or scheduled role, with the role. */
+  clubRoles: ReadonlyArray<{ organizationId: string; role: string }>;
+};
+
+/**
+ * The "Chosen in the invite" rows for one viewer. A Clubs Administrator never sees (or saves) staff-side items. An
+ * item the person already has is marked so; one that needs a login the person doesn't have is not saveable.
+ */
+export function planGrantItems(items: readonly GrantItem[], scope: PeopleScope, person: GrantPlanPerson): GrantPlanRow[] {
+  const rows: GrantPlanRow[] = [];
+  for (const item of items) {
+    if (scope === "clubs" && isStaffSideGrant(item)) continue;
+    let state: GrantPlanState;
+    if (isStaffSideGrant(item) && !person.hasStaff) state = "needs-staff";
+    else if (!isStaffSideGrant(item) && !person.hasAccount) state = "needs-account";
+    else if (item.type === "sa") state = person.systemAdministrator ? "has" : "save";
+    else if (item.type === "ca") state = person.clubsAdministrator ? "has" : "save";
+    else if (item.type === "ac") state = person.areaCoordinator ? "has" : "save";
+    else if (item.type === "event") {
+      const current = person.activeEvents.find((entry) => entry.eventId === item.eventId);
+      state = !current ? "save" : current.role === item.role ? "has" : "change";
+    } else {
+      const current = person.clubRoles.filter((entry) => entry.organizationId === item.organizationId);
+      state = current.length === 0 ? "save" : current.some((entry) => entry.role === item.role) ? "has" : "other-role";
+    }
+    rows.push({ key: grantKey(item), item, state });
+  }
+  return rows;
 }

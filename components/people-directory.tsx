@@ -1,6 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
-import type { PendingPerson } from "@/modules/system-admin/pending-people";
 import {
   needsEventPick,
   peopleHref,
@@ -23,17 +23,23 @@ export function PeopleDirectory({
   filters = { role: null, eventId: null, clubId: null },
   eventOptions = [],
   clubOptions = [],
-  pending = [],
+  pending,
+  pendingCount = 0,
   pendingCapped = false,
 }: {
+  /**
+   * The Pending invites section (#1276, with Resend and Cancel): drawn between the search and the results when no role
+   * filter is on, and as the results when the Pending invites filter is (#1277).
+   */
+  pending?: ReactNode;
+  /** How many invites that section lists. */
+  pendingCount?: number;
   scope?: "full" | "clubs";
   query: string;
   filters?: PeopleFilters;
   eventOptions?: readonly { id: string; name: string }[];
   clubOptions?: readonly { id: string; name: string }[];
-  /** This page of the pending-invites list, when the Pending filter is on. */
-  pending?: readonly PendingPerson[];
-  /** The pending list hit its row cap, so the total is a lower bound. */
+  /** The pending list hit its row cap, so the count is a lower bound. */
   pendingCapped?: boolean;
   rows: readonly PeopleRow[];
   page: number;
@@ -79,40 +85,22 @@ export function PeopleDirectory({
         <button className="primary-button" type="submit">{role ? "Apply" : "Search"}</button>
         {query || role ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
       </form>
+      {role ? null : pending}
       <p className={styles.count} role="status">
         {pickEvent
           ? "Pick an event to see who has this role."
-          : total === 0
-            ? "No people found."
-            : role?.kind === "pending"
-              ? `${pendingCapped ? "Showing the first " : ""}${total} pending ${total === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Search to narrow the list." : "."}`
+          : role?.kind === "pending"
+            ? pendingCount === 0
+              ? "No pending invites."
+              : `${pendingCapped ? "Showing the newest " : ""}${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Search to narrow the list." : "."}`
+            : total === 0
+              ? "No people found."
               : `${total} ${total === 1 ? "person" : "people"}${role ? ` with ${peopleRoleLabel(role)}` : ""}${query ? ` matching "${query}"` : ""}.`}
       </p>
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
       ) : role?.kind === "pending" ? (
-        pending.length === 0 ? (
-          <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p>
-        ) : (
-          <ul className={styles.list}>
-            {pending.map((item) => (
-              <li className={styles.row} key={item.key}>
-                {item.href ? (
-                  <Link className={styles.rowLink} href={item.href}>
-                    <strong translate="no">{item.name || item.email}</strong>
-                    <small translate="no">{item.email}</small>
-                  </Link>
-                ) : (
-                  <div className={styles.rowLink}>
-                    <strong translate="no">{item.name || item.email}</strong>
-                    <small translate="no">{item.email}</small>
-                  </div>
-                )}
-                <p className={styles.access}>{item.what}</p>
-              </li>
-            ))}
-          </ul>
-        )
+        pendingCount === 0 ? <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p> : pending
       ) : rows.length === 0 ? (
         <p className={styles.empty}>{query ? "No staff logins or website accounts match that search." : "Nobody has an account yet."}</p>
       ) : (

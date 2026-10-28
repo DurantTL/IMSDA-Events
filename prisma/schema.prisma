@@ -860,6 +860,7 @@ model User {
   grantedClubDirectorships       ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedBy")
   revokedClubDirectorships       ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedBy")
   createdClubInvites             ClubInvite[]                     @relation("ClubInviteCreatedBy")
+  createdAreaCoordinatorInvites  AreaCoordinatorInvite[]          @relation("AreaCoordinatorInviteCreatedBy")
   decidedNewClubApplications     NewClubApplication[]             @relation("NewClubApplicationDecider")
   createdNewClubApplicationInvites NewClubApplicationInvite[]     @relation("NewClubApplicationInviteCreator")
   passkeys                       UserPasskey[]
@@ -1161,6 +1162,7 @@ model AttendeeAccount {
   coordinatedLocations              EventLocation[]                  @relation("EventLocationCoordinator")
   grantedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedByAccount")
   acceptedClubInvites               ClubInvite[]                     @relation("ClubInviteAcceptedAccount")
+  acceptedAreaCoordinatorInvites    AreaCoordinatorInvite[]          @relation("AreaCoordinatorInviteAcceptedAccount")
   createdClubInvites                ClubInvite[]                     @relation("ClubInviteCreatedByAccount")
   revokedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedByAccount")
   createdClubRosterMembers          ClubRosterMember[]          @relation("ClubRosterMemberCreatedBy")
@@ -2736,6 +2738,31 @@ model AreaCoordinatorGrant {
   attendeeAccount AttendeeAccount @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)
 
   @@index([revokedAt])
+}
+
+/// An invite to be an Area Coordinator (#1276), for an email with no website
+/// account yet. Same pattern as ClubInvite: the grant is created when the
+/// account with that verified email accepts. One open invite per email.
+model AreaCoordinatorInvite {
+  id                String           @id @default(cuid())
+  email             String
+  name              String           @default("")
+  status            ClubInviteStatus @default(SENT)
+  createdByUserId   String?
+  sentAt            DateTime?
+  sentCount         Int              @default(0)
+  lastMessageId     String?
+  expiresAt         DateTime?
+  acceptedAt        DateTime?
+  acceptedAccountId String?
+  cancelledAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  createdBy       User?            @relation("AreaCoordinatorInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  acceptedAccount AttendeeAccount? @relation("AreaCoordinatorInviteAcceptedAccount", fields: [acceptedAccountId], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
 }
 
 /// A Clubs Administrator (#1225): conference-wide staff for the club areas
