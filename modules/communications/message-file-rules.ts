@@ -20,6 +20,17 @@ export const MAX_INLINE_IMAGE_BYTES = 2 * MB;
 export const MAX_INLINE_IMAGES_TOTAL_BYTES = 6 * MB;
 export const MAX_INLINE_IMAGES_PER_MESSAGE = 30;
 
+/**
+ * Real email whose files (attachments and embedded pictures) total more than this is sent by the background mailer
+ * rather than inside the request that queued it (#847). Smaller sets, such as a template's logo, send inline.
+ */
+export const BACKGROUND_MAILER_FILE_BYTES_THRESHOLD = 2 * MB;
+
+/** The one decision: do these files together make a message heavy enough to leave to the background mailer? */
+export function filesNeedBackgroundMailer(files: ReadonlyArray<{ sizeBytes: number }>) {
+  return files.reduce((sum, file) => sum + file.sizeBytes, 0) > BACKGROUND_MAILER_FILE_BYTES_THRESHOLD;
+}
+
 export const MESSAGE_FILE_TYPES = {
   "application/pdf": { extension: "pdf", label: "PDF" },
   "image/png": { extension: "png", label: "PNG image" },
@@ -109,6 +120,15 @@ export function plainTextFromMessageSource(text: string) {
   return text
     .replace(/!\[([^\]]*)\]\(msgfile:[A-Za-z0-9_-]{8,64}\)/g, (match, alt: string) => (alt.trim() ? `[Image: ${alt.trim()}]` : ""))
     .replace(/(\[[^\]]+\]\([^()\s]+\))\{\.button\}/g, "$1");
+}
+
+/**
+ * An announcement body for a public or attendee page, which shows text and never the files (they resolve only on the
+ * staff route). A picture shows as its description, "[Image: alt]", or nothing when it has none; a `{.button}` marker
+ * is dropped. Safe on any text, so it can be applied wherever a body is shown as plain text.
+ */
+export function announcementBodyForDisplay(text: string) {
+  return plainTextFromMessageSource(text).replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export type AttachmentTotalsIssue = { code: "TOO_MANY" | "TOTAL_TOO_LARGE"; message: string };

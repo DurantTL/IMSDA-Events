@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { Megaphone, X } from "lucide-react";
 import { splitParagraphs, type AccountBannerAnnouncement } from "@/modules/communications/account-banner-domain";
+import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
 
 // Dismissals are per browser and per account, so a shared browser doesn't
 // carry one person's dismissals to the next.
@@ -60,8 +61,9 @@ function BannerItem({
   announcement: AccountBannerAnnouncement;
   onDismiss: (id: string) => void;
 }) {
-  const long = announcement.body.length > trimAt;
-  const text = long ? `${announcement.body.trim().slice(0, trimAt).trimEnd()}…` : announcement.body;
+  const displayBody = announcementBodyForDisplay(announcement.body);
+  const long = displayBody.length > trimAt;
+  const text = long ? `${displayBody.slice(0, trimAt).trimEnd()}…` : displayBody;
   return (
     <article className={`account-announcement is-${announcement.priority.toLowerCase()}`}>
       <Megaphone size={16} aria-hidden="true" />
