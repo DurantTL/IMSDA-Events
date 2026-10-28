@@ -50,6 +50,7 @@ const person: PersonDetail = {
   accountId: "a-target",
   systemAdministrator: false,
   clubsAdministrator: false,
+    siteContentEditor: false,
   areaCoordinator: false,
   staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },
   account: { status: "ACTIVE", signInDisabled: false, emailVerified: false, twoStep: "On", lastSignedInAt: null },

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { SiteNoticesView } from "@/components/site-notices-view";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
 import {
@@ -22,6 +23,8 @@ import {
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
 import { pinFeatured } from "@/modules/events/featured-domain";
 import { listFeaturedEventRows } from "@/modules/events/featured";
+import { getPublishedHubContent } from "@/modules/site-content/hub-content";
+import { activeNotices, applyCategoryPreferences } from "@/modules/site-content/hub-content-domain";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
@@ -79,15 +82,18 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   const filtering = hasActiveDirectoryFilters(filters);
   const today = conferenceToday();
   const windowEnd = addDays(today, openRegistrationWindowDays);
-  const [calendarItems, directsClub, featuredRows] = await Promise.all([
+  const [calendarItems, directsClub, featuredRows, hubContent] = await Promise.all([
     listPublicCalendarItems(today, windowEnd),
     visitorRegistersClubs(),
     listFeaturedEventRows(today),
+    getPublishedHubContent(),
   ]);
   // Featured events (#1218) are pinned to the top of this list, each keeping its own card.
   // Search and filters (#106) narrow the open list first, so pinning only ever lifts events that matched.
   const openItems = selectOpenRegistrationItems(calendarItems, filter);
-  const { categories, locations } = eventDirectoryOptions(openItems, filters);
+  const { categories: allCategories, locations } = eventDirectoryOptions(openItems, filters);
+  // Staff can reorder and hide category choices (#111); hiding only removes the choice, the events stay listed.
+  const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
   const clearHref = eventDirectoryHref({ audience: filter });
 
@@ -102,6 +108,8 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
           <div className="public-header-links"><PublicHeaderSessionLinks /></div>
         </div>
       </header>
+
+      <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
       <section className="public-registration-hero calendar-hero public-home-banner">
         <div>

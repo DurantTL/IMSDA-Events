@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { SiteNoticesView } from "@/components/site-notices-view";
+import { calendarDateIn } from "@/modules/calendar/domain";
+import { getPublishedHubContent } from "@/modules/site-content/hub-content";
+import { activeNotices } from "@/modules/site-content/hub-content-domain";
 import { EventInfoCards } from "@/components/event-info-cards";
 import {
   EventContentBlocks,
@@ -76,6 +80,7 @@ export default async function PublicEventPage({
   const { eventSlug } = await params;
   const landing = await getPublicEventLanding(eventSlug);
   if (!landing) notFound();
+  const hubContent = await getPublishedHubContent();
 
   // Directions come from the typed place only (#1213). The share link is the canonical address built from the saved
   // slug, never the route param or the visitor's own URL, and only for an event others can open (#1214).
@@ -277,6 +282,7 @@ export default async function PublicEventPage({
           </div>
         </div>
       </header>
+      <SiteNoticesView notices={activeNotices(hubContent, calendarDateIn(new Date()))} />
       <TranslateHint />
 
       {/* One container (#720): every section below shares this width and left

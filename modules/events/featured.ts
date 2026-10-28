@@ -45,3 +45,44 @@ export async function listEventCardImages(slugs: readonly string[]): Promise<Map
   }
   return images;
 }
+
+/**
+ * The events staff chose by hand for the homepage (#111), in the order chosen. Each must still pass the public rules
+ * (published, shown on the calendar, not archived, not ended); the featured flag itself is not needed. An id that is
+ * unknown, private, unpublished or past is dropped without a trace, so a private event's title can never leak.
+ */
+export async function listCuratedFeaturedRows(ids: readonly string[], today: string): Promise<FeaturedEventRow[]> {
+  if (ids.length === 0) return [];
+  const events = await getPrisma().event.findMany({
+    where: { id: { in: [...ids] }, isPublished: true, archivedAt: null, showOnCalendar: true },
+    select: { id: true, slug: true, startsAt: true, endsAt: true, timezone: true },
+  });
+  const byId = new Map(events.map((event) => [event.id, event]));
+  const rows: FeaturedEventRow[] = [];
+  ids.forEach((id, index) => {
+    const event = byId.get(id);
+    if (!event) return;
+    const endsOn = calendarDateIn(event.endsAt, event.timezone);
+    rows.push({ slug: event.slug, featuredOrder: index + 1, featureUntil: endsOn, startsOn: calendarDateIn(event.startsAt, event.timezone), endsOn });
+  });
+  return activeFeaturedRows(rows, today);
+}
+
+/** The homepage's featured rows: the curated choice when any of it still qualifies, otherwise the events flagged featured (#1218). */
+export async function listHomeFeaturedRows(curatedIds: readonly string[], today: string): Promise<FeaturedEventRow[]> {
+  const curated = await listCuratedFeaturedRows(curatedIds, today);
+  return curated.length > 0 ? curated : listFeaturedEventRows(today);
+}
+
+/** Public events staff can choose to feature: published, on the calendar, not archived and not ended. Titles and dates only. */
+export async function listFeaturableEvents(today: string): Promise<Array<{ id: string; name: string; startsOn: string; endsOn: string }>> {
+  const events = await getPrisma().event.findMany({
+    where: { isPublished: true, archivedAt: null, showOnCalendar: true, endsAt: { gte: new Date(`${today}T00:00:00Z`) } },
+    select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true },
+    orderBy: { startsAt: "asc" },
+    take: 200,
+  });
+  return events
+    .map((event) => ({ id: event.id, name: event.name, startsOn: calendarDateIn(event.startsAt, event.timezone), endsOn: calendarDateIn(event.endsAt, event.timezone) }))
+    .filter((event) => event.endsOn >= today);
+}

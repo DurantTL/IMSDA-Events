@@ -293,7 +293,7 @@ describe("what the page can never list (#1217)", () => {
 describe("links to /events", () => {
   const source = (path: string) => readFileSync(path, "utf8");
   it.each([
-    ["homepage", "app/page.tsx"],
+    ["homepage", "components/public-home-page.tsx"],
     ["calendar", "app/(public)/calendar/page.tsx"],
     ["Find a club", "app/(public)/clubs/page.tsx"],
     ["club portal home", "components/club-home.tsx"],

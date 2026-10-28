@@ -92,6 +92,20 @@ export function PersonAccess({
                   {person.systemAdministrator ? <span className={styles.note}>A system administrator already has every club area.</span> : null}
                 </>}
           </Fact>
+          <Fact label="Site content editor">
+            {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
+              : full && !person.systemAdministrator ? (
+                <>
+                  <RoleToggle kind="site-content-editor" name={name} on={person.siteContentEditor} userId={person.staffId!} />
+                  <span className={styles.note}>Edits the public homepage, notices and navigation.</span>
+                </>
+              ) : (
+                <>
+                  <OnOff on={person.siteContentEditor} />
+                  {person.systemAdministrator ? <span className={styles.note}>A system administrator can already edit the site content.</span> : null}
+                </>
+              )}
+          </Fact>
           <Fact label="Area Coordinator">
             {hasAccount
               ? <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />

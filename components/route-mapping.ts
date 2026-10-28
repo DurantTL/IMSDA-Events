@@ -79,6 +79,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/master-award-rules", "System", "System management", "Catalogs and settings", "Master Award rules"],
   ["/admin/organizations/background-checks", "System", "System management", "Catalogs and settings", "Sterling Volunteers"],
   ["/admin/email", "System", "System management", "Catalogs and settings", "Email"],
+  ["/admin/site-content", "System", "System management", "Catalogs and settings", "Homepage & site content"],
   ["/admin/settings", "System", "System management", "Catalogs and settings", "Platform settings"],
   ["/admin/readiness", "System", "System management", "Catalogs and settings", "System readiness"],
   // Event sidebar
@@ -134,6 +135,7 @@ const aliasRoutes: readonly (readonly [route: string, destinationPath: string])[
 
 /** Sub-pages reached from a parent page: [route, parent route, source file that links to it]. */
 const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn: string])[] = [
+  ["/admin/site-content/preview", "/admin/site-content", "components/site-content-workspace.tsx"],
   ["/admin/clubs/health-import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/clubs/import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/organizations/import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],

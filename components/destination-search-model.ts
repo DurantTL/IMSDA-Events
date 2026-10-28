@@ -112,6 +112,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/master-award-rules": ["master award", "award rules"],
   "/admin/organizations/background-checks": ["sterling", "screening", "volunteer screening", "clearance"],
   "/admin/email": ["mail", "sender", "notification", "paused events", "staff alerts", "email health"],
+  "/admin/site-content": ["homepage", "home page", "public site", "notices", "announcements", "banner", "footer", "navigation links", "featured events", "emergency notice"],
   "/admin/settings": ["platform", "configuration", "preferences", "options", "sign-in settings", "payment settings"],
   "/admin/readiness": ["ready", "checklist", "go live", "launch"],
   "/profile": ["account", "password", "multi-factor", "mfa", "security", "my details", "sign in"],
