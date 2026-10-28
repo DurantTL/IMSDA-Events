@@ -513,6 +513,12 @@ describe("Profile verified-email meaning (#1176)", () => {
     expect(html).toContain('href="/account/registrations"');
   });
 
+  it("lets a long signed-in email break, so enlarged text never widens the page (#1111)", () => {
+    const html = renderToStaticMarkup(createElement(ProfileView, { data, variant: "portal" }));
+    expect(html).toContain('<strong class="profile-account-email" translate="no">taylor@imsda-events.test</strong>');
+    expect(readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8")).toMatch(/\.profile-account-email \{ overflow-wrap: anywhere; \}/);
+  });
+
   it("shows nothing about the email while the second step is pending", () => {
     const html = renderToStaticMarkup(createElement(ProfileView, { data: { ...(data as object), secondStepPending: true } as never, variant: "portal" }));
     expect(html).not.toContain("What your verified email means");

@@ -9294,6 +9294,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .profile-account-section > .account-page-body:last-child { margin-bottom: 48px; }
 .profile-account-card { display: grid; gap: 12px; }
 .profile-account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* A long verified email breaks rather than widening the card, so enlarged text never scrolls the page sideways (#1111). */
+.profile-account-email { overflow-wrap: anywhere; }
 .profile-account-actions .profile-back-links { margin: 0; }
 .profile-account-actions .secondary-button { min-height: 44px; }
 .profile-readonly-field { grid-column: 1 / -1; }
