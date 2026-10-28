@@ -38,6 +38,7 @@ import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { evaluateLocationPhase, locationLifecycleSource } from "@/modules/event-locations/domain";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { signatureFields } from "@/modules/signatures/fields";
 import { createOrganizationInTransaction, listSimilarClubCandidates, sponsorPlace } from "@/modules/organizations/repository";
 import { addClubBlock, shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
 import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
@@ -1229,7 +1230,7 @@ export async function resolvePendingTeam(
   // the form changed after the team was received, its acknowledgment answers were for other wording and are dropped here.
   const storedVersionId = (row.payload as { versionId?: unknown }).versionId;
   const formChanged = storedVersionId !== experience.form.versionId;
-  const acknowledgmentKeys = new Set(acknowledgmentFields(experience.form.definition).map((field) => field.key));
+  const acknowledgmentKeys = new Set([...acknowledgmentFields(experience.form.definition), ...signatureFields(experience.form.definition)].map((field) => field.key));
   const withoutAcknowledgments = (answers: Record<string, unknown>) => (
     !formChanged || acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
   );

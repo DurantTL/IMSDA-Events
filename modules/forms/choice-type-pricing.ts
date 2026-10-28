@@ -7,7 +7,7 @@ import type { RegistrationFormField } from "@/modules/forms/definition";
  * the advanced panel and by `hiddenPricePatchForType`, so they cannot drift (#680).
  */
 export function hidesFieldPrice(type: string): boolean {
-  return isChoiceFieldType(type) || type === "ADDRESS";
+  return isChoiceFieldType(type) || type === "ADDRESS" || type === "SIGNATURE";
 }
 
 /**
@@ -23,7 +23,7 @@ export function hiddenPricePatchForType(
   previousType: string,
   nextType: string,
 ): { priceCents?: undefined; latePricing?: undefined } {
-  if (nextType === "ADDRESS") return { priceCents: undefined, latePricing: undefined };
+  if (nextType === "ADDRESS" || nextType === "SIGNATURE") return { priceCents: undefined, latePricing: undefined };
   return hidesFieldPrice(nextType) && !hidesFieldPrice(previousType)
     ? { priceCents: undefined, latePricing: undefined }
     : {};

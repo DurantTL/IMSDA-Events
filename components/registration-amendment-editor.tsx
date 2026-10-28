@@ -160,6 +160,16 @@ function AmendmentField({
     );
   }
 
+  // A signature is typed by the person at submission (#1265); staff cannot sign for them, so an amendment only shows it.
+  if (field.type === "SIGNATURE") {
+    return (
+      <div className="amendment-locked-field">
+        <small>{field.label}</small>
+        <strong>{typeof value === "string" && value.trim() ? `Signed by ${value.trim()}` : "Not signed"}</strong>
+      </div>
+    );
+  }
+
   if (locked) {
     return (
       <div className="amendment-locked-field">

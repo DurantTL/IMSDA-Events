@@ -7,6 +7,7 @@ import { isLockTimeoutError } from "@/lib/prisma-errors";
 import {
   assertNoReservedChoiceValues,
   placeholderAcknowledgmentLabels,
+  placeholderSignatureLabels,
   registrationFormDefinitionSchema,
   summarizeChoiceUsage,
   type RegistrationFormDefinition,
@@ -79,7 +80,7 @@ async function assertAcknowledgmentPolicies(eventId: string, definition: Registr
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED" | "ACKNOWLEDGMENT_PLACEHOLDER",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED" | "ACKNOWLEDGMENT_PLACEHOLDER" | "SIGNATURE_PLACEHOLDER",
     message: string,
   ) {
     super(message);
@@ -604,6 +605,8 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     // A form saved as a template carries placeholder wording to reword (#1065); it must not go live as the real statement.
     const placeholders = placeholderAcknowledgmentLabels(definition);
     if (placeholders.length > 0) throw new FormOperationError("ACKNOWLEDGMENT_PLACEHOLDER", `Write the acknowledgment statement for: ${placeholders.join(", ")}.`);
+    const signaturePlaceholders = placeholderSignatureLabels(definition);
+    if (signaturePlaceholders.length > 0) throw new FormOperationError("SIGNATURE_PLACEHOLDER", `Write the statement to be signed for: ${signaturePlaceholders.join(", ")}.`);
     // A test is required only before a form's first publish (#564, #1061).
     // The first publish proves the form can be filled in and priced. Once a
     // version has been published or archived, later drafts are mostly wording

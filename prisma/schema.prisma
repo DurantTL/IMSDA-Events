@@ -1803,6 +1803,7 @@ model Event {
   attendanceReviewAcknowledgements    AttendanceReviewAcknowledgement[]
   guardianAuthorities                 GuardianAuthority[]
   acknowledgmentEvidence              AcknowledgmentEvidence[]
+  signatureEvidence SignatureEvidence[]
   acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
@@ -3152,6 +3153,7 @@ model Registration {
   formNotificationDeliveries       RegistrationNotificationDelivery[]
   guardianAuthorities     GuardianAuthority[]
   acknowledgmentEvidence  AcknowledgmentEvidence[]
+  signatureEvidence SignatureEvidence[]
   acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts GuardianAuthorityConflict[]
   lodgingRequests         EventLodgingRequest[]
@@ -4440,6 +4442,7 @@ model RegistrationFormVersion {
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
   acknowledgmentEvidence AcknowledgmentEvidence[]
+  signatureEvidence SignatureEvidence[]
 
   @@unique([formId, versionNumber])
   @@index([formId, status, versionNumber])
@@ -7695,6 +7698,45 @@ model AcknowledgmentEvidence {
   @@index([registrationAttendeeId, fieldKey, acknowledgedAt])
   @@index([policyVersionId])
   @@index([subjectPersonId])
+}
+
+/// Evidence that someone signed a statement by typing their name (#1265): the typed name, the exact text shown, the moment
+/// and the IP address the submission came from. Append-only: a trigger refuses every UPDATE and DELETE (event deletion
+/// included; the deletion service refuses an event that holds a signature), so a signature can never be rewritten or
+/// silently lost. Caleb approved recording the IP address for typed signatures on Oct 27, 2026 (#1265, Q22 option A); it is
+/// NOT added to acknowledgment request metadata. `ipAddress` is the trusted client address, null when it cannot be resolved.
+/// `registrationAttendeeId` is a plain id on purpose, like acknowledgment evidence: an attendee removed later leaves the
+/// signature behind. Never read by exports, logs, analytics or messages; staff see it only with VIEW_SENSITIVE_DATA.
+model SignatureEvidence {
+  id                     String   @id @default(cuid())
+  eventId                String
+  registrationId         String
+  /// Null for a registration-level signature field.
+  registrationAttendeeId String?
+  formVersionId          String
+  fieldId                String
+  fieldKey               String
+  fieldLabel             String
+  /// The name the person typed.
+  signerName             String
+  /// The exact statement shown with the field.
+  signedText             String
+  /// SHA-256 of `signedText`.
+  contentHash            String
+  signedAt               DateTime
+  ipAddress              String?
+  /// One-way hash of the user agent; never the raw string.
+  userAgentHash          String?
+  idempotencyKey         String
+  recordedAt             DateTime @default(now())
+
+  event        Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  formVersion  RegistrationFormVersion @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, idempotencyKey])
+  @@index([registrationId])
+  @@index([registrationAttendeeId])
 }
 
 /// A correction to acknowledgment evidence (#150): staff with VIEW_SENSITIVE_DATA void a row with a reason. The evidence row is

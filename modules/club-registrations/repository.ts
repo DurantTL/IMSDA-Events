@@ -38,6 +38,7 @@ import {
 import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
 import { type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { signatureFields } from "@/modules/signatures/fields";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import {
   PublicRegistrationError,
@@ -1057,7 +1058,7 @@ export async function saveClubRegistrationDraft(
   // A recorded acknowledgment (#150) is given at submission, never carried in a saved draft: the server copy drops it, as the
   // browser's own draft does.
   const draftForm = await publishedClubForm(eventId);
-  const acknowledgmentKeys = new Set(draftForm ? acknowledgmentFields(draftForm.definition).map((field) => field.key) : []);
+  const acknowledgmentKeys = new Set(draftForm ? [...acknowledgmentFields(draftForm.definition), ...signatureFields(draftForm.definition)].map((field) => field.key) : []);
   const withoutAcknowledgments = <T,>(answers: Record<string, T>) => (
     acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
   );

@@ -26,7 +26,7 @@ function attendeeFields(definition: RegistrationFormDefinition) {
   return definition.sections
     .flatMap((section) => section.fields)
     // A recorded acknowledgment (#150) is never set by a file: it has its own evidence path.
-    .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED" && field.type !== "ACKNOWLEDGMENT");
+    .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED" && field.type !== "ACKNOWLEDGMENT" && field.type !== "SIGNATURE");
 }
 
 function escapeCsvCell(value: string) {

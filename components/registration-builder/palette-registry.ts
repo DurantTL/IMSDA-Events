@@ -8,10 +8,11 @@
 // See docs/FORM-BUILDER-PALETTE.md.
 import {
   Calculator, Calendar, CircleDot, ChevronDown, Church, FileCheck2, Hash, Layers3, ListChecks, ListOrdered,
-  Mail, MapPin, AlignLeft, Phone, School, SquareCheck, Tag, Type, DollarSign, Users, type LucideIcon,
+  Mail, MapPin, AlignLeft, PenLine, Phone, School, SquareCheck, Tag, Type, DollarSign, Users, type LucideIcon,
 } from "lucide-react";
 import { builderFieldModules, planModuleInsert, type BuilderModuleDefinition } from "@/modules/forms/builder-modules";
 import { acknowledgmentTypePatch } from "@/components/acknowledgment-field-settings";
+import { signatureTypePatch } from "@/components/signature-field-settings";
 import type { RegistrationFormField } from "@/modules/forms/definition";
 
 /** What an entry's `add()` is given: the fields already on the form (for unique keys) and an id maker. */
@@ -234,6 +235,7 @@ const typeEntrySpecs: TypeEntrySpec[] = [
   { type: "RANKED_CHOICE", label: "Ranked choice", description: "Put choices in order", group: PALETTE_GROUP_IDS.general, icon: ListOrdered, keywords: ["rank", "order", "first choice", "preference"], extra: () => ({ options: [...choiceOptions], minSelections: 2, maxSelections: 2 }) },
   { type: "CHECKBOX", label: "Checkbox", description: "One box to tick", group: PALETTE_GROUP_IDS.general, icon: SquareCheck, keywords: ["tick", "agree", "yes", "confirm"], extra: () => ({ placeholder: "Yes, I agree" }) },
   { type: "ACKNOWLEDGMENT", label: "Recorded acknowledgment", description: "A signed-off agreement, recorded with its wording", group: PALETTE_GROUP_IDS.agreements, icon: FileCheck2, keywords: ["agreement", "waiver", "release", "policy", "consent", "terms"], extra: (field) => acknowledgmentTypePatch(field, "ACKNOWLEDGMENT") },
+  { type: "SIGNATURE", label: "Signature (typed name)", description: "A statement signed by typing a full name, recorded with the time", group: PALETTE_GROUP_IDS.agreements, icon: PenLine, keywords: ["sign", "signature", "waiver", "release", "agreement", "typed name"], extra: (field) => signatureTypePatch(field, "SIGNATURE") },
   { type: "MEMBER_LIST", label: "Member list", description: "Repeating rows of name, age, level and what they are working on", group: PALETTE_GROUP_IDS.people, icon: Users, keywords: ["members", "rows", "list", "adventurer", "club members"], informationOnly: true, extra: () => ({
     options: ["Level one", "Level two"],
     memberColumns: [

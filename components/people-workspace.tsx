@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { RegistrationAmendmentEditor } from "@/components/registration-amendment-editor";
 import { RegistrationNotesTagsPanel } from "@/components/registration-notes-tags-panel";
+import { RegistrationSignaturesPanel } from "@/components/registration-signatures-panel";
 import { SelectedAudienceDialog } from "@/components/selected-audience-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
 import { SubmitButton } from "@/components/submit-button";
@@ -406,6 +407,12 @@ export function PeopleWorkspace({
     .reduce((total, registration) => total + registration.attendeeCount, 0);
   const selectedFieldLabels = useMemo(
     () => fieldLabelsFromDefinition(selected?.publicSubmission?.definition ?? {}),
+    [selected],
+  );
+  // A typed signature (#1265) is shown by its record, not as a plain answer.
+  const selectedSignatureKeys = useMemo(
+    () => new Set(((selected?.publicSubmission?.definition as { sections?: Array<{ fields?: Array<{ key: string; type: string }> }> } | undefined)?.sections ?? [])
+      .flatMap((section) => section.fields ?? []).filter((field) => field.type === "SIGNATURE").map((field) => field.key)),
     [selected],
   );
   const selectedPricing = useMemo(
@@ -1042,8 +1049,8 @@ export function PeopleWorkspace({
                   </details>}
                   <details open>
                     <summary>Registration answers</summary>
-                    {Object.keys(selected.publicSubmission.responses).length > 0
-                      ? <dl>{Object.entries(selected.publicSubmission.responses).map(([key, value]) => <div key={key}><dt>{selectedFieldLabels.get(key) ?? answerLabel(key)}</dt><dd>{answerValue(value)}</dd></div>)}</dl>
+                    {Object.keys(selected.publicSubmission.responses).some((key) => !selectedSignatureKeys.has(key))
+                      ? <dl>{Object.entries(selected.publicSubmission.responses).filter(([key]) => !selectedSignatureKeys.has(key)).map(([key, value]) => <div key={key}><dt>{selectedFieldLabels.get(key) ?? answerLabel(key)}</dt><dd>{answerValue(value)}</dd></div>)}</dl>
                       : <p className="quiet-copy">No registration-level answers were submitted.</p>}
                   </details>
                 </div>}
@@ -1091,7 +1098,7 @@ export function PeopleWorkspace({
                               </dd>
                             </div>
                             {attendee.phone && <div><dt>Phone</dt><dd>{attendee.phone}</dd></div>}
-                            {Object.entries(attendee.responses).map(([key, value]) => <div key={`${attendeeIndex}_${key}`}><dt>{selectedFieldLabels.get(key) ?? answerLabel(key)}</dt><dd>{answerValue(value)}</dd></div>)}
+                            {Object.entries(attendee.responses).filter(([key]) => !selectedSignatureKeys.has(key)).map(([key, value]) => <div key={`${attendeeIndex}_${key}`}><dt>{selectedFieldLabels.get(key) ?? answerLabel(key)}</dt><dd>{answerValue(value)}</dd></div>)}
                           </dl>
                         : <p className="quiet-copy">No additional attendee choices or contact details are recorded.</p>}
                     </details>
@@ -1154,6 +1161,7 @@ export function PeopleWorkspace({
                     {selected.messages.length === 0 && <p className="quiet-copy">No registrant emails are linked to this registration yet.</p>}
                   </div>
                 </section>
+                {selected.publicSubmission && <RegistrationSignaturesPanel key={selected.id} eventId={eventId} registrationId={selected.id} timeZone={eventTimezone} attendeeNames={Object.fromEntries(selected.attendees.map((attendee) => [attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim()]))} />}
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
                 {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
