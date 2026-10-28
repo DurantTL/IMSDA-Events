@@ -11,7 +11,9 @@ import { describe, expect, it } from "vitest";
 const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
 const start = css.indexOf("/* Coordinator pages at 200% text on a phone (#1113)");
 const builder = css.indexOf("/* Registration form builder editor shell (#1132)");
-const block = css.slice(start, builder);
+// The block ends at the next top-level comment: other sections may also sit before the builder blocks.
+const nextSection = css.indexOf("\n/* ", start + 1);
+const block = css.slice(start, nextSection === -1 || nextSection > builder ? builder : nextSection);
 
 describe("coordinator pages at 200% text (#1113)", () => {
   it("sits before the builder blocks, with no hover or small text", () => {
