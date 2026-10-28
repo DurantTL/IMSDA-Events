@@ -93,7 +93,7 @@ export function PersonAccess({
                   {person.systemAdministrator ? <span className={styles.note}>A system administrator already has every club area.</span> : null}
                 </>}
           </Fact>
-          <Fact label="Site content editor">
+          <Fact label={systemRoleText.SITE_CONTENT_EDITOR.name}>
             {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
               : full && !person.systemAdministrator ? (
                 <>

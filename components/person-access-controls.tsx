@@ -74,7 +74,7 @@ function Chip({ tone, children }: { tone?: "green" | "coral"; children: ReactNod
 
 type RoleKind = "system-administrator" | "clubs-administrator" | "site-content-editor" | "area-coordinator";
 
-const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "area-coordinator": "AREA_COORDINATOR" } as const;
+const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR" } as const;
 
 const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
@@ -88,8 +88,8 @@ const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string;
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
   },
   "site-content-editor": {
-    noun: "Site content editor",
-    grantBody: "They can edit the public homepage, notices, navigation and footer, preview them and publish. Nothing else. Every change is recorded under their name.",
+    noun: systemRoleText.SITE_CONTENT_EDITOR.name,
+    grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the homepage and site content on their next page. Nothing they published is undone.",
   },
   "area-coordinator": {
