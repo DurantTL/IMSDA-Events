@@ -124,6 +124,9 @@ APP_RELEASE_SHA=                 # optional 7–64 character Git SHA; see releas
 ALERT_WEBHOOK_URL=               # Slack/Teams incoming webhook; see Alerting below
 ALERT_REPEAT_MINUTES=60          # how long the same condition stays quiet after paging
 PASSWORD_BREACH_CHECK=           # enabled/disabled; unset means on in production
+MESSAGE_FILE_EVENT_QUOTA_MB=     # most one event may keep as message files; default 200
+MESSAGE_FILE_SWEEP_GRACE_HOURS=  # age before an unused message file may be swept; default 72, minimum 24
+MESSAGE_FILE_SWEEP_DELETE=       # "true" lets the scheduled sweep delete; anything else only reports
 ACCOUNT_EMAIL_SENDER_NAME=IMSDA Events
 ACCOUNT_EMAIL_REPLY_TO=
 RATE_LIMIT_TRUSTED_PROXY_HOPS=1  # 1 for a single Nginx; 2 if Cloudflare is also in front
@@ -1525,6 +1528,57 @@ shred -u /root/keytest/backup-key /root/keytest/db.env && rmdir /root/keytest
    it will show the key status (configured, and loaded from a file or the
    environment) and the date of the last restore test, and this date goes there
    too.
+
+## Message files: storage, the quota and the sweep (#845)
+
+Attachments and pictures staff upload for email live on disk in
+`ASSET_STORAGE_DIR/message-files/<eventId>/` (in Compose,
+`/app/storage/event-assets/message-files/<eventId>/` on the `imsda_events_assets`
+volume), with a row per file in the database. They are included in every backup
+of that directory (the nightly assets archive; see `docs/BACKUPS.md`), so a
+restore needs the database and the assets volume from the same time.
+
+Three settings, all optional:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MESSAGE_FILE_EVENT_QUOTA_MB` | `200` | The most one event may keep as message files, counting uploads in progress and files waiting to be removed from disk. A positive whole number of MB. |
+| `MESSAGE_FILE_SWEEP_GRACE_HOURS` | `72` | How old an unused file must be before the sweep may remove it. Never less than `24`, whatever is set. |
+| `MESSAGE_FILE_SWEEP_DELETE` | unset | Exactly `true` lets the scheduled sweep delete. Anything else, or nothing, is a **dry run**: it reports and removes nothing. |
+
+The quota and the grace period are decisions for the organisation, not the
+software: the defaults are only a starting point. System management > Email
+shows each event's use against the quota and whether the scheduled sweep is in
+dry-run or delete mode.
+
+A file is "unused" only when it is older than the grace period and nothing refers
+to it: no template version (any status, including old and archived ones), no
+announcement, no queued or sent message links it, and no body (template,
+announcement, scheduled batch or message snapshot, in any event) names it as a
+picture. A file anything refers to is never removed.
+
+**Turning deletion on, step by step (a person does each step):**
+
+1. On the server, run `npm run message-files:sweep`. This is a dry run. It prints
+   how many files and bytes would be removed, per event, and lists each file
+   (id, event, size, upload time; never a storage path). File names are
+   left out because they can be personal; add `--show-names` to print them.
+2. Read the report. Anything that should not go means a body or message still
+   needs it; fix that first.
+3. Either run `npm run message-files:sweep -- --apply` once to delete now, or set
+   `MESSAGE_FILE_SWEEP_DELETE=true` and redeploy so the scheduled sweep deletes
+   (up to 100 files per run). `--grace-hours=N` on the command changes the grace
+   period for one run (still never under 24).
+
+A file's row is deleted first and its bytes after. If the disk delete fails, the
+file is kept in a retry list (shown in the System management > Email usage
+section) and still counts against its event's quota until the bytes are really
+gone. Likewise an interrupted upload leaves a one-hour reservation that counts
+against the quota. **Retrying failed byte deletes and clearing expired
+reservations happen only in an apply run** (`--apply`, or
+`MESSAGE_FILE_SWEEP_DELETE=true` for the scheduled sweep). A dry run reports how
+many are waiting but changes nothing, so until an apply run they keep counting
+against the event's quota. Deleting an event removes its files as before.
 
 ## Backups and restore rehearsals
 

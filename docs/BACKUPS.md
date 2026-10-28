@@ -5,6 +5,11 @@ This is the production runbook for the manually started deployment
 in its own container). The Compose `backup` service described in
 `DEPLOY-DOCKER.md` runs the same scripts for the all-in-one stack.
 
+> **Message files (#845).** Email attachments and pictures staff upload are stored in
+> `ASSET_STORAGE_DIR/message-files/<eventId>/`, inside the `imsda_events_assets` volume,
+> so the nightly assets archive includes them. See "Message files" in `DEPLOY-DOCKER.md`
+> for the per-event quota and the cleanup sweep.
+
 ## What runs
 
 A small second container, **`imsda-backup`**, started next to the app and the
