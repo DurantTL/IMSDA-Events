@@ -13522,6 +13522,20 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 /* Club roster and Honors name search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. */
 .roster-search-panel, .roster-search-field, .honor-name-search { grid-template-columns: minmax(0, 1fr); }
 .roster-search-row, .roster-search-input, .honor-name-search-field { min-width: 0; }
+/* Coordinator pages at 200% text on a phone (#1113): an Open club button sits under its card label, as other
+   controls do, instead of beside a gutter that grows with the text; a long leader email wraps in the club's list. */
+@media screen and (max-width: 600px) {
+  /* When enlarged text makes a card narrow for its text, every label moves above its value instead of squeezing it. */
+  :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) { container-type: inline-size; }
+  @container (max-width: 15em) {
+    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label] { padding-left: 0; }
+    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+  }
+  :is(.coordinator-overview, .coordinator-destination) table.table-cards.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button) { padding-left: 0; }
+  :is(.coordinator-overview, .coordinator-destination) table.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button)::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+}
+.public-manage-club-list { grid-template-columns: minmax(0, 1fr); }
+.public-manage-club-list li > span { min-width: 0; overflow-wrap: anywhere; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
