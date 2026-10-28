@@ -4,20 +4,22 @@
  * person direct this club right now?" the same way.
  */
 
+import { clubRoleText } from "@/modules/access/role-descriptions";
+
 export const clubDirectorRoleLabels = {
-  DIRECTOR: "Director",
-  DEPUTY: "Deputy",
-  REGISTRAR: "Registrar",
-  REPORTER: "Reporter",
+  DIRECTOR: clubRoleText.DIRECTOR.name,
+  DEPUTY: clubRoleText.DEPUTY.name,
+  REGISTRAR: clubRoleText.REGISTRAR.name,
+  REPORTER: clubRoleText.REPORTER.name,
 } as const;
 
 export type ClubRole = keyof typeof clubDirectorRoleLabels;
 
 export const clubRoleDescriptions: Record<ClubRole, string> = {
-  DIRECTOR: "Runs the club: roster, events, team, and club profile.",
-  DEPUTY: "Same access as the director.",
-  REGISTRAR: "Keeps the roster and registers the club for events. Sees ages, not full birth dates.",
-  REPORTER: "Submits the club's Monthly Records. No roster access.",
+  DIRECTOR: clubRoleText.DIRECTOR.summary,
+  DEPUTY: clubRoleText.DEPUTY.summary,
+  REGISTRAR: clubRoleText.REGISTRAR.summary,
+  REPORTER: clubRoleText.REPORTER.summary,
 };
 
 /**

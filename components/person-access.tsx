@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import type { PersonDetail } from "@/modules/system-admin/people-directory";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import {
@@ -75,7 +76,7 @@ export function PersonAccess({
       <section aria-labelledby="people-system-wide" className={styles.box}>
         <h2 id="people-system-wide">System-wide</h2>
         <ul className={styles.facts}>
-          <Fact label="System administrator">
+          <Fact label={systemRoleText.SYSTEM_ADMIN.name}>
             {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
               : full && !isSelf ? <RoleToggle kind="system-administrator" name={name} on={person.systemAdministrator} userId={person.staffId!} />
                 : full && !person.systemAdministrator ? <RoleToggle kind="system-administrator" name={name} on={false} userId={person.staffId!} />
@@ -84,7 +85,7 @@ export function PersonAccess({
                     {full ? <span className={styles.note}>You can&apos;t remove your own.</span> : null}
                   </>}
           </Fact>
-          <Fact label="Clubs Administrator">
+          <Fact label={systemRoleText.CLUBS_ADMIN.name}>
             {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
               : full && !person.systemAdministrator ? <RoleToggle kind="clubs-administrator" name={name} on={person.clubsAdministrator} userId={person.staffId!} />
                 : <>
@@ -106,7 +107,7 @@ export function PersonAccess({
                 </>
               )}
           </Fact>
-          <Fact label="Area Coordinator">
+          <Fact label={systemRoleText.AREA_COORDINATOR.name}>
             {hasAccount
               ? <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />
               : <span className={styles.muted}>Needs a website account</span>}

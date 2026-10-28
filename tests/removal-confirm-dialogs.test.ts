@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
@@ -49,7 +50,13 @@ describe("high-consequence actions use the shared ConfirmDialog, not window.conf
     const code = source("components/person-access-controls.tsx");
     expect(code).toContain("Their authenticator and passkeys are removed and they're signed out.");
     expect(code).toContain("They'll no longer see other clubs.");
-    expect(code).toContain("They'll see every club, view only (ages, not birth dates), after a second sign-in step.");
+    // The grant consequence now comes from the shared role wording (#1278), shown as a summary plus Details.
+    expect(code).toContain("systemRoleText[roleKeys[kind]].summary");
+    expect(code).toContain("<RoleDetails");
+    const coordinator = [systemRoleText.AREA_COORDINATOR.summary, ...systemRoleText.AREA_COORDINATOR.can, ...systemRoleText.AREA_COORDINATOR.cannot].join(" ");
+    expect(coordinator).toContain("second sign-in step");
+    expect(coordinator).toContain("ages");
+    expect(coordinator).toContain("full birth dates");
   });
 
   it("club-team-workspace still says access is lost right away when removing a member", () => {

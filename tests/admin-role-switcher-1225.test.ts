@@ -15,7 +15,7 @@ describe("AdminRoleSwitcher", () => {
     const html = render({ held: ["EVENTS_ADMIN", "CLUBS_ADMIN"], active: "CLUBS_ADMIN", counts: { CLUBS_ADMIN: 3 } });
     expect(html).toContain("Events Administrator");
     expect(html).toContain("Clubs Administrator");
-    expect(html).not.toContain("System Administrator");
+    expect(html).not.toContain("System administrator");
     expect(html.match(/<a /g)).toHaveLength(2);
     expect(html.indexOf('href="/admin-role/EVENTS_ADMIN"')).toBeLessThan(html.indexOf('href="/admin-role/CLUBS_ADMIN"'));
     expect(html).toMatch(/<a aria-current="page" class="admin-role-pill" href="\/admin-role\/CLUBS_ADMIN">/);
