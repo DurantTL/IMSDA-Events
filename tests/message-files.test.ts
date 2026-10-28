@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
     rejectCrossOriginRequest: vi.fn(),
     findActiveMembership: vi.fn(),
     getPrisma: vi.fn(),
-    writeStoredFile: vi.fn(),
+    writeStoredFileAt: vi.fn(),
     readAsset: vi.fn(),
     deleteAsset: vi.fn(),
   };
@@ -31,9 +31,13 @@ vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: 
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/events/asset-storage", () => ({
-  writeStoredFile: mocks.writeStoredFile,
+  writeStoredFileAt: mocks.writeStoredFileAt,
   readAsset: mocks.readAsset,
   deleteAsset: mocks.deleteAsset,
+}));
+vi.mock("@/modules/communications/message-file-config", () => ({
+  messageFileEventQuotaMb: () => 200,
+  messageFileEventQuotaBytes: () => 200 * 1024 * 1024,
 }));
 vi.mock("@/modules/events/asset-response", () => ({
   eventAssetResponse: vi.fn(async (asset: { displayName: string; contentType: string }, disposition: string) => new Response("bytes", {
@@ -49,12 +53,25 @@ import { MessageFileDeliveryError } from "@/modules/communications/message-file-
 const PDF = Buffer.from("%PDF-1.7 synthetic agenda");
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 1)]);
 
-function fakeClient(options: { eventExists?: boolean; existingFiles?: number } = {}) {
+function fakeClient(options: { eventExists?: boolean; existingFiles?: number; usedBytes?: number; cleanupBytes?: number; reservedBytes?: number } = {}) {
   const rows: Array<Record<string, unknown>> = [];
+  const reservations: Array<Record<string, unknown>> = [];
   const client = {
+    $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) => run(client)),
+    $executeRaw: vi.fn(async () => 1),
     event: { findUnique: vi.fn(async () => (options.eventExists === false ? null : { id: "event-1" })) },
+    messageFileUploadReservation: {
+      aggregate: vi.fn(async () => ({ _count: { _all: reservations.length }, _sum: { sizeBytes: options.reservedBytes ?? 0 } })),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => { reservations.push(data); return data; }),
+      deleteMany: vi.fn(async ({ where }: { where: { storageKey: string } }) => {
+        const before = reservations.length;
+        for (let index = reservations.length - 1; index >= 0; index -= 1) if (reservations[index].storageKey === where.storageKey) reservations.splice(index, 1);
+        return { count: before - reservations.length };
+      }),
+    },
+    messageFileStorageCleanup: { aggregate: vi.fn(async () => ({ _sum: { sizeBytes: options.cleanupBytes ?? 0 } })) },
     messageFile: {
-      count: vi.fn(async () => options.existingFiles ?? rows.length),
+      aggregate: vi.fn(async () => ({ _count: { _all: options.existingFiles ?? rows.length }, _sum: { sizeBytes: options.usedBytes ?? 0 } })),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const row = { id: `file-${rows.length + 1}`, createdAt: new Date("2026-10-01T00:00:00Z"), ...data };
         rows.push(row);
@@ -68,7 +85,7 @@ function fakeClient(options: { eventExists?: boolean; existingFiles?: number } =
     },
     auditLog: { create: vi.fn<(args: unknown) => Promise<object>>(async () => ({})) },
   };
-  return { client, rows };
+  return { client, rows, reservations };
 }
 
 function upload_(file: File, extra: Record<string, string> = {}) {
@@ -91,8 +108,8 @@ beforeEach(() => {
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.requirePermission.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.deleteAsset.mockResolvedValue(undefined);
-  mocks.writeStoredFile.mockImplementation(async (partition: string, extension: string, bytes: Uint8Array) => ({
-    storageKey: `${partition}/generated-name.${extension}`,
+  mocks.writeStoredFileAt.mockImplementation(async (storageKey: string, bytes: Uint8Array) => ({
+    storageKey,
     byteSize: bytes.byteLength,
     checksum: createHash("sha256").update(bytes).digest("hex"),
   }));
@@ -103,14 +120,14 @@ describe("createMessageFile (#824)", () => {
     const { client, rows } = fakeClient();
     const record = await createMessageFile("event-1", new File([PDF], "../../Friday Agenda.exe", { type: "application/x-msdownload" }), "staff-1", "attachment", client as never);
     expect(record).toMatchObject({ filename: "Friday Agenda.pdf", contentType: "application/pdf", sizeBytes: PDF.byteLength, isInlineImage: false });
-    expect(mocks.writeStoredFile).toHaveBeenCalledWith("message-files/event-1", "pdf", expect.any(Uint8Array));
-    expect(String(rows[0].storageKey)).toBe("message-files/event-1/generated-name.pdf");
+    expect(mocks.writeStoredFileAt).toHaveBeenCalledWith(expect.stringMatching(/^message-files\/event-1\/[0-9a-f-]{36}\.pdf$/), expect.any(Uint8Array));
+    expect(String(rows[0].storageKey)).toMatch(/^message-files\/event-1\/[0-9a-f-]{36}\.pdf$/);
     expect(String(rows[0].storageKey)).not.toContain("Agenda");
     const audit = client.auditLog.create.mock.calls[0][0] as unknown as { data: { action: string; metadata: unknown; summary: string } };
     expect(audit.data.action).toBe("MESSAGE_FILE_UPLOADED");
     expect(audit.data.metadata).toEqual({ files: [{ filename: "Friday Agenda.pdf", sizeBytes: PDF.byteLength }] });
     expect(JSON.stringify(audit.data)).not.toContain(createHash("sha256").update(PDF).digest("hex"));
-    expect(JSON.stringify(audit.data)).not.toContain("generated-name");
+    expect(JSON.stringify(audit.data)).not.toContain(String(rows[0].storageKey));
   });
 
   it("decides the type from the bytes, not the claimed type: a script claiming to be a PDF is refused", async () => {
@@ -118,7 +135,7 @@ describe("createMessageFile (#824)", () => {
     await expect(
       createMessageFile("event-1", new File(["#!/bin/sh\nrm -rf /\n"], "agenda.pdf", { type: "application/pdf" }), "staff-1", "attachment", client as never),
     ).rejects.toMatchObject({ code: "FILE_TYPE_NOT_ALLOWED" });
-    expect(mocks.writeStoredFile).not.toHaveBeenCalled();
+    expect(mocks.writeStoredFileAt).not.toHaveBeenCalled();
     expect(client.messageFile.create).not.toHaveBeenCalled();
   });
 
@@ -127,7 +144,7 @@ describe("createMessageFile (#824)", () => {
     for (const [name, content] of [["logo.svg", "<svg><script>1</script></svg>"], ["page.html", "<html></html>"], ["a.zip", "PK\u0003\u0004zipfile"]] as const) {
       await expect(createMessageFile("event-1", new File([content], name), "staff-1", "attachment", client as never), name).rejects.toBeInstanceOf(MessageFileError);
     }
-    expect(mocks.writeStoredFile).not.toHaveBeenCalled();
+    expect(mocks.writeStoredFileAt).not.toHaveBeenCalled();
   });
 
   it("refuses an attachment over 10 MB before reading it, and an empty file", async () => {
@@ -148,10 +165,12 @@ describe("createMessageFile (#824)", () => {
   });
 
   it("removes the stored bytes when the row cannot be written", async () => {
-    const { client } = fakeClient();
+    const { client, reservations } = fakeClient();
     client.messageFile.create.mockRejectedValueOnce(new Error("database down"));
     await expect(createMessageFile("event-1", new File([PDF], "a.pdf"), "staff-1", "attachment", client as never)).rejects.toThrow("database down");
-    expect(mocks.deleteAsset).toHaveBeenCalledWith("message-files/event-1/generated-name.pdf");
+    expect(mocks.deleteAsset).toHaveBeenCalledWith(expect.stringMatching(/^message-files\/event-1\/.+\.pdf$/));
+    // The bytes are gone, so the reservation is released too.
+    expect(reservations).toHaveLength(0);
   });
 });
 
@@ -159,13 +178,13 @@ describe("createMessageFile limits on the event (#824)", () => {
   it("makes no directory and writes no byte for an event that does not exist", async () => {
     const { client } = fakeClient({ eventExists: false });
     await expect(createMessageFile("no-such-event", new File([PDF], "a.pdf"), "staff-1", "attachment", client as never)).rejects.toMatchObject({ code: "FILE_NOT_FOUND" });
-    expect(mocks.writeStoredFile).not.toHaveBeenCalled();
+    expect(mocks.writeStoredFileAt).not.toHaveBeenCalled();
   });
 
   it("refuses an upload once the event holds 200 files", async () => {
     const { client } = fakeClient({ existingFiles: 200 });
     await expect(createMessageFile("event-1", new File([PDF], "a.pdf"), "staff-1", "attachment", client as never)).rejects.toMatchObject({ code: "FILE_LIMIT_REACHED" });
-    expect(mocks.writeStoredFile).not.toHaveBeenCalled();
+    expect(mocks.writeStoredFileAt).not.toHaveBeenCalled();
   });
 });
 
@@ -225,7 +244,7 @@ describe("message file routes (#824)", () => {
       expect(call[2]).toBe("MANAGE_COMMUNICATIONS");
     }
     expect(mocks.requirePermission).toHaveBeenCalledTimes(4);
-    expect(mocks.writeStoredFile).not.toHaveBeenCalled();
+    expect(mocks.writeStoredFileAt).not.toHaveBeenCalled();
   });
 
   it("refuses a cross-origin upload before doing anything", async () => {
@@ -243,7 +262,7 @@ describe("message file routes (#824)", () => {
     const json = await response.json() as { file: Record<string, unknown> };
     expect(json.file).toMatchObject({ filename: "Agenda.pdf", url: "/api/events/event-1/message-files/file-1" });
     expect(JSON.stringify(json)).not.toContain("storageKey");
-    expect(JSON.stringify(json)).not.toContain("message-files/event-1/generated");
+    expect(JSON.stringify(json)).not.toContain("message-files/event-1/");
   });
 
   it("answers an upload of the wrong kind with a plain error", async () => {

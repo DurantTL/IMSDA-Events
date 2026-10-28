@@ -276,8 +276,13 @@ export type AnnouncementBroadcastPreview = {
   attachments: Array<{ filename: string; sizeBytes: number }>;
   /** Set when the files together are over the per-message limits, which blocks the send. */
   attachmentProblem: string | null;
-  /** True when any message carries an attachment or an embedded picture; real email then goes out through the background worker. */
+  /** True when any message carries an attachment or an embedded picture. Only real email whose files total over the size threshold goes through the background worker; see `sentByBackgroundMailer`. */
   carriesFiles: boolean;
+  /** Real email whose files total over the size threshold (#847): sent by the background mailer, not at once. */
+  sentByBackgroundMailer: boolean;
+  /** What the background mailer does, from the server, so the dialog's time estimate cannot drift (#847). */
+  workerBatchSize: number;
+  workerSweepSeconds: number;
   /** The inbox preview line the emails will carry (#836): the announcement's own, else the template's; as written, tokens unexpanded. */
   preheader: string | null;
   /** The send check (#836) run on the email as it will go out. Errors block the send; warnings need acknowledging. */

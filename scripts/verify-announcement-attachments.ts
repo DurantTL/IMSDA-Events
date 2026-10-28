@@ -245,6 +245,8 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>, st
   const agenda = pdfOf("agenda");
   const terms = pdfOf("terms");
   const agendaFile = await createMessageFile(ids.event, file(agenda, "Friday Agenda.pdf", "application/pdf"), ids.staff, "attachment", prisma);
+  // Files over 2 MB go to the background mailer (#847); record a large size for the agenda so this check still covers that path.
+  await prisma.messageFile.update({ where: { id: agendaFile.id }, data: { sizeBytes: 3 * 1024 * 1024 } });
   const termsFile = await createMessageFile(ids.event, file(terms, "../../Terms.exe", "application/x-msdownload"), ids.staff, "attachment", prisma);
   assert(agendaFile.filename === "Friday Agenda.pdf" && termsFile.filename === "Terms.pdf", `stored display names are clean: ${termsFile.filename}`);
   const mapPng = await renderAttendeePassQrPng("synthetic-map-image");
@@ -496,7 +498,7 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>, st
   const testAudit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: test.id, action: "MESSAGE_TEST_CREATED" }, select: { metadata: true } });
   assert(
     JSON.stringify((testAudit.metadata as { attachments?: unknown }).attachments) === JSON.stringify([
-      { filename: "Friday Agenda.pdf", sizeBytes: agenda.length },
+      { filename: "Friday Agenda.pdf", sizeBytes: 3 * 1024 * 1024 },
       { filename: "Terms.pdf", sizeBytes: terms.length },
     ]),
     "the test audit lists file names and sizes only",

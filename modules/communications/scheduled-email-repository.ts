@@ -17,6 +17,8 @@ import { classifyAttendeeType, normalizeAudienceEmail } from "@/modules/communic
 import { evaluateEventAudience, type AudienceEvaluationOptions } from "@/modules/communications/audience-repository";
 import { BATCH_TRANSACTION_MAX_WAIT_MS, BATCH_TRANSACTION_TIMEOUT_MS } from "@/modules/communications/batch-transaction";
 import { MessagingError } from "@/modules/communications/messaging-error";
+import { assertBodyImagesBelongToEvent, MessageFileError } from "@/modules/communications/message-files";
+import { messageFileIdsInMarkdown } from "@/modules/communications/message-file-rules";
 import {
   captureMessageIdsLocally,
   ensureEventMessagingDefaults,
@@ -566,6 +568,21 @@ function previewChanged(review: ScheduledEmailReview) {
  * Create, edit, approve, pause, cancel (every one a person's own request)
  * ---------------------------------------------------------------------------------------------------------------- */
 
+/**
+ * A batch's announcement text can embed uploaded pictures (`![x](msgfile:id)`), which have no foreign key. Called inside
+ * the transaction that writes the text, it locks those pictures until commit so the message file sweep cannot delete one
+ * between this check and the save, and refuses a picture that is not one of this event's own (#845).
+ */
+async function lockBatchPictures(tx: Prisma.TransactionClient, eventId: string, content: { templateKey: string; announcementBody: string }) {
+  if (content.templateKey !== "EVENT_ANNOUNCEMENT") return;
+  try {
+    await assertBodyImagesBelongToEvent(tx, eventId, messageFileIdsInMarkdown(content.announcementBody));
+  } catch (error) {
+    if (error instanceof MessageFileError) throw new MessagingError("INVALID_TEMPLATE", error.message);
+    throw error;
+  }
+}
+
 function contentColumns(content: ReviewContent & { name: string }, review: ScheduledEmailReview) {
   return {
     name: content.name,
@@ -635,6 +652,7 @@ export async function createScheduledEmail(
 
   try {
     const created = await prisma.$transaction(async (tx) => {
+      await lockBatchPictures(tx, eventId, input);
       const row = await tx.scheduledEmailBatch.create({
         data: {
           id: input.scheduleId,
@@ -700,6 +718,7 @@ export async function updateScheduledEmail(
   }
   const template = await loadTemplateSource(prisma, eventId, input.templateKey);
   const updated = await prisma.$transaction(async (tx) => {
+    await lockBatchPictures(tx, eventId, input);
     const changed = await tx.scheduledEmailBatch.updateMany({
       where: { id: input.scheduleId, eventId, revision: input.expectedRevision, status: { in: ["SCHEDULED", "PAUSED", "ACTIVE"] }, claimToken: null },
       data: {
@@ -792,6 +811,7 @@ export async function activateScheduledEmail(
   const now = options.now ?? new Date();
 
   await serializable(async (tx) => {
+    await lockBatchPictures(tx, eventId, content);
     const changed = await tx.scheduledEmailBatch.updateMany({
       where: { id: scheduleId, eventId, revision: input.expectedRevision, status: { in: ["SCHEDULED", "PAUSED"] }, claimToken: null },
       data: {

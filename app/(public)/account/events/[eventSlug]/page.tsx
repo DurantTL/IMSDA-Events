@@ -34,6 +34,7 @@ import {
   getAttendeeCommunity,
   getStaffCommunity,
 } from "@/modules/community/repository";
+import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -295,7 +296,7 @@ export default async function AttendeeEventHubPage({
                   {staffTimeline.map((item) => item.kind === "OFFICIAL" ? (
                     <article className={`attendee-timeline-official is-${item.announcement.priority.toLowerCase()}`} key={`announcement:${item.announcement.id}`}>
                       <header><div><Megaphone size={15} aria-hidden="true" /><strong>Official update</strong><small>{item.announcement.priority.toLowerCase()}</small></div><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString()}</time></header>
-                      <h3>{item.announcement.title}</h3><p>{item.announcement.body}</p>
+                      <h3>{item.announcement.title}</h3><p>{announcementBodyForDisplay(item.announcement.body)}</p>
                     </article>
                   ) : (
                     <article className={`attendee-community-post is-${item.post.status.toLowerCase()}`} key={`post:${item.post.id}`}>
