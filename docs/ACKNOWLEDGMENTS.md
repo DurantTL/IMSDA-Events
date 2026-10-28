@@ -7,7 +7,7 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
 1. **Event deletion refuses while evidence exists.** Retention of acknowledgment evidence is not decided. Until it is, an event
    with any evidence cannot be deleted (unpublish it instead). The decision to allow deletion, and after how long, belongs to the
    owner; it takes a migration (the table refuses every delete) and a change to `eventDeletionBlockers`.
-2. **No IP address is stored.** Approved request metadata is a one-way user-agent hash, the form version id and the submission
+2. **No IP address is stored for acknowledgments** (typed signatures are the one exception, below). Approved request metadata is a one-way user-agent hash, the form version id and the submission
    key. Recording an address needs an owner decision and a migration (a check constraint holds the list).
 3. **Nobody acknowledges for another adult.** #131 only records authority over minors. A household with several adults needs a
    registration-level acknowledgment, or paper acknowledgments recorded by staff for each adult.
@@ -63,3 +63,21 @@ a moment. It never includes the wording; staff with sensitive-data access can op
 
 `npm run test:acknowledgments` (real PostgreSQL, wired into CI) and the Vitest files `tests/acknowledgment-*.test.ts` and
 `tests/guardian-active-authority.test.ts`.
+
+## Typed signatures (#1265)
+
+A `SIGNATURE` form field records a typed name against the exact statement shown, in the append-only `SignatureEvidence` table.
+
+- **IP address:** recorded for typed signatures only (approved by Caleb on Oct 27, 2026, #1265 Q22 option A). It is the client address a
+  configured trusted proxy reports (`RATE_LIMIT_TRUSTED_PROXY_HOPS`); with no trusted proxy, or no usable header, it is null. A raw
+  forwarding header is never trusted. Acknowledgment request metadata is unchanged and still has no IP. A team held for staff
+  confirmation on the general link records a null IP.
+- **Append-only:** the database refuses every UPDATE, DELETE and TRUNCATE, and refuses a row whose registration, attendee or form
+  version belongs to another event.
+- **Retention is undecided.** Until it is, event deletion is refused while any signature row exists (unpublish instead).
+- **Who sees it:** staff with MANAGE_REGISTRATION or VIEW_SENSITIVE_DATA see who signed and when; the signed text and IP need
+  VIEW_SENSITIVE_DATA, decided on the server.
+- **Left out of:** the attendee roster file, other exports, the registration PDF, notification emails, confirmation summaries and
+  saved drafts. Amendments keep the stored name; staff acting as a director cannot sign for them.
+
+Verified by `npm run test:signatures` (real PostgreSQL, wired into CI) and `tests/signature-*.test.ts`.

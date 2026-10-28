@@ -9,6 +9,7 @@ import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/mes
 import { ClassSelectionError, saveRegistrationHonorPicks } from "@/modules/honors/enrollment-repository";
 import { honorConfirmationsSchema, honorSelectionsSchema } from "@/modules/honors/registration-picks";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
+import { trustedClientIpAddress } from "@/modules/rate-limit/domain";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -46,7 +47,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
       actorAttribution(access.actor),
       input,
       new Date(),
-      { locationId: locationId ?? null, teamName: teamName ?? null, ...(draftKey ? { draftKey } : {}), report: (reported) => { outcome = reported; }, registered: (id) => { registeredId = id; } },
+      { locationId: locationId ?? null, teamName: teamName ?? null, ...(draftKey ? { draftKey } : {}), requestContext: { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) }, report: (reported) => { outcome = reported; }, registered: (id) => { registeredId = id; } },
     );
     // The registration is saved either way. The picks go through the same
     // enrollment rules as the class picker; if a class filled up meanwhile the

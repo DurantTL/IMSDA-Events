@@ -159,8 +159,9 @@ describe("planning which signatures a submission gives", () => {
   });
 
   it("derives a stable key from the submission key, field and attendee", () => {
-    expect(signatureEvidenceKey("sub-1", "f_sig", null)).toBe("submission:sub-1:f_sig:registration");
-    expect(signatureEvidenceKey("sub-1", "f_sig", "a1")).toBe("submission:sub-1:f_sig:a1");
+    expect(signatureEvidenceKey("reg-1", "sub-1", "f_sig", null)).toBe("submission:reg-1:sub-1:f_sig:registration");
+    expect(signatureEvidenceKey("reg-1", "sub-1", "f_sig", "a1")).toBe("submission:reg-1:sub-1:f_sig:a1");
+    expect(signatureEvidenceKey("reg-2", "sub-1", "f_sig", null)).not.toBe(signatureEvidenceKey("reg-1", "sub-1", "f_sig", null));
     expect(sha256("abc")).toHaveLength(64);
   });
 });

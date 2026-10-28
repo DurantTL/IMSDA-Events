@@ -44,6 +44,7 @@ import {
   PublicRegistrationError,
   getPublicRegistrationExperience,
   submitPublicRegistration,
+  type SubmissionRequestContext,
   type ClubSubmissionContext,
 } from "@/modules/forms/public-repository";
 import {
@@ -1288,7 +1289,7 @@ export async function submitClubRegistration(
   actor: ClubRegistrationActor,
   input: PublicRegistrationInput,
   now = new Date(),
-  options: { locationId?: string | null; report?: ClubSubmissionContext["report"]; registered?: ClubSubmissionContext["registered"]; teamName?: string | null; draftKey?: string } = {},
+  options: { locationId?: string | null; report?: ClubSubmissionContext["report"]; registered?: ClubSubmissionContext["registered"]; teamName?: string | null; draftKey?: string; requestContext?: SubmissionRequestContext } = {},
 ) {
   const event = await requireClubEvent(eventId);
   const form = await publishedClubForm(event.id);
@@ -1307,7 +1308,7 @@ export async function submitClubRegistration(
     ...(options.report ? { report: options.report } : {}),
     ...(options.registered ? { registered: options.registered } : {}),
     prepareAttendees: clubAttendeePreparer(organizationId, actor, draftKey),
-  });
+  }, options.requestContext);
 }
 
 export function recordFromJson(value: unknown): Record<string, unknown> {

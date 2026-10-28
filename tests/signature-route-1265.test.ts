@@ -66,6 +66,30 @@ describe("the staff signatures route (#1265)", () => {
     expect(dependencies.listRegistrationSignatures).toHaveBeenCalledWith("event-1", "reg-1", true);
   });
 
+  it("also opens for a VIEW_SENSITIVE_DATA holder who cannot manage registrations, with the full record", async () => {
+    dependencies.requirePermission.mockImplementation(async (_session: unknown, _event: string, permission: string) => {
+      if (permission === "MANAGE_REGISTRATION") throw new dependencies.MockAccessDeniedError("The MANAGE_REGISTRATION permission is required for this event.");
+      return { user, membership: { role: "FINANCE_MANAGER", permissions: [], status: "ACTIVE" } };
+    });
+    const response = await GET(request(), { params });
+    expect(response.status).toBe(200);
+    expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "VIEW_SENSITIVE_DATA", dependencies.findActiveMembership);
+    expect(dependencies.listRegistrationSignatures).toHaveBeenCalledWith("event-1", "reg-1", true);
+  });
+
+  it("refuses someone with neither permission", async () => {
+    dependencies.requirePermission.mockRejectedValue(new dependencies.MockAccessDeniedError("The permission is required for this event."));
+    expect((await GET(request(), { params })).status).toBe(403);
+    expect(dependencies.requirePermission).toHaveBeenCalledTimes(2);
+    expect(dependencies.listRegistrationSignatures).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back when the person is not on the event at all", async () => {
+    dependencies.requirePermission.mockRejectedValue(new dependencies.MockAccessDeniedError("Not assigned.", "EVENT_ACCESS_DENIED", 403));
+    expect((await GET(request(), { params })).status).toBe(403);
+    expect(dependencies.requirePermission).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses someone without access and answers 404 for another event's registration", async () => {
     dependencies.requirePermission.mockRejectedValue(new dependencies.MockAccessDeniedError("The MANAGE_REGISTRATION permission is required for this event."));
     expect((await GET(request(), { params })).status).toBe(403);

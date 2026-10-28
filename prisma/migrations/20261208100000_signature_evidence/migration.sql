@@ -54,3 +54,30 @@ FOR EACH ROW EXECUTE FUNCTION "SignatureEvidence_append_only"();
 CREATE TRIGGER "SignatureEvidence_no_truncate"
 BEFORE TRUNCATE ON "SignatureEvidence"
 FOR EACH STATEMENT EXECUTE FUNCTION "SignatureEvidence_append_only"();
+
+-- Every reference must belong to the signature's own event, even when the id exists elsewhere: the registration, the attendee
+-- on it (when set) and the form version.
+CREATE FUNCTION "SignatureEvidence_insert_guard"() RETURNS trigger AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM "Registration" r WHERE r."id" = NEW."registrationId" AND r."eventId" = NEW."eventId") THEN
+    RAISE EXCEPTION 'That registration belongs to another event.' USING ERRCODE = 'AE001';
+  END IF;
+  IF NEW."registrationAttendeeId" IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM "RegistrationAttendee" a
+    WHERE a."id" = NEW."registrationAttendeeId" AND a."registrationId" = NEW."registrationId"
+  ) THEN
+    RAISE EXCEPTION 'That attendee is not on this registration.' USING ERRCODE = 'AE001';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "RegistrationFormVersion" v JOIN "RegistrationForm" f ON f."id" = v."formId"
+    WHERE v."id" = NEW."formVersionId" AND f."eventId" = NEW."eventId"
+  ) THEN
+    RAISE EXCEPTION 'That form version belongs to another event.' USING ERRCODE = 'AE001';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "SignatureEvidence_insert_guard"
+BEFORE INSERT ON "SignatureEvidence"
+FOR EACH ROW EXECUTE FUNCTION "SignatureEvidence_insert_guard"();

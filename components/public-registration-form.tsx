@@ -2257,8 +2257,8 @@ export function PublicRegistrationForm({
               The director must sign this themselves; staff cannot sign for them.
             </p>
           ) : (
-            <label className="public-registration-signature-name">
-              Type your full name to sign
+            <div className="public-registration-signature-name">
+              <label htmlFor={id}>Type your full name to sign</label>
               <input
                 id={id}
                 type="text"
@@ -2272,7 +2272,7 @@ export function PublicRegistrationForm({
                 onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.value)}
               />
               <small id={`${id}_signature_help`}>Typing your name here is your signature. We record your name, the statement above, the date and time, and your network address.</small>
-            </label>
+            </div>
           )}
           {fieldSupport(field, context)}
         </fieldset>

@@ -31,6 +31,7 @@ describe("signature evidence wiring (#1265)", () => {
     const migration = read("prisma/migrations/20261208100000_signature_evidence/migration.sql");
     expect(migration).toMatch(/BEFORE UPDATE OR DELETE ON "SignatureEvidence"/);
     expect(migration).toMatch(/BEFORE TRUNCATE ON "SignatureEvidence"/);
+    expect(migration).toMatch(/BEFORE INSERT ON "SignatureEvidence"/);
     expect(migration.match(/ON DELETE RESTRICT/g)).toHaveLength(3);
     expect(migration).not.toMatch(/ALTER TABLE "(?!SignatureEvidence)/);
   });

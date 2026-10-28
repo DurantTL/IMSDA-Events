@@ -47,6 +47,7 @@ import {
   getPublicRegistrationExperience,
   PublicRegistrationError,
   submitPublicRegistration,
+  type SubmissionRequestContext,
   usageFromReservations,
   type ClubSubmissionContext,
   type PublicRegistrationConfirmation,
@@ -625,7 +626,7 @@ function unsupportedFieldProblem(definition: RegistrationFormDefinition, input: 
 export async function submitGeneralLinkRegistration(
   eventSlug: string,
   input: PublicRegistrationInput,
-  options: { locationId?: string | null; teamName?: string | null } = {},
+  options: { locationId?: string | null; teamName?: string | null; requestContext?: SubmissionRequestContext } = {},
   now = new Date(),
 ): Promise<GeneralLinkConfirmation> {
   const prisma = getPrisma();
@@ -701,7 +702,7 @@ export async function submitGeneralLinkRegistration(
   if (picked && matches) {
     return submitMatched({
       event, form, input, organizationId: picked.id, clubName: picked.name, team: teamIdentity, locationId, hash, now,
-      pricingDate: experience.pricingDate, attendeeNames,
+      pricingDate: experience.pricingDate, attendeeNames, requestContext: options.requestContext,
       director: { email: directorEmail, name: directorName },
     }).catch(answerFromWinner);
   }
@@ -736,6 +737,8 @@ async function submitMatched(input: {
   now: Date;
   pricingDate: string;
   attendeeNames: string[];
+  /** Only a team attached straight away (the director's email matched) is submitted now, so only it can carry the request's IP. */
+  requestContext?: SubmissionRequestContext;
 }): Promise<GeneralLinkConfirmation> {
   const submissionId = randomUUID();
   // The reference the screen shows and the email repeats: the same format as a waiting team's, so the screen never differs.
@@ -789,7 +792,7 @@ async function submitMatched(input: {
         },
       });
     },
-  });
+  }, input.requestContext);
   return receivedConfirmation({
     reference,
     email: input.director.email,
@@ -799,6 +802,8 @@ async function submitMatched(input: {
   });
 }
 
+// A team that waits for staff confirmation is not given the request's IP: the pending payload is kept for days and is read back
+// by staff, and the registration is later made by staff, not by the person who typed it. Its signature evidence records a null IP.
 async function createPending(input: {
   event: ClubEvent;
   definition: RegistrationFormDefinition;

@@ -60,9 +60,12 @@ export function planSignatures(
   return planned;
 }
 
-/** The key a registration form submission gives each signature it records, stable across a retried submission. */
-export function signatureEvidenceKey(submissionKey: string, fieldId: string, attendeeClientId: string | null) {
-  return `submission:${submissionKey}:${fieldId}:${attendeeClientId ?? "registration"}`;
+/**
+ * The key a registration form submission gives each signature it records, stable across a retried submission. It names the
+ * registration too, so a client key reused for another registration can never collide with, and so silently drop, its evidence.
+ */
+export function signatureEvidenceKey(registrationId: string, submissionKey: string, fieldId: string, attendeeClientId: string | null) {
+  return `submission:${registrationId}:${submissionKey}:${fieldId}:${attendeeClientId ?? "registration"}`;
 }
 
 /**

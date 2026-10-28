@@ -96,11 +96,11 @@ describe("recording signature evidence with a submission (#1265)", () => {
       eventId: "event-1", registrationId: "reg-1", registrationAttendeeId: null, formVersionId: "version-1", fieldId: "f_reg",
       fieldLabel: "Registrant signature", signerName: "Ann Sample", signedText: STATEMENT, contentHash: sha256(STATEMENT),
       signedAt: new Date("2027-03-04T18:30:00.000Z"), ipAddress: "203.0.113.9", userAgentHash: hashUserAgent("SyntheticAgent/1.0"),
-      idempotencyKey: "submission:submission-1:f_reg:registration",
+      idempotencyKey: "submission:reg-1:submission-1:f_reg:registration",
     });
     expect(JSON.stringify(stored)).not.toContain("SyntheticAgent");
     const attendeeRow = stored.find((row) => row.fieldKey === "att_sig")!;
-    expect(attendeeRow).toMatchObject({ registrationAttendeeId: "att-1", idempotencyKey: "submission:submission-1:f_att:c1" });
+    expect(attendeeRow).toMatchObject({ registrationAttendeeId: "att-1", idempotencyKey: "submission:reg-1:submission-1:f_att:c1" });
   });
 
   it("records a null IP when none could be resolved", async () => {
@@ -120,6 +120,14 @@ describe("recording signature evidence with a submission (#1265)", () => {
     expect(again).toEqual({ planned: 2, recorded: 0 });
     expect(stored).toHaveLength(2);
     expect(stored.every((row) => row.ipAddress === "203.0.113.9")).toBe(true);
+  });
+
+  it("never drops evidence when a client key is reused for another registration", async () => {
+    const { tx, stored } = fakeTx();
+    await recordSubmissionSignatures(tx as never, input({ registrationId: "reg-1" }));
+    const other = await recordSubmissionSignatures(tx as never, input({ registrationId: "reg-2" }));
+    expect(other).toEqual({ planned: 2, recorded: 2 });
+    expect(stored).toHaveLength(4);
   });
 
   it("records nothing, and does not touch the database, when nobody signed", async () => {

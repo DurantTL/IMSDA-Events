@@ -62,9 +62,13 @@ describe("where evidence is written", () => {
   });
 
   it("passes only a hash of the user agent to the evidence, and only from the public route", () => {
-    expect(route).toContain('{ userAgent: request.headers.get("user-agent") }');
+    expect(route).toContain('{ userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) }');
     expect(publicRepository).toContain("userAgentHash: hashUserAgent(requestContext?.userAgent ?? null)");
-    expect(publicRepository).not.toMatch(/ipAddress|x-forwarded-for|clientIp/i);
+    // The IP is for typed-signature evidence only (#1265): the acknowledgment request metadata stays on its approved keys.
+    const metadata = /await recordSubmissionAcknowledgments\(tx, \{[\s\S]*?requestMetadata: (\{[\s\S]*?\n      \}),/.exec(publicRepository)?.[1] ?? "";
+    expect(metadata).toContain("userAgentHash");
+    expect(metadata).not.toMatch(/ipAddress|x-forwarded-for|clientIp/i);
+    expect([...metadata.matchAll(/^\s{8}(\w+):/gm)].map((match) => match[1])).toEqual(["userAgentHash", "formVersionId", "submissionKey"]);
   });
 
   it("reads a policy version's wording into the public experience by exact version id", () => {

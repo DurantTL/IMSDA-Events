@@ -26,6 +26,7 @@ import {
   getPublicRegistrationExperience,
   PublicRegistrationError,
   submitPublicRegistration,
+  type SubmissionRequestContext,
   type GroupSubmissionContext,
 } from "@/modules/forms/public-repository";
 import {
@@ -244,7 +245,7 @@ const waitlistedHonorsMessage = "This group is waitlisted, so classes weren't sa
 export async function submitGroupRegistration(
   eventSlug: string,
   input: PublicRegistrationInput,
-  options: { locationId?: string | null; honorSelections?: Record<string, string[]> } = {},
+  options: { locationId?: string | null; honorSelections?: Record<string, string[]>; requestContext?: SubmissionRequestContext } = {},
   now = new Date(),
 ) {
   const event = await groupEventBySlug(eventSlug);
@@ -258,7 +259,7 @@ export async function submitGroupRegistration(
     report: (reported) => { outcome = reported; },
     registered: (id) => { registrationId = id; },
     prepareAttendees: groupAttendeePreparer(),
-  });
+  }, options.requestContext);
   let honors: { saved: number } | { error: string } | null = null;
   const picks = options.honorSelections ?? {};
   const settled = outcome as { replayed: boolean; waitlisted: boolean } | null;

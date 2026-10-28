@@ -3963,7 +3963,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-registration-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .public-registration-acknowledgment-text strong { display: block; margin-bottom: 6px; }
 /* The typed name of a signature field (#1265): a full-width, thumb-sized input under the statement. */
-.public-registration-signature-name { display: grid; gap: 6px; margin-top: 12px; font-weight: 700; }
+.public-registration-signature-name { display: grid; gap: 6px; margin-top: 12px; }
+.public-registration-signature-name label { font-weight: 700; }
 .public-registration-signature-name input { width: 100%; min-height: 44px; box-sizing: border-box; }
 .public-registration-signature-name small { margin: 4px 0 0; font-weight: 500; }
 

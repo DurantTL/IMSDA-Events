@@ -50,7 +50,7 @@ export async function recordSubmissionSignatures(tx: Prisma.TransactionClient, i
       signedAt: input.signedAt,
       ipAddress: input.ipAddress ?? null,
       userAgentHash,
-      idempotencyKey: signatureEvidenceKey(input.submissionKey, item.field.id, item.attendeeClientId),
+      idempotencyKey: signatureEvidenceKey(input.registrationId, input.submissionKey, item.field.id, item.attendeeClientId),
     });
   }
   if (data.length === 0) return { planned: 0, recorded: 0 };
