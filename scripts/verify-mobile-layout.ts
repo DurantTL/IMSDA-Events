@@ -840,7 +840,7 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
 
 /** Removes the cancellation event and what hangs off it (requests, their timeline, calculations, the registration and its people). */
 /**
- * A published event running today with one confirmed three-person registration (long names) that still owes money, so the
+ * An unpublished event running today with one confirmed three-person registration (long names) that still owes money, so the
  * check-in station (#892) shows its real family list and payment panel. Idempotent.
  */
 async function seedStationEvent(prisma: PrismaClient) {
@@ -854,7 +854,8 @@ async function seedStationEvent(prisma: PrismaClient) {
       data: {
         id: stationEventId, slug: `${P}-station-weekend`, name: "Mobilecheck Station Weekend",
         startsAt: new Date(`${addDays(today, -1)}T12:00:00Z`), endsAt: new Date(`${addDays(today, 1)}T12:00:00Z`), timezone: "America/Chicago",
-        isPublished: true, billingMode: "ATTENDEE_PAY",
+        // Unpublished: a station does not need it, and a published event dated today would join the public calendar's pages.
+        isPublished: false, billingMode: "ATTENDEE_PAY",
       },
     });
     await tx.eventMembership.create({ data: { eventId: stationEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
