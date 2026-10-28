@@ -245,6 +245,8 @@ async function runChecks(stub: Awaited<ReturnType<typeof startSmtpStub>>) {
 
   const agenda = pdfOf("agenda");
   const agendaFile = await createMessageFile(ids.event, new File([new Uint8Array(agenda)], "Friday Agenda.pdf", { type: "application/pdf" }), ids.staff, "attachment", prisma);
+  // Files over 2 MB go to the background mailer (#847); record a large size for the agenda so this check still covers that path.
+  await prisma.messageFile.update({ where: { id: agendaFile.id }, data: { sizeBytes: 3 * 1024 * 1024 } });
   const mapPng = await renderAttendeePassQrPng("synthetic-map-image");
   const mapFile = await createMessageFile(ids.event, new File([new Uint8Array(mapPng)], "map.png", { type: "image/png" }), ids.staff, "inline-image", prisma);
   await publishMessageTemplateVersion(ids.event, template.id, {

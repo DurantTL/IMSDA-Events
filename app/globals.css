@@ -9299,6 +9299,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .profile-account-section > .account-page-body:last-child { margin-bottom: 48px; }
 .profile-account-card { display: grid; gap: 12px; }
 .profile-account-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* A long verified email breaks rather than widening the card, so enlarged text never scrolls the page sideways (#1111). */
+.profile-account-email { overflow-wrap: anywhere; }
 .profile-account-actions .profile-back-links { margin: 0; }
 .profile-account-actions .secondary-button { min-height: 44px; }
 .profile-readonly-field { grid-column: 1 / -1; }
@@ -12759,6 +12761,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   min-width: 0; max-width: 18ch; overflow: hidden; color: var(--muted); font-size: 0.875rem; font-weight: 700;
   text-overflow: ellipsis; white-space: nowrap;
 }
+/* On a wide screen there is room for a long name: show all of it, wrapping to a second line rather than clipping. */
+@media (min-width: 801px) {
+  .account-header-identity { max-width: 34ch; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
+}
 .attendee-ov-layout {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 24px;
   max-width: 1180px; margin: 0 auto 48px;
@@ -13517,6 +13523,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .environment-status-badge.is-unknown { border-color: #cfd6dc; background: #f1f4f6; color: #3d4852; }
 .environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.message-file-storage-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
 
 /* Typed-name signature records on a staff registration (#1265). */
@@ -13525,6 +13532,14 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .registration-signature-record p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .registration-signature-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .registration-signature-record .registration-signature-text { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }
+
+/* Public page and links overview (#448): the short read-only summary at the top of Step 3. */
+.public-page-overview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
+.public-page-overview > div { display: grid; gap: 2px; }
+.public-page-overview dt { font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.public-page-overview dd { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.public-page-overview dd small { display: block; margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.public-page-overview a { display: flex; width: fit-content; align-items: center; min-height: 44px; color: var(--imsda-purple); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.

@@ -16,7 +16,7 @@ export const settingsBlockTitles: Record<SettingsBlockId, string> = {
   basics: "Event basics",
   timing: "Registration timing & waitlist",
   options: "Registration options",
-  "public-info": "Public information & help",
+  "public-info": "Public page and links",
   lodging: "Lodging",
   more: "More settings",
 };
@@ -26,7 +26,7 @@ export const settingsBlockJumpLabels: Record<SettingsBlockId, string> = {
   basics: "Basics",
   timing: "Timing",
   options: "Options",
-  "public-info": "Public info",
+  "public-info": "Public page",
   lodging: "Lodging",
   more: "More settings",
 };
@@ -155,7 +155,7 @@ type SummaryValues = HotelValues & {
 const join = (parts: Array<string | null | undefined | false>) => parts.filter((part): part is string => Boolean(part)).join(" · ");
 
 /** The one-line summary a collapsed block shows under its title. */
-export function blockSummary(id: SettingsBlockId, values: SummaryValues, extra?: { count?: number }): string {
+export function blockSummary(id: SettingsBlockId, values: SummaryValues, extra?: { count?: number; publicState?: string }): string {
   switch (id) {
     case "basics":
       return join([
@@ -177,6 +177,7 @@ export function blockSummary(id: SettingsBlockId, values: SummaryValues, extra?:
     }
     case "public-info":
       return join([
+        extra?.publicState ?? "",
         text(values.supportContact) ? `Support: ${text(values.supportContact)}` : "No support contact yet",
         text(values.publicInfoUrl) ? "IMSDA.org page linked" : "",
       ]);

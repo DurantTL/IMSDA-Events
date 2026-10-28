@@ -117,7 +117,7 @@ describe("the Clubs sidebar groups", () => {
       ["/admin/clubs/summary#club-events"],
       ["/admin/club-forms"],
       ["/admin/clubs/applications", "/admin/clubs/invites"],
-      ["/admin/people"],
+      ["/admin/clubs/leaders", "/admin/people"],
     ]);
     for (const item of clubsAdminGroups.flatMap((group) => group.items)) {
       if (item.href.includes("#")) continue;

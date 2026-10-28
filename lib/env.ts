@@ -113,6 +113,23 @@ export const serverEnvSchema = z
     // sweep endpoint is never reachable without a credential.
     OUTBOX_SWEEP_TOKEN: optionalTrimmed,
 
+    // Message files (#845). The quota is the most one event may keep, in whole megabytes. The grace period is how old an
+    // unreferenced upload must be before the sweep may remove it (never less than 24 hours: the reader clamps it). The
+    // sweep only reports what it would remove unless MESSAGE_FILE_SWEEP_DELETE is exactly "true".
+    MESSAGE_FILE_EVENT_QUOTA_MB: z
+      .string()
+      .trim()
+      .regex(/^[1-9]\d{0,5}$/, "must be a positive whole number of megabytes")
+      .transform(Number)
+      .optional(),
+    MESSAGE_FILE_SWEEP_GRACE_HOURS: z
+      .string()
+      .trim()
+      .regex(/^\d{1,5}$/, "must be a whole number of hours")
+      .transform(Number)
+      .optional(),
+    MESSAGE_FILE_SWEEP_DELETE: optionalTrimmed,
+
     // Encrypts the values that must be recoverable rather than hashed — today,
     // TOTP secrets. Required in production, where MFA is enforced for admins.
     // Set directly for development. Production loads it from a protected file
@@ -398,6 +415,9 @@ export const SERVER_ENV_KEYS = [
     "SQUARE_WEBHOOK_NOTIFICATION_URL",
     "SQUARE_ENABLE_PRODUCTION",
     "OUTBOX_SWEEP_TOKEN",
+    "MESSAGE_FILE_EVENT_QUOTA_MB",
+    "MESSAGE_FILE_SWEEP_GRACE_HOURS",
+    "MESSAGE_FILE_SWEEP_DELETE",
     "SECRET_ENCRYPTION_KEY",
     "SECRET_ENCRYPTION_KEY_FILE",
     "HEALTH_RECORDS_ENABLED",

@@ -1,16 +1,19 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { deleteAsset, readAsset, writeStoredFile } from "@/modules/events/asset-storage";
+import { logError } from "@/lib/logger";
+import { deleteAsset, readAsset, writeStoredFileAt } from "@/modules/events/asset-storage";
 import {
   attachmentSetIssue,
   inlineImageSetIssue,
   isMessageImageType,
   MAX_INLINE_IMAGE_BYTES,
   MAX_MESSAGE_FILE_BYTES,
+  formatFileSize,
   MAX_MESSAGE_FILES_PER_EVENT,
+  MESSAGE_FILE_RESERVATION_TTL_MS,
   MESSAGE_FILE_TYPES,
   messageFileIdsInHtml,
   messageFileIdsInMarkdown,
@@ -20,6 +23,13 @@ import {
   type MessageFileRecord,
 } from "@/modules/communications/message-file-rules";
 import { sniffMessageFileType } from "@/modules/communications/message-file-sniff";
+import { messageFileEventQuotaBytes, messageFileEventQuotaMb } from "@/modules/communications/message-file-config";
+import {
+  SWEEP_TRANSACTION_OPTIONS,
+  errnoCode,
+  findReferencedMessageFileIds,
+  removeStoredBytes,
+} from "@/modules/communications/message-file-storage";
 
 export class MessageFileError extends Error {
   constructor(
@@ -30,6 +40,8 @@ export class MessageFileError extends Error {
       | "FILE_TYPE_NOT_ALLOWED"
       | "FILE_NOT_FOUND"
       | "FILE_LIMIT_REACHED"
+      | "FILE_QUOTA_REACHED"
+      | "UPLOAD_EXPIRED"
       | "FILE_SET_INVALID",
     message: string,
   ) {
@@ -78,9 +90,13 @@ export function toMessageFileRecord(row: Pick<FileRow, "id" | "eventId" | "filen
 
 /**
  * Stores an upload after checking it is what its bytes say it is. Size comes first (before the bytes are read), then
- * the type is taken from the bytes alone, then the file is written under a generated name. A rejected upload leaves
- * nothing behind. `purpose` decides the size ceiling: an image for a message body is held to a small cap, because
- * every recipient downloads it with the message.
+ * the type is taken from the bytes alone, then the event's room is reserved, the file is written under a generated
+ * name, and the row is recorded. A rejected upload leaves nothing behind. `purpose` decides the size ceiling: an
+ * image for a message body is held to a small cap, because every recipient downloads it with the message.
+ *
+ * The event's quota (#845) is counted from what is stored, not from the size a browser declared: the real byte count,
+ * in a transaction that holds a per-event lock, together with every other upload's reservation and every file still
+ * waiting to be removed from disk. Two uploads racing for the last of the room cannot both fit.
  */
 export async function createMessageFile(
   eventId: string,
@@ -101,17 +117,6 @@ export async function createMessageFile(
         : `Each attachment must be ${Math.floor(limit / (1024 * 1024))} MB or smaller.`,
     );
   }
-  // The event must exist (a system administrator can address any id), and holds a bounded number of files, before
-  // a directory is made or a byte is written.
-  if (!(await client.event.findUnique({ where: { id: eventId }, select: { id: true } }))) {
-    throw new MessageFileError("FILE_NOT_FOUND", "That event no longer exists.");
-  }
-  if ((await client.messageFile.count({ where: { eventId } })) >= MAX_MESSAGE_FILES_PER_EVENT) {
-    throw new MessageFileError(
-      "FILE_LIMIT_REACHED",
-      `This event already holds ${MAX_MESSAGE_FILES_PER_EVENT} message files. Ask a system administrator to clear unused ones.`,
-    );
-  }
   const bytes = new Uint8Array(await file.arrayBuffer());
   const type = sniffMessageFileType(bytes);
   if (!type || (purpose === "inline-image" && !isMessageImageType(type))) {
@@ -122,40 +127,113 @@ export async function createMessageFile(
         : "Attach a PDF, PNG, JPEG, WebP, Word, Excel, or PowerPoint file.",
     );
   }
+  // The real size, from the bytes read: `file.size` is only what the request claimed.
+  const sizeBytes = bytes.byteLength;
+  if (sizeBytes === 0 || sizeBytes > limit) {
+    throw new MessageFileError("FILE_TOO_LARGE", "That file is not the size it claimed to be.");
+  }
+  const storageKey = `message-files/${eventId}/${randomUUID()}.${MESSAGE_FILE_TYPES[type].extension}`;
 
-  const stored = await writeStoredFile(`message-files/${eventId}`, MESSAGE_FILE_TYPES[type].extension, bytes);
+  await reserveUpload(client, eventId, storageKey, sizeBytes);
   try {
-    const row = await client.messageFile.create({
-      data: {
-        eventId,
-        filename: safeMessageFileName(file.name, type),
-        contentType: type,
-        sizeBytes: stored.byteSize,
-        sha256: stored.checksum,
-        storageKey: stored.storageKey,
-        isInlineImage: purpose === "inline-image",
-        uploadedByUserId: actorUserId,
-      },
-      select: fileSelect,
-    });
-    await client.auditLog.create({
-      data: {
-        eventId,
-        actorUserId,
-        action: "MESSAGE_FILE_UPLOADED",
-        entityType: "MessageFile",
-        entityId: row.id,
-        correlationId: randomUUID(),
-        // Names and sizes only: never the content, its hash, or where it is stored.
-        summary: `Uploaded ${purpose === "inline-image" ? "an image for a message" : "a message attachment"}: ${row.filename} (${row.sizeBytes} bytes).`,
-        metadata: { files: [{ filename: row.filename, sizeBytes: row.sizeBytes }] },
-      },
+    const stored = await writeStoredFileAt(storageKey, bytes);
+    const row = await client.$transaction(async (tx) => {
+      // The reservation goes in the same transaction as the row, so the bytes are never counted twice or not at all.
+      // One that is already gone was reconciled as abandoned while this upload was still running.
+      const released = await tx.messageFileUploadReservation.deleteMany({ where: { storageKey } });
+      if (released.count !== 1) {
+        throw new MessageFileError("UPLOAD_EXPIRED", "That upload took too long and was cancelled. Upload the file again.");
+      }
+      const created = await tx.messageFile.create({
+        data: {
+          eventId,
+          filename: safeMessageFileName(file.name, type),
+          contentType: type,
+          sizeBytes: stored.byteSize,
+          sha256: stored.checksum,
+          storageKey: stored.storageKey,
+          isInlineImage: purpose === "inline-image",
+          uploadedByUserId: actorUserId,
+        },
+        select: fileSelect,
+      });
+      await tx.auditLog.create({
+        data: {
+          eventId,
+          actorUserId,
+          action: "MESSAGE_FILE_UPLOADED",
+          entityType: "MessageFile",
+          entityId: created.id,
+          correlationId: randomUUID(),
+          // Names and sizes only: never the content, its hash, or where it is stored.
+          summary: `Uploaded ${purpose === "inline-image" ? "an image for a message" : "a message attachment"}: ${created.filename} (${created.sizeBytes} bytes).`,
+          metadata: { files: [{ filename: created.filename, sizeBytes: created.sizeBytes }] },
+        },
+      });
+      return created;
     });
     return toMessageFileRecord(row);
   } catch (error) {
-    // The row is the record of truth; without it the file is unreachable, so it goes rather than sitting on disk.
-    await deleteAsset(stored.storageKey).catch(() => undefined);
+    await abandonUpload(client, eventId, storageKey);
     throw error;
+  }
+}
+
+/**
+ * Checks the event's room and records the claim on it, under a lock that serialises every upload to this event.
+ * Throws `FILE_NOT_FOUND`, `FILE_LIMIT_REACHED` or `FILE_QUOTA_REACHED` without writing anything.
+ */
+async function reserveUpload(client: PrismaClient, eventId: string, storageKey: string, sizeBytes: number) {
+  await client.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`message-file-quota:${eventId}`}, 0))`;
+    // The event must exist (a system administrator can address any id) before a directory is made or a byte is written.
+    if (!(await tx.event.findUnique({ where: { id: eventId }, select: { id: true } }))) {
+      throw new MessageFileError("FILE_NOT_FOUND", "That event no longer exists.");
+    }
+    const [files, reserved, cleanup] = await Promise.all([
+      tx.messageFile.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } }),
+      tx.messageFileUploadReservation.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } }),
+      tx.messageFileStorageCleanup.aggregate({ where: { eventId }, _sum: { sizeBytes: true } }),
+    ]);
+    if (files._count._all + reserved._count._all >= MAX_MESSAGE_FILES_PER_EVENT) {
+      throw new MessageFileError(
+        "FILE_LIMIT_REACHED",
+        `This event already holds ${MAX_MESSAGE_FILES_PER_EVENT} message files. Ask a system administrator to clear unused ones.`,
+      );
+    }
+    // Files still waiting to be removed from disk count too: a failed delete has freed nothing.
+    const used = (files._sum.sizeBytes ?? 0) + (reserved._sum.sizeBytes ?? 0) + (cleanup._sum.sizeBytes ?? 0);
+    if (used + sizeBytes > messageFileEventQuotaBytes()) {
+      throw new MessageFileError(
+        "FILE_QUOTA_REACHED",
+        `This event's message files use ${formatFileSize(used)} of its ${messageFileEventQuotaMb()} MB limit, so this ${formatFileSize(sizeBytes)} file does not fit. Remove attachments you no longer need, or ask a system administrator.`,
+      );
+    }
+    await tx.messageFileUploadReservation.create({
+      data: { eventId, storageKey, sizeBytes, expiresAt: new Date(Date.now() + MESSAGE_FILE_RESERVATION_TTL_MS) },
+    });
+  });
+}
+
+/**
+ * An upload that failed after reserving room: the bytes go first (best effort), and only when they are gone is the
+ * reservation released. If the bytes cannot be removed the reservation stays, still counting their size, and the
+ * sweep reconciles it once it has expired. Never throws, so the original error is what the caller sees.
+ */
+async function abandonUpload(client: PrismaClient, eventId: string, storageKey: string) {
+  try {
+    await deleteAsset(storageKey);
+  } catch (error) {
+    logError("An upload's bytes could not be removed after it failed; its reservation was kept for the sweep", error, {
+      eventId,
+      errorCode: errnoCode(error),
+    });
+    return;
+  }
+  try {
+    await client.messageFileUploadReservation.deleteMany({ where: { storageKey } });
+  } catch (error) {
+    logError("An upload's reservation could not be released after it failed; the sweep will reconcile it", error, { eventId });
   }
 }
 
@@ -199,8 +277,33 @@ export async function readMessageFileBytes(file: { storageKey: string; sha256: s
 }
 
 /**
+ * Locks the named files of this event `FOR SHARE` until the surrounding transaction ends and returns what it found.
+ * Every save that records a reference to a file (a link row, or `msgfile:<id>` in a body, which has no foreign key)
+ * validates it through this, in the same transaction that writes the reference. The sweep locks its candidates
+ * `FOR UPDATE` and re-reads every reference only after that, so exactly one of two outcomes happens: the save holds
+ * the lock, the sweep waits and then sees the committed reference and keeps the file; or the sweep deletes first,
+ * and the save finds the file gone and refuses (`FILE_SET_INVALID`) instead of recording a dangling reference.
+ * Rows are locked in id order so two saves cannot deadlock each other.
+ */
+export async function lockMessageFilesForShare(
+  client: FileClient,
+  eventId: string,
+  ids: readonly string[],
+  isInlineImage: boolean,
+) {
+  if (ids.length === 0) return [];
+  return client.$queryRaw<Array<{ id: string; sizeBytes: number }>>(Prisma.sql`
+    SELECT "id", "sizeBytes" FROM "MessageFile"
+    WHERE "id" IN (${Prisma.join([...ids])}) AND "eventId" = ${eventId} AND "isInlineImage" = ${isInlineImage}
+    ORDER BY "id"
+    FOR SHARE
+  `);
+}
+
+/**
  * The attachment files an author chose, in the order they chose them, checked to be this event's own downloadable
- * files and to fit the per-message limits together. Throws `FILE_SET_INVALID` otherwise.
+ * files and to fit the per-message limits together. Throws `FILE_SET_INVALID` otherwise. The files stay locked
+ * (`lockMessageFilesForShare`) until the caller's transaction ends.
  */
 export async function resolveAttachmentSet(
   client: FileClient,
@@ -209,10 +312,7 @@ export async function resolveAttachmentSet(
 ) {
   const unique = [...new Set(fileIds)];
   if (unique.length === 0) return [];
-  const rows = await client.messageFile.findMany({
-    where: { id: { in: unique }, eventId, isInlineImage: false },
-    select: { id: true, sizeBytes: true },
-  });
+  const rows = await lockMessageFilesForShare(client, eventId, unique, false);
   if (rows.length !== unique.length) {
     throw new MessageFileError("FILE_SET_INVALID", "One of the attachments is no longer available. Remove it and attach it again.");
   }
@@ -223,7 +323,8 @@ export async function resolveAttachmentSet(
 
 /**
  * Every uploaded image a body refers to must be one of this event's own inline images, and together they must fit
- * the per-message picture limits, so delivery never has to drop one.
+ * the per-message picture limits, so delivery never has to drop one. The images stay locked until the caller's
+ * transaction ends, so run this in the transaction that writes the body.
  */
 export async function assertBodyImagesBelongToEvent(
   client: FileClient,
@@ -232,10 +333,7 @@ export async function assertBodyImagesBelongToEvent(
 ) {
   const unique = [...new Set(ids)];
   if (unique.length === 0) return;
-  const rows = await client.messageFile.findMany({
-    where: { id: { in: unique }, eventId, isInlineImage: true },
-    select: { sizeBytes: true },
-  });
+  const rows = await lockMessageFilesForShare(client, eventId, unique, true);
   if (rows.length !== unique.length) {
     throw new MessageFileError("FILE_SET_INVALID", "An image in the message is no longer available. Remove it and insert it again.");
   }
@@ -475,28 +573,41 @@ export async function copyOutboxFiles(tx: FileClient, fromMessageId: string, toM
   });
 }
 
-/** Removes a file nothing refers to any more, from disk and from the table. Safe to call on a file still in use. */
+/**
+ * Removes a file nothing refers to any more, from the table and then from disk. Safe to call on a file still in use:
+ * it locks the row, re-checks every reference (links, and `msgfile:` in any body or snapshot, in any event), and keeps
+ * the file if there is one. This is a person's own request for one file, so it does not wait for the sweep's grace period.
+ * The row delete and a cleanup record for the bytes commit together; the bytes are deleted after, and if that fails the
+ * record stays for the sweep to retry (and keeps counting against the event's quota).
+ */
 export async function deleteMessageFileIfUnused(eventId: string, fileId: string, client: PrismaClient = getPrisma()) {
-  const file = await client.messageFile.findFirst({
-    where: {
-      id: fileId,
-      eventId,
-      templateVersions: { none: {} },
-      announcements: { none: {} },
-      outboxLinks: { none: {} },
-    },
-    select: { id: true, storageKey: true },
-  });
-  if (!file) return false;
-  let removed: { count: number };
+  let cleanup: { id: string; eventId: string; storageKey: string; sizeBytes: number } | null;
   try {
-    removed = await client.messageFile.deleteMany({ where: { id: file.id } });
-  } catch {
-    // The foreign keys are RESTRICT: if anything linked the file between the check and the delete, the database
-    // refuses the delete and the file stays.
-    return false;
+    cleanup = await client.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ id: string; storageKey: string; sizeBytes: number }>>(Prisma.sql`
+        SELECT "id", "storageKey", "sizeBytes" FROM "MessageFile"
+        WHERE "id" = ${fileId} AND "eventId" = ${eventId}
+        FOR UPDATE
+      `);
+      const file = locked[0];
+      if (!file) return null;
+      if ((await findReferencedMessageFileIds(tx, [file.id])).size > 0) return null;
+      const removed = await tx.messageFile.deleteMany({ where: { id: file.id } });
+      if (removed.count === 0) return null;
+      return tx.messageFileStorageCleanup.upsert({
+        where: { storageKey: file.storageKey },
+        create: { eventId, storageKey: file.storageKey, sizeBytes: file.sizeBytes, reason: "REMOVED" },
+        update: {},
+        select: { id: true, eventId: true, storageKey: true, sizeBytes: true },
+      });
+    }, SWEEP_TRANSACTION_OPTIONS);
+  } catch (error) {
+    // The foreign keys are RESTRICT: if anything linked the file after the check, the database refuses the delete
+    // (a foreign key violation) and the file stays. Any other failure (a timeout, a lost connection) is not "in use".
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") return false;
+    throw error;
   }
-  if (removed.count === 0) return false;
-  await deleteAsset(file.storageKey).catch(() => undefined);
+  if (!cleanup) return false;
+  await removeStoredBytes(client, [cleanup], new Date());
   return true;
 }

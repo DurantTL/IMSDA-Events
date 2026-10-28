@@ -123,11 +123,13 @@ async function loadAnnouncementBroadcastState(
     ...messageFileIdsInMarkdown(template?.versions[0]?.bodyTemplate ?? ""),
   ])];
   let pictureProblem: string | null = null;
+  let pictureBytes = 0;
   if (pictureIds.length > 0) {
     const pictures = await client.messageFile.findMany({
       where: { id: { in: pictureIds }, eventId: input.eventId, isInlineImage: true },
       select: { sizeBytes: true },
     });
+    pictureBytes = pictures.reduce((sum, picture) => sum + picture.sizeBytes, 0);
     pictureProblem = pictures.length !== pictureIds.length
       ? "A picture in this announcement or its template is no longer available. Edit it and insert the picture again."
       : inlineImageSetIssue(pictures)?.message ?? null;
@@ -175,6 +177,7 @@ async function loadAnnouncementBroadcastState(
       attachments,
       pictureIds,
       pictureProblem,
+      pictureBytes,
       essential: announcement.isEssential,
     },
     undefined,
@@ -386,7 +389,7 @@ export async function broadcastPublishedAnnouncement(input: {
       replayed: false,
     };
   }, { timeout: BATCH_TRANSACTION_TIMEOUT_MS, maxWait: BATCH_TRANSACTION_MAX_WAIT_MS });
-  // Real email with files is left to the outbox worker inside `processQueuedMessageIdsAfterCommit`.
+  // Real email whose files total over the size threshold is left to the outbox worker inside `processQueuedMessageIdsAfterCommit`.
   await processQueuedMessageIdsAfterCommit(result.pendingMessageIds);
   return {
     broadcastId: input.batchId,

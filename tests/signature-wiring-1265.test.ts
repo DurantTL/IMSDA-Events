@@ -38,7 +38,7 @@ describe("signature evidence wiring (#1265)", () => {
   });
 
   it("keeps the append-only trigger and RESTRICT references in the migration", () => {
-    const migration = read("prisma/migrations/20261208100000_signature_evidence/migration.sql");
+    const migration = read("prisma/migrations/20261210100000_signature_evidence/migration.sql");
     expect(migration).toMatch(/BEFORE UPDATE OR DELETE ON "SignatureEvidence"/);
     expect(migration).toMatch(/BEFORE TRUNCATE ON "SignatureEvidence"/);
     expect(migration).toMatch(/BEFORE INSERT ON "SignatureEvidence"/);

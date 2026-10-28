@@ -10,7 +10,7 @@ import {
   selectRegistrationMessageTemplate,
   type MessageTemplateKey,
 } from "@/modules/communications/templates";
-import { attachmentSetIssue } from "@/modules/communications/message-file-rules";
+import { attachmentSetIssue, filesNeedBackgroundMailer } from "@/modules/communications/message-file-rules";
 import {
   ANNOUNCEMENT_OPT_OUT_REASON,
   announcementOptOutFor,
@@ -159,8 +159,10 @@ export type SelectedAudiencePreview = {
   attachments: Array<{ filename: string; sizeBytes: number }>;
   /** Why the files or pictures cannot be sent, if so; sending is refused until a human fixes the template. */
   attachmentProblem: string | null;
-  /** Whether the messages carry any file or picture; real email that does is sent by the background mailer. */
+  /** Whether the messages carry any file or picture. */
   carriesFiles: boolean;
+  /** Real email whose files total over the size threshold (#847); smaller sets are sent at once. */
+  sentByBackgroundMailer: boolean;
   recipients: SelectedAudienceRecipient[];
   skipped: SelectedAudienceSkip[];
 };
@@ -182,6 +184,8 @@ export type SelectedAudiencePreviewContext = {
   attachments?: ReadonlyArray<{ id: string; filename: string; sizeBytes: number }>;
   pictureIds?: readonly string[];
   pictureProblem?: string | null;
+  /** The embedded pictures' sizes together, which count toward the background-mailer threshold (#847). */
+  pictureBytes?: number;
   /**
    * Opt-outs that apply to these addresses for this event (#838). Only an announcement honours them. A staff-chosen
    * announcement is written in the dialog, not an Announcement row, so there is nothing to mark essential: an opted-out
@@ -362,6 +366,8 @@ export function computeSelectedAudiencePreview(
     attachments: attachments.map((file) => ({ filename: file.filename, sizeBytes: file.sizeBytes })),
     attachmentProblem,
     carriesFiles: attachments.length > 0 || pictureIds.length > 0,
+    sentByBackgroundMailer: context.deliveryMode === "EXTERNAL_EMAIL"
+      && filesNeedBackgroundMailer([...attachments, { sizeBytes: context.pictureBytes ?? 0 }]),
     recipients,
     skipped,
   };
