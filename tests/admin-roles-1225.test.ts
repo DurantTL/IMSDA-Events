@@ -64,7 +64,7 @@ describe("roles held (pure)", () => {
   });
 
   it("names the roles the way the pills do", () => {
-    expect(Object.values(ADMIN_ROLE_LABELS)).toEqual(["Events Administrator", "Clubs Administrator", "System Administrator"]);
+    expect(Object.values(ADMIN_ROLE_LABELS)).toEqual(["Events Administrator", "Clubs Administrator", "System administrator"]);
   });
 
   it("says how many roles are held only when there is a choice", () => {

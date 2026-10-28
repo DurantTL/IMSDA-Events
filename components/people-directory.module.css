@@ -55,6 +55,7 @@
 .check { display: flex; align-items: flex-start; gap: 10px; min-width: 0; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .check input { flex: none; width: 24px; height: 24px; margin: 10px 0 0; }
 .check span { display: grid; gap: 2px; min-width: 0; padding-top: 10px; overflow-wrap: anywhere; }
+.inviteForm :global(.role-details) { margin-left: 34px; }
 .check small { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
 .rowPair { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; min-width: 0; }
 .rowPair .field { flex: 1 1 200px; }

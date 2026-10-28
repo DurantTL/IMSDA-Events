@@ -2052,6 +2052,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-record small { margin-top: 3px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.61rem); line-height: 1.45; }
 .staff-record > span:last-child { color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), 0.67rem); font-weight: 700; }
 .staff-person { display: flex; align-items: center; gap: 10px; }
+.staff-person > span { min-width: 0; }
+.staff-person small { overflow-wrap: anywhere; }
 .permission-matrix { overflow: hidden; }
 .role-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .role-grid article { border: 1px solid var(--line); border-radius: 13px; background: #fbfcfd; padding: 14px; }
@@ -13513,6 +13515,15 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .environment-status-missing { flex-basis: 100%; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
+
+/* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
+.role-details { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.role-details > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.role-details > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.role-details .role-details-body { display: grid; gap: 8px; min-width: 0; padding: 0 0 6px; }
+.role-details .role-details-body .role-details-label { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.role-details .role-details-body ul { display: block; margin: 2px 0 0; padding-left: 20px; list-style: disc; }
+.role-details .role-details-body li { display: list-item; color: inherit; text-transform: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.

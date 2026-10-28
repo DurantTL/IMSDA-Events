@@ -11,6 +11,7 @@ import {
   unlinkStaffAndAttendee,
 } from "@/modules/account-merge/hand-link";
 import { changeAttendeeEmail, resetAttendeeTwoStep, sendAttendeeVerificationByAdmin, signOutAttendeeEverywhere } from "@/modules/system-admin/user-admin";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -53,7 +54,7 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
       await setAreaCoordinator(accountId, input.on, actor.id);
       return Response.json({
         message: input.on
-          ? "Now an Area Coordinator: sees every club, view only, after a second sign-in step."
+          ? `Now an ${systemRoleText.AREA_COORDINATOR.name}. ${systemRoleText.AREA_COORDINATOR.summary}`
           : "No longer an Area Coordinator.",
       });
     }

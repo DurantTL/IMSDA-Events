@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import type { GrantPlanRow, GrantPlanState } from "@/modules/system-admin/people-directory-model";
@@ -11,9 +12,9 @@ type Names = Record<string, string>;
 
 function itemLabel(row: GrantPlanRow, eventNames: Names, clubNames: Names) {
   const { item } = row;
-  if (item.type === "sa") return "System administrator";
-  if (item.type === "ca") return "Clubs Administrator";
-  if (item.type === "ac") return "Area Coordinator";
+  if (item.type === "sa") return systemRoleText.SYSTEM_ADMIN.name;
+  if (item.type === "ca") return systemRoleText.CLUBS_ADMIN.name;
+  if (item.type === "ac") return systemRoleText.AREA_COORDINATOR.name;
   if (item.type === "event") return `${eventNames[item.eventId] ?? "An event"}: ${roleLabel(item.role)}`;
   return `${clubNames[item.organizationId] ?? "A club"}: ${clubDirectorRoleLabels[item.role]}`;
 }
