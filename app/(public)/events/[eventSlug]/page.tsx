@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { SiteNoticesView } from "@/components/site-notices-view";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
@@ -282,6 +283,7 @@ export default async function PublicEventPage({
           </div>
         </div>
       </header>
+      <PublicMetricsBeacon hits={[{ metric: "EVENT_PAGE_VIEW", dimension: landing.event.slug }]} />
       <SiteNoticesView notices={activeNotices(hubContent, calendarDateIn(new Date()))} />
       <TranslateHint />
 

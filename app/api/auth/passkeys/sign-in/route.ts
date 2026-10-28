@@ -1,6 +1,7 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { z } from "zod";
 import { cookies } from "next/headers";
+import { recordPublicMetric } from "@/modules/public-metrics/repository";
 import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
 import {
   ATTENDEE_SESSION_COOKIE_NAME,
@@ -96,8 +97,10 @@ async function postHandler(request: Request) {
       { id: result.userId, globalRole: result.globalRole },
       next,
     );
+    void recordPublicMetric("LOGIN_SUCCESS", "staff-passkey");
     return applyRateLimitHeaders(Response.json({ ok: true, redirectTo }), rateLimit);
   } catch (error) {
+    void recordPublicMetric("LOGIN_FAILURE", "staff-passkey");
     return passkeyApiError(error, "Signing in with a passkey");
   }
 }

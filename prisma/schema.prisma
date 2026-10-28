@@ -2833,6 +2833,31 @@ model SiteContentRevision {
   @@index([status])
 }
 
+enum PublicMetric {
+  EVENT_PAGE_VIEW
+  DIRECTORY_SEARCH
+  DIRECTORY_FILTER
+  REGISTRATION_START
+  REGISTRATION_COMPLETE
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  NOT_FOUND
+  IMAGE_ERROR
+  WEB_VITAL
+}
+
+/// Privacy-safe public analytics (#111): a count per day, metric and allowlisted dimension, and nothing else. No
+/// person, session, address, device, search text, URL or referrer is ever stored here (docs/PUBLIC-ANALYTICS.md).
+model PublicMetricDaily {
+  day       DateTime     @db.Date
+  metric    PublicMetric
+  dimension String       @default("")
+  count     Int          @default(0)
+
+  @@id([day, metric, dimension])
+  @@index([metric, day])
+}
+
 model ClubInvite {
   id                String           @id @default(cuid())
   organizationId    String

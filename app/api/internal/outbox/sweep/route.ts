@@ -8,6 +8,7 @@ import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminder
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { pruneAlertFeed } from "@/modules/notifications/feed";
+import { prunePublicMetrics } from "@/modules/public-metrics/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
@@ -57,6 +58,12 @@ async function postHandler(request: Request) {
     // Emails and audit rows are untouched. Its failure must not make a successful sweep look failed.
     const alertFeedRetention = await pruneAlertFeed().catch((error) => {
       logError("The alert feed retention sweep failed after a successful outbox sweep", error);
+      return null;
+    });
+    // Public analytics (#111): daily aggregate rows older than 400 days are deleted. Counts only, nothing personal.
+    // Its failure must not make a successful sweep look failed.
+    const publicMetricsRetention = await prunePublicMetrics().catch((error) => {
+      logError("The public analytics retention sweep failed after a successful outbox sweep", error);
       return null;
     });
     // The daily location waitlist digest to Area Coordinators and event staff
@@ -135,6 +142,7 @@ async function postHandler(request: Request) {
       },
       communityRetention,
       alertFeedRetention,
+      publicMetricsRetention,
       calendarFeeds,
       deadlineReminders,
       hostedLinks,

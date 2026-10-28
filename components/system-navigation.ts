@@ -24,6 +24,7 @@ import {
   Bell,
   BookmarkPlus,
   Megaphone,
+  LineChart,
 } from "lucide-react";
 
 /**
@@ -115,6 +116,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
       { href: "/admin/email", label: "Email", description: "The central sender, paused events, staff alerts, and email health.", icon: Bell, alsoActiveFor: ["/admin/notifications"] },
       { href: "/admin/site-content", label: "Homepage & site content", description: "Notices, announcements, featured events, header links and the footer on the public pages, with preview and publish.", icon: Megaphone },
+      { href: "/admin/analytics", label: "Public analytics", description: "Anonymous 30-day counts: event views, registration funnel, sign-in rates, broken links and page speed.", icon: LineChart },
       { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
     ],
@@ -216,6 +218,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/(email|notifications)(\/|$)/, "Email"],
   [/^\/admin\/readiness(\/|$)/, "System readiness"],
   [/^\/admin\/site-content(\/|$)/, "Homepage & site content"],
+  [/^\/admin\/analytics(\/|$)/, "Public analytics"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
 ];

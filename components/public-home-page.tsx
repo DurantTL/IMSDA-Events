@@ -3,6 +3,7 @@ import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { HomepageMinistryIconView } from "@/components/homepage-ministry-icon";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { eventSlugFromHref, eventTransitionNames } from "@/modules/events/view-transition";
 import { EventPhotoCard, eventCardImage } from "@/components/event-photo-card";
@@ -164,6 +165,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
         </div>
       </header>
 
+      {!preview && <PublicMetricsBeacon />}
       <SiteNoticesView notices={activeNotices(content, today)} />
 
       <section className="public-registration-hero calendar-hero public-home-banner season-band">

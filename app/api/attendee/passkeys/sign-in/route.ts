@@ -1,5 +1,6 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { cookies } from "next/headers";
+import { recordPublicMetric } from "@/modules/public-metrics/repository";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { passkeyApiError } from "@/modules/attendee-accounts/passkey-api";
@@ -42,8 +43,10 @@ async function postHandler(request: Request) {
       maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    void recordPublicMetric("LOGIN_SUCCESS", "attendee-passkey");
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {
+    void recordPublicMetric("LOGIN_FAILURE", "attendee-passkey");
     return passkeyApiError(error, "Signing in with a passkey");
   }
 }

@@ -80,6 +80,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/organizations/background-checks", "System", "System management", "Catalogs and settings", "Sterling Volunteers"],
   ["/admin/email", "System", "System management", "Catalogs and settings", "Email"],
   ["/admin/site-content", "System", "System management", "Catalogs and settings", "Homepage & site content"],
+  ["/admin/analytics", "System", "System management", "Catalogs and settings", "Public analytics"],
   ["/admin/settings", "System", "System management", "Catalogs and settings", "Platform settings"],
   ["/admin/readiness", "System", "System management", "Catalogs and settings", "System readiness"],
   // Event sidebar

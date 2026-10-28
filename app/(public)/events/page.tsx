@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { SiteNoticesView } from "@/components/site-notices-view";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
@@ -24,6 +25,7 @@ import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/rep
 import { pinFeatured } from "@/modules/events/featured-domain";
 import { listFeaturedEventRows } from "@/modules/events/featured";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
+import { directoryFiltersInUse } from "@/modules/public-metrics/domain";
 import { activeNotices, applyCategoryPreferences } from "@/modules/site-content/hub-content-domain";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -80,6 +82,8 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   const filters = parseEventDirectoryFilters(await searchParams);
   const filter = filters.audience;
   const filtering = hasActiveDirectoryFilters(filters);
+  // Only which filters were used is counted, never what was typed or chosen (#111).
+  const used = directoryFiltersInUse(filters);
   const today = conferenceToday();
   const windowEnd = addDays(today, openRegistrationWindowDays);
   const [calendarItems, directsClub, featuredRows, hubContent] = await Promise.all([
@@ -109,6 +113,10 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
         </div>
       </header>
 
+      <PublicMetricsBeacon hits={[
+        ...(used.search ? [{ metric: "DIRECTORY_SEARCH" as const }] : []),
+        ...used.filters.map((name) => ({ metric: "DIRECTORY_FILTER" as const, dimension: name })),
+      ]} />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
       <section className="public-registration-hero calendar-hero public-home-banner">

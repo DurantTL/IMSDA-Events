@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { recordPublicMetric } from "@/modules/public-metrics/repository";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { authenticateAttendee } from "@/modules/attendee-accounts/account-service";
@@ -55,6 +56,7 @@ async function postHandler(request: Request) {
     // password. Saying "verify your email first" would confirm the address is
     // known and that a sign-up for it is outstanding.
     if (!authentication) {
+      void recordPublicMetric("LOGIN_FAILURE", "attendee-password");
       return applyRateLimitHeaders(Response.json(REFUSAL, { status: 401 }), rateLimit);
     }
 
@@ -67,6 +69,7 @@ async function postHandler(request: Request) {
       maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    void recordPublicMetric("LOGIN_SUCCESS", "attendee-password");
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {
     if (error instanceof z.ZodError) {
