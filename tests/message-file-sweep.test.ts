@@ -150,7 +150,13 @@ function fakeDatabase() {
         return { count: 1 };
       }),
     },
+    // The event's quota lock (#845): recorded in order with the row locks, so a test can check which came first.
+    $executeRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      state.sql.push(`${strings.join("?")} ${JSON.stringify(values)}`);
+      return 1;
+    }),
     messageFileUploadReservation: {
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => state.reservations.find((row) => row.id === where.id) ?? null),
       count: vi.fn(async ({ where }: { where: { expiresAt: { lt: Date } } }) => state.reservations.filter((row) => row.expiresAt < where.expiresAt.lt).length),
       findMany: vi.fn(async ({ where, take }: { where: { expiresAt: { lt: Date } }; take: number }) => state.reservations.filter((row) => row.expiresAt < where.expiresAt.lt).slice(0, take)),
       deleteMany: vi.fn(async ({ where }: { where: { id: string } }) => {
@@ -393,6 +399,13 @@ describe("sweepMessageFiles apply (#845)", () => {
     expect(state.cleanup).toHaveLength(1);
     expect(state.cleanup[0]).toMatchObject({ reason: "UPLOAD_ABORTED", sizeBytes: 20, lastErrorCode: "EBUSY", attempts: 1 });
     expect(state.files.map((file) => file.id)).toContain("committed-file");
+    // Each takes the event's quota lock before its row lock, the order an upload uses, so the two cannot deadlock.
+    const order = state.sql.filter((text) => text.includes("pg_advisory_xact_lock") || text.includes('FROM "MessageFileUploadReservation"'));
+    expect(order).toHaveLength(6);
+    for (let i = 0; i < order.length; i += 2) {
+      expect(order[i]).toContain("message-file-quota:event-1");
+      expect(order[i + 1]).toContain("FOR UPDATE");
+    }
   });
 });
 
@@ -533,6 +546,9 @@ describe("createMessageFile quota and reservations (#845)", () => {
     expect(mocks.writeStoredFileAt).toHaveBeenCalledWith(key, expect.any(Uint8Array));
     expect(reservations).toHaveLength(0);
     expect(client.auditLog.create).toHaveBeenCalledTimes(1);
+    // The commit takes the event's quota lock too, so a reservation check never counts the upload in neither place.
+    expect(client.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(client.$executeRaw.mock.calls[1])).toContain("message-file-quota:event-1");
   });
 
   it("releases the reservation when the write fails, after deleting the bytes", async () => {

@@ -138,6 +138,8 @@ export async function createMessageFile(
   try {
     const stored = await writeStoredFileAt(storageKey, bytes);
     const row = await client.$transaction(async (tx) => {
+      // Under the event's quota lock, so a reservation check never reads the files and the reservations either side of this commit.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`message-file-quota:${eventId}`}, 0))`;
       // The reservation goes in the same transaction as the row, so the bytes are never counted twice or not at all.
       // One that is already gone was reconciled as abandoned while this upload was still running.
       const released = await tx.messageFileUploadReservation.deleteMany({ where: { storageKey } });
@@ -190,11 +192,11 @@ async function reserveUpload(client: PrismaClient, eventId: string, storageKey: 
     if (!(await tx.event.findUnique({ where: { id: eventId }, select: { id: true } }))) {
       throw new MessageFileError("FILE_NOT_FOUND", "That event no longer exists.");
     }
-    const [files, reserved, cleanup] = await Promise.all([
-      tx.messageFile.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } }),
-      tx.messageFileUploadReservation.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } }),
-      tx.messageFileStorageCleanup.aggregate({ where: { eventId }, _sum: { sizeBytes: true } }),
-    ]);
+    // In this order, one after another: a file deleted without this lock moves to cleanup in one commit, and reading files
+    // before cleanup can only count its bytes twice (a cautious refusal), never not at all.
+    const files = await tx.messageFile.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } });
+    const reserved = await tx.messageFileUploadReservation.aggregate({ where: { eventId }, _count: { _all: true }, _sum: { sizeBytes: true } });
+    const cleanup = await tx.messageFileStorageCleanup.aggregate({ where: { eventId }, _sum: { sizeBytes: true } });
     if (files._count._all + reserved._count._all >= MAX_MESSAGE_FILES_PER_EVENT) {
       throw new MessageFileError(
         "FILE_LIMIT_REACHED",
