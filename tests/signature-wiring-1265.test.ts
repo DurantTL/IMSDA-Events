@@ -13,6 +13,16 @@ describe("signature evidence wiring (#1265)", () => {
     expect(route).toContain("ipAddress: trustedClientIpAddress(request)");
   });
 
+  it("passes the trusted IP from the group, club and general-link submit routes", () => {
+    for (const path of [
+      "app/api/public/events/[eventSlug]/group-registrations/route.ts",
+      "app/api/attendee/clubs/[organizationId]/events/[eventId]/registration/route.ts",
+      "app/api/public/events/[eventSlug]/general-registrations/route.ts",
+    ]) {
+      expect(read(path)).toContain("requestContext: { userAgent: request.headers.get(\"user-agent\"), ipAddress: trustedClientIpAddress(request) }");
+    }
+  });
+
   it("drops signature answers when staff act as a director", () => {
     expect(read("modules/forms/public-repository.ts")).toMatch(/actAsAcknowledgmentKeys = club\?\.submittedByUserId\s*\?\s*new Set\(\[\.\.\.acknowledgmentFields\(definition\), \.\.\.signatureFields\(definition\)\]/);
   });
