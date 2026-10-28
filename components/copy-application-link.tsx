@@ -7,7 +7,7 @@ import { Check, Copy } from "lucide-react";
  * The address of a form's public open application (#1229), with a button to copy it. The address is always shown as
  * text too, so it can be selected and copied by hand when the clipboard is unavailable.
  */
-export function CopyApplicationLink({ url, label = "Copy application link", showAddress = true }: { url: string; label?: string; showAddress?: boolean }) {
+export function CopyApplicationLink({ url, label = "Copy application link", showAddress = true, noun = "application link" }: { url: string; label?: string; showAddress?: boolean; noun?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   async function copy() {
@@ -26,7 +26,7 @@ export function CopyApplicationLink({ url, label = "Copy application link", show
       </button>
       {showAddress && <code>{url}</code>}
       <span aria-live="polite" className={state === "failed" ? "field-help" : "sr-only"} role="status">
-        {state === "copied" ? "The application link was copied." : state === "failed" ? "Copying didn't work here. Select the address above and copy it." : ""}
+        {state === "copied" ? `The ${noun} was copied.` : state === "failed" ? "Copying didn't work here. Select the address above and copy it." : ""}
       </span>
     </div>
   );

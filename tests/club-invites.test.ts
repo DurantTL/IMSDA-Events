@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   inviteUpdateMany: vi.fn(),
   outboxCreate: vi.fn(),
   organizationFindUnique: vi.fn(),
+  userFindUnique: vi.fn(),
+  clubsGrantFindFirst: vi.fn(),
   grantFindFirst: vi.fn(),
   grantCreate: vi.fn(),
   getCurrentAttendee: vi.fn(),
@@ -28,6 +30,8 @@ const client = {
     updateMany: mocks.inviteUpdateMany,
   },
   organization: { findUnique: mocks.organizationFindUnique },
+  user: { findUnique: mocks.userFindUnique },
+  clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst },
   messageOutbox: { create: mocks.outboxCreate },
   clubDirectorGrant: { findFirst: mocks.grantFindFirst, create: mocks.grantCreate },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
@@ -52,6 +56,7 @@ import {
   clubInviteExpiry,
   clubInviteSignUpUrl,
   createClubTeamInvite,
+  createPeopleClubInvite,
   listInvitesForAccount,
   listPendingClubTeamInvites,
   resendClubTeamInvite,
@@ -385,5 +390,48 @@ describe("listing invites for an account (#425)", () => {
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       }),
     }));
+  });
+});
+
+describe("People & access club invites (#1276)", () => {
+  it("renews the 14-day expiry when a PEOPLE invite is sent again, with the PEOPLE wording", async () => {
+    mocks.inviteFindMany.mockResolvedValue([
+      { id: "invite-1", email: "leader@example.test", name: "Pat Example", role: "REGISTRAR", source: "PEOPLE", organizationId: "club-1", organization: { name: "Example Pathfinders" } },
+    ]);
+    await sendClubInvites({ inviteIds: ["invite-1"] }, "admin-1", now);
+    expect(mocks.inviteUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "SENT", expiresAt: clubInviteExpiry(now) }) }));
+    const message = mocks.outboxCreate.mock.calls[0][0].data;
+    expect(message.bodyTextSnapshot).toContain("The Iowa-Missouri Conference has invited you as Example Pathfinders's registrar on IMSDA Events.");
+    expect(message.bodyTextSnapshot).toContain("This invite expires in 14 days.");
+  });
+
+  it("creates a SENT invite without queueing mail when account email isn't set up", async () => {
+    mocks.configured.mockReturnValue(false);
+    const created = await createPeopleClubInvite({ ...client, clubInvite: client.clubInvite } as never, { organizationId: "club-1", clubName: "Example Pathfinders", email: "Leader@Example.test", name: "Pat", role: "DIRECTOR", actorUserId: "admin-1" }, now);
+    expect(created).toEqual({ inviteId: "invite-2", messageId: null });
+    expect(mocks.inviteCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ email: "leader@example.test", source: "PEOPLE", status: "SENT", sentCount: 0, expiresAt: clubInviteExpiry(now) }) }));
+    expect(mocks.outboxCreate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a second open invite for the same email, club and role", async () => {
+    mocks.inviteFindFirst.mockResolvedValue({ id: "invite-1" });
+    await expect(createPeopleClubInvite(client as never, { organizationId: "club-1", clubName: "Example Pathfinders", email: "leader@example.test", name: "", role: "DIRECTOR", actorUserId: "admin-1" }, now)).rejects.toMatchObject({ code: "INVITE_ALREADY_OPEN" });
+    expect(mocks.inviteCreate).not.toHaveBeenCalled();
+  });
+
+  it("accepts a PEOPLE invite only while its sender is still a system administrator or active Clubs Administrator", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, source: "PEOPLE", expiresAt: new Date("2026-10-01T00:00:00Z") });
+    mocks.userFindUnique.mockResolvedValue({ globalRole: null });
+    mocks.clubsGrantFindFirst.mockResolvedValue(null);
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN" });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
+    mocks.clubsGrantFindFirst.mockResolvedValue({ id: "grant-1" });
+    await expect(acceptClubInvite("invite-1", account, now)).resolves.toEqual({ organizationId: "club-1" });
+    expect(mocks.grantCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an expired PEOPLE invite as expired", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, source: "PEOPLE", expiresAt: new Date("2026-09-01T00:00:00Z") });
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_EXPIRED" });
   });
 });

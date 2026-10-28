@@ -2,13 +2,15 @@ import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { getTeamDirectory } from "@/modules/system-admin/team-directory";
-import { changeStaffEmail, resetStaffTwoStep, sendStaffPasswordReset } from "@/modules/system-admin/user-admin";
+import { cancelStaffInvite, changeStaffEmail, resendStaffInvite, resetStaffTwoStep, sendStaffPasswordReset } from "@/modules/system-admin/user-admin";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { withRequestContext } from "@/lib/request-context";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("send-password-reset") }).strict(),
+  z.object({ action: z.literal("resend-invite") }).strict(),
+  z.object({ action: z.literal("cancel-invite") }).strict(),
   z.object({ action: z.literal("change-email"), email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")) }).strict(),
 ]);
 
@@ -27,6 +29,14 @@ async function postHandler(request: Request, context: { params: Promise<{ userId
     } else if (input.action === "send-password-reset") {
       const { queued } = await sendStaffPasswordReset(userId, actor.id);
       message = queued ? "Password reset link sent." : "That account can't receive a reset link (its sign-in is switched off).";
+    } else if (input.action === "resend-invite") {
+      // Where account email isn't configured the new activation link comes back to hand over (#1276).
+      const delivery = await resendStaffInvite(userId, actor.id);
+      message = delivery.invitationEmailed ? "Invite sent again." : delivery.setupUrl ? "Account email isn't set up. Give them the one-time link below." : "The invite could not be sent.";
+      return Response.json({ message, setupUrl: delivery.setupUrl, setupExpiresAt: delivery.setupExpiresAt, directory: await getTeamDirectory() });
+    } else if (input.action === "cancel-invite") {
+      await cancelStaffInvite(userId, actor.id);
+      message = "Invite cancelled. Their sign-in is switched off and any system administrator or Clubs Administrator role is removed; event assignments are kept.";
     } else {
       await changeStaffEmail(userId, input.email, actor.id);
       message = "Email changed.";

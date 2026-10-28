@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, CircleAlert, CircleDollarSign, CircleHelp, GraduationCap, Inbox, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { AccountRegistrationCard } from "@/components/account-registration-card";
 import { AreaCoordinatorCardSection, AreaCoordinatorCardSkeleton } from "@/components/area-coordinator-card";
-import { ClubInviteAccept } from "@/components/club-invite-accept";
+import { AreaCoordinatorInviteAccept, ClubInviteAccept } from "@/components/club-invite-accept";
 import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
@@ -16,6 +16,7 @@ import { listRegistrationsForVerifiedEmail } from "@/modules/attendee-accounts/r
 import { listInvitesForAccount } from "@/modules/club-imports/invites";
 import { accountIsInstructor, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { listAreaCoordinatorInvitesForAccount } from "@/modules/organizations/area-coordinator-invites";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { logError } from "@/lib/logger";
@@ -44,7 +45,7 @@ export default async function AttendeeAccountOverviewPage() {
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 
-  const [registrationsResult, mfaStatus, clubs, invites, areaCoordinator, instructorInvites, isInstructor] = await Promise.all([
+  const [registrationsResult, mfaStatus, clubs, invites, areaInvites, areaCoordinator, instructorInvites, isInstructor] = await Promise.all([
     // A failed load is its own calm state with a retry: not "no registrations", and not a blank page.
     listRegistrationsForVerifiedEmail(account.verifiedEmail).then(
       (registrations) => ({ ok: true as const, registrations }),
@@ -57,6 +58,8 @@ export default async function AttendeeAccountOverviewPage() {
     listDirectedClubs(account.id),
     // Only the person themselves may accept, so staff viewing an account don't see them.
     via === "attendee" ? listInvitesForAccount(account.verifiedEmail) : Promise.resolve([]),
+    // Area Coordinator invites (#1276), matched and accepted the same way.
+    via === "attendee" ? listAreaCoordinatorInvitesForAccount(account.verifiedEmail) : Promise.resolve([]),
     // Null unless this is the person's own session with an active Area Coordinator grant and second step (#656).
     currentAreaCoordinator(),
     // Honors Weekend instructor invites (#833): like club invites, only the person themselves may accept.
@@ -71,7 +74,7 @@ export default async function AttendeeAccountOverviewPage() {
   // Exactly one filled primary per screen, in this order: an invite's Accept (when one is showing), else the first
   // card with a View registration (any card when none has one), else Find events in the empty states, else (registrations failed to load) a club
   // director's authenticator prompt. The prompt's wording never changes; only its fill does.
-  const inviteShowing = invites.length > 0 || instructorInvites.length > 0;
+  const inviteShowing = invites.length > 0 || areaInvites.length > 0 || instructorInvites.length > 0;
   const needsAuthenticator = !authenticatorOn && clubs.length > 0;
   const cardPrimary = !inviteShowing && upcoming.length > 0;
   const primaryCardId = overviewPrimaryCardId(upcoming);
@@ -108,7 +111,8 @@ export default async function AttendeeAccountOverviewPage() {
       </section>
 
       {invites.length > 0 && <ClubInviteAccept invites={invites} fill="first" />}
-      {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} fill={invites.length > 0 ? "none" : "first"} />}
+      {areaInvites.length > 0 && <AreaCoordinatorInviteAccept invites={areaInvites} fill={invites.length > 0 ? "none" : "first"} />}
+      {instructorInvites.length > 0 && <InstructorInviteAccept invites={instructorInvites} fill={invites.length > 0 || areaInvites.length > 0 ? "none" : "first"} />}
 
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">

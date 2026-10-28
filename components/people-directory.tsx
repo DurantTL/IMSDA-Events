@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
 import { personPath } from "@/modules/system-admin/people-directory-model";
 import styles from "./people-directory.module.css";
@@ -19,7 +20,10 @@ export function PeopleDirectory({
   pageCount,
   total,
   scope = "full",
+  pending,
 }: {
+  /** The Pending invites section (#1276), drawn between the search and the results. */
+  pending?: ReactNode;
   scope?: "full" | "clubs";
   query: string;
   rows: readonly PeopleRow[];
@@ -37,6 +41,7 @@ export function PeopleDirectory({
         <button className="primary-button" type="submit">Search</button>
         {query ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
       </form>
+      {pending}
       <p className={styles.count} role="status">
         {total === 0 ? "No people found." : `${total} ${total === 1 ? "person" : "people"}${query ? ` matching "${query}"` : ""}.`}
       </p>

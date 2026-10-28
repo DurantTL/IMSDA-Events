@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { EventPermission, EventRole } from "@prisma/client";
+import type { EventPermission, EventRole, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { wouldRemoveLastActiveEventAdmin } from "@/modules/access/membership-rules";
@@ -120,57 +120,92 @@ export async function listStaffMemberships(eventId: string) {
   }));
 }
 
-export async function addStaffMembership(eventId: string, actorUserId: string, input: { email: string; displayName: string; role: EventRole }) {
+type MembershipClient = Prisma.TransactionClient;
+
+/**
+ * Nobody — not even the inviting administrator — is handed a password. A staff login is created PENDING_ACTIVATION
+ * with a hash of a random value nobody sees, and its owner sets the first password from an activation link.
+ */
+export async function createUnusableCredentialHash() {
+  return hashPassword(`${createOpaqueToken()}-pending-activation`);
+}
+
+/**
+ * Finds the staff login for an email or creates it (pending activation, unusable credential). Shared by adding a
+ * colleague to an event and by the People & access invite (#1276), which can create a login with no event at all.
+ * `credentialCreated` is true when the person still has to be sent an activation link.
+ */
+export async function findOrCreatePendingStaffUser(
+  tx: MembershipClient,
+  input: { email: string; displayName: string },
+  unusableHash: string,
+) {
   const email = input.email.trim().toLowerCase();
-  // Nobody — not even the inviting administrator — is handed a password. The
-  // account is created PENDING_ACTIVATION and its owner sets the first one.
-  const unusableHash = await hashPassword(`${createOpaqueToken()}-pending-activation`);
-  const result = await getPrisma().$transaction(async (tx) => {
-    let user = await tx.user.findUnique({ where: { email }, select: { id: true, credential: { select: { id: true } } } });
-    let credentialCreated = false;
-    if (!user) {
-      user = await tx.user.create({
-        data: {
-          email,
-          displayName: input.displayName.trim(),
-          accountStatus: "PENDING_ACTIVATION",
-          credential: { create: { passwordHash: unusableHash } },
-        },
-        select: { id: true, credential: { select: { id: true } } },
+  let user = await tx.user.findUnique({ where: { email }, select: { id: true, credential: { select: { id: true } } } });
+  let credentialCreated = false;
+  const created = !user;
+  if (!user) {
+    user = await tx.user.create({
+      data: {
+        email,
+        displayName: input.displayName.trim(),
+        accountStatus: "PENDING_ACTIVATION",
+        credential: { create: { passwordHash: unusableHash } },
+      },
+      select: { id: true, credential: { select: { id: true } } },
+    });
+    credentialCreated = true;
+  } else {
+    await tx.user.update({ where: { id: user.id }, data: { displayName: input.displayName.trim() } });
+    if (!user.credential) {
+      await tx.authCredential.create({ data: { userId: user.id, passwordHash: unusableHash } });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { accountStatus: "PENDING_ACTIVATION", activatedAt: null },
       });
       credentialCreated = true;
-    } else {
-      await tx.user.update({ where: { id: user.id }, data: { displayName: input.displayName.trim() } });
-      if (!user.credential) {
-        await tx.authCredential.create({ data: { userId: user.id, passwordHash: unusableHash } });
-        await tx.user.update({
-          where: { id: user.id },
-          data: { accountStatus: "PENDING_ACTIVATION", activatedAt: null },
-        });
-        credentialCreated = true;
-      }
     }
+  }
+  return { userId: user.id, email, credentialCreated, created };
+}
 
-    const existing = await tx.eventMembership.findUnique({ where: { eventId_userId: { eventId, userId: user.id } } });
-    // Health information access (#658) never survives a re-add: only a system administrator grants it again.
-    if (existing) await stripHealthAccess(tx, existing, actorUserId, "RE_ADDED");
-    // Nor does permission to finalize invoices (#167).
-    if (existing) await stripInvoiceFinalizationAccess(tx, existing, actorUserId, "RE_ADDED");
-    const membership = existing
-      ? await tx.eventMembership.update({ where: { id: existing.id }, data: { role: input.role, status: "ACTIVE" } })
-      : await tx.eventMembership.create({ data: { eventId, userId: user.id, role: input.role, status: "ACTIVE" } });
+/** Gives a staff login a role on an event (creating or reactivating its membership) and writes the audit entry. */
+export async function assignEventMembership(
+  tx: MembershipClient,
+  eventId: string,
+  actorUserId: string,
+  user: { userId: string; email: string },
+  input: { displayName: string; role: EventRole },
+) {
+  const existing = await tx.eventMembership.findUnique({ where: { eventId_userId: { eventId, userId: user.userId } } });
+  // Health information access (#658) never survives a re-add: only a system administrator grants it again.
+  if (existing) await stripHealthAccess(tx, existing, actorUserId, "RE_ADDED");
+  // Nor does permission to finalize invoices (#167).
+  if (existing) await stripInvoiceFinalizationAccess(tx, existing, actorUserId, "RE_ADDED");
+  const membership = existing
+    ? await tx.eventMembership.update({ where: { id: existing.id }, data: { role: input.role, status: "ACTIVE" } })
+    : await tx.eventMembership.create({ data: { eventId, userId: user.userId, role: input.role, status: "ACTIVE" } });
 
-    await writeAuditLog({
-      eventId,
-      actorUserId,
-      action: existing ? "EVENT_MEMBERSHIP_REACTIVATED" : "EVENT_MEMBERSHIP_CREATED",
-      entityType: "EventMembership",
-      entityId: membership.id,
-      correlationId: randomUUID(),
-      summary: `${input.displayName.trim()} was assigned as ${input.role.toLowerCase().replaceAll("_", " ")}.`,
-      metadata: { userId: user.id, email, role: input.role, previousRole: existing?.role ?? null, previousStatus: existing?.status ?? null },
-    }, tx);
-    return { credentialCreated };
+  await writeAuditLog({
+    eventId,
+    actorUserId,
+    action: existing ? "EVENT_MEMBERSHIP_REACTIVATED" : "EVENT_MEMBERSHIP_CREATED",
+    entityType: "EventMembership",
+    entityId: membership.id,
+    correlationId: randomUUID(),
+    summary: `${input.displayName.trim()} was assigned as ${input.role.toLowerCase().replaceAll("_", " ")}.`,
+    metadata: { userId: user.userId, email: user.email, role: input.role, previousRole: existing?.role ?? null, previousStatus: existing?.status ?? null },
+  }, tx);
+  return membership;
+}
+
+export async function addStaffMembership(eventId: string, actorUserId: string, input: { email: string; displayName: string; role: EventRole }) {
+  const email = input.email.trim().toLowerCase();
+  const unusableHash = await createUnusableCredentialHash();
+  const result = await getPrisma().$transaction(async (tx) => {
+    const user = await findOrCreatePendingStaffUser(tx, input, unusableHash);
+    await assignEventMembership(tx, eventId, actorUserId, user, input);
+    return { credentialCreated: user.credentialCreated };
   });
   return { membership: (await listStaffMemberships(eventId)).find((row) => row.user.email === email)!, credentialCreated: result.credentialCreated };
 }
@@ -229,53 +264,63 @@ export async function setGlobalRole(
   globalRole: "SYSTEM_ADMIN" | null,
   eventId?: string,
 ) {
-  return getPrisma().$transaction(async (tx) => {
-    const target = await tx.user.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, email: true, displayName: true, globalRole: true },
-    });
-    if (!target) {
-      throw new MembershipOperationError("USER_NOT_FOUND", "That account no longer exists.");
-    }
-    if (target.globalRole === globalRole) return target;
+  return getPrisma().$transaction((tx) => applyGlobalRole(tx, targetUserId, actorUserId, globalRole, eventId));
+}
 
-    if (target.globalRole === "SYSTEM_ADMIN" && globalRole === null) {
-      const remaining = await tx.user.count({
-        where: { globalRole: "SYSTEM_ADMIN", id: { not: target.id } },
-      });
-      if (remaining === 0) {
-        throw new MembershipOperationError(
-          "LAST_SYSTEM_ADMIN",
-          "Grant another account system administrator access before removing this one.",
-        );
-      }
-    }
-
-    const updated = await tx.user.update({
-      where: { id: target.id },
-      data: { globalRole },
-      select: { id: true, email: true, displayName: true, globalRole: true },
-    });
-
-    // A change of privilege must not be carried by a session that predates it.
-    await tx.userSession.updateMany({
-      where: { userId: target.id, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    await writeAuditLog({
-      eventId,
-      actorUserId,
-      action: globalRole ? "SYSTEM_ADMIN_GRANTED" : "SYSTEM_ADMIN_REVOKED",
-      entityType: "User",
-      entityId: target.id,
-      correlationId: randomUUID(),
-      summary: globalRole
-        ? `${target.displayName} was granted system administrator access.`
-        : `${target.displayName} no longer has system administrator access.`,
-      metadata: { email: target.email, before: target.globalRole, after: globalRole },
-    }, tx);
-
-    return updated;
+/** `setGlobalRole` inside a caller's transaction, so an invite can create the login and its role together (#1276). */
+export async function applyGlobalRole(
+  tx: MembershipClient,
+  targetUserId: string,
+  actorUserId: string,
+  globalRole: "SYSTEM_ADMIN" | null,
+  eventId?: string,
+) {
+  const target = await tx.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, email: true, displayName: true, globalRole: true },
   });
+  if (!target) {
+    throw new MembershipOperationError("USER_NOT_FOUND", "That account no longer exists.");
+  }
+  if (target.globalRole === globalRole) return target;
+
+  if (target.globalRole === "SYSTEM_ADMIN" && globalRole === null) {
+    const remaining = await tx.user.count({
+      // Only an activated login whose sign-in is on can administer anything: an invited-but-never-activated one, or one whose sign-in is off (a cancelled invite), doesn't count.
+      where: { globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE", id: { not: target.id }, NOT: { credential: { is: { disabledAt: { not: null } } } } },
+    });
+    if (remaining === 0) {
+      throw new MembershipOperationError(
+        "LAST_SYSTEM_ADMIN",
+        "Grant another account system administrator access before removing this one.",
+      );
+    }
+  }
+
+  const updated = await tx.user.update({
+    where: { id: target.id },
+    data: { globalRole },
+    select: { id: true, email: true, displayName: true, globalRole: true },
+  });
+
+  // A change of privilege must not be carried by a session that predates it.
+  await tx.userSession.updateMany({
+    where: { userId: target.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  await writeAuditLog({
+    eventId,
+    actorUserId,
+    action: globalRole ? "SYSTEM_ADMIN_GRANTED" : "SYSTEM_ADMIN_REVOKED",
+    entityType: "User",
+    entityId: target.id,
+    correlationId: randomUUID(),
+    summary: globalRole
+      ? `${target.displayName} was granted system administrator access.`
+      : `${target.displayName} no longer has system administrator access.`,
+    metadata: { email: target.email, before: target.globalRole, after: globalRole },
+  }, tx);
+
+  return updated;
 }

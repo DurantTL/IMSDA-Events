@@ -120,7 +120,7 @@ const STAFF_AUTHORED = authoredRelations("User", [
 const ATTENDEE_AUTHORED = authoredRelations("AttendeeAccount", [
   "sessions", "tokens", "passkeys", "stepUpCodes", "identities", "messages",
   "communityParticipations", "communityNotifications", "clubDirectorGrants",
-  "coordinatedLocations", "acceptedClubInvites",
+  "coordinatedLocations", "acceptedClubInvites", "acceptedAreaCoordinatorInvites",
 ]);
 
 function sumCounts(count: unknown, select: CountSelect): number {
