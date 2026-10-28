@@ -12754,6 +12754,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   min-width: 0; max-width: 18ch; overflow: hidden; color: var(--muted); font-size: 0.875rem; font-weight: 700;
   text-overflow: ellipsis; white-space: nowrap;
 }
+/* On a wide screen there is room for a long name: show all of it, wrapping to a second line rather than clipping. */
+@media (min-width: 801px) {
+  .account-header-identity { max-width: 34ch; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
+}
 .attendee-ov-layout {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 24px;
   max-width: 1180px; margin: 0 auto 48px;
