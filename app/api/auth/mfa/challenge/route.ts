@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import {
   MfaError,
   beginEnrollmentFromChallenge,
@@ -77,6 +78,8 @@ async function postHandler(request: Request) {
   if (originError) return originError;
 
   let rateLimit: RateLimitOutcome | undefined;
+  // True only while the second-step code itself is being checked: that is the one place a failure counts (#111).
+  let verifying = false;
   try {
     // Shares the sign-in bucket: guessing a six-digit code is a sign-in attempt.
     rateLimit = await checkLoginClientRateLimit(request);
@@ -106,6 +109,7 @@ async function postHandler(request: Request) {
       ), rateLimit);
     }
 
+    verifying = true;
     const result = await completeMfaChallenge(input.challengeToken, input.code, {
       userAgent: request.headers.get("user-agent"),
     });
@@ -118,6 +122,8 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    // The password step that handed off to this one counted nothing; the sign-in counts as worked only here.
+    countPublicMetric(request, "LOGIN_SUCCESS", "staff-mfa");
     // One account per person (#554): with the one-sign-in switch on, a staff person who just
     // passed the staff second factor also gets their linked attendee session, marked as having
     // passed the second step. Does nothing (null) with the switch off or with no usable link.
@@ -145,6 +151,7 @@ async function postHandler(request: Request) {
     }), rateLimit);
   } catch (error) {
     if (error instanceof MfaError) {
+      if (verifying) countPublicMetric(request, "LOGIN_FAILURE", "staff-mfa");
       const response = mfaErrorResponse(error);
       return rateLimit ? applyRateLimitHeaders(response, rateLimit) : response;
     }

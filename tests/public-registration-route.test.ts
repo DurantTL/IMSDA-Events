@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+const metricMocks = vi.hoisted(() => ({ recordPublicMetric: vi.fn() }));
+vi.mock("@/modules/public-metrics/repository", () => metricMocks);
+
 const repositoryMocks = vi.hoisted(() => {
   class MockPublicRegistrationError extends Error {
     constructor(
@@ -155,6 +159,8 @@ describe("public registration route", () => {
 
     const response = await POST(postRequest(), context);
     expect(response.status).toBe(201);
+    // Counted per event only, with no registration or person attached (#111).
+    expect(metricMocks.recordPublicMetric).toHaveBeenCalledWith("REGISTRATION_COMPLETE", "summer-retreat");
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(await response.json()).toMatchObject({
       confirmation: {

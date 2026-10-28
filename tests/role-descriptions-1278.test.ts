@@ -23,7 +23,7 @@ describe("role wording (#1278)", () => {
     for (const role of Object.values(EventRole)) expectPlain(eventRoleText[role], role);
     for (const role of Object.values(ClubDirectorRole)) expectPlain(clubRoleText[role], role);
     for (const key of ["VIEW_HEALTH_INFORMATION", "FINALIZE_INVOICES"] as const) expectPlain(eventExtraText[key], key);
-    for (const key of ["SYSTEM_ADMIN", "CLUBS_ADMIN", "AREA_COORDINATOR", "EVENTS_ADMIN"] as const) expectPlain(systemRoleText[key], key);
+    for (const key of ["SYSTEM_ADMIN", "CLUBS_ADMIN", "AREA_COORDINATOR", "EVENTS_ADMIN", "SITE_CONTENT_EDITOR"] as const) expectPlain(systemRoleText[key], key);
     expect(Object.keys(eventRoleText).sort()).toEqual([...Object.values(EventRole)].sort());
     expect(Object.keys(clubRoleText).sort()).toEqual([...Object.values(ClubDirectorRole)].sort());
     expect([...eventRoles].sort()).toEqual([...Object.values(EventRole)].sort());

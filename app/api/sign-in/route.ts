@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
 import { issueMfaChallenge } from "@/modules/access/mfa-service";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
@@ -94,6 +95,7 @@ async function postHandler(request: Request) {
     const outcome = await unifiedPasswordSignIn(input.email, input.password, userAgent);
 
     if (outcome.kind === "refused") {
+      countPublicMetric(request, "LOGIN_FAILURE", "unified-password");
       return applyRateLimitHeaders(Response.json(REFUSAL_BODY, { status: 401 }), rateLimit);
     }
 
@@ -140,6 +142,7 @@ async function postHandler(request: Request) {
         priority: "high",
       });
     }
+    countPublicMetric(request, "LOGIN_SUCCESS", "unified-password");
     const redirectTo = outcome.staff
       ? await staffDestinationOrDefault({ id: outcome.staff.userId, globalRole: outcome.staff.globalRole }, input.next)
       : attendeeReturnDestination(input.next, "/account");
