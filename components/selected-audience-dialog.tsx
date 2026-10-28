@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, MailCheck, Send, TriangleAlert, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import Link from "next/link";
-import { formatFileSize } from "@/modules/communications/message-file-rules";
+import { BACKGROUND_MAILER_FILE_BYTES_THRESHOLD, formatFileSize } from "@/modules/communications/message-file-rules";
 import { selectionLimitSummary } from "@/modules/communications/selected-audience-limit";
 import type { SelectedAudiencePreview } from "@/modules/communications/selected-audience";
 import {
@@ -283,8 +283,8 @@ export function SelectedAudienceDialog({
                         ? "none"
                         : preview.attachments.map((file) => `${file.filename} (${formatFileSize(file.sizeBytes)})`).join(", ")}
                     </p>
-                    {preview.deliveryMode === "EXTERNAL_EMAIL" && preview.carriesFiles && (
-                      <p className="quiet-copy">This message carries files or pictures, so the background mailer sends it in batches every few minutes rather than all at once.</p>
+                    {preview.sentByBackgroundMailer && (
+                      <p className="quiet-copy">The files in this message total over {formatFileSize(BACKGROUND_MAILER_FILE_BYTES_THRESHOLD)}, so the background mailer sends it in batches every few minutes rather than all at once.</p>
                     )}
                     {preview.attachmentProblem && (
                       <p className="form-error" role="alert">{preview.attachmentProblem}</p>

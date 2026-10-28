@@ -32,6 +32,7 @@ import { contentBlocks, parseBlockData } from "@/modules/events/content-schemas"
 import { getServerEnv } from "@/lib/env";
 import { directionsTargets } from "@/modules/events/directions";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
+import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -363,7 +364,7 @@ export default async function PublicEventPage({
                       </time>
                     </div>
                     <h3 id={headingId}>{announcement.title}</h3>
-                    <p>{announcement.body}</p>
+                    <p>{announcementBodyForDisplay(announcement.body)}</p>
                   </article>
                 </li>
               );

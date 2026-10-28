@@ -156,7 +156,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "attendee-history" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -225,6 +225,12 @@ const pages: PageSpec[] = [
   { name: "account-profile", path: "/account/profile", role: "director" },
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
+  // The plain attendee with registrations in every lifecycle state (#1111): see seedHistoryAccount.
+  { name: "account-overview-history", path: "/account", role: "attendee-history", expectText: /(?=[\s\S]*Registration received)(?=[\s\S]*\$40\.00 remaining)/ },
+  { name: "account-registrations-history", path: "/account/registrations", role: "attendee-history", expectText: /(?=[\s\S]*No payment due while waitlisted)(?=[\s\S]*\$40\.00 remaining)(?=[\s\S]*places requested)/ },
+  { name: "account-registrations-history-past", path: "/account/registrations?show=past", role: "attendee-history", expectText: /Mobilecheck Spring Reunion/ },
+  { name: "account-registrations-history-cancelled", path: "/account/registrations?show=cancelled", role: "attendee-history", expectText: /(?=[\s\S]*Nothing due now)(?=[\s\S]*\$100\.00 refunded)(?=[\s\S]*No payment is due on a cancelled registration)/ },
+  { name: "account-profile-history", path: "/account/profile", role: "attendee-history" },
   { name: "club-all-clubs", path: "/account/clubs", role: "director" },
   // Portal help (#1259): the hub for each portal role, and a guide for the club roles and the coordinator.
   { name: "account-help-attendee", path: "/account/help", role: "attendee" },
@@ -825,6 +831,70 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
   ];
 }
 
+/**
+ * A plain attendee with registrations in every lifecycle state (#1111), matched by the contact email like the director's own. The
+ * events and registrations are made directly (the real models and enums), so the portal's cards show: received with a balance
+ * (long event name and location), confirmed and paid, waitlisted with nothing due, cancelled with a refund, and a past event.
+ */
+const historyEventIds = ["received", "confirmed", "waitlisted", "cancelled", "past"].map((key) => `${P}_hist_event_${key}`);
+async function seedHistoryAccount(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const today = calendarDateIn(new Date());
+  const email = `${P}.history@example.test`;
+  const holderData = { id: `${P}_person_history_holder`, firstName: "Jordan", lastName: "Mobilecheck-Riverside-Abernathy", normalizedEmail: email };
+  const holder = await prisma.person.upsert({ where: { id: holderData.id }, update: {}, create: holderData });
+  const rows = [
+    { key: "received", name: "Mobilecheck Iowa-Missouri Conference Family Retreat and Spiritual Renewal Weekend 2027", location: "Mobilecheck Lakeside Conference Center and Retreat Grounds, Okoboji, Iowa", start: 60, end: 62, status: "SUBMITTED", total: 80, paid: 40, refunded: 0, people: 2, code: "MOBHIS1" },
+    { key: "confirmed", name: "Mobilecheck Sabbath Praise Gathering", location: "Mobilecheck Fellowship Hall", start: 45, end: 46, status: "CONFIRMED", total: 60, paid: 60, refunded: 0, people: 1, code: "MOBHIS2" },
+    { key: "waitlisted", name: "Mobilecheck Waitlist Weekend", location: "Mobilecheck Camp Heritage", start: 75, end: 77, status: "WAITLISTED", total: 120, paid: 0, refunded: 0, people: 2, code: "MOBHIS3" },
+    { key: "cancelled", name: "Mobilecheck Cancelled Campout", location: "Mobilecheck Pine Lodge", start: 30, end: 32, status: "CANCELLED", total: 100, paid: 100, refunded: 100, people: 1, code: "MOBHIS4" },
+    { key: "past", name: "Mobilecheck Spring Reunion", location: "Mobilecheck Community Church", start: -32, end: -30, status: "CONFIRMED", total: 50, paid: 50, refunded: 0, people: 1, code: "MOBHIS5" },
+  ] as const;
+  for (const row of rows) {
+    const eventId = `${P}_hist_event_${row.key}`;
+    if (await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } })) continue;
+    const registrationId = `${P}_reg_hist_${row.key}`;
+    await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: eventId, slug: `${P}-history-${row.key}`, name: row.name, location: row.location,
+          startsAt: new Date(`${addDays(today, row.start)}T15:00:00Z`), endsAt: new Date(`${addDays(today, row.end)}T18:00:00Z`), timezone: "America/Chicago",
+          isPublished: true, billingMode: "ATTENDEE_PAY",
+        },
+      });
+      await tx.registration.create({
+        data: {
+          id: registrationId, eventId, accountHolderPersonId: holder.id, confirmationCode: row.code, totalAmount: row.total, status: row.status, submittedAt: new Date(),
+          contactSnapshot: { firstName: holder.firstName, lastName: holder.lastName, email, phone: "(515) 555-0100" },
+        },
+      });
+      for (let index = 0; index < row.people; index += 1) {
+        const person = await tx.person.create({ data: { id: `${P}_person_hist_${row.key}_${index}`, firstName: index === 0 ? "Jordan" : "Riley", lastName: "Mobilecheck-Riverside-Abernathy", normalizedEmail: `${P}.hist.${row.key}.${index}@example.test` } });
+        await tx.registrationAttendee.create({
+          data: { id: `${P}_hist_${row.key}_attendee_${index}`, eventId, registrationId, personId: person.id, attendeeType: "ADULT", position: index, profileSnapshot: { firstName: person.firstName, lastName: person.lastName } },
+        });
+      }
+      if (row.paid > 0) {
+        const payment = await tx.payment.create({ data: { id: `${P}_hist_payment_${row.key}`, eventId, registrationId, amount: row.paid, status: "SUCCEEDED", method: "CHECK", receivedAt: new Date() } });
+        if (row.refunded > 0) await tx.refund.create({ data: { id: `${P}_hist_refund_${row.key}`, eventId, paymentId: payment.id, amount: row.refunded, status: "SUCCEEDED", reason: "Synthetic cancellation refund" } });
+      }
+    });
+  }
+  return [];
+}
+
+/** Removes the history account's events and what hangs off them. */
+async function cleanupHistoryAccount(prisma: PrismaClient) {
+  const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
+  for (const eventId of historyEventIds) {
+    if (!(await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } }))) continue;
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+      await removeEventOwnedRows(tx, eventId);
+    }, { timeout: 30_000 });
+  }
+}
+
 /** Removes the cancellation event and what hangs off it (requests, their timeline, calculations, the registration and its people). */
 async function cleanupCancellationEvent(prisma: PrismaClient) {
   if (!(await prisma.event.findUnique({ where: { id: cancelEventId }, select: { id: true } }))) return;
@@ -1124,7 +1194,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
-  const accountIds = [`${P}_account_director`, `${P}_account_area`, `${P}_account_attendee`];
+  const accountIds = [`${P}_account_director`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
@@ -1132,6 +1202,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
+  await cleanupHistoryAccount(prisma).catch((error: Error) => console.error(`Could not remove the synthetic history events: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await cleanupInformationForm(prisma).catch((error: Error) => console.error(`Could not remove the synthetic information form: ${error.message}`));
   await prisma.$transaction([
@@ -1226,8 +1297,11 @@ async function seedSynthetic(prisma: PrismaClient) {
   const accounts = [
     { id: `${P}_account_director`, email: `${P}.director@example.test`, displayName: "Dana Mobilecheck-Directorsson", firstName: "Dana", lastName: "Mobilecheck-Directorsson" },
     { id: `${P}_account_area`, email: `${P}.area@example.test`, displayName: "Avery Mobilecheck-Coordinator", firstName: "Avery", lastName: "Mobilecheck-Coordinator" },
-    // A plain attendee (#1175): no club, coordinator or staff grant and no registrations, so the Overview shows its empty state.
+    // Plain attendees (#1175, #1111), neither with a club, coordinator or staff grant. "attendee" has no registrations, so the
+    // Overview shows its empty state. "history" has one registration in each lifecycle state (seedHistoryAccount): received with a
+    // balance, confirmed, waitlisted, cancelled with a refund and past; its long name checks the header and the cards.
     { id: `${P}_account_attendee`, email: `${P}.attendee@example.test`, displayName: "Taylor Mobilecheck-Lane", firstName: "Taylor", lastName: "Mobilecheck-Lane" },
+    { id: `${P}_account_history`, email: `${P}.history@example.test`, displayName: "Jordan Mobilecheck-Riverside-Abernathy", firstName: "Jordan", lastName: "Mobilecheck-Riverside-Abernathy" },
   ];
   for (const account of accounts) {
     await prisma.attendeeAccount.upsert({
@@ -1745,8 +1819,8 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
   const cookie = async (role: SignedInRole) => {
-    if (role === "director" || role === "area" || role === "attendee") {
-      const accountId = role === "director" ? `${P}_account_director` : role === "area" ? `${P}_account_area` : `${P}_account_attendee`;
+    if (role === "director" || role === "area" || role === "attendee" || role === "attendee-history") {
+      const accountId = role === "director" ? `${P}_account_director` : role === "area" ? `${P}_account_area` : role === "attendee" ? `${P}_account_attendee` : `${P}_account_history`;
       const session = await attendeeSession.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
       tokens.attendee.push(session.token);
       return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
@@ -1765,6 +1839,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
     director: await cookie("director"),
     area: await cookie("area"),
     attendee: await cookie("attendee"),
+    "attendee-history": await cookie("attendee-history"),
   };
   return cookies;
 }
@@ -4015,6 +4090,7 @@ async function main() {
     await seedSynthetic(prisma);
     pages.push(...pbePages(await seedPbeEvent(prisma)));
     pages.push(...await seedCancellationEvent(prisma));
+    pages.push(...await seedHistoryAccount(prisma));
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedEventTemplatePages(prisma));
@@ -4026,7 +4102,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "attendee", "event-admin", "system-admin", "kitchen"] as Role[]) {
+      for (const role of ["visitor", "director", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

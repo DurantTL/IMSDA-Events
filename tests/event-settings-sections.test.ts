@@ -208,7 +208,7 @@ const baseFields = {
   hotelRate: null,
   hotelInstructions: null,
   approvedPaymentInstructions: null,
-  isPublished: false, archivedAt: null,
+  isPublished: false, archivedAt: null, showOnCalendar: true,
   registrationOpensOn: "2027-05-01",
   registrationClosesOn: "2027-10-01",
   paymentDueOn: null,

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
+import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
 
 export type AttendeeTimelineCommunityPost = {
   id: string;
@@ -415,7 +416,7 @@ export function AttendeeCommunityBoard({
                   <time dateTime={item.occurredAt}>{dateTime(item.occurredAt)}</time>
                 </header>
                 <h3>{item.announcement.title}</h3>
-                <p>{item.announcement.body}</p>
+                <p>{announcementBodyForDisplay(item.announcement.body)}</p>
               </article>
             ) : (() => {
               const post = item.post;
@@ -543,7 +544,7 @@ export function AttendeeCommunityBoard({
                 <time dateTime={item.occurredAt}>{dateTime(item.occurredAt)}</time>
               </header>
               <h3>{item.announcement.title}</h3>
-              <p>{item.announcement.body}</p>
+              <p>{announcementBodyForDisplay(item.announcement.body)}</p>
             </article>
           ))}
         </div>

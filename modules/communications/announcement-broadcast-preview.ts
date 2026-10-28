@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { attachmentSetIssue } from "@/modules/communications/message-file-rules";
+import { EMAIL_DELIVERY_BATCH_SIZE, outboxSweepIntervalSeconds } from "@/modules/communications/delivery-timing";
+import { attachmentSetIssue, filesNeedBackgroundMailer } from "@/modules/communications/message-file-rules";
 import {
   announcementOptOutFor,
   type AnnouncementOptOutRow,
@@ -47,6 +48,8 @@ export type AnnouncementBroadcastPreviewContext = {
   /** Uploaded pictures the message embeds (the announcement body's and the template's), and why they cannot be sent, if so. */
   pictureIds?: readonly string[];
   pictureProblem?: string | null;
+  /** The embedded pictures' sizes together, which count toward the background-mailer threshold (#847). */
+  pictureBytes?: number;
   /** An event manager marked this announcement essential (#838): it reaches people who opted out. */
   essential?: boolean;
 };
@@ -175,6 +178,11 @@ export function computeAnnouncementBroadcastPreview(
     attachmentProblem: attachmentSetIssue(attachments)?.message ?? context.pictureProblem ?? null,
     // The one answer to "does this send carry files?", for the dialog and the delivery rule alike: attachments or pictures.
     carriesFiles: attachments.length > 0 || (context.pictureIds ?? []).length > 0,
+    // The same rule `processQueuedMessageIdsAfterCommit` applies to the queued messages: real email only, files over the threshold.
+    sentByBackgroundMailer: context.deliveryMode === "EXTERNAL_EMAIL"
+      && filesNeedBackgroundMailer([...attachments, { sizeBytes: context.pictureBytes ?? 0 }]),
+    workerBatchSize: EMAIL_DELIVERY_BATCH_SIZE,
+    workerSweepSeconds: outboxSweepIntervalSeconds(),
     preheader: context.preheader ?? null,
     sendCheck: context.sendCheck ?? NO_FINDINGS,
     fingerprint,
