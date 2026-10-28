@@ -13,15 +13,17 @@
  * The switcher only changes the view. Server gates never read its cookie.
  */
 
+import { systemRoleText } from "@/modules/access/role-descriptions";
+
 export const ADMIN_ROLES = ["EVENTS_ADMIN", "CLUBS_ADMIN", "SYSTEM_ADMIN"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export const ADMIN_ROLE_COOKIE_NAME = "imsda_admin_role";
 
 export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
-  EVENTS_ADMIN: "Events Administrator",
-  CLUBS_ADMIN: "Clubs Administrator",
-  SYSTEM_ADMIN: "System Administrator",
+  EVENTS_ADMIN: systemRoleText.EVENTS_ADMIN.name,
+  CLUBS_ADMIN: systemRoleText.CLUBS_ADMIN.name,
+  SYSTEM_ADMIN: systemRoleText.SYSTEM_ADMIN.name,
 };
 
 export type AdminRoles = {

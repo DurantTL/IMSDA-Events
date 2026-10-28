@@ -79,6 +79,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
+import { clubYearChoices } from "../modules/club-rosters/domain";
 
 loadEnvConfig(process.cwd());
 
@@ -156,7 +157,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "attendee" | "attendee-history" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -187,6 +188,14 @@ const club = (name: string, suffix: string, clubId = clubA): PageSpec => ({
   path: `/account/clubs/${clubId}${suffix}`,
   role: "director",
 });
+// The club shell for the other club roles and a read-only year (#1112): both roles hold a grant on club A only.
+const clubRole = (role: "registrar" | "reporter", name: string, suffix: string, expectText: RegExp): PageSpec => ({
+  name: `club-${role}-${name}`,
+  path: `/account/clubs/${clubA}${suffix}`,
+  role,
+  expectText,
+});
+const previousClubYear = clubYearChoices(new Date())[0]!;
 const area = (name: string, route: string): PageSpec => ({ name: `area-${name}`, path: route, role: "area" });
 
 const pages: PageSpec[] = [
@@ -242,6 +251,13 @@ const pages: PageSpec[] = [
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
   club("home", ""),
   club("roster", "/roster"),
+  // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
+  { ...club("home-past-year", `?year=${previousClubYear}`), expectText: /read-only/i },
+  { ...club("roster-past-year", `/roster?year=${previousClubYear}`), expectText: /read-only/i },
+  clubRole("registrar", "home", "", /Registrar/),
+  clubRole("registrar", "roster", "/roster", /Registrar/),
+  clubRole("reporter", "home", "", /Monthly Records/),
+  clubRole("reporter", "monthly-records", "/records", /Monthly Records/),
   club("roster-inactive", "/roster?inactive=1"),
   club("registration-events", "/events"),
   club("registration-form", `/events/${clubEventId}`),
@@ -289,6 +305,7 @@ const pages: PageSpec[] = [
   staff("people-email-selected", "/people"),
   staff("attendee-listing", "/people/attendees"),
   staff("duplicates", "/people/duplicates"),
+  staff("event-staff", "/staff"),
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
   staff("finance-church-owed", "/finance/church-owed"),
@@ -1195,7 +1212,7 @@ async function seedLauncherModule(prisma: PrismaClient) {
 async function cleanupSynthetic(prisma: PrismaClient) {
   await prisma.clubFormTemplate.updateMany({ where: { key: "can_collecting_report" }, data: { requirement: "NOT_REQUIRED", requiredRoles: [] } }).catch((error: Error) => console.error(`Could not undo the synthetic Required setting: ${error.message}`));
   const orgs = { organizationId: { in: [clubA, clubB] } };
-  const accountIds = [`${P}_account_director`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
+  const accountIds = [`${P}_account_director`, `${P}_account_registrar`, `${P}_account_reporter`, `${P}_account_area`, `${P}_account_attendee`, `${P}_account_history`];
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
@@ -1297,6 +1314,9 @@ async function seedSynthetic(prisma: PrismaClient) {
   // Accounts: a director (both clubs) and an Area Coordinator.
   const accounts = [
     { id: `${P}_account_director`, email: `${P}.director@example.test`, displayName: "Dana Mobilecheck-Directorsson", firstName: "Dana", lastName: "Mobilecheck-Directorsson" },
+    // The other two club roles (#1112), granted on club A only.
+    { id: `${P}_account_registrar`, email: `${P}.registrar@example.test`, displayName: "Riley Mobilecheck-Registrarsdottir", firstName: "Riley", lastName: "Mobilecheck-Registrarsdottir" },
+    { id: `${P}_account_reporter`, email: `${P}.reporter@example.test`, displayName: "Reese Mobilecheck-Reporterson-Whitlock", firstName: "Reese", lastName: "Mobilecheck-Reporterson-Whitlock" },
     { id: `${P}_account_area`, email: `${P}.area@example.test`, displayName: "Avery Mobilecheck-Coordinator", firstName: "Avery", lastName: "Mobilecheck-Coordinator" },
     // Plain attendees (#1175, #1111), neither with a club, coordinator or staff grant. "attendee" has no registrations, so the
     // Overview shows its empty state. "history" has one registration in each lifecycle state (seedHistoryAccount): received with a
@@ -1325,6 +1345,14 @@ async function seedSynthetic(prisma: PrismaClient) {
     if (!existing) {
       await prisma.clubDirectorGrant.create({
         data: { organizationId, attendeeAccountId: `${P}_account_director`, role: "DIRECTOR", effectiveFrom: new Date("2026-01-01T00:00:00Z"), reason: "Synthetic mobile layout check" },
+      });
+    }
+  }
+  for (const [accountId, role] of [[`${P}_account_registrar`, "REGISTRAR"], [`${P}_account_reporter`, "REPORTER"]] as const) {
+    const existing = await prisma.clubDirectorGrant.findFirst({ where: { organizationId: clubA, attendeeAccountId: accountId, revokedAt: null } });
+    if (!existing) {
+      await prisma.clubDirectorGrant.create({
+        data: { organizationId: clubA, attendeeAccountId: accountId, role, effectiveFrom: new Date("2026-01-01T00:00:00Z"), reason: "Synthetic mobile layout check" },
       });
     }
   }
@@ -1820,8 +1848,9 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
   const cookie = async (role: SignedInRole) => {
-    if (role === "director" || role === "area" || role === "attendee" || role === "attendee-history") {
-      const accountId = role === "director" ? `${P}_account_director` : role === "area" ? `${P}_account_area` : role === "attendee" ? `${P}_account_attendee` : `${P}_account_history`;
+    if (role === "director" || role === "registrar" || role === "reporter" || role === "area" || role === "attendee" || role === "attendee-history") {
+      const accountIds = { director: `${P}_account_director`, registrar: `${P}_account_registrar`, reporter: `${P}_account_reporter`, area: `${P}_account_area`, attendee: `${P}_account_attendee`, "attendee-history": `${P}_account_history` } as const;
+      const accountId = accountIds[role];
       const session = await attendeeSession.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
       tokens.attendee.push(session.token);
       return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
@@ -1838,6 +1867,8 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
     "system-admin": await cookie("system-admin"),
     kitchen: await cookie("kitchen"),
     director: await cookie("director"),
+    registrar: await cookie("registrar"),
+    reporter: await cookie("reporter"),
     area: await cookie("area"),
     attendee: await cookie("attendee"),
     "attendee-history": await cookie("attendee-history"),
@@ -4103,7 +4134,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen"] as Role[]) {
+      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

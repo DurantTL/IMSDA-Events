@@ -1,4 +1,4 @@
-import { clubDirectorRoleLabels, clubRoleDescriptions, type ClubRole } from "@/modules/organizations/director-grants-domain";
+import { clubRoleText, type ClubRoleKey } from "@/modules/access/role-descriptions";
 import type { PortalDestination, PortalGuide } from "@/modules/help/types";
 
 /**
@@ -27,7 +27,7 @@ export const portalDestinations: Record<string, PortalDestination> = {
   "coordinator-new-clubs": { id: "coordinator-new-clubs", label: "New clubs (view only)", path: "/account/area-clubs/applications", audience: "coordinator" },
 };
 
-const roleLines = (Object.keys(clubDirectorRoleLabels) as ClubRole[]).map((role) => `${clubDirectorRoleLabels[role]}: ${clubRoleDescriptions[role]}`);
+const roleLines = (Object.keys(clubRoleText) as ClubRoleKey[]).map((role) => `${clubRoleText[role].name}: ${clubRoleText[role].summary}${clubRoleText[role].cannot.length ? ` Can't: ${clubRoleText[role].cannot.join(" ")}` : ""}`);
 
 export const portalGuides: readonly PortalGuide[] = [
   {
@@ -91,7 +91,7 @@ export const portalGuides: readonly PortalGuide[] = [
     summary: "File your club's report for a month, from meeting notes to Submit report.",
     audience: "director",
     needs: [
-      "A club role that can submit reports: director, deputy or reporter. A registrar cannot, and sees a note saying Monthly Records are kept by the club's director, deputy or reporter.",
+      `A club role that can submit reports: ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}. A ${clubRoleText.REGISTRAR.name} cannot, and sees a note saying Monthly Records are kept by the club's ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}.`,
       "The month's numbers: attendance, staff, honors worked on and class levels.",
     ],
     changes: [
@@ -124,7 +124,7 @@ export const portalGuides: readonly PortalGuide[] = [
     summary: "Check the pre-filled Year-End Report for a Pathfinder year, then save a draft or submit it.",
     audience: "director",
     needs: [
-      "A club role that can submit reports: director, deputy or reporter. A registrar cannot.",
+      `A club role that can submit reports: ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name} or ${clubRoleText.REPORTER.name}. A ${clubRoleText.REGISTRAR.name} cannot.`,
       "A little time to check the numbers. The report is pre-filled from your roster, honors and classes.",
     ],
     changes: [

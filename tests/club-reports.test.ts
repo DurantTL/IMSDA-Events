@@ -223,6 +223,17 @@ describe("who may file", () => {
     expect(response.status).toBe(404);
     expect(mocks.reportCreate).not.toHaveBeenCalled();
   });
+
+  it("refuses an Area Coordinator, whose grant opens records read only and never saves one (#1113)", async () => {
+    // A coordinator-only account directs no club; the capability check reads club roles alone, never the coordinator grant.
+    mocks.listDirectedClubs.mockResolvedValue([]);
+    const response = await PUT(request(), ctx);
+    expect(response.status).toBe(404);
+    expect(mocks.reportCreate).not.toHaveBeenCalled();
+    expect(mocks.reportUpdate).not.toHaveBeenCalled();
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("modules/club-rosters/access.ts", "utf8")).not.toMatch(/area-coordinators|AreaCoordinator/);
+  });
 });
 
 describe("draft and submit", () => {

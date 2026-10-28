@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { isAccountNavItemActive, type AccountNavItem } from "@/components/account-section-nav";
+import { clubNavLinks } from "@/modules/club-rosters/nav-year-links";
 
 /**
  * The club shell's primary navigation (#1165): the first destinations as
@@ -14,15 +15,32 @@ import { isAccountNavItemActive, type AccountNavItem } from "@/components/accoun
  * links the button names it, so the location stays visible while closed.
  * The links only mirror what the server already allowed for this role.
  */
-export function ClubPortalNav({
-  primary,
-  more,
-  label = "Club",
-}: {
+export function ClubPortalNav(props: {
   primary: AccountNavItem[];
   more: AccountNavItem[];
   label?: string;
+  /** The club's base path (`/account/clubs/<id>`): the Home and Roster links carry a read-only `?year=` (#1112). */
+  base?: string;
 }) {
+  // useSearchParams needs a Suspense boundary; until it resolves the links are bare.
+  return (
+    <Suspense fallback={<ClubPortalNavView {...props} years={[]} />}>
+      <ClubPortalNavWithYear {...props} />
+    </Suspense>
+  );
+}
+
+function ClubPortalNavWithYear(props: Parameters<typeof ClubPortalNav>[0]) {
+  return <ClubPortalNavView {...props} years={useSearchParams().getAll("year")} />;
+}
+
+function ClubPortalNavView({
+  primary,
+  more,
+  label = "Club",
+  base,
+  years,
+}: Parameters<typeof ClubPortalNav>[0] & { years: string[] }) {
   const pathname = usePathname();
   // Open for one page only: following a link in the list lands on a new pathname, which starts with More closed.
   const [openFor, setOpenFor] = useState<string | null>(null);
@@ -32,6 +50,8 @@ export function ClubPortalNav({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const pointerInside = useRef(false);
+  // The year rides on the links only; active state still compares each item's bare href.
+  const hrefOf = new Map(clubNavLinks([...primary, ...more], base ?? "", years).map(({ item, href }) => [item, href]));
   const currentMore = more.find((item) => isAccountNavItemActive(pathname, item));
 
   // A press that started inside More is over once the pointer is released or cancelled.
@@ -59,7 +79,7 @@ export function ClubPortalNav({
       <ul>
         {primary.map((item) => (
           <li key={item.href}>
-            <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={item.href}>{item.label}</Link>
+            <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={hrefOf.get(item) ?? item.href}>{item.label}</Link>
           </li>
         ))}
         {more.length > 0 && (
@@ -96,7 +116,7 @@ export function ClubPortalNav({
               {more.map((item) => (
                 <li key={item.href}>
                   {/* Closes even when the link points at the page already open, where the path does not change. */}
-                  <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={item.href} onClick={() => setOpenFor(null)}>{item.label}</Link>
+                  <Link aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined} href={hrefOf.get(item) ?? item.href} onClick={() => setOpenFor(null)}>{item.label}</Link>
                 </li>
               ))}
             </ul>
