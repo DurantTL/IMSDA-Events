@@ -242,9 +242,12 @@ describe("My registrations page (#1176)", () => {
   });
 
   it("offers no continue payment or contact edit on a waitlisted registration and keeps its wording", async () => {
-    mocks.registrations = [registration("w", "WAITLISTED", { totalCents: 25000 })];
+    mocks.registrations = [registration("w", "WAITLISTED", { totalCents: 25000, attendeeNames: ["Taylor Lane", "Jordan Lane"] })];
     const html = await render();
     expect(html).toContain("Waitlisted");
+    // Places are requested, not taken (#1111).
+    expect(html).toContain("2 places requested");
+    expect(html).not.toContain("people registered");
     expect(html).toContain("No payment due while waitlisted");
     expect(html).not.toContain("Continue payment");
     expect(html).not.toContain("$250");
