@@ -3,6 +3,7 @@ import { buildAdminSectionNav, type AdminBackLink, type AdminSection } from "@/c
 import { activeAdminSection } from "@/modules/access/admin-section";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
+import type { ClubSummaryView } from "@/modules/club-reports/club-directory-domain";
 
 /**
  * The section header a server page draws at its top (#1274). The page names itself with `path` (its own path, with any
@@ -19,6 +20,7 @@ export async function AdminPageHeader({
   path,
   section,
   year,
+  clubSummaryView,
   eventId,
   waitingApplications,
   parentName,
@@ -28,6 +30,7 @@ export async function AdminPageHeader({
   path: string;
   section?: AdminSection;
   year?: string;
+  clubSummaryView?: ClubSummaryView;
   eventId?: string | null;
   waitingApplications?: number;
   parentName?: string;
@@ -45,6 +48,7 @@ export async function AdminPageHeader({
     section: resolved,
     pathname: path,
     clubYear: resolved === "clubs" ? resolveAreaClubYear(year) : undefined,
+    clubSummaryView,
     waitingApplications,
     eventId,
     parentName,

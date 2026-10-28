@@ -3,6 +3,7 @@ import { clubsAdminActiveHref, clubsAdminGroups, type ClubsNavGroupKey } from "@
 import { systemNavActiveItem, systemNavGroups, type SystemNavGroupKey } from "@/components/system-navigation";
 import type { AdminRole } from "@/modules/access/admin-roles-domain";
 import { clubsAdminTabs } from "@/modules/club-reports/clubs-admin-home-model";
+import type { ClubSummaryView } from "@/modules/club-reports/club-directory-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { eventsAdminTabs } from "@/modules/events/events-admin-home-model";
 import { systemHomeTabs } from "@/modules/system-admin/home-model";
@@ -135,7 +136,7 @@ function markCurrent(tabs: readonly DashboardTab[], pathname: string, areaKey: s
 export function adminSectionTabs(
   section: AdminSection,
   pathname: string,
-  options: { clubYear?: string; waitingApplications?: number; eventId?: string | null } = {},
+  options: { clubYear?: string; clubSummaryView?: ClubSummaryView; waitingApplications?: number; eventId?: string | null } = {},
 ): AdminSectionTab[] {
   if (section === "system") {
     const tabs = systemHomeTabs.map((tab) => (tab.href.startsWith("#") && pathname !== "/admin" ? { ...tab, href: `/admin${tab.href}` } : tab));
@@ -143,6 +144,10 @@ export function adminSectionTabs(
   }
   if (section === "clubs") {
     const tabs = clubsAdminTabs(options.clubYear ?? clubYearFor(new Date()), options.waitingApplications);
+    if (pathname === "/admin/clubs/summary" && options.clubSummaryView) {
+      const key = { directory: "all-clubs", records: "monthly-records", points: "points", events: "club-events" }[options.clubSummaryView];
+      return tabs.map((tab) => tab.key === key ? { ...tab, current: options.clubSummaryView === "records" ? "true" as const : "page" as const } : { ...tab });
+    }
     return markCurrent(tabs, pathname, clubsAreaKey(pathname));
   }
   const tabs = eventsAdminTabs(options.eventId ?? null).map((tab) => (tab.href.startsWith("#") && pathname !== "/events-admin" ? { ...tab, href: `/events-admin${tab.href}` } : tab));
@@ -158,11 +163,12 @@ export function adminSectionTabs(
 export function adminBackLink(
   section: AdminSection,
   pathname: string,
-  options: { parentName?: string; viaParent?: boolean } = {},
+  options: { parentName?: string; viaParent?: boolean; clubYear?: string } = {},
 ): AdminBackLink | null {
   const clubsView = section === "clubs";
+  const openClubYear = options.clubYear && /^\/admin\/organizations\/[^/]+\/club\/?$/.test(pathname) ? options.clubYear : null;
   const clubList: AdminBackLink = clubsView
-    ? { href: "/admin/clubs/summary", label: "Back to Club summary" }
+    ? { href: `/admin/clubs/summary${openClubYear ? `?year=${encodeURIComponent(openClubYear)}` : ""}`, label: "Back to Club summary" }
     : { href: "/admin/organizations", label: "Back to Clubs and churches" };
   const clubPage = (id: string): AdminBackLink => ({ href: `/admin/organizations/${id}/club`, label: `Back to ${options.parentName ?? "the club"}` });
 
@@ -193,6 +199,7 @@ export function buildAdminSectionNav(input: {
   section: AdminSection;
   pathname: string;
   clubYear?: string;
+  clubSummaryView?: ClubSummaryView;
   waitingApplications?: number;
   eventId?: string | null;
   parentName?: string;

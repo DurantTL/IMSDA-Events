@@ -113,8 +113,8 @@ describe("the Clubs sidebar groups", () => {
     ]);
     expect(clubsAdminGroups.map((group) => group.items.map((item) => item.href))).toEqual([
       ["/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks", "/admin/honors", "/admin/club-supplies", "/admin/clubs/import", "/admin/clubs/health-import"],
-      ["/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary#points"],
-      ["/admin/clubs/summary#club-events"],
+      ["/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"],
+      ["/admin/clubs/summary?view=events#club-events"],
       ["/admin/club-forms"],
       ["/admin/clubs/applications", "/admin/clubs/invites"],
       ["/admin/clubs/leaders", "/admin/people"],
@@ -151,7 +151,7 @@ describe("the Clubs sidebar groups", () => {
   });
 
   it("adds ?year= to the year-aware links only when the URL has one", () => {
-    expect(clubsAdminHrefForYear("/admin/clubs/summary#points", "2025-26")).toBe("/admin/clubs/summary?year=2025-26#points");
+    expect(clubsAdminHrefForYear("/admin/clubs/summary?view=points#points", "2025-26")).toBe("/admin/clubs/summary?view=points&year=2025-26#points");
     expect(clubsAdminHrefForYear("/admin/clubs/reports/year-end", "2025-26")).toBe("/admin/clubs/reports/year-end?year=2025-26");
     expect(clubsAdminHrefForYear("/admin/clubs", "2025-26")).toBe("/admin/clubs?year=2025-26");
     expect(clubsAdminHrefForYear("/admin/honors", "2025-26")).toBe("/admin/honors");
@@ -160,7 +160,7 @@ describe("the Clubs sidebar groups", () => {
     navigation.pathname = "/admin/clubs";
     navigation.search = "year=2025-26";
     const nav = sidebarOf(render({ user: staff, adminRoleView: view }));
-    expect(nav).toContain('href="/admin/clubs/summary?year=2025-26#points"');
+    expect(nav).toContain('href="/admin/clubs/summary?view=points&amp;year=2025-26#points"');
     expect(nav).toContain('href="/admin/honors"');
   });
 });
@@ -248,7 +248,7 @@ describe("Find a page or task in the Clubs view", () => {
       "Club administration", ...clubsAdminGroups.flatMap((group) => group.items.map((item) => item.label)),
     ]);
     const points = searchDestinations(buildSearchDestinations({ ...base, clubsAdmin: { healthImport: true } }), "points")[0];
-    expect(points).toMatchObject({ scope: "Clubs", label: "Points", href: "/admin/clubs/summary#points" });
+    expect(points).toMatchObject({ scope: "Clubs", label: "Points", href: "/admin/clubs/summary?view=points#points" });
     expect(points?.description).toContain("Records and points");
     // The group name finds its items.
     expect(searchDestinations(buildSearchDestinations({ ...base, clubsAdmin: { healthImport: true } }), "applications").map((destination) => destination.label)).toEqual(

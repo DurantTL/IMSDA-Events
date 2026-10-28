@@ -20,23 +20,23 @@
  * - Roster members: active roster members across active clubs, for the selected club year.
  */
 import { calendarDateIn, CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
-import { clubYearMonths, reportMonthLabel } from "@/modules/club-reports/domain";
+import { reportMonthLabel } from "@/modules/club-reports/domain";
 import {
   eventHeadcount,
-  filterClubsByNameChurchOrCity,
   type AreaClubSummary,
   type AreaEventClubRow,
-  type MonthStatus,
 } from "@/modules/club-reports/area-summary-domain";
 import { clubYearOptions } from "@/modules/club-rosters/domain";
 import { clubsWithFormsMissing, clubsFormsMissingHref, type ClubRequiredForms } from "@/modules/club-forms/required-domain";
-import { recordState, recordStateLabels, recordsToReview, recordsToReviewHref, type RecordState } from "@/modules/club-reports/review-domain";
+import { recordsToReview, recordsToReviewHref } from "@/modules/club-reports/review-domain";
+import { buildClubDirectory, chooseReportMonth, clubSummaryHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
+export { chooseReportMonth, recordStatusLabel } from "@/modules/club-reports/club-directory-domain";
 
 // Lives in the roster domain so the Clubs sidebar (a client component) can use it.
 export { clubYearOptions };
 
 export const NEW_CLUBS_LIMIT = 5;
-export const REGISTERED_CLUBS_LIMIT = 10;
+export const REGISTERED_CLUBS_LIMIT = 6;
 export const EVENT_TOTAL_NOTE = "Only registered clubs count toward an event's total.";
 export const NEW_CLUBS_NOTE = "Only the buttons in this list decide an application.";
 
@@ -74,16 +74,7 @@ export type ClubsAdminNewClub = {
   reviewHref: string;
 };
 
-export type ClubsAdminClubRow = {
-  id: string;
-  name: string;
-  church: string;
-  rosterSize: number;
-  recordStatus: MonthStatus | null;
-  /** Not submitted, Submitted or Reviewed (#1246); null only when the month is not yet due. */
-  recordState: RecordState | null;
-  recordLabel: string;
-};
+export type ClubsAdminClubRow = ClubDirectoryRow;
 
 export type ClubsAdminNextEvent = {
   id: string;
@@ -113,18 +104,6 @@ export type ClubsAdminHome = {
   moreNewClubs: boolean;
   registeredClubs: { rows: ClubsAdminClubRow[]; matchCount: number; total: number };
 };
-
-/** What a club's record for the month is called in the clubs table (#1246): Not submitted, Submitted or Reviewed; a future month is "Not yet due". */
-export function recordStatusLabel(cell: { status: MonthStatus; reviewed?: boolean } | null) {
-  return cell && cell.status !== "FUTURE" ? recordStateLabels[recordState(cell)] : "Not yet due";
-}
-
-/** The month the monthly-records card counts: this month when it is in the club year, else the club year's last month. */
-export function chooseReportMonth(clubYear: string, now: Date) {
-  const months = clubYearMonths(clubYear);
-  const current = calendarDateIn(now).slice(0, 7);
-  return months.includes(current) ? current : months[months.length - 1]!;
-}
 
 /** The first event whose start date (Central time) is today or later, or null. Events come ordered by start; this does not rely on it. */
 export function pickNextEvent<T extends { startsAt: string }>(events: readonly T[], now: Date): T | null {
@@ -160,8 +139,8 @@ export function clubsAdminHrefs(clubYear: string) {
     summary: `/admin/clubs/summary?${year}`,
     reports: `/admin/clubs/reports?${year}`,
     recordsToReview: (month: string) => recordsToReviewHref(clubYear, month),
-    points: `/admin/clubs/summary?${year}#points`,
-    clubEvents: `/admin/clubs/summary?${year}#club-events`,
+    points: `${clubSummaryHref({ clubYear, view: "points" })}#points`,
+    clubEvents: `${clubSummaryHref({ clubYear, view: "events" })}#club-events`,
     forms: "/admin/club-forms",
     applications: "/admin/clubs/applications",
     registeredClubs: "#registered-clubs",
@@ -197,7 +176,6 @@ export function buildClubsAdminHome(input: {
 }): ClubsAdminHome {
   const { clubYear, now, clubs } = input;
   const month = chooseReportMonth(clubYear, now);
-  const cellOf = (club: AreaClubSummary) => club.months.find((cell) => cell.month === month) ?? null;
 
   const next = pickNextEvent(input.events, now);
   const nextEvent: ClubsAdminNextEvent | null = next
@@ -216,10 +194,7 @@ export function buildClubsAdminHome(input: {
     .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
   const waiting = Math.max(input.waitingCount, pending.length);
 
-  const matches = filterClubsByNameChurchOrCity(
-    clubs.map((club) => ({ ...club, sponsoringChurch: club.church })),
-    input.query,
-  );
+  const directory = buildClubDirectory({ clubs, clubYear, now, query: input.query, pageSize: REGISTERED_CLUBS_LIMIT, prioritizeAttention: true });
 
   return {
     clubYear,
@@ -248,19 +223,8 @@ export function buildClubsAdminHome(input: {
     })),
     moreNewClubs: waiting > NEW_CLUBS_LIMIT,
     registeredClubs: {
-      rows: matches.slice(0, REGISTERED_CLUBS_LIMIT).map((club) => {
-        const cell = cellOf(club);
-        return {
-          id: club.id,
-          name: club.name,
-          church: club.church,
-          rosterSize: club.rosterSize,
-          recordStatus: cell?.status ?? null,
-          recordState: cell && cell.status !== "FUTURE" ? recordState(cell) : null,
-          recordLabel: recordStatusLabel(cell),
-        };
-      }),
-      matchCount: matches.length,
+      rows: directory.items,
+      matchCount: directory.total,
       total: clubs.length,
     },
   };

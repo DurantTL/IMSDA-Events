@@ -19,7 +19,8 @@ import {
 } from "@/modules/club-reports/clubs-admin-home-model";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
-import { cardCell } from "@/components/table-card-labels";
+import { ClubDirectoryCards } from "@/components/club-directory";
+import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import styles from "./admin-clubs.module.css";
 
 export const metadata: Metadata = { title: "Club administration" };
@@ -165,7 +166,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           <div>
             <p className="eyebrow">Club year {clubYear}</p>
             <h2 id="registered-clubs-heading">Registered clubs</h2>
-            <p>The record column is for {home.reportMonthLabel}.</p>
+            <p>{home.reportMonthLabel} records. Clubs with records not submitted or awaiting review appear first.</p>
           </div>
         </div>
         <form className={styles.searchForm} method="get" action="/admin/clubs">
@@ -179,34 +180,10 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         {registeredClubs.rows.length === 0 ? (
           <p className="report-empty">{query ? `No clubs match "${query}".` : "No active clubs."}</p>
         ) : (
-          <div className={`report-table-wrap ${styles.clubTable}`}>
-            <table role="table" className="report-table table-cards">
-              <caption className="sr-only">Registered clubs, club year {clubYear}</caption>
-              <thead role="rowgroup">
-                <tr role="row">
-                  <th role="columnheader" scope="col">Club</th>
-                  <th role="columnheader" scope="col">Roster</th>
-                  <th role="columnheader" scope="col">{"This month's record"}</th>
-                  <th role="columnheader" scope="col">Open club</th>
-                </tr>
-              </thead>
-              <tbody role="rowgroup">
-                {registeredClubs.rows.map((club) => (
-                  <tr role="row" key={club.id}>
-                    <th role="rowheader" scope="row" translate="no">{club.name}{club.church && <small> ({club.church})</small>}</th>
-                    <td {...cardCell("Roster")}>{club.rosterSize}</td>
-                    <td {...cardCell("This month's record")}>{club.recordLabel}</td>
-                    <td {...cardCell("Open club")}>
-                      <Link className={styles.seeAll} href={`/admin/organizations/${encodeURIComponent(club.id)}/club`}>Open club<span className="sr-only"> {club.name}</span></Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ClubDirectoryCards clubs={registeredClubs.rows} clubYear={clubYear} monthLabel={home.reportMonthLabel} />
         )}
-        <Link className={styles.seeAll} href={href.summary}>
-          See all {registeredClubs.total} clubs
+        <Link className={`secondary-button ${styles.linkButton}`} href={clubSummaryHref({ clubYear, query })} prefetch={false}>
+          View all {query ? `${registeredClubs.matchCount} matching` : registeredClubs.total} clubs
         </Link>
       </section>
 

@@ -157,8 +157,8 @@ describe("registered clubs", () => {
     expect(home.registeredClubs.rows.map((row) => [row.name, row.recordLabel, row.rosterSize])).toEqual([
       ["Alpha Pathfinders", "Submitted", 12],
       ["Beta Adventurers", "Submitted", 8],
-      ["Gamma Pathfinders", "Not submitted", 5],
       ["Delta Explorers", "Not submitted", 0],
+      ["Gamma Pathfinders", "Not submitted", 5],
     ]);
   });
 
@@ -168,9 +168,9 @@ describe("registered clubs", () => {
       club("c2", "Beta Adventurers", [submitted("2026-10", 0)]),
     ];
     const home = buildClubsAdminHome({ ...base, clubs: reviewed });
-    expect(home.registeredClubs.rows.map((row) => row.recordLabel)).toEqual(["Reviewed", "Submitted"]);
+    expect(home.registeredClubs.rows.map((row) => row.recordLabel)).toEqual(["Submitted", "Reviewed"]);
     expect(home.counts.monthlyRecordsToReview).toBe(1);
-    expect(home.registeredClubs.rows.map((row) => row.recordState)).toEqual(["REVIEWED", "SUBMITTED"]);
+    expect(home.registeredClubs.rows.map((row) => row.recordState)).toEqual(["SUBMITTED", "REVIEWED"]);
   });
 
   it("filters by name or church and keeps the total", () => {
@@ -181,7 +181,7 @@ describe("registered clubs", () => {
     expect(buildClubsAdminHome({ ...base, query: "zzz" }).registeredClubs.rows).toEqual([]);
   });
 
-  it("shows the first ten", () => {
+  it("shows at most six, with records needing attention first", () => {
     const many = Array.from({ length: 14 }, (_, index) => club(`m${index}`, `Club ${String(index).padStart(2, "0")}`, []));
     const home = buildClubsAdminHome({ ...base, clubs: many });
     expect(home.registeredClubs.rows).toHaveLength(REGISTERED_CLUBS_LIMIT);
@@ -193,13 +193,13 @@ describe("tabs, links and years", () => {
   it("carries the club year on every year link", () => {
     const href = clubsAdminHrefs(clubYear);
     expect(href.summary).toBe("/admin/clubs/summary?year=2026-27");
-    expect(href.points).toBe("/admin/clubs/summary?year=2026-27#points");
+    expect(href.points).toBe("/admin/clubs/summary?year=2026-27&view=points#points");
     expect(clubsAdminTabs(clubYear, 3).map((tab) => [tab.label, tab.href])).toEqual([
       ["Overview", "/admin/clubs?year=2026-27"],
       ["All clubs", "/admin/clubs/summary?year=2026-27"],
       ["Monthly Records", "/admin/clubs/reports?year=2026-27"],
-      ["Points", "/admin/clubs/summary?year=2026-27#points"],
-      ["Club events", "/admin/clubs/summary?year=2026-27#club-events"],
+      ["Points", "/admin/clubs/summary?year=2026-27&view=points#points"],
+      ["Club events", "/admin/clubs/summary?year=2026-27&view=events#club-events"],
       ["Forms", "/admin/club-forms"],
       ["New clubs (3)", "/admin/clubs/applications"],
       ["Club leaders", "/admin/clubs/leaders"],

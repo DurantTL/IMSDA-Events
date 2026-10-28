@@ -285,13 +285,13 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
     items: [
       { href: "/admin/clubs/reports", label: "Club Monthly Records", icon: FileText },
       { href: "/admin/clubs/reports/year-end", label: "Club Year-End Reports", icon: Trophy },
-      { href: "/admin/clubs/summary#points", label: "Points", icon: Star },
+      { href: "/admin/clubs/summary?view=points#points", label: "Points", icon: Star },
     ],
   },
   {
     key: "clubs-events",
     label: "Club events",
-    items: [{ href: "/admin/clubs/summary#club-events", label: "Club events", icon: CalendarDays }],
+    items: [{ href: "/admin/clubs/summary?view=events#club-events", label: "Club events", icon: CalendarDays }],
   },
   {
     key: "clubs-forms",
@@ -331,9 +331,12 @@ export const clubsAdminYearPaths: readonly string[] = ["/admin/clubs", "/admin/c
 /** A Clubs sidebar href with `?year=` (before any `#`) when the page reads it and a year is chosen. */
 export function clubsAdminHrefForYear(href: string, year: string | null): string {
   if (!year) return href;
-  const [path, hash] = href.split("#");
+  const [pathAndQuery, hash] = href.split("#");
+  const [path, query] = pathAndQuery.split("?");
   if (!clubsAdminYearPaths.includes(path)) return href;
-  return `${path}?year=${encodeURIComponent(year)}${hash ? `#${hash}` : ""}`;
+  const params = new URLSearchParams(query);
+  params.set("year", year);
+  return `${path}?${params}${hash ? `#${hash}` : ""}`;
 }
 
 /**

@@ -55,7 +55,7 @@ export default async function StaffOpenClubPage({
 
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/club`} />
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/club`} year={view.clubYear} />
       <div className="intro-actions club-admin-links">
         <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
           <UserCog aria-hidden="true" size={14} /> Club admins
