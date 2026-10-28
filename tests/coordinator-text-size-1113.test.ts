@@ -35,6 +35,6 @@ describe("coordinator pages at 200% text (#1113)", () => {
 
   it("lets a long leader email wrap in a club's list", () => {
     expect(block).toContain(".public-manage-club-list { grid-template-columns: minmax(0, 1fr); }");
-    expect(block).toMatch(/\.public-manage-club-list li > span \{[^}]*overflow-wrap: anywhere/);
+    expect(block).toMatch(/\.public-manage-club-list li > span:not\(\[class\]\) \{[^}]*overflow-wrap: anywhere/);
   });
 });

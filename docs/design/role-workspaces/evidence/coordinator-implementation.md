@@ -2,7 +2,7 @@
 
 Issue: [#1113](https://github.com/DurantTL/IMSDA-Events/issues/1113). It was built in two slices: [#1186](https://github.com/DurantTL/IMSDA-Events/issues/1186) (masthead, task navigation and Overview) and [#1187](https://github.com/DurantTL/IMSDA-Events/issues/1187) (one club, Monthly Records, Points, Club events, Team approvals and New clubs). This page records what the delivered pages show and how each acceptance criterion was checked. The #1113 wrap-up change adds one fix:
 
-- at 200% text on a phone, the Overview, Club events and one-club pages no longer scroll sideways. Card labels move above their values when the text is large, the Open club button sits under its label, and a long leader email wraps in the club's list.
+- at 200% text on a phone, the Overview, Club events and one-club pages no longer scroll sideways. On the coordinator's card tables (Overview, Club events and Points), card labels move above their values when the text is large; the Open club button sits under its label, and a long leader email wraps in the club's list.
 
 All screenshots come from a local production build with synthetic `mobilecheck` data, taken on October 28, 2026. They show this build, not a deployment.
 
@@ -44,8 +44,10 @@ There are also two synthetic new-club applications, one with a very long email a
    - A failed read says "unavailable" with a retry, never 0 or Submitted.
    - Checked by `tests/coordinator-overview-1186.test.ts` ("overview numbers come from the clubs the owning query returned", "shows unavailable, never zero clubs or Submitted…") and `tests/coordinator-destinations-1187.test.ts` (each page's unavailable state).
 4. **A submitted record is view only; no roster, settings, new-club decisions or director tools, even by direct URL or modified request.**
-   - Checked by `tests/coordinator-one-club-1187.test.ts` ("a direct URL cannot reach the director's tools": no roster editor, Class tracking, Club settings or Health route; Orders and Supplies answer 404; the roster API and Orders loaders refuse a coordinator and a staff act-as).
-   - `tests/coordinator-destinations-1187.test.ts` covers "opens a Submitted month read only…", "has no approve control…" and "lists applications read only, with no Approve, Decline or invite controls".
+   - Checked by `tests/coordinator-one-club-1187.test.ts` ("a direct URL cannot reach the director's tools": no roster editor, Class tracking, Club settings or Health route under the one-club pages; Orders and Supplies answer 404; the roster API and Orders loaders refuse a coordinator and a staff act-as).
+   - The separate event Health Record viewer under `/account/area-clubs/health` (#611) is unchanged: switched off by default, behind its own second sign-in step and audited.
+   - On screen, `tests/coordinator-destinations-1187.test.ts` covers "opens a Submitted month read only…", "has no approve control…" and "lists applications read only, with no Approve, Decline or invite controls".
+   - On the server, the new-club decision route gives an Area Coordinator 403 (`tests/new-club-application-routes.test.ts`, "gives an Area Coordinator, who can read the queue, a 403"). The Monthly Record save route refuses a coordinator-only account with 404 and saves nothing (`tests/club-reports.test.ts`, "refuses an Area Coordinator…", added by this change).
 5. **Team approval only for qualifying requests at the coordinator's own locations.**
    - Checked by `tests/team-approvals-1187.test.ts`:
      - another location answers 404 and changes nothing;
