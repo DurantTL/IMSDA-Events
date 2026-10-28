@@ -26,6 +26,8 @@ import {
   workerDeliveryLabel,
 } from "@/components/announcement-broadcast-review";
 import { BoundedFileCache } from "@/modules/communications/email-attachments";
+import { EMAIL_DELIVERY_BATCH_SIZE, outboxSweepIntervalSeconds } from "@/modules/communications/delivery-timing";
+import { BACKGROUND_MAILER_FILE_BYTES_THRESHOLD, announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
 import { computeAnnouncementBroadcastPreview } from "@/modules/communications/announcement-broadcast-preview";
 import { assertAnnouncementFits, MessageFileError } from "@/modules/communications/message-files";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
@@ -84,6 +86,27 @@ describe("the announcement review counts pictures and files alike (#824)", () =>
     expect(computeAnnouncementBroadcastPreview(candidates, { ...base, attachments: [{ id: "f", filename: "a.pdf", sizeBytes: 5 }] }).carriesFiles).toBe(true);
   });
 
+  it("defers only when the files total over the threshold, and reports the worker numbers from the server", () => {
+    const small = computeAnnouncementBroadcastPreview(candidates, { ...base, pictureIds: ["p1"], pictureBytes: 100 * 1024 });
+    expect(small.carriesFiles).toBe(true);
+    expect(small.sentByBackgroundMailer).toBe(false);
+    const attachmentAndPicture = computeAnnouncementBroadcastPreview(candidates, {
+      ...base,
+      pictureIds: ["p1"],
+      pictureBytes: BACKGROUND_MAILER_FILE_BYTES_THRESHOLD,
+      attachments: [{ id: "f", filename: "a.pdf", sizeBytes: 1 }],
+    });
+    expect(attachmentAndPicture.sentByBackgroundMailer).toBe(true);
+    expect(computeAnnouncementBroadcastPreview(candidates, { ...base, deliveryMode: "LOCAL_CAPTURE", pictureIds: ["p1"], pictureBytes: 3 * MB }).sentByBackgroundMailer).toBe(false);
+    expect(small.workerBatchSize).toBe(EMAIL_DELIVERY_BATCH_SIZE);
+    expect(small.workerSweepSeconds).toBe(outboxSweepIntervalSeconds());
+    expect(outboxSweepIntervalSeconds({})).toBe(300);
+    expect(outboxSweepIntervalSeconds({ OUTBOX_SWEEP_INTERVAL_SECONDS: "120" })).toBe(120);
+    expect(outboxSweepIntervalSeconds({ OUTBOX_SWEEP_INTERVAL_SECONDS: "nope" })).toBe(300);
+    const html = renderToStaticMarkup(createElement(AnnouncementBroadcastReviewFacts, { preview: small }));
+    expect(html).toContain("Sends immediately by email");
+  });
+
   it("turns a picture problem into the attachment problem that blocks Send, and changes the fingerprint", () => {
     const fine = computeAnnouncementBroadcastPreview(candidates, { ...base, pictureIds: ["p1"] });
     const broken = computeAnnouncementBroadcastPreview(candidates, { ...base, pictureIds: ["p1"], pictureProblem: "The pictures in a message may total 6.0 MB or less; these total 6.8 MB." });
@@ -94,11 +117,14 @@ describe("the announcement review counts pictures and files alike (#824)", () =>
   });
 
   it("words the dialog by the same condition, with the time from the audience size", () => {
-    expect(workerDeliveryLabel(1)).toContain("about 5 minutes");
-    expect(workerDeliveryLabel(50)).toContain("about 5 minutes");
-    expect(workerDeliveryLabel(51)).toContain("about 10 minutes");
-    expect(workerDeliveryLabel(300)).toContain("about 30 minutes");
-    const pictureOnly = computeAnnouncementBroadcastPreview(candidates, { ...base, pictureIds: ["p1"] });
+    const timing = { workerBatchSize: 50, workerSweepSeconds: 300 };
+    expect(workerDeliveryLabel(1, timing)).toContain("about 5 minutes");
+    expect(workerDeliveryLabel(50, timing)).toContain("about 5 minutes");
+    expect(workerDeliveryLabel(51, timing)).toContain("about 10 minutes");
+    expect(workerDeliveryLabel(300, timing)).toContain("about 30 minutes");
+    expect(workerDeliveryLabel(300, { workerBatchSize: 100, workerSweepSeconds: 600 })).toContain("batches of 100");
+    expect(workerDeliveryLabel(300, { workerBatchSize: 100, workerSweepSeconds: 600 })).toContain("about 30 minutes");
+    const pictureOnly = computeAnnouncementBroadcastPreview(candidates, { ...base, pictureIds: ["p1"], pictureBytes: 3 * MB });
     const html = renderToStaticMarkup(createElement(AnnouncementBroadcastReviewFacts, { preview: pictureOnly }));
     expect(html).toContain("background mailer");
     expect(html).not.toContain("immediately");
@@ -108,7 +134,8 @@ describe("the announcement review counts pictures and files alike (#824)", () =>
 });
 
 describe("processQueuedMessageIdsAfterCommit leaves real email with files to the worker (#824)", () => {
-  function prismaWith(messages: Array<{ id: string; mode: string; files: Array<{ fileId: string }> }>) {
+  const file = (sizeBytes: number) => ({ file: { sizeBytes } });
+  function prismaWith(messages: Array<{ id: string; mode: string; files: Array<{ file: { sizeBytes: number } }> }>) {
     const tx = {
       messageOutbox: {
         findMany: vi.fn(async () => messages.map((message) => ({
@@ -129,19 +156,22 @@ describe("processQueuedMessageIdsAfterCommit leaves real email with files to the
     mocks.processExternalEmailQueue.mockResolvedValue({ sentIds: [], failedIds: [], rescheduledIds: [] });
   });
 
-  it("sends the messages without files in the request and defers those with files", async () => {
+  it("sends small-file messages in the request and defers those whose files total over the threshold", async () => {
     prismaWith([
       { id: "plain", mode: "EXTERNAL_EMAIL", files: [] },
-      { id: "with-picture", mode: "EXTERNAL_EMAIL", files: [{ fileId: "p" }] },
+      { id: "logo", mode: "EXTERNAL_EMAIL", files: [file(40 * 1024)] },
+      { id: "at-limit", mode: "EXTERNAL_EMAIL", files: [file(BACKGROUND_MAILER_FILE_BYTES_THRESHOLD)] },
+      { id: "big", mode: "EXTERNAL_EMAIL", files: [file(BACKGROUND_MAILER_FILE_BYTES_THRESHOLD), file(1)] },
+      { id: "two-medium", mode: "EXTERNAL_EMAIL", files: [file(MB * 1.5), file(MB * 1.5)] },
     ]);
-    const result = await processQueuedMessageIdsAfterCommit(["plain", "with-picture"]);
-    expect(result.deferredIds).toEqual(["with-picture"]);
+    const result = await processQueuedMessageIdsAfterCommit(["plain", "logo", "at-limit", "big", "two-medium"]);
+    expect(result.deferredIds).toEqual(["big", "two-medium"]);
     expect(mocks.processExternalEmailQueue).toHaveBeenCalledTimes(1);
-    expect(mocks.processExternalEmailQueue).toHaveBeenCalledWith("event-1", expect.objectContaining({ messageIds: ["plain"] }));
+    expect(mocks.processExternalEmailQueue).toHaveBeenCalledWith("event-1", expect.objectContaining({ messageIds: ["plain", "logo", "at-limit"] }));
   });
 
-  it("calls the sender not at all when every message carries files", async () => {
-    prismaWith([{ id: "a", mode: "EXTERNAL_EMAIL", files: [{ fileId: "f" }] }]);
+  it("calls the sender not at all when every message is over the threshold", async () => {
+    prismaWith([{ id: "a", mode: "EXTERNAL_EMAIL", files: [file(3 * MB)] }]);
     const result = await processQueuedMessageIdsAfterCommit(["a"]);
     expect(result.deferredIds).toEqual(["a"]);
     expect(mocks.processExternalEmailQueue).not.toHaveBeenCalled();
@@ -182,5 +212,16 @@ describe("assertAnnouncementFits (#824)", () => {
       .rejects.toMatchObject({ code: "FILE_SET_INVALID", message: expect.stringContaining("6.0 MB") });
     const fits = client({ pictureRows: [{ sizeBytes: MB }, { sizeBytes: MB }], templateBody: `![t](msgfile:${other})` });
     await expect(assertAnnouncementFits(fits as never, "event-1", { body: `![x](msgfile:${picture})`, fileIds: [] })).resolves.toBeUndefined();
+  });
+});
+
+describe("announcementBodyForDisplay (#847)", () => {
+  it("drops picture markers and the button marker, keeping a picture's description", () => {
+    expect(announcementBodyForDisplay("Hello\n\n![Map of the grounds](msgfile:cm9abc123def456)\n\n[Register](https://example.test/r){.button}"))
+      .toBe("Hello\n\n[Image: Map of the grounds]\n\n[Register](https://example.test/r)");
+    expect(announcementBodyForDisplay("![](msgfile:cm9abc123def456)")).toBe("");
+    expect(announcementBodyForDisplay("Before\n\n![](msgfile:cm9abc123def456)\n\n\n\nAfter")).toBe("Before\n\nAfter");
+    expect(announcementBodyForDisplay("plain text")).toBe("plain text");
+    expect(announcementBodyForDisplay("see msgfile:cm9abc123def456")).not.toContain("![");
   });
 });

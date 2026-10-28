@@ -78,10 +78,11 @@ import {
   revokeRegistrationAccessToken,
 } from "@/modules/public-access/repository";
 import { registrationRecoveryAccessExpiry } from "@/modules/public-access/domain";
+import { EMAIL_DELIVERY_BATCH_SIZE } from "@/modules/communications/delivery-timing";
 
 export const MAX_EMAIL_DELIVERY_ATTEMPTS = 5;
 export const EMAIL_DELIVERY_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
-export const EMAIL_DELIVERY_BATCH_SIZE = 50;
+export { EMAIL_DELIVERY_BATCH_SIZE };
 const EMAIL_RETRY_BASE_MS = 60 * 1000;
 const EMAIL_RETRY_MAX_MS = 60 * 60 * 1000;
 // A provider quota does not clear in minutes (Resend's free plan resets daily), so it backs off in hours (#860).

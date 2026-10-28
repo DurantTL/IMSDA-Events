@@ -297,6 +297,8 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   // 4. Publish a formatted custom message with a picture, an attachment, QR codes and seminar choices.
   const agenda = pdfOf("agenda");
   const agendaFile = await createMessageFile(ids.event, file(agenda, "Friday Agenda.pdf", "application/pdf"), ids.staff, "attachment", prisma);
+  // Files over 2 MB go to the background mailer (#847); record a large size for the agenda so this check still covers that path.
+  await prisma.messageFile.update({ where: { id: agendaFile.id }, data: { sizeBytes: 3 * 1024 * 1024 } });
   const mapPng = await renderAttendeePassQrPng("synthetic-map-image");
   const mapFile = await createMessageFile(ids.event, file(mapPng, "map.png", "image/png"), ids.staff, "inline-image", prisma);
   const customBody = [
