@@ -26,15 +26,18 @@ export type MessageFileStorageUsage = {
   quotaBytes: number;
   graceHours: number;
   sweepMode: "dry-run" | "delete";
+  /** Interrupted uploads whose reservation has expired and is waiting for an apply run. */
+  expiredReservations: number;
   events: MessageFileEventUsage[];
 };
 
 export async function getMessageFileStorageUsage(): Promise<MessageFileStorageUsage> {
   const prisma = getPrisma();
-  const [files, reservations, cleanup] = await Promise.all([
+  const [files, reservations, cleanup, expiredReservations] = await Promise.all([
     prisma.messageFile.groupBy({ by: ["eventId"], _count: { _all: true }, _sum: { sizeBytes: true } }),
     prisma.messageFileUploadReservation.groupBy({ by: ["eventId"], _sum: { sizeBytes: true } }),
     prisma.messageFileStorageCleanup.groupBy({ by: ["eventId"], _count: { _all: true }, _sum: { sizeBytes: true } }),
+    prisma.messageFileUploadReservation.count({ where: { expiresAt: { lt: new Date() } } }),
   ]);
   const byEvent = new Map<string, MessageFileEventUsage>();
   const entry = (eventId: string) => {
@@ -70,6 +73,7 @@ export async function getMessageFileStorageUsage(): Promise<MessageFileStorageUs
     quotaBytes: messageFileEventQuotaBytes(),
     graceHours: messageFileSweepGraceHours(),
     sweepMode: messageFileSweepDeletes() ? "delete" : "dry-run",
+    expiredReservations,
     events,
   };
 }

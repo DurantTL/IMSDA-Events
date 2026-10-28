@@ -136,6 +136,7 @@ async function postHandler(request: Request) {
         bytesRemoved: report.bytesRemoved.bytes,
         cleanupPending: report.cleanup.pending,
         cleanupFailed: report.cleanup.failed,
+        reservationsExpired: report.reservations.expired,
         reservationsReconciled: report.reservations.reconciled,
       }))
       .catch((error) => {

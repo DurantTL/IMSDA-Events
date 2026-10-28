@@ -60,7 +60,8 @@ function fakeDatabase() {
   let counter = 0;
   const rowsFor = (ids: string[]) => state.files.filter((file) => ids.includes(file.id));
   const client = {
-    $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) => {
+    $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>, ...rest: unknown[]) => {
+      void rest;
       const snapshot = JSON.stringify({ files: state.files, cleanup: state.cleanup, reservations: state.reservations, audits: state.audits });
       try {
         const result = await run(client);
@@ -244,6 +245,9 @@ describe("sweepMessageFiles candidates (#845)", () => {
     for (const column of ['"MessageTemplateVersion"', '"bodyTemplate"', '"Announcement"', '"ScheduledEmailBatch"', '"announcementBody"', '"MessageOutbox"', '"bodyHtmlSnapshot"', '"bodyTextSnapshot"']) {
       expect(sql, column).toContain(column);
     }
+    // The largest table is searched only for the candidates' own events.
+    expect(sql).toMatch(/FROM "MessageOutbox"\s+WHERE "eventId" IN \(SELECT "eventId" FROM "MessageFile"/);
+    expect(sql.match(/FROM "MessageOutbox"/g)).toHaveLength(2);
     const linkSql = state.sql.find((text) => text.includes('"MessageTemplateVersionFile"')) ?? "";
     expect(linkSql).toContain('"AnnouncementFile"');
     expect(linkSql).toContain('"MessageOutboxFile"');
@@ -269,6 +273,9 @@ describe("sweepMessageFiles dry run (#845)", () => {
     expect(state.cleanup).toHaveLength(1);
     expect(state.reservations).toHaveLength(1);
     expect(JSON.stringify(report)).not.toContain("message-files/");
+    expect(state.cleanup[0].attempts).toBe(1);
+    expect(client.messageFileStorageCleanup.updateMany).not.toHaveBeenCalled();
+    expect(client.messageFileUploadReservation.deleteMany).not.toHaveBeenCalled();
   });
 
   it("is the mode used unless apply is asked for by name", async () => {
@@ -289,6 +296,7 @@ describe("sweepMessageFiles apply (#845)", () => {
     mocks.deleteAsset.mockImplementation(async () => { state.log.push("disk-delete"); });
     const report = await sweepMessageFiles({ client: client as never, now: NOW, mode: "apply" });
     expect(report.deleted).toEqual({ count: 1, bytes: 4096 });
+    expect(client.$transaction.mock.calls[0][1]).toEqual({ maxWait: 10_000, timeout: 60_000 });
     expect(report.bytesRemoved).toEqual({ count: 1, bytes: 4096 });
     expect(state.files).toHaveLength(0);
     expect(state.cleanup).toHaveLength(0);
@@ -397,6 +405,19 @@ describe("deleteMessageFileIfUnused (#845)", () => {
     expect(state.log).toEqual(["row-delete", "commit", "disk-delete"]);
     expect(state.files).toHaveLength(0);
     expect(state.cleanup).toHaveLength(0);
+  });
+
+  it("gives its transaction room for the text search, and lets a timeout surface instead of calling the file in use", async () => {
+    const { client, addFile } = fakeDatabase();
+    addFile({ id: "fresh-attachm1" });
+    await deleteMessageFileIfUnused("event-1", "fresh-attachm1", client as never);
+    expect(client.$transaction.mock.calls[0][1]).toEqual({ maxWait: 10_000, timeout: 60_000 });
+    const timeout = new Error("Transaction already closed");
+    client.$transaction.mockRejectedValueOnce(timeout);
+    await expect(deleteMessageFileIfUnused("event-1", "fresh-attachm1", client as never)).rejects.toBe(timeout);
+    const { Prisma } = await import("@prisma/client");
+    client.$transaction.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("fk", { code: "P2003", clientVersion: "x" }));
+    expect(await deleteMessageFileIfUnused("event-1", "fresh-attachm1", client as never)).toBe(false);
   });
 
   it("keeps a file a link or a body still names, in any event", async () => {

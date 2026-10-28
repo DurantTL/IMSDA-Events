@@ -9,6 +9,9 @@ import { logError } from "@/lib/logger";
  * sweep and by staff removing one file, so both apply the same rule and the same record of unfinished disk work.
  */
 
+/** The reference check scans text columns, so the transactions that run it get more room than Prisma's 5 second default. */
+export const SWEEP_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 60_000 } as const;
+
 type Client = PrismaClient | Prisma.TransactionClient;
 
 /**
@@ -23,7 +26,10 @@ type Client = PrismaClient | Prisma.TransactionClient;
  *   A body names a picture by id with no foreign key, so the text itself is the only record.
  *
  * The text match is a plain substring check on `msgfile:<id>`, deliberately wider than the picture syntax: a false
- * "referenced" only keeps a file a little longer, a false "unreferenced" loses one. Run it in the delete transaction
+ * "referenced" only keeps a file a little longer, a false "unreferenced" loses one. The message snapshots are the
+ * largest table, so only those of the candidates' own events are searched (by the eventId index): a message can only
+ * embed its own event's pictures (`linkQueuedMessageFiles` refuses another's), and a queued picture also has a
+ * RESTRICT link row, checked above for every event. The other tables are small and searched whole. Run it in the delete transaction
  * after the rows are locked, as separate statements, so each sees what has committed since the last.
  */
 export async function findReferencedMessageFileIds(client: Client, ids: readonly string[]): Promise<Set<string>> {
@@ -55,9 +61,11 @@ export async function findReferencedMessageFileIds(client: Client, ids: readonly
       UNION ALL
       SELECT "announcementBody" FROM "ScheduledEmailBatch" WHERE "announcementBody" LIKE '%msgfile:%'
       UNION ALL
-      SELECT "bodyHtmlSnapshot" FROM "MessageOutbox" WHERE "bodyHtmlSnapshot" LIKE '%msgfile:%'
+      SELECT "bodyHtmlSnapshot" FROM "MessageOutbox"
+        WHERE "eventId" IN (SELECT "eventId" FROM "MessageFile" WHERE "id" IN (${rest})) AND "bodyHtmlSnapshot" LIKE '%msgfile:%'
       UNION ALL
-      SELECT "bodyTextSnapshot" FROM "MessageOutbox" WHERE "bodyTextSnapshot" LIKE '%msgfile:%'
+      SELECT "bodyTextSnapshot" FROM "MessageOutbox"
+        WHERE "eventId" IN (SELECT "eventId" FROM "MessageFile" WHERE "id" IN (${rest})) AND "bodyTextSnapshot" LIKE '%msgfile:%'
     )
     SELECT DISTINCT c.id
     FROM unnest(ARRAY[${rest}]::text[]) AS c(id)

@@ -69,12 +69,12 @@ describe("getMessageFileStorageUsage (#845)", () => {
     mocks.env = parsed({ MESSAGE_FILE_SWEEP_DELETE: "true" });
     mocks.getPrisma.mockReturnValue({
       messageFile: { groupBy: vi.fn(async () => [{ eventId: "e1", _count: { _all: 3 }, _sum: { sizeBytes: 3000 } }, { eventId: "e2", _count: { _all: 1 }, _sum: { sizeBytes: 100 } }]) },
-      messageFileUploadReservation: { groupBy: vi.fn(async () => [{ eventId: "e1", _sum: { sizeBytes: 500 } }]) },
+      messageFileUploadReservation: { groupBy: vi.fn(async () => [{ eventId: "e1", _sum: { sizeBytes: 500 } }]), count: vi.fn(async () => 2) },
       messageFileStorageCleanup: { groupBy: vi.fn(async () => [{ eventId: "e1", _count: { _all: 2 }, _sum: { sizeBytes: 700 } }, { eventId: "gone", _count: { _all: 1 }, _sum: { sizeBytes: 50 } }]) },
       event: { findMany: vi.fn(async () => [{ id: "e1", name: "Synthetic Camporee" }, { id: "e2", name: "Synthetic Retreat" }]) },
     });
     const usage = await getMessageFileStorageUsage();
-    expect(usage).toMatchObject({ quotaBytes: 200 * 1024 * 1024, graceHours: 72, sweepMode: "delete" });
+    expect(usage).toMatchObject({ quotaBytes: 200 * 1024 * 1024, graceHours: 72, sweepMode: "delete", expiredReservations: 2 });
     expect(usage.events.map((event) => [event.eventId, event.eventName, event.usedBytes, event.pendingCleanupBytes])).toEqual([
       ["e1", "Synthetic Camporee", 4200, 700],
       ["e2", "Synthetic Retreat", 100, 0],

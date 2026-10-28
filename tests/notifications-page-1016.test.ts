@@ -39,7 +39,7 @@ vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigu
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true, webhookConfigured: true }) }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));
 vi.mock("@/modules/communications/message-file-usage", () => ({
-  getMessageFileStorageUsage: async () => ({ quotaBytes: 200 * 1024 * 1024, graceHours: 72, sweepMode: "dry-run", events: [] }),
+  getMessageFileStorageUsage: async () => ({ quotaBytes: 200 * 1024 * 1024, graceHours: 72, sweepMode: "dry-run", expiredReservations: 0, events: [] }),
 }));
 vi.mock("@/modules/communications/email-suppression", () => ({ listActiveSuppressions: async () => ({ total: 0, rows: [] }) }));
 

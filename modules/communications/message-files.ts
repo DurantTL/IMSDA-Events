@@ -25,6 +25,7 @@ import {
 import { sniffMessageFileType } from "@/modules/communications/message-file-sniff";
 import { messageFileEventQuotaBytes, messageFileEventQuotaMb } from "@/modules/communications/message-file-config";
 import {
+  SWEEP_TRANSACTION_OPTIONS,
   errnoCode,
   findReferencedMessageFileIds,
   removeStoredBytes,
@@ -599,11 +600,12 @@ export async function deleteMessageFileIfUnused(eventId: string, fileId: string,
         update: {},
         select: { id: true, eventId: true, storageKey: true, sizeBytes: true },
       });
-    });
-  } catch {
+    }, SWEEP_TRANSACTION_OPTIONS);
+  } catch (error) {
     // The foreign keys are RESTRICT: if anything linked the file after the check, the database refuses the delete
-    // and the file stays.
-    return false;
+    // (a foreign key violation) and the file stays. Any other failure (a timeout, a lost connection) is not "in use".
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") return false;
+    throw error;
   }
   if (!cleanup) return false;
   await removeStoredBytes(client, [cleanup], new Date());

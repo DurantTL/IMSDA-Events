@@ -8,6 +8,7 @@ import { deleteAsset } from "@/modules/events/asset-storage";
 import { messageFileSweepGraceHours } from "@/modules/communications/message-file-config";
 import { effectiveSweepGraceHours } from "@/modules/communications/message-file-rules";
 import {
+  SWEEP_TRANSACTION_OPTIONS,
   errnoCode,
   findReferencedMessageFileIds,
   removeStoredBytes,
@@ -217,7 +218,7 @@ async function deleteCandidates(
         });
       }
       return { cleanup, kept, bytes: doomed.reduce((sum, row) => sum + row.sizeBytes, 0) };
-    });
+    }, SWEEP_TRANSACTION_OPTIONS);
   } catch (error) {
     // Nothing was deleted (the transaction rolled back); the files are candidates again on the next run.
     logError("The message file sweep could not delete a batch", error, { candidates: candidates.length });
@@ -301,7 +302,7 @@ async function reconcileExpiredReservations(client: PrismaClient, now: Date, rep
         }
         await tx.messageFileUploadReservation.deleteMany({ where: { id } });
         return true;
-      });
+      }, SWEEP_TRANSACTION_OPTIONS);
       if (done) report.reservations.reconciled += 1;
     } catch (error) {
       logError("An expired upload reservation could not be reconciled", error, { reservationId: id });

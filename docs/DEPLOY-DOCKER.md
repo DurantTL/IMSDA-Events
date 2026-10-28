@@ -1561,7 +1561,8 @@ picture. A file anything refers to is never removed.
 
 1. On the server, run `npm run message-files:sweep`. This is a dry run. It prints
    how many files and bytes would be removed, per event, and lists each file
-   (id, event, name, size, upload time; never a storage path).
+   (id, event, size, upload time; never a storage path). File names are
+   left out because they can be personal; add `--show-names` to print them.
 2. Read the report. Anything that should not go means a body or message still
    needs it; fix that first.
 3. Either run `npm run message-files:sweep -- --apply` once to delete now, or set
@@ -1571,10 +1572,13 @@ picture. A file anything refers to is never removed.
 
 A file's row is deleted first and its bytes after. If the disk delete fails, the
 file is kept in a retry list (shown in the System management > Email usage
-section), retried by later sweeps, and still counts against its event's quota
-until the bytes are really gone. Uploads that were interrupted are cleaned up
-the same way once their one-hour reservation has expired. Deleting an event
-removes its files as before.
+section) and still counts against its event's quota until the bytes are really
+gone. Likewise an interrupted upload leaves a one-hour reservation that counts
+against the quota. **Retrying failed byte deletes and clearing expired
+reservations happen only in an apply run** (`--apply`, or
+`MESSAGE_FILE_SWEEP_DELETE=true` for the scheduled sweep). A dry run reports how
+many are waiting but changes nothing, so until an apply run they keep counting
+against the event's quota. Deleting an event removes its files as before.
 
 ## Backups and restore rehearsals
 
