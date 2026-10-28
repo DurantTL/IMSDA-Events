@@ -11,7 +11,7 @@ import { useLoadedBuilder } from "./builder-context";
 import { BuilderShowWhen } from "./builder-show-when";
 
 type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
-const fieldTypesWithoutPlaceholder = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "DATE", "CALCULATED", "ADDRESS", "ACKNOWLEDGMENT"];
+const fieldTypesWithoutPlaceholder = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "DATE", "CALCULATED", "ADDRESS", "ACKNOWLEDGMENT", "SIGNATURE"];
 
 export function BuilderHelpTextInput({ field, sectionIndex, fieldIndex, className = "field-wide" }: FieldTarget & { className?: string }) {
   const { canEdit, updateField } = useLoadedBuilder();

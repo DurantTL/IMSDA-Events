@@ -1,3 +1,4 @@
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -61,6 +62,8 @@ export default async function GeneralLinkPage({ params }: GeneralLinkPageProps) 
   if (loaded.experience.lifecycle.phase !== "OPEN") redirect(`/events/${encodeURIComponent(eventSlug)}`);
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
   return (
+    <>
+    <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <GeneralLinkRegistrationFlow
       eventSlug={eventSlug}
       topContent={
@@ -80,5 +83,6 @@ export default async function GeneralLinkPage({ params }: GeneralLinkPageProps) 
       }
       ready={{ ...loaded, experience: loaded.experience }}
     />
+    </>
   );
 }

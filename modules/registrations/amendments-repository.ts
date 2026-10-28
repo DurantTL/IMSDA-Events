@@ -56,6 +56,7 @@ import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
+import { holdSignatureAnswers } from "@/modules/signatures/domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 
 /** The role answer that maps to a team member (#1050). */
@@ -1066,8 +1067,16 @@ async function prepareAmendment(
       return row ? recordFromJson(row.formResponses) : null;
     },
   });
-  input = held.input;
-  const acknowledgmentKeys = held.keys;
+  // Typed signatures (#1265) are held the same way: staff cannot sign for someone.
+  const heldSignatures = holdSignatureAnswers(definition, held.input, {
+    registration: currentRegistrationResponses,
+    attendee: (attendeeId) => {
+      const row = registration.attendees.find((candidate) => candidate.id === attendeeId);
+      return row ? recordFromJson(row.formResponses) : null;
+    },
+  });
+  input = heldSignatures.input;
+  const acknowledgmentKeys = [...held.keys, ...heldSignatures.keys];
   // #1050: a team registered on an older form version asks the role (`attendee_type`); once the current published form
   // dropped that question, nobody can answer it for a person added now. That person gets the answer that maps to a
   // team member ("Pathfinder"); the age rule (`teamRoleFor`) still makes anyone over the age limit a coach. People already

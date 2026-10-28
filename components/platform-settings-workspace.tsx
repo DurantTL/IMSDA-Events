@@ -613,6 +613,10 @@ export function PlatformSettingsWorkspace({
         </p>
       </form>
 
+      <p className="field-help" style={{ margin: "4px 0 0" }}>
+        Notices, announcements, featured events, header links and the footer are edited, previewed and published on <Link className="text-button" href="/admin/site-content">Homepage &amp; site content</Link>.
+      </p>
+
       <HomepageMinistriesEditor initial={initialMinistries.ministries} updatedAt={initialMinistries.updatedAt} updatedByName={initialMinistries.updatedByName} />
     </section>
   );

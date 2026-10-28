@@ -16,7 +16,8 @@ vi.mock("@/modules/calendar/repository", () => ({
   listPublicCalendarItems: mocks.listPublicCalendarItems,
 }));
 const featured = vi.hoisted(() => ({ rows: vi.fn(), images: vi.fn() }));
-vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: featured.rows, listEventCardImages: featured.images }));
+vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: featured.rows, listCuratedFeaturedRows: async () => [], listEventCardImages: featured.images }));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 // An async server component cannot render inside renderToStaticMarkup, so this stands in for it with the same presentational links (#1009).
 vi.mock("@/components/public-header-session-links", async () => {

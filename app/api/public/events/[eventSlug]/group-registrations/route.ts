@@ -1,10 +1,11 @@
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 import { groupRegistrationApiError } from "@/modules/group-registrations/api-errors";
 import { getGroupRegistrationExperience, submitGroupRegistration } from "@/modules/group-registrations/repository";
 import { honorSelectionsSchema } from "@/modules/honors/registration-picks";
-import { applyRateLimitHeaders, type RateLimitOutcome } from "@/modules/rate-limit/domain";
+import { applyRateLimitHeaders, trustedClientIpAddress, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkPublicRegistrationRateLimit } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -58,7 +59,9 @@ async function postHandler(request: Request, context: Context) {
       honorSelections: honorSelectionsSchema.optional(),
     }).loose().parse(JSON.parse(body));
     const input = publicRegistrationInputSchema.parse(answers);
-    const result = await submitGroupRegistration(eventSlug, input, { locationId: locationId ?? null, ...(honorSelections ? { honorSelections } : {}) });
+    const result = await submitGroupRegistration(eventSlug, input, { locationId: locationId ?? null, ...(honorSelections ? { honorSelections } : {}), requestContext: { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) } });
+    // Counted per public event only, with no registration or person attached (#111).
+    countPublicMetric(request, "REGISTRATION_COMPLETE", eventSlug);
     return applyRateLimitHeaders(Response.json(result, { status: 201, headers: noStoreHeaders }), rateLimit);
   } catch (error) {
     const response = groupRegistrationApiError(error, "Submitting the group registration");

@@ -2,6 +2,9 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { countPublicMetric } from "@/modules/public-metrics/record";
+import { PasskeyError as StaffPasskeyError } from "@/modules/access/passkeys";
+import { PasskeyError as AttendeePasskeyError } from "@/modules/attendee-accounts/passkeys";
 import { withRequestContext } from "@/lib/request-context";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { passkeyApiError } from "@/modules/access/passkey-api";
@@ -62,7 +65,11 @@ async function postHandler(request: Request) {
       request.headers.get("origin"),
       response as unknown as AuthenticationResponseJSON,
       request.headers.get("user-agent"),
-    );
+    ).catch((error: unknown) => {
+      // Only a real verification failure counts: not a bad body, a store error, or anything after the session starts.
+      if ((error instanceof StaffPasskeyError || error instanceof AttendeePasskeyError) && error.code === "PASSKEY_NOT_VERIFIED") countPublicMetric(request, "LOGIN_FAILURE", "unified-passkey");
+      throw error;
+    });
 
     if (result.kind === "attendee") {
       cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
@@ -74,6 +81,7 @@ async function postHandler(request: Request) {
         maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
         priority: "high",
       });
+      countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
       return applyRateLimitHeaders(Response.json({ ok: true, attendee: true, redirectTo: attendeeReturnDestination(next, "/account") }), rateLimit);
     }
 
@@ -86,6 +94,7 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
     // A user-verified staff passkey also earns the linked attendee session, marked as having
     // passed the second step (one account per person, #554). Null with no usable link.
     const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });

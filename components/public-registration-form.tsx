@@ -66,6 +66,7 @@ import {
 } from "@/modules/guardian-authority/domain";
 import { selectUsesRadioCards } from "@/modules/forms/choice-controls";
 import { acknowledgmentFields, type AcknowledgmentDisplay } from "@/modules/acknowledgments/fields";
+import { signatureFields } from "@/modules/signatures/fields";
 import { TranslateHint } from "@/components/translate-hint";
 import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
 import { confirmationEmailHeadline } from "@/modules/forms/confirmation-email-status";
@@ -86,6 +87,7 @@ import {
   resolveResponsibleOrganization,
   isLatePricingActive,
   numberFieldBounds,
+  SIGNATURE_NAME_MAX,
   typedFieldNote,
   validateTestResponses,
   type ChoiceUsage,
@@ -1119,7 +1121,7 @@ export function PublicRegistrationForm({
           { ignoredFieldKeys },
         ).issues;
     // Staff acting as a director cannot give the director's acknowledgments, so they are never required of them.
-    const actingAsDirectorKeys = new Set(club?.staffActingAsDirector ? acknowledgmentFields(definition).map((candidate) => candidate.key) : []);
+    const actingAsDirectorKeys = new Set(club?.staffActingAsDirector ? [...acknowledgmentFields(definition), ...signatureFields(definition)].map((candidate) => candidate.key) : []);
     const validationIssues = actingAsDirectorKeys.size === 0
       ? allValidationIssues
       : allValidationIssues.filter((issue) => !actingAsDirectorKeys.has(issue.key));
@@ -2238,6 +2240,45 @@ export function PublicRegistrationForm({
       );
     }
 
+    if (field.type === "SIGNATURE") {
+      // The statement is shown in full, then signed by typing a name (#1265). What is recorded is exactly this statement, the
+      // typed name, the time and the network address the submission came from; the server takes it from the form version.
+      const statementId = `${id}_statement`;
+      const nameValue = typeof context.values[field.key] === "string" ? context.values[field.key] as string : "";
+      const staffActing = Boolean(club?.staffActingAsDirector);
+      return (
+        <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused && !staffActing} aria-describedby={[statementId, description].filter(Boolean).join(" ")}>
+          <legend>{fieldLabel(field, context)}</legend>
+          <div className="public-registration-acknowledgment-text" id={statementId} tabIndex={0} role="region" aria-label={`Statement for ${field.label}`}>
+            <p>{field.signature?.text ?? ""}</p>
+          </div>
+          {staffActing ? (
+            <p className="field-help public-registration-acknowledgment-note" role="note">
+              The director must sign this themselves; staff cannot sign for them.
+            </p>
+          ) : (
+            <div className="public-registration-signature-name">
+              <label htmlFor={id}>Type your full name to sign</label>
+              <input
+                id={id}
+                type="text"
+                value={nameValue}
+                maxLength={SIGNATURE_NAME_MAX}
+                autoComplete={context.attendeeIndex !== null ? `section-${safeId(context.idContext)} name` : "name"}
+                required={field.required && !excused}
+                aria-required={field.required && !excused}
+                aria-invalid={Boolean(issue)}
+                aria-describedby={[`${id}_signature_help`, description].filter(Boolean).join(" ")}
+                onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.value)}
+              />
+              <small id={`${id}_signature_help`}>Typing your name here is your signature. We record your name, the statement above, the date and time, and your network address.</small>
+            </div>
+          )}
+          {fieldSupport(field, context)}
+        </fieldset>
+      );
+    }
+
     const value = typeof context.values[field.key] === "string" ? context.values[field.key] as string : "";
     // The same inline check as club forms (#855, #1193). A saved answer left alone that fails today's rules is flagged
     // for correcting but never blocks; a changed one shows its message once the person leaves the field. The server
@@ -2728,6 +2769,7 @@ export function PublicRegistrationForm({
         || field.type === "CALCULATED"
         || field.type === "CHECKBOX"
         || field.type === "ACKNOWLEDGMENT"
+        || field.type === "SIGNATURE"
         || !isFieldVisible(field, { ...shared, ...values })
       ) {
         return [];

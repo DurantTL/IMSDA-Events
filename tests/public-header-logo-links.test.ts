@@ -38,7 +38,8 @@ function hrefOf(tag: string): string | undefined {
   return expression ? `{${expression[1]}}` : undefined;
 }
 
-const filesWithBrandLink = listTsxFiles(appDir)
+// The homepage's header lives in a component (#111) so the real page and the staff preview draw the same markup.
+const filesWithBrandLink = [...listTsxFiles(appDir), join(process.cwd(), "components/public-home-page.tsx")]
   .filter((file) => readFileSync(file, "utf8").includes(BRAND_CLASS))
   .map((file) => relative(process.cwd(), file))
   .sort();
@@ -46,7 +47,7 @@ const filesWithBrandLink = listTsxFiles(appDir)
 describe("public header logo links (#470)", () => {
   it("finds the header logo on the known public pages (discovery sanity check)", () => {
     for (const known of [
-      "app/page.tsx",
+      "components/public-home-page.tsx",
       "app/not-found.tsx",
       "app/(public)/clubs/page.tsx",
       "app/(public)/calendar/page.tsx",

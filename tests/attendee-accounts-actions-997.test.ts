@@ -13,7 +13,7 @@ import type { PersonDetail } from "@/modules/system-admin/people-directory";
  */
 const base: PersonDetail = {
   name: "Sample Person", email: "sample@example.test", staffEmail: "sample@example.test", accountEmail: "sample@example.test",
-  staffId: "u-1", accountId: "a-1", systemAdministrator: false, clubsAdministrator: false, areaCoordinator: false,
+  staffId: "u-1", accountId: "a-1", systemAdministrator: false, clubsAdministrator: false, siteContentEditor: false, areaCoordinator: false,
   staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },
   account: { status: "ACTIVE", signInDisabled: false, emailVerified: false, twoStep: "On", lastSignedInAt: null },
   events: [], clubs: [],

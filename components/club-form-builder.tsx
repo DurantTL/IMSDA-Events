@@ -70,7 +70,7 @@ const typeLabels: Record<string, string> = {
   ADDRESS: "Address",
 };
 // Club forms do not use calculated fields.
-const clubFieldTypes = formFieldTypes.filter((type) => type !== "CALCULATED" && type !== "ACKNOWLEDGMENT");
+const clubFieldTypes = formFieldTypes.filter((type) => type !== "CALCULATED" && type !== "ACKNOWLEDGMENT" && type !== "SIGNATURE");
 
 const operatorLabels: Record<string, string> = {
   EQUALS: "is",

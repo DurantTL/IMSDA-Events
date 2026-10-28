@@ -3964,6 +3964,11 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-registration-acknowledgment-text:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .public-registration-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .public-registration-acknowledgment-text strong { display: block; margin-bottom: 6px; }
+/* The typed name of a signature field (#1265): a full-width, thumb-sized input under the statement. */
+.public-registration-signature-name { display: grid; gap: 6px; margin-top: 12px; }
+.public-registration-signature-name label { font-weight: 700; }
+.public-registration-signature-name input { width: 100%; min-height: 44px; box-sizing: border-box; }
+.public-registration-signature-name small { margin: 4px 0 0; font-weight: 500; }
 
 .public-registration-calculated { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid #d8c8e6; border-radius: 13px; background: var(--imsda-purple-soft); padding: 14px 16px; }
 .public-registration-calculated > span { display: grid; gap: 3px; }
@@ -13609,6 +13614,12 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .cis-panel-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .cis-panel-list li > div { min-width: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
 
+/* Typed-name signature records on a staff registration (#1265). */
+.registration-signature-record { display: grid; gap: 4px; border-top: 1px solid var(--line, #d2dfe4); padding-top: 10px; }
+.registration-signature-record:first-child { border-top: 0; padding-top: 0; }
+.registration-signature-record p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.registration-signature-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.registration-signature-record .registration-signature-text { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }
 /* Events list search and filters (#106): a plain GET form, one column on phones. */
 .events-directory-form { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 14px 0 6px; min-width: 0; }
 .events-directory-field { display: grid; gap: 4px; min-width: 0; }
@@ -13625,6 +13636,32 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
   .events-directory-form { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
   .events-directory-search { grid-column: 1 / -1; }
 }
+
+/* Curated hub content (#111): site notices, announcements, extra header links and footer details. */
+.site-notices { margin: 0; padding: 0; }
+.site-notices ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.site-notice { display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--line); padding: 12px max(16px, calc((100% - 1180px) / 2)); font-size: 1rem; line-height: 1.45; }
+.site-notice svg { flex: 0 0 auto; margin-top: 2px; }
+.site-notice p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.site-notice-info { background: var(--imsda-navy-soft); color: var(--imsda-navy-deep); }
+.site-notice-urgent { background: var(--imsda-gold-soft); color: #5b3b00; border-left: 6px solid #b45309; }
+.site-notice-emergency { background: #fdeceb; color: #7a1712; border-left: 6px solid #b3261e; font-weight: 600; }
+.site-notice-link { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font-weight: 700; text-decoration: underline; }
+.site-notice-link:focus-visible, .home-announcement-link:focus-visible, .home-footer-links a:focus-visible, .public-header-nav a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.public-header-nav { min-width: 0; }
+.public-header-nav ul { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
+.public-header-nav .text-button { white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
+.home-announcements { display: grid; gap: 12px; min-width: 0; }
+.home-announcements > h2 { margin: 0; color: var(--ink); font-size: 1.25rem; }
+.home-announcements-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 761px) { .home-announcements-list { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
+.home-announcements-list li { display: grid; gap: 6px; align-content: start; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px 16px; min-width: 0; }
+.home-announcements-list h3 { margin: 0; color: var(--imsda-navy); font-size: 1.1rem; overflow-wrap: anywhere; }
+.home-announcements-list p { margin: 0; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+.home-announcement-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
+.home-footer-contact { overflow-wrap: anywhere; }
+.home-footer-links ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
+.home-footer-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
 
 /* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
 .role-details { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

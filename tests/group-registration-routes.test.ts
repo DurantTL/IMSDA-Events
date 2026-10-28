@@ -81,7 +81,7 @@ describe("public group registration route (#650)", () => {
     expect(mocks.submitGroupRegistration).toHaveBeenCalledWith(
       "honors-weekend",
       expect.objectContaining({ versionId: "v1", idempotencyKey: "5b1f6f3e-7f3a-4c3e-9a6a-0a3a4d5e6f71" }),
-      { locationId: "loc-1", honorSelections: { p1: ["off-1"] } },
+      { locationId: "loc-1", honorSelections: { p1: ["off-1"] }, requestContext: { userAgent: null, ipAddress: null } },
     );
     // The location and picks are not form answers.
     expect(mocks.submitGroupRegistration.mock.calls[0]![1]).not.toHaveProperty("locationId");

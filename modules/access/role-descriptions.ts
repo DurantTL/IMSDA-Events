@@ -19,7 +19,7 @@ export type RoleText = {
 };
 
 /** Roles that span the whole system rather than one event or club. */
-export type SystemRoleKey = "SYSTEM_ADMIN" | "CLUBS_ADMIN" | "AREA_COORDINATOR" | "EVENTS_ADMIN";
+export type SystemRoleKey = "SYSTEM_ADMIN" | "CLUBS_ADMIN" | "AREA_COORDINATOR" | "EVENTS_ADMIN" | "SITE_CONTENT_EDITOR";
 
 export const systemRoleText: Record<SystemRoleKey, RoleText> = {
   SYSTEM_ADMIN: {
@@ -53,6 +53,16 @@ export const systemRoleText: Record<SystemRoleKey, RoleText> = {
     summary: "Sees every club, view only.",
     can: ["Look at every club, after a second sign-in step.", "See members' ages."],
     cannot: ["Change anything.", "See full birth dates."],
+  },
+  SITE_CONTENT_EDITOR: {
+    name: "Site content editor",
+    summary: "Edits the public homepage, notices, navigation and footer, and nothing else.",
+    can: [
+      "Change the homepage sections, announcements, featured events and site notices.",
+      "Change the public header links, the footer and the order of the category filters.",
+      "Preview changes, publish them, and restore an earlier version.",
+    ],
+    cannot: ["Work on events or clubs.", "Give roles or change system settings."],
   },
   EVENTS_ADMIN: {
     name: "Events Administrator",

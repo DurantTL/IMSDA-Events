@@ -271,9 +271,14 @@ async function reconcileExpiredReservations(client: PrismaClient, now: Date, rep
   for (const { id } of expired) {
     try {
       const done = await client.$transaction(async (tx) => {
+        // The event's quota lock first, as an upload takes it before the row, so the two cannot deadlock and a reservation
+        // check never sees this reservation gone and its cleanup record not yet there.
+        const owner = await tx.messageFileUploadReservation.findUnique({ where: { id }, select: { eventId: true } });
+        if (!owner) return false;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`message-file-quota:${owner.eventId}`}, 0))`;
         const locked = await tx.$queryRaw<Array<{ eventId: string; storageKey: string; sizeBytes: number }>>(Prisma.sql`
           SELECT "eventId", "storageKey", "sizeBytes" FROM "MessageFileUploadReservation"
-          WHERE "id" = ${id} AND "expiresAt" < ${now}
+          WHERE "id" = ${id} AND "expiresAt" < ${now} AND "eventId" = ${owner.eventId}
           FOR UPDATE
         `);
         const reservation = locked[0];

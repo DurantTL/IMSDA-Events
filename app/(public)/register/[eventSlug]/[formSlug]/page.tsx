@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { notFound, redirect } from "next/navigation";
 import { AutoEventInfoCards } from "@/components/auto-event-info-cards";
 import { clubDirectorSignInNotice } from "@/modules/club-registrations/club-notices";
@@ -107,6 +108,8 @@ export default async function PublicRegistrationPage({
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
 
   return (
+    <>
+    <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <PublicRegistrationForm
       event={{
         ...experience.event,
@@ -137,5 +140,6 @@ export default async function PublicRegistrationPage({
         ) : undefined
       }
     />
+    </>
   );
 }

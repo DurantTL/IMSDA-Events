@@ -74,6 +74,8 @@ import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { signatureFields } from "@/modules/signatures/fields";
+import { recordSubmissionSignatures } from "@/modules/signatures/repository";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
@@ -735,7 +737,11 @@ async function findExistingConfirmation(
 }
 
 /** What the server knows about the request itself, for acknowledgment evidence (#150). Only approved metadata is ever stored. */
-export type SubmissionRequestContext = { userAgent?: string | null };
+export type SubmissionRequestContext = {
+  userAgent?: string | null;
+  /** The trusted client IP (#1265), for typed-signature evidence only; null or absent when it cannot be resolved. */
+  ipAddress?: string | null;
+};
 
 async function createPublicRegistrationTransaction(
   tx: Prisma.TransactionClient,
@@ -978,7 +984,10 @@ async function createPublicRegistrationTransaction(
   // Staff acting as a director cannot acknowledge for them (evidence names the person who acknowledged), so an act-as submission
   // is made without acknowledgments: any ticked answer is dropped, a required one is not asked for, and no evidence is recorded.
   // The acknowledgment stays "not acknowledged" until the director gives it, or staff record it on paper afterward.
-  const actAsAcknowledgmentKeys = club?.submittedByUserId ? new Set(acknowledgmentFields(definition).map((field) => field.key)) : new Set<string>();
+  // The same goes for typed signatures (#1265): staff cannot sign for the director, so those answers are dropped and not required.
+  const actAsAcknowledgmentKeys = club?.submittedByUserId
+    ? new Set([...acknowledgmentFields(definition), ...signatureFields(definition)].map((field) => field.key))
+    : new Set<string>();
   const canonicalInput = actAsAcknowledgmentKeys.size > 0
     ? {
         ...withoutDeferredPayment,
@@ -1384,6 +1393,20 @@ async function createPublicRegistrationTransaction(
       }),
     );
   }
+  // Typed-name signatures (#1265): the name, the exact statement, the moment and the trusted client IP, recorded with the
+  // registration or not at all. Staff acting as a director gave no signature answers (dropped above), so none is recorded.
+  await recordSubmissionSignatures(tx, {
+    eventId: form.eventId,
+    registrationId: registration.id,
+    formVersionId: version.id,
+    definition,
+    registrationResponses: prepared.registrationResponses,
+    attendees: createdAttendees.map((attendee) => ({ clientId: attendee.clientId, attendeeId: attendee.attendeeId, responses: attendee.responses })),
+    submissionKey: input.idempotencyKey,
+    signedAt: now,
+    ipAddress: requestContext?.ipAddress ?? null,
+    userAgent: requestContext?.userAgent ?? null,
+  });
   if (input.lodging && lodgingPlan) {
     try {
       await recordRegistrationLodging(tx, {

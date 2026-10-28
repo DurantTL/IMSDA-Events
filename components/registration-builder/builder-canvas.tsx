@@ -53,6 +53,8 @@ export function FieldPreviewControl({ field }: { field: RegistrationFormField })
       return <span className="fb-choice"><span className="fb-choice-mark check" />{field.placeholder || "Yes, I agree"}</span>;
     case "ACKNOWLEDGMENT":
       return <span className="fb-acknowledgment">{field.acknowledgment?.source === "TEXT" && field.acknowledgment.text ? field.acknowledgment.text : "The agreement wording is shown here."}<span className="fb-choice"><span className="fb-choice-mark check" />I acknowledge this.</span></span>;
+    case "SIGNATURE":
+      return <span className="fb-acknowledgment">{field.signature?.text ? field.signature.text : "The statement to be signed is shown here."}<span className="fb-input">Type your full name to sign</span></span>;
     case "CALCULATED":
       return <span className="fb-fee">{field.priceCents === undefined ? "Fee set in the question settings" : `Fee: ${money(field.priceCents)}`}</span>;
     case "ADDRESS":

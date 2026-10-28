@@ -1,11 +1,12 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { cookies } from "next/headers";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { passkeyApiError } from "@/modules/attendee-accounts/passkey-api";
 import { passkeyVerificationSchema } from "@/modules/attendee-accounts/passkey-schemas";
 import { PASSKEY_SIGN_IN_COOKIE } from "@/modules/attendee-accounts/passkey-sign-in";
-import { finishPasskeySignIn } from "@/modules/attendee-accounts/passkeys";
+import { finishPasskeySignIn, PasskeyError } from "@/modules/attendee-accounts/passkeys";
 import { ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
 import { checkAttendeePasskeySignInRateLimit } from "@/modules/rate-limit/service";
@@ -32,7 +33,11 @@ async function postHandler(request: Request) {
       request.headers.get("origin"),
       response as unknown as AuthenticationResponseJSON,
       request.headers.get("user-agent"),
-    );
+    ).catch((error: unknown) => {
+      // Only a real verification failure counts: not a bad body, a store error, or anything after the session starts.
+      if (error instanceof PasskeyError && error.code === "PASSKEY_NOT_VERIFIED") countPublicMetric(request, "LOGIN_FAILURE", "attendee-passkey");
+      throw error;
+    });
     cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -42,6 +47,7 @@ async function postHandler(request: Request) {
       maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    countPublicMetric(request, "LOGIN_SUCCESS", "attendee-passkey");
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {
     return passkeyApiError(error, "Signing in with a passkey");
