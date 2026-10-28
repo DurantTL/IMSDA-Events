@@ -12,6 +12,8 @@ import {
 } from "@/modules/account-merge/hand-link-reasons";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
+import { RoleDetails } from "@/components/role-details";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import styles from "./people-directory.module.css";
 
@@ -72,20 +74,22 @@ function Chip({ tone, children }: { tone?: "green" | "coral"; children: ReactNod
 
 type RoleKind = "system-administrator" | "clubs-administrator" | "area-coordinator";
 
-const roleCopy: Record<RoleKind, { grantBody: string; revokeBody: string; noun: string }> = {
+const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "area-coordinator": "AREA_COORDINATOR" } as const;
+
+const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
     noun: "system administrator",
-    grantBody: "A system administrator can administer every event and manage system roles. Grant this only to someone who must.",
+    grantNote: "Grant this only to someone who must.",
     revokeBody: "They lose system administrator access on their next request. The last system administrator cannot be removed.",
   },
   "clubs-administrator": {
     noun: "Clubs Administrator",
-    grantBody: "They get the club areas for every club: reports, points, forms, rosters including birth dates, new club applications, health records (with the same reasons and recorded access), imports, invites, transfers, catalogs and club roles. Not churches, the conference, settings, accounts or events, except that they can make someone an Area Coordinator or give club roles. Every change is recorded under their name.",
+    grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
   },
   "area-coordinator": {
     noun: "Area Coordinator",
-    grantBody: "They'll see every club, view only (ages, not birth dates), after a second sign-in step.",
+    grantNote: null,
     revokeBody: "They'll no longer see other clubs.",
   },
 };
@@ -106,7 +110,12 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
   async function change() {
     if (!(await confirm({
       title: grant ? `Make ${name} a ${copy.noun}?` : `Remove ${copy.noun} from ${name}?`,
-      body: <p>{grant ? copy.grantBody : copy.revokeBody}</p>,
+      body: grant ? (
+        <>
+          <p>{systemRoleText[roleKeys[kind]].summary}{copy.grantNote ? ` ${copy.grantNote}` : ""}</p>
+          <RoleDetails role={systemRoleText[roleKeys[kind]]} />
+        </>
+      ) : <p>{copy.revokeBody}</p>,
       confirmLabel: grant ? `Make ${name} a ${copy.noun}` : `Remove ${copy.noun} from ${name}`,
       destructive: !grant,
     }))) return;

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
 
-export const COORDINATOR_ROLE_LABEL = "Area Coordinator";
+export const COORDINATOR_ROLE_LABEL = systemRoleText.AREA_COORDINATOR.name;
 
 export type CoordinatorMastheadModel = {
   /** The signed-in coordinator's name; null during a staff act-as and while a second step is pending. */
@@ -34,7 +35,7 @@ export function coordinatorMastheadModel(input: {
 }): CoordinatorMastheadModel {
   if (input.actingAs) {
     const actingLabel = input.actingRole === "AREA_COORDINATOR" || input.actingRole == null
-      ? "Acting as Area Coordinator"
+      ? `Acting as ${COORDINATOR_ROLE_LABEL}`
       : input.actingRole === "CLUB_DIRECTOR" ? "Acting as club director" : "Staff act-as";
     return { identity: null, actingLabel, showMyAccount: false, showWaitlists: false, signOut: "none" };
   }

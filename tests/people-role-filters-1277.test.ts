@@ -159,7 +159,7 @@ describe("the People list with filters", () => {
   it("gives a Clubs Administrator no system or event options and no event picker", () => {
     const html = render({ scope: "clubs" });
     expect(html).not.toContain("System administrator");
-    expect(html).not.toContain("Event Administrator");
+    expect(html).not.toContain("Event administrator");
     expect(html).not.toContain('name="event"');
     expect(html).toContain('value="club-director"');
   });

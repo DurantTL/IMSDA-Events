@@ -76,7 +76,7 @@ describe("portal guide registry", () => {
     const find = (id: string) => findPortalGuide(id)!.steps.join(" ");
     expect(find("find-my-registration")).toMatch(/verified email/i);
     expect(find("director-choose-club")).toMatch(/Registrar:.*ages/);
-    expect(find("director-choose-club")).toMatch(/Reporter:.*No roster access/);
+    expect(find("director-choose-club")).toMatch(/Reporter:.*can't: see the roster/i);
     expect(findPortalGuide("director-monthly-record")!.needs.join(" ")).toMatch(/registrar cannot/i);
     expect(find("coordinator-find-club")).toMatch(/view only/i);
     expect(find("coordinator-team-approvals")).toMatch(/cannot approve or decline/i);

@@ -13514,6 +13514,14 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
 
+/* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
+.role-details { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.role-details > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 4px; color: var(--link, inherit); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.role-details-body { display: grid; gap: 8px; min-width: 0; padding: 0 0 6px; }
+.role-details-body h4 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.role-details-body ul { display: block; margin: 2px 0 0; padding-left: 20px; list-style: disc; }
+.role-details-body li { display: list-item; color: inherit; text-transform: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
