@@ -281,6 +281,7 @@ const pages: PageSpec[] = [
   staff("people-email-selected", "/people"),
   staff("attendee-listing", "/people/attendees"),
   staff("duplicates", "/people/duplicates"),
+  staff("event-staff", "/staff"),
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
   staff("finance-church-owed", "/finance/church-owed"),

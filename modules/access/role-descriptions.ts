@@ -56,7 +56,7 @@ export const systemRoleText: Record<SystemRoleKey, RoleText> = {
   },
   EVENTS_ADMIN: {
     name: "Events Administrator",
-    summary: "An Event administrator on one or more events, who sees only those events.",
+    summary: "Runs only the events where they are an Event administrator; club records and club events are not part of it.",
     can: ["Run the events they are an Event administrator on."],
     cannot: ["See other events.", "See club records or club events."],
   },

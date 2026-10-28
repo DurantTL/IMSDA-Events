@@ -51,7 +51,7 @@ export default async function EventsAdminPage() {
       <section className={styles.hero} aria-labelledby="events-admin-heading">
         <p className="eyebrow">Your events</p>
         <h2 id="events-admin-heading">Event administration</h2>
-        <p>What is waiting for someone across your events, then the events themselves. {systemRoleText.EVENTS_ADMIN.summary} Nothing on this page changes a record.</p>
+        <p>What is waiting for someone across your events, then the events themselves. Your role: {systemRoleText.EVENTS_ADMIN.name}. {systemRoleText.EVENTS_ADMIN.summary} Nothing on this page changes a record.</p>
         <p className={styles.identity} data-testid="signed-in-identity">Signed in as <strong>{user.displayName}</strong></p>
       </section>
 
