@@ -9,8 +9,8 @@ import { PeopleDirectory } from "@/components/people-directory";
 import { PendingInvites } from "@/components/pending-invites";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
-import { listPendingInvites } from "@/modules/system-admin/pending-invites";
-import { parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+import { PENDING_INVITES_CAP, listPendingInvites } from "@/modules/system-admin/pending-invites";
+import { parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 
 export const metadata: Metadata = { title: "People & access" };
 export const dynamic = "force-dynamic";
@@ -18,7 +18,13 @@ export const dynamic = "force-dynamic";
 export default async function PeopleAccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string | string[];
+    page?: string | string[];
+    role?: string | string[];
+    event?: string | string[];
+    club?: string | string[];
+  }>;
 }) {
   const viewer = await resolvePeopleViewer();
   if (!viewer.user) redirect(await staffLoginRedirectPath());
@@ -26,10 +32,16 @@ export default async function PeopleAccessPage({
   // Search and page live in the URL, so a reload or shared link keeps them.
   const params = await searchParams;
   const query = parsePeopleQuery(params.q);
+  const filters = parsePeopleFilters(params, viewer.scope);
   const full = viewer.scope === "full";
+  // Pending invites (#1276) show above the list when no role filter is on, and are the list for the Pending filter (#1277).
+  const pendingOnly = filters.role?.kind === "pending";
+  const showPending = !filters.role || pendingOnly;
   const [result, pending, eventOptions, clubOptions] = await Promise.all([
-    searchPeople(query, parsePeoplePage(params.page), viewer.scope),
-    listPendingInvites({ query, scope: viewer.scope }),
+    pendingOnly
+      ? { rows: [], page: 1, pageCount: 1, total: 0 }
+      : searchPeople(query, parsePeoplePage(params.page), viewer.scope, filters),
+    showPending ? listPendingInvites({ query, scope: viewer.scope }) : { invites: [], emailConfigured: false },
     full ? listEventOptions() : [],
     listClubOptions(),
   ]);
@@ -55,12 +67,13 @@ export default async function PeopleAccessPage({
       />
       <PeopleDirectory
         scope={viewer.scope}
-        page={result.page}
-        pageCount={result.pageCount}
+        filters={filters}
+        eventOptions={eventOptions}
+        clubOptions={clubOptions}
         pending={<PendingInvites emailConfigured={pending.emailConfigured} invites={pending.invites} />}
-        query={query}
-        rows={result.rows}
-        total={result.total}
+        pendingCount={pending.invites.length}
+        pendingCapped={pending.invites.length >= PENDING_INVITES_CAP}
+        page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
       />
     </>
   );

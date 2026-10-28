@@ -202,6 +202,7 @@ describe("tabs, links and years", () => {
       ["Club events", "/admin/clubs/summary?year=2026-27#club-events"],
       ["Forms", "/admin/club-forms"],
       ["New clubs (3)", "/admin/clubs/applications"],
+      ["Club leaders", "/admin/clubs/leaders"],
       ["People", "/admin/people"],
     ]);
   });

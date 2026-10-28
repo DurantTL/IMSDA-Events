@@ -2,10 +2,12 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import {
+  buildRoleWhere,
   clubRoleStatus,
   mergePeopleCandidates,
   pagePeople,
   type ClubRoleStatus,
+  type PeopleFilters,
   type PeopleScope,
   summarizePeopleAccess,
   type MergedPerson,
@@ -143,8 +145,40 @@ export async function loadPeopleRows(people: readonly MergedPerson[], scope: Peo
   });
 }
 
-export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full") {
-  const matches = await findPeople(query);
+/**
+ * The people who hold the chosen role right now (#1277), merged and sorted like `findPeople`, with the text search
+ * applied inside the role. A role that cannot be listed (no event picked, or not allowed for the scope) is nobody.
+ */
+export async function findPeopleByRole(
+  filters: PeopleFilters,
+  query: string,
+  scope: PeopleScope,
+  now = new Date(),
+): Promise<MergedPerson[]> {
+  const where = buildRoleWhere(filters, scope, now);
+  if (!where) return [];
+  const prisma = getPrisma();
+  const text = query.trim().slice(0, 120);
+  const textWhere = text ? { OR: [{ email: textFilter(text) }, { displayName: textFilter(text) }] } : undefined;
+  const combine = (roleWhere: Record<string, unknown>) => (textWhere ? { AND: [roleWhere, textWhere] } : roleWhere);
+  const [users, accounts] = await Promise.all([
+    where.staff ? prisma.user.findMany({
+      where: combine(where.staff),
+      select: { id: true, email: true, displayName: true, attendeeAccountId: true },
+    }) : [],
+    where.account ? prisma.attendeeAccount.findMany({
+      where: combine(where.account),
+      select: { id: true, email: true, displayName: true, linkedUser: { select: { id: true } } },
+    }) : [],
+  ]);
+  return mergePeopleCandidates(
+    users.map((user) => ({ kind: "staff" as const, id: user.id, name: user.displayName, email: user.email, linkedId: user.attendeeAccountId })),
+    accounts.map((account) => ({ kind: "account" as const, id: account.id, name: account.displayName, email: account.email, linkedId: account.linkedUser?.id ?? null })),
+  );
+}
+
+export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full", filters?: PeopleFilters) {
+  const matches = filters?.role ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
   const page = pagePeople(matches, requestedPage);
   return { ...page, rows: await loadPeopleRows(page.items, scope) };
 }

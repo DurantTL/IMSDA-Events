@@ -4,6 +4,8 @@ import { ClubTeamWorkspace } from "@/components/club-team-workspace";
 import { listPendingClubTeamInvites } from "@/modules/club-imports/invites";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club-profile-repository";
+import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
+import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
 import { listClubTeam } from "@/modules/organizations/director-grants-repository";
 
 export const metadata: Metadata = { title: "Club settings" };
@@ -32,6 +34,8 @@ export default async function ClubInfoPage({ params }: { params: Promise<{ organ
     ? await Promise.all([listClubTeam(organizationId), listPendingClubTeamInvites(organizationId)])
     : null;
 
+  const canOpenPeople = teamSection && access.actor.kind === "STAFF_ACTING" ? clubTeamPeopleLinkAllowed(access.actor, await resolvePeopleViewer()) : false;
+
   return (
     <>
       {profileSection && (
@@ -50,6 +54,7 @@ export default async function ClubInfoPage({ params }: { params: Promise<{ organ
             initialInvites={teamSection[1]}
             organizationId={organizationId}
             viewerAccountId={access.actor.kind === "ATTENDEE" ? access.actor.accountId : null}
+            canOpenPeople={canOpenPeople}
           />
         </div>
       )}

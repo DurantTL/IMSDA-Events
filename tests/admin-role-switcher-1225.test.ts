@@ -51,7 +51,7 @@ describe("the Clubs sidebar", () => {
     // The flat page list behind the phone bar and the active match (#1245): the grouped sidebar's pages, each once.
     expect([...clubsAdminNavigation.map((item) => item.href)].sort()).toEqual([
       "/admin/club-forms", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
-      "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
+      "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/leaders", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
       "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks", "/admin/people",
     ]);
     // Never a page a Clubs Administrator cannot open.
