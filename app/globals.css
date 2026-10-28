@@ -2052,6 +2052,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-record small { margin-top: 3px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.61rem); line-height: 1.45; }
 .staff-record > span:last-child { color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), 0.67rem); font-weight: 700; }
 .staff-person { display: flex; align-items: center; gap: 10px; }
+.staff-person > span { min-width: 0; }
+.staff-person small { overflow-wrap: anywhere; }
 .permission-matrix { overflow: hidden; }
 .role-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .role-grid article { border: 1px solid var(--line); border-radius: 13px; background: #fbfcfd; padding: 14px; }
