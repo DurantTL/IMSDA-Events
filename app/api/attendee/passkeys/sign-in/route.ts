@@ -35,7 +35,7 @@ async function postHandler(request: Request) {
       request.headers.get("user-agent"),
     ).catch((error: unknown) => {
       // Only a real verification failure counts: not a bad body, a store error, or anything after the session starts.
-      if (error instanceof PasskeyError) countPublicMetric(request, "LOGIN_FAILURE", "attendee-passkey");
+      if (error instanceof PasskeyError && error.code === "PASSKEY_NOT_VERIFIED") countPublicMetric(request, "LOGIN_FAILURE", "attendee-passkey");
       throw error;
     });
     cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {

@@ -86,7 +86,7 @@ export function firstPathSegment(pathname: string): string {
  * analytics are about the public site only.
  */
 export const staffWorkspaceSections = [
-  "admin", "overview", "people", "finance", "check-in", "communications", "more", "imports", "registration-builder",
+  "admin", "admin-role", "community", "overview", "people", "finance", "check-in", "communications", "more", "imports", "registration-builder",
   "event-setup", "events-admin", "archived-events", "staff", "profile", "help", "information-forms", "select-event", "no-access", "api",
 ] as const;
 

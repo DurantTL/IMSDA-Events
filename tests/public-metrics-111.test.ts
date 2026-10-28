@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the fake database receives loosely typed Prisma arguments */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +42,8 @@ import {
   decideDimension,
   directoryFiltersInUse,
   firstPathSegment,
+  isStaffWorkspacePath,
+  staffWorkspaceSections,
   optedOutByHeaders,
 } from "@/modules/public-metrics/domain";
 import { getAnalyticsSummary, prunePublicMetrics, recordPublicMetric } from "@/modules/public-metrics/repository";
@@ -89,6 +91,13 @@ describe("the allowlists", () => {
     expect(directoryFiltersInUse({ q: "", from: "", to: "", category: "", location: "", audience: "all" })).toEqual({ search: false, filters: [] });
     expect(firstPathSegment("/Events/abc?x=1#y")).toBe("events");
     expect(firstPathSegment("/")).toBe("");
+  });
+
+  it("lists every staff workspace folder and the staff-only top-level pages, so a new one cannot be forgotten", () => {
+    const folders = readdirSync("app/(workspace)", { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    for (const folder of [...folders, "archived-events", "select-event", "no-access"]) expect(staffWorkspaceSections as readonly string[], folder).toContain(folder);
+    expect(isStaffWorkspacePath("/community/posts")).toBe(true);
+    expect(isStaffWorkspacePath("/events/public-camp")).toBe(false);
   });
 
   it("reads Global Privacy Control and Do Not Track", () => {
@@ -150,6 +159,15 @@ describe("the beacon route", () => {
       expect(await response.text()).toBe("");
     }
     expect(mocks.executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("stops reading a large body that declares no length", async () => {
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(`{"metric":"DIRECTORY_SEARCH","dimension":"${"x".repeat(5000)}"}`)); controller.close(); } });
+    const response = await beacon(new Request("https://events.imsda.test/api/public-metrics", { method: "POST", headers: { origin: "https://events.imsda.test" }, body: stream, duplex: "half" } as RequestInit));
+    expect(response.status).toBe(204);
+    expect(mocks.executeRaw).not.toHaveBeenCalled();
+    expect((await post({ metric: "DIRECTORY_SEARCH" })).status).toBe(204);
+    expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a large body by its declared length before reading it", async () => {

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const hooks = vi.hoisted(() => ({ registered: [] as unknown[] }));
 vi.mock("next/web-vitals", () => ({ useReportWebVitals: (callback: unknown) => { hooks.registered.push(callback); } }));
 
-import { PublicMetricsBeacon, PublicWebVitals, reportVital } from "@/components/public-metrics-beacon";
+import { PublicMetricsBeacon, PublicWebVitals, reportVital, resetVitalsForTests } from "@/components/public-metrics-beacon";
 
 const sendBeacon = vi.fn<(url: string, data: Blob) => boolean>(() => true);
 const readBlob = (blob: Blob) => new Promise<string>((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(blob); });
@@ -26,6 +26,7 @@ function setSignals(signals: { gpc?: boolean; dnt?: string | null }) {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
+  resetVitalsForTests();
   hooks.registered.length = 0;
   Object.defineProperty(navigator, "sendBeacon", { value: sendBeacon, configurable: true });
   setSignals({});
@@ -63,6 +64,24 @@ describe("web vitals", () => {
     setPath("/admin/people");
     reportVital({ name: "TTFB", rating: "good" });
     reportVital({ name: "INP", rating: "good" });
+    expect(sendBeacon).not.toHaveBeenCalled();
+  });
+});
+
+describe("web vitals and where the visit began", () => {
+  it("judge the page the visit landed on, not where the visitor has navigated since", async () => {
+    setPath("/events");
+    await mount(createElement(PublicWebVitals));
+    setPath("/admin/people");
+    reportVital({ name: "LCP", rating: "good" });
+    expect(await sent()).toEqual([{ metric: "WEB_VITAL", dimension: "LCP:good" }]);
+  });
+
+  it("stay silent for a visit that began in the staff workspace, even after navigating to a public page", async () => {
+    setPath("/admin/people");
+    await mount(createElement(PublicWebVitals));
+    setPath("/events");
+    reportVital({ name: "LCP", rating: "good" });
     expect(sendBeacon).not.toHaveBeenCalled();
   });
 });

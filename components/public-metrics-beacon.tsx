@@ -65,6 +65,8 @@ export function PublicMetricsBeacon({ hits = [], notFound = false }: { hits?: Be
 }
 
 const reportedVitals = new Set<string>();
+/** The page the visit began on. Web vitals describe that page load, so this, not wherever the visitor has since navigated, decides whether they count. */
+let landingPath: string | null = null;
 
 /**
  * The web-vitals callback, at module scope so its identity never changes: Next registers the listeners again whenever
@@ -72,7 +74,7 @@ const reportedVitals = new Set<string>();
  */
 export function reportVital(metric: { name: string; rating?: string }) {
   if (!(vitalNames as readonly string[]).includes(metric.name)) return;
-  if (typeof window === "undefined" || isStaffWorkspacePath(window.location.pathname)) return;
+  if (typeof window === "undefined" || isStaffWorkspacePath(landingPath ?? window.location.pathname)) return;
   const { rating } = metric;
   if (rating !== "good" && rating !== "needs-improvement" && rating !== "poor") return;
   if (reportedVitals.has(metric.name)) return;
@@ -80,8 +82,16 @@ export function reportVital(metric: { name: string; rating?: string }) {
   sendHit({ metric: "WEB_VITAL", dimension: `${metric.name}:${rating}` });
 }
 
+/** Test hook: forget the landing page and the measures already sent. */
+export function resetVitalsForTests() {
+  landingPath = null;
+  reportedVitals.clear();
+}
+
 /** Mounted once, in the root layout, so the listeners are registered once for the whole visit. */
 export function PublicWebVitals() {
+  // Remembered once, at the first render of the visit (the layout never remounts on client navigation).
+  useEffect(() => { landingPath ??= window.location.pathname; }, []);
   useReportWebVitals(reportVital);
   return null;
 }

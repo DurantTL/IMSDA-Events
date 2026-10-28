@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   unifiedPasswordSignIn: vi.fn(),
   finishPasskeySignIn: vi.fn(),
   finishCombinedPasskeySignIn: vi.fn(),
+  finishAttendeePasskeySignIn: vi.fn(),
   set: vi.fn(),
   cookieGet: vi.fn(() => ({ value: "handle" })),
 }));
@@ -39,6 +40,7 @@ vi.mock("@/modules/access/post-login-destination", () => ({ resolvePostLoginDest
 vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: async () => true }));
 vi.mock("@/modules/account-merge/unified-sign-in", () => ({ unifiedPasswordSignIn: mocks.unifiedPasswordSignIn, issueLinkedAttendeeSession: async () => null }));
 vi.mock("@/modules/access/passkeys", async (importOriginal) => ({ ...(await importOriginal<object>()), finishPasskeySignIn: mocks.finishPasskeySignIn }));
+vi.mock("@/modules/attendee-accounts/passkeys", async (importOriginal) => ({ ...(await importOriginal<object>()), finishPasskeySignIn: mocks.finishAttendeePasskeySignIn }));
 vi.mock("@/modules/account-merge/combined-passkey-sign-in", () => ({ finishCombinedPasskeySignIn: mocks.finishCombinedPasskeySignIn }));
 
 import { POST as staffLogin } from "@/app/api/auth/login/route";
@@ -46,6 +48,8 @@ import { POST as mfaChallenge } from "@/app/api/auth/mfa/challenge/route";
 import { POST as unifiedSignIn } from "@/app/api/sign-in/route";
 import { POST as staffPasskey } from "@/app/api/auth/passkeys/sign-in/route";
 import { POST as unifiedPasskey } from "@/app/api/sign-in/passkey/route";
+import { POST as attendeePasskey } from "@/app/api/attendee/passkeys/sign-in/route";
+import { PasskeyError as AttendeePasskeyError } from "@/modules/attendee-accounts/passkeys";
 import { MfaError } from "@/modules/access/mfa-service";
 import { PasskeyError } from "@/modules/access/passkeys";
 
@@ -141,5 +145,23 @@ describe("passkey sign-in", () => {
     mocks.finishCombinedPasskeySignIn.mockResolvedValueOnce({ kind: "staff", session, userId: "u1", globalRole: null });
     expect((await attempt()).status).toBe(200);
     expect(counted()).toEqual(["LOGIN_FAILURE:unified-passkey", "LOGIN_SUCCESS:unified-passkey", "LOGIN_SUCCESS:unified-passkey"]);
+  });
+
+  it("counts a failure only when the passkey was not verified, not for an expired prompt or an unavailable feature", async () => {
+    const staff = () => staffPasskey(post("/api/auth/passkeys/sign-in", passkeyBody));
+    const attendee = () => attendeePasskey(post("/api/attendee/passkeys/sign-in", passkeyBody));
+    const unified = () => unifiedPasskey(post("/api/sign-in/passkey", passkeyBody));
+    for (const code of ["CHALLENGE_EXPIRED", "PASSKEYS_NOT_AVAILABLE"] as const) {
+      mocks.finishPasskeySignIn.mockRejectedValueOnce(new PasskeyError(code, "No."));
+      mocks.finishAttendeePasskeySignIn.mockRejectedValueOnce(new AttendeePasskeyError(code, "No."));
+      mocks.finishCombinedPasskeySignIn.mockRejectedValueOnce(new PasskeyError(code, "No."));
+      await staff(); await attendee(); await unified();
+    }
+    expect(mocks.count).not.toHaveBeenCalled();
+    mocks.finishAttendeePasskeySignIn.mockRejectedValueOnce(new AttendeePasskeyError("PASSKEY_NOT_VERIFIED", "No."));
+    await attendee();
+    mocks.finishAttendeePasskeySignIn.mockResolvedValueOnce({ session });
+    expect((await attendee()).status).toBe(200);
+    expect(counted()).toEqual(["LOGIN_FAILURE:attendee-passkey", "LOGIN_SUCCESS:attendee-passkey"]);
   });
 });
