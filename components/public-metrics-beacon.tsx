@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useReportWebVitals } from "next/web-vitals";
-import { firstPathSegment, vitalNames, type BeaconMetric } from "@/modules/public-metrics/domain";
+import { firstPathSegment, isStaffWorkspacePath, vitalNames, type BeaconMetric } from "@/modules/public-metrics/domain";
 
 /**
  * The one first-party analytics beacon for public pages (#111). It sends a metric name and an allowlisted dimension to
@@ -12,34 +12,35 @@ import { firstPathSegment, vitalNames, type BeaconMetric } from "@/modules/publi
  */
 export type BeaconHit = { metric: BeaconMetric; dimension?: string };
 
-function measuringAllowed() {
+export function measuringAllowed() {
   if (typeof navigator === "undefined") return false;
   const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
   return nav.globalPrivacyControl !== true && navigator.doNotTrack !== "1";
 }
 
-function send(hit: BeaconHit) {
+/** Sends one hit. A `text/plain` body keeps it a simple request; the server reads it as JSON. */
+export function sendHit(hit: BeaconHit) {
   if (!measuringAllowed()) return;
   try {
     const body = JSON.stringify(hit.dimension === undefined ? { metric: hit.metric } : { metric: hit.metric, dimension: hit.dimension });
-    const blob = new Blob([body], { type: "application/json" });
-    if (!navigator.sendBeacon?.("/api/public-metrics", blob)) {
-      void fetch("/api/public-metrics", { method: "POST", body, headers: { "Content-Type": "application/json" }, keepalive: true, credentials: "omit" }).catch(() => undefined);
+    if (!navigator.sendBeacon?.("/api/public-metrics", new Blob([body], { type: "text/plain" }))) {
+      void fetch("/api/public-metrics", { method: "POST", body, headers: { "Content-Type": "text/plain" }, keepalive: true, credentials: "omit" }).catch(() => undefined);
     }
   } catch {
     // Measuring must never get in the way of the page.
   }
 }
 
-export function PublicMetricsBeacon({ hits = [], notFound = false, vitals = true }: { hits?: BeaconHit[]; notFound?: boolean; vitals?: boolean }) {
+export function PublicMetricsBeacon({ hits = [], notFound = false }: { hits?: BeaconHit[]; notFound?: boolean }) {
   const hitKey = JSON.stringify(hits);
 
   useEffect(() => {
-    for (const hit of JSON.parse(hitKey) as BeaconHit[]) send(hit);
+    for (const hit of JSON.parse(hitKey) as BeaconHit[]) sendHit(hit);
   }, [hitKey]);
 
   useEffect(() => {
-    if (notFound) send({ metric: "NOT_FOUND", dimension: firstPathSegment(window.location.pathname) });
+    // The staff workspace is never measured, not even its missing pages.
+    if (notFound && !isStaffWorkspacePath(window.location.pathname)) sendHit({ metric: "NOT_FOUND", dimension: firstPathSegment(window.location.pathname) });
   }, [notFound]);
 
   useEffect(() => {
@@ -47,26 +48,40 @@ export function PublicMetricsBeacon({ hits = [], notFound = false, vitals = true
     function onError(event: Event) {
       const target = event.target;
       if (!(target instanceof HTMLImageElement)) return;
+      if (isStaffWorkspacePath(window.location.pathname)) return;
       let external = true;
       try {
         external = new URL(target.currentSrc || target.src, window.location.href).origin !== window.location.origin;
       } catch {
         external = true;
       }
-      send({ metric: "IMAGE_ERROR", dimension: external ? "external" : "same-origin" });
+      sendHit({ metric: "IMAGE_ERROR", dimension: external ? "external" : "same-origin" });
     }
     window.addEventListener("error", onError, true);
     return () => window.removeEventListener("error", onError, true);
   }, []);
 
-  return vitals ? <WebVitals /> : null;
+  return null;
 }
 
-function WebVitals() {
-  useReportWebVitals((metric) => {
-    if (!(vitalNames as readonly string[]).includes(metric.name)) return;
-    const rating = (metric as { rating?: string }).rating;
-    if (rating === "good" || rating === "needs-improvement" || rating === "poor") send({ metric: "WEB_VITAL", dimension: `${metric.name}:${rating}` });
-  });
+const reportedVitals = new Set<string>();
+
+/**
+ * The web-vitals callback, at module scope so its identity never changes: Next registers the listeners again whenever
+ * the callback changes and never removes them. Each measure is reported once per page load, and never from the staff workspace.
+ */
+export function reportVital(metric: { name: string; rating?: string }) {
+  if (!(vitalNames as readonly string[]).includes(metric.name)) return;
+  if (typeof window === "undefined" || isStaffWorkspacePath(window.location.pathname)) return;
+  const { rating } = metric;
+  if (rating !== "good" && rating !== "needs-improvement" && rating !== "poor") return;
+  if (reportedVitals.has(metric.name)) return;
+  reportedVitals.add(metric.name);
+  sendHit({ metric: "WEB_VITAL", dimension: `${metric.name}:${rating}` });
+}
+
+/** Mounted once, in the root layout, so the listeners are registered once for the whole visit. */
+export function PublicWebVitals() {
+  useReportWebVitals(reportVital);
   return null;
 }

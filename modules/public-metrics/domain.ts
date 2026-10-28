@@ -18,7 +18,7 @@ export type BeaconMetric = (typeof beaconMetrics)[number];
 
 export const eventMetrics = ["EVENT_PAGE_VIEW", "REGISTRATION_START", "REGISTRATION_COMPLETE"] as const satisfies readonly PublicMetricName[];
 export const directoryFilters = ["category", "audience", "location", "date"] as const;
-export const loginSurfaces = ["staff-password", "staff-passkey", "attendee-password", "attendee-passkey"] as const;
+export const loginSurfaces = ["staff-password", "staff-mfa", "staff-passkey", "attendee-password", "attendee-passkey", "unified-password", "unified-passkey"] as const;
 export type LoginSurface = (typeof loginSurfaces)[number];
 export const publicSections = [
   "events", "calendar", "clubs", "account", "register", "manage", "forms", "embed", "club-forms", "pay",
@@ -79,6 +79,19 @@ export const beaconMaxBytes = 1024;
 /** The first path segment of a path, lower case, for the 404 metric. Never the rest of the address. */
 export function firstPathSegment(pathname: string): string {
   return (pathname.split("?")[0].split("#")[0].split("/").filter(Boolean)[0] ?? "").toLowerCase().slice(0, 40);
+}
+
+/**
+ * First path segments of the staff workspace. Pages there are never measured: not their speed, not their 404s. Public
+ * analytics are about the public site only.
+ */
+export const staffWorkspaceSections = [
+  "admin", "overview", "people", "finance", "check-in", "communications", "more", "imports", "registration-builder",
+  "event-setup", "events-admin", "archived-events", "staff", "profile", "help", "information-forms", "select-event", "no-access", "api",
+] as const;
+
+export function isStaffWorkspacePath(pathname: string): boolean {
+  return (staffWorkspaceSections as readonly string[]).includes(firstPathSegment(pathname));
 }
 
 /** Whether the visitor asked not to be measured (Global Privacy Control or Do Not Track), from request headers. */

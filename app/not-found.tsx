@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Page not found" };
 export default function NotFound() {
   return (
     <main className="public-registration-page public-event-page">
-      <PublicMetricsBeacon notFound vitals={false} />
+      <PublicMetricsBeacon notFound />
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <Link className="public-registration-brand public-event-brand-link" href="/">

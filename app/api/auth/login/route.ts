@@ -7,7 +7,7 @@ import { resolvePostLoginDestination } from "@/modules/access/post-login-destina
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { logError } from "@/lib/logger";
-import { recordPublicMetric } from "@/modules/public-metrics/repository";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import {
   applyRateLimitHeaders,
   mergeRateLimitOutcomes,
@@ -83,7 +83,7 @@ async function postHandler(request: Request) {
     const authentication = await authenticateWithPassword(input.email, input.password, userAgent);
     if (!authentication) {
       // Counted by surface only, never by who tried; it cannot change this response (#111).
-      void recordPublicMetric("LOGIN_FAILURE", "staff-password");
+      countPublicMetric(request, "LOGIN_FAILURE", "staff-password");
       return applyRateLimitHeaders(Response.json({ error: "INVALID_CREDENTIALS", message: "The email or password is incorrect, or the account is temporarily unavailable." }, { status: 401 }), rateLimit);
     }
 
@@ -122,7 +122,7 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
-    void recordPublicMetric("LOGIN_SUCCESS", "staff-password");
+    countPublicMetric(request, "LOGIN_SUCCESS", "staff-password");
     const redirectTo = await postLoginDestinationOrDefault(
       { id: authentication.userId, globalRole: authentication.globalRole },
       input.next,

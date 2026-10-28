@@ -109,7 +109,7 @@ export default async function PublicRegistrationPage({
 
   return (
     <>
-    <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} vitals={false} />
+    <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <PublicRegistrationForm
       event={{
         ...experience.event,

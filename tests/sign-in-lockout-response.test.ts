@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// Counting public metrics also uses after(); it is not what these tests look at.
+vi.mock("@/modules/public-metrics/record", () => ({ countPublicMetric: vi.fn() }));
 vi.mock("next/server", async (importOriginal) => ({
   ...await importOriginal<typeof import("next/server")>(),
   after: mocks.after,

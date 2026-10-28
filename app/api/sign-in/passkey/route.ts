@@ -2,6 +2,9 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { countPublicMetric } from "@/modules/public-metrics/record";
+import { PasskeyError as StaffPasskeyError } from "@/modules/access/passkeys";
+import { PasskeyError as AttendeePasskeyError } from "@/modules/attendee-accounts/passkeys";
 import { withRequestContext } from "@/lib/request-context";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { passkeyApiError } from "@/modules/access/passkey-api";
@@ -62,9 +65,14 @@ async function postHandler(request: Request) {
       request.headers.get("origin"),
       response as unknown as AuthenticationResponseJSON,
       request.headers.get("user-agent"),
-    );
+    ).catch((error: unknown) => {
+      // Only a real verification failure counts: not a bad body, a store error, or anything after the session starts.
+      if (error instanceof StaffPasskeyError || error instanceof AttendeePasskeyError) countPublicMetric(request, "LOGIN_FAILURE", "unified-passkey");
+      throw error;
+    });
 
     if (result.kind === "attendee") {
+      countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
       cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -77,6 +85,7 @@ async function postHandler(request: Request) {
       return applyRateLimitHeaders(Response.json({ ok: true, attendee: true, redirectTo: attendeeReturnDestination(next, "/account") }), rateLimit);
     }
 
+    countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
     cookieStore.set(SESSION_COOKIE_NAME, result.session.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

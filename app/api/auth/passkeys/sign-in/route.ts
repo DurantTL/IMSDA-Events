@@ -1,7 +1,7 @@
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { z } from "zod";
 import { cookies } from "next/headers";
-import { recordPublicMetric } from "@/modules/public-metrics/repository";
+import { countPublicMetric } from "@/modules/public-metrics/record";
 import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
 import {
   ATTENDEE_SESSION_COOKIE_NAME,
@@ -12,7 +12,7 @@ import { logError } from "@/lib/logger";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { passkeyApiError } from "@/modules/access/passkey-api";
 import { STAFF_PASSKEY_SIGN_IN_COOKIE } from "@/modules/access/passkey-sign-in";
-import { finishPasskeySignIn } from "@/modules/access/passkeys";
+import { finishPasskeySignIn, PasskeyError } from "@/modules/access/passkeys";
 import { passkeyVerificationSchema } from "@/modules/passkeys/schemas";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
@@ -68,7 +68,11 @@ async function postHandler(request: Request) {
       request.headers.get("origin"),
       response as unknown as AuthenticationResponseJSON,
       request.headers.get("user-agent"),
-    );
+    ).catch((error: unknown) => {
+      // Only a real verification failure counts: not a bad body, a store error, or anything after the session starts.
+      if (error instanceof PasskeyError) countPublicMetric(request, "LOGIN_FAILURE", "staff-passkey");
+      throw error;
+    });
     cookieStore.set(SESSION_COOKIE_NAME, result.session.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -78,6 +82,7 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    countPublicMetric(request, "LOGIN_SUCCESS", "staff-passkey");
     // One account per person (#554): with the one-sign-in switch on, a staff person who just
     // passed the staff second factor also gets their linked attendee session, marked as having
     // passed the second step. Does nothing (null) with the switch off or with no usable link.
@@ -97,10 +102,8 @@ async function postHandler(request: Request) {
       { id: result.userId, globalRole: result.globalRole },
       next,
     );
-    void recordPublicMetric("LOGIN_SUCCESS", "staff-passkey");
     return applyRateLimitHeaders(Response.json({ ok: true, redirectTo }), rateLimit);
   } catch (error) {
-    void recordPublicMetric("LOGIN_FAILURE", "staff-passkey");
     return passkeyApiError(error, "Signing in with a passkey");
   }
 }

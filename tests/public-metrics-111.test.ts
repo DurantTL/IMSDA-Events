@@ -152,6 +152,12 @@ describe("the beacon route", () => {
     expect(mocks.executeRaw).not.toHaveBeenCalled();
   });
 
+  it("refuses a large body by its declared length before reading it", async () => {
+    const response = await post({ metric: "DIRECTORY_SEARCH" }, { "content-length": "5000" });
+    expect(response.status).toBe(204);
+    expect(mocks.executeRaw).not.toHaveBeenCalled();
+  });
+
   it("does not count a visitor who sends Global Privacy Control or Do Not Track", async () => {
     expect((await post({ metric: "DIRECTORY_SEARCH" }, { "sec-gpc": "1" })).status).toBe(204);
     expect((await post({ metric: "DIRECTORY_SEARCH" }, { dnt: "1" })).status).toBe(204);

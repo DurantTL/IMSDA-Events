@@ -16,6 +16,8 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   if (optedOutByHeaders(request.headers)) return noContent();
   try {
+    // Refuse a large body before reading it, as the registration routes do.
+    if (Number(request.headers.get("content-length") ?? 0) > beaconMaxBytes) return noContent();
     const text = await request.text();
     if (text.length > beaconMaxBytes) return noContent();
     const parsed = beaconBodySchema.safeParse(JSON.parse(text));

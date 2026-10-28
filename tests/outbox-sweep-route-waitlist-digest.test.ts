@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   sweepHostedCheckouts: vi.fn(),
   runHealthSnapshotSweep: vi.fn(),
   expireStalePendingTeams: vi.fn(),
+  prunePublicMetrics: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -29,6 +30,7 @@ vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordSweepH
 vi.mock("@/modules/payments/square-hosted-invalidation", () => ({ sweepHostedCheckouts: mocks.sweepHostedCheckouts }));
 vi.mock("@/modules/health-records/snapshot-hooks", () => ({ runHealthSnapshotSweep: mocks.runHealthSnapshotSweep }));
 vi.mock("@/modules/general-link-registrations/repository", () => ({ expireStalePendingTeams: mocks.expireStalePendingTeams }));
+vi.mock("@/modules/public-metrics/repository", () => ({ prunePublicMetrics: mocks.prunePublicMetrics }));
 vi.mock("@/modules/calendar/feeds", () => ({ refreshDueCalendarFeeds: mocks.refreshDueCalendarFeeds }));
 vi.mock("@/modules/event-locations/waitlist-digest", () => ({ sendDueLocationWaitlistDigests: mocks.sendDueLocationWaitlistDigests }));
 
@@ -51,6 +53,7 @@ beforeEach(() => {
   mocks.sweepHostedCheckouts.mockResolvedValue({ withdrawn: 0, deleted: 0, failed: 0 });
   mocks.runHealthSnapshotSweep.mockResolvedValue(null);
   mocks.expireStalePendingTeams.mockResolvedValue({ expired: 0, events: 0 });
+  mocks.prunePublicMetrics.mockResolvedValue(0);
   mocks.sendDueLocationWaitlistDigests.mockResolvedValue({ status: "QUEUED", dateKey: "2026-10-06", changesCovered: 4, recipients: 2, messageIds: ["m1", "m2"], delivered: 2 });
 });
 
@@ -139,5 +142,22 @@ describe("the sweep and the general link's retention (#931)", () => {
     expect(failed.status).toBe(200);
     expect((await failed.json()).generalLinkRetention).toBeNull();
     expect(mocks.logError).toHaveBeenCalledWith("The general link retention sweep failed after a successful outbox sweep", expect.any(Error));
+  });
+});
+
+describe("the sweep and public analytics retention (#111)", () => {
+  it("prunes old daily counts on each sweep and reports how many went", async () => {
+    mocks.prunePublicMetrics.mockResolvedValueOnce(12);
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mocks.prunePublicMetrics).toHaveBeenCalledTimes(1);
+    expect((await response.json()).publicMetricsRetention).toBe(12);
+  });
+
+  it("is not failed by a pruning error", async () => {
+    mocks.prunePublicMetrics.mockRejectedValueOnce(new Error("synthetic failure"));
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).publicMetricsRetention).toBeNull();
   });
 });

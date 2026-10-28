@@ -1,3 +1,4 @@
+import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -66,6 +67,8 @@ export default async function GroupRegistrationPage({ params }: GroupRegistratio
   }
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
   return (
+    <>
+    <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <GroupRegistrationFlow
       eventSlug={eventSlug}
       topContent={
@@ -90,5 +93,6 @@ export default async function GroupRegistrationPage({ params }: GroupRegistratio
         billingNotice: experience.billingNotice ?? "You'll be billed after the event.",
       }}
     />
+    </>
   );
 }

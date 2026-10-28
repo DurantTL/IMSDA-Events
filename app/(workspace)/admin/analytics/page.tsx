@@ -47,7 +47,7 @@ export default async function PublicAnalyticsPage() {
           <div className="section-heading"><div><p className="eyebrow">Last 30 days</p><h2 id="analytics-intro">Public analytics</h2></div></div>
           <p className="field-help" style={{ margin: "4px 0 0" }}>
             {summary.from} to {summary.to}. Daily counts only. Nothing here identifies a person, a device, a search or a private event.
-            Visitors who send a Global Privacy Control or Do Not Track signal are not counted. Rows older than 400 days are deleted.
+            Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
           </p>
         </section>
 
