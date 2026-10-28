@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/prisma";
 import { checkInBlocksForAttendees } from "@/modules/background-checks/repository";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
+import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { Prisma } from "@prisma/client";
 
 const activeRegistrationStatusSet = new Set<string>(activeRegistrationStatuses);
@@ -78,14 +79,27 @@ async function checkedInByName(reader: Reader, eventId: string, attendeeId: stri
   return entry?.actor?.displayName ?? null;
 }
 
+/**
+ * #892: set when a check-in station records the action. The audit entry stays under the staff account that started
+ * the station, and carries which station it was so the history can tell desk work from station work.
+ */
+export type StationAuditContext = { station: { id: string; label: string } };
+
+export function stationAuditMetadata(context: StationAuditContext | undefined) {
+  return context
+    ? { channel: "CHECK_IN_STATION", station: { id: context.station.id, label: context.station.label } }
+    : null;
+}
+
 export async function checkInAttendee(
   eventId: string,
   attendeeId: string,
   actorUserId: string,
   idempotencyKey: string,
-  options: { sterlingOverrideReason?: string } = {},
+  options: { sterlingOverrideReason?: string; auditContext?: StationAuditContext } = {},
 ) {
   const prisma = getPrisma();
+  const stationMetadata = stationAuditMetadata(options.auditContext);
   // #874: decided before the transaction opens, so no query runs on a second pool connection while the
   // transaction holds its own (a deadlock with a one-connection pool, starvation at the arrival rush). A replay or
   // an already-checked-in answer ignores it.
@@ -165,7 +179,8 @@ export async function checkInAttendee(
             entityType: "RegistrationAttendee",
             entityId: attendeeId,
             correlationId,
-            summary: "Checked in an attendee.",
+            summary: options.auditContext ? `Checked in an attendee${stationSummarySuffix(options.auditContext.station.label)}.` : "Checked in an attendee.",
+            ...(stationMetadata ? { metadata: stationMetadata } : {}),
           },
         });
         if (sterlingState && overrideReason) {
@@ -179,7 +194,7 @@ export async function checkInAttendee(
               entityId: attendeeId,
               correlationId,
               summary: "Checked in an attendee without a current Sterling Volunteers check.",
-              metadata: { checkInId: checkIn.id, sterlingState, reason: overrideReason },
+              metadata: { checkInId: checkIn.id, sterlingState, reason: overrideReason, ...(stationMetadata ?? {}) },
             },
           });
         }

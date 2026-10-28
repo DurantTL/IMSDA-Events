@@ -26,6 +26,8 @@ describe("health data stays out of exports, the check-in book, communications an
       // (checked below); the check-in module itself stays free of health code.
       "app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts",
       "app/api/internal/outbox/sweep/route.ts",
+      // #892 station check-in; imports only snapshot-hooks.
+      "app/api/check-in-station/check-in/route.ts",
       // Shows the "Import health records" link only when the feature is on (#878); it imports the flag and nothing else.
       "app/(workspace)/admin/organizations/page.tsx",
       // Hides the Clubs Administrator's "Import health records" sidebar link while the feature is off (#1232); flag only.
@@ -87,7 +89,7 @@ describe("health data stays out of exports, the check-in book, communications an
   });
 
   it("lets the check-in route and the sweep call only the sealed-copy hooks, and nothing else reach sealed copies except the administrator routes (#924)", () => {
-    for (const path of ["app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts", "app/api/internal/outbox/sweep/route.ts"]) {
+    for (const path of ["app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts", "app/api/internal/outbox/sweep/route.ts", "app/api/check-in-station/check-in/route.ts"]) {
       const imports = [...read(path).matchAll(/from "@\/modules\/health-records\/([a-z-]+)"/g)].map((match) => match[1]);
       expect(imports, path).toEqual(["snapshot-hooks"]);
     }

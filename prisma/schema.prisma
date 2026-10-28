@@ -818,6 +818,8 @@ model User {
   announcements             Announcement[]
   pinnedAnnouncements       Announcement[]        @relation("AnnouncementPinnedBy")
   auditLogs                 AuditLog[]
+  startedCheckInStations    CheckInStation[]      @relation("CheckInStationStartedBy")
+  revokedCheckInStations    CheckInStation[]      @relation("CheckInStationRevokedBy")
   archivedEvents            Event[]               @relation("EventArchivedBy")
   moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
   moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
@@ -1769,6 +1771,7 @@ model Event {
   announcementOptOuts                 EmailAnnouncementOptOut[]
   unsubscribeTokens                   EmailUnsubscribeToken[]
   auditLogs                           AuditLog[]
+  checkInStations                     CheckInStation[]
   importRuns                          ImportRun[]
   awardItems                          EventAwardItem[]
   registrationForms                   RegistrationForm[]
@@ -3574,6 +3577,9 @@ model Payment {
   /// reservation counts as held exactly while a deposit payment's net amount is above zero.
   isDeposit         Boolean       @default(false)
   receivedAt        DateTime?
+  /// A check-in station's cash/check entry (#892): one key per submission attempt, so a retry after a lost
+  /// response replays the saved payment instead of recording a second. Null for every other payment.
+  idempotencyKey    String?       @unique
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -10595,4 +10601,34 @@ model RegistrationLedgerEntry {
   @@unique([sourceType, sourceId, kind])
   @@index([registrationId, createdAt])
   @@index([eventId])
+}
+
+/**
+ * A staff-run check-in station (#892): a tablet or laptop at the arrival desk that a signed-in staff member starts
+ * for one event. The device holds an opaque cookie whose hash is `tokenHash`; the staff session is never copied
+ * onto it. A station keeps working without the staff idle timeout until `expiresAt` (the event's end), but it is
+ * only as powerful as its starter is right now: every request re-checks the starter's account and event
+ * permissions. Stopped from the device (`stoppedAt`) or revoked from the staff workspace (`revokedAt`).
+ */
+model CheckInStation {
+  id              String    @id @default(cuid())
+  eventId         String
+  startedByUserId String
+  /// Short staff-entered name, e.g. "Front desk tablet". Shown in the station list and in audit entries.
+  label           String    @default("")
+  tokenHash       String    @unique
+  expiresAt       DateTime
+  lastSeenAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  stoppedAt       DateTime?
+  revokedAt       DateTime?
+  revokedByUserId String?
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  startedBy User  @relation("CheckInStationStartedBy", fields: [startedByUserId], references: [id], onDelete: Cascade)
+  revokedBy User? @relation("CheckInStationRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, revokedAt])
+  @@index([startedByUserId])
+  @@index([revokedByUserId])
 }

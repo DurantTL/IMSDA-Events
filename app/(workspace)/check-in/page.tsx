@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
+import { CheckInStationsPanel } from "@/components/check-in-stations-panel";
 import { CheckInWorkspace } from "@/components/check-in-workspace";
 import { DeskLocationSelect, deskLocationLabel } from "@/components/desk-location-select";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { listActiveStations } from "@/modules/checkin-stations/repository";
 import { findDefaultCheckInEventId } from "@/modules/checkin/default-event";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -48,10 +50,11 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
   // #825: the live list asks other devices' changes from this moment (minus a
   // safety overlap), so nothing checked in while the page loaded is missed.
   const loadedAt = new Date().toISOString();
-  const [registrations, flagged, clubs] = await Promise.all([
+  const [registrations, flagged, clubs, stations] = await Promise.all([
     listRegistrations(event.id, { statuses: activeRegistrationStatuses, locationId }),
     backgroundFlaggedAttendeeIds(event.id),
     listClubCheckInInfo(event.id, { locationId }),
+    listActiveStations(event.id),
   ]);
   // #757: the client gets a projection of what the desk renders, never the full
   // registration records (which carry every form answer).
@@ -59,5 +62,6 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
   return <>
     <DeskLocationSelect basePath="/check-in" locations={locations} params={{ event: event.id }} selectedId={locationId} />
     <CheckInWorkspace key={`${event.id}:${locationId ?? "all"}`} locationName={selected ? deskLocationLabel(selected) : undefined} eventName={event.name} eventId={event.id} loadedAt={loadedAt} initialArrivals={arrivals} canCheckIn={permissions.includes("MANAGE_CHECK_IN")} backgroundFlaggedAttendeeIds={[...flagged]} clubs={clubs} />
+    <CheckInStationsPanel eventId={event.id} stations={stations} timeZone={event.timezone || "America/Chicago"} />
   </>;
 }

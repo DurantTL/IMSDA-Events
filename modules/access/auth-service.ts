@@ -399,6 +399,11 @@ export async function resetPassword(token: string, password: string) {
       where: { userId: reset.userId, revokedAt: null },
       data: { revokedAt: now },
     });
+    // Check-in stations (#892) hold their own cookie, so they end with the sessions.
+    await tx.checkInStation.updateMany({
+      where: { startedByUserId: reset.userId, revokedAt: null, stoppedAt: null },
+      data: { revokedAt: now },
+    });
     // A reset (often after a suspected compromise) removes every way in, not
     // only the password: staff passkeys are revoked too, and added again after
     // signing in (#453). A password lockout still blocks passkey sign-in.

@@ -122,6 +122,8 @@ const pbeDraftKey = "0123456789abcdef0123456789abcdef";
 // and the private link opens it), and requests in several states: the registrant's panel and the staff queue (#170).
 const cancelEventId = `${P}_cancel_event`;
 const cancelEventSlug = `${P}-cancel-weekend`;
+// The check-in station (#892) only runs while its event does, so it gets its own event dated around today.
+const stationEventId = `${P}_station_event`;
 // A general event with personal staff invitation links (#804, #1027): the invite list in every status, and a link form that also
 // asks the event's own attendee questions.
 const staffInviteEventId = `${P}_staffinv_event`;
@@ -157,7 +159,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "station" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -361,6 +363,21 @@ const pages: PageSpec[] = [
   staff("event-settings", "/more/event-settings"),
   staff("team-results", "/more/team-results"),
   staff("check-in", "/check-in"),
+  // The staff-run check-in station (#892): a device with its own station cookie, no staff session. First the
+  // code entry, then a looked-up registration (its family list and payment panel).
+  { name: "station-check-in-ready", path: "/check-in-station", role: "station", expectText: /Check-in station/i },
+  {
+    name: "station-check-in-family",
+    path: "/check-in-station",
+    role: "station",
+    expectText: /Check-in station/i,
+    prepare: async (page) => {
+      await page.getByLabel(/confirmation code/i).fill("MOBSTA1");
+      await page.getByRole("button", { name: /Find family/i }).click();
+      await page.getByRole("status").first().waitFor({ timeout: 5000 }).catch(() => undefined);
+      await page.waitForTimeout(500);
+    },
+  },
   // The printable name badge sheets (#981): the sheet preview must not make the page scroll sideways.
   staff("check-in-badges", "/check-in/badges"),
   staff("communications", "/communications"),
@@ -918,6 +935,53 @@ async function cleanupHistoryAccount(prisma: PrismaClient) {
 }
 
 /** Removes the cancellation event and what hangs off it (requests, their timeline, calculations, the registration and its people). */
+/**
+ * An unpublished event running today with one confirmed three-person registration (long names) that still owes money, so the
+ * check-in station (#892) shows its real family list and payment panel. Idempotent.
+ */
+async function seedStationEvent(prisma: PrismaClient) {
+  if (await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } })) return;
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  const today = calendarDateIn(new Date());
+  const registrationId = `${P}_reg_station`;
+  await prisma.$transaction(async (tx) => {
+    await tx.event.create({
+      data: {
+        id: stationEventId, slug: `${P}-station-weekend`, name: "Mobilecheck Station Weekend",
+        startsAt: new Date(`${addDays(today, -1)}T12:00:00Z`), endsAt: new Date(`${addDays(today, 1)}T12:00:00Z`), timezone: "America/Chicago",
+        // Unpublished: a station does not need it, and a published event dated today would join the public calendar's pages.
+        isPublished: false, billingMode: "ATTENDEE_PAY",
+      },
+    });
+    await tx.eventMembership.create({ data: { eventId: stationEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+    const holder = await tx.person.create({ data: { id: `${P}_person_station_0`, firstName: "Bartholomew-Alexander", lastName: "Quillfeather-Hargreaves-Montgomery", normalizedEmail: `${P}.station.0@example.test` } });
+    await tx.registration.create({
+      data: {
+        id: registrationId, eventId: stationEventId, accountHolderPersonId: holder.id, confirmationCode: "MOBSTA1", totalAmount: 525, status: "CONFIRMED", submittedAt: new Date(),
+        contactSnapshot: { firstName: holder.firstName, lastName: holder.lastName, email: `${P}.station.0@example.test`, phone: "" },
+      },
+    });
+    for (const [index, [firstName, lastName]] of [[holder.firstName, holder.lastName], ["Wolfeschlegelsteinhausenbergerdorff", "Oyelaran-Whitcombe"], ["Ng", "Smith"]].entries()) {
+      const personId = index === 0 ? holder.id : (await tx.person.create({ data: { id: `${P}_person_station_${index}`, firstName, lastName } })).id;
+      await tx.registrationAttendee.create({
+        data: { id: `${P}_station_attendee_${index}`, eventId: stationEventId, registrationId, personId, attendeeType: index === 2 ? "CHILD" : "ADULT", position: index, profileSnapshot: { firstName, lastName } },
+      });
+    }
+    await tx.payment.create({ data: { eventId: stationEventId, registrationId, amount: 175, status: "SUCCEEDED", method: "CASH", receivedAt: new Date() } });
+  });
+}
+
+async function cleanupStationEvent(prisma: PrismaClient) {
+  if (!(await prisma.event.findUnique({ where: { id: stationEventId }, select: { id: true } }))) return;
+  const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
+  await prisma.auditLog.deleteMany({ where: { eventId: stationEventId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await removeEventOwnedRows(tx, stationEventId);
+  }, { timeout: 30_000 });
+}
+
 async function cleanupCancellationEvent(prisma: PrismaClient) {
   if (!(await prisma.event.findUnique({ where: { id: cancelEventId }, select: { id: true } }))) return;
   const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
@@ -1256,10 +1320,12 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
   const mine = { startsWith: `${P}_` };
+  await prisma.checkInStation.deleteMany({ where: { label: `${P} station` } }).catch((error: Error) => console.error(`Could not remove the synthetic check-in station: ${error.message}`));
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
   await cleanupHistoryAccount(prisma).catch((error: Error) => console.error(`Could not remove the synthetic history events: ${error.message}`));
+  await cleanupStationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic station event: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await cleanupInformationForm(prisma).catch((error: Error) => console.error(`Could not remove the synthetic information form: ${error.message}`));
   await prisma.$transaction([
@@ -1888,6 +1954,19 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
   const cookie = async (role: SignedInRole) => {
+    if (role === "station") {
+      // A station is a device cookie, not a session: mint one for the seeded event admin directly.
+      const { createOpaqueToken, hashOpaqueToken } = await import("../modules/access/tokens");
+      const { CHECK_IN_STATION_COOKIE_NAME } = await import("../modules/checkin-stations/domain");
+      const admin = await prisma.user.findUnique({ where: { email: "admin@imsda-events.test" } });
+      if (!admin) throw new Error("The seeded account admin@imsda-events.test is missing. Run `npm run db:seed` first.");
+      const token = createOpaqueToken();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await prisma.checkInStation.create({
+        data: { eventId: stationEventId, startedByUserId: admin.id, label: `${P} station`, tokenHash: hashOpaqueToken(token), expiresAt },
+      });
+      return { name: CHECK_IN_STATION_COOKIE_NAME, value: token, expires: Math.floor(expiresAt.getTime() / 1000) };
+    }
     if (role === "director" || role === "registrar" || role === "reporter" || role === "area" || role === "attendee" || role === "attendee-history") {
       const accountIds = { director: `${P}_account_director`, registrar: `${P}_account_registrar`, reporter: `${P}_account_reporter`, area: `${P}_account_area`, attendee: `${P}_account_attendee`, "attendee-history": `${P}_account_history` } as const;
       const accountId = accountIds[role];
@@ -1912,6 +1991,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
     area: await cookie("area"),
     attendee: await cookie("attendee"),
     "attendee-history": await cookie("attendee-history"),
+    station: await cookie("station"),
   };
   return cookies;
 }
@@ -4163,6 +4243,7 @@ async function main() {
     pages.push(...pbePages(await seedPbeEvent(prisma)));
     pages.push(...await seedCancellationEvent(prisma));
     pages.push(...await seedHistoryAccount(prisma));
+    await seedStationEvent(prisma);
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedEventTemplatePages(prisma));
@@ -4174,7 +4255,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen"] as Role[]) {
+      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen", "station"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

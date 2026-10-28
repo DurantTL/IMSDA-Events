@@ -72,11 +72,24 @@ export async function revokeDatabaseSession(token: string | undefined) {
   });
 }
 
+/**
+ * A check-in station (#892) holds its own cookie, so revoking a person's staff sessions never reached it. Every place
+ * that ends all of someone's sessions ends their stations too.
+ */
+export async function revokeUserCheckInStations(userId: string, revokedByUserId: string | null = null) {
+  const result = await getPrisma().checkInStation.updateMany({
+    where: { startedByUserId: userId, revokedAt: null, stoppedAt: null },
+    data: { revokedAt: new Date(), revokedByUserId },
+  });
+  return result.count;
+}
+
 export async function revokeAllUserSessions(userId: string) {
   await getPrisma().userSession.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+  await revokeUserCheckInStations(userId);
 }
 
 /**
@@ -93,6 +106,8 @@ export async function revokeOtherUserSessions(userId: string, keepToken: string 
     },
     data: { revokedAt: new Date() },
   });
+  // A station is never this device's staff session, so signing out other devices ends all of them.
+  await revokeUserCheckInStations(userId);
   return result.count;
 }
 

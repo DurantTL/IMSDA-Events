@@ -7,6 +7,8 @@ import {
 } from "@/modules/payments/deposit-domain";
 import { enqueueRefundNoticeMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
+import { findPaymentReplay } from "@/modules/payments/payment-replay";
+import { stationSummarySuffix } from "@/modules/checkin-stations/domain";
 import { logError } from "@/lib/logger";
 import {
   flushHostedDeletionsAfterResponse,
@@ -14,9 +16,11 @@ import {
 } from "@/modules/payments/square-hosted-invalidation";
 
 export class PaymentOperationError extends Error {
-  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | StaffDepositProblem) {
+  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | "PAYMENT_IDEMPOTENCY_KEY_REUSED" | StaffDepositProblem) {
     super(
-      code === "PAYMENT_CONFLICT"
+      code === "PAYMENT_IDEMPOTENCY_KEY_REUSED"
+        ? "This payment key was already used for a different payment. Start the payment again."
+        : code === "PAYMENT_CONFLICT"
         ? "Another payment changed this registration at the same time. Review the registration and try again."
         : code === "DEPOSIT_NOT_OFFERED"
         ? "This registration's form does not offer a reservation deposit."
@@ -44,9 +48,19 @@ export async function recordManualPayment(
   eventId: string,
   registrationId: string,
   actorUserId: string,
-  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean },
+  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean; idempotencyKey?: string },
+  /** #892: set by a check-in station; the entry stays under the starter's account and names the station. */
+  auditContext?: { station: { id: string; label: string } },
 ) {
   const prisma = getPrisma();
+  const stationMetadata = auditContext
+    ? { channel: "CHECK_IN_STATION", station: { id: auditContext.station.id, label: auditContext.station.label } }
+    : null;
+  const stationSummary = auditContext ? stationSummarySuffix(auditContext.station.label) : "";
+  // A retry of a payment that was already saved answers with the registration as it stands: no second Payment row, no
+  // second audit entry, and no balance check (the first save already used the balance up).
+  const replayed = await findPaymentReplay(prisma, eventId, registrationId, input);
+  if (replayed) return getRegistrationById(eventId, registrationId);
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
     include: {
@@ -95,6 +109,8 @@ export async function recordManualPayment(
       WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
       FOR NO KEY UPDATE
     `;
+    // Two submissions of one attempt racing each other: the loser sees the winner's row here and does nothing.
+    if (await findPaymentReplay(tx, eventId, registrationId, input)) return;
     const locked = await tx.registration.findFirst({
       where: { id: registrationId, eventId },
       select: { status: true, totalAmount: true },
@@ -118,6 +134,7 @@ export async function recordManualPayment(
         method: input.method,
         externalReference: input.reference || null,
         receivedAt: new Date(),
+        idempotencyKey: input.idempotencyKey ?? null,
       },
     });
     await tx.auditLog.create({
@@ -129,11 +146,11 @@ export async function recordManualPayment(
         entityId: payment.id,
         correlationId: crypto.randomUUID(),
         summary: isDeposit
-          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held.`
-          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
+          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held${stationSummary}.`
+          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}${stationSummary}.`,
         metadata: isDeposit
-          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true }
-          : { amountCents: input.amountCents },
+          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true, ...(stationMetadata ?? {}) }
+          : { amountCents: input.amountCents, ...(stationMetadata ?? {}) },
       },
     });
     // The balance moved, so a Pay on Square link quoted against the old one must not stay payable (#327).

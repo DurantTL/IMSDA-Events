@@ -1058,3 +1058,19 @@ export async function checkInformationFormRateLimit(request: Request, formKey: s
     { policy: `information-form.${operation}.client-form`, limit: informationFormBudgets[operation].clientForm, windowSeconds: fifteenMinutes, identifierHashes: [client, form] },
   ], configuration);
 }
+
+/**
+ * Code lookups at a staff check-in station (#892), counted per station so one busy venue Wi-Fi address with
+ * several stations never shares a budget. A scanner types one code per arrival, so a minute's worth is generous
+ * for a line and still stops a script from walking confirmation codes.
+ */
+export async function checkCheckInStationLookupRateLimit(stationId: string, limitPerMinute = 60) {
+  const configuration = getRateLimitConfiguration();
+  const station = hashRateLimitIdentifier("check-in-station", stationId, configuration);
+  return evaluate([{
+    policy: "check-in-station.lookup",
+    limit: limitPerMinute,
+    windowSeconds: 60,
+    identifierHashes: [station],
+  }], configuration);
+}
