@@ -6,6 +6,8 @@ import { useId, useState, type FormEvent } from "react";
 import { UserPlus, X } from "lucide-react";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { RoleDetails } from "@/components/role-details";
+import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
@@ -172,18 +174,21 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                     <>
                       <label className={styles.check}>
                         <input checked={systemAdmin} onChange={(event) => setSystemAdmin(event.target.checked)} type="checkbox" />
-                        <span>System administrator<small>Administers every event and manages system roles.</small></span>
+                        <span>{systemRoleText.SYSTEM_ADMIN.name}<small>{systemRoleText.SYSTEM_ADMIN.summary}</small></span>
                       </label>
+                      <RoleDetails role={systemRoleText.SYSTEM_ADMIN} />
                       <label className={styles.check}>
                         <input checked={clubsAdministrator} onChange={(event) => setClubsAdministrator(event.target.checked)} type="checkbox" />
-                        <span>Clubs Administrator<small>The club areas for every club.</small></span>
+                        <span>{systemRoleText.CLUBS_ADMIN.name}<small>{systemRoleText.CLUBS_ADMIN.summary}</small></span>
                       </label>
+                      <RoleDetails role={systemRoleText.CLUBS_ADMIN} />
                     </>
                   ) : null}
                   <label className={styles.check}>
                     <input checked={areaCoordinator} onChange={(event) => setAreaCoordinator(event.target.checked)} type="checkbox" />
-                    <span>Area Coordinator<small>Sees every club, view only.</small></span>
+                    <span>{systemRoleText.AREA_COORDINATOR.name}<small>{systemRoleText.AREA_COORDINATOR.summary}</small></span>
                   </label>
+                  <RoleDetails role={systemRoleText.AREA_COORDINATOR} />
                   {errors.access ? <p className={styles.fieldError} id="invite-access-error" role="alert">{errors.access}</p> : null}
                 </fieldset>
 

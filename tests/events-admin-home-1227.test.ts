@@ -274,7 +274,7 @@ describe("the page", () => {
     expect(html).toMatch(/<a aria-current="page" href="\/events-admin">Overview<\/a>/);
     for (const href of ["#your-events", "/people?event=event-one", "/more/event-content?event=event-one", "/more/kitchen-report?event=event-one", "/communications?event=event-one"]) expect(html).toContain(`href="${href}"`);
     expect(html).toContain("Event administration");
-    expect(html).toContain("You will only see events assigned to you; club records and club events are not part of this role.");
+    expect(html).toContain("Your role: Events Administrator. Runs only the events where they are an Event administrator; club records and club events are not part of it.");
     expect(html).toContain("Upcoming events you administer. Archived events are not counted.");
     expect(html).toContain("Across your 2 events");
     expect(html).toContain("Open balances and incomplete forms, across your events");
