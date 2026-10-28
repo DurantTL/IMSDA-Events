@@ -126,12 +126,12 @@ async function main() {
   const director = { accountId: `${P}-director` };
   const pick = (name: string, classIds: string[], at: Date) => setClassSelections(orgId, eventId, director, { [attendee[name]!]: classIds }, at);
 
-  // The first summary window after now: the morning after, 6:05 AM Central.
-  const tomorrowKey = centralDateKey(new Date(real.getTime() + DAY));
-  const morning1 = new Date(centralInstant(tomorrowKey, 6).getTime() + 5 * 60 * 1000);
-  const morning2 = new Date(morning1.getTime() + DAY);
-  const morning3 = new Date(morning2.getTime() + DAY);
-  const morning4 = new Date(morning3.getTime() + DAY);
+  // Each morning is 6:05 AM Central on a Central calendar day, never a fixed 24-hour step: a daylight saving change (1 Nov)
+  // would otherwise land a morning at 5:05, before the summary window opens. The first is the morning after now.
+  const noonToday = centralInstant(centralDateKey(real), 12);
+  const morningOn = (days: number) => new Date(centralInstant(centralDateKey(new Date(noonToday.getTime() + days * DAY)), 6).getTime() + 5 * 60 * 1000);
+  const [morning1, morning2, morning3, morning4] = [1, 2, 3, 4].map(morningOn) as [Date, Date, Date, Date];
+  const tomorrowKey = centralDateKey(morning1);
   assert(classSummaryWindow(morning1).due && !classSummaryWindow(new Date(morning1.getTime() - 10 * 60 * 1000)).due, "the window opens at 6:00 AM Central plus a short grace");
 
   // ---------------------------------------------------------------- each real path writes its change rows
