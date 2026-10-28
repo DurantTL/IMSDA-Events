@@ -80,13 +80,13 @@ export const eventRoleText: Record<EventRole, RoleText> = {
   REGISTRATION_MANAGER: {
     name: "Registration manager",
     summary: "Looks after people, registrations and forms for the event.",
-    can: ["Add and change registrations.", "Edit the event's forms.", "See people's contact details and reports."],
+    can: ["Add and change registrations.", "Edit the event's forms.", "See attendees' details and reports."],
     cannot: ["Take payments or give refunds.", "Change the event's settings or staff."],
   },
   FINANCE_MANAGER: {
     name: "Finance manager",
     summary: "Looks after payments, refunds and balances for the event.",
-    can: ["Record payments and give refunds.", "Prepare invoice drafts.", "See balances, people's contact details and reports."],
+    can: ["Record payments and give refunds.", "Prepare invoice drafts.", "See balances, attendees' details and reports."],
     cannot: ["Finalize invoices, unless also given that extra.", "Change registrations, settings or staff."],
   },
   COMMUNICATIONS_MANAGER: {
@@ -98,7 +98,7 @@ export const eventRoleText: Record<EventRole, RoleText> = {
   CHECK_IN_STAFF: {
     name: "Check-in staff",
     summary: "Finds people as they arrive and checks them in.",
-    can: ["Search for arriving people.", "Check people in and undo a check-in."],
+    can: ["Search for arriving people and see their details.", "Check people in and undo a check-in."],
     cannot: ["Change registrations or payments."],
   },
   READ_ONLY_STAFF: {
