@@ -4,7 +4,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("next/link", () => ({
+vi.mock("next/link", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/link")>(),
   default: ({ children, href }: { children: React.ReactNode; href: string }) => createElement("a", { href }, children),
 }));
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { redirect } from "next/navigation";
 import { LayoutGrid, ClipboardList, ChartNoAxesColumn, CalendarDays } from "lucide-react";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";

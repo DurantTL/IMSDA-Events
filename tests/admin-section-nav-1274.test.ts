@@ -218,14 +218,14 @@ describe("the rendered header", () => {
     const html = render(nav("system", "/admin/people/staff/u1"));
     expect(html).toContain("System administration");
     expect(html).toContain('aria-label="System administration sections"');
-    expect(html).toMatch(/<a aria-current="true" href="\/admin\/people">People<\/a>/);
+    expect(html).toMatch(/<a aria-current="true" href="\/admin\/people">People</);
     expect(html).not.toContain('aria-current="page"');
-    expect(render(nav("system", "/admin/people"))).toMatch(/<a aria-current="page" href="\/admin\/people">People<\/a>/);
+    expect(render(nav("system", "/admin/people"))).toMatch(/<a aria-current="page" href="\/admin\/people">People</);
   });
 
   it("draws the back link as a plain link to the parent, and none on a main page", () => {
     const deeper = render(nav("clubs", "/admin/clubs/import"));
-    expect(deeper).toMatch(/<a [^>]*href="\/admin\/clubs\/summary"[^>]*>.*Back to Club summary<\/a>/);
+    expect(deeper).toMatch(/<a [^>]*href="\/admin\/clubs\/summary"[^>]*>.*Back to Club summary</);
     expect(deeper).not.toContain("history.back");
     expect(deeper.match(/Back to/g)).toHaveLength(1);
     expect(render(nav("clubs", "/admin/clubs/summary"))).not.toContain("Back to");

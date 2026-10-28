@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ComponentProps } from "react";
+import { useTransition, type ComponentProps } from "react";
 import { handleGuardedLinkClick } from "@/components/link-guard";
+import { NavigationPending } from "@/components/navigation-link";
 
 /**
  * A link that runs the existing unsaved-changes guard (#647) before it changes
@@ -17,6 +18,7 @@ import { handleGuardedLinkClick } from "@/components/link-guard";
  */
 export function GuardedLink({
   href,
+  children,
   onClick,
   onNavigate,
   replace,
@@ -28,6 +30,7 @@ export function GuardedLink({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
+  const [pending, startNavigation] = useTransition();
   return (
     <Link
       {...rest}
@@ -42,11 +45,16 @@ export function GuardedLink({
           download: (rest as { download?: unknown }).download,
           run: () => {
             onNavigate?.();
-            if (replace) router.replace(href, { scroll });
-            else router.push(href, { scroll });
+            startNavigation(() => {
+              if (replace) router.replace(href, { scroll });
+              else router.push(href, { scroll });
+            });
           },
         });
       }}
-    />
+    >
+      {children}
+      <NavigationPending pending={pending} />
+    </Link>
   );
 }

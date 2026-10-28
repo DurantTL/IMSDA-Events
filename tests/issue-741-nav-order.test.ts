@@ -73,7 +73,7 @@ const withoutClosedGroups = (nav: string) => nav.replace(/<div class="nav-group-
 
 function tokensOf(nav: string): string[] {
   const tokens: string[] = [];
-  for (const match of nav.matchAll(/<button [^>]*class="nav-group-toggle"[^>]*><span>([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)) {
+  for (const match of nav.matchAll(/<button [^>]*class="nav-group-toggle"[^>]*><span>([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span>/g)) {
     // The pinned Help & learning link (#1077) follows More for everyone; tests/help-learning-1077.test.ts covers it.
     if (match[2] === "Help &amp; learning") continue;
     tokens.push(match[1] ? `# ${match[1]}` : match[2]);
@@ -96,7 +96,7 @@ function phoneTabs(viewer: Viewer): { labels: string[]; active: string[] } {
   const bar = markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
   const labels: string[] = [];
   const active: string[] = [];
-  for (const match of bar.matchAll(/<a ([^>]*)>.*?<span>([^<]+)<\/span><\/a>/g)) {
+  for (const match of bar.matchAll(/<a ([^>]*)>.*?<span>([^<]+)<\/span>/g)) {
     labels.push(match[2]);
     if (match[1].includes('class="active"')) active.push(match[2]);
   }
@@ -238,16 +238,16 @@ describe("collapsible groups (#964)", () => {
   it("opens Set up on the Event features page, lights that item, and leaves More alone (#965)", () => {
     const viewer = { ...eventAdmin, pathname: `${eventFeaturesRoute}` };
     expect(toggle(viewer, "setup")).toContain('aria-expanded="true"');
-    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
     expect(active).toEqual(["Event features"]);
     // A page below it lights the same item.
-    const below = [...navMarkup({ ...viewer, pathname: `${eventFeaturesRoute}/anything` }).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    const below = [...navMarkup({ ...viewer, pathname: `${eventFeaturesRoute}/anything` }).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
     expect(below).toEqual(["Event features"]);
   });
 
   it("lights More, not Event features, on the Event modules page at /more (#965)", () => {
     const viewer = { ...eventAdmin, pathname: "/more" };
-    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
     expect(active).toEqual(["More"]);
   });
 
@@ -370,7 +370,7 @@ describe("Operational health and desktop highlight (#741 slice 4)", () => {
   function activeItems(pathname: string) {
     const markup = render({ ...eventAdmin, pathname });
     const nav = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
-    return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
   }
 
   it("highlights Operational reports and Operational health on their own pages, not More", () => {
@@ -390,7 +390,7 @@ describe("Operational health and desktop highlight (#741 slice 4)", () => {
   it("lights More for Imports when the viewer cannot see Registrations (#964)", () => {
     const active = (permissions: readonly EventPermission[]) => {
       const nav = navMarkup({ permissions, pathname: "/imports" });
-      return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+      return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
     };
     expect(active(["MANAGE_IMPORTS"])).toEqual(["More"]);
     expect(active(["MANAGE_IMPORTS", "VIEW_SENSITIVE_DATA"])).toEqual(["Registrations"]);

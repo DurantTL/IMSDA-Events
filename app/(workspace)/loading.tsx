@@ -6,8 +6,8 @@
  */
 export default function WorkspaceLoading() {
   return (
-    <div aria-busy="true" className="content-skeleton" role="status">
-      <span className="sr-only">Loading the page…</span>
+    <div aria-busy="true" className="content-skeleton" role="status" data-workspace-loading>
+      <p className="workspace-loading-label">Loading the page…</p>
       <div aria-hidden="true" className="content-skeleton-bar content-skeleton-title" />
       <div aria-hidden="true" className="content-skeleton-bar content-skeleton-line" />
       <div aria-hidden="true" className="content-skeleton-grid">

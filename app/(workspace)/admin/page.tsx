@@ -1,7 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { systemRoleText } from "@/modules/access/role-descriptions";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,

@@ -99,7 +99,7 @@ describe("what it shows", () => {
     expect(html).toContain("Club administration");
     expect(html).toContain("All clubs and applications");
     expect(html).toContain("Signed in as <strong>Synthetic Admin</strong> (admin@example.test)");
-    expect(html).toMatch(/<a aria-current="page" href="\/admin\/clubs\?year=[\d-]+">Overview<\/a>/);
+    expect(html).toMatch(/<a aria-current="page" href="\/admin\/clubs\?year=[\d-]+">Overview</);
     expect(html).toContain("New clubs (2)");
     expect(html).toContain("1 of 2");
     expect(html).toContain("<strong>20</strong> roster members");

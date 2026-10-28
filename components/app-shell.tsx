@@ -20,6 +20,7 @@ import { ClubsYearSelector } from "@/components/clubs-year-selector";
 import { requestedClubYear } from "@/components/clubs-year-selector-model";
 import { DestinationSearch } from "@/components/destination-search";
 import { GuardedLink } from "@/components/guarded-link";
+import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { SystemPhoneMenu } from "@/components/system-phone-menu";
 import { moduleDestinationStates } from "@/components/module-destination-states";
 import { activeWorkContext, returnToSystemHref, showsSystemChrome, systemMenuGroups, workContextSwitches } from "@/components/work-context-model";
@@ -383,7 +384,7 @@ export function AppShell({
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
         <GuardedLink className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
           <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
+          <span className="sidebar-link-label"><strong>IMSDA</strong><small>Events</small></span>
         </GuardedLink>
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
@@ -400,7 +401,7 @@ export function AppShell({
               <span className="system-navigation-icon">
                 <ShieldCheck aria-hidden="true" size={19} strokeWidth={1.9} />
               </span>
-              <span>
+              <span className="sidebar-link-label">
                 <strong>System management</strong>
                 <small>All events and integrations</small>
               </span>
@@ -677,7 +678,7 @@ export function AppShell({
             </label>
           )}
         </header>
-        <div className="workspace-content" id="workspace-content">
+        <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
           {showAutoSelectNotice && defaultEvent && (
             <EventAutoSelectNotice
               eventName={defaultEvent.name}
@@ -685,7 +686,7 @@ export function AppShell({
             />
           )}
           {children}
-        </div>
+        </WorkspaceContent>
       </main>
 
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
