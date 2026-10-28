@@ -64,6 +64,7 @@ export const fieldTypeLabels: Record<RegistrationFormField["type"], string> = {
   RANKED_CHOICE: "Ranked choice",
   CHECKBOX: "Checkbox",
   ACKNOWLEDGMENT: "Recorded acknowledgment",
+  SIGNATURE: "Signature (typed name)",
   DATE: "Date",
   NUMBER: "Number",
   CALCULATED: "Automatic fee",

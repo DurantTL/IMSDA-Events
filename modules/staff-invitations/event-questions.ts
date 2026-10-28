@@ -56,7 +56,7 @@ export function staffQuestionExclusion(field: RegistrationFormField, sectionTitl
   if (field.availabilityMode === "CAPACITY") return "capacity-limited";
   if (NAME_KEYS.has(field.key) || AGE_KEYS.has(field.key) || TYPE_KEYS.has(field.key) || field.optionSource === "ATTENDEE_TYPES") return "already-known";
   // An address answer is a structured object, and a directory-sourced list (churches, clubs) is read from the directory, not the form.
-  if (field.type === "ACKNOWLEDGMENT" || field.type === "ADDRESS" || field.autoDate || field.optionSource) return "unsupported";
+  if (field.type === "ACKNOWLEDGMENT" || field.type === "SIGNATURE" || field.type === "ADDRESS" || field.autoDate || field.optionSource) return "unsupported";
   // An explicit "not sensitive" flag can only ever add exclusions here: health-type wording and birth dates stay off the form.
   if (isMedicalField(field, sectionTitle)) return "sensitive";
   return null;

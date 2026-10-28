@@ -71,7 +71,7 @@ export function conditionFieldChoices(definition: RegistrationFormDefinition) {
   for (const section of definition.sections) {
     for (const field of section.fields) {
       if (field.scope !== "REGISTRATION" || excluded.has(field.key) || seen.has(field.key)) continue;
-      if (field.type === "ACKNOWLEDGMENT" || field.type === "ADDRESS" || field.type === "CALCULATED") continue;
+      if (field.type === "ACKNOWLEDGMENT" || field.type === "SIGNATURE" || field.type === "ADDRESS" || field.type === "CALCULATED") continue;
       seen.add(field.key);
       choices.push({ key: field.key, label: field.label, options: field.options });
     }

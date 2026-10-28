@@ -129,6 +129,23 @@ function trustedClientIp(
   return normalizeIpCandidate(chain[clientIndex]);
 }
 
+/**
+ * The client's IP address as the configured trusted proxy reports it (#1265), for signature evidence only. Null when proxy
+ * trust is not configured or the header is missing or invalid: a raw forwarding header is never believed on its own.
+ */
+export function trustedClientIpAddress(
+  request: Request,
+  configuration?: RateLimitConfiguration,
+) {
+  try {
+    return trustedClientIp(request, configuration ?? getRateLimitConfiguration());
+  } catch (error) {
+    // A misconfigured proxy setting must not fail a registration; the address is simply not recorded.
+    if (error instanceof RateLimitConfigurationError) return null;
+    throw error;
+  }
+}
+
 export function hashRateLimitIdentifier(
   namespace: string,
   value: string,

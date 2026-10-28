@@ -38,11 +38,13 @@ import {
 import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
 import { type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { signatureFields } from "@/modules/signatures/fields";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import {
   PublicRegistrationError,
   getPublicRegistrationExperience,
   submitPublicRegistration,
+  type SubmissionRequestContext,
   type ClubSubmissionContext,
 } from "@/modules/forms/public-repository";
 import {
@@ -1057,7 +1059,7 @@ export async function saveClubRegistrationDraft(
   // A recorded acknowledgment (#150) is given at submission, never carried in a saved draft: the server copy drops it, as the
   // browser's own draft does.
   const draftForm = await publishedClubForm(eventId);
-  const acknowledgmentKeys = new Set(draftForm ? acknowledgmentFields(draftForm.definition).map((field) => field.key) : []);
+  const acknowledgmentKeys = new Set(draftForm ? [...acknowledgmentFields(draftForm.definition), ...signatureFields(draftForm.definition)].map((field) => field.key) : []);
   const withoutAcknowledgments = <T,>(answers: Record<string, T>) => (
     acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
   );
@@ -1287,7 +1289,7 @@ export async function submitClubRegistration(
   actor: ClubRegistrationActor,
   input: PublicRegistrationInput,
   now = new Date(),
-  options: { locationId?: string | null; report?: ClubSubmissionContext["report"]; registered?: ClubSubmissionContext["registered"]; teamName?: string | null; draftKey?: string } = {},
+  options: { locationId?: string | null; report?: ClubSubmissionContext["report"]; registered?: ClubSubmissionContext["registered"]; teamName?: string | null; draftKey?: string; requestContext?: SubmissionRequestContext } = {},
 ) {
   const event = await requireClubEvent(eventId);
   const form = await publishedClubForm(event.id);
@@ -1306,7 +1308,7 @@ export async function submitClubRegistration(
     ...(options.report ? { report: options.report } : {}),
     ...(options.registered ? { registered: options.registered } : {}),
     prepareAttendees: clubAttendeePreparer(organizationId, actor, draftKey),
-  });
+  }, options.requestContext);
 }
 
 export function recordFromJson(value: unknown): Record<string, unknown> {

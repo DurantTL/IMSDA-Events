@@ -54,6 +54,7 @@
     "test:consent-policies": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-consent-policies.ts",
     "test:guardian-authority": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-guardian-authority.ts",
     "test:acknowledgments": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-acknowledgments.ts",
+    "test:signatures": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-signatures.ts",
     "test:square-hosted-link": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-square-hosted-link.ts",
     "test:cancellation-policy": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-policy.ts",
     "test:cancellation-requests": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-requests.ts",

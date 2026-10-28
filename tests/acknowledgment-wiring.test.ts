@@ -11,7 +11,7 @@ import { eventDeletionBlockers, decideEventDeletion, type EventDeletionCounts } 
 const emptyCounts: EventDeletionCounts = {
   registrations: 0, attendees: 0, payments: 0, invoices: 0, honorEnrollments: 0, locations: 0, forms: 0, messages: 0, queuedMessages: 0,
   formSubmissions: 0, informationFormResponses: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, communityPosts: 0, announcements: 0, realPayments: 0, scholarshipContributions: 0,
-  healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0,
+  healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0, signatureEvidence: 0,
 };
 
 describe("event deletion refuses while acknowledgment evidence exists", () => {
@@ -62,9 +62,13 @@ describe("where evidence is written", () => {
   });
 
   it("passes only a hash of the user agent to the evidence, and only from the public route", () => {
-    expect(route).toContain('{ userAgent: request.headers.get("user-agent") }');
+    expect(route).toContain('{ userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) }');
     expect(publicRepository).toContain("userAgentHash: hashUserAgent(requestContext?.userAgent ?? null)");
-    expect(publicRepository).not.toMatch(/ipAddress|x-forwarded-for|clientIp/i);
+    // The IP is for typed-signature evidence only (#1265): the acknowledgment request metadata stays on its approved keys.
+    const metadata = /await recordSubmissionAcknowledgments\(tx, \{[\s\S]*?requestMetadata: (\{[\s\S]*?\n      \}),/.exec(publicRepository)?.[1] ?? "";
+    expect(metadata).toContain("userAgentHash");
+    expect(metadata).not.toMatch(/ipAddress|x-forwarded-for|clientIp/i);
+    expect([...metadata.matchAll(/^\s{8}(\w+):/gm)].map((match) => match[1])).toEqual(["userAgentHash", "formVersionId", "submissionKey"]);
   });
 
   it("reads a policy version's wording into the public experience by exact version id", () => {

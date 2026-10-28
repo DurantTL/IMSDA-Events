@@ -7,7 +7,7 @@ import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDa
 import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
 
-export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
+export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "SIGNATURE", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
 /**
  * The types an information form may use: the shared ones plus MEMBER_LIST (#1222). `formFieldTypes` stays without it, so the
  * club form builder, the question library and the registration builder never offer or accept a member list; the registration
@@ -147,6 +147,26 @@ export const acknowledgmentConfigSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("POLICY_VERSION"), policyVersionId: z.string().trim().min(1).max(100) }),
 ]);
 export type AcknowledgmentConfig = z.infer<typeof acknowledgmentConfigSchema>;
+
+/** The longest statement a typed-name signature field can carry (#1265). */
+export const SIGNATURE_TEXT_MAX = 4000;
+/** The longest typed signer name (#1265). */
+export const SIGNATURE_NAME_MAX = 200;
+
+export const SIGNATURE_PLACEHOLDER_TEXT = "Replace this with the statement people sign.";
+
+/** Labels of signature fields whose statement is still the placeholder (#1265): such a form version must not be published. */
+export function placeholderSignatureLabels(definition: { sections: Array<{ fields: Array<{ label: string; type: string; signature?: { text?: string } | undefined }> }> }) {
+  return definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "SIGNATURE" && field.signature?.text?.trim() === SIGNATURE_PLACEHOLDER_TEXT)
+    .map((field) => field.label);
+}
+
+/** What a SIGNATURE field shows above the name box (#1265): the exact statement the typed name signs. */
+export const signatureConfigSchema = z.object({
+  text: z.string().trim().min(5, "Enter the statement to be signed.").max(SIGNATURE_TEXT_MAX),
+});
+export type SignatureConfig = z.infer<typeof signatureConfigSchema>;
 
 export const memberColumnTypes = ["TEXT", "NUMBER", "SELECT"] as const;
 export const memberColumnSchema = z.object({
@@ -294,7 +314,22 @@ export const formFieldSchema = z.object({
    * acknowledgment lives in its own append-only table; the stored answer is only `true`.
    */
   acknowledgment: acknowledgmentConfigSchema.optional(),
+  /**
+   * What a SIGNATURE field records (#1265). Required on that type and refused on every other. The stored answer is the
+   * typed name; the signed text, timestamp and IP live in the append-only signature evidence table.
+   */
+  signature: signatureConfigSchema.optional(),
 }).superRefine((field, context) => {
+  if (field.type === "SIGNATURE") {
+    if (!field.signature) {
+      context.addIssue({ code: "custom", path: ["signature"], message: "A signature needs the statement to be signed." });
+    }
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+      context.addIssue({ code: "custom", path: ["type"], message: "A signature carries no choices, price, credit, age range or automatic date." });
+    }
+  } else if (field.signature) {
+    context.addIssue({ code: "custom", path: ["signature"], message: "Only a signature field carries a statement to be signed." });
+  }
   if (field.type === "ACKNOWLEDGMENT") {
     if (!field.acknowledgment) {
       context.addIssue({ code: "custom", path: ["acknowledgment"], message: "An acknowledgment needs its wording or a policy version." });
@@ -2039,6 +2074,13 @@ export function validateTestResponses(
       if ((field.type === "TEXT" || field.type === "LONG_TEXT" || field.type === "EMAIL" || field.type === "PHONE" || field.type === "DATE") && typeof value !== "string") {
         issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be text.` });
         continue;
+      }
+      if (field.type === "SIGNATURE") {
+        if (typeof value !== "string") {
+          issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be text.` });
+          continue;
+        }
+        if (value.trim().length > SIGNATURE_NAME_MAX) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be ${SIGNATURE_NAME_MAX} characters or fewer.` });
       }
       if (field.type === "TEXT" && String(value).length > 500) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be 500 characters or fewer.` });
       if (field.type === "LONG_TEXT" && String(value).length > 5000) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be 5,000 characters or fewer.` });

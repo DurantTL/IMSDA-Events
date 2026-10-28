@@ -3964,6 +3964,11 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-registration-acknowledgment-text:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .public-registration-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .public-registration-acknowledgment-text strong { display: block; margin-bottom: 6px; }
+/* The typed name of a signature field (#1265): a full-width, thumb-sized input under the statement. */
+.public-registration-signature-name { display: grid; gap: 6px; margin-top: 12px; }
+.public-registration-signature-name label { font-weight: 700; }
+.public-registration-signature-name input { width: 100%; min-height: 44px; box-sizing: border-box; }
+.public-registration-signature-name small { margin: 4px 0 0; font-weight: 500; }
 
 .public-registration-calculated { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid #d8c8e6; border-radius: 13px; background: var(--imsda-purple-soft); padding: 14px 16px; }
 .public-registration-calculated > span { display: grid; gap: 3px; }
@@ -13540,6 +13545,12 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .public-manage-club-list { grid-template-columns: minmax(0, 1fr); }
 .public-manage-club-list li > span:not([class]) { min-width: 0; overflow-wrap: anywhere; }
 
+/* Typed-name signature records on a staff registration (#1265). */
+.registration-signature-record { display: grid; gap: 4px; border-top: 1px solid var(--line, #d2dfe4); padding-top: 10px; }
+.registration-signature-record:first-child { border-top: 0; padding-top: 0; }
+.registration-signature-record p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.registration-signature-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.registration-signature-record .registration-signature-text { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }
 /* Events list search and filters (#106): a plain GET form, one column on phones. */
 .events-directory-form { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 14px 0 6px; min-width: 0; }
 .events-directory-field { display: grid; gap: 4px; min-width: 0; }

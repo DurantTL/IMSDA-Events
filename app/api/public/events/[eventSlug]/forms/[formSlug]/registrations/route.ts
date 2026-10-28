@@ -9,6 +9,7 @@ import {
 import {
   applyRateLimitHeaders,
   mergeRateLimitOutcomes,
+  trustedClientIpAddress,
   type RateLimitOutcome,
 } from "@/modules/rate-limit/domain";
 import { checkPublicFormRoommateLookupRateLimit, checkPublicRegistrationRateLimit, publicRequestClientHash } from "@/modules/rate-limit/service";
@@ -125,7 +126,7 @@ async function postHandler(request: Request, context: { params: Promise<{ eventS
     let confirmation;
     try {
       // The user agent goes in only as a one-way hash, as approved acknowledgment evidence metadata (#150).
-      confirmation = await submitPublicRegistration(eventSlug, formSlug, input, undefined, undefined, { userAgent: request.headers.get("user-agent") });
+      confirmation = await submitPublicRegistration(eventSlug, formSlug, input, undefined, undefined, { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) });
     } catch (error) {
       // A roommate lookup that found nobody rolled the submission back, so it is audited here, by the hashed client and
       // the form only: never the typed name or code.

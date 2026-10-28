@@ -146,6 +146,8 @@ export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<s
       || field.key === "promo_code"
       // A calculated field is a price: it is in the fees at the end, not in the answers.
       || field.type === "CALCULATED"
+      // A typed signature (#1265) is evidence: staff see its record, and the answer never prints or mails.
+      || field.type === "SIGNATURE"
     ) excluded.add(field.key);
   }
   for (let changed = true; changed;) {
