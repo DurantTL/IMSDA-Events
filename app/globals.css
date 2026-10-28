@@ -9914,10 +9914,10 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   html[data-sidebar="collapsed"] .brand { justify-content: center; margin-inline: 0; }
   html[data-sidebar="collapsed"] .sidebar-toggle { justify-content: center; margin-inline: 0; padding-inline: 0; }
 
-  html[data-sidebar="collapsed"] .brand > span:last-child,
+  html[data-sidebar="collapsed"] .brand > .sidebar-link-label,
   html[data-sidebar="collapsed"] .sidebar-toggle > span,
   html[data-sidebar="collapsed"] .nav-item > span,
-  html[data-sidebar="collapsed"] .system-navigation-link > span:last-child,
+  html[data-sidebar="collapsed"] .system-navigation-link > .sidebar-link-label,
   html[data-sidebar="collapsed"] .sidebar-foot > span:last-child {
     position: absolute;
     width: 1px;

@@ -384,7 +384,7 @@ export function AppShell({
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
         <GuardedLink className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
           <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
+          <span className="sidebar-link-label"><strong>IMSDA</strong><small>Events</small></span>
         </GuardedLink>
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
@@ -401,7 +401,7 @@ export function AppShell({
               <span className="system-navigation-icon">
                 <ShieldCheck aria-hidden="true" size={19} strokeWidth={1.9} />
               </span>
-              <span>
+              <span className="sidebar-link-label">
                 <strong>System management</strong>
                 <small>All events and integrations</small>
               </span>
