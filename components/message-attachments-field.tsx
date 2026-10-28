@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { FileUp, Paperclip, Trash2 } from "lucide-react";
 import {
   attachmentSetIssue,
+  BACKGROUND_MAILER_FILE_BYTES_THRESHOLD,
   formatFileSize,
   MAX_MESSAGE_ATTACHMENT_COUNT,
   MAX_MESSAGE_ATTACHMENTS_TOTAL_BYTES,
@@ -143,7 +144,7 @@ export function MessageAttachmentsField({ eventId, files, onChange, help, disabl
         />
       </label>
       <small id={`${inputId}-help`}>
-        PDF, PNG, JPEG, WebP, Word, Excel or PowerPoint. Each file up to {formatFileSize(MAX_MESSAGE_FILE_BYTES)}. {help}
+        PDF, PNG, JPEG, WebP, Word, Excel or PowerPoint. Each file up to {formatFileSize(MAX_MESSAGE_FILE_BYTES)}. Messages whose files total over {formatFileSize(BACKGROUND_MAILER_FILE_BYTES_THRESHOLD)} are sent by the background mailer, within a few minutes. {help}
       </small>
       {uploading ? <p role="status">Uploading…</p> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}

@@ -38,6 +38,9 @@ vi.mock("@/modules/communications/effective-delivery", () => ({ isPlatformEmailC
 vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true, webhookConfigured: true }) }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));
+vi.mock("@/modules/communications/message-file-usage", () => ({
+  getMessageFileStorageUsage: async () => ({ quotaBytes: 200 * 1024 * 1024, graceHours: 72, sweepMode: "dry-run", expiredReservations: 0, events: [] }),
+}));
 vi.mock("@/modules/communications/email-suppression", () => ({ listActiveSuppressions: async () => ({ total: 0, rows: [] }) }));
 
 import EmailPage from "@/app/(workspace)/admin/email/page";
@@ -168,11 +171,11 @@ describe("email page, with the staff alerts (#1016, #1043)", () => {
     expect(mocks.listEventEmailStates).not.toHaveBeenCalled();
   });
 
-  it("renders the three sections for a system administrator, in order", async () => {
+  it("renders the sections for a system administrator, in order", async () => {
     const element = await EmailPage();
     const children = (element as { props: { children: Array<{ type: unknown; props: Record<string, unknown> }> } }).props.children
       .filter((child) => child && typeof child === "object" && "type" in child && typeof child.type === "function");
-    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection"]);
+    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection", "MessageFileStorageSection"]);
     expect(children[3]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
     expect(children[2]!.props).toMatchObject({ sender: { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
   });
