@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { areaClubPortalNavItems, clubNavLinks, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
+import { clubNavLinks } from "@/modules/club-rosters/nav-year-links";
+import { areaClubPortalNavItems, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 /** The selected read-only club year stays on Home and Roster only (#1112). Synthetic ids; today is pinned to 2026-10-28 (current club year 2026-27). */

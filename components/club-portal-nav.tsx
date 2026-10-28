@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { isAccountNavItemActive, type AccountNavItem } from "@/components/account-section-nav";
-import { clubNavLinks } from "@/modules/club-rosters/portal-nav";
+import { clubNavLinks } from "@/modules/club-rosters/nav-year-links";
 
 /**
  * The club shell's primary navigation (#1165): the first destinations as
