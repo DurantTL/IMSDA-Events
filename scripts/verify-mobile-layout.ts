@@ -215,6 +215,8 @@ const pages: PageSpec[] = [
   { name: "public-calendar-year-day", path: "/calendar?view=year&year=2026&filter=everything&date=2026-10-10", role: "visitor" },
   { name: "public-home", path: "/", role: "visitor" },
   { name: "public-events-open", path: "/events", role: "visitor" },
+  { name: "public-events-filtered", path: "/events?q=retreat&from=2026-01-01&to=2027-12-31&for=everyone", role: "visitor" },
+  { name: "public-events-filtered-empty", path: "/events?q=zzzz-no-match", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   // The public Club forms list (#1221).
   { name: "public-club-forms", path: "/clubs/forms", role: "visitor" },
