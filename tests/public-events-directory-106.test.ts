@@ -166,7 +166,8 @@ describe("the page (#106)", () => {
     expect(html).toContain("Show events");
     expect(html).not.toContain("Clear filters");
     expect(html).toContain("2 events");
-    expect(html).toMatch(/aria-live="polite"/);
+    expect(html).toMatch(/class="events-directory-count" role="status"/);
+    expect(html).toMatch(/id="events-from" max="\d{4}-\d{2}-\d{2}" min="2026-10-27"/);
   });
 
   it("reflects URL values, filters, and counts in words", async () => {

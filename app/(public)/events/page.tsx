@@ -78,8 +78,9 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   const filter = filters.audience;
   const filtering = hasActiveDirectoryFilters(filters);
   const today = conferenceToday();
+  const windowEnd = addDays(today, openRegistrationWindowDays);
   const [calendarItems, directsClub, featuredRows] = await Promise.all([
-    listPublicCalendarItems(today, addDays(today, openRegistrationWindowDays)),
+    listPublicCalendarItems(today, windowEnd),
     visitorRegistersClubs(),
     listFeaturedEventRows(today),
   ]);
@@ -124,11 +125,11 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
           </div>
           <div className="events-directory-field">
             <label htmlFor="events-from">From</label>
-            <input defaultValue={filters.from} id="events-from" name="from" type="date" />
+            <input defaultValue={filters.from} id="events-from" max={windowEnd} min={today} name="from" type="date" />
           </div>
           <div className="events-directory-field">
             <label htmlFor="events-to">To</label>
-            <input defaultValue={filters.to} id="events-to" name="to" type="date" />
+            <input defaultValue={filters.to} id="events-to" max={windowEnd} min={today} name="to" type="date" />
           </div>
           <div className="events-directory-field">
             <label htmlFor="events-category">Category</label>
@@ -149,7 +150,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
             {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
           </div>
         </form>
-        <p aria-live="polite" className="events-directory-count" role="status">{calendarCountLabel(items.length)}</p>
+        <p className="events-directory-count" role="status">{calendarCountLabel(items.length)}</p>
 
         <section aria-labelledby="open-events-heading" className="calendar-agenda">
           <h2 className="sr-only" id="open-events-heading">Events open for registration</h2>
