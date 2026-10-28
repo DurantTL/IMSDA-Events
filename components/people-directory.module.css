@@ -2,7 +2,7 @@
 .wrap { display: grid; gap: 14px; min-width: 0; }
 .search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .searchField { display: grid; flex: 1 1 220px; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.searchField input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 8px 10px; font-size: 16px; }
+.searchField input, .searchField select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 8px 10px; font-size: 16px; }
 .search :global(.primary-button), .search :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .count { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -48,3 +48,28 @@
 .status { min-width: 0; flex: 1 1 100%; }
 .status p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .statusError { color: var(--coral); font-weight: 700; }
+/* Invite a person and pending invites (#1276). Stacked at 360px, 44px targets, no sideways scroll. */
+.inviteForm { display: grid; gap: 14px; min-width: 0; }
+.inviteForm fieldset { display: grid; gap: 8px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.inviteForm legend { padding: 0 4px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
+.check { display: flex; align-items: flex-start; gap: 10px; min-width: 0; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.check input { flex: none; width: 24px; height: 24px; margin: 10px 0 0; }
+.check span { display: grid; gap: 2px; min-width: 0; padding-top: 10px; overflow-wrap: anywhere; }
+.check small { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.rowPair { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; min-width: 0; }
+.rowPair .field { flex: 1 1 200px; }
+.rowPair :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.fieldError { margin: 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; overflow-wrap: anywhere; }
+.inviteResult { display: grid; gap: 10px; min-width: 0; }
+.inviteResult p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.inviteResult code { display: block; overflow-wrap: anywhere; word-break: break-all; }
+.pendingList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.pendingRow { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 10px 12px; }
+.pendingRow strong { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.95rem); overflow-wrap: anywhere; }
+.pendingRow small { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.pendingRow p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.pendingActions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.pendingActions :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.chosenList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chosenItem { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.sectionHead { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 800; }

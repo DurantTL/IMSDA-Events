@@ -242,9 +242,12 @@ describe("My registrations page (#1176)", () => {
   });
 
   it("offers no continue payment or contact edit on a waitlisted registration and keeps its wording", async () => {
-    mocks.registrations = [registration("w", "WAITLISTED", { totalCents: 25000 })];
+    mocks.registrations = [registration("w", "WAITLISTED", { totalCents: 25000, attendeeNames: ["Taylor Lane", "Jordan Lane"] })];
     const html = await render();
     expect(html).toContain("Waitlisted");
+    // Places are requested, not taken (#1111).
+    expect(html).toContain("2 places requested");
+    expect(html).not.toContain("people registered");
     expect(html).toContain("No payment due while waitlisted");
     expect(html).not.toContain("Continue payment");
     expect(html).not.toContain("$250");
@@ -508,6 +511,12 @@ describe("Profile verified-email meaning (#1176)", () => {
     expect(html).toContain("What your verified email means");
     expect(html).toContain("Sign-in security on this page");
     expect(html).toContain('href="/account/registrations"');
+  });
+
+  it("lets a long signed-in email break, so enlarged text never widens the page (#1111)", () => {
+    const html = renderToStaticMarkup(createElement(ProfileView, { data, variant: "portal" }));
+    expect(html).toContain('<strong class="profile-account-email" translate="no">taylor@imsda-events.test</strong>');
+    expect(readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8")).toMatch(/\.profile-account-email \{ overflow-wrap: anywhere; \}/);
   });
 
   it("shows nothing about the email while the second step is pending", () => {

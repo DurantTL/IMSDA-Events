@@ -29,6 +29,19 @@ export async function isActiveClubsAdministrator(userId: string, client: RolesCl
   return Boolean(grant);
 }
 
+/**
+ * What a staff user may do in the club areas, read from the database by id (never from a request): a system
+ * administrator, an active Clubs Administrator (`viaClubsAdministrator`), or null for anyone else, including an id that
+ * no longer exists. For the module-level re-checks behind People & access (#1275, #1276).
+ */
+export async function resolveClubsActor(userId: string, client: RolesClient = getPrisma()) {
+  const actor = await client.user.findUnique({ where: { id: userId }, select: { globalRole: true } });
+  if (!actor) return null;
+  if (actor.globalRole === "SYSTEM_ADMIN") return { systemAdmin: true as const, viaClubsAdministrator: false as const };
+  if (await isActiveClubsAdministrator(userId, client)) return { systemAdmin: false as const, viaClubsAdministrator: true as const };
+  return null;
+}
+
 /** Every admin role a staff user holds: the one place roles are resolved on the server. */
 export async function resolveAdminRoles(
   user: Pick<AuthenticatedUser, "id" | "globalRole">,
