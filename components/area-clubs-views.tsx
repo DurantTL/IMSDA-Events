@@ -139,13 +139,13 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clu
  * description, the bars are hidden from assistive tech, and the data table
  * right below it carries every number. One row per club, so it reads on a phone.
  */
-export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links }: { clubs: AreaClubSummary[]; clubYear: string; sort: LeaderboardSort; basePath: string; query?: string; links?: AreaLinks }) {
+export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links, sortHref: customSortHref }: { clubs: AreaClubSummary[]; clubYear: string; sort: LeaderboardSort; basePath: string; query?: string; links?: AreaLinks; sortHref?: (sort: LeaderboardSort) => string }) {
   // Rank and the bar scale come from every club; a search only narrows the rows shown (#791).
   const ranked = sortLeaderboard(clubs, sort);
   const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
   const rankOf = new Map(ranked.map((club, index) => [club.id, index + 1]));
   const sorted = filterClubsByName(ranked, query);
-  const sortHref = (value: LeaderboardSort) => `${basePath}?year=${encodeURIComponent(clubYear)}&sort=${value}${query ? `&q=${encodeURIComponent(query)}` : ""}`;
+  const sortHref = customSortHref ?? ((value: LeaderboardSort) => `${basePath}?year=${encodeURIComponent(clubYear)}&sort=${value}${query ? `&q=${encodeURIComponent(query)}` : ""}`);
   return (
     <>
       <SortOrderNote>{sort === "name" ? "Sorted by club name, A to Z." : "Sorted by total points, highest first."}</SortOrderNote>
