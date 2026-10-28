@@ -7,6 +7,7 @@ import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { allowedReturnTo } from "@/lib/return-to";
 import { listDirectorGrants } from "@/modules/organizations/director-grants-repository";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
+import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club directors" };
@@ -41,7 +42,7 @@ export default async function ClubDirectorsPage({
   return (
     <>
       <AdminPageHeader path={`/admin/organizations/${organizationId}/directors`} parentName={initial.club.name} viaParent={viaParent} />
-      <ClubDirectorsWorkspace club={initial.club} initialGrants={initial.grants} />
+      <ClubDirectorsWorkspace canOpenPeople={(await resolvePeopleViewer()).scope !== null} club={initial.club} initialGrants={initial.grants} />
     </>
   );
 }

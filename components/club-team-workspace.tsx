@@ -1,6 +1,7 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Mail, RefreshCw, UserMinus, UserPlus, X, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -31,12 +32,15 @@ export function ClubTeamWorkspace({
   initialInvites,
   organizationId,
   viewerAccountId,
+  canOpenPeople = false,
 }: {
   initialTeam: ClubTeamMember[];
   initialInvites: ClubTeamInvite[];
   organizationId: string;
   /** Null for a staff "act as" director (#442): no attendee account to mark "(you)". */
   viewerAccountId: string | null;
+  /** True only for conference staff acting as the club's director who may open People & access (#1277). A director signed in as themselves never sees the link. */
+  canOpenPeople?: boolean;
 }) {
   const [team, setTeam] = useState(initialTeam);
   const [invites, setInvites] = useState(initialInvites);
@@ -150,6 +154,7 @@ export function ClubTeamWorkspace({
               <span>
                 <strong translate="no">{member.displayName}{member.accountId === viewerAccountId ? " (you)" : ""}</strong>
                 <small translate="no">{member.email}</small>
+                {canOpenPeople ? <Link className="secondary-button" href={`/admin/people/account/${member.accountId}`}>See all of this person&apos;s access<span className="sr-only"> ({member.displayName})</span></Link> : null}
               </span>
               <span className="status-chip purple">{clubDirectorRoleLabels[member.role]}</span>
               {member.removableByClub ? (

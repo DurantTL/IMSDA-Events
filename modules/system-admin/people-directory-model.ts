@@ -151,6 +151,188 @@ export function clubRoleStatus(
 /** Who is looking: a system administrator sees everything, a Clubs Administrator only Area Coordinator and club roles. */
 export type PeopleScope = "full" | "clubs";
 
+/* "Who has this role" filters (#1277). Pure: parsing the URL and building the where-clauses. */
+
+export const EVENT_ROLE_VALUES = [
+  "EVENT_ADMIN", "REGISTRATION_MANAGER", "FINANCE_MANAGER", "COMMUNICATIONS_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF", "KITCHEN_STAFF",
+] as const;
+export type EventRoleValue = (typeof EVENT_ROLE_VALUES)[number];
+export const CLUB_ROLE_VALUES = ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const;
+export type ClubRoleValue = (typeof CLUB_ROLE_VALUES)[number];
+
+export const EVENT_ROLE_LABELS: Record<EventRoleValue, string> = {
+  EVENT_ADMIN: "Event Administrator",
+  REGISTRATION_MANAGER: "Registration Manager",
+  FINANCE_MANAGER: "Finance Manager",
+  COMMUNICATIONS_MANAGER: "Communications Manager",
+  CHECK_IN_STAFF: "Check-in Staff",
+  READ_ONLY_STAFF: "Read-only Staff",
+  KITCHEN_STAFF: "Kitchen Staff",
+};
+export const CLUB_ROLE_LABELS: Record<ClubRoleValue, string> = {
+  DIRECTOR: "Director",
+  DEPUTY: "Deputy",
+  REGISTRAR: "Registrar",
+  REPORTER: "Reporter",
+};
+
+export type PeopleRoleFilter =
+  | { kind: "system-admin" }
+  | { kind: "clubs-admin" }
+  | { kind: "area-coordinator" }
+  | { kind: "pending" }
+  | { kind: "event"; role: EventRoleValue }
+  | { kind: "club"; role: ClubRoleValue };
+
+const kebab = (value: string) => value.toLowerCase().replace(/_/g, "-");
+
+/** The `?role=` value of a filter, e.g. `event-check-in-staff` or `club-deputy`. */
+export function peopleRoleKey(filter: PeopleRoleFilter): string {
+  if (filter.kind === "event") return `event-${kebab(filter.role)}`;
+  if (filter.kind === "club") return `club-${kebab(filter.role)}`;
+  return filter.kind;
+}
+
+export function peopleRoleLabel(filter: PeopleRoleFilter): string {
+  switch (filter.kind) {
+    case "system-admin": return "System administrator";
+    case "clubs-admin": return "Clubs Administrator";
+    case "area-coordinator": return "Area Coordinator";
+    case "pending": return "Pending invites";
+    case "event": return EVENT_ROLE_LABELS[filter.role];
+    case "club": return CLUB_ROLE_LABELS[filter.role];
+  }
+}
+
+export type PeopleRoleOptionGroup = { label: "System" | "Event" | "Club" | "Invites"; options: Array<{ key: string; label: string }> };
+
+function allRoleFilters(): Array<{ group: PeopleRoleOptionGroup["label"]; filter: PeopleRoleFilter }> {
+  return [
+    { group: "System", filter: { kind: "system-admin" } },
+    { group: "System", filter: { kind: "clubs-admin" } },
+    { group: "System", filter: { kind: "area-coordinator" } },
+    ...EVENT_ROLE_VALUES.map((role) => ({ group: "Event" as const, filter: { kind: "event", role } as PeopleRoleFilter })),
+    ...CLUB_ROLE_VALUES.map((role) => ({ group: "Club" as const, filter: { kind: "club", role } as PeopleRoleFilter })),
+    { group: "Invites", filter: { kind: "pending" } },
+  ];
+}
+
+/** Whether a Clubs Administrator ("clubs") may use this filter: Area Coordinator, club roles and pending invites only. */
+export function roleAllowedForScope(filter: PeopleRoleFilter, scope: PeopleScope): boolean {
+  if (scope === "full") return true;
+  return filter.kind === "area-coordinator" || filter.kind === "club" || filter.kind === "pending";
+}
+
+/** The grouped role choices for the select, limited to what the viewer's scope may use. */
+export function peopleRoleOptions(scope: PeopleScope): PeopleRoleOptionGroup[] {
+  const groups = new Map<PeopleRoleOptionGroup["label"], PeopleRoleOptionGroup>();
+  for (const { group, filter } of allRoleFilters()) {
+    if (!roleAllowedForScope(filter, scope)) continue;
+    const entry = groups.get(group) ?? { label: group, options: [] };
+    entry.options.push({ key: peopleRoleKey(filter), label: peopleRoleLabel(filter) });
+    groups.set(group, entry);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Reads `?role=`. An unknown value, or one the viewer's scope may not use (a Clubs Administrator asking for a system
+ * or event role), is no filter at all.
+ */
+export function parsePeopleRole(value: unknown, scope: PeopleScope): PeopleRoleFilter | null {
+  const text = Array.isArray(value) ? value[0] : value;
+  if (typeof text !== "string") return null;
+  const found = allRoleFilters().find(({ filter }) => peopleRoleKey(filter) === text.trim());
+  return found && roleAllowedForScope(found.filter, scope) ? found.filter : null;
+}
+
+/** Reads `?event=` / `?club=`: an id (letters, digits, `_`, `-`), or nothing. */
+export function parsePeopleId(value: unknown): string | null {
+  const text = Array.isArray(value) ? value[0] : value;
+  return typeof text === "string" && /^[\w-]{1,64}$/.test(text.trim()) ? text.trim() : null;
+}
+
+export type PeopleFilters = { role: PeopleRoleFilter | null; eventId: string | null; clubId: string | null };
+
+export function parsePeopleFilters(
+  params: { role?: unknown; event?: unknown; club?: unknown },
+  scope: PeopleScope,
+): PeopleFilters {
+  const role = parsePeopleRole(params.role, scope);
+  return {
+    role,
+    // An event only matters to an event role, and a club only to a club role; drop it otherwise so links stay tidy.
+    eventId: role?.kind === "event" ? parsePeopleId(params.event) : null,
+    clubId: role?.kind === "club" ? parsePeopleId(params.club) : null,
+  };
+}
+
+/** `/admin/people` with the search, filters and page kept in the URL. */
+export function peopleHref(input: { query?: string; page?: number; filters?: PeopleFilters }): string {
+  const params = new URLSearchParams();
+  if (input.query) params.set("q", input.query);
+  const role = input.filters?.role;
+  if (role) {
+    params.set("role", peopleRoleKey(role));
+    if (input.filters?.eventId) params.set("event", input.filters.eventId);
+    if (input.filters?.clubId) params.set("club", input.filters.clubId);
+  }
+  if (input.page && input.page > 1) params.set("page", String(input.page));
+  const text = params.toString();
+  return text ? `/admin/people?${text}` : "/admin/people";
+}
+
+export type PeopleRoleWhere = {
+  staff?: Record<string, unknown>;
+  account?: Record<string, unknown>;
+};
+
+/**
+ * The where-clauses that find the people who hold a role right now. `staff` is for `User`, `account` for
+ * `AttendeeAccount`. `null` for `pending` (listed by its own module) and for an event role with no event picked
+ * (nobody is listed across every event). A Clubs Administrator's club roles are limited to CLUB-type organizations.
+ */
+export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now = new Date()): PeopleRoleWhere | null {
+  const role = filters.role;
+  if (!role || !roleAllowedForScope(role, scope)) return null;
+  switch (role.kind) {
+    case "system-admin":
+      return { staff: { globalRole: "SYSTEM_ADMIN" } };
+    case "clubs-admin":
+      return { staff: { clubsAdministratorGrant: { is: { revokedAt: null } } } };
+    case "area-coordinator":
+      return { account: { areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } };
+    case "event":
+      if (!filters.eventId) return null;
+      return { staff: { memberships: { some: { role: role.role, status: "ACTIVE", eventId: filters.eventId } } } };
+    case "club":
+      return {
+        account: {
+          clubDirectorGrants: {
+            some: {
+              role: role.role,
+              revokedAt: null,
+              effectiveFrom: { lte: now },
+              OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+              organization: {
+                isActive: true,
+                ...(scope === "clubs" ? { type: "CLUB" } : {}),
+                ...(filters.clubId ? { id: filters.clubId } : {}),
+              },
+            },
+          },
+        },
+      };
+    case "pending":
+      return null;
+  }
+}
+
+/** True when the chosen role needs an event and none is picked yet. */
+export function needsEventPick(filters: PeopleFilters): boolean {
+  return filters.role?.kind === "event" && !filters.eventId;
+}
+
 // ---------------------------------------------------------------- Chosen in the invite (#1276)
 
 /** One piece of access chosen in the Invite a person dialog. */
