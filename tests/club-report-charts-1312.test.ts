@@ -101,7 +101,7 @@ describe("club report chart components (#1312)", () => {
     expect(html).toContain("Outlined: October 2025");
   });
 
-  it("draws only drafts and missing as Not submitted; due and future months are Not due yet", () => {
+  it("draws only drafts and missing as Not submitted; due and future months are Due or upcoming", () => {
     // NOW is 2026-02-20: Jan is missing/draft territory, Feb is due, Mar to Aug are not yet due.
     const aug = staffTotals[11]!;
     expect(aug).toMatchObject({ drafts: 0, missing: 0, due: 0, future: 3 });
@@ -110,11 +110,11 @@ describe("club report chart components (#1312)", () => {
     const jan = staffTotals[4]!;
     expect(jan).toMatchObject({ missing: 2, submitted: 1 });
     const html = renderToStaticMarkup(createElement(RecordsByMonthChart, { variant: "staff", totals: staffTotals, clubYear: CLUB_YEAR }));
-    expect(html).toContain("Not due yet");
-    expect(html).toContain("Aug: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 not due yet");
-    expect(html).toContain("Feb: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 not due yet");
-    expect(html).toContain("Jan: 0 reviewed, 1 submitted, not reviewed, 2 not submitted, 0 not due yet");
-    expect(html).toContain("Dec: 0 reviewed, 0 submitted, not reviewed, 3 not submitted, 0 not due yet");
+    expect(html).toContain("Due or upcoming");
+    expect(html).toContain("Aug: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 due or upcoming");
+    expect(html).toContain("Feb: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 due or upcoming");
+    expect(html).toContain("Jan: 0 reviewed, 1 submitted, not reviewed, 2 not submitted, 0 due or upcoming");
+    expect(html).toContain("Dec: 0 reviewed, 0 submitted, not reviewed, 3 not submitted, 0 due or upcoming");
     // The table row for August adds up: 0 + 0 + 0 + 0 + 3 = 3 clubs, and each row sums to its Total clubs cell.
     expect(html).toMatch(/<th scope="row">August 2026<\/th><td>0<\/td><td>0<\/td><td>0<\/td><td>0<\/td><td>3<\/td><td>3<\/td>/);
     for (const t of staffTotals) {
