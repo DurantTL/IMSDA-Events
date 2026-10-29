@@ -26,10 +26,14 @@ vi.mock("@/modules/access/admin-roles", () => ({
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ organization: { findUnique: mocks.orgFindUnique } }) }));
 vi.mock("@/modules/club-imports/move-year", () => ({ listClubImports: mocks.listClubImports }));
+vi.mock("@/modules/club-rosters/guardians-access", () => ({ resolveStaffGuardianViewer: async () => ({ kind: "staff" }) }));
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 
 import StaffOpenClubPage from "@/app/(workspace)/admin/organizations/[organizationId]/club/page";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
 import { ClubOverview } from "@/components/club-overview";
+import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
+import { AdminPageHeader } from "@/components/admin-page-header";
 
 type AnyProps = Record<string, unknown>;
 
@@ -64,7 +68,7 @@ afterEach(() => {
 });
 
 describe("the staff club page's club year (#541)", () => {
-  it("shows the chosen year's roster, read-only, with links to the three years", async () => {
+  it("shows the chosen year's roster, read-only, with links to every directory year and next year", async () => {
     const tree = await open("2025-26");
     const all = elements(tree);
     expect(all.find((element) => element.type === ClubOverview)?.props).toMatchObject({ rosterYear: "2025-26" });
@@ -73,12 +77,32 @@ describe("the staff club page's club year (#541)", () => {
     expect(clubLinks.some((link) => link.props.href === "/admin/organizations/club-1/club/honors")).toBe(true);
     const links = clubLinks.filter((link) => link.props.href !== "/admin/organizations/club-1/club/honors");
     expect(links.map((link) => [link.props.href, link.props["aria-current"]])).toEqual([
+      ["/admin/organizations/club-1/club?year=2023-24", undefined],
+      ["/admin/organizations/club-1/club?year=2024-25", undefined],
       ["/admin/organizations/club-1/club?year=2025-26", "page"],
       ["/admin/organizations/club-1/club", undefined],
       ["/admin/organizations/club-1/club?year=2027-28", undefined],
     ]);
     const texts = all.flatMap((element) => [element.props.children].flat().filter((child): child is string => typeof child === "string"));
     expect(texts.some((text) => text.includes("roster, read-only"))).toBe(true);
+  });
+
+  it("opens an older directory year read-only, keeps the year in the back link, and renders no write panels (#1304)", async () => {
+    const all = elements(await open("2023-24"));
+    expect(all.find((element) => element.type === ClubOverview)?.props).toMatchObject({ rosterYear: "2023-24", reportsEditable: true });
+    expect(all.find((element) => element.type === AdminPageHeader)?.props).toMatchObject({ year: "2023-24" });
+    expect(all.some((element) => element.type === ClubGuardiansPanel)).toBe(false);
+    const texts = all.flatMap((element) => [element.props.children].flat().filter((child): child is string => typeof child === "string"));
+    expect(texts.join("")).toContain("roster, read-only");
+    expect(texts).toContain("2023-24");
+    // Current year still shows the guardians panel.
+    expect(elements(await open()).some((element) => element.type === ClubGuardiansPanel)).toBe(true);
+    // Next year stays read-only with no guardians panel here (the page never had one for it).
+    expect(elements(await open("2027-28")).some((element) => element.type === ClubGuardiansPanel)).toBe(false);
+  });
+
+  it("still falls back to the current year beyond the directory's range", async () => {
+    expect(elements(await open("2022-23")).find((element) => element.type === ClubOverview)?.props).toMatchObject({ rosterYear: "2026-27" });
   });
 
   it("falls back to the current year for an invalid year", async () => {

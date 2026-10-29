@@ -5,18 +5,18 @@ import { portalDirectoryHref, type portalClubDirectory } from "@/modules/club-ro
 import styles from "./club-directory.module.css";
 
 /** Reuses the staff directory's card hierarchy, showing only each portal viewer's existing destinations. */
-export function PortalClubDirectory({ slice, query, total, searchLabel = "Search by club, church or city" }: { slice: ReturnType<typeof portalClubDirectory>; query: string; total: number; searchLabel?: string }) {
+export function PortalClubDirectory({ slice, query, total, searchLabel = "Search by club or church" }: { slice: ReturnType<typeof portalClubDirectory>; query: string; total: number; searchLabel?: string }) {
   return (
     <div className="page-stack">
       <AreaClubSearch basePath="/account/clubs" label={searchLabel} query={query} shown={slice.total} total={total} />
-      {slice.total === 0 ? <p className="public-manage-empty">{query ? `No club, church or city matches “${query}”.` : "No active clubs yet."}</p> : (
+      {slice.total === 0 ? <p className="public-manage-empty">{query ? `No club or church matches “${query}”.` : "No active clubs yet."}</p> : (
         <>
           <p className={styles.note}>Showing {slice.from}–{slice.to} of {slice.total} {query ? "matching " : ""}{slice.total === 1 ? "club" : "clubs"}</p>
           <ul className={styles.grid} aria-label="Clubs">
             {slice.items.map((club) => (
               <li className={styles.card} key={club.organizationId}>
                 <div className={styles.identity}>
-                  <h2><Link href={club.href} prefetch={false} translate="no">{club.name}</Link></h2>
+                  <h2 translate="no">{club.name}</h2>
                   <p translate="no">{club.sponsoringChurch || "No church listed"}</p>
                   {club.city && <p translate="no">{club.city}</p>}
                 </div>

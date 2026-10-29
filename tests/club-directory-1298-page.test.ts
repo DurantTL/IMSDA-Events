@@ -39,6 +39,7 @@ describe("staff club directory page", () => {
   it("defaults to 12 club cards with year-aware name and Open club links, without the report tables", async () => {
     const html = await render({ year: "2024-25" });
     expect(html.match(/Open club /g)).toHaveLength(12);
+    // 2024-25 is a year the directory offers, and the club page opens it (#1304).
     expect(html).toContain('href="/admin/organizations/club-0/club?year=2024-25"');
     expect(html).toContain("Cedar Church"); expect(html).toContain("roster members");
     expect(html).toContain("Showing 1–12 of 15 active clubs");
@@ -68,5 +69,30 @@ describe("staff club directory page", () => {
     const events = await render({ year: clubYear, view: "events" });
     expect(events).toContain("No club events this club year"); expect(events).not.toContain('id="points"');
     expect(mocks.events).toHaveBeenCalledWith(clubYear);
+  });
+
+  it("keeps one link per club card and the club name as a plain heading (#1304)", async () => {
+    const html = await render();
+    expect(html.match(/href="\/admin\/organizations\/club-0\/club/g)).toHaveLength(1);
+    expect(html).toContain('<h3 translate="no">Synthetic Club 00</h3>');
+  });
+
+  it("drops search and attention from report links but keeps the year (#1304)", async () => {
+    const html = await render({ year: "2024-25", q: "Cedar", attention: "needs-attention", view: "records" });
+    expect(html).toContain('href="/admin/clubs/summary?year=2024-25&amp;view=points&amp;sort=points#points"');
+    expect(html).toContain('href="/admin/clubs/summary?year=2024-25&amp;view=events#club-events"');
+    expect(html).not.toContain("q=Cedar");
+    expect(html).not.toContain("attention=needs-attention");
+    expect(html).not.toContain('name="q"');
+    expect(html).not.toContain('name="attention"');
+    // The directory view still carries its own filters.
+    expect(await render({ q: "Cedar", attention: "needs-attention" })).toContain("q=Cedar&amp;attention=needs-attention");
+  });
+
+  it("shows the carry-forward status only when clubs exist, as before #1298 (#1304)", async () => {
+    mocks.newYear.mockResolvedValue({ toClubYear: "2026-27", clubs: [], notStarted: [] });
+    expect(await render()).not.toContain("Roster carry-forward status");
+    mocks.newYear.mockResolvedValue({ toClubYear: "2026-27", clubs: [{ organizationId: "club-1" }], notStarted: [] });
+    expect(await render()).toContain("Roster carry-forward status");
   });
 });

@@ -84,3 +84,10 @@ describe("directory and report navigation", () => {
     expect(buildAdminSectionNav({ section: "clubs", pathname: "/admin/organizations/club-1/club", clubYear: "2024-25" }).back?.href).toBe("/admin/clubs/summary?year=2024-25");
   });
 });
+
+describe("club summary year selector (#1304)", () => {
+  it("does not carry search or attention into a report view", () => {
+    const model = clubYearSelectorModel("/admin/clubs/summary", clubYear, now, new URLSearchParams("view=points&q=Cedar&attention=needs-attention&sort=points"));
+    expect(model.carry).toEqual([["sort", "points"], ["view", "points"]]);
+  });
+});

@@ -223,7 +223,7 @@ export function AppShell({
   // A Clubs Administrator with any event membership keeps the event picker and sidebar (#1225 review); only one with
   // no events at all gets the club-only chrome.
   const clubsOnly = clubsView && events.length === 0;
-  const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname) : null;
+  const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname, searchParams.get("view")) : null;
   // The health record import page only exists while the Health Record feature is on (#1232).
   const showClubsItem = (item: NavigationItem) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false;
   const clubsNavItems = clubsAdminNavigation.filter(showClubsItem);
@@ -457,7 +457,7 @@ export function AppShell({
               </GuardedLink>
               {clubsAdminGroups.map((group) => {
                 const items = group.items.filter(showClubsItem);
-                // A hash item never lights (it opens a section of a page another item owns), so it never matches the active href.
+                // Points and Events open a view of the Club summary; they light on that view (#1304), as the section tabs do.
                 const isActive = (item: NavigationItem) => activeClubsHref === item.href;
                 const open = resolveSidebarGroupOpen({
                   saved: savedGroups[group.key],

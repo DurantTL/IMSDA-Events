@@ -49,7 +49,13 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
     view === "directory" && carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
   ]);
   const directory = buildClubDirectory({ clubs, clubYear, now, query, attention, page: Number(params.page ?? 1) });
-  const href = (options: { view?: typeof view; page?: number; sort?: string } = {}) => clubSummaryHref({ clubYear, query, attention, page: directory.page, ...options });
+  // Search, the attention filter and paging only apply to the directory (#1304): links to a report view keep just the year.
+  const href = (options: { view?: typeof view; page?: number; sort?: string } = {}) => {
+    const target = options.view ?? view;
+    return target === "directory" && view === "directory"
+      ? clubSummaryHref({ clubYear, query, attention, page: directory.page, ...options })
+      : clubSummaryHref({ clubYear, ...options, page: undefined });
+  };
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
     reportHref: (id: string, month: string) => `/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`,
@@ -83,8 +89,6 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
           <label className={styles.search}>Search by club or church name<input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" /></label>
           <label>Show<select name="attention" defaultValue={attention ? "needs-attention" : "all"} aria-describedby="club-attention-help"><option value="all">All clubs</option><option value="needs-attention">Needs attention</option></select></label>
         </> : <>
-          {query && <input type="hidden" name="q" value={query} />}
-          {attention && <input type="hidden" name="attention" value="needs-attention" />}
           {view === "points" && <input type="hidden" name="sort" value={sort} />}
         </>}
         <button className="secondary-button" type="submit">{view === "directory" ? "Find clubs" : "Apply year"}</button>

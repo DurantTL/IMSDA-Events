@@ -31,7 +31,7 @@ vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: a
 import ClubRosterPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/page";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { ClubTransfersPanel } from "@/components/club-transfers-panel";
-import { rosterYearView } from "@/modules/club-rosters/domain";
+import { rosterYearView, staffClubYearView } from "@/modules/club-rosters/domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
 type AnyProps = Record<string, unknown>;
@@ -153,5 +153,24 @@ describe("the club roster page's ?year= view (#541)", () => {
     const { workspace } = await renderPage("1999-00");
     expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27");
     expect(workspace).toMatchObject({ clubYear: "2026-27", readOnly: false });
+  });
+});
+
+describe("staffClubYearView (#1304)", () => {
+  const now = new Date("2026-10-26T18:00:00Z");
+
+  it("accepts every directory year and next year, read-only except the current one", () => {
+    expect(staffClubYearView(undefined, now).choices).toEqual(["2023-24", "2024-25", "2025-26", "2026-27", "2027-28"]);
+    expect(staffClubYearView("2023-24", now)).toMatchObject({ clubYear: "2023-24", readOnly: true });
+    expect(staffClubYearView("2027-28", now)).toMatchObject({ clubYear: "2027-28", readOnly: true });
+    expect(staffClubYearView("2026-27", now)).toMatchObject({ clubYear: "2026-27", readOnly: false });
+    expect(staffClubYearView("2022-23", now).clubYear).toBe("2026-27");
+    expect(staffClubYearView(["2023-24", "2024-25"], now).clubYear).toBe("2026-27");
+    expect(staffClubYearView(undefined, now).importChoices).toEqual(["2025-26", "2026-27", "2027-28"]);
+  });
+
+  it("leaves the director range unchanged", () => {
+    expect(rosterYearView("2023-24", now).clubYear).toBe("2026-27");
+    expect(rosterYearView("2025-26", now).choices).toEqual(["2025-26", "2026-27", "2027-28"]);
   });
 });

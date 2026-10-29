@@ -103,15 +103,20 @@ describe("staff page arrival", () => {
 });
 
 describe("real pending navigation", () => {
-  it("keeps native link props and announces only a genuinely pending Next link", async () => {
+  it("keeps native link props and shows a visual cue only for a genuinely pending Next link", async () => {
     const link = () => h(NavigationLink, { href: "/admin/clubs", prefetch: false, target: "_blank", download: "clubs.csv" }, "Open clubs");
     await render(link());
     expect(container.querySelector("a")?.getAttribute("href")).toBe("/admin/clubs");
     expect(container.querySelector("a")?.getAttribute("target")).toBe("_blank");
     expect(container.querySelector("a")?.getAttribute("download")).toBe("clubs.csv");
-    expect(container.querySelector('[role="status"]')?.textContent).toBe("");
+    expect(container.querySelector('[data-navigation-pending="false"]')).not.toBeNull();
     mocks.linkPending = true; await render(link());
-    expect(container.querySelector('[role="status"]')?.textContent).toBe("Opening page…");
+    // The cue is visual only (#1304): no added accessible text and no live region; loading.tsx announces.
+    const cue = container.querySelector('[data-navigation-pending="true"]')!;
+    expect(cue.getAttribute("aria-hidden")).toBe("true");
+    expect(cue.textContent).toBe("");
+    expect(container.querySelector("a")?.textContent).toBe("Open clubs");
+    expect(container.querySelector('[role="status"]')).toBeNull();
     mocks.linkPending = false; await render(link());
     expect(container.querySelector('[data-navigation-pending="true"]')).toBeNull();
   });
@@ -147,7 +152,8 @@ describe("real pending navigation", () => {
     }
     await render(h(Harness));
     await act(async () => container.querySelectorAll("a")[0]!.click());
-    expect(container.querySelector('[data-navigation-pending="true"]')?.textContent).toBe("Opening page…");
+    expect(container.querySelector('[data-navigation-pending="true"]')?.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector("a")?.textContent).toBe("Slow");
     expect(container.querySelector('[data-page="/initial"]')).not.toBeNull();
     await act(async () => container.querySelectorAll("a")[1]!.click());
     await act(async () => release.get("/latest")!());

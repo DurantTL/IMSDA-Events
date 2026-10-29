@@ -6,7 +6,7 @@ import { ClubHonorsWorkspace } from "@/components/club-honors-workspace";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
-import { rosterYearView } from "@/modules/club-rosters/domain";
+import { staffClubYearView } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
@@ -34,8 +34,8 @@ export default async function StaffClubHonorsPage({
     select: { type: true, name: true, isActive: true },
   });
   if (!club || club.type !== "CLUB") notFound();
-  // The roster's year, carried by its Honors link (#819); an unlisted year falls back to the current one.
-  const clubYear = rosterYearView((await searchParams)?.year).clubYear;
+  // The roster's year, carried by its Honors link (#819); an unlisted year (see `staffClubYearView`) falls back to the current one.
+  const clubYear = staffClubYearView((await searchParams)?.year).clubYear;
   const [rows, honors] = await Promise.all([
     listClubHonorsPage(organizationId, clubYear),
     listActiveHonorOptions(),

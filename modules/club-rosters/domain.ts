@@ -138,6 +138,28 @@ export function rosterYearView(yearParam: string | string[] | undefined, now = n
 }
 
 /**
+ * Which club year the staff club page shows for `?year=` (#1304): every year the
+ * club directory offers (the current year and three back) plus next year, so a
+ * card opened from an older year keeps that year. Anything else is the current
+ * year. Staff never write here, so any year but the current one is read-only.
+ * Director screens keep `rosterYearView`; this widens only the staff view.
+ */
+export function staffClubYearView(yearParam: string | string[] | undefined, now = new Date()) {
+  const base = rosterYearView(undefined, now);
+  const choices = [base.nextClubYear, ...clubYearOptions(base.currentClubYear, now)].reverse();
+  const clubYear = choices.find((year) => year === yearParam) ?? base.currentClubYear;
+  return {
+    clubYear,
+    currentClubYear: base.currentClubYear,
+    nextClubYear: base.nextClubYear,
+    choices,
+    /** The previous, current and next year: where a club import may be moved (#541). */
+    importChoices: base.choices,
+    readOnly: clubYear !== base.currentClubYear,
+  };
+}
+
+/**
  * The club year a roster route answers for: the current year, or next year
  * when `?year=` names it (#959). Anything else, a past year included, is the
  * current year, so a route never lists a past year's emergency contacts.

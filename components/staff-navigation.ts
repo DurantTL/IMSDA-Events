@@ -341,9 +341,17 @@ export function clubsAdminHrefForYear(href: string, year: string | null): string
 
 /**
  * The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. The dashboard,
- * "/admin/clubs", is the parent of every club page, so it lights only on exactly that path.
+ * "/admin/clubs", is the parent of every club page, so it lights only on exactly that path. On the Club summary,
+ * `summaryView` ("points" or "events") lights that view's own item, as the section tabs do.
  */
-export function clubsAdminActiveHref(pathname: string): string | null {
+export function clubsAdminActiveHref(pathname: string, summaryView?: string | null): string | null {
+  // The Club summary's Points and Events views have their own sidebar items (#1304); light the one the section tabs light.
+  if (pathname === "/admin/clubs/summary") {
+    const viewItem = summaryView === "points" || summaryView === "events"
+      ? clubsAdminGroups.flatMap((group) => group.items).find((item) => item.href.startsWith(`/admin/clubs/summary?view=${summaryView}#`))
+      : null;
+    if (viewItem) return viewItem.href;
+  }
   return clubsAdminNavigation.reduce<string | null>((best, item) => (
     (pathname === item.href || (item.href !== "/admin/clubs" && pathname.startsWith(`${item.href}/`))) && (!best || item.href.length > best.length) ? item.href : best
   ), null);

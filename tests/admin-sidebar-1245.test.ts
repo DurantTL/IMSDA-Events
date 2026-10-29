@@ -132,6 +132,14 @@ describe("the Clubs sidebar groups", () => {
     expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
   });
 
+  it("lights Points and Events on those Club summary views, as the section tabs do (#1304)", () => {
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "points")).toBe("/admin/clubs/summary?view=points#points");
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "events")).toBe("/admin/clubs/summary?view=events#club-events");
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "directory")).toBe("/admin/clubs/summary");
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "records")).toBe("/admin/clubs/summary");
+    expect(clubsAdminActiveHref("/admin/clubs/reports", "points")).toBe("/admin/clubs/reports");
+  });
+
   it("draws the groups closed, opens the one holding the page, and keeps the health import rule", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     navigation.pathname = "/admin/clubs";

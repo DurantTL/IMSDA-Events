@@ -57,9 +57,12 @@ describe("authorized portal directory", () => {
     expect(html).toContain('href="/account/clubs?q=Bayport&amp;page=3"');
     expect(html).toContain('href="/account/area/club-12"');
     expect(html).not.toContain("/admin/");
+    // One keyboard stop per card (#1304): the named Open club link; the club name is a plain heading.
+    expect(html.match(/href="\/account\/area\/club-12"/g)).toHaveLength(1);
+    expect(html).toContain('<h2 translate="no">Synthetic club 12</h2>');
     expect(renderToStaticMarkup(h(PortalClubDirectory, {
       slice: portalClubDirectory(clubs, new Map(), "No such club", 1), query: "No such club", total: 25,
-    }))).toContain("No club, church or city matches");
+    }))).toContain("No club or church matches");
   });
 });
 

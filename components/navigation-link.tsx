@@ -3,9 +3,12 @@
 import Link, { useLinkStatus } from "next/link";
 import type { ComponentProps } from "react";
 
-/** Always mounted so a real pending navigation can announce itself without moving the link's label. */
+/**
+ * The pending cue is visual only (#1304): the link's own background animates while `data-navigation-pending` is "true"
+ * (see globals.css). It adds no accessible text, so the route's loading status (`loading.tsx`) is the one announcement.
+ */
 export function NavigationPending({ pending }: { pending: boolean }) {
-  return <span className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-navigation-pending={pending ? "true" : "false"}>{pending ? "Opening page…" : ""}</span>;
+  return <span aria-hidden="true" data-navigation-pending={pending ? "true" : "false"} />;
 }
 
 function LinkPending() {
