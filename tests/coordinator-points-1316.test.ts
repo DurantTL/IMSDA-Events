@@ -26,7 +26,7 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => "/account/area-clubs/reports",
+  usePathname: () => "/account/area-clubs/points",
 }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique } }) }));

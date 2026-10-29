@@ -3,7 +3,7 @@ import { CoordinatorScrollRegion } from "@/components/coordinator-destinations";
 import { cardCell } from "@/components/table-card-labels";
 import { filterClubsByName, sortLeaderboard, type AreaClubSummary, type LeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { supportingRecordMonths } from "@/modules/club-reports/coordinator-destinations-domain";
-import { pointsPageHref } from "@/modules/club-reports/coordinator-points-domain";
+import { POINTS_CHART_LIMIT, pointsPageHref } from "@/modules/club-reports/coordinator-points-domain";
 import styles from "./coordinator-points.module.css";
 
 const formatNumber = (value: number) => value.toLocaleString("en-US");
@@ -23,7 +23,7 @@ export function CoordinatorPointsRanking({ allClubs, basePath, clubYear, query, 
   const rows = filterClubsByName(sortLeaderboard(allClubs, sort), query);
   const sortHref = (value: LeaderboardSort) => pointsPageHref(basePath, { year: clubYear, sort: value, q: query });
   return (
-    <details className={styles.details}>
+    <details className={styles.details} open={sort === "name"}>
       <summary className={styles.summary}>Show as a table (ranking and supporting records)</summary>
       <p className={styles.sortNote}>
         {sort === "name" ? "Sorted by club name, A to Z." : "Sorted by total points, highest first."}{" "}
@@ -79,5 +79,5 @@ export function CoordinatorPointsRanking({ allClubs, basePath, clubYear, query, 
 }
 
 export function ShowTopLink({ href }: { href: string }) {
-  return <p className={styles.back}><Link href={href}>Show top 10 only</Link></p>;
+  return <p className={styles.back}><Link href={href}>Show top {POINTS_CHART_LIMIT} only</Link></p>;
 }
