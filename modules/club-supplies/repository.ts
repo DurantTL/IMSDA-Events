@@ -180,6 +180,8 @@ export type ClubStockRow = {
   sizeLabel: string | null;
   isActive: boolean;
   quantityOnHand: number;
+  /** The honor this patch is linked to, so the order list's picker can search by honor name (#1324). */
+  honorName?: string | null;
 };
 
 /**
@@ -190,7 +192,7 @@ export async function listClubStock(organizationId: string): Promise<ClubStockRo
   const [items, stock] = await Promise.all([
     getPrisma().clubSupplyItem.findMany({
       where: { OR: [{ isActive: true }, { stock: { some: { organizationId, quantityOnHand: { gt: 0 } } } }] },
-      select: { id: true, section: true, name: true, catalogNumber: true, sizeLabel: true, isActive: true },
+      select: { id: true, section: true, name: true, catalogNumber: true, sizeLabel: true, isActive: true, honor: { select: { name: true } } },
       orderBy: [{ section: "asc" }, { name: "asc" }],
     }),
     getPrisma().clubSupplyStock.findMany({ where: { organizationId }, select: { itemId: true, quantityOnHand: true } }),
@@ -204,6 +206,7 @@ export async function listClubStock(organizationId: string): Promise<ClubStockRo
     sizeLabel: item.sizeLabel,
     isActive: item.isActive,
     quantityOnHand: quantities.get(item.id) ?? 0,
+    honorName: item.honor?.name ?? null,
   }));
 }
 

@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck
 import styles from "@/components/club-orders.module.css";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
-import { ORDER_LIST_SECTIONS, activeHelperLines, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
+import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
@@ -190,7 +190,7 @@ export function ClubOrderWorkspace({
   const pickerItems = useMemo(() => {
     const listed = new Set(onList.map((line) => line.itemId));
     const matches = makeSearchMatcher(pickerQuery);
-    return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel]));
+    return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
   }, [stock, pickerQuery, onList]);
   const shownPickerItems = useMemo(() => pickerItems.slice(0, PICKER_LIMIT), [pickerItems]);
   const pickerSummary = pickerItems.length > PICKER_LIMIT
@@ -371,6 +371,7 @@ export function ClubOrderWorkspace({
   }
 
   const unmatchedCount = data.unmatched.length;
+  const unmatchedHonors = useMemo(() => groupUnmatchedByHonor(data.unmatched), [data.unmatched]);
   const earlierIds = earlier.map((need) => need.needId);
   const beforeDateIds = needsDatedBefore(earlier, beforeDate).map((need) => need.needId);
 
@@ -452,9 +453,20 @@ export function ClubOrderWorkspace({
       <section className={styles.block} id={ORDER_SECTION_IDS.list}>
         <h3>Your order list</h3>
         {unmatchedCount > 0 && (
-          <p className={styles.flag} role="status">
-            <Info aria-hidden="true" size={14} /> {unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.
-          </p>
+          <div className={styles.flag} id="club-order-unmatched" role="status">
+            <Info aria-hidden="true" size={14} />
+            <div className={styles.unmatched}>
+              <p>{unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.</p>
+              <details className={styles.earlierDetails}>
+                <summary>Show which {unmatchedHonors.length === 1 ? "honor" : "honors"} to order separately</summary>
+                <ul className={styles.unmatchedList}>
+                  {unmatchedHonors.map((honor) => (
+                    <li key={honor.name}><span translate="no">{honor.name}</span> · {honor.members} {honor.members === 1 ? "member" : "members"}</li>
+                  ))}
+                </ul>
+              </details>
+            </div>
+          </div>
         )}
         {onList.length === 0 ? (
           <p className="quiet-copy">Nothing on the list. New completed honors appear here on their own; record uniform needs below, add earned awards on the Class tracking page, or add an item yourself.</p>
@@ -474,11 +486,11 @@ export function ClubOrderWorkspace({
                         <span className={styles.text}>
                           <strong translate="no">{line.name}</strong>
                           <small>
-                            {line.size && <>Size {line.size} · </>}
+                            {line.size && <>{formatSizeLabel(line.size)} · </>}
                             {line.catalogNumber ? <>Item no. <code>{line.catalogNumber}</code></> : (
                               <span className={styles.flagInline}><AlertTriangle aria-hidden="true" size={12} /> No item number</span>
                             )}
-                            {line.edited && line.needed !== line.computedNeeded && <> · calculated: {line.computedNeeded}</>}
+                            {line.edited && line.needed !== line.computedNeeded && <> · Suggested from honors and uniform needs: {line.computedNeeded}</>}
                           </small>
                         </span>
                         <dl className={styles.numbers}>
@@ -570,8 +582,8 @@ export function ClubOrderWorkspace({
             <div className={styles.groupHead}><strong>Add an item</strong></div>
             <div className={styles.pickerRow}>
               <label className={styles.pickerField} htmlFor="club-order-picker-search">
-                Search the catalog
-                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerItem(""); }} placeholder="Name or item number" type="search" value={pickerQuery} />
+                Search honors and items
+                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerItem(""); }} placeholder="Honor or item name, or item number" type="search" value={pickerQuery} />
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item
@@ -579,7 +591,7 @@ export function ClubOrderWorkspace({
                   <option value="">Choose an item</option>
                   {shownPickerItems.map((row) => (
                     <option key={row.itemId} value={row.itemId}>
-                      {row.name}{row.catalogNumber ? ` · ${row.catalogNumber}` : ""}
+                      {row.name}{row.catalogNumber ? ` · ${row.catalogNumber}` : ""}{row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}
                     </option>
                   ))}
                 </select>
@@ -593,6 +605,7 @@ export function ClubOrderWorkspace({
               </button>
             </div>
             <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{pickerSummary}</p>
+            <p className={`field-help ${styles.helpText}`}>Only honors linked to a catalog item can be added. If an honor is missing, conference staff can link it in the supply catalog.</p>
           </div>
         )}
 
@@ -601,6 +614,9 @@ export function ClubOrderWorkspace({
             <a className="primary-button" href={`${base}/csv?view=list`}><Download aria-hidden="true" size={14} /> Export list (CSV)</a>
           ) : (
             <button aria-describedby="club-order-nothing" className="primary-button" disabled type="button"><Download aria-hidden="true" size={14} /> Export list (CSV)</button>
+          )}
+          {onList.length > 0 && (
+            <a className="secondary-button" href={`${base}/csv?view=all`}><Download aria-hidden="true" size={14} /> Export everything (CSV)</a>
           )}
           {printHref && onList.length > 0 && (
             <a className="secondary-button" href={printHref}><Printer aria-hidden="true" size={14} /> Printable list</a>

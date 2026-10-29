@@ -302,3 +302,45 @@ export function orderListCsv(header: OrderExportHeader, lines: readonly HelperLi
   }
   return toCsv(rows);
 }
+
+/**
+ * A size for display (#1324): catalog size labels sometimes already say "Size 8"
+ * (`extractSizeLabel`), others are bare ("M"). Show "Size" once.
+ */
+export function formatSizeLabel(size: string) {
+  const trimmed = size.trim();
+  if (!trimmed) return "";
+  return /^size\b/i.test(trimmed) ? trimmed : `Size ${trimmed}`;
+}
+
+/**
+ * The one combined export (#1324): honors, uniforms and other items together,
+ * one row per item that is on the list, in the screen's order (section, then
+ * name, then size). Same lines and same to-order math as the screen; no club or
+ * director details and no totals row, so it opens as a plain table.
+ */
+export function orderEverythingCsv(lines: readonly HelperLine[]) {
+  const rows: Array<Array<string | number>> = [["Section", "Item name", "Item number", "Size", "Quantity", "Available", "To order"]];
+  const active = activeHelperLines(lines);
+  for (const section of ORDER_LIST_SECTIONS) {
+    for (const line of active.filter((entry) => entry.section === section)) {
+      rows.push([orderListSectionLabels[section], line.name, line.catalogNumber ?? "", line.size, line.needed, line.onHand, line.toOrder]);
+    }
+  }
+  return toCsv(rows);
+}
+
+export type UnmatchedHonorGroup = { name: string; members: number };
+
+/**
+ * Completed honors with no catalog item, one entry per honor with how many
+ * members completed it (#1324). Counts only: no member is named.
+ */
+export function groupUnmatchedByHonor(unmatched: ReadonlyArray<{ sourceLabel: string }>): UnmatchedHonorGroup[] {
+  const counts = new Map<string, number>();
+  for (const need of unmatched) {
+    const name = need.sourceLabel.trim() || "Unnamed honor";
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts].map(([name, members]) => ({ name, members })).sort((a, b) => a.name.localeCompare(b.name));
+}

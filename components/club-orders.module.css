@@ -21,6 +21,9 @@
 .number { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 8px; background: #fff; padding: 8px; font-size: 16px; text-align: right; }
 .flag { display: flex; align-items: flex-start; gap: 6px; margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); padding: 8px 10px; color: var(--ink); font-size: max(var(--type-floor, 0px), .66rem); line-height: 1.5; }
 .flag svg { flex: 0 0 auto; margin-top: 3px; }
+.unmatched { display: grid; gap: 4px; min-width: 0; }
+.unmatched p { margin: 0; }
+.unmatchedList { display: grid; gap: 4px; margin: 0; padding: 0 0 0 18px; font-size: max(var(--type-floor, 0px), .74rem); }
 .flagInline { display: inline-flex; align-items: center; gap: 4px; color: var(--coral); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .actions :global(.secondary-button), .actions :global(.primary-button), .groupHead :global(.text-button) { min-height: 44px; min-width: 44px; }

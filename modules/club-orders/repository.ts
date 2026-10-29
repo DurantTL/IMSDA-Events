@@ -312,7 +312,7 @@ async function neededPicture(organizationId: string) {
 
 type NeededPicture = Awaited<ReturnType<typeof neededPicture>>;
 
-export type UnmatchedNeed = { sourceId: string; personId: string };
+export type UnmatchedNeed = { sourceId: string; personId: string; sourceLabel: string };
 
 function orderListFrom(picture: NeededPicture, extraByItem: ReadonlyMap<string, number>) {
   const items = [...picture.byItem.values()].map((group) => toCatalogItem(group[0].item!));
@@ -320,7 +320,7 @@ function orderListFrom(picture: NeededPicture, extraByItem: ReadonlyMap<string, 
   const lines = buildOrderLines(items, neededByItem, picture.available, extraByItem);
   const unmatched: UnmatchedNeed[] = picture.needs
     .filter((need) => need.itemId === null)
-    .map((need) => ({ sourceId: need.sourceId, personId: need.personId }));
+    .map((need) => ({ sourceId: need.sourceId, personId: need.personId, sourceLabel: need.sourceLabel ?? "" }));
   return { lines, unmatched };
 }
 
