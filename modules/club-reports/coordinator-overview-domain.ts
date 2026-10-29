@@ -102,6 +102,35 @@ export function buildCoordinatorOverview(clubs: readonly AreaClubSummary[], club
   };
 }
 
+/**
+ * One month's record counts for the coordinator chart (#1312). Deliberately has no reviewed field: Reviewed is
+ * staff-only, and the type makes it impossible to carry it into a coordinator page.
+ */
+export type CoordinatorMonthTotals = {
+  month: string;
+  label: string;
+  clubs: number;
+  submitted: number;
+  notSubmitted: number;
+  notDue: number;
+};
+
+/** Per-month tallies of `clubRecordStatus` for every club-year month. No new counting rule. */
+export function coordinatorMonthlyTotals(clubs: readonly AreaClubSummary[], clubYear: string, now: Date): CoordinatorMonthTotals[] {
+  return clubYearMonths(clubYear).map((month) => {
+    const states = clubs.map((club) => clubRecordStatus(club, month, now).state);
+    const count = (state: RecordState) => states.filter((entry) => entry === state).length;
+    return {
+      month,
+      label: reportMonthLabel(month),
+      clubs: clubs.length,
+      submitted: count("SUBMITTED"),
+      notSubmitted: count("NOT_SUBMITTED"),
+      notDue: count("NOT_DUE"),
+    };
+  });
+}
+
 /** The clubs the table shows for a search; the summary and follow-up above always speak about every club. */
 export function overviewTableClubs(clubs: readonly AreaClubSummary[], query: string) {
   return filterClubsByName(clubs, query);
