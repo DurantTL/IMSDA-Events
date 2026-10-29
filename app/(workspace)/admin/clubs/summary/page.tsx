@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { LayoutGrid, ClipboardList, ChartNoAxesColumn, CalendarDays } from "lucide-react";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable, AreaPointsChart } from "@/components/area-clubs-views";
+import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable } from "@/components/area-clubs-views";
+import { StaffPoints } from "@/components/staff-points";
 import { StaffMonthlyRecords } from "@/components/staff-monthly-records";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { ClubSummaryLegacyAnchor } from "@/components/club-summary-legacy-anchor";
@@ -19,8 +20,10 @@ import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary, listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
 import { buildClubDirectory, clubDirectoryClubHref, clubSummaryAnchors, clubSummaryHref, parseClubSummaryView } from "@/modules/club-reports/club-directory-domain";
 import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
+import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import styles from "@/components/club-directory.module.css";
+import pointsStyles from "@/components/staff-points.module.css";
 
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
@@ -50,6 +53,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
     view === "events" ? listAreaClubEvents(clubYear) : Promise.resolve([]),
     view === "directory" && carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
   ]);
+  const points = view === "points" ? buildStaffPoints({ clubs, clubYear, q: params.q, all: params.all }) : null;
   const directory = buildClubDirectory({ clubs, clubYear, now, query, attention, page: Number(params.page ?? 1) });
   // Search, the attention filter and paging only apply to the directory (#1304): links to a report view keep just the year.
   const href = (options: { view?: typeof view; page?: number; sort?: string } = {}) => {
@@ -84,16 +88,20 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         ))}
       </nav>
       <h2 className="club-summary-section" id={clubSummaryAnchors[view]}>{views.find((item) => item.key === view)!.label}</h2>
-      <form className={styles.toolbar} method="get" action="/admin/clubs/summary">
+      <form className={view === "points" ? `${styles.toolbar} ${pointsStyles.toolbar}` : styles.toolbar} method="get" action="/admin/clubs/summary">
         <input type="hidden" name="view" value={view} />
         <label>Club year<select name="year" defaultValue={clubYear}>{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
         {view === "directory" ? <>
           <label className={styles.search}>Search by club or church name<input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" /></label>
           <label>Show<select name="attention" defaultValue={attention ? "needs-attention" : "all"} aria-describedby="club-attention-help"><option value="all">All clubs</option><option value="needs-attention">Needs attention</option></select></label>
         </> : <>
-          {view === "points" && <input type="hidden" name="sort" value={sort} />}
+          {view === "points" && <>
+            <input type="hidden" name="sort" value={sort} />
+            {points?.expanded && <input type="hidden" name="all" value="1" />}
+            <label className={styles.search}>Search<span className="sr-only"> by club or church name</span><input type="search" name="q" defaultValue={points?.query} maxLength={80} autoComplete="off" /></label>
+          </>}
         </>}
-        <button className="secondary-button" type="submit">{view === "directory" ? "Find clubs" : "Apply year"}</button>
+        <button className="secondary-button" type="submit">{view === "directory" ? "Find clubs" : view === "points" ? "Apply" : "Apply year"}</button>
         {view === "directory" && (query || attention) && <Link className="secondary-button" href={clubSummaryHref({ clubYear })} prefetch={false}>Clear filters</Link>}
       </form>
       {view === "directory" && <>
@@ -117,7 +125,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
           <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
         </details>
       </>}
-      {view === "points" && <AreaPointsChart basePath="/admin/clubs/summary" clubYear={clubYear} clubs={clubs} sort={sort} sortHref={(value) => `${href({ view: "points", sort: value })}#points`} />}
+      {points && <StaffPoints clubYear={clubYear} view={points} />}
       {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} />}
     </section>
   );

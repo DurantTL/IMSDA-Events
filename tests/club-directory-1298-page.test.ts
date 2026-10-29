@@ -60,8 +60,10 @@ describe("staff club directory page", () => {
 
   it("shows only the chosen report and keeps points sort links in that view", async () => {
     const points = await render({ year: clubYear, view: "points", sort: "name" });
-    expect(points).toContain('id="points"'); expect(points).toContain("Total points per club");
-    expect(points).toContain('view=points&amp;sort=points#points');
+    expect(points).toContain('id="points"'); expect(points).toContain("Top 10 clubs by total points");
+    // The staff points view has no sort links any more (#1314); the nav link keeps whatever sort it was opened with.
+    expect(points).toContain('view=points&amp;sort=name#points');
+    expect(await render({ year: clubYear, view: "points" })).toContain('view=points&amp;sort=points#points');
     expect(points).not.toContain('aria-label="Clubs"'); expect(points).not.toContain('id="monthly-records"');
     const records = await render({ year: clubYear, view: "records" });
     expect(records).toContain('id="monthly-records"'); expect(records).toContain("Full-year grid and yearly totals");
@@ -84,7 +86,8 @@ describe("staff club directory page", () => {
     // The records view has its own search (#1313), so only the other views' links are checked for dropped filters.
     expect(html).not.toContain("attention=needs-attention");
     expect(html).not.toContain('name="attention"');
-    for (const view of ["points", "events"]) {
+    // The points view has its own search (#1314).
+    for (const view of ["events"]) {
       const other = await render({ year: "2024-25", q: "Cedar", attention: "needs-attention", view });
       expect(other).not.toContain("q=Cedar");
       expect(other).not.toContain("attention=needs-attention");

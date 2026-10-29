@@ -30,9 +30,10 @@ export function shortMonth(month: string) {
 
 export type SummaryTile = { label: string; value: string | number; detail?: string; href?: string };
 
-export function ReportSummaryBand({ tiles, label }: { tiles: readonly SummaryTile[]; label?: string }) {
+/** `compact` (opt-in) tightens the band on phones: two columns, smaller values. */
+export function ReportSummaryBand({ tiles, label, compact }: { tiles: readonly SummaryTile[]; label?: string; compact?: boolean }) {
   return (
-    <ul aria-label={label} className={styles.band}>
+    <ul aria-label={label} className={compact ? `${styles.band} ${styles.bandCompact}` : styles.band}>
       {tiles.map((tile, index) => {
         const body = (
           <>
@@ -219,12 +220,16 @@ function CoordinatorTable({ totals, title, clubYear }: { totals: readonly Coordi
 
 export type PointsBarsClub = { id: string; name: string; reportPoints: number; totalPoints: number };
 
-export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "Total points by club" }: {
+export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "Total points by club", ranks, compact }: {
   clubs: readonly PointsBarsClub[];
   clubYear: string;
   limit?: number;
   showAllHref?: string;
   title?: string;
+  /** Rank by club id when `clubs` is a filtered subset, so the table keeps each club's rank in the whole year. */
+  ranks?: ReadonlyMap<string, number>;
+  /** Opt-in: denser rows and one footer line on phones. */
+  compact?: boolean;
 }) {
   const base = safe(useId());
   const ranked = sortLeaderboard(clubs, "points");
@@ -232,21 +237,23 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
   const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
   const description = `${pointsChartDescription(ranked, clubYear)} Each bar is split into report points and yearly registration points.`
     + (ranked.length > shown.length ? ` The chart shows the top ${shown.length}; the table lists all ${ranked.length}.` : "");
+  // With ranks (a search), list positions would contradict the whole-year rank each row announces.
+  const BarList = ranks ? "ul" : "ol";
   const titleId = `${base}-title`;
   const descId = `${base}-desc`;
   return (
     <figure aria-describedby={descId} aria-labelledby={titleId} className={styles.figure}>
-      <figcaption className={styles.caption} id={titleId}>
+      <figcaption className={compact ? `${styles.caption} ${styles.captionCompact}` : styles.caption} id={titleId}>
         {title} <span className={styles.captionYear}>({clubYear}{ranked.length > shown.length ? `, top ${shown.length} of ${ranked.length}` : ""})</span>
       </figcaption>
       <p className="sr-only" id={descId}>{description}</p>
       {shown.length === 0 ? <p className={styles.empty}>No active clubs for {clubYear}.</p> : (
-        <ol className={styles.bars}>
+        <BarList className={compact ? `${styles.bars} ${styles.barsCompact}` : styles.bars}>
           {shown.map((club) => {
             const registration = club.totalPoints - club.reportPoints;
             return (
               <li className={styles.barRow} key={club.id}>
-                <span className={styles.barName} translate="no">{club.name}</span>
+                <span className={styles.barName} translate="no">{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}{club.name}</span>
                 <span aria-hidden="true" className={styles.barTrack}>
                   <span className={styles.barReport} style={{ width: `${(club.reportPoints / max) * 100}%` }} title={`Report points: ${number(club.reportPoints)}`} />
                   <span className={styles.barRegistration} style={{ width: `${(registration / max) * 100}%` }} title={`Yearly registration: ${number(registration)}`} />
@@ -255,12 +262,13 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
               </li>
             );
           })}
-        </ol>
+        </BarList>
       )}
       <ul aria-label="Legend" className={styles.legend}>
         <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesDark}`} />Report points</li>
         <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesLight}`} />Yearly registration</li>
       </ul>
+      <div className={compact ? styles.footerCompact : styles.footer}>
       {showAllHref && ranked.length > shown.length && (
         <p className={styles.more}><Link className={styles.moreLink} href={showAllHref}>Show all {number(ranked.length)} clubs</Link></p>
       )}
@@ -275,7 +283,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
             <tbody>
               {ranked.map((club, index) => (
                 <tr key={club.id}>
-                  <td>{index + 1}</td>
+                  <td>{ranks?.get(club.id) ?? index + 1}</td>
                   <th scope="row" translate="no">{club.name}</th>
                   <td>{number(club.reportPoints)}</td>
                   <td>{number(club.totalPoints - club.reportPoints)}</td>
@@ -286,6 +294,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
           </table>
         </div>
       </details>
+      </div>
     </figure>
   );
 }
