@@ -227,15 +227,17 @@ export function AppShell({
   // The health record import page only exists while the Health Record feature is on (#1232).
   const showClubsItem = (item: NavigationItem) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false;
   const clubsNavItems = clubsAdminNavigation.filter(showClubsItem);
+  // The phone bar has no Points or Events items (they carry a #), so on those views it keeps the page's own item lit (#1304).
+  const phoneClubsHref = clubsView && activeClubsHref && !clubsNavItems.some((item) => item.href === activeClubsHref) ? clubsAdminActiveHref(pathname) : activeClubsHref;
   // The year-aware Clubs links keep the club year the URL has (#1245).
   const clubsLinkYear = clubsView ? requestedClubYear(searchParams.get("year")) : null;
   const onEventsAdminHome = pathname === eventsAdminHomeItem.href;
   // The phone Clubs bar scrolls sideways (#1232): bring the page's own item into view when the page changes.
   const clubsMobileNavRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (!activeClubsHref) return;
+    if (!phoneClubsHref) return;
     clubsMobileNavRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [activeClubsHref]);
+  }, [phoneClubsHref]);
   // Event Admins can ask for a module (#741 slice 3); system administrators turn modules on directly.
   const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
   // The other workspaces this staff identity may switch into (#108): the
@@ -692,7 +694,7 @@ export function AppShell({
       {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
       {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation" ref={clubsMobileNavRef}>
         {clubsNavItems.map(({ href, icon: Icon, label }) => (
-          <GuardedLink className={activeClubsHref === href ? "active" : undefined} href={clubsAdminHrefForYear(href, clubsLinkYear)} key={href} aria-current={activeClubsHref === href ? "page" : undefined}>
+          <GuardedLink className={phoneClubsHref === href ? "active" : undefined} href={clubsAdminHrefForYear(href, clubsLinkYear)} key={href} aria-current={phoneClubsHref === href ? "page" : undefined}>
             <Icon aria-hidden="true" size={22} /><span>{label}</span>
           </GuardedLink>
         ))}

@@ -62,7 +62,13 @@ describe("authorized portal directory", () => {
     expect(html).toContain('<h2 translate="no">Synthetic club 12</h2>');
     expect(renderToStaticMarkup(h(PortalClubDirectory, {
       slice: portalClubDirectory(clubs, new Map(), "No such club", 1), query: "No such club", total: 25,
-    }))).toContain("No club or church matches");
+    }))).toContain("No club, church or city matches");
+    // The director page's own, narrower label gives the matching empty text (#1304).
+    const director = renderToStaticMarkup(h(PortalClubDirectory, {
+      slice: portalClubDirectory(clubs, new Map(), "No such club", 1), query: "No such club", total: 25, searchLabel: "Search by club or church",
+    }));
+    expect(director).toContain("No club or church matches");
+    expect(director).not.toContain("city");
   });
 });
 

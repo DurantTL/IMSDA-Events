@@ -140,6 +140,17 @@ describe("the Clubs sidebar groups", () => {
     expect(clubsAdminActiveHref("/admin/clubs/reports", "points")).toBe("/admin/clubs/reports");
   });
 
+  it("keeps the phone Clubs bar lit on the Points and Events views (#1304)", () => {
+    const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
+    const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
+    for (const search of ["view=points", "view=events"]) {
+      navigation.pathname = "/admin/clubs/summary"; navigation.search = search;
+      const bar = phone(render({ user: staff, adminRoleView: view }));
+      expect(bar.match(/aria-current="page"/g), search).toHaveLength(1);
+      expect(bar).toMatch(/aria-current="page"(?:(?!<\/a>)[^])*Club summary/);
+    }
+  });
+
   it("draws the groups closed, opens the one holding the page, and keeps the health import rule", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     navigation.pathname = "/admin/clubs";

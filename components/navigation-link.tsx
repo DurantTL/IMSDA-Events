@@ -8,7 +8,7 @@ import type { ComponentProps } from "react";
  * (see globals.css). It adds no accessible text, so the route's loading status (`loading.tsx`) is the one announcement.
  */
 export function NavigationPending({ pending }: { pending: boolean }) {
-  return <span aria-hidden="true" data-navigation-pending={pending ? "true" : "false"} />;
+  return <span className="sr-only" aria-hidden="true" data-navigation-pending={pending ? "true" : "false"} />;
 }
 
 function LinkPending() {

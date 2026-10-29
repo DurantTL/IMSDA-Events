@@ -114,6 +114,7 @@ describe("real pending navigation", () => {
     // The cue is visual only (#1304): no added accessible text and no live region; loading.tsx announces.
     const cue = container.querySelector('[data-navigation-pending="true"]')!;
     expect(cue.getAttribute("aria-hidden")).toBe("true");
+    expect(cue.classList.contains("sr-only")).toBe(true);
     expect(cue.textContent).toBe("");
     expect(container.querySelector("a")?.textContent).toBe("Open clubs");
     expect(container.querySelector('[role="status"]')).toBeNull();
