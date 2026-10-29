@@ -47,7 +47,7 @@ async function getHandler(request: Request, context: RouteContext) {
       entityId: organizationId,
       summary: "Downloaded a club's meeting attendance export as CSV.",
       metadata: {
-        organizationId, clubYear, meetingCount: data.meetings.length, memberCount: data.members.length,
+        organizationId, clubYear, from: from ?? null, to: to ?? null, meetingCount: data.meetings.length, memberCount: data.members.length,
         ...("accountId" in actor ? { accountId: actor.accountId } : {}),
         ...("actAsId" in actor ? { actAsId: actor.actAsId } : {}),
       },
@@ -57,7 +57,7 @@ async function getHandler(request: Request, context: RouteContext) {
         "Content-Type": "text/csv; charset=utf-8",
         "Cache-Control": "private, no-store, max-age=0",
         "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="${attendanceExportFileName(clubYear)}"`,
+        "Content-Disposition": `attachment; filename="${attendanceExportFileName(clubYear, { from, to })}"`,
       },
     });
   } catch (error) {

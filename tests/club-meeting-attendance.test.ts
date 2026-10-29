@@ -46,6 +46,7 @@ import { POST as POST_NOTE } from "@/app/api/attendee/clubs/[organizationId]/not
 import { GET as EXPORT } from "@/app/api/attendee/clubs/[organizationId]/exports/attendance/route";
 import {
   attendanceExportCsv,
+  attendanceExportFileName,
   attendanceGroupOf,
   attendanceMarkKey,
   countsFromAttendance,
@@ -53,7 +54,7 @@ import {
   presentTotal,
   groupAttendanceRoster,
 } from "@/modules/club-meeting-notes/attendance";
-import { defaultMeetingDate, meetingAttendanceTotal, notesMonthlySummary, recordsMonth } from "@/modules/club-meeting-notes/domain";
+import { defaultMeetingDate, meetingAttendanceTotal, monthDateBounds, notesMonthlySummary, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { eraseRosterRow } from "@/modules/club-rosters/repository";
 import { createClubMeetingNote, updateClubMeetingNote } from "@/modules/club-meeting-notes/repository";
 import { meetingNoteInputSchema } from "@/modules/club-meeting-notes/schemas";
@@ -354,6 +355,28 @@ describe("attendance needs roster access (ADR 0005)", () => {
     expect(mocks.noteFindMany.mock.calls[0][0].where).toMatchObject({ organizationId: "club-1" });
   });
 
+  it("exports the selected month with a month file name and the range in the audit row", async () => {
+    role("DIRECTOR");
+    const response = await EXPORT(request("?year=2026-27&from=2026-10-01&to=2026-10-31"), ctx);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Disposition")).toContain('filename="meeting-attendance-2026-10.csv"');
+    expect(mocks.noteFindMany.mock.calls[0][0].where.meetingDate).toEqual({ gte: "2026-10-01", lte: "2026-10-31" });
+    expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ from: "2026-10-01", to: "2026-10-31" });
+  });
+
+  it("keeps the whole-year export unfiltered with the year file name", async () => {
+    role("DIRECTOR");
+    const response = await EXPORT(request("?year=2026-27"), ctx);
+    expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="meeting-attendance-2026-27.csv"');
+    expect(mocks.noteFindMany.mock.calls[0][0].where.meetingDate).toEqual({});
+  });
+
+  it("keeps a reporter out of the month export too (403)", async () => {
+    role("REPORTER");
+    expect((await EXPORT(request("?year=2026-27&from=2026-10-01&to=2026-10-31"), ctx)).status).toBe(403);
+    expect(mocks.noteFindMany).not.toHaveBeenCalled();
+  });
+
   it("lets a registrar, who has the roster, download it", async () => {
     role("REGISTRAR");
     expect((await EXPORT(request(), ctx)).status).toBe(200);
@@ -380,6 +403,40 @@ describe("attendance needs roster access (ADR 0005)", () => {
     expect(extras.where.status).toEqual({ not: "REMOVED" });
     expect((await EXPORT(request("?from=2026-02-31"), ctx)).status).toBe(400);
     expect((await EXPORT(request("?from=2026-11-01&to=2026-10-01"), ctx)).status).toBe(400);
+  });
+});
+
+describe("month export bounds and file names (#1320)", () => {
+  it("gives the first and last day of every month length, including leap Februarys", () => {
+    expect(monthDateBounds("2026-01")).toEqual({ from: "2026-01-01", to: "2026-01-31" });
+    expect(monthDateBounds("2026-02")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(monthDateBounds("2028-02")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+    expect(monthDateBounds("2100-02").to).toBe("2100-02-28");
+    expect(monthDateBounds("2000-02").to).toBe("2000-02-29");
+    expect(monthDateBounds("2026-04").to).toBe("2026-04-30");
+    expect(monthDateBounds("2026-12")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+
+  it("does not depend on the clock or the time zone", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      for (const now of ["2026-12-31T23:59:59-11:00", "2026-01-01T00:00:00+14:00"]) {
+        vi.setSystemTime(new Date(now));
+        expect(monthDateBounds("2026-10")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+        expect(monthDateBounds("2026-11").to).toBe("2026-11-30");
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the file for the year, one month, or any other range", () => {
+    expect(attendanceExportFileName("2026-27")).toBe("meeting-attendance-2026-27.csv");
+    expect(attendanceExportFileName("2026-27", {})).toBe("meeting-attendance-2026-27.csv");
+    expect(attendanceExportFileName("2026-27", { from: "2026-10-01", to: "2026-10-31" })).toBe("meeting-attendance-2026-10.csv");
+    expect(attendanceExportFileName("2026-27", { from: "2026-10-01", to: "2026-10-30" })).toBe("meeting-attendance-2026-27-2026-10-01-to-2026-10-30.csv");
+    expect(attendanceExportFileName("2026-27", { from: "2026-10-01" })).toBe("meeting-attendance-2026-27-2026-10-01-to-end.csv");
+    expect(attendanceExportFileName("2026-27", { to: "2026-10-31" })).toBe("meeting-attendance-2026-27-start-to-2026-10-31.csv");
   });
 });
 

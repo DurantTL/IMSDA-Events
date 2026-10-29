@@ -34,6 +34,14 @@ export function isMeetingDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+/** First and last calendar day of a `YYYY-MM` month as date strings. Pure string math, no Date or time zone. */
+export function monthDateBounds(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const days = monthNumber === 2 ? (leap ? 29 : 28) : [4, 6, 9, 11].includes(monthNumber) ? 30 : 31;
+  return { from: `${month}-01`, to: `${month}-${String(days).padStart(2, "0")}` };
+}
+
 /** "2026-10-14" → "2026-10". */
 export function meetingNoteMonth(meetingDate: string) {
   return meetingDate.slice(0, 7);

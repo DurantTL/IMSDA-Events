@@ -5,7 +5,7 @@ import { PortalContextualHelp } from "@/components/contextual-help-slot";
 import { ClubMeetingNotes } from "@/components/club-meeting-notes";
 import { ClubReportForm } from "@/components/club-report-form";
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { defaultMeetingDate, recordsMonth } from "@/modules/club-meeting-notes/domain";
+import { defaultMeetingDate, monthDateBounds, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { listAttendanceRoster, listClubMeetingNotes, monthlyNotesSummary } from "@/modules/club-meeting-notes/repository";
 import {
   ON_TIME_POINTS,
@@ -153,6 +153,7 @@ export default async function ClubRecordsPage({
       <ClubMeetingNotes
         attendanceAvailable={attendanceAvailable}
         exportHref={exportable ? `${apiBase}/exports/attendance?year=${encodeURIComponent(clubYear)}` : null}
+        exportMonthHref={exportable ? `${apiBase}/exports/attendance?year=${encodeURIComponent(clubYear)}&from=${monthDateBounds(month).from}&to=${monthDateBounds(month).to}` : null}
         initialNotes={notes}
         key={month}
         month={month}
