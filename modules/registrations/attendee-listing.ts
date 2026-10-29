@@ -232,7 +232,37 @@ export const LISTING_COLUMNS: ReadonlyArray<{ key: ListingSortKey; label: string
   { key: "accountHolderEmail", label: "Account holder email" },
 ];
 
+export type ListingViewId = "everything" | "checkin" | "meals" | "childcare" | "contacts";
+
+/**
+ * Task view presets (#1307): fixed lists of stable column keys. A preset only
+ * ever hides columns; `visibleListingColumns` intersects it with what the
+ * viewer is permitted to see. `name` is in every preset (row header, card title).
+ */
+export const LISTING_VIEWS: ReadonlyArray<{ id: ListingViewId; label: string; columns: readonly ListingSortKey[] }> = [
+  { id: "everything", label: "Everything", columns: LISTING_COLUMNS.map((column) => column.key) },
+  { id: "checkin", label: "Check-in", columns: ["confirmationCode", "status", "name", "attendeeType", "group", "church"] },
+  { id: "meals", label: "Meal planning", columns: ["name", "mealPreference", "dietaryNeeds", "group", "church", "confirmationCode"] },
+  { id: "childcare", label: "Childcare", columns: ["name", "attendeeType", "childcareNeeded", "accountHolderName", "phone", "confirmationCode"] },
+  { id: "contacts", label: "Contacts", columns: ["name", "phone", "accountHolderName", "accountHolderEmail", "church", "confirmationCode"] },
+];
+export const DEFAULT_LISTING_VIEW: ListingViewId = "everything";
+const VIEW_IDS: ReadonlySet<string> = new Set(LISTING_VIEWS.map((view) => view.id));
+
+/** Every column key; today all of them are viewable by anyone who can open the listing. */
+export const ALL_LISTING_COLUMN_KEYS: ReadonlySet<ListingSortKey> = new Set(LISTING_COLUMNS.map((column) => column.key));
+
+/**
+ * The columns to show: the preset's columns (in table order) that are also in
+ * `permitted`. A preset can never add a column the viewer may not see.
+ */
+export function visibleListingColumns(view: ListingViewId, permitted: ReadonlySet<ListingSortKey> = ALL_LISTING_COLUMN_KEYS): typeof LISTING_COLUMNS[number][] {
+  const preset = new Set<ListingSortKey>((LISTING_VIEWS.find((candidate) => candidate.id === view) ?? LISTING_VIEWS[0]!).columns);
+  return LISTING_COLUMNS.filter((column) => preset.has(column.key) && permitted.has(column.key));
+}
+
 export type AttendeeListingQuery = {
+  view: ListingViewId;
   statuses: ListingStatus[];
   meal: MealCategory | null;
   dietaryOnly: boolean;
@@ -261,7 +291,9 @@ export function parseAttendeeListingQuery(params: URLSearchParams | Record<strin
   const statuses = LISTING_STATUSES.filter((status) => requested.includes(status));
   const meal = get("meal");
   const sort = get("sort");
+  const view = get("view");
   return {
+    view: VIEW_IDS.has(view) ? (view as ListingViewId) : DEFAULT_LISTING_VIEW,
     statuses: statuses.length > 0 ? statuses : [...DEFAULT_LISTING_STATUSES],
     meal: MEAL_VALUES.has(meal) ? (meal as MealCategory) : null,
     dietaryOnly: get("dietary") === "1",
@@ -274,6 +306,7 @@ export function parseAttendeeListingQuery(params: URLSearchParams | Record<strin
 /** The query as URL parameters (defaults left out), for links, the form and the export button. */
 export function attendeeListingParams(query: AttendeeListingQuery): URLSearchParams {
   const params = new URLSearchParams();
+  if (query.view !== DEFAULT_LISTING_VIEW) params.set("view", query.view);
   const isDefault = query.statuses.length === DEFAULT_LISTING_STATUSES.length && query.statuses.every((status) => DEFAULT_LISTING_STATUSES.includes(status));
   if (!isDefault) params.set("statuses", query.statuses.join(","));
   if (query.meal) params.set("meal", query.meal);

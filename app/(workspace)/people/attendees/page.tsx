@@ -11,8 +11,10 @@ import { sortOrderText } from "@/lib/list-sort";
 import { isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
+  DEFAULT_LISTING_VIEW,
   LISTING_COLUMNS,
   LISTING_STATUSES,
+  LISTING_VIEWS,
   MEAL_CATEGORIES,
   attendeeListingParams,
   canViewDietaryDetails,
@@ -20,6 +22,7 @@ import {
   filterAttendeeListing,
   mealTotals,
   parseAttendeeListingQuery,
+  visibleListingColumns,
   type AttendeeListingQuery,
 } from "@/modules/registrations/attendee-listing";
 
@@ -41,6 +44,11 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent: await isClubAudienceEvent(event.id) });
   const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
   const totals = mealTotals(rows);
+  // Every column is viewable by VIEW_SENSITIVE_DATA holders (dietary content is gated above, in the rows).
+  const columns = visibleListingColumns(query.view);
+  const activeView = LISTING_VIEWS.find((view) => view.id === query.view) ?? LISTING_VIEWS[0]!;
+  // A sort on a column this view hides still applies, so keep it selectable.
+  const sortOptions = LISTING_COLUMNS.filter((column) => columns.some((visible) => visible.key === column.key) || column.key === query.sort);
   const canExport = permissions.includes("VIEW_REPORTS");
 
   const href = (next: Partial<AttendeeListingQuery>) => {
@@ -48,7 +56,8 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
     urlParams.set("event", event.id);
     return `/people/attendees?${urlParams.toString()}`;
   };
-  const exportParams = attendeeListingParams(query).toString();
+  // The CSV always has every permitted column, so the view is not passed on.
+  const exportParams = attendeeListingParams({ ...query, view: DEFAULT_LISTING_VIEW }).toString();
   const exportHref = `/api/events/${encodeURIComponent(event.id)}/exports/attendees${exportParams ? `?${exportParams}` : ""}`;
 
   return (
@@ -57,10 +66,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <div>
           <p className="eyebrow">{event.name}</p>
           <h2>{staffPageTitles.attendeeList}</h2>
-          <p>One row per attendee, with meal, dietary, childcare and volunteer answers. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown.</p>
+          <p>One row per attendee, with meal, dietary, childcare and volunteer answers. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
         </div>
         <div className="intro-actions">
-          {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</a>}
+          {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</a>}
         </div>
       </div>
 
@@ -76,7 +85,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
 
       {/* Keyed on the current query: a header sort link or Reset is a client navigation that keeps this
           form mounted, and uncontrolled fields would otherwise submit the previous values. */}
-      <form key={JSON.stringify([query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
+      <form key={JSON.stringify([query.view, query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -85,7 +94,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           <label>Sort by
             <select name="sort" defaultValue={query.sort ?? ""}>
               <option value="">Default order</option>
-              {LISTING_COLUMNS.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
+              {sortOptions.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
             </select>
           </label>
           <label>Direction
@@ -95,6 +104,11 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </select>
           </label>
         </div>
+        <label>View
+          <select name="view" defaultValue={query.view}>
+            {LISTING_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
+          </select>
+        </label>
         <label>Search<input type="search" name="q" defaultValue={query.search} placeholder="Name or confirmation code" /></label>
         <label>Meal preference
           <select name="meal" defaultValue={query.meal ?? ""}>
@@ -121,7 +135,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           <caption className="sr-only">Attendees</caption>
           <thead role="rowgroup">
             <tr role="row">
-              {LISTING_COLUMNS.map((column) => {
+              {columns.map((column) => {
                 const active = query.sort === column.key;
                 const nextDirection = active && query.direction === "asc" ? "desc" : "asc";
                 return (
@@ -133,10 +147,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </tr>
           </thead>
           <tbody role="rowgroup">
-            {rows.length === 0 && <tr role="row"><td role="cell" colSpan={LISTING_COLUMNS.length}>No attendees match these filters.</td></tr>}
+            {rows.length === 0 && <tr role="row"><td role="cell" colSpan={columns.length}>No attendees match these filters.</td></tr>}
             {rows.map((row) => (
               <tr role="row" key={row.attendeeId}>
-                {LISTING_COLUMNS.map((column) => {
+                {columns.map((column) => {
                   const value = column.key === "confirmationCode"
                     ? <Link href={`/people?event=${encodeURIComponent(event.id)}&registration=${encodeURIComponent(row.registrationId)}`}>{row.confirmationCode}</Link>
                     : row[column.key];

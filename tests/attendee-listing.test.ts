@@ -14,6 +14,11 @@ import {
   mealCategoryOf,
   mealTotals,
   parseAttendeeListingQuery,
+  visibleListingColumns,
+  LISTING_VIEWS,
+  LISTING_COLUMNS,
+  ALL_LISTING_COLUMN_KEYS,
+  type ListingSortKey,
 } from "@/modules/registrations/attendee-listing";
 
 const definition = formTemplates.find((template) => template.key === "womens_retreat_export")!.definition as unknown as Record<string, unknown>;
@@ -297,5 +302,66 @@ describe("group registrations", () => {
     const [row] = build([group]);
     expect(row.church).toBe("");
     expect(row.mealPreference).toBe("Vegan");
+  });
+});
+
+describe("task view presets (#1307)", () => {
+  const keys = (view: Parameters<typeof visibleListingColumns>[0], permitted?: ReadonlySet<ListingSortKey>) => visibleListingColumns(view, permitted).map((column) => column.key);
+
+  it("everything is every column, in table order", () => {
+    expect(keys("everything")).toEqual(LISTING_COLUMNS.map((column) => column.key));
+  });
+
+  it.each([
+    ["checkin", ["confirmationCode", "status", "name", "attendeeType", "group", "church"]],
+    ["meals", ["name", "mealPreference", "dietaryNeeds", "group", "church", "confirmationCode"]],
+    ["childcare", ["name", "attendeeType", "childcareNeeded", "accountHolderName", "phone", "confirmationCode"]],
+    ["contacts", ["name", "phone", "accountHolderName", "accountHolderEmail", "church", "confirmationCode"]],
+  ] as const)("%s shows its columns in table order, always with name", (view, expected) => {
+    const order = LISTING_COLUMNS.map((column) => column.key).filter((key) => (expected as readonly string[]).includes(key));
+    expect(keys(view)).toEqual(order);
+    expect(keys(view)).toContain("name");
+  });
+
+  it("never shows a column outside the permitted set, whatever the preset", () => {
+    const withoutPhoneAndEmail = new Set([...ALL_LISTING_COLUMN_KEYS].filter((key) => key !== "phone" && key !== "accountHolderEmail"));
+    for (const view of LISTING_VIEWS) {
+      const shown = keys(view.id, withoutPhoneAndEmail);
+      expect(shown).not.toContain("phone");
+      expect(shown).not.toContain("accountHolderEmail");
+      expect(shown.every((key) => view.columns.includes(key))).toBe(true);
+    }
+    expect(keys("contacts", withoutPhoneAndEmail)).toEqual(["name", "church", "accountHolderName", "confirmationCode"].sort((a, b) => LISTING_COLUMNS.findIndex((c) => c.key === a) - LISTING_COLUMNS.findIndex((c) => c.key === b)));
+    expect(keys("meals", new Set<ListingSortKey>())).toEqual([]);
+  });
+
+  it("keeps dietary needs at Yes or No under the meals view without health access", () => {
+    const hidden = build(registrations, false);
+    const shown = visibleListingColumns("meals");
+    expect(shown.map((column) => column.key)).toContain("dietaryNeeds");
+    const cells = hidden.slice(0, 2).map((row) => shown.map((column) => row[column.key]).join("|"));
+    expect(cells.join("\n")).not.toContain("peanuts");
+    expect(hidden.slice(0, 2).map((row) => row.dietaryNeeds)).toEqual(["Yes", "No"]);
+  });
+
+  it("round-trips view through the URL and omits the default", () => {
+    const query = parseAttendeeListingQuery(new URLSearchParams("view=meals&meal=vegan&sort=name"));
+    expect(query.view).toBe("meals");
+    expect(attendeeListingParams(query).get("view")).toBe("meals");
+    expect(parseAttendeeListingQuery(attendeeListingParams(query))).toEqual(query);
+    expect(attendeeListingParams(parseAttendeeListingQuery(new URLSearchParams("view=everything"))).has("view")).toBe(false);
+  });
+
+  it("falls back to everything for unknown values", () => {
+    for (const value of ["", "nonsense", "MEALS", "meals;drop", "__proto__"]) {
+      expect(parseAttendeeListingQuery(new URLSearchParams({ view: value })).view).toBe("everything");
+    }
+  });
+
+  it("leaves the CSV on every column whatever the view", () => {
+    const shown = filterAttendeeListing(rows, parseAttendeeListingQuery(new URLSearchParams("view=checkin")));
+    const header = attendeeListingCsv(shown).slice(1).split("\r\n")[0];
+    expect(header).toBe(LISTING_COLUMNS.map((column) => `"${column.label}"`).join(","));
+    expect(attendeeListingCsv(shown)).toBe(attendeeListingCsv(filterAttendeeListing(rows, defaults)));
   });
 });
