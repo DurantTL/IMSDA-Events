@@ -6,6 +6,7 @@ import { ActionsMenu } from "@/components/actions-menu";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
+import { CalendarWidgetEmbed } from "@/components/calendar-widget-embed";
 import { DeadlineRemindersPanel } from "@/components/deadline-reminders-panel";
 import { ConfirmDialog, cancelUnlessBusy } from "@/components/confirm-dialog";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -112,12 +113,15 @@ export function CalendarAdminWorkspace({
   initialEvents,
   initialFeeds = [],
   initialReminders = { batches: [], emailConfigured: true },
+  widgetEmbedCode = "",
 }: {
   initialEntries: CalendarAdminEntry[];
   initialEvents: CalendarAdminEvent[];
   initialFeeds?: CalendarAdminFeed[];
   /** Deadline reminder batches waiting for a send (#910). */
   initialReminders?: PendingReminders;
+  /** The upcoming-events widget's embed code (#107); empty hides the section. */
+  widgetEmbedCode?: string;
 }) {
   const [tab, setTab] = useState<"entries" | "events" | "imports" | "reminders">("entries");
   const [reminderCount, setReminderCount] = useState(initialReminders.batches.length);
@@ -304,6 +308,8 @@ export function CalendarAdminWorkspace({
       <div hidden={tab !== "imports"}>
         <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={setEntries} />
       </div>
+
+      {widgetEmbedCode && tab === "events" && <CalendarWidgetEmbed code={widgetEmbedCode} />}
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While a dialog is open, its own alert shows the error; one announcement, not two. */}

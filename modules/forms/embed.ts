@@ -5,7 +5,7 @@ type RegistrationEmbedCodeInput = {
   eventName: string;
 };
 
-function escapeHtmlAttribute(value: string) {
+export function escapeHtmlAttribute(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll('"', "&quot;")
