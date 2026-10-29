@@ -40,6 +40,10 @@
   /* Each club reads as a compact card: name, then the month's status, the year strip and one action. */
   .table :is(td, th) { min-width: 0; }
   .status, .year, .action { padding-block: 2px; }
+  /* Year so far: the label sits above the strip (full row width) and the strip wraps, so 12 cells fit at 360px. */
+  .table.table > tbody > tr > td.year { padding-left: 0; }
+  .table.table > tbody > tr > td.year::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+  .year > [role="img"] { display: flex; flex-wrap: wrap; max-width: 100%; }
 }
 
 .fullYear { min-width: 0; }

@@ -93,10 +93,14 @@ describe("Monthly Records by month (#1315)", () => {
   it("opens on the current report month and marks it in the picker", async () => {
     const html = await page();
     expect(html).toContain('<nav aria-label="Report month"');
-    expect(html).toMatch(/aria-current="page"[^>]*>(?:(?!<\/a>)[\s\S])*Nov/);
-    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toMatch(/aria-current="date"[^>]*>(?:(?!<\/a>)[\s\S])*Nov/);
+    expect(html.match(/aria-current="date"/g)).toHaveLength(1);
     expect(html).toContain("November 2026");
     expect(html).toContain("Nov record");
+    // The short name is hidden from assistive tech so the full month is read once; the selected month is not "page".
+    expect(html).toContain('<span aria-hidden="true" class="');
+    expect(html).not.toContain('aria-current="page"');
+    expect(html).not.toContain("aria-disabled");
   });
 
   it("?month= selects a month and keeps the search and year in the picker links", async () => {

@@ -44,25 +44,26 @@ export function CoordinatorMonthPicker({ clubYear, month, query, clubs, now }: V
         {previous ? (
           <Link className={styles.step} href={href(previous)}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, {reportMonthLabel(previous)}</span></Link>
         ) : (
-          <span aria-disabled="true" className={`${styles.step} ${styles.stepOff}`}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, none</span></span>
+          <span className={`${styles.step} ${styles.stepOff}`}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, none</span></span>
         )}
         <strong className={styles.current}>{reportMonthLabel(month)}</strong>
         {next ? (
           <Link className={styles.step} href={href(next)}>Next<span className="sr-only"> month, {reportMonthLabel(next)}</span> <ChevronRight aria-hidden="true" size={16} /></Link>
         ) : (
-          <span aria-disabled="true" className={`${styles.step} ${styles.stepOff}`}>Next<span className="sr-only"> month, none</span> <ChevronRight aria-hidden="true" size={16} /></span>
+          <span className={`${styles.step} ${styles.stepOff}`}>Next<span className="sr-only"> month, none</span> <ChevronRight aria-hidden="true" size={16} /></span>
         )}
       </div>
       <ul className={styles.months}>
         {totals.map((total) => (
           <li key={total.month}>
             <Link
-              aria-current={total.month === month ? "page" : undefined}
+              aria-current={total.month === month ? "date" : undefined}
               className={`${styles.monthLink}${total.month === month ? ` ${styles.monthSelected}` : ""}`}
               href={href(total.month)}
             >
-              <span className={styles.monthName}>{shortMonth(total.month)}<span className="sr-only"> {reportMonthLabel(total.month)}</span></span>
-              <small>{total.submitted}/{total.clubs}<span className="sr-only"> submitted</span></small>
+              <span aria-hidden="true" className={styles.monthName}>{shortMonth(total.month)}</span>
+              <span className="sr-only">{reportMonthLabel(total.month)}</span>
+              <small><span aria-hidden="true">{total.submitted}/{total.clubs}</span><span className="sr-only">, {total.submitted} of {total.clubs} submitted</span></small>
             </Link>
           </li>
         ))}
