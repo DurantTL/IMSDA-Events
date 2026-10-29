@@ -730,8 +730,8 @@ async function helperLinesFrom(organizationId: string, picture: NeededPicture): 
     select: { itemId: true, quantity: true },
   });
   const overrideByItem = new Map(overrides.map((row) => [row.itemId, row.quantity]));
-  // Honors added by hand (#1330). One whose honor now has an active catalog
-  // item folds into that item's line, as its quantity override, unless the
+  // Honors added by hand (#1330). One whose honor now has a catalog item
+  // (`firstLinkedItemId`, active or not) folds into that item's line, as its quantity override, unless the
   // item has a line of its own (that one wins); the rest are catalog-free lines.
   const honorRows = await getPrisma().clubOrderHonorLine.findMany({
     where: { organizationId },
@@ -786,7 +786,8 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
   return getPrisma().$transaction(async (tx) => {
     await lockClubOrders(tx, organizationId);
     const item = await tx.clubSupplyItem.findUnique({ where: { id: itemId }, select: { isActive: true } });
-    if (!item || (!item.isActive && quantity !== null)) {
+    // A retired item can still be taken off the list (0) or reset, never ordered.
+    if (!item || (!item.isActive && quantity !== null && quantity !== 0)) {
       throw new ClubOrderError("ITEM_NOT_ORDERABLE", "That catalog item could not be found.");
     }
     // The item line takes over (#1330): a by-hand honor line folded into this item must not keep
@@ -812,7 +813,7 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
       action: "CLUB_ORDER_LIST_LINE_SET",
       entityType: "ClubOrderListLine",
       summary: quantity === null ? "Reset a club order list line to its computed count." : `Set a club order list line to ${quantity}.`,
-      metadata: { organizationId, itemId, quantity, ...who.metadata },
+      metadata: { organizationId, itemId, quantity, clearedHonorLines: foldedIds.length, ...who.metadata },
     }, tx);
     return { itemId, quantity };
   });
@@ -821,8 +822,8 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
 /**
  * Sets the quantity for an honor with no catalog item on a club's helper list
  * (#1330): a positive number adds or changes the line, 0 or `null` removes it.
- * Only an active honor with no catalog item (see `firstLinkedItemId`) can be added; one that has an
- * active catalog item is refused (the catalog item's own line is the one to use,
+ * Only an active honor with no catalog item (see `firstLinkedItemId`) can be added; one that has a
+ * catalog item (active or not) is refused (the catalog item's own line is the one to use,
  * so a thing is never on the list twice). Removing is always allowed, so a line
  * left over from before the honor was linked can still be cleared. Audited with
  * ids and the number only.

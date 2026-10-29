@@ -64,7 +64,7 @@ describe("setOrderListQuantity (#654)", () => {
       update: { quantity: 4 },
     });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "CLUB_ORDER_LIST_LINE_SET", metadata: expect.objectContaining({ organizationId: "club-1", itemId: "knots", quantity: 4 }) }),
+      expect.objectContaining({ action: "CLUB_ORDER_LIST_LINE_SET", metadata: expect.objectContaining({ organizationId: "club-1", itemId: "knots", quantity: 4, clearedHonorLines: 0 }) }),
       expect.anything(),
     );
   });
@@ -75,13 +75,16 @@ describe("setOrderListQuantity (#654)", () => {
     expect(mocks.lineUpsert).not.toHaveBeenCalled();
   });
 
-  it("refuses an unknown item, and an inactive one unless resetting", async () => {
+  it("refuses an unknown item, and ordering an inactive one; an inactive one can still be reset or taken off", async () => {
     mocks.itemFindUnique.mockResolvedValue(null);
     await expect(setOrderListQuantity("club-1", "nope", 1, actor)).rejects.toBeInstanceOf(ClubOrderError);
     mocks.itemFindUnique.mockResolvedValue({ isActive: false });
     await expect(setOrderListQuantity("club-1", "old", 1, actor)).rejects.toBeInstanceOf(ClubOrderError);
-    await expect(setOrderListQuantity("club-1", "old", null, actor)).resolves.toEqual({ itemId: "old", quantity: null });
     expect(mocks.lineUpsert).not.toHaveBeenCalled();
+    await expect(setOrderListQuantity("club-1", "old", null, actor)).resolves.toEqual({ itemId: "old", quantity: null });
+    // Remove sends 0 (#1330): a by-hand honor line folded into a retired item must still come off.
+    await expect(setOrderListQuantity("club-1", "old", 0, actor)).resolves.toEqual({ itemId: "old", quantity: 0 });
+    expect(mocks.lineUpsert).toHaveBeenCalledWith(expect.objectContaining({ create: { organizationId: "club-1", itemId: "old", quantity: 0 } }));
   });
 });
 
@@ -228,7 +231,7 @@ describe("listHelperLines with honors added by hand (#1330)", () => {
 });
 
 describe("listOrderableUnlinkedHonors (#1330)", () => {
-  it("asks only for active honors with no active catalog item and returns names and ids only", async () => {
+  it("asks only for active honors with no linked catalog item and returns names and ids only", async () => {
     mocks.honorFindMany.mockResolvedValue([{ id: "h1", name: "Archery" }]);
     await expect(listOrderableUnlinkedHonors()).resolves.toEqual([{ honorId: "h1", name: "Archery" }]);
     expect(mocks.honorFindMany.mock.calls[0][0].where).toEqual({ isActive: true, clubSupplyItems: { none: {} } });
