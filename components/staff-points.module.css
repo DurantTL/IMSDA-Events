@@ -2,3 +2,10 @@
 .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
 .clear { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; }
 .empty { margin: 0; padding: 12px 0; }
+
+/* Points toolbar on phones (#1314): year, search and Apply share one row; labels stay visible above their fields. */
+@media (max-width: 600px) {
+  form.toolbar { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; align-items: end; gap: 8px; padding: 10px; }
+  form.toolbar > * { min-width: 0; flex: none; }
+  form.toolbar button { padding: 0 12px; }
+}

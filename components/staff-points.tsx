@@ -7,11 +7,10 @@ import styles from "./staff-points.module.css";
 export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffPointsView }) {
   return (
     <div className={styles.root}>
-      <ReportSummaryBand label={`Points at a glance, all ${view.totalClubs} clubs`} tiles={view.tiles} />
-      <p className={styles.note}>The band always counts every active club for {clubYear}. A search narrows the chart and table only.</p>
+      <ReportSummaryBand compact label={`Points at a glance, all ${view.totalClubs} clubs. A search narrows the chart and table only.`} tiles={view.tiles} />
       {view.query !== "" && (
         <p className={styles.note}>
-          {view.matches.length > 0 && `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”.`}{" "}
+          {view.matches.length > 0 && `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”; the figures above count all clubs.`}{" "}
           <Link className={styles.clear} href={view.clearHref} prefetch={false}>Clear search</Link>
         </p>
       )}
@@ -21,6 +20,7 @@ export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffP
         </p>
       ) : (
         <PointsBars
+          compact
           clubYear={clubYear}
           clubs={view.matches}
           limit={view.chartLimit}

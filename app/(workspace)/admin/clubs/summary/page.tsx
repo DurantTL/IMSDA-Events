@@ -23,6 +23,7 @@ import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-r
 import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import styles from "@/components/club-directory.module.css";
+import pointsStyles from "@/components/staff-points.module.css";
 
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
@@ -87,7 +88,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         ))}
       </nav>
       <h2 className="club-summary-section" id={clubSummaryAnchors[view]}>{views.find((item) => item.key === view)!.label}</h2>
-      <form className={styles.toolbar} method="get" action="/admin/clubs/summary">
+      <form className={view === "points" ? `${styles.toolbar} ${pointsStyles.toolbar}` : styles.toolbar} method="get" action="/admin/clubs/summary">
         <input type="hidden" name="view" value={view} />
         <label>Club year<select name="year" defaultValue={clubYear}>{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
         {view === "directory" ? <>
@@ -97,7 +98,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
           {view === "points" && <>
             <input type="hidden" name="sort" value={sort} />
             {points?.expanded && <input type="hidden" name="all" value="1" />}
-            <label className={styles.search}>Search by club or church name<input type="search" name="q" defaultValue={points?.query} maxLength={80} autoComplete="off" /></label>
+            <label className={styles.search}>Search<span className="sr-only"> by club or church name</span><input type="search" name="q" defaultValue={points?.query} maxLength={80} autoComplete="off" /></label>
           </>}
         </>}
         <button className="secondary-button" type="submit">{view === "directory" ? "Find clubs" : view === "points" ? "Apply" : "Apply year"}</button>
