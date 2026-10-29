@@ -234,6 +234,8 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
   const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
   const description = `${pointsChartDescription(ranked, clubYear)} Each bar is split into report points and yearly registration points.`
     + (ranked.length > shown.length ? ` The chart shows the top ${shown.length}; the table lists all ${ranked.length}.` : "");
+  // With ranks (a search), list positions would contradict the whole-year rank each row announces.
+  const BarList = ranks ? "ul" : "ol";
   const titleId = `${base}-title`;
   const descId = `${base}-desc`;
   return (
@@ -243,7 +245,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
       </figcaption>
       <p className="sr-only" id={descId}>{description}</p>
       {shown.length === 0 ? <p className={styles.empty}>No active clubs for {clubYear}.</p> : (
-        <ol className={styles.bars}>
+        <BarList className={styles.bars}>
           {shown.map((club) => {
             const registration = club.totalPoints - club.reportPoints;
             return (
@@ -257,7 +259,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
               </li>
             );
           })}
-        </ol>
+        </BarList>
       )}
       <ul aria-label="Legend" className={styles.legend}>
         <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesDark}`} />Report points</li>
