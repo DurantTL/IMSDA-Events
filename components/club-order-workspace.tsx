@@ -86,6 +86,12 @@ export function orderSectionLinks(hasWaiting: boolean, readOnly = false): { id: 
   ];
 }
 
+/** The picker's matches (#1324): active items not already listed, found by name, item number, size or linked honor name. */
+export function filterPickerItems(stock: readonly ClubStockRow[], listed: ReadonlySet<string>, query: string) {
+  const matches = makeSearchMatcher(query);
+  return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
+}
+
 /** Most items the "add an item" picker lists at once. */
 const PICKER_LIMIT = 100;
 
@@ -188,9 +194,7 @@ export function ClubOrderWorkspace({
     return [...groups.entries()];
   }, [data.awardable]);
   const pickerItems = useMemo(() => {
-    const listed = new Set(onList.map((line) => line.itemId));
-    const matches = makeSearchMatcher(pickerQuery);
-    return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
+    return filterPickerItems(stock, new Set(onList.map((line) => line.itemId)), pickerQuery);
   }, [stock, pickerQuery, onList]);
   const shownPickerItems = useMemo(() => pickerItems.slice(0, PICKER_LIMIT), [pickerItems]);
   const pickerSummary = pickerItems.length > PICKER_LIMIT
@@ -453,12 +457,12 @@ export function ClubOrderWorkspace({
       <section className={styles.block} id={ORDER_SECTION_IDS.list}>
         <h3>Your order list</h3>
         {unmatchedCount > 0 && (
-          <div className={styles.flag} id="club-order-unmatched" role="status">
+          <div className={styles.flag} id="club-order-unmatched">
             <Info aria-hidden="true" size={14} />
             <div className={styles.unmatched}>
-              <p>{unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.</p>
+              <p role="status">{unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.</p>
               <details className={styles.earlierDetails}>
-                <summary>Show which {unmatchedHonors.length === 1 ? "honor" : "honors"} to order separately</summary>
+                <summary>{`${unmatchedHonors.length === 1 ? "Honor" : "Honors"} to order separately (${unmatchedHonors.length})`}</summary>
                 <ul className={styles.unmatchedList}>
                   {unmatchedHonors.map((honor) => (
                     <li key={honor.name}><span translate="no">{honor.name}</span> · {honor.members} {honor.members === 1 ? "member" : "members"}</li>
@@ -625,6 +629,9 @@ export function ClubOrderWorkspace({
             <a className="secondary-button" href={`${base}/csv?view=picklist`}><Download aria-hidden="true" size={14} /> Pick list (who gets what)</a>
           ) : null}
         </div>
+        {onList.length > 0 && (
+          <p className={`field-help ${styles.helpText}`}>Export list has the club details and a calculated column. Export everything is one plain table: honors, uniforms and other items together, one row per item.</p>
+        )}
         {onList.length === 0 && <p className={`field-help ${styles.helpText}`} id="club-order-nothing">Nothing on the list to export yet.</p>}
       </section>
 

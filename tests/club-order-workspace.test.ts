@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ADVENTSOURCE_URL, ClubOrderWorkspace, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
+import { ADVENTSOURCE_URL, ClubOrderWorkspace, filterPickerItems, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
 /**
@@ -171,7 +171,7 @@ describe("ClubOrderWorkspace (#654)", () => {
       const html = render(readOnly);
       expect(html).toContain("Conference staff can link the honor in the supply catalog.");
       expect(html).toContain("3 completed honors have no matching catalog item");
-      expect(html).toMatch(/<details[^>]*>\s*<summary>Show which honors to order separately<\/summary>/);
+      expect(html).toMatch(/<details[^>]*>\s*<summary>Honors to order separately \(2\)<\/summary>/);
       expect(html).toContain("Archery</span> · 1 member<");
       expect(html).toContain("Orienteering</span> · 2 members<");
       const block = html.slice(html.indexOf('id="club-order-unmatched"'), html.indexOf("</details>"));
@@ -191,6 +191,18 @@ describe("ClubOrderWorkspace (#654)", () => {
     expect(html).toContain("Search honors and items");
     expect(html).toContain("Knot Tying Patch · 002120 · honor: Knots and Lashings");
     expect(render(true)).not.toContain("Search honors and items");
+  });
+
+  it("the picker keeps an item whose linked honor name matches the search and drops a non-match (#1324)", () => {
+    expect(filterPickerItems(stock, new Set(), "lashings").map((row) => row.itemId)).toEqual(["x1"]);
+    expect(filterPickerItems(stock, new Set(), "lashings").map((row) => row.itemId)).not.toContain("i1");
+    expect(filterPickerItems(stock, new Set(["x1"]), "lashings")).toEqual([]);
+  });
+
+  it("keeps the unmatched sentence as the only live region, with the list outside it (#1324)", () => {
+    const html = render(false);
+    expect(html).toMatch(/<p role="status">3 completed honors/);
+    expect(html).not.toContain('id="club-order-unmatched" role="status"');
   });
 
   it("offers the list export (CSV and printable) and the pick list", () => {
