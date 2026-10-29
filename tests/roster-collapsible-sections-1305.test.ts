@@ -43,8 +43,8 @@ describe("collapsible sections markup", () => {
     const html = render();
     const sections = html.match(/<details[^>]*data-roster-section="[A-Z]+"/g) ?? [];
     expect(sections).toHaveLength(2);
-    expect(html).toMatch(/<summary[^>]*>.*?Staff<\/span> <span class="count-badge">1<\/span><\/summary>/s);
-    expect(html).toMatch(/<summary[^>]*>.*?Members<\/span> <span class="count-badge">1<\/span><\/summary>/s);
+    expect(html).toMatch(/<summary[^>]*>[\s\S]*?Staff<\/span> <span class="count-badge">1<\/span><\/summary>/);
+    expect(html).toMatch(/<summary[^>]*>[\s\S]*?Members<\/span> <span class="count-badge">1<\/span><\/summary>/);
     expect(html.match(/<table/g)).toHaveLength(2);
     expect(html).toContain('aria-labelledby="roster-section-staff-title"');
     expect(html).toContain('id="roster-section-staff-title"');
@@ -70,7 +70,7 @@ describe("row actions (#1305)", () => {
   it("shows a visible Edit word with a person-specific name, and Remove only inside the Actions menu", () => {
     const html = render();
     expect(html).toContain('aria-label="Edit Pat Pathfinder"');
-    expect(html).toMatch(/aria-label="Edit Pat Pathfinder"[^>]*>.*?<\/svg> Edit<\/button>/s);
+    expect(html).toMatch(/aria-label="Edit Pat Pathfinder"[^>]*>[\s\S]*?<\/svg> Edit<\/button>/);
     expect(html).toContain("Actions for Pat Pathfinder");
     const menuStart = html.indexOf("Actions for Pat Pathfinder");
     const remove = html.indexOf('aria-label="Remove Pat Pathfinder"');

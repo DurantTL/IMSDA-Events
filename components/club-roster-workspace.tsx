@@ -2,7 +2,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -96,6 +96,26 @@ function dropFilterParams(...names: string[]) {
   } catch {
     // A page without a usable address bar (a preview) simply keeps its address.
   }
+}
+
+/** Remembered Staff/Members open state (#1305), kept in this browser only. Read with useSyncExternalStore so the server render and first client render agree (the role default). */
+const sectionChoiceListeners = new Set<() => void>();
+function readSectionChoices(organizationId: string) {
+  return (["STAFF", "MEMBERS"] as const).map((key) => {
+    try {
+      return window.localStorage.getItem(rosterSectionStorageKey(organizationId, key)) ?? "";
+    } catch {
+      return "";
+    }
+  }).join("|");
+}
+function subscribeSectionChoices(listener: () => void) {
+  sectionChoiceListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => {
+    sectionChoiceListeners.delete(listener);
+    window.removeEventListener("storage", listener);
+  };
 }
 
 export function ClubRosterWorkspace({
@@ -350,26 +370,22 @@ export function ClubRosterWorkspace({
    * role default. A filter-forced open is not remembered: closing a section while filtering lasts only until the
    * filters change, and clearing them returns each section to its remembered state.
    */
-  const [remembered, setRemembered] = useState<Partial<Record<SectionKey, boolean>>>({});
+  const savedChoices = useSyncExternalStore(
+    subscribeSectionChoices,
+    () => readSectionChoices(organizationId),
+    () => "",
+  );
+  const remembered: Partial<Record<SectionKey, boolean>> = {};
+  savedChoices.split("|").forEach((value, index) => {
+    if (value === "open" || value === "closed") remembered[index === 0 ? "STAFF" : "MEMBERS"] = value === "open";
+  });
   const filterSignature = `${query}|${detailsOnly}|${complianceFilter ?? ""}`;
   const [filterChoice, setFilterChoice] = useState<{ signature: string; open: Partial<Record<SectionKey, boolean>> }>({ signature: "", open: {} });
   const [hashOpen, setHashOpen] = useState<SectionKey[]>([]);
   const sectionOfPerson = useRef(new Map<string, SectionKey>());
-  sectionOfPerson.current = new Map(sections.flatMap((section) => section.people.map((person) => [person.id, section.key] as const)));
-  // Read after mount, so the server and first client render agree (the role default), then the saved choice applies.
   useEffect(() => {
-    const saved: Partial<Record<SectionKey, boolean>> = {};
-    for (const key of ["STAFF", "MEMBERS"] as const) {
-      try {
-        const value = window.localStorage.getItem(rosterSectionStorageKey(organizationId, key));
-        if (value === "open") saved[key] = true;
-        if (value === "closed") saved[key] = false;
-      } catch {
-        // Storage can be blocked (private window); the role default then applies.
-      }
-    }
-    setRemembered(saved);
-  }, [organizationId]);
+    sectionOfPerson.current = new Map(sections.flatMap((section) => section.people.map((person) => [person.id, section.key] as const)));
+  });
   // A link to #member-<id> opens that person's section so the row can be shown (not remembered).
   useEffect(() => {
     function openForHash() {
@@ -397,12 +413,12 @@ export function ClubRosterWorkspace({
       return;
     }
     setHashOpen((current) => current.filter((key) => key !== section.key));
-    setRemembered((current) => ({ ...current, [section.key]: open }));
     try {
       window.localStorage.setItem(rosterSectionStorageKey(organizationId, section.key), open ? "open" : "closed");
     } catch {
-      // The choice then lasts only for this visit.
+      // Storage is blocked: the choice is not remembered, and the section keeps the state the browser gave it.
     }
+    sectionChoiceListeners.forEach((listener) => listener());
   }
   /** The Health link's words and status; its accessible name starts with exactly these. */
   const healthLinkText = (id: string) => `${healthEntryOnly ? "Enter health record" : "Health record"}${healthTab?.[id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab?.[id]?.status === "NONE" ? ": none yet" : ""}`;
