@@ -10,8 +10,8 @@ export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffP
       <ReportSummaryBand label={`Points at a glance, all ${view.totalClubs} clubs`} tiles={view.tiles} />
       <p className={styles.note}>The band always counts every active club for {clubYear}. A search narrows the chart and table only.</p>
       {view.query !== "" && (
-        <p className={styles.note} role="status">
-          {view.matches.length === 0 ? `No clubs match “${view.query}”.` : `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”.`}{" "}
+        <p className={styles.note}>
+          {view.matches.length > 0 && `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”.`}{" "}
           <Link className={styles.clear} href={view.clearHref} prefetch={false}>Clear search</Link>
         </p>
       )}

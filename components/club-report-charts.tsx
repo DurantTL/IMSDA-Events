@@ -248,7 +248,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
             const registration = club.totalPoints - club.reportPoints;
             return (
               <li className={styles.barRow} key={club.id}>
-                <span className={styles.barName} translate="no">{club.name}</span>
+                <span className={styles.barName} translate="no">{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}{club.name}</span>
                 <span aria-hidden="true" className={styles.barTrack}>
                   <span className={styles.barReport} style={{ width: `${(club.reportPoints / max) * 100}%` }} title={`Report points: ${number(club.reportPoints)}`} />
                   <span className={styles.barRegistration} style={{ width: `${(registration / max) * 100}%` }} title={`Yearly registration: ${number(registration)}`} />

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { summarizeClub, sortLeaderboard } from "@/modules/club-reports/area-summary-domain";
+import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
 import { STAFF_POINTS_CHART_LIMIT, buildStaffPoints, medianTotalPoints, staffPointsHref } from "@/modules/club-reports/staff-points-domain";
 import { StaffPoints } from "@/components/staff-points";
 
@@ -41,15 +41,24 @@ describe("staff points domain (#1314)", () => {
   it("builds the band from the summary fields", () => {
     const view = buildStaffPoints({ clubs, clubYear });
     expect(clubs.map((c) => c.totalPoints)).toEqual([0, 1700, 1700, 1600, 200]);
-    expect(view.tiles.map((tile) => tile.value)).toEqual(["Alpha Club", 1600, "3 of 5", 700]);
+    expect(view.tiles.map((tile) => tile.value)).toEqual(["2 clubs tied", 1600, "3 of 5", 700]);
     expect(view.tiles[0]!.detail).toBe("1,700 total points");
     expect(view.tiles[2]!.detail).toBe("1,500 points each");
     expect(view.tiles[3]!.detail).toBe("From submitted records");
   });
 
-  it("breaks leader ties by name, as sortLeaderboard does", () => {
-    expect(sortLeaderboard(clubs, "points")[0]!.name).toBe("Alpha Club");
-    expect(buildStaffPoints({ clubs, clubYear }).tiles[0]!.value).toBe("Alpha Club");
+  it("names a single leader, and says how many are tied rather than picking one by name", () => {
+    expect(buildStaffPoints({ clubs: [clubs[1]!, clubs[3]!], clubYear }).tiles[0]).toMatchObject({ value: "Bravo Club" });
+    expect(buildStaffPoints({ clubs, clubYear }).tiles[0]).toEqual({ label: "Points leader", value: "2 clubs tied", detail: "1,700 total points" });
+  });
+
+  it("shows no leader when nobody has points", () => {
+    const zero = [club("x", "X Club", 0, false), club("y", "Y Club", 0, false)];
+    expect(buildStaffPoints({ clubs: zero, clubYear }).tiles[0]).toMatchObject({ value: "—", detail: "No points yet" });
+  });
+
+  it("words the median accurately", () => {
+    expect(buildStaffPoints({ clubs, clubYear }).tiles[1]!.detail).toBe("Median of 5 clubs");
   });
 
   it("takes the median of odd and even counts and handles no clubs", () => {
@@ -128,6 +137,25 @@ describe("staff points page (#1314)", () => {
     expect(none).toContain("Clear search");
     const limited = await render({ q: "synthetic" });
     expect(limited).toContain("q=synthetic&amp;all=1");
+  });
+
+  it("shows all 24 bars with all=1 and no search, without a show-all link", async () => {
+    const html = await render({ all: "1" });
+    expect(html).toContain("All clubs by total points");
+    expect(html.match(/<li class="[^"]*barRow/g)).toHaveLength(24);
+    expect(html).not.toContain("Show all 24 clubs");
+  });
+
+  it("announces whole-year ranks on the bars while searching", async () => {
+    const html = await render({ q: "cedar" });
+    // Cedar clubs are 00-11; Club 10 is 7th in the whole year, not 1st of the results.
+    expect(html).toContain("Rank 7, </span>Synthetic Club 10");
+    expect(html).not.toContain("Rank 1, </span>");
+  });
+
+  it("opens the points view for a bare sort=name", async () => {
+    const html = await render({ view: "", sort: "name" });
+    expect(html).toContain("Top 10 clubs by total points");
   });
 
   it("keeps the permission gate", async () => {

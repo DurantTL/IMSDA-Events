@@ -5,12 +5,11 @@ import {
   sortLeaderboard,
   type AreaClubSummary,
 } from "@/modules/club-reports/area-summary-domain";
+import { YEARLY_REGISTRATION_POINTS } from "@/modules/club-reports/domain";
 import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 
 /** The chart shows this many clubs until "Show all". */
 export const STAFF_POINTS_CHART_LIMIT = 10;
-/** Yearly registration is worth this many points; shown only as a note, the figure per club is total minus report points. */
-export const YEARLY_REGISTRATION_POINTS = 1500;
 
 export type StaffPointsTile = { label: string; value: string | number; detail?: string };
 
@@ -29,11 +28,17 @@ export function medianTotalPoints(clubs: ReadonlyArray<{ totalPoints: number }>)
  * narrows the chart and table only, and the band label says so.
  */
 export function staffPointsTiles(clubs: readonly StaffPointsClub[]): StaffPointsTile[] {
-  const leader = sortLeaderboard(clubs, "points")[0];
+  const top = Math.max(0, ...clubs.map((club) => club.totalPoints));
+  const leaders = clubs.filter((club) => club.totalPoints === top);
+  const leaderTile: StaffPointsTile = clubs.length === 0 || top === 0
+    ? { label: "Points leader", value: "—", detail: clubs.length === 0 ? "No active clubs" : "No points yet" }
+    : leaders.length > 1
+      ? { label: "Points leader", value: `${leaders.length} clubs tied`, detail: `${top.toLocaleString("en-US")} total points` }
+      : { label: "Points leader", value: leaders[0]!.name, detail: `${top.toLocaleString("en-US")} total points` };
   const onTime = clubs.filter((club) => club.registrationOnTime).length;
   return [
-    { label: "Points leader", value: leader?.name ?? "—", detail: leader ? `${leader.totalPoints.toLocaleString("en-US")} total points` : "No active clubs" },
-    { label: "Median total points", value: medianTotalPoints(clubs), detail: "Middle club" },
+    leaderTile,
+    { label: "Median total points", value: medianTotalPoints(clubs), detail: `Median of ${clubs.length} ${clubs.length === 1 ? "club" : "clubs"}` },
     { label: "On-time yearly registration", value: `${onTime} of ${clubs.length}`, detail: `${YEARLY_REGISTRATION_POINTS.toLocaleString("en-US")} points each` },
     { label: "Report points, all clubs", value: clubs.reduce((sum, club) => sum + club.reportPoints, 0), detail: "From submitted records" },
   ];
