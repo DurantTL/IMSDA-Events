@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** #1277: "who has this role" filters, Club leaders, and the links between levels. Synthetic data only. */
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   accountFindMany: vi.fn(),
@@ -36,7 +37,7 @@ import {
 import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
 
 const now = new Date("2026-10-27T12:00:00.000Z");
-const none = { role: null, eventId: null, clubId: null } satisfies PeopleFilters;
+const none = { roles: [], eventIds: [], clubIds: [] } satisfies PeopleFilters;
 const filtersFor = (role: string, extra: { event?: string; club?: string } = {}, scope: "full" | "clubs" = "full") => parsePeopleFilters({ role, ...extra }, scope);
 
 describe("role parameter parsing", () => {
@@ -61,10 +62,10 @@ describe("role parameter parsing", () => {
     expect(peopleRoleOptions("full").map((group) => group.label)).toEqual(["System", "Event", "Club", "Invites"]);
   });
 
-  it("keeps the event only for an event role and the club only for a club role, and drops odd ids", () => {
-    expect(filtersFor("event-event-admin", { event: "evt_1", club: "org_1" })).toMatchObject({ eventId: "evt_1", clubId: null });
-    expect(filtersFor("club-director", { event: "evt_1", club: "org_1" })).toMatchObject({ eventId: null, clubId: "org_1" });
-    expect(filtersFor("club-director", { club: "a b;c" }).clubId).toBeNull();
+  it("keeps picked events and clubs even with no matching role (#1321), and drops odd ids", () => {
+    expect(filtersFor("event-event-admin", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: ["evt_1"], clubIds: ["org_1"] });
+    expect(filtersFor("club-director", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: ["evt_1"], clubIds: ["org_1"] });
+    expect(filtersFor("club-director", { club: "a b;c" }).clubIds).toEqual([]);
     expect(needsEventPick(filtersFor("event-event-admin"))).toBe(true);
     expect(needsEventPick(filtersFor("event-event-admin", { event: "evt_1" }))).toBe(false);
   });
@@ -92,24 +93,24 @@ describe("role where-clauses", () => {
   it("an event role needs an event and is an ACTIVE membership in it", () => {
     expect(buildRoleWhere(filtersFor("event-event-admin"), "full", now)).toBeNull();
     expect(buildRoleWhere(filtersFor("event-finance-manager", { event: "evt_1" }), "full", now)).toEqual({
-      staff: { memberships: { some: { role: "FINANCE_MANAGER", status: "ACTIVE", eventId: "evt_1" } } },
+      staff: { memberships: { some: { role: { in: ["FINANCE_MANAGER"] }, status: "ACTIVE", eventId: { in: ["evt_1"] } } } },
     });
   });
 
   it("a club role is a current grant; a Clubs Administrator only gets CLUB-type organizations", () => {
     const grant = (where: ReturnType<typeof buildRoleWhere>) => (where?.account as { clubDirectorGrants: { some: Record<string, unknown> } }).clubDirectorGrants.some;
     const full = grant(buildRoleWhere(filtersFor("club-deputy", { club: "org_1" }), "full", now));
-    expect(full).toMatchObject({ role: "DEPUTY", revokedAt: null, effectiveFrom: { lte: now }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }], organization: { isActive: true, id: "org_1" } });
+    expect(full).toMatchObject({ role: { in: ["DEPUTY"] }, revokedAt: null, effectiveFrom: { lte: now }, OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }], organization: { isActive: true, id: { in: ["org_1"] } } });
     expect(full.organization).not.toHaveProperty("type");
     const clubs = grant(buildRoleWhere(filtersFor("club-deputy", { club: "org_1" }, "clubs"), "clubs", now));
-    expect(clubs.organization).toEqual({ type: "CLUB", isActive: true, id: "org_1" });
+    expect(clubs.organization).toEqual({ type: "CLUB", isActive: true, id: { in: ["org_1"] } });
     expect(grant(buildRoleWhere(filtersFor("club-director", {}, "clubs"), "clubs", now)).organization).toEqual({ type: "CLUB", isActive: true });
   });
 
   it("builds nothing for a system or event role asked by a Clubs Administrator, or for pending", () => {
-    const forged: PeopleFilters = { role: { kind: "system-admin" }, eventId: null, clubId: null };
+    const forged: PeopleFilters = { roles: [{ kind: "system-admin" }], eventIds: [], clubIds: [] };
     expect(buildRoleWhere(forged, "clubs", now)).toBeNull();
-    expect(buildRoleWhere({ role: { kind: "event", role: "EVENT_ADMIN" }, eventId: "evt_1", clubId: null }, "clubs", now)).toBeNull();
+    expect(buildRoleWhere({ roles: [{ kind: "event", role: "EVENT_ADMIN" }], eventIds: ["evt_1"], clubIds: [] }, "clubs", now)).toBeNull();
     expect(buildRoleWhere(filtersFor("pending"), "full", now)).toBeNull();
     expect(buildRoleWhere(none, "full", now)).toBeNull();
   });
@@ -141,7 +142,7 @@ describe("findPeopleByRole", () => {
 
   it("lists nobody for an event role with no event, and for a Clubs Administrator forging a system role", async () => {
     expect(await findPeopleByRole(filtersFor("event-event-admin"), "", "full", now)).toEqual([]);
-    expect(await findPeopleByRole({ role: { kind: "system-admin" }, eventId: null, clubId: null }, "", "clubs", now)).toEqual([]);
+    expect(await findPeopleByRole({ roles: [{ kind: "system-admin" }], eventIds: [], clubIds: [] }, "", "clubs", now)).toEqual([]);
     expect(mocks.userFindMany).not.toHaveBeenCalled();
     expect(mocks.accountFindMany).not.toHaveBeenCalled();
   });

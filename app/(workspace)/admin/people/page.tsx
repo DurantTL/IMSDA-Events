@@ -10,7 +10,7 @@ import { PendingInvites } from "@/components/pending-invites";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
 import { PENDING_INVITES_CAP, listPendingInvites } from "@/modules/system-admin/pending-invites";
-import { parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+import { keepKnownFilterIds, peopleFilterCount, parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 
 export const metadata: Metadata = { title: "People & access" };
 export const dynamic = "force-dynamic";
@@ -24,6 +24,9 @@ export default async function PeopleAccessPage({
     role?: string | string[];
     event?: string | string[];
     club?: string | string[];
+    keepRole?: string | string[];
+    keepEvent?: string | string[];
+    keepClub?: string | string[];
   }>;
 }) {
   const viewer = await resolvePeopleViewer();
@@ -32,18 +35,19 @@ export default async function PeopleAccessPage({
   // Search and page live in the URL, so a reload or shared link keeps them.
   const params = await searchParams;
   const query = parsePeopleQuery(params.q);
-  const filters = parsePeopleFilters(params, viewer.scope);
+  const parsed = parsePeopleFilters(params, viewer.scope);
   const full = viewer.scope === "full";
-  // Pending invites (#1276) show above the list when no role filter is on, and are the list for the Pending filter (#1277).
-  const pendingOnly = filters.role?.kind === "pending";
-  const showPending = !filters.role || pendingOnly;
-  const [result, pending, eventOptions, clubOptions] = await Promise.all([
+  // Options are loaded first so an event or club the viewer cannot choose is dropped from the filter (#1321).
+  const [eventOptions, clubOptions] = await Promise.all([full ? listEventOptions() : [], listClubOptions()]);
+  const filters = keepKnownFilterIds(parsed, eventOptions, clubOptions);
+  // Pending invites (#1276) show above the list when no role filter is on, and are the list when it is the only role (#1277).
+  const pendingOnly = filters.roles.length === 1 && filters.roles[0].kind === "pending";
+  const showPending = peopleFilterCount(filters) === 0 || pendingOnly;
+  const [result, pending] = await Promise.all([
     pendingOnly
       ? { rows: [], page: 1, pageCount: 1, total: 0 }
       : searchPeople(query, parsePeoplePage(params.page), viewer.scope, filters),
     showPending ? listPendingInvites({ query, scope: viewer.scope }) : { invites: [], emailConfigured: false },
-    full ? listEventOptions() : [],
-    listClubOptions(),
   ]);
   return (
     <>

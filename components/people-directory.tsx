@@ -2,15 +2,90 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
 import {
+  NO_PEOPLE_FILTERS,
+  eventRolesNeedEvent,
   needsEventPick,
+  peopleFilterChips,
+  peopleFilterCount,
+  peopleFilterSummary,
   peopleHref,
-  peopleRoleLabel,
   peopleRoleKey,
   peopleRoleOptions,
   personPath,
   type PeopleFilters,
 } from "@/modules/system-admin/people-directory-model";
+import { PEOPLE_STATUS_ID, PeopleActiveFilters } from "./people-active-filters";
+import { PeopleQuickFilters } from "./people-quick-filters";
 import styles from "./people-directory.module.css";
+
+type Option = { id: string; name: string };
+
+/** The Filters panel (#1321): checkboxes for several roles, events and clubs at once. A plain GET form, no JavaScript needed. */
+function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }: {
+  query: string;
+  scope: "full" | "clubs";
+  filters: PeopleFilters;
+  eventOptions: readonly Option[];
+  clubOptions: readonly Option[];
+}) {
+  const count = peopleFilterCount(filters);
+  const chosenRoles = new Set(filters.roles.map(peopleRoleKey));
+  const roleGroups = peopleRoleOptions(scope).filter((group) => group.label !== "Invites");
+  return (
+    <details className={styles.panel}>
+      <summary className={styles.panelSummary}>
+        Filters{count > 0 ? <span className={styles.badge}>{count} active</span> : null}
+      </summary>
+      <form action="/admin/people" className={styles.panelForm} method="get">
+        {query ? <input name="q" type="hidden" value={query} /> : null}
+        <fieldset className={styles.panelSet}>
+          <legend>Roles (anyone with any of these)</legend>
+          <div className={styles.panelScroll}>
+            {roleGroups.map((group) => (
+              <fieldset className={styles.panelGroup} key={group.label}>
+                <legend className={styles.panelGroupLabel}>{group.label}</legend>
+                {group.options.map((option) => (
+                  <label className={styles.panelCheck} key={option.key}>
+                    <input defaultChecked={chosenRoles.has(option.key)} name="role" type="checkbox" value={option.key} />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+          </div>
+        </fieldset>
+        {scope === "full" ? (
+          <fieldset className={styles.panelSet}>
+            <legend>Events (any event role there, or the roles chosen above)</legend>
+            <div className={styles.panelScroll}>
+              {eventOptions.map((event) => (
+                <label className={styles.panelCheck} key={event.id}>
+                  <input defaultChecked={filters.eventIds.includes(event.id)} name="event" type="checkbox" value={event.id} />
+                  <span>{event.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
+        <fieldset className={styles.panelSet}>
+          <legend>Clubs (any club role there, or the roles chosen above)</legend>
+          <div className={styles.panelScroll}>
+            {clubOptions.map((club) => (
+              <label className={styles.panelCheck} key={club.id}>
+                <input defaultChecked={filters.clubIds.includes(club.id)} name="club" type="checkbox" value={club.id} />
+                <span>{club.name}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className={styles.panelActions}>
+          <button className="primary-button" type="submit">Apply filters</button>
+          {count > 0 ? <Link className="secondary-button" href={peopleHref({ query })}>Clear all</Link> : null}
+        </div>
+      </form>
+    </details>
+  );
+}
 
 /** The People & access list (#1275): search box, one row per person, Previous/Next. Server rendered, URL state. */
 export function PeopleDirectory({
@@ -20,7 +95,7 @@ export function PeopleDirectory({
   pageCount,
   total,
   scope = "full",
-  filters = { role: null, eventId: null, clubId: null },
+  filters = NO_PEOPLE_FILTERS,
   eventOptions = [],
   clubOptions = [],
   pending,
@@ -46,60 +121,31 @@ export function PeopleDirectory({
   pageCount: number;
   total: number;
 }) {
-  const role = filters.role;
   const pickEvent = needsEventPick(filters);
+  const pendingOnly = filters.roles.length === 1 && filters.roles[0].kind === "pending";
+  const summary = peopleFilterSummary(filters, { eventOptions, clubOptions });
+  const chips = peopleFilterChips({ filters, query, scope, eventOptions, clubOptions });
   return (
     <div className={styles.wrap}>
-      <form action="/admin/people" className={styles.search} method="get" role="search">
-        <label className={styles.searchField}>
-          Search by name or email
-          <input autoComplete="off" defaultValue={query} maxLength={120} name="q" type="search" />
-        </label>
-        <label className={styles.searchField}>
-          Who has this role
-          <select defaultValue={role ? peopleRoleKey(role) : ""} name="role">
-            <option value="">Everyone</option>
-            {peopleRoleOptions(scope).map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        {scope === "full" ? (
-          <label className={styles.searchField}>
-            Event (for event roles)
-            <select defaultValue={filters.eventId ?? ""} name="event">
-              <option value="">Pick an event</option>
-              {eventOptions.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
-            </select>
-          </label>
-        ) : null}
-        <label className={styles.searchField}>
-          Club (for club roles)
-          <select defaultValue={filters.clubId ?? ""} name="club">
-            <option value="">Any club</option>
-            {clubOptions.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
-          </select>
-        </label>
-        <button className="primary-button" type="submit">{role ? "Apply" : "Search"}</button>
-        {query || role ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
-      </form>
-      {role ? null : pending}
-      <p className={styles.count} role="status">
+      <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
+      <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
+      <PeopleActiveFilters chips={chips} clearHref={peopleHref({ query })} />
+      {peopleFilterCount(filters) === 0 || pendingOnly ? pending : null}
+      <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."
-          : role?.kind === "pending"
+          : pendingOnly
             ? pendingCount === 0
               ? "No pending invites."
               : `${pendingCapped ? "Showing the newest " : ""}${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Search to narrow the list." : "."}`
             : total === 0
               ? "No people found."
-              : `${total} ${total === 1 ? "person" : "people"}${role ? ` with ${peopleRoleLabel(role)}` : ""}${query ? ` matching "${query}"` : ""}.`}
+              : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}
+        {eventRolesNeedEvent(filters) ? " Event roles need an event. Pick one to include them." : ""}
       </p>
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
-      ) : role?.kind === "pending" ? (
+      ) : pendingOnly ? (
         pendingCount === 0 ? <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p> : pending
       ) : rows.length === 0 ? (
         <p className={styles.empty}>{query ? "No staff logins or website accounts match that search." : "Nobody has an account yet."}</p>
