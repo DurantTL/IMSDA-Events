@@ -1,5 +1,5 @@
 /** Staff Monthly Records view (#1313, design #1308): pure projections over the authorized club summaries. No new counting rule. */
-import { clubYearMonths, reportMonthLabel } from "@/modules/club-reports/domain";
+import { clubYearMonths, isLockedForClub, reportMonthLabel } from "@/modules/club-reports/domain";
 import {
   filterClubsByNameChurchOrCity,
   monthStatusLabels,
@@ -82,10 +82,11 @@ export function sortStaffRecordRows<T extends { kind: StaffRecordKind; name: str
 export type StaffRecordsTile = { label: string; value: string | number; detail?: string; href?: string };
 
 /** Band tiles straight from `monthlyStatusTotals` for the month. */
-export function staffRecordsTiles(total: MonthlyStatusTotals, clubYear: string): StaffRecordsTile[] {
+export function staffRecordsTiles(total: MonthlyStatusTotals, clubYear: string, now: Date): StaffRecordsTile[] {
   const percent = total.submitted > 0 ? Math.round((total.reviewed / total.submitted) * 100) : 0;
   const draftNote = `plus ${total.drafts} draft`;
-  const notLocked = total.missing === 0 && total.due > 0;
+  // An open month (not past its due date, and not a month still to come) reads "Not in yet", never "Missing".
+  const notLocked = !isLockedForClub(total.month, now) && total.future < total.clubs;
   return [
     { label: "Submitted", value: `${total.submitted} of ${total.clubs}`, detail: `${total.late} late` },
     { label: "Reviewed", value: total.reviewed, detail: `${percent}% of submitted` },
@@ -96,12 +97,11 @@ export function staffRecordsTiles(total: MonthlyStatusTotals, clubYear: string):
   ];
 }
 
-export type StaffMonthPickerItem = { month: string; short: string; label: string; submitted: number; clubs: number; ariaLabel: string };
+export type StaffMonthPickerItem = { month: string; short: string; label: string; submitted: number; clubs: number };
 
 export function staffMonthPicker(totals: readonly MonthlyStatusTotals[]): StaffMonthPickerItem[] {
   return totals.map((total) => ({
     month: total.month, short: reportMonthLabel(total.month).slice(0, 3), label: total.label, submitted: total.submitted, clubs: total.clubs,
-    ariaLabel: `${total.label}: ${total.submitted} of ${total.clubs} submitted`,
   }));
 }
 
@@ -135,7 +135,7 @@ export function buildStaffMonthlyRecords(input: StaffRecordsOptions) {
   const index = months.indexOf(month);
   return {
     month, monthLabel: reportMonthLabel(month), query, showAllClubs, expanded, totals, monthTotals,
-    tiles: staffRecordsTiles(monthTotals, input.clubYear), picker: staffMonthPicker(totals),
+    tiles: staffRecordsTiles(monthTotals, input.clubYear, input.now), picker: staffMonthPicker(totals),
     previousMonth: index > 0 ? months[index - 1]! : null, nextMonth: index < months.length - 1 ? months[index + 1]! : null,
     totalClubs: rows.length, attentionCount, matches: matches.length, rows: visible,
     hasMore: visible.length < matches.length,

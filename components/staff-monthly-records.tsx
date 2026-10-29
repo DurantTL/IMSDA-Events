@@ -26,12 +26,12 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
   return (
     <div className={styles.root}>
       <nav aria-labelledby="records-month-label" className={styles.picker}>
-        <h3 className={styles.heading} id="records-month-label">Month</h3>
+        <h3 className="sr-only" id="records-month-label">Month</h3>
         <ul className={styles.months}>
           {view.picker.map((item) => (
             <li key={item.month}>
-              <Link aria-current={item.month === view.month ? "true" : undefined} aria-label={item.ariaLabel} className={styles.monthLink} href={here({ month: item.month })} prefetch={false}>
-                <span>{item.short}</span><small>{item.submitted}/{item.clubs}</small>
+              <Link aria-current={item.month === view.month ? "true" : undefined} className={styles.monthLink} href={here({ month: item.month })} prefetch={false}>
+                <span>{item.short}<span className="sr-only"> {item.label.slice(-4)}:</span></span><small>{item.submitted}/{item.clubs}<span className="sr-only"> submitted</span></small>
               </Link>
             </li>
           ))}
@@ -47,7 +47,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
             </select>
           </label>
           {view.nextMonth ? <Link aria-label={`Next month, ${view.picker.find((item) => item.month === view.nextMonth)!.label}`} className={styles.step} href={here({ month: view.nextMonth })} prefetch={false}>›</Link> : <span aria-hidden="true" className={styles.stepOff}>›</span>}
-          <button className="secondary-button" type="submit">Go</button>
+          <button className={styles.go} type="submit">Go</button>
         </form>
       </nav>
 
@@ -66,36 +66,36 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
         <form action="/admin/clubs/summary" className={styles.search} method="get">
           <input name="year" type="hidden" value={clubYear} /><input name="view" type="hidden" value="records" /><input name="month" type="hidden" value={view.month} />
           {view.showAllClubs && <input name="show" type="hidden" value="all" />}
-          <label>Search by club, church or city<input autoComplete="off" defaultValue={view.query} maxLength={80} name="q" type="search" /></label>
+          <label>Search by club or church name<input autoComplete="off" defaultValue={view.query} maxLength={80} name="q" type="search" /></label>
           <button className="secondary-button" type="submit">Search</button>
           {view.query && <Link className="secondary-button" href={here({ query: null })} prefetch={false}>Clear search</Link>}
         </form>
         {view.rows.length === 0 ? (
           <p className={styles.empty}>
-            {view.totalClubs === 0 ? "No active clubs for this club year."
-              : view.query ? "No clubs match this search. Try another club, church or city name."
+            {view.query && !view.showAllClubs && view.totalClubs > 0 ? <>No clubs that need attention match this search. <Link href={here({ showAll: true })} prefetch={false}>Search all clubs for “{view.query}”</Link>.</> : view.totalClubs === 0 ? "No active clubs for this club year."
+              : view.query ? "No clubs match this search. Try another club or church name."
               : `Nothing needs attention for ${view.monthLabel}. Every record is reviewed or not yet due.`}
           </p>
         ) : (
-          <table className={styles.table}>
+          <table className={styles.table} role="table">
             <caption className="sr-only">Clubs and their {view.monthLabel} record, {view.showAllClubs ? "all clubs" : "clubs that need attention"}</caption>
-            <thead>
-              <tr><th scope="col">Club</th><th scope="col">{view.monthLabel} record</th><th scope="col">Points</th><th scope="col">Year so far</th><th scope="col"><span className="sr-only">Action</span></th></tr>
+            <thead role="rowgroup">
+              <tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">{view.monthLabel} record</th><th role="columnheader" scope="col">Points</th><th role="columnheader" scope="col">Year so far</th><th role="columnheader" scope="col"><span className="sr-only">Action</span></th></tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {view.rows.map((row) => {
                 const display = staffRecordKindDisplay[row.kind];
                 const href = row.action === "Club" ? links.clubHref(row.id) : links.reportHref(row.id, view.month);
                 return (
-                  <tr key={row.id}>
-                    <th className={styles.club} scope="row" translate="no"><span className={styles.name}>{row.name}</span>{row.church && <small>{row.church}</small>}</th>
-                    <td className={styles.status}>
+                  <tr key={row.id} role="row">
+                    <th className={styles.club} role="rowheader" scope="row" translate="no"><span className={styles.name}>{row.name}</span>{row.church && <small>{row.church}</small>}</th>
+                    <td className={styles.status} role="cell">
                       <span className={styles.badge} data-kind={row.kind}><span aria-hidden="true">{display.icon}</span> {display.word}</span>
                       {row.late && <span className={styles.late}>late</span>}
                     </td>
-                    <td className={styles.points}><span className="sr-only">Points: </span>{row.points === null ? "—" : row.points.toLocaleString("en-US")}</td>
-                    <td className={styles.stripCell}><YearStrip cells={row.cells} clubName={row.name} selectedMonth={view.month} variant="staff" /></td>
-                    <td className={styles.action}>
+                    <td className={styles.points} role="cell"><span className="sr-only">Points: </span>{row.points === null ? "—" : row.points.toLocaleString("en-US")}</td>
+                    <td className={styles.stripCell} role="cell"><YearStrip cells={row.cells} clubName={row.name} selectedMonth={view.month} variant="staff" /></td>
+                    <td className={styles.action} role="cell">
                       <Link className={styles.rowLink} href={href} prefetch={false}>{row.action}<span className="sr-only"> {row.name}, {staffRecordStatusLabel(row)}</span> <span aria-hidden="true">›</span></Link>
                     </td>
                   </tr>
@@ -105,8 +105,8 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           </table>
         )}
         {view.hasMore && <Link className={`secondary-button ${styles.showAll}`} href={here({ expanded: true })} prefetch={false}>Show all {view.matches} {view.matches === 1 ? "club" : "clubs"}</Link>}
-        {filtered && view.rows.length > 0 && <p className={styles.note}>{view.matches} of {view.totalClubs} clubs shown.</p>}
-        <p className={styles.note}>Year so far: one square per month, September to August, with the same key as the chart. The selected month is outlined.</p>
+        {filtered && view.rows.length > 0 && <p className={styles.note}>Showing {view.rows.length} of {view.matches} matching clubs.</p>}
+        <p className={`${styles.note} ${styles.stripNote}`}>Year so far: one square per month, September to August, with the same key as the chart. The selected month is outlined.</p>
       </section>
     </div>
   );

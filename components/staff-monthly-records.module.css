@@ -1,18 +1,22 @@
 .root { display: grid; gap: 16px; min-width: 0; }
 .heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; }
 .muted, .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
-.picker { display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
-.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.picker { container: picker / inline-size; display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.months { display: none; grid-template-columns: repeat(12, minmax(44px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .monthLink { display: grid; justify-items: center; align-content: center; min-height: 44px; min-width: 44px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
 .monthLink small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; color: #3f4b52; }
 .monthLink[aria-current="true"] { background: var(--imsda-navy); border-color: var(--imsda-navy); color: white; }
 .monthLink[aria-current="true"] small { color: white; }
-.phoneMonth { display: none; align-items: center; gap: 8px; }
-.monthSelect { flex: 1; min-width: 0; }
+.phoneMonth { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding: 2px; }
+.monthSelect { flex: 1 1 0; min-width: 0; width: auto; }
 .monthSelect select { width: 100%; min-height: 44px; }
-.step, .stepOff { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; color: var(--imsda-navy); font-size: 1.25rem; text-decoration: none; background: white; }
+.go { flex: 0 0 auto; min-width: 56px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); font: inherit; font-weight: 700; cursor: pointer; }
+.search button.secondary-button, .search a.secondary-button { flex: 0 0 auto; width: auto; max-width: none; min-width: 64px; min-height: 44px; padding: 0 14px; }
+.phoneMonth :focus-visible { outline-offset: 2px; }
+.stripNote { display: block; }
+.step, .stepOff { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; color: var(--imsda-navy); font-size: 1.25rem; text-decoration: none; background: white; }
 .stepOff { opacity: 0.4; }
-.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.card { container: card / inline-size; display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
@@ -37,16 +41,22 @@
 .showAll { justify-self: start; min-height: 44px; }
 .empty { margin: 0; padding: 12px 0; }
 
-@media (max-width: 860px) {
-  .months { display: none; }
-  .phoneMonth { display: flex; }
+/* Twelve 44px buttons need about 640px; narrower boxes use the select form. */
+@container picker (min-width: 660px) {
+  .months { display: grid; }
+  .phoneMonth { display: none; }
+}
+
+/* Below about 780px of card width the five columns do not fit: each row becomes two short lines and the strip is dropped. */
+@container card (max-width: 779px) {
+  .stripNote { display: none; }
   .table thead { display: none; }
   .table, .table tbody { display: block; }
   .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .table th, .table td { display: block; padding: 0; border: 0; }
-  .club { grid-column: 1 / -1; }
-  .status { grid-column: 1; grid-row: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-  .points { grid-column: 2; grid-row: 2; justify-self: end; }
-  .stripCell { display: none; }
-  .action { grid-column: 3; grid-row: 2; }
+  .table th.club, .table td { display: block; padding: 0; border: 0; }
+  .table th.club { grid-column: 1 / -1; }
+  .table td.status { grid-column: 1; grid-row: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .table td.points { grid-column: 2; grid-row: 2; justify-self: end; }
+  .table td.stripCell { display: none; }
+  .table td.action { grid-column: 3; grid-row: 2; }
 }

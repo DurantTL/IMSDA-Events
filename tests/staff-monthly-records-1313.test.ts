@@ -59,6 +59,13 @@ describe("staff monthly records domain (#1313)", () => {
     expect(view.attentionCount).toBe(4);
   });
 
+  it("reads Not in yet for any open month, even with no club still due", () => {
+    const filed = [club("a", "A", [report("2026-10")])];
+    expect(buildStaffMonthlyRecords({ clubs: filed, clubYear, now, month: "2026-10" }).tiles[3]).toMatchObject({ label: "Not in yet", value: 0 });
+    expect(buildStaffMonthlyRecords({ clubs: filed, clubYear, now, month: "2026-09" }).tiles[3]!.label).toBe("Missing");
+    expect(buildStaffMonthlyRecords({ clubs: filed, clubYear, now, month: "2026-12" }).tiles[3]!.label).toBe("Missing");
+  });
+
   it("shows Not in yet for a month that is not locked, and FUTURE as not yet due", () => {
     const october = buildStaffMonthlyRecords({ clubs, clubYear, now, month: "2026-10" });
     expect(october.tiles[3]).toMatchObject({ label: "Not in yet", value: 5 });
@@ -122,7 +129,9 @@ describe("staff monthly records page (#1313)", () => {
   it("renders the picker, band, chart, table, strips and the collapsed grid", async () => {
     const html = await render({ year: clubYear, view: "records", month: "2026-09" });
     expect(html).toContain('id="monthly-records"');
-    expect(html).toContain('aria-label="September 2026: 3 of 5 submitted"');
+    expect(html).toContain('Sep<span class="sr-only"> 2026:</span>');
+    expect(html).toContain('3/5<span class="sr-only"> submitted</span>');
+    for (const role of ["table", "rowgroup", "row", "columnheader", "rowheader", "cell"]) expect(html).toContain(`role="${role}"`);
     expect(html.match(/aria-current="true"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toContain("September 2026 at a glance");
     expect(html).toContain("3 of 5");
@@ -145,7 +154,10 @@ describe("staff monthly records page (#1313)", () => {
 
   it("shows empty states", async () => {
     expect(await render({ year: clubYear, view: "records", month: "2026-12" })).toContain("Nothing needs attention for December 2026");
-    expect(await render({ year: clubYear, view: "records", q: "zzz" })).toContain("No clubs match this search");
+    const searched = await render({ year: clubYear, view: "records", q: "zzz" });
+    expect(searched).toContain("No clubs that need attention match this search");
+    expect(searched).toContain("show=all");
+    expect(await render({ year: clubYear, view: "records", q: "zzz", show: "all" })).toContain("No clubs match this search");
     mocks.clubs.mockResolvedValue([]);
     expect(await render({ year: clubYear, view: "records" })).toContain("No active clubs for this club year");
   });
