@@ -1,7 +1,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** #1304: the staff Honors page and its reload route share one year range, so the club page links a year only when both accept it. */
+/** #1304: the staff Honors page and its reload route share one year range, so the club page links a year only when both accept it; an older year has no Honors link. */
 
 const mocks = vi.hoisted(() => ({
   listClubHonorsPage: vi.fn(),
@@ -62,8 +62,8 @@ describe("club overview Honors link", () => {
     const tree = await ClubOverview({ organizationId: "club-1", rosterYear, staffHonorsHref: "/admin/organizations/club-1/club/honors", reportHref: () => "/r", reportsEditable: true });
     return elements(tree).find((e) => e.type === ClubYearTiles)?.props.honorsHref;
   };
-  it("carries the year only when the Honors page accepts it", async () => {
-    expect(await honorsHref("2023-24")).toBe("/admin/organizations/club-1/club/honors");
+  it("carries the year only when the Honors page accepts it, and drops the link for an older year", async () => {
+    expect(await honorsHref("2023-24")).toBeUndefined();
     expect(await honorsHref("2025-26")).toBe("/admin/organizations/club-1/club/honors?year=2025-26");
     expect(await honorsHref("2027-28")).toBe("/admin/organizations/club-1/club/honors?year=2027-28");
     expect(await honorsHref("2026-27")).toBe("/admin/organizations/club-1/club/honors");
