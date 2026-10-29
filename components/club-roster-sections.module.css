@@ -11,6 +11,5 @@
 .chevron { flex: 0 0 auto; transition: transform 0.15s ease; transform: rotate(-90deg); }
 .section[open] > .summary .chevron { transform: rotate(0deg); }
 .section[open] > .summary { margin-bottom: 8px; }
-.table { table-layout: fixed; }
 .empty { margin: 0 0 4px; padding: 0 13px; color: var(--muted); font-style: italic; font-size: max(var(--type-body-floor, 0px), 0.875rem); }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }

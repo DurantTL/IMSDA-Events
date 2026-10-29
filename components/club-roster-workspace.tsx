@@ -43,6 +43,7 @@ import {
   rosterLabelDetail,
   rosterPersonLabels,
   rosterRowTools,
+  rosterSectionOpen,
   rosterSectionStorageKey,
 } from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
@@ -390,21 +391,30 @@ export function ClubRosterWorkspace({
   useEffect(() => {
     function openForHash() {
       const match = /^#member-(.+)$/.exec(window.location.hash);
-      const key = match ? sectionOfPerson.current.get(decodeURIComponent(match[1]!)) : undefined;
+      let id = "";
+      try {
+        id = match ? decodeURIComponent(match[1]!) : "";
+      } catch {
+        return;
+      }
+      const key = id ? sectionOfPerson.current.get(id) : undefined;
       if (!key) return;
       setHashOpen((current) => (current.includes(key) ? current : [...current, key]));
-      window.requestAnimationFrame(() => document.getElementById(`member-${match![1]}`)?.scrollIntoView({ block: "center" }));
+      window.requestAnimationFrame(() => document.getElementById(`member-${id}`)?.scrollIntoView({ block: "center" }));
     }
     openForHash();
     window.addEventListener("hashchange", openForHash);
     return () => window.removeEventListener("hashchange", openForHash);
   }, []);
   function sectionIsOpen(section: { key: SectionKey; people: readonly unknown[] }) {
-    if (filtersActive && section.people.length > 0) {
-      return (filterChoice.signature === filterSignature ? filterChoice.open[section.key] : undefined) ?? true;
-    }
-    if (hashOpen.includes(section.key)) return true;
-    return remembered[section.key] ?? !sectionsStartClosed;
+    return rosterSectionOpen({
+      filtersActive,
+      matchCount: section.people.length,
+      filterChoice: filterChoice.signature === filterSignature ? filterChoice.open[section.key] : undefined,
+      hashTarget: hashOpen.includes(section.key),
+      remembered: remembered[section.key],
+      startClosed: sectionsStartClosed,
+    });
   }
   function sectionToggled(section: { key: SectionKey; people: readonly unknown[] }, open: boolean) {
     if (open === sectionIsOpen(section)) return;
@@ -471,9 +481,6 @@ export function ClubRosterWorkspace({
     hasScreening: Boolean(complianceStatuses),
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
-  /** Relative column widths, so the two section tables share one grid. */
-  const columnShare = { name: 24, age: 6, birthDate: 11, type: 10, class: 12, details: 20, gender: 8, screening: 16, actions: 18 } as const;
-  const columnShareTotal = columns.reduce((total, column) => total + columnShare[column], 0);
 
   async function call(url: string, method: string, body: unknown, success: string) {
     setSaving(true);
@@ -796,8 +803,7 @@ export function ClubRosterWorkspace({
           <div className={styles.sections}>
             {/*
               One table per section inside a native <details> (#1305): a details element can't live inside a table, and a
-              closed section should take no room. Every table gets the same column shares (colgroup, fixed layout), so Staff
-              and Members still line up the way the single shared table did (#435). The summary is the section heading and
+              closed section should take no room. The columns of the two tables size independently (some drift between them is accepted). The summary is the section heading and
               names its table. Both tables keep the sortable Name header, so sorting works from whichever is open.
             */}
             <SortOrderNote>{`${sortOrderText(nameSortLabel, nameDirection)} Staff and Members are listed separately.`}</SortOrderNote>
@@ -819,14 +825,11 @@ export function ClubRosterWorkspace({
                 ) : (
                   <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
                     <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className={`report-table roster-card-table ${styles.table}`}>
-                      <colgroup>
-                        {columns.map((column) => <col key={column} style={{ width: `${(columnShare[column] / columnShareTotal) * 100}%` }} />)}
-                      </colgroup>
                       <thead>
                         <tr>
                           {columns.map((column) => {
                             switch (column) {
-                              case "name": return <SortableHeader active direction={nameDirection} key={column} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
+                              case "name": return <SortableHeader active direction={nameDirection} key={column} hiddenLabel={section.title} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
                               case "age": return <th key={column}>Age</th>;
                               case "birthDate": return <th key={column}>Birth date</th>;
                               case "type": return <th key={column}>Type</th>;

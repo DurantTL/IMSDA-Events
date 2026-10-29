@@ -197,6 +197,10 @@ const clubRole = (role: "registrar" | "reporter", name: string, suffix: string, 
   role,
   expectText,
 });
+/** The director and registrar roster opens with Staff and Members closed (#1305), so open them before measuring the rows. */
+const openRosterSections = async (page: Page) => {
+  await page.evaluate(() => document.querySelectorAll("details[data-roster-section]").forEach((element) => { (element as HTMLDetailsElement).open = true; }));
+};
 const previousClubYear = clubYearChoices(new Date())[0]!;
 const area = (name: string, route: string): PageSpec => ({ name: `area-${name}`, path: route, role: "area" });
 
@@ -253,15 +257,15 @@ const pages: PageSpec[] = [
   { name: "account-help-area", path: "/account/help", role: "area" },
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
   { ...club("home", ""), flow: "portal-navigation" },
-  club("roster", "/roster"),
+  { ...club("roster", "/roster"), prepare: openRosterSections },
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
   { ...club("home-past-year", `?year=${previousClubYear}`), expectText: /read-only/i },
-  { ...club("roster-past-year", `/roster?year=${previousClubYear}`), expectText: /read-only/i },
+  { ...club("roster-past-year", `/roster?year=${previousClubYear}`), expectText: /read-only/i, prepare: openRosterSections },
   clubRole("registrar", "home", "", /Registrar/),
-  clubRole("registrar", "roster", "/roster", /Registrar/),
+  { ...clubRole("registrar", "roster", "/roster", /Registrar/), prepare: openRosterSections },
   clubRole("reporter", "home", "", /Monthly Records/),
   clubRole("reporter", "monthly-records", "/records", /Monthly Records/),
-  club("roster-inactive", "/roster?inactive=1"),
+  { ...club("roster-inactive", "/roster?inactive=1"), prepare: openRosterSections },
   club("registration-events", "/events"),
   club("registration-form", `/events/${clubEventId}`),
   club("class-tracking", "/class-tracking"),

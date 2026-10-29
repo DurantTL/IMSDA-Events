@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
-import { rosterRowTools, rosterSectionsStartClosed, rosterSectionStorageKey } from "@/modules/club-rosters/roster-view";
+import { rosterRowTools, rosterSectionOpen, rosterSectionsStartClosed, rosterSectionStorageKey } from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
 /** Roster row actions and collapsible Staff and Members sections (#1305). Synthetic data only. */
@@ -103,5 +103,37 @@ describe("section styles", () => {
     expect(css).toMatch(/\.summary \{[^}]*min-height: 44px/);
     expect(css).toContain("max(var(--type-staff-floor, 0px), 0.875rem)");
     expect(css).toContain(".summary:focus-visible");
+  });
+});
+
+describe("whether a section is open", () => {
+  const base = { filtersActive: false, matchCount: 3, hashTarget: false, startClosed: false };
+  it("uses the role default when nothing is stored or storage is unavailable", () => {
+    expect(rosterSectionOpen({ ...base, startClosed: true })).toBe(false);
+    expect(rosterSectionOpen({ ...base, startClosed: false })).toBe(true);
+  });
+  it("lets a remembered choice beat the role default, both ways", () => {
+    expect(rosterSectionOpen({ ...base, startClosed: true, remembered: true })).toBe(true);
+    expect(rosterSectionOpen({ ...base, startClosed: false, remembered: false })).toBe(false);
+  });
+  it("opens the section a search matches, even for a director with both remembered closed", () => {
+    const director = { ...base, startClosed: true, remembered: false, filtersActive: true };
+    expect(rosterSectionOpen({ ...director, matchCount: 1 })).toBe(true);
+    // A section with no match stays as it was.
+    expect(rosterSectionOpen({ ...director, matchCount: 0 })).toBe(false);
+  });
+  it("lets a close made while filtering win until the filters change", () => {
+    expect(rosterSectionOpen({ ...base, startClosed: true, filtersActive: true, filterChoice: false })).toBe(false);
+  });
+  it("opens the section a #member- link points into", () => {
+    expect(rosterSectionOpen({ ...base, startClosed: true, remembered: false, hashTarget: true })).toBe(true);
+  });
+});
+
+describe("sortable Name headers", () => {
+  it("name each table's header by section", () => {
+    const html = render();
+    expect(html).toContain(', Staff</span>');
+    expect(html).toContain(', Members</span>');
   });
 });

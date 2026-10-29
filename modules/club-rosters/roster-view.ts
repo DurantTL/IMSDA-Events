@@ -191,3 +191,22 @@ export function rosterSectionsStartClosed(role: string | null | undefined): bool
 export function rosterSectionStorageKey(organizationId: string, section: "STAFF" | "MEMBERS"): string {
   return `imsda:roster-section:${organizationId}:${section}`;
 }
+
+/**
+ * Whether one roster section (Staff or Members) is open (#1305). In order: a search or filter that matches people in
+ * the section opens it (unless the person closed it since the filters last changed, `filterChoice`); a link to one of its
+ * rows opens it; otherwise the choice remembered in this browser; otherwise the role default. `remembered` is undefined
+ * when nothing is stored or storage is unavailable.
+ */
+export function rosterSectionOpen(options: {
+  filtersActive: boolean;
+  matchCount: number;
+  filterChoice?: boolean;
+  hashTarget: boolean;
+  remembered?: boolean;
+  startClosed: boolean;
+}): boolean {
+  if (options.filtersActive && options.matchCount > 0) return options.filterChoice ?? true;
+  if (options.hashTarget) return true;
+  return options.remembered ?? !options.startClosed;
+}
