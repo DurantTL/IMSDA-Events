@@ -94,6 +94,54 @@ export function summarizeClub(input: AreaSummaryInput, clubYear: string, now: Da
   };
 }
 
+/** One club-year month's counts across a set of clubs (#1312). Staff only: it carries Reviewed (#1246). */
+export type MonthlyStatusTotals = {
+  month: string;
+  label: string;
+  /** Clubs counted: every club passed in. */
+  clubs: number;
+  /** Submitted, including late: the same rule as `AreaClubSummary.submitted`. */
+  submitted: number;
+  /** Late is a subset of submitted. */
+  late: number;
+  /** Submitted records a Clubs Administrator marked Reviewed. */
+  reviewed: number;
+  submittedNotReviewed: number;
+  drafts: number;
+  /** MISSING only; a month still before the 10th is `due`. */
+  missing: number;
+  due: number;
+  future: number;
+};
+
+/**
+ * Per-month counts for the staff chart and summary band, one entry per club-year month (September to August).
+ * Only tallies the cells `summarizeClub` already built, so summing a field over the months equals the same field
+ * summed over the clubs (`submitted`, `late`, `drafts`, `missing`). No new counting rule.
+ */
+export function monthlyStatusTotals(clubs: readonly AreaClubSummary[], clubYear: string): MonthlyStatusTotals[] {
+  return clubYearMonths(clubYear).map((month) => {
+    const cells = clubs.flatMap((club) => club.months.filter((cell) => cell.month === month));
+    const count = (test: (cell: MonthCell) => boolean) => cells.filter(test).length;
+    const isSubmitted = (cell: MonthCell) => cell.status === "SUBMITTED" || cell.status === "LATE";
+    const reviewed = count((cell) => isSubmitted(cell) && cell.reviewed === true);
+    const submitted = count(isSubmitted);
+    return {
+      month,
+      label: reportMonthLabel(month),
+      clubs: clubs.length,
+      submitted,
+      late: count((cell) => cell.status === "LATE"),
+      reviewed,
+      submittedNotReviewed: submitted - reviewed,
+      drafts: count((cell) => cell.status === "DRAFT"),
+      missing: count((cell) => cell.status === "MISSING"),
+      due: count((cell) => cell.status === "DUE"),
+      future: count((cell) => cell.status === "FUTURE"),
+    };
+  });
+}
+
 export type LeaderboardSort = "points" | "name";
 
 export function parseLeaderboardSort(value: string | undefined): LeaderboardSort {
