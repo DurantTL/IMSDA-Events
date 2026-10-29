@@ -1,0 +1,35 @@
+/* The printed emergency reference (#114). Legible on paper first; the screen view is the same page. */
+.sheet { display: grid; gap: 12px; padding: 16px 0 32px; color: #111; }
+.frame { width: 100%; border-collapse: collapse; }
+.frame > tbody > tr > td, .frame > tfoot > tr > td { padding: 0; }
+.screenOnly { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.screenOnly :global(.secondary-button), .screenOnly :global(.primary-button) { min-height: 44px; min-width: 44px; }
+.draftBanner { margin: 0 0 12px; border: 3px solid #111; padding: 10px 14px; font-size: max(var(--type-staff-floor, 0px), 1.1rem); font-weight: 800; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
+.header { margin-bottom: 14px; border-bottom: 2px solid #111; padding-bottom: 8px; }
+.eyebrow { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.title { margin: 2px 0; font-size: max(var(--type-staff-floor, 0px), 1.6rem); line-height: 1.2; }
+.dates { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.section { margin: 0 0 16px; break-inside: auto; }
+.section h3 { margin: 0 0 6px; border-bottom: 1px solid #555; font-size: max(var(--type-staff-floor, 0px), 1.1rem); }
+.section h4 { margin: 0 0 4px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.section p { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }
+.empty { color: #444; font-style: italic; }
+.cards { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.card, .procedure { break-inside: avoid; border: 1px solid #777; border-radius: 4px; padding: 8px 10px; }
+.procedure { margin-bottom: 8px; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.facts dt { font-weight: 700; }
+.facts dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.kind { font-weight: 400; }
+.steps { margin: 4px 0 0; padding-left: 22px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); line-height: 1.45; }
+.steps li { margin-bottom: 3px; overflow-wrap: anywhere; }
+.contacts { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.contacts th, .contacts td { border: 1px solid #777; padding: 6px 8px; text-align: left; overflow-wrap: anywhere; }
+.contacts th { background: #eee; }
+.footer { margin: 10px 0 0; border-top: 1px solid #555; padding-top: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+@media print {
+  .screenOnly { display: none !important; }
+  .sheet { padding: 0; }
+  .frame > tfoot { display: table-footer-group; }
+}

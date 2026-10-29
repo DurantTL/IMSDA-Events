@@ -21,6 +21,7 @@ import {
   PanelsTopLeft,
   ClipboardPen,
   Settings2,
+  Siren,
   ShieldCheck,
   ShoppingBag,
   Tag,
@@ -156,6 +157,7 @@ export const staffPageTitles = {
   teamForm: "Team form",
   eventContent: "Public content",
   eventPatches: "Event patches",
+  emergencyPlan: "Emergency plan",
   operationalHealth: "Operational health",
   merchandise: "Merchandise catalog",
   assignmentRoster: "Assignment roster",
@@ -207,6 +209,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-health", "prefix", staffPageTitles.eventHealth],
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
+  ["/more/emergency-plan", "prefix", staffPageTitles.emergencyPlan],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
@@ -723,6 +726,7 @@ export function buildMoreDirectoryCards({
     },
     { key: "club-assignments", group: "people-access", allowed: clubEvent && canManageClubAssignments(permissions), href: `/more/club-assignments${eventQuery}`, icon: Tent, title: "Club assignments", description: "Set each registered club's campsite, duty, and activity, then email directors after review.", cta: "Assign clubs" },
     { key: "event-patches", group: "setup", allowed: clubEvent && has("CONFIGURE_EVENT"), href: `/more/event-patches${eventQuery}`, icon: Trophy, title: "Event patches", description: "Link the patch or pin a club event gives, so directors are suggested it for every member who attended.", cta: "Link patches" },
+    { key: "emergency-plans", group: "setup", allowed: has("VIEW_EVENT"), href: `/more/emergency-plan${eventQuery}`, icon: Siren, title: "Emergency plan", description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.", cta: "Open emergency plan" },
     // Club forms (#610) belong to no event: system administrators, Clubs Administrators and Event Admins of a current event only.
     { key: "club-forms", group: "people-access", allowed: clubFormsAccess, href: `/more/club-forms${eventQuery}`, icon: FileText, title: "Club forms", description: "Membership applications, staff service forms, permission slips, and passenger lists clubs have filled in.", cta: "Open club forms" },
     // Health information for club events (#658): system administrators, plus staff a system administrator gave VIEW_HEALTH_INFORMATION. No role carries it.

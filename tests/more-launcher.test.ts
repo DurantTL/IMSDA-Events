@@ -87,7 +87,8 @@ describe("launcher grouping", () => {
 
   it("does not let a module being on grant a card the role cannot open", () => {
     const keys = keysOf(cardsFor({ permissions: ["VIEW_EVENT"], clubOversight: false, clubFormsAccess: false }));
-    expect(keys).toEqual([]);
+    // The emergency plan (#114) is the one card read-only event staff may open: viewing and printing follow VIEW_EVENT.
+    expect(keys).toEqual(["emergency-plans"]);
   });
 });
 
