@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { PointsBars, RecordsByMonthChart, ReportSummaryBand, YearStrip } from "@/components/club-report-charts";
 import { clubYearMonths } from "@/modules/club-reports/domain";
 import { monthlyStatusTotals, summarizeClub, type AreaSummaryInput } from "@/modules/club-reports/area-summary-domain";
-import { clubRecordStatus, coordinatorMonthlyTotals } from "@/modules/club-reports/coordinator-overview-domain";
+import { buildCoordinatorOverview, clubRecordStatus, coordinatorMonthlyTotals, overviewMonth } from "@/modules/club-reports/coordinator-overview-domain";
 
 
 const CLUB_YEAR = "2025-2026";
@@ -99,6 +99,44 @@ describe("club report chart components (#1312)", () => {
     expect(html).toContain("Submitted, not reviewed");
     expect(html).toContain("Not submitted");
     expect(html).toContain("Outlined: October 2025");
+  });
+
+  it("draws only drafts and missing as Not submitted; due and future months are Not due yet", () => {
+    // NOW is 2026-02-20: Jan is missing/draft territory, Feb is due, Mar to Aug are not yet due.
+    const aug = staffTotals[11]!;
+    expect(aug).toMatchObject({ drafts: 0, missing: 0, due: 0, future: 3 });
+    const feb = staffTotals[5]!;
+    expect(feb).toMatchObject({ due: 3, missing: 0 });
+    const jan = staffTotals[4]!;
+    expect(jan).toMatchObject({ missing: 2, submitted: 1 });
+    const html = renderToStaticMarkup(createElement(RecordsByMonthChart, { variant: "staff", totals: staffTotals, clubYear: CLUB_YEAR }));
+    expect(html).toContain("Not due yet");
+    expect(html).toContain("Aug: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 not due yet");
+    expect(html).toContain("Feb: 0 reviewed, 0 submitted, not reviewed, 0 not submitted, 3 not due yet");
+    expect(html).toContain("Jan: 0 reviewed, 1 submitted, not reviewed, 2 not submitted, 0 not due yet");
+    expect(html).toContain("Dec: 0 reviewed, 0 submitted, not reviewed, 3 not submitted, 0 not due yet");
+    // The table row for August adds up: 0 + 0 + 0 + 0 + 3 = 3 clubs, and each row sums to its Total clubs cell.
+    expect(html).toMatch(/<th scope="row">August 2026<\/th><td>0<\/td><td>0<\/td><td>0<\/td><td>0<\/td><td>3<\/td><td>3<\/td>/);
+    for (const t of staffTotals) {
+      expect(t.reviewed + t.submittedNotReviewed + t.drafts + t.missing + t.due + t.future).toBe(t.clubs);
+    }
+  });
+
+  it("names the svg by its title only and describes it once", () => {
+    const html = renderToStaticMarkup(createElement(RecordsByMonthChart, { variant: "staff", totals: staffTotals, clubYear: CLUB_YEAR }));
+    const svg = html.match(/<svg[^>]*>/)![0];
+    expect(svg).toMatch(/aria-labelledby="[^" ]+-svg"/);
+    expect(svg).toContain("aria-describedby=");
+  });
+
+  it("ties the coordinator totals to the overview's own numbers", () => {
+    const month = overviewMonth(CLUB_YEAR, NOW);
+    const overview = buildCoordinatorOverview(clubs, CLUB_YEAR, NOW);
+    const entry = coordinatorMonthlyTotals(clubs, CLUB_YEAR, NOW).find((t) => t.month === month)!;
+    expect(overview.month).toBe(month);
+    expect(entry.submitted).toBe(overview.submittedCount);
+    expect(entry.clubs).toBe(overview.recordDenominator);
+    expect(entry.notSubmitted).toBe(overview.followUp.length);
   });
 
   it("gives two charts on one page different ids", () => {

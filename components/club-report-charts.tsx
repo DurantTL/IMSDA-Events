@@ -33,7 +33,7 @@ export type SummaryTile = { label: string; value: string | number; detail?: stri
 export function ReportSummaryBand({ tiles, label }: { tiles: readonly SummaryTile[]; label?: string }) {
   return (
     <ul aria-label={label} className={styles.band}>
-      {tiles.map((tile) => {
+      {tiles.map((tile, index) => {
         const body = (
           <>
             <span className={styles.tileLabel}>{tile.label}</span>
@@ -42,7 +42,7 @@ export function ReportSummaryBand({ tiles, label }: { tiles: readonly SummaryTil
           </>
         );
         return (
-          <li className={styles.tile} key={tile.label}>
+          <li className={styles.tile} key={`${index}-${tile.label}`}>
             {tile.href ? <Link className={styles.tileLink} href={tile.href}>{body}</Link> : <div className={styles.tileBody}>{body}</div>}
           </li>
         );
@@ -69,7 +69,8 @@ function staffSeries(total: MonthlyStatusTotals): Series[] {
   return [
     { key: "reviewed", label: "Reviewed", className: styles.seriesDark!, value: total.reviewed },
     { key: "toReview", label: "Submitted, not reviewed", className: styles.seriesLight!, value: total.submittedNotReviewed },
-    { key: "notSubmitted", label: "Not submitted", className: styles.seriesHatch!, value: total.clubs - total.submitted },
+    { key: "notSubmitted", label: "Not submitted", className: styles.seriesHatch!, value: total.drafts + total.missing },
+    { key: "notDue", label: "Not due yet", className: styles.seriesPale!, value: total.due + total.future },
   ];
 }
 
@@ -118,8 +119,8 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
   return (
     <figure aria-labelledby={titleId} className={styles.figure}>
       <figcaption className={styles.caption} id={titleId}>{title} <span className={styles.captionYear}>({clubYear})</span></figcaption>
-      <svg aria-describedby={descId} aria-labelledby={`${titleId}-svg ${descId}`} className={styles.chart} focusable="false" preserveAspectRatio="none" role="img" viewBox={`0 0 120 ${height}`}>
-        <title id={`${titleId}-svg`}>{title}, club year {clubYear}</title>
+      <svg aria-describedby={descId} aria-labelledby={`${titleId}-svg`} className={styles.chart} focusable="false" preserveAspectRatio="none" role="img" viewBox={`0 0 120 ${height}`}>
+        <title id={`${titleId}-svg`}>{`${title}, club year ${clubYear}`}</title>
         <desc id={descId}>{description}</desc>
         <defs>
           <pattern height="3" id={hatchId} patternTransform="rotate(45)" patternUnits="userSpaceOnUse" width="3">
@@ -177,17 +178,17 @@ function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatu
       <caption className="sr-only">{title}, {clubYear}: club counts for each month</caption>
       <thead>
         <tr>
-          <th scope="col">Month</th><th scope="col">Clubs</th><th scope="col">Reviewed</th><th scope="col">Submitted, not reviewed</th>
-          <th scope="col">Not submitted</th><th scope="col">Late</th><th scope="col">Draft</th><th scope="col">Missing</th><th scope="col">Due</th><th scope="col">Not yet due</th>
+          <th scope="col">Month</th><th scope="col">Reviewed</th><th scope="col">Submitted, not reviewed</th>
+          <th scope="col">Draft</th><th scope="col">Missing</th><th scope="col">Not due yet</th><th scope="col">Total clubs</th><th scope="col">Late (included in submitted)</th>
         </tr>
       </thead>
       <tbody>
         {totals.map((total) => (
           <tr key={total.month}>
             <th scope="row">{total.label}</th>
-            <td>{number(total.clubs)}</td><td>{number(total.reviewed)}</td><td>{number(total.submittedNotReviewed)}</td>
-            <td>{number(total.clubs - total.submitted)}</td><td>{number(total.late)}</td><td>{number(total.drafts)}</td>
-            <td>{number(total.missing)}</td><td>{number(total.due)}</td><td>{number(total.future)}</td>
+            <td>{number(total.reviewed)}</td><td>{number(total.submittedNotReviewed)}</td>
+            <td>{number(total.drafts)}</td><td>{number(total.missing)}</td><td>{number(total.due + total.future)}</td>
+            <td>{number(total.clubs)}</td><td>{number(total.late)}</td>
           </tr>
         ))}
       </tbody>
@@ -322,7 +323,7 @@ export function YearStrip(props: YearStripProps) {
   const items: StripItem[] = props.variant === "staff"
     ? props.cells.map(staffItem)
     : props.states.map((entry) => ({ month: entry.month, ...coordinatorWords[entry.state] }));
-  const label = `${props.clubName ? `${props.clubName}, year` : "Year"} so far: ${items.map((item) => `${shortMonth(item.month)} ${item.word}`).join(", ")}.`;
+  const label = `${props.clubName ? `${props.clubName}, year` : "Year"} at a glance: ${items.map((item) => `${shortMonth(item.month)} ${item.word}`).join(", ")}.`;
   return (
     <span aria-label={label} className={styles.strip} role="img">
       {items.map((item) => (
