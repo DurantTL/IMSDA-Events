@@ -19,7 +19,9 @@ export function clubYearSelectorModel(pathname: string, requestedYear: string | 
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   const stays = clubsAdminYearPaths.includes(path);
   // Directory/report selections ride along only when returning to this page; a new year starts at page one.
-  const carry = stays ? (["q", "sort", "view", "attention"] as const).flatMap((name) => { const value = params?.get(name); return value ? [[name, value] as const] : []; }) : [];
+  // Search and the attention filter belong to the directory view only (#1304), so a report view does not carry them.
+  const reportView = ["records", "points", "events"].includes(params?.get("view") ?? "");
+  const carry = stays ? (["q", "sort", "view", "attention"] as const).flatMap((name) => { const value = params?.get(name); return value && !(reportView && (name === "q" || name === "attention")) ? [[name, value] as const] : []; }) : [];
   return {
     action: stays ? path : "/admin/clubs",
     carry,

@@ -9,14 +9,14 @@ export function PortalClubDirectory({ slice, query, total, searchLabel = "Search
   return (
     <div className="page-stack">
       <AreaClubSearch basePath="/account/clubs" label={searchLabel} query={query} shown={slice.total} total={total} />
-      {slice.total === 0 ? <p className="public-manage-empty">{query ? `No club, church or city matches “${query}”.` : "No active clubs yet."}</p> : (
+      {slice.total === 0 ? <p className="public-manage-empty">{query ? `No ${searchLabel.replace(/^Search by /, "")} matches “${query}”.` : "No active clubs yet."}</p> : (
         <>
           <p className={styles.note}>Showing {slice.from}–{slice.to} of {slice.total} {query ? "matching " : ""}{slice.total === 1 ? "club" : "clubs"}</p>
           <ul className={styles.grid} aria-label="Clubs">
             {slice.items.map((club) => (
               <li className={styles.card} key={club.organizationId}>
                 <div className={styles.identity}>
-                  <h2><Link href={club.href} prefetch={false} translate="no">{club.name}</Link></h2>
+                  <h2 translate="no">{club.name}</h2>
                   <p translate="no">{club.sponsoringChurch || "No church listed"}</p>
                   {club.city && <p translate="no">{club.city}</p>}
                 </div>

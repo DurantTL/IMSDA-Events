@@ -10,7 +10,7 @@ import { ClubOverview } from "@/components/club-overview";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubImports } from "@/modules/club-imports/move-year";
-import { rosterYearView } from "@/modules/club-rosters/domain";
+import { staffClubYearView } from "@/modules/club-rosters/domain";
 import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { getPrisma } from "@/lib/prisma";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -22,8 +22,8 @@ export const dynamic = "force-dynamic";
  * A club as its director sees it, for conference staff, view only (#386):
  * the club's admins, this year's roster, its events, and its monthly reports.
  * Changes are made on the staff screens linked here, never on the club's behalf.
- * `?year=` shows the previous or next club year's roster, read-only (#541),
- * so an import can be checked in the year it went into. The one change made
+ * `?year=` shows any year the club directory offers, or next year, read-only
+ * (#541, #1304), so an import can be checked in the year it went into. The one change made
  * here is moving a club import to another club year. System administrators and Clubs Administrators (#1232) both get
  * the club's change tools (club admins, profile, honors, act-as, year move); this page only opens for a club.
  */
@@ -41,7 +41,7 @@ export default async function StaffOpenClubPage({
   // Sterling Volunteers detail, guardians, and the change tools (club admins, profile, honors, act-as, year move).
   // The way back is in the section header (#1274): Club summary in the Clubs view, Clubs and churches in the System view. Churches 404 below.
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
-  const view = rosterYearView(query?.year);
+  const view = staffClubYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
     select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
@@ -130,7 +130,7 @@ export default async function StaffOpenClubPage({
           imports={imports}
           key={imports.map((item) => item.clubYear).join(",")}
           organizationId={organizationId}
-          yearChoices={view.choices}
+          yearChoices={view.importChoices}
         />
       )}
     </section>

@@ -7,7 +7,7 @@ import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { listClubEvents } from "@/modules/club-registrations/repository";
 import { monthlyReportProgress, reportMonthLabel, reportableMonths, yearToDate } from "@/modules/club-reports/domain";
 import { getClubReportYear } from "@/modules/club-reports/repository";
-import { clubYearFor, rosterYearSummary } from "@/modules/club-rosters/domain";
+import { clubYearChoices, clubYearFor, rosterYearSummary } from "@/modules/club-rosters/domain";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { honorYearSummary } from "@/modules/honors/member-honor-domain";
 import { listClubHonorsPage } from "@/modules/honors/member-honor-repository";
@@ -86,8 +86,12 @@ export async function ClubOverview({
     listClubHonorsPage(organizationId, shownRosterYear),
   ]);
   const honors = honorYearSummary(honorRows, shownRosterYear);
-  // The staff link carries a non-current roster year, so the Honors page opens on the same year (#819).
-  const staffHonorsHrefForYear = staffHonorsHref && (otherYear ? `${staffHonorsHref}?year=${encodeURIComponent(shownRosterYear)}` : staffHonorsHref);
+  // The staff link carries a non-current roster year, so the Honors page opens on the same year (#819), but only one
+  // that page and its reload route accept (previous, current, next). An older directory year gets no Honors link, so its
+  // counts never lead to another year's list (#1304).
+  const staffHonorsHrefForYear = !staffHonorsHref || !otherYear
+    ? staffHonorsHref
+    : clubYearChoices(now).includes(shownRosterYear) ? `${staffHonorsHref}?year=${encodeURIComponent(shownRosterYear)}` : undefined;
   const registered = events.filter((event) => event.registration);
   const open = events.filter((event) => !event.registration && event.available && event.phase === "OPEN");
   // A club's own draft isn't shown here as filed (#426); staff open the report itself to see or edit one.
