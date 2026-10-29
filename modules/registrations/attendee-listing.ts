@@ -291,14 +291,17 @@ export function parseAttendeeListingQuery(params: URLSearchParams | Record<strin
   const statuses = LISTING_STATUSES.filter((status) => requested.includes(status));
   const meal = get("meal");
   const sort = get("sort");
-  const view = get("view");
+  const viewParam = get("view");
+  const view = VIEW_IDS.has(viewParam) ? (viewParam as ListingViewId) : DEFAULT_LISTING_VIEW;
+  // A sort on a column the view hides could not be seen or changed, so it is dropped.
+  const sortKey = SORT_KEYS.has(sort) && visibleListingColumns(view).some((column) => column.key === sort) ? (sort as ListingSortKey) : null;
   return {
-    view: VIEW_IDS.has(view) ? (view as ListingViewId) : DEFAULT_LISTING_VIEW,
+    view,
     statuses: statuses.length > 0 ? statuses : [...DEFAULT_LISTING_STATUSES],
     meal: MEAL_VALUES.has(meal) ? (meal as MealCategory) : null,
     dietaryOnly: get("dietary") === "1",
     search: get("q").trim().slice(0, 100),
-    sort: SORT_KEYS.has(sort) ? (sort as ListingSortKey) : null,
+    sort: sortKey,
     direction: get("dir") === "desc" ? "desc" : "asc",
   };
 }

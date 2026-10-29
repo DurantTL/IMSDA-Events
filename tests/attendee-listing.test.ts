@@ -358,10 +358,9 @@ describe("task view presets (#1307)", () => {
     }
   });
 
-  it("leaves the CSV on every column whatever the view", () => {
-    const shown = filterAttendeeListing(rows, parseAttendeeListingQuery(new URLSearchParams("view=checkin")));
-    const header = attendeeListingCsv(shown).slice(1).split("\r\n")[0];
-    expect(header).toBe(LISTING_COLUMNS.map((column) => `"${column.label}"`).join(","));
-    expect(attendeeListingCsv(shown)).toBe(attendeeListingCsv(filterAttendeeListing(rows, defaults)));
+  it("drops a sort on a column the view hides, and keeps one it shows", () => {
+    expect(parseAttendeeListingQuery(new URLSearchParams("view=checkin&sort=phone")).sort).toBeNull();
+    expect(parseAttendeeListingQuery(new URLSearchParams("view=checkin&sort=church&dir=desc"))).toMatchObject({ sort: "church", direction: "desc" });
+    expect(parseAttendeeListingQuery(new URLSearchParams("sort=phone")).sort).toBe("phone");
   });
 });

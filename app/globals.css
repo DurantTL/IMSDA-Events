@@ -11552,10 +11552,10 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 @media screen and (min-width: 601px) {
   .attendee-listing-table { min-width: 78rem; }
   .attendee-listing-table th, .attendee-listing-table td { overflow-wrap: anywhere; word-break: normal; }
-  .attendee-listing-table td:last-child { width: auto; min-width: 14rem; }
-  .attendee-listing-table th:nth-child(1), .attendee-listing-table td:nth-child(1) { min-width: 8rem; }
-  .attendee-listing-table th:nth-child(2), .attendee-listing-table td:nth-child(2) { min-width: 7rem; }
-  .attendee-listing-table th:nth-child(3) { min-width: 11rem; }
+  .attendee-listing-table td[data-col="accountHolderEmail"] { width: auto; min-width: 14rem; }
+  .attendee-listing-table [data-col="confirmationCode"] { min-width: 8rem; }
+  .attendee-listing-table [data-col="status"] { min-width: 7rem; }
+  .attendee-listing-table th[data-col="name"] { min-width: 11rem; }
 }
 
 /* The month-by-month club grid: 15 columns scroll inside the box instead of squeezing into each other. */
@@ -12009,7 +12009,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media screen and (min-width: 601px) {
   .attendee-listing-table thead th, .attendee-listing-table td { overflow-wrap: normal; word-break: normal; }
   /* Only the long free-text columns (the name, the account holder) break inside a word. */
-  .attendee-listing-table tbody th, .attendee-listing-table td:last-child { overflow-wrap: anywhere; }
+  .attendee-listing-table tbody th, .attendee-listing-table td[data-col="accountHolderEmail"] { overflow-wrap: anywhere; }
   /* The 12 columns take the room their longest header word needs and no more (the 78rem minimum above
      made the list scroll at 1280 even when the columns fit); what does not fit scrolls in its box. */
   .attendee-listing-table { min-width: 0; }

@@ -47,8 +47,6 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   // Every column is viewable by VIEW_SENSITIVE_DATA holders (dietary content is gated above, in the rows).
   const columns = visibleListingColumns(query.view);
   const activeView = LISTING_VIEWS.find((view) => view.id === query.view) ?? LISTING_VIEWS[0]!;
-  // A sort on a column this view hides still applies, so keep it selectable.
-  const sortOptions = LISTING_COLUMNS.filter((column) => columns.some((visible) => visible.key === column.key) || column.key === query.sort);
   const canExport = permissions.includes("VIEW_REPORTS");
 
   const href = (next: Partial<AttendeeListingQuery>) => {
@@ -66,7 +64,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <div>
           <p className="eyebrow">{event.name}</p>
           <h2>{staffPageTitles.attendeeList}</h2>
-          <p>One row per attendee, with meal, dietary, childcare and volunteer answers. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
+          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
         </div>
         <div className="intro-actions">
           {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</a>}
@@ -94,7 +92,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           <label>Sort by
             <select name="sort" defaultValue={query.sort ?? ""}>
               <option value="">Default order</option>
-              {sortOptions.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
+              {columns.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
             </select>
           </label>
           <label>Direction
@@ -139,7 +137,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                 const active = query.sort === column.key;
                 const nextDirection = active && query.direction === "asc" ? "desc" : "asc";
                 return (
-                  <th key={column.key} role="columnheader" scope="col" aria-sort={active ? (query.direction === "asc" ? "ascending" : "descending") : undefined}>
+                  <th key={column.key} data-col={column.key} role="columnheader" scope="col" aria-sort={active ? (query.direction === "asc" ? "ascending" : "descending") : undefined}>
                     <PhoneHiddenSortLink href={href({ sort: column.key, direction: nextDirection })}>{column.label}{active ? (query.direction === "asc" ? " ▲" : " ▼") : ""}</PhoneHiddenSortLink>
                   </th>
                 );
@@ -156,8 +154,8 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                     : row[column.key];
                   // The attendee's name is the card's title on a phone (table-cards).
                   return column.key === "name"
-                    ? <th key={column.key} role="rowheader" scope="row">{value}</th>
-                    : <td key={column.key} {...cardCell(column.label)}>{value}</td>;
+                    ? <th key={column.key} data-col={column.key} role="rowheader" scope="row">{value}</th>
+                    : <td key={column.key} data-col={column.key} {...cardCell(column.label)}>{value}</td>;
                 })}
               </tr>
             ))}
