@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ChangeEvent } from "react";
+import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import {
   PEOPLE_FILTER_SEVERAL,
   parsePeopleFilters,
@@ -60,11 +60,18 @@ export function PeopleQuickFilters({
     startTransition(() => router.push(peopleHref({ query: typed, filters: next }), { scroll: false }));
   };
 
+  // With JavaScript, Search/Enter goes to the canonical repeated-param URL, not the __several / keep* form fields.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const typed = String(new FormData(event.currentTarget).get("q") ?? "").trim();
+    startTransition(() => router.push(peopleHref({ query: typed, filters: shown }), { scroll: false }));
+  };
+
   const selectValue = (list: readonly string[]) => (list.length === 0 ? "" : list.length === 1 ? list[0] : PEOPLE_FILTER_SEVERAL);
   const roleKeys = shown.roles.map(peopleRoleKey);
   const active = peopleFilterCount(shown) > 0;
   return (
-    <form action="/admin/people" aria-busy={busy} className={styles.search} method="get" role="search">
+    <form action="/admin/people" aria-busy={busy} className={styles.search} method="get" onSubmit={submit} role="search">
       <label className={styles.searchField}>
         Search by name or email
         <input autoComplete="off" defaultValue={query} maxLength={120} name="q" type="search" />
@@ -83,7 +90,7 @@ export function PeopleQuickFilters({
       </label>
       {scope === "full" ? (
         <label className={styles.searchField}>
-          Event (for event roles)
+          Event
           <select name="event" onChange={change("event")} value={selectValue(shown.eventIds)}>
             <option value="">Pick an event</option>
             {shown.eventIds.length > 1 ? <option value={PEOPLE_FILTER_SEVERAL}>Several ({shown.eventIds.length}), see Filters</option> : null}
@@ -92,7 +99,7 @@ export function PeopleQuickFilters({
         </label>
       ) : null}
       <label className={styles.searchField}>
-        Club (for club roles)
+        Club
         <select name="club" onChange={change("club")} value={selectValue(shown.clubIds)}>
           <option value="">Any club</option>
           {shown.clubIds.length > 1 ? <option value={PEOPLE_FILTER_SEVERAL}>Several ({shown.clubIds.length}), see Filters</option> : null}
@@ -103,7 +110,7 @@ export function PeopleQuickFilters({
       {shown.eventIds.length > 1 ? shown.eventIds.map((id) => <input key={id} name="keepEvent" type="hidden" value={id} />) : null}
       {shown.clubIds.length > 1 ? shown.clubIds.map((id) => <input key={id} name="keepClub" type="hidden" value={id} />) : null}
       <button className="primary-button" type="submit">{active ? "Apply" : "Search"}</button>
-      {query && !active ? <Link className="secondary-button" href="/admin/people">Clear</Link> : null}
+      {query ? <Link className="secondary-button" href={peopleHref({ filters })}>Clear</Link> : null}
     </form>
   );
 }

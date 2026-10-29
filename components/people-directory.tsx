@@ -14,6 +14,7 @@ import {
   personPath,
   type PeopleFilters,
 } from "@/modules/system-admin/people-directory-model";
+import { PEOPLE_STATUS_ID, PeopleActiveFilters } from "./people-active-filters";
 import { PeopleQuickFilters } from "./people-quick-filters";
 import styles from "./people-directory.module.css";
 
@@ -41,21 +42,21 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
           <legend>Roles (anyone with any of these)</legend>
           <div className={styles.panelScroll}>
             {roleGroups.map((group) => (
-              <div className={styles.panelGroup} key={group.label}>
-                <strong className={styles.panelGroupLabel}>{group.label}</strong>
+              <fieldset className={styles.panelGroup} key={group.label}>
+                <legend className={styles.panelGroupLabel}>{group.label}</legend>
                 {group.options.map((option) => (
                   <label className={styles.panelCheck} key={option.key}>
                     <input defaultChecked={chosenRoles.has(option.key)} name="role" type="checkbox" value={option.key} />
                     <span>{option.label}</span>
                   </label>
                 ))}
-              </div>
+              </fieldset>
             ))}
           </div>
         </fieldset>
         {scope === "full" ? (
           <fieldset className={styles.panelSet}>
-            <legend>Events (for event roles)</legend>
+            <legend>Events (any event role there, or the roles chosen above)</legend>
             <div className={styles.panelScroll}>
               {eventOptions.map((event) => (
                 <label className={styles.panelCheck} key={event.id}>
@@ -67,7 +68,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
           </fieldset>
         ) : null}
         <fieldset className={styles.panelSet}>
-          <legend>Clubs (for club roles)</legend>
+          <legend>Clubs (any club role there, or the roles chosen above)</legend>
           <div className={styles.panelScroll}>
             {clubOptions.map((club) => (
               <label className={styles.panelCheck} key={club.id}>
@@ -128,21 +129,9 @@ export function PeopleDirectory({
     <div className={styles.wrap}>
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
-      {chips.length > 0 ? (
-        <div className={styles.activeBar}>
-          <ul aria-label="Active filters" className={styles.activeList}>
-            {chips.map((chip) => (
-              <li className={styles.activeChip} key={chip.key}>
-                <span>{chip.label}</span>
-                <Link aria-label={chip.removeLabel} className={styles.remove} href={chip.href}><span aria-hidden="true">&times;</span></Link>
-              </li>
-            ))}
-          </ul>
-          <Link className={styles.clearAll} href={peopleHref({ query })}>Clear all</Link>
-        </div>
-      ) : null}
+      <PeopleActiveFilters chips={chips} clearHref={peopleHref({ query })} />
       {filters.roles.length === 0 || pendingOnly ? pending : null}
-      <p aria-live="polite" className={styles.count} role="status">
+      <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."
           : pendingOnly
@@ -152,8 +141,8 @@ export function PeopleDirectory({
             : total === 0
               ? "No people found."
               : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}
+        {eventRolesNeedEvent(filters) ? " Event roles need an event. Pick one to include them." : ""}
       </p>
-      {eventRolesNeedEvent(filters) ? <p className={styles.count}>Event roles need an event. Pick one to include them.</p> : null}
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
       ) : pendingOnly ? (

@@ -38,10 +38,10 @@ describe("parsing repeated values", () => {
     expect(parsePeopleFilters({ role: "club-director", club: many }, "full").clubIds).toHaveLength(30);
   });
 
-  it("drops unknown roles, bad ids, and event or club ids without a matching role", () => {
+  it("drops unknown roles and bad ids, and keeps ids picked without a role", () => {
     const filters = parsePeopleFilters({ role: ["nonsense", "club-director", 7], club: ["a b;c", "org_1"], event: "evt_1" }, "full");
     expect(keys(filters)).toEqual(["club-director"]);
-    expect(filters).toMatchObject({ clubIds: ["org_1"], eventIds: [] });
+    expect(filters).toMatchObject({ clubIds: ["org_1"], eventIds: ["evt_1"] });
   });
 
   it("drops out-of-scope roles and every event id for a Clubs Administrator", () => {
@@ -104,14 +104,19 @@ describe("URL round trip, pager and chips", () => {
     expect(club?.href).not.toContain("org_1");
     const lastEvent = peopleFilterChips({ filters: { ...filters, eventIds: ["evt_1"] }, query: "", scope: "full", eventOptions: events, clubOptions: clubs }).find((chip) => chip.label.startsWith("Event:"));
     expect(lastEvent?.href).not.toContain("event=");
-    const onlyEventRole = parsePeopleFilters({ role: ["club-director", "event-check-in-staff"], event: "evt_1", club: "org_1" }, "full");
-    const removeEventRole = peopleFilterChips({ filters: onlyEventRole, query: "", scope: "full", eventOptions: events, clubOptions: clubs }).find((chip) => chip.label.startsWith("Role: Check"));
-    expect(removeEventRole?.href).toBe("/admin/people?role=club-director&club=org_1");
+    const mixed = parsePeopleFilters({ role: ["club-director", "event-check-in-staff"], event: "evt_1", club: "org_1" }, "full");
+    const removeEventRole = peopleFilterChips({ filters: mixed, query: "", scope: "full", eventOptions: events, clubOptions: clubs }).find((chip) => chip.label.startsWith("Role: Check"));
+    expect(removeEventRole?.href).toBe("/admin/people?role=club-director&event=evt_1&club=org_1");
   });
 
   it("summarises the filter for the result count", () => {
     expect(peopleFilterSummary(parsePeopleFilters({ role: ["club-director", "club-deputy"], club: ["org_1", "org_2"] }, "full"), { eventOptions: events, clubOptions: clubs })).toBe("Director or Deputy in 2 clubs");
     expect(peopleFilterSummary(parsePeopleFilters({ role: "club-director", club: "org_1" }, "full"), { eventOptions: events, clubOptions: clubs })).toBe("Director in Alpha Club");
+    const names = { eventOptions: events, clubOptions: clubs };
+    expect(peopleFilterSummary(parsePeopleFilters({ club: "org_1" }, "full"), names)).toBe("a club role in Alpha Club");
+    expect(peopleFilterSummary(parsePeopleFilters({ event: ["evt_1", "evt_2"] }, "full"), names)).toBe("an event role at 2 events");
+    // The club limits only the club role, not the system role.
+    expect(peopleFilterSummary(parsePeopleFilters({ role: ["system-admin", "club-director"], club: "org_1" }, "full"), names)).toBe("System administrator, or Director in Alpha Club");
   });
 });
 
@@ -145,6 +150,34 @@ describe("where-clauses across several values", () => {
   });
 });
 
+describe("ids picked without a role (#1321)", () => {
+  it("means any club role at those clubs, OR'd with the chosen roles", () => {
+    const where = buildRoleWhere(parsePeopleFilters({ role: "system-admin", club: ["org_1", "org_2"] }, "full"), "full", now);
+    expect(where?.staff).toEqual({ globalRole: "SYSTEM_ADMIN" });
+    expect(where?.account).toMatchObject({ clubDirectorGrants: { some: { role: { in: ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] }, organization: { isActive: true, id: { in: ["org_1", "org_2"] } } } } });
+    expect(buildRoleWhere(parsePeopleFilters({ club: "org_1" }, "full"), "full", now)?.staff).toBeUndefined();
+  });
+
+  it("means any event role at those events (full scope only)", () => {
+    const where = buildRoleWhere(parsePeopleFilters({ event: ["evt_1", "evt_2"] }, "full"), "full", now);
+    expect(where?.staff).toMatchObject({ memberships: { some: { status: "ACTIVE", eventId: { in: ["evt_1", "evt_2"] } } } });
+    expect((where?.staff as { memberships: { some: { role: { in: string[] } } } }).memberships.some.role.in).toHaveLength(7);
+    expect(where?.account).toBeUndefined();
+  });
+
+  it("keeps CLUB type for a Clubs Administrator and ignores events", () => {
+    const filters = parsePeopleFilters({ club: "org_1", event: "evt_1" }, "clubs");
+    expect(filters.eventIds).toEqual([]);
+    expect(buildRoleWhere(filters, "clubs", now)?.account).toMatchObject({ clubDirectorGrants: { some: { organization: { isActive: true, type: "CLUB", id: { in: ["org_1"] } } } } });
+    expect(buildRoleWhere({ roles: [], eventIds: ["evt_1"], clubIds: [] }, "clubs", now)).toBeNull();
+  });
+
+  it("drops Pending when any id is present, and event roles with a club picked are not an event prompt", () => {
+    expect(parsePeopleFilters({ role: "pending", club: "org_1" }, "full").roles).toEqual([]);
+    expect(needsEventPick(parsePeopleFilters({ role: "event-event-admin", club: "org_1" }, "full"))).toBe(false);
+  });
+});
+
 describe("the People list markup", () => {
   const render = (filters: PeopleFilters, extra: Record<string, unknown> = {}) => renderToStaticMarkup(createElement(PeopleDirectory, {
     query: "", rows: [], page: 1, pageCount: 1, total: 12, filters, eventOptions: events, clubOptions: clubs, ...extra,
@@ -169,7 +202,23 @@ describe("the People list markup", () => {
     expect(several).toContain('name="keepRole"');
   });
 
-  it("notes that event roles need an event when mixed with other roles", () => {
-    expect(render(parsePeopleFilters({ role: ["event-event-admin", "system-admin"] }, "full"))).toContain("Event roles need an event");
+  it("puts the event note inside the live status text", () => {
+    const html = render(parsePeopleFilters({ role: ["event-event-admin", "system-admin"] }, "full"));
+    expect(html).toMatch(/role="status"[^>]*>[^<]*Event roles need an event/);
+    expect(html).toContain('id="people-status"');
+  });
+
+  it("shows search Clear whenever a search is set, keeping filters", () => {
+    const html = render(parsePeopleFilters({ role: "club-director" }, "full"), { query: "sam" });
+    expect(html).toContain('class="secondary-button" href="/admin/people?role=club-director"');
+  });
+
+  it("groups roles in the panel with legends", () => {
+    expect(render(parsePeopleFilters({}, "full"))).toContain('<legend class="_panelGroupLabel');
+  });
+
+  it("caps ids at the limit without scanning the rest", () => {
+    const many = Array.from({ length: 500 }, (_, i) => `org_${i}`);
+    expect(parsePeopleFilters({ club: many }, "full").clubIds).toHaveLength(30);
   });
 });

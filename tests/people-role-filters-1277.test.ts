@@ -62,9 +62,9 @@ describe("role parameter parsing", () => {
     expect(peopleRoleOptions("full").map((group) => group.label)).toEqual(["System", "Event", "Club", "Invites"]);
   });
 
-  it("keeps the event only for an event role and the club only for a club role, and drops odd ids", () => {
-    expect(filtersFor("event-event-admin", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: ["evt_1"], clubIds: [] });
-    expect(filtersFor("club-director", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: [], clubIds: ["org_1"] });
+  it("keeps picked events and clubs even with no matching role (#1321), and drops odd ids", () => {
+    expect(filtersFor("event-event-admin", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: ["evt_1"], clubIds: ["org_1"] });
+    expect(filtersFor("club-director", { event: "evt_1", club: "org_1" })).toMatchObject({ eventIds: ["evt_1"], clubIds: ["org_1"] });
     expect(filtersFor("club-director", { club: "a b;c" }).clubIds).toEqual([]);
     expect(needsEventPick(filtersFor("event-event-admin"))).toBe(true);
     expect(needsEventPick(filtersFor("event-event-admin", { event: "evt_1" }))).toBe(false);

@@ -422,6 +422,8 @@ const pages: PageSpec[] = [
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),
   // People & access (#1275): the list, and one person (the seeded Registration manager, a non-admin staff login with an event membership) with its boxes.
   staff("people", "/admin/people?q=imsda-events.test", "system-admin"),
+  // Filters active (#1321): chips, a role mix with a seeded event and club.
+  staff("people-filtered", `/admin/people?role=club-director&role=club-deputy&role=event-event-admin&event=${eventId}&club=${clubA}`, "system-admin"),
   staff("people-person", "/admin/people/staff/usr_registration_manager", "system-admin"),
   // The person page opened from an invite with access ready to save (#1276): nothing is saved.
   staff("people-person-chosen", "/admin/people/staff/usr_registration_manager?grant=sa%2Cca%2Cac%2Ce%3Aevt_wr26%3AEVENT_ADMIN", "system-admin"),
