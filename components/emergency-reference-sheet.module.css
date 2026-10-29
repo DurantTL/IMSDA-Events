@@ -28,6 +28,8 @@
 .printTable { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
 .printTable th, .printTable td { border: 1px solid #777; padding: 6px 8px; text-align: left; overflow-wrap: anywhere; }
 .printTable th { background: #eee; }
+/* The escalation order is a short number; keep its header whole at phone width. */
+.printTable .orderCell { width: 1%; white-space: nowrap; overflow-wrap: normal; }
 .footer { margin: 10px 0 0; border-top: 1px solid #555; padding-top: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 
 @media print {

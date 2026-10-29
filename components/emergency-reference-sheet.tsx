@@ -45,11 +45,11 @@ export function EmergencyReferenceSheetView({ sheet, generatedAtIso, actions }: 
                 <h3>Contacts, in escalation order</h3>
                 {sheet.contacts.length === 0 ? <p className={styles.empty}>No contacts listed.</p> : (
                   <table className={styles.printTable}>
-                    <thead><tr><th scope="col">Order</th><th scope="col">Role</th><th scope="col">Name</th><th scope="col">Phone</th></tr></thead>
+                    <thead><tr><th scope="col" className={styles.orderCell}>Order</th><th scope="col">Role</th><th scope="col">Name</th><th scope="col">Phone</th></tr></thead>
                     <tbody>
                       {sheet.contacts.map((contact) => (
                         <tr key={`${contact.escalationOrder}-${contact.name}`}>
-                          <td>{contact.escalationOrder}</td><td>{contact.role}</td><td>{contact.name}</td><td>{contact.phone}</td>
+                          <td className={styles.orderCell}>{contact.escalationOrder}</td><td>{contact.role}</td><td>{contact.name}</td><td>{contact.phone}</td>
                         </tr>
                       ))}
                     </tbody>
