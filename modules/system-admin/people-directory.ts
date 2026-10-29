@@ -7,6 +7,7 @@ import {
   mergePeopleCandidates,
   pagePeople,
   type ClubRoleStatus,
+  peopleFilterCount,
   type PeopleFilters,
   type PeopleScope,
   summarizePeopleAccess,
@@ -178,7 +179,7 @@ export async function findPeopleByRole(
 }
 
 export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full", filters?: PeopleFilters) {
-  const matches = filters && filters.roles.length > 0 ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
+  const matches = filters && peopleFilterCount(filters) > 0 ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
   const page = pagePeople(matches, requestedPage);
   return { ...page, rows: await loadPeopleRows(page.items, scope) };
 }

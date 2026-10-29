@@ -130,7 +130,7 @@ export function PeopleDirectory({
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleActiveFilters chips={chips} clearHref={peopleHref({ query })} />
-      {filters.roles.length === 0 || pendingOnly ? pending : null}
+      {peopleFilterCount(filters) === 0 || pendingOnly ? pending : null}
       <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."

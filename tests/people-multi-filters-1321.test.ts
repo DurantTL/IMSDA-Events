@@ -1,13 +1,18 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** #1321: several roles, clubs and events at once, kept in the URL. Synthetic data only. */
 
 vi.mock("server-only", () => ({}));
+const mocks = vi.hoisted(() => ({ userFindMany: vi.fn(), accountFindMany: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({
+  getPrisma: () => ({ user: { findMany: mocks.userFindMany }, attendeeAccount: { findMany: mocks.accountFindMany } }),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import { PeopleDirectory } from "@/components/people-directory";
+import { findPeopleByRole, searchPeople } from "@/modules/system-admin/people-directory";
 import {
   PEOPLE_FILTER_SEVERAL,
   buildRoleWhere,
@@ -220,5 +225,43 @@ describe("the People list markup", () => {
   it("caps ids at the limit without scanning the rest", () => {
     const many = Array.from({ length: 500 }, (_, i) => `org_${i}`);
     expect(parsePeopleFilters({ club: many }, "full").clubIds).toHaveLength(30);
+  });
+});
+
+describe("an id-only filter uses the role path (#1321 review)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists only people at the picked club, never everyone", async () => {
+    mocks.accountFindMany.mockResolvedValue([{ id: "a1", email: "dee@example.test", displayName: "Dee", linkedUser: null }]);
+    const people = await findPeopleByRole(parsePeopleFilters({ club: "org_1" }, "full"), "", "full", now);
+    expect(people.map((person) => person.accountId)).toEqual(["a1"]);
+    expect(mocks.userFindMany).not.toHaveBeenCalled();
+    expect(mocks.accountFindMany.mock.calls[0][0].where).toMatchObject({ clubDirectorGrants: { some: { organization: { id: { in: ["org_1"] } } } } });
+  });
+
+  it("lists only staff with a role at the picked event", async () => {
+    mocks.userFindMany.mockResolvedValue([{ id: "u1", email: "sam@example.test", displayName: "Sam", attendeeAccountId: null }]);
+    const people = await findPeopleByRole(parsePeopleFilters({ event: "evt_1" }, "full"), "", "full", now);
+    expect(people.map((person) => person.staffId)).toEqual(["u1"]);
+    expect(mocks.accountFindMany).not.toHaveBeenCalled();
+    expect(mocks.userFindMany.mock.calls[0][0].where).toMatchObject({ memberships: { some: { eventId: { in: ["evt_1"] } } } });
+  });
+
+  it("searchPeople does not fall back to the unfiltered list for an id-only or pending-plus-club filter", async () => {
+    mocks.userFindMany.mockResolvedValue([]);
+    mocks.accountFindMany.mockResolvedValue([]);
+    for (const params of [{ club: "org_1" }, { event: "evt_1" }, { role: "pending", club: "org_1" }]) {
+      mocks.userFindMany.mockClear();
+      mocks.accountFindMany.mockClear();
+      const result = await searchPeople("", 1, "full", parsePeopleFilters(params, "full"));
+      expect(result.total).toBe(0);
+      for (const call of [...mocks.userFindMany.mock.calls, ...mocks.accountFindMany.mock.calls]) expect(call[0].where).toBeDefined();
+    }
+  });
+
+  it("hides the pending block when only a club is chosen", () => {
+    const section = createElement("section", { id: "pending-section" }, "Resend");
+    const html = renderToStaticMarkup(createElement(PeopleDirectory, { query: "", rows: [], page: 1, pageCount: 1, total: 0, filters: parsePeopleFilters({ club: "org_1" }, "full"), clubOptions: clubs, pending: section, pendingCount: 1 }));
+    expect(html).not.toContain('id="pending-section"');
   });
 });

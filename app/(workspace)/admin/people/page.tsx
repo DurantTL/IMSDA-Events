@@ -10,7 +10,7 @@ import { PendingInvites } from "@/components/pending-invites";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
 import { PENDING_INVITES_CAP, listPendingInvites } from "@/modules/system-admin/pending-invites";
-import { keepKnownFilterIds, parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
+import { keepKnownFilterIds, peopleFilterCount, parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 
 export const metadata: Metadata = { title: "People & access" };
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function PeopleAccessPage({
   const filters = keepKnownFilterIds(parsed, eventOptions, clubOptions);
   // Pending invites (#1276) show above the list when no role filter is on, and are the list when it is the only role (#1277).
   const pendingOnly = filters.roles.length === 1 && filters.roles[0].kind === "pending";
-  const showPending = filters.roles.length === 0 || pendingOnly;
+  const showPending = peopleFilterCount(filters) === 0 || pendingOnly;
   const [result, pending] = await Promise.all([
     pendingOnly
       ? { rows: [], page: 1, pageCount: 1, total: 0 }

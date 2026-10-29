@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import styles from "./people-directory.module.css";
 
 export const PEOPLE_STATUS_ID = "people-status";
+
+const modified = (event: MouseEvent) => event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
 
 type Chip = { key: string; label: string; removeLabel: string; href: string };
 
@@ -43,13 +45,13 @@ export function PeopleActiveFilters({ chips, clearHref }: { chips: readonly Chip
         {chips.map((chip, index) => (
           <li className={styles.activeChip} key={chip.key}>
             <span>{chip.label}</span>
-            <Link aria-label={chip.removeLabel} className={styles.remove} data-chip={chip.key} href={chip.href} onClick={remember(index)}>
+            <Link aria-label={chip.removeLabel} className={styles.remove} data-chip={chip.key} href={chip.href} onClick={(event) => { if (!modified(event)) remember(index)(); }}>
               <span aria-hidden="true">&times;</span>
             </Link>
           </li>
         ))}
       </ul>
-      <Link className={styles.clearAll} href={clearHref} onClick={() => { targets.current = ["status"]; }}>Clear all</Link>
+      <Link className={styles.clearAll} href={clearHref} onClick={(event) => { if (!modified(event)) targets.current = ["status"]; }}>Clear all</Link>
     </div>
   );
 }
