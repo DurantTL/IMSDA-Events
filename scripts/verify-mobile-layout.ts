@@ -308,6 +308,7 @@ const pages: PageSpec[] = [
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),
   staff("attendee-listing", "/people/attendees"),
+  staff("attendee-listing-meals", "/people/attendees?view=meals"),
   staff("duplicates", "/people/duplicates"),
   staff("event-staff", "/staff"),
   staff("finance", "/finance"),

@@ -51,7 +51,7 @@ describe("attendee listing page", () => {
     const html = await render();
     expect(html).toContain("WR26-R1");
     expect(html).toContain("synthetic: no peanuts");
-    expect(html).toContain("Download CSV");
+    expect(html).toContain("Download CSV (all columns)");
     expect(html).not.toContain("Dietary details are limited");
   });
 
@@ -70,5 +70,26 @@ describe("attendee listing page", () => {
     const html = await render();
     expect(html).not.toContain("synthetic: no peanuts");
     expect(html).toContain("Dietary details are limited to staff with health access");
+  });
+
+  it("shows only the chosen view's columns, keeps the CSV link view-free, and falls back on unknown views", async () => {
+    dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_REPORTS", "VIEW_SENSITIVE_DATA"]));
+    const html = await render({ event: "evt", view: "contacts" });
+    const header = html.slice(html.indexOf("<thead"), html.indexOf("</thead>"));
+    expect(header).toContain("Account holder email");
+    expect(header).not.toContain("Meal preference");
+    expect(html).toContain("Contacts view");
+    expect(html).toMatch(/exports\/attendees"|exports\/attendees\?(?!.*view=)[^"]*"/);
+    expect(html).not.toMatch(/exports\/attendees[^"]*view=/);
+    const fallback = await render({ event: "evt", view: "bogus" });
+    expect(fallback.slice(fallback.indexOf("<thead"), fallback.indexOf("</thead>"))).toContain("Meal preference");
+  });
+
+  it("keeps dietary at Yes or No in the meals view without health access", async () => {
+    dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_SENSITIVE_DATA"]));
+    const html = await render({ event: "evt", view: "meals" });
+    expect(html).not.toContain("synthetic: no peanuts");
+    expect(html).toContain("Dietary needs");
+    expect(html).not.toContain(">Volunteer<");
   });
 });
