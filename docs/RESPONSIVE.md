@@ -49,8 +49,10 @@ It runs as its own workflow, not in `ci.yml` (CI minutes are tight):
   change. The shared CSS is left out on purpose: it changes in most pull
   requests, so it is covered by the label and the weekly run.
 - **Pull requests with the `mobile-check` label**, whatever they change: the
-  same quick run, started by `mobile-layout-label.yml`. Put the label on a PR
-  that changes a page's layout. A workflow cannot OR a `paths` filter with a
+  same quick run, started by `mobile-layout-label.yml`. Put the label only on
+  a PR that changes shared layout (app shell, navigation, shared CSS); a
+  page-level change is checked by the local audit before the PR and by the
+  weekly run (Caleb, October 29, 2026). A workflow cannot OR a `paths` filter with a
   label, so the label trigger is a small second workflow that calls the first
   (`workflow_call`). A PR that matches both shares one concurrency group, so one
   of the two runs is cancelled (it shows as a cancelled check). Adding a

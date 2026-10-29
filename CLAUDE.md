@@ -13,8 +13,10 @@ subagents. The agents live in `.claude/agents/`.
 - **Human-only steps:** Caleb merges PRs and runs production migrations
   himself. Never merge or deploy.
 - **PRs:** target `main`, open ready for review (not draft), use the repository
-  template, and add the `mobile-check` label when UI changes. Never delete
-  branches.
+  template. Add the `mobile-check` label only for shared layout changes (app
+  shell, navigation, shared CSS in `app/globals.css`); a page-level change
+  relies on the local mobile audit the build already runs, plus the weekly
+  run (Caleb, October 29). Never delete branches.
 - **Two builds at most:** never run more than two builds at once. Keep moving
   through approved issues without re-asking.
 - **Base branch:** don't merge `main` into an open PR unless there is a real
