@@ -77,7 +77,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
               : `Nothing needs attention for ${view.monthLabel}. Every record is reviewed or not yet due.`}
           </p>
         ) : (
-          <table className={styles.table} role="table">
+          <table className={`report-table report-table-auto ${styles.table}`} role="table">
             <caption className="sr-only">Clubs and their {view.monthLabel} record, {view.showAllClubs ? "all clubs" : "clubs that need attention"}</caption>
             <thead role="rowgroup">
               <tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">{view.monthLabel} record</th><th role="columnheader" scope="col">Points</th><th role="columnheader" scope="col">Year so far</th><th role="columnheader" scope="col"><span className="sr-only">Action</span></th></tr>
