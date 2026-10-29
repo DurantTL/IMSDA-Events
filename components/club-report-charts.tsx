@@ -219,12 +219,14 @@ function CoordinatorTable({ totals, title, clubYear }: { totals: readonly Coordi
 
 export type PointsBarsClub = { id: string; name: string; reportPoints: number; totalPoints: number };
 
-export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "Total points by club" }: {
+export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "Total points by club", ranks }: {
   clubs: readonly PointsBarsClub[];
   clubYear: string;
   limit?: number;
   showAllHref?: string;
   title?: string;
+  /** Rank by club id when `clubs` is a filtered subset, so the table keeps each club's rank in the whole year. */
+  ranks?: ReadonlyMap<string, number>;
 }) {
   const base = safe(useId());
   const ranked = sortLeaderboard(clubs, "points");
@@ -275,7 +277,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
             <tbody>
               {ranked.map((club, index) => (
                 <tr key={club.id}>
-                  <td>{index + 1}</td>
+                  <td>{ranks?.get(club.id) ?? index + 1}</td>
                   <th scope="row" translate="no">{club.name}</th>
                   <td>{number(club.reportPoints)}</td>
                   <td>{number(club.totalPoints - club.reportPoints)}</td>
