@@ -2,7 +2,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { attendanceExportCsv, attendanceExportFileName, attendanceGroupOf } from "@/modules/club-meeting-notes/attendance";
 import { clubMeetingNoteApiError } from "@/modules/club-meeting-notes/api-errors";
-import { isMeetingDate } from "@/modules/club-meeting-notes/domain";
+import { clubYearDateBounds, isMeetingDate } from "@/modules/club-meeting-notes/domain";
 import { loadAttendanceExport } from "@/modules/club-meeting-notes/repository";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
@@ -32,6 +32,10 @@ async function getHandler(request: Request, context: RouteContext) {
       return Response.json({ error: "INVALID_DATE_RANGE", message: "The start date must be on or before the end date." }, { status: 400 });
     }
     const { clubYear } = rosterYearView(params.get("year") ?? undefined);
+    const yearBounds = clubYearDateBounds(clubYear);
+    if ((from && (from < yearBounds.from || from > yearBounds.to)) || (to && (to < yearBounds.from || to > yearBounds.to))) {
+      return Response.json({ error: "INVALID_DATE_RANGE", message: `The export dates must fall inside the ${clubYear} club year.` }, { status: 400 });
+    }
     const data = await loadAttendanceExport(organizationId, clubYear, { from, to });
     const csv = attendanceExportCsv(
       { clubName: data.clubName, clubYear, from, to },
@@ -47,7 +51,7 @@ async function getHandler(request: Request, context: RouteContext) {
       entityId: organizationId,
       summary: "Downloaded a club's meeting attendance export as CSV.",
       metadata: {
-        organizationId, clubYear, meetingCount: data.meetings.length, memberCount: data.members.length,
+        organizationId, clubYear, from: from ?? null, to: to ?? null, meetingCount: data.meetings.length, memberCount: data.members.length,
         ...("accountId" in actor ? { accountId: actor.accountId } : {}),
         ...("actAsId" in actor ? { actAsId: actor.actAsId } : {}),
       },
@@ -57,7 +61,7 @@ async function getHandler(request: Request, context: RouteContext) {
         "Content-Type": "text/csv; charset=utf-8",
         "Cache-Control": "private, no-store, max-age=0",
         "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="${attendanceExportFileName(clubYear)}"`,
+        "Content-Disposition": `attachment; filename="${attendanceExportFileName(clubYear, { from, to })}"`,
       },
     });
   } catch (error) {

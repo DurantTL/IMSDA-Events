@@ -74,6 +74,7 @@ export function ClubMeetingNotes({
   rosterClubYear,
   attendanceAvailable,
   exportHref,
+  exportMonthHref,
 }: {
   initialNotes: ClubMeetingNoteRecord[];
   organizationId: string;
@@ -86,6 +87,7 @@ export function ClubMeetingNotes({
   attendanceAvailable: boolean;
   /** Null when this month's club year can't be exported. */
   exportHref: string | null;
+  exportMonthHref: string | null;
 }) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes);
@@ -284,9 +286,14 @@ export function ClubMeetingNotes({
             <h2 id="club-notes-heading">Meetings in {monthLabel}</h2>
           </div>
           <span className="club-team-invite-actions">
+            {exportMonthHref && attendanceAvailable && (
+              <a className="secondary-button club-event-action" href={exportMonthHref}>
+                <Download aria-hidden="true" size={14} /> Export {monthLabel.split(" ")[0]} attendance (CSV)
+              </a>
+            )}
             {exportHref && attendanceAvailable && (
               <a className="secondary-button club-event-action" href={exportHref}>
-                <Download aria-hidden="true" size={14} /> Attendance export (CSV)
+                <Download aria-hidden="true" size={14} /> Export whole year (CSV)
               </a>
             )}
             <button className="primary-button" data-meeting-note-add="" disabled={saving} onClick={startAdd} type="button">

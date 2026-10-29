@@ -1,3 +1,4 @@
+import { monthDateBounds } from "@/modules/club-meeting-notes/domain";
 import { toCsv } from "@/modules/reporting/csv";
 
 /**
@@ -147,6 +148,18 @@ export function attendanceExportCsv(
   return toCsv(out);
 }
 
-export function attendanceExportFileName(clubYear: string) {
-  return `meeting-attendance-${clubYear}.csv`;
+/**
+ * No range: the whole club year (`meeting-attendance-2026-27.csv`). A range
+ * that is exactly one calendar month: that month (`meeting-attendance-2026-10.csv`).
+ * Any other range: `meeting-attendance-2026-27-<from>-to-<to>.csv`, with
+ * `start`/`end` standing in for a missing side.
+ */
+export function attendanceExportFileName(clubYear: string, range: { from?: string; to?: string } = {}) {
+  const { from, to } = range;
+  if (!from && !to) return `meeting-attendance-${clubYear}.csv`;
+  if (from && to && from.slice(0, 7) === to.slice(0, 7)) {
+    const bounds = monthDateBounds(from.slice(0, 7));
+    if (from === bounds.from && to === bounds.to) return `meeting-attendance-${from.slice(0, 7)}.csv`;
+  }
+  return `meeting-attendance-${clubYear}-${from ?? "start"}-to-${to ?? "end"}.csv`;
 }
