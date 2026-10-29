@@ -803,8 +803,8 @@ export function ClubRosterWorkspace({
           <div className={styles.sections}>
             {/*
               One table per section inside a native <details> (#1305): a details element can't live inside a table, and a
-              closed section should take no room. The columns of the two tables size independently (some drift between them is accepted). The summary is the section heading and
-              names its table. Both tables keep the sortable Name header, so sorting works from whichever is open.
+              closed section should take no room. The columns of the two tables size independently (some drift between them is
+              accepted). The summary is the section heading and names its table. Both tables keep the sortable Name header, so sorting works from whichever is open.
             */}
             <SortOrderNote>{`${sortOrderText(nameSortLabel, nameDirection)} Staff and Members are listed separately.`}</SortOrderNote>
             {sections.map((section) => (
@@ -824,7 +824,7 @@ export function ClubRosterWorkspace({
                   <p className={styles.empty}>{section.empty}</p>
                 ) : (
                   <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
-                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className={`report-table roster-card-table ${styles.table}`}>
+                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table roster-card-table">
                       <thead>
                         <tr>
                           {columns.map((column) => {
