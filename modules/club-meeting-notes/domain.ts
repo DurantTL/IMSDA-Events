@@ -1,5 +1,5 @@
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { MAX_HONORS, isReportMonth, type ReportHonor } from "@/modules/club-reports/domain";
+import { MAX_HONORS, clubYearMonths, isReportMonth, type ReportHonor } from "@/modules/club-reports/domain";
 
 /**
  * Club meeting notes (#426): one simple record per meeting so the monthly
@@ -40,6 +40,18 @@ export function monthDateBounds(month: string) {
   const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const days = monthNumber === 2 ? (leap ? 29 : 28) : [4, 6, 9, 11].includes(monthNumber) ? 30 : 31;
   return { from: `${month}-01`, to: `${month}-${String(days).padStart(2, "0")}` };
+}
+
+/** First and last day of a club year (`2026-27` → 2026-09-01 to 2027-08-31). */
+export function clubYearDateBounds(clubYear: string) {
+  const months = clubYearMonths(clubYear);
+  return { from: monthDateBounds(months[0]!).from, to: monthDateBounds(months[11]!).to };
+}
+
+/** The attendance export link for one month of a club year. */
+export function attendanceMonthExportHref(apiBase: string, clubYear: string, month: string) {
+  const { from, to } = monthDateBounds(month);
+  return `${apiBase}/exports/attendance?year=${encodeURIComponent(clubYear)}&from=${from}&to=${to}`;
 }
 
 /** "2026-10-14" → "2026-10". */

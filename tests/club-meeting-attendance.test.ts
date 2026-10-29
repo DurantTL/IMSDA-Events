@@ -54,7 +54,7 @@ import {
   presentTotal,
   groupAttendanceRoster,
 } from "@/modules/club-meeting-notes/attendance";
-import { defaultMeetingDate, meetingAttendanceTotal, monthDateBounds, notesMonthlySummary, recordsMonth } from "@/modules/club-meeting-notes/domain";
+import { attendanceMonthExportHref, clubYearDateBounds, defaultMeetingDate, meetingAttendanceTotal, monthDateBounds, notesMonthlySummary, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { eraseRosterRow } from "@/modules/club-rosters/repository";
 import { createClubMeetingNote, updateClubMeetingNote } from "@/modules/club-meeting-notes/repository";
 import { meetingNoteInputSchema } from "@/modules/club-meeting-notes/schemas";
@@ -395,6 +395,8 @@ describe("attendance needs roster access (ADR 0005)", () => {
   });
 
   it("applies a date range, rejects a bad one, and leaves out removed members' extras", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
     role("DIRECTOR");
     mocks.noteFindMany.mockResolvedValue([{ id: "n-1", meetingDate: "2026-10-07", attendance: [{ rosterMemberId: "m-9", present: true }] }]);
     expect((await EXPORT(request("?from=2026-10-01&to=2026-10-31"), ctx)).status).toBe(200);
@@ -403,6 +405,18 @@ describe("attendance needs roster access (ADR 0005)", () => {
     expect(extras.where.status).toEqual({ not: "REMOVED" });
     expect((await EXPORT(request("?from=2026-02-31"), ctx)).status).toBe(400);
     expect((await EXPORT(request("?from=2026-11-01&to=2026-10-01"), ctx)).status).toBe(400);
+    vi.useRealTimers();
+  });
+
+  it("rejects a range outside the club year and accepts its first and last day", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-29T12:00:00Z"));
+    role("DIRECTOR");
+    expect((await EXPORT(request("?year=2026-27&from=2026-08-31&to=2026-10-01"), ctx)).status).toBe(400);
+    expect((await EXPORT(request("?year=2026-27&from=2026-10-01&to=2027-09-01"), ctx)).status).toBe(400);
+    expect(mocks.noteFindMany).not.toHaveBeenCalled();
+    expect((await EXPORT(request("?year=2026-27&from=2026-09-01&to=2027-08-31"), ctx)).status).toBe(200);
+    vi.useRealTimers();
   });
 });
 
@@ -415,6 +429,12 @@ describe("month export bounds and file names (#1320)", () => {
     expect(monthDateBounds("2000-02").to).toBe("2000-02-29");
     expect(monthDateBounds("2026-04").to).toBe("2026-04-30");
     expect(monthDateBounds("2026-12")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+
+  it("builds the club year bounds and the month link", () => {
+    expect(clubYearDateBounds("2026-27")).toEqual({ from: "2026-09-01", to: "2027-08-31" });
+    expect(attendanceMonthExportHref("/api/attendee/clubs/club-1", "2027-28", "2028-02"))
+      .toBe("/api/attendee/clubs/club-1/exports/attendance?year=2027-28&from=2028-02-01&to=2028-02-29");
   });
 
   it("does not depend on the clock or the time zone", () => {
