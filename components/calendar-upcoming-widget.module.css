@@ -1,0 +1,117 @@
+/* The embeddable upcoming-events widget (#107): a compact list. The embed layout paints the site's paper colour behind it; the cards are white. */
+.widget {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 0 8px;
+  color: #1b2a41;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.heading {
+  margin: 0 0 12px;
+  font-size: max(var(--type-staff-floor, 0px), 1.25rem);
+  line-height: 1.2;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #d5dbe4;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+.managed { border-left-color: #1d3b6e; }
+.informational { border-left-color: #8a6d1d; border-left-style: dashed; }
+.off .title { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  color: #44546a;
+}
+
+.status { color: #a3321f; }
+
+.title {
+  margin: 0 0 4px;
+  font-size: max(var(--type-staff-floor, 0px), 1.0625rem);
+  line-height: 1.25;
+}
+
+.titleLink {
+  display: inline-block;
+  min-height: 44px;
+  padding: 10px 0;
+  box-sizing: border-box;
+  color: inherit;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.meta span { display: inline-flex; align-items: center; gap: 5px; }
+
+.registration { margin: 6px 0 0; font-size: 0.9375rem; }
+.open { font-weight: 700; color: #0f5c33; }
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: #1d3b6e;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.informational .action {
+  background: transparent;
+  color: #1d3b6e;
+  border: 1px solid #1d3b6e;
+}
+
+.empty { margin: 0 0 12px; font-size: 1rem; }
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  font-weight: 700;
+  color: #1d3b6e;
+}

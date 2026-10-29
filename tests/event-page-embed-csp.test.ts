@@ -81,3 +81,14 @@ describe("public event page: frame-src for embeds (#816)", () => {
     expect(eventRules.map((rule) => rule.source)).toEqual(["/:path*", "/events/:eventSlug"]);
   });
 });
+
+describe("embeddable calendar widget (#107)", () => {
+  it("sends the embed allow-list as frame-ancestors on /embed/calendar and no frame-src embed origins", async () => {
+    const policy = await policyFor("/embed/calendar");
+    expect(policy).toContain("frame-ancestors");
+    expect(policy).toContain("https://*.imsda.org");
+    expect(policy).not.toContain("frame-ancestors 'none'");
+    expect(policy).toBe(await policyFor("/embed/synthetic-event/general"));
+    for (const origin of embedFrameOrigins) expect(frameSources(policy)).not.toContain(origin);
+  });
+});
