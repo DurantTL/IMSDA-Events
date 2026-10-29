@@ -9,6 +9,18 @@
   font-weight: 700;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
+/* `display: flex` drops the native disclosure triangle, so draw one that turns when open. */
+.summary::-webkit-details-marker { display: none; }
+.summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-block: 5px solid transparent;
+  border-inline-start: 7px solid currentColor;
+  transition: transform 0.15s ease;
+}
+details[open] > .summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .summary::before { transition: none; } }
 .summary h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .count { color: var(--muted); font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .past { display: grid; gap: 12px; }
