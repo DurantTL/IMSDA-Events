@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -10,52 +9,50 @@ import { ClubPortalNav } from "@/components/club-portal-nav";
 import { clubPortalNavItems, clubReporterNavItems, clubShellNavigation } from "@/modules/club-rosters/portal-nav";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-/** The club shell navigation (#1165): Home, Roster, Forms, Club events, More, derived from the existing capability lists. Synthetic ids only. */
+/** The club shell navigation (#1319): one flat row in a fixed order, derived from the existing capability lists. Synthetic ids only. */
 
 const base = "/account/clubs/club-1";
 type Role = Parameters<typeof clubCapabilities>[0];
+const roles = ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const satisfies readonly Role[];
 const shell = (role: Role) => {
   const capabilities = clubCapabilities(role);
   // The layout's own choice: a reporter has no roster, so the reporter list; everyone else the full list.
-  const items = capabilities.roster ? clubPortalNavItems({ base, role, capabilities }) : clubReporterNavItems({ base, capabilities });
-  return { items, ...clubShellNavigation(items) };
+  const source = capabilities.roster ? clubPortalNavItems({ base, role, capabilities }) : clubReporterNavItems({ base, capabilities });
+  return { source, items: clubShellNavigation(source) };
 };
 const labels = (items: { label: string }[]) => items.map((item) => item.label);
 const path = (href: string) => href.replace(base, "") || "/";
 
-describe("club shell navigation (#1165)", () => {
-  it.each(["DIRECTOR", "DEPUTY"] as const)("gives a %s Home, Roster, Forms, Club events and the rest under More", (role) => {
-    const { primary, more } = shell(role);
-    expect(labels(primary)).toEqual(["Home", "Roster", "Forms", "Club events"]);
-    expect(labels(more)).toEqual(["Honors", "Class tracking", "Monthly Records", "Orders", "Health", "Club settings"]);
+describe("club shell navigation order (#1319)", () => {
+  it.each(["DIRECTOR", "DEPUTY"] as const)("gives a %s every section in one flat order, Monthly Records included", (role) => {
+    expect(labels(shell(role).items)).toEqual(["Home", "Roster", "Forms", "Club events", "Honors", "Class tracking", "Monthly Records", "Orders", "Health", "Club settings"]);
   });
 
   it("gives a registrar no Forms, Health, Monthly Records or Club settings", () => {
-    const { primary, more } = shell("REGISTRAR");
-    expect(labels(primary)).toEqual(["Home", "Roster", "Club events"]);
-    expect(labels(more)).toEqual(["Honors", "Class tracking", "Orders"]);
-  });
-  it("shows a reporter Home and Monthly Records directly in the bar (a More of one item is not worth a menu), with no roster, events or forms", () => {
-    const { primary, more } = shell("REPORTER");
-    expect(labels(primary)).toEqual(["Home", "Monthly Records"]);
-    expect(more).toEqual([]);
+    expect(labels(shell("REGISTRAR").items)).toEqual(["Home", "Roster", "Club events", "Honors", "Class tracking", "Orders"]);
   });
 
-  it.each(["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const)("keeps exactly the %s's current destinations, none added and none lost", (role) => {
-    const { items, primary, more } = shell(role);
-    expect([...primary, ...more].map((item) => item.href).sort()).toEqual(items.map((item) => item.href).sort());
-    expect(new Set([...primary, ...more].map((item) => item.href)).size).toBe(items.length);
+  it("gives a reporter Home and Monthly Records only, with no roster, events or forms", () => {
+    expect(labels(shell("REPORTER").items)).toEqual(["Home", "Monthly Records"]);
   });
 
-  it("matches the destinations each role had before the shell", () => {
+  it.each(roles)("keeps exactly the %s's destinations, none added, none lost, none repeated", (role) => {
+    const { source, items } = shell(role);
+    expect(items.map((item) => item.href).sort()).toEqual(source.map((item) => item.href).sort());
+    expect(new Set(items.map((item) => item.href)).size).toBe(source.length);
+    // The items themselves pass through untouched (active-state matching fields included).
+    for (const item of items) expect(source).toContain(item);
+  });
+
+  it("matches the destinations each role had before the flat row", () => {
     const all = ["/", "/roster", "/forms", "/events", "/honors", "/class-tracking", "/records", "/orders", "/health", "/club-info"].sort();
-    for (const role of ["DIRECTOR", "DEPUTY"] as const) expect([...shell(role).primary, ...shell(role).more].map((i) => path(i.href)).sort()).toEqual(all);
-    expect([...shell("REGISTRAR").primary, ...shell("REGISTRAR").more].map((i) => path(i.href)).sort()).toEqual(["/", "/roster", "/events", "/honors", "/class-tracking", "/orders"].sort());
-    expect([...shell("REPORTER").primary, ...shell("REPORTER").more].map((i) => path(i.href))).toEqual(["/", "/records"]);
+    for (const role of ["DIRECTOR", "DEPUTY"] as const) expect(shell(role).items.map((i) => path(i.href)).sort()).toEqual(all);
+    expect(shell("REGISTRAR").items.map((i) => path(i.href)).sort()).toEqual(["/", "/roster", "/events", "/honors", "/class-tracking", "/orders"].sort());
+    expect(shell("REPORTER").items.map((i) => path(i.href))).toEqual(["/", "/records"]);
   });
 
   it("never lists a platform or staff destination", () => {
-    for (const role of ["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const) {
+    for (const role of roles) {
       for (const item of shell(role).items) {
         expect(item.href.startsWith(base)).toBe(true);
         expect(item.href).not.toMatch(/\/(admin|overview|system|staff)(\/|$)/);
@@ -73,54 +70,62 @@ describe("club shell navigation (#1165)", () => {
     expect(reporter.submitReports).toBe(true);
   });
 
-  it("puts an unknown future destination at the end of More instead of dropping it", () => {
-    const { more } = clubShellNavigation([{ href: base, label: "Home" }, { href: `${base}/zebra`, label: "Zebra" }, { href: `${base}/honors`, label: "Honors" }]);
-    expect(labels(more)).toEqual(["Honors", "Zebra"]);
+  it("puts unknown future destinations at the end, in their original order, instead of dropping them", () => {
+    const items = clubShellNavigation([
+      { href: `${base}/zebra`, label: "Zebra" },
+      { href: `${base}/honors`, label: "Honors" },
+      { href: `${base}/aardvark`, label: "Aardvark" },
+      { href: base, label: "Home" },
+    ]);
+    expect(labels(items)).toEqual(["Home", "Honors", "Zebra", "Aardvark"]);
+  });
+
+  it("does not mutate the list it was given", () => {
+    const source = [{ href: `${base}/honors`, label: "Honors" }, { href: base, label: "Home" }];
+    clubShellNavigation(source);
+    expect(labels(source)).toEqual(["Honors", "Home"]);
   });
 });
 
-describe("the club shell navigation bar (#1165)", () => {
-  const { primary, more } = shell("DIRECTOR");
-  const render = (pathname: string) => {
+describe("the club shell navigation bar (#1319)", () => {
+  const { items } = shell("DIRECTOR");
+  const render = (pathname: string, list = items) => {
     mocks.pathname = pathname;
-    return renderToStaticMarkup(createElement(ClubPortalNav, { more, primary }));
+    return renderToStaticMarkup(createElement(ClubPortalNav, { items: list }));
   };
+  const currentLabels = (html: string) => [...html.matchAll(/aria-current="page"[^>]*>([^<]+)</g)].map((m) => m[1]);
 
-  it("marks the current primary destination and keeps More closed and collapsed", () => {
-    const html = render(`${base}/roster`);
-    expect(html).toMatch(/aria-current="page" href="\/account\/clubs\/club-1\/roster"/);
-    expect(html).toMatch(/aria-expanded="false"/);
-    expect(html).toMatch(/class="club-more-menu" hidden=""/);
-    expect(html).not.toContain("is-current");
+  it("renders every item as a link in order, with no More control", () => {
+    const html = render(base);
+    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => m[2]);
+    expect(links).toEqual(labels(items));
+    expect(html).not.toMatch(/<button/);
+    expect(html).not.toContain("aria-expanded");
+    expect(html).not.toMatch(/More/);
   });
 
-  it("names the current destination on the More button when it is reached through More, and in the list", () => {
-    const html = render(`${base}/honors`);
-    expect(html).toContain("club-more-button is-current");
-    expect(html).toContain("(current page: ");
-    expect(html).toMatch(/aria-current="page" href="\/account\/clubs\/club-1\/honors"/);
-    expect(html).not.toMatch(/aria-current="page" href="\/account\/clubs\/club-1"/);
+  it("marks only the current destination", () => {
+    expect(currentLabels(render(`${base}/roster`))).toEqual(["Roster"]);
+    expect(currentLabels(render(base))).toEqual(["Home"]);
   });
 
-  it("keeps a More child page (an honors export) lit on its parent", () => {
-    expect(render(`${base}/exports/honors`)).toContain("club-more-button is-current");
+  it("lights Monthly Records, Health and Club settings directly, with no name stacked anywhere else", () => {
+    expect(currentLabels(render(`${base}/records`))).toEqual(["Monthly Records"]);
+    expect(currentLabels(render(`${base}/health`))).toEqual(["Health"]);
+    expect(currentLabels(render(`${base}/club-info`))).toEqual(["Club settings"]);
+    expect(render(`${base}/records`)).not.toContain("current page");
   });
 
-  it("closes on Escape and returns focus to the More button, and closes when focus leaves", () => {
-    const source = readFileSync("components/club-portal-nav.tsx", "utf8");
-    expect(source).toContain('event.key === "Escape"');
-    expect(source).toContain("buttonRef.current?.focus()");
-    expect(source).toContain("onBlur");
-    // Safari: a blur with no target while a pointer is down inside More must not close it, and a link click always closes it.
-    expect(source).toContain("!event.relatedTarget && pointerInside.current");
-    expect(source).toContain("onClick={() => setOpenFor(null)}");
-    expect(source).toContain("aria-expanded={open}");
-    expect(source).toContain("aria-controls={menuId}");
+  it("keeps child pages lit on their parent tab", () => {
+    expect(currentLabels(render(`${base}/exports/honors`))).toEqual(["Honors"]);
+    expect(currentLabels(render(`${base}/exports/class-tracking`))).toEqual(["Class tracking"]);
+    expect(currentLabels(render(`${base}/reports/2026-10`))).toEqual(["Monthly Records"]);
+    expect(currentLabels(render(`${base}/events/event-1`))).toEqual(["Club events"]);
   });
 
-  it("renders no More control for someone with nothing to put in it", () => {
-    mocks.pathname = base;
-    const html = renderToStaticMarkup(createElement(ClubPortalNav, { more: [], primary: primary.slice(0, 1) }));
-    expect(html).not.toContain("club-more");
+  it("shows a reporter's two tabs, and a registrar no director-only tab", () => {
+    expect(currentLabels(render(`${base}/records`, shell("REPORTER").items))).toEqual(["Monthly Records"]);
+    const registrar = render(base, shell("REGISTRAR").items);
+    for (const hidden of ["Forms", "Health", "Monthly Records", "Club settings"]) expect(registrar).not.toContain(`>${hidden}<`);
   });
 });

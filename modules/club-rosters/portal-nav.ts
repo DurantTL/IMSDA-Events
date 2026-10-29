@@ -39,33 +39,26 @@ export function clubPortalNavItems({
   ];
 }
 
-const SHELL_PRIMARY_ORDER = ["Home", "Roster", "Forms", "Club events"];
-const SHELL_MORE_ORDER = ["Honors", "Class tracking", "Monthly Records", "Orders", "Health", "Club settings"];
+const SHELL_ORDER = ["Home", "Roster", "Forms", "Club events", "Honors", "Class tracking", "Monthly Records", "Orders", "Health", "Club settings"];
 
 /**
- * The club shell's navigation (#1165): Home, Roster, Forms and Club events
- * stay in the bar and every other destination the role already has goes under
- * More. This only regroups the items `clubPortalNavItems` or
- * `clubReporterNavItems` already produced, so a role never gains a destination
- * here (no second permission list), and nothing is silently dropped: labels
- * not listed above land at the end of More. Showing or hiding a link is not
- * authorization; each page still checks on the server.
+ * The club shell's navigation (#1319): every destination the role already has,
+ * in one flat tab row (the More menu of #1165 is gone). This only reorders the
+ * items `clubPortalNavItems` or `clubReporterNavItems` already produced, so a
+ * role never gains a destination here (no second permission list), and nothing
+ * is silently dropped: labels not listed above land at the end, in their
+ * original order. Showing or hiding a link is not authorization; each page
+ * still checks on the server.
  */
-export function clubShellNavigation(items: AccountNavItem[]): { primary: AccountNavItem[]; more: AccountNavItem[] } {
-  const rank = (order: string[], label: string) => order.indexOf(label);
-  const primary = items
-    .filter((item) => rank(SHELL_PRIMARY_ORDER, item.label) >= 0)
-    .sort((a, b) => rank(SHELL_PRIMARY_ORDER, a.label) - rank(SHELL_PRIMARY_ORDER, b.label));
-  const more = items
-    .filter((item) => rank(SHELL_PRIMARY_ORDER, item.label) < 0)
-    .sort((a, b) => {
-      const ra = rank(SHELL_MORE_ORDER, a.label);
-      const rb = rank(SHELL_MORE_ORDER, b.label);
-      return (ra < 0 ? SHELL_MORE_ORDER.length : ra) - (rb < 0 ? SHELL_MORE_ORDER.length : rb);
-    });
-  // A bar that would hold only Home next to a More with one item (a reporter) shows that item directly: a menu of one hides it for nothing.
-  if (primary.length === 1 && more.length === 1) return { primary: [...primary, ...more], more: [] };
-  return { primary, more };
+export function clubShellNavigation(items: AccountNavItem[]): AccountNavItem[] {
+  const rank = (label: string) => {
+    const index = SHELL_ORDER.indexOf(label);
+    return index < 0 ? SHELL_ORDER.length : index;
+  };
+  return items
+    .map((item, position) => ({ item, position }))
+    .sort((a, b) => rank(a.item.label) - rank(b.item.label) || a.position - b.position)
+    .map(({ item }) => item);
 }
 
 /** A reporter with no roster access (#375, #377): Home and the two report screens only. */

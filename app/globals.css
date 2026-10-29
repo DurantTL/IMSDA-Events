@@ -10292,14 +10292,13 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .account-workspace-menu a[aria-current] { background: var(--imsda-navy-soft); box-shadow: inset 3px 0 var(--imsda-purple); }
 .account-workspace-menu a:hover { background: var(--imsda-navy-soft); }
 .account-workspace-menu :is(a, summary):focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
-.account-portal :is(.account-nav a, .club-primary-nav a, .club-more-button, .account-workspace-menu summary) { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
+.account-portal :is(.account-nav a, .account-workspace-menu summary) { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 @media print { .account-workspace-menu { display: none !important; } }
 
-/* Club shell (#1165): Club portal masthead, navy club banner and the Home / Roster / Forms / Club events / More bar. On club
+/* Club shell (#1165): Club portal masthead, navy club banner and the tab row (club-portal-nav.module.css). On club
    pages the shell's own masthead replaces the account header and the account tabs (My account stays a link in the masthead). */
 .account-portal:has(.club-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
 .club-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; }
-.club-nav-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
 .club-masthead-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 8px 0; }
 .club-masthead-brand { display: inline-flex; min-height: 44px; align-items: center; gap: 12px; color: var(--imsda-navy); text-decoration: none; }
@@ -10317,42 +10316,15 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; }
 .club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-banner-year strong { font-size: 1.05rem; }
-.club-primary-nav { border-bottom: 1px solid var(--line); background: #fff; }
-.club-primary-nav > ul { position: relative; display: flex; flex-wrap: wrap; align-items: stretch; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 0; list-style: none; }
-.club-primary-nav > ul > li { min-width: 0; }
-.club-primary-nav > ul > .club-more { margin-left: auto; }
-.club-primary-nav a, .club-more-button {
-  display: flex; min-height: 48px; align-items: center; border: 0; border-bottom: 3px solid transparent; background: transparent;
-  padding: 8px 14px 5px; color: var(--muted); font: inherit; font-size: 0.95rem; font-weight: 800; text-decoration: none; cursor: pointer;
-}
-.club-primary-nav > ul > li > a { white-space: nowrap; }
-.club-primary-nav a:hover, .club-more-button:hover { color: var(--imsda-navy); }
-.club-primary-nav a[aria-current="page"], .club-more-button.is-current { border-bottom-color: var(--imsda-purple); color: var(--imsda-navy); }
-.club-primary-nav a:focus-visible, .club-more-button:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
-.club-more-button { flex-direction: column; align-items: flex-end; justify-content: center; gap: 0; }
-.club-more-label { display: inline-flex; align-items: center; gap: 4px; }
-.club-more-current { position: relative; max-width: 12ch; overflow: hidden; color: var(--imsda-purple); font-size: 0.75rem; line-height: 1.15; overflow-wrap: anywhere; text-align: right; }
-.club-more-menu {
-  position: absolute; top: 100%; right: 0; z-index: 30; display: grid; width: 15rem; max-width: calc(100vw - 24px); margin: 0; padding: 6px; list-style: none;
-  border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 12px 28px rgba(0, 44, 69, 0.18);
-}
-.club-more-menu[hidden] { display: none; }
-.club-more-menu a { border-bottom: 0; border-radius: 8px; white-space: normal; }
-.club-more-menu a[aria-current="page"] { background: var(--imsda-navy-soft); }
 @media (max-width: 640px) {
-  .club-masthead-inner, .club-banner-inner, .club-primary-nav > ul { width: calc(100% - 24px); }
+  .club-masthead-inner, .club-banner-inner { width: calc(100% - 24px); }
   .club-banner-inner { padding: 14px 0; }
   .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
   .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
-  .club-primary-nav a, .club-more-button { padding-inline: 9px; font-size: 0.9rem; }
   .club-masthead-account { justify-content: flex-start; }
 }
-@media (max-width: 420px) {
-  .club-primary-nav a, .club-more-button { padding-inline: 6px; }
-  .club-primary-nav > ul > li > a { white-space: normal; }
-}
 @media print {
-  .club-masthead, .club-banner, .club-primary-nav { display: none !important; }
+  .club-masthead, .club-banner { display: none !important; }
 }
 /* Issue 743 (print): expandable descriptions print in full, with no Read more button. */
 @media print {

@@ -1,6 +1,8 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
+import styles from "@/components/club-portal-masthead-view.module.css";
+import { Repeat2, UserRound } from "lucide-react";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 
@@ -49,7 +51,7 @@ export function ClubPortalMastheadView({ model, role }: { model: ClubMastheadMod
           <BrandMark />
           <span><small>IMSDA Events</small><strong>Club portal</strong></span>
         </Link>
-        <div className="club-masthead-account">
+        <div className={styles.account}>
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (
             <span className="club-masthead-identity" translate="no">
@@ -57,9 +59,9 @@ export function ClubPortalMastheadView({ model, role }: { model: ClubMastheadMod
               <span className="club-masthead-role"> · {clubDirectorRoleLabels[role]}</span>
             </span>
           )}
-          {model.showSwitchClub && <Link className="text-button club-masthead-link" href="/account/clubs">Switch club</Link>}
-          {model.showMyAccount && <Link className="text-button club-masthead-link" href="/account">My account</Link>}
-          {model.signOut !== "none" && <AttendeeSignOutButton className="text-button club-masthead-link" endStaffSession={model.signOut === "both"} />}
+          {model.showSwitchClub && <Link className={styles.action} href="/account/clubs"><Repeat2 aria-hidden="true" size={16} />Switch club</Link>}
+          {model.showMyAccount && <Link className={styles.action} href="/account"><UserRound aria-hidden="true" size={16} />My account</Link>}
+          {model.signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={model.signOut === "both"} />}
         </div>
       </div>
     </header>
