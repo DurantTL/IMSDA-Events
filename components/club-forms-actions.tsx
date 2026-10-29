@@ -1,5 +1,6 @@
 "use client";
 
+import { announceClubForms } from "@/components/club-forms-status";
 import { clubFormLinkRequestBody } from "@/components/club-form-link-body";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
@@ -154,6 +155,89 @@ export function RevokeClubFormLinkButton({ organizationId, linkId }: { organizat
       {confirmDialog}
       <button className="text-button" disabled={saving} onClick={revoke} type="button">Withdraw</button>
       {error && <small className="club-report-problem">{error}</small>}
+    </>
+  );
+}
+
+/** Deletes a link nobody has answered (#1323). The server refuses one that has a filled form. */
+export function DeleteClubFormLinkButton({ organizationId, linkId, formName }: { organizationId: string; linkId: string; formName: string }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
+  async function remove() {
+    if (!(await askConfirm({
+      title: `Delete the ${formName} link`,
+      body: <p>Delete this unused form link? This can&apos;t be undone.</p>,
+      confirmLabel: "Delete link",
+      destructive: true,
+    }))) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/forms/links/${encodeURIComponent(linkId)}/delete`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { message?: string };
+        setError(result.message ?? "The link could not be deleted.");
+        return;
+      }
+      announceClubForms("Link deleted.");
+      router.refresh();
+    } catch {
+      setError("The link could not be deleted.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      {confirmDialog}
+      <button className="text-button" disabled={saving} onClick={remove} type="button">
+        Delete<span className="sr-only"> the {formName} link</span>
+      </button>
+      {error && <small className="club-report-problem" role="alert">{error}</small>}
+    </>
+  );
+}
+
+/** Moves earlier club years' forms and links under Past years (#1323). Nothing is deleted. */
+export function StartClubFormsYearButton({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
+  async function start() {
+    if (!(await askConfirm({
+      title: "Start the new year",
+      body: <p>Move forms from earlier club years into Past years? Nothing is deleted, and past forms stay open to view and print.</p>,
+      confirmLabel: "Start the new year",
+    }))) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/forms/year-start`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { message?: string };
+        setError(result.message ?? "The new year could not be started.");
+        return;
+      }
+      announceClubForms("Earlier forms moved to Past years.");
+      router.refresh();
+    } catch {
+      setError("The new year could not be started.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      {confirmDialog}
+      <button className="primary-button" disabled={saving} onClick={start} type="button">Start the new year</button>
+      {error && <small className="club-report-problem" role="alert">{error}</small>}
     </>
   );
 }

@@ -2658,6 +2658,7 @@ model Organization {
   contacts                OrganizationContact[]
   billingResponsibilities RegistrationBillingResponsibility[]
   clubFormLinks       ClubFormLink[]
+  clubFormYearStarts  ClubFormYearStart[]
 
   @@index([type, isActive, name])
   @@index([parentOrganizationId, isActive])
@@ -7248,6 +7249,22 @@ model ClubFormLink {
   @@index([organizationId, status])
   @@index([templateId, organizationId])
   @@index([status, expiresAt])
+}
+
+/// A club's "Start the new year" on the Forms page (#1323): once a row exists for
+/// a club year, the club's forms and links from earlier club years are listed
+/// under Past years. Nothing is deleted and nobody's read access changes.
+model ClubFormYearStart {
+  organizationId     String
+  clubYear           String
+  startedAt          DateTime @default(now())
+  startedByAccountId String?
+  /// Set instead of `startedByAccountId` for a staff "act as" director.
+  startedByUserId    String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, clubYear])
 }
 
 // ---------------------------------------------------------------------------

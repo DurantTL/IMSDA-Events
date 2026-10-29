@@ -20,6 +20,7 @@ vi.mock("@/modules/club-forms/templates", () => ({ listEnabledClubFormTemplates:
 vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.listRoster, listSubmissionsForViewer: mocks.listSubmissions }));
 vi.mock("@/modules/club-forms/required", () => ({ getRequiredFormsStatus: mocks.getRequired }));
 vi.mock("@/modules/club-forms/links", () => ({ listClubFormLinks: mocks.listLinks }));
+vi.mock("@/modules/club-forms/year-start", () => ({ getClubFormsYearState: async () => ({ startedClubYear: null, yearStarted: false, hasEarlierYears: false }) }));
 
 import ClubFormsPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/forms/page";
 
