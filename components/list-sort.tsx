@@ -24,6 +24,7 @@ export function SortableHeader({
   onSort,
   disabled,
   className,
+  hiddenLabel,
 }: {
   label: string;
   active: boolean;
@@ -31,11 +32,14 @@ export function SortableHeader({
   onSort: () => void;
   disabled?: boolean;
   className?: string;
+  /** Extra words for assistive technology only, so two tables' identical headers have different names ("Name, Staff"). */
+  hiddenLabel?: string;
 }) {
   return (
     <th aria-sort={ariaSortValue(active, direction)} className={className} role="columnheader" scope="col">
       <button className="table-sort-button" disabled={disabled} onClick={onSort} type="button">
         {label}
+        {hiddenLabel && <span className="sr-only">, {hiddenLabel}</span>}
         {active
           ? (direction === "asc" ? <ArrowUp aria-hidden="true" size={13} /> : <ArrowDown aria-hidden="true" size={13} />)
           : <ArrowUpDown aria-hidden="true" size={13} />}
