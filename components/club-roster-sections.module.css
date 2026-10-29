@@ -1,0 +1,16 @@
+/* Collapsible Staff and Members sections on the club roster (#1305). */
+.sections { display: grid; gap: 12px; }
+.section { min-width: 0; }
+.summary {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 13px; cursor: pointer; list-style: none;
+  border-radius: 8px; background: #f6f9fa; box-shadow: inset 4px 0 0 var(--imsda-navy); color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700;
+}
+.summary::-webkit-details-marker { display: none; }
+.summary:focus-visible { outline: 3px solid var(--imsda-purple, #5b2a86); outline-offset: 2px; }
+.chevron { flex: 0 0 auto; transition: transform 0.15s ease; transform: rotate(-90deg); }
+.section[open] > .summary .chevron { transform: rotate(0deg); }
+.section[open] > .summary { margin-bottom: 8px; }
+.table { table-layout: fixed; }
+.empty { margin: 0 0 4px; padding: 0 13px; color: var(--muted); font-style: italic; font-size: max(var(--type-body-floor, 0px), 0.875rem); }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }

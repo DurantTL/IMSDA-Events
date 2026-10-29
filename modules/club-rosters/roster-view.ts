@@ -177,3 +177,17 @@ export function applyRosterFilters<T extends NamedMember & Parameters<typeof ros
 export function clearedRosterFilters() {
   return { query: "", detailsOnly: false, complianceFilter: null } as const;
 }
+
+/**
+ * Whether the roster's Staff and Members sections start closed for a club role (#1305): the director and registrar
+ * open the page to work from the filters, so the long lists stay out of the way until asked for. Every other role,
+ * and the conference staff view that has no club role, sees them open. A remembered choice always wins over this.
+ */
+export function rosterSectionsStartClosed(role: string | null | undefined): boolean {
+  return role === "DIRECTOR" || role === "REGISTRAR";
+}
+
+/** The browser-storage key for one section's remembered open/closed choice, scoped to the club. */
+export function rosterSectionStorageKey(organizationId: string, section: "STAFF" | "MEMBERS"): string {
+  return `imsda:roster-section:${organizationId}:${section}`;
+}

@@ -11,7 +11,7 @@ import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
-import { ROSTER_DETAILS_NEEDED_FILTER } from "@/modules/club-rosters/roster-view";
+import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modules/club-rosters/roster-view";
 import { listRoster } from "@/modules/club-rosters/repository";
 import { listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
@@ -114,6 +114,7 @@ export default async function ClubRosterPage({
         initialMembers={linkableMembers}
         organizationId={organizationId}
         readOnly={readOnly}
+        sectionsStartClosed={rosterSectionsStartClosed(access.club.role)}
       />
       {canTransfer && <ClubTransfersPanel organizationId={organizationId} />}
     </>

@@ -3,7 +3,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Award, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
+import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
@@ -43,8 +43,10 @@ import {
   rosterLabelDetail,
   rosterPersonLabels,
   rosterRowTools,
+  rosterSectionStorageKey,
 } from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
+import styles from "@/components/club-roster-sections.module.css";
 
 type RosterResponse = {
   members?: RosterMemberRecord[];
@@ -68,6 +70,8 @@ function complianceLabel({ state, note }: RosterComplianceInfo) {
   if (state === "FLAGGED") return note ? "Expiring soon (see note)" : "Expiring soon";
   return { CLEAR: "Clear", NOT_COMPLIANT: "Not in compliance", NO_RECORD: "No record" }[state];
 }
+type SectionKey = "STAFF" | "MEMBERS";
+
 const complianceTone = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "gold" } as const;
 
 /** A value that follows `value` after it has stopped changing for `delay` ms, so a polite status is not re-read on every keystroke. */
@@ -113,6 +117,7 @@ export function ClubRosterWorkspace({
   healthRecordFlags,
   guardians: initialGuardians,
   guardiansOnly = false,
+  sectionsStartClosed = false,
 }: {
   /** Directors and deputies only; a registrar enters birth dates but sees ages (#375). */
   canSeeBirthDates: boolean;
@@ -175,6 +180,8 @@ export function ClubRosterWorkspace({
    * then holds only the contact fields, and nothing else about the person is sent.
    */
   guardiansOnly?: boolean;
+  /** Staff and Members start closed (#1305) for the club director and registrar; a remembered choice still wins. Everyone else starts open. */
+  sectionsStartClosed?: boolean;
 }) {
   const [members, setMembers] = useState(initialMembers);
   const showHonors = Boolean(honorsPopup || honorsHref);
@@ -337,6 +344,66 @@ export function ClubRosterWorkspace({
     { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF"), nameDirection) },
     { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
   ] as const;
+  /**
+   * Staff and Members open and close on their own (#1305). Order of precedence: a search or filter that matches people
+   * in a section opens it (so results are never hidden); otherwise the choice remembered in this browser; otherwise the
+   * role default. A filter-forced open is not remembered: closing a section while filtering lasts only until the
+   * filters change, and clearing them returns each section to its remembered state.
+   */
+  const [remembered, setRemembered] = useState<Partial<Record<SectionKey, boolean>>>({});
+  const filterSignature = `${query}|${detailsOnly}|${complianceFilter ?? ""}`;
+  const [filterChoice, setFilterChoice] = useState<{ signature: string; open: Partial<Record<SectionKey, boolean>> }>({ signature: "", open: {} });
+  const [hashOpen, setHashOpen] = useState<SectionKey[]>([]);
+  const sectionOfPerson = useRef(new Map<string, SectionKey>());
+  sectionOfPerson.current = new Map(sections.flatMap((section) => section.people.map((person) => [person.id, section.key] as const)));
+  // Read after mount, so the server and first client render agree (the role default), then the saved choice applies.
+  useEffect(() => {
+    const saved: Partial<Record<SectionKey, boolean>> = {};
+    for (const key of ["STAFF", "MEMBERS"] as const) {
+      try {
+        const value = window.localStorage.getItem(rosterSectionStorageKey(organizationId, key));
+        if (value === "open") saved[key] = true;
+        if (value === "closed") saved[key] = false;
+      } catch {
+        // Storage can be blocked (private window); the role default then applies.
+      }
+    }
+    setRemembered(saved);
+  }, [organizationId]);
+  // A link to #member-<id> opens that person's section so the row can be shown (not remembered).
+  useEffect(() => {
+    function openForHash() {
+      const match = /^#member-(.+)$/.exec(window.location.hash);
+      const key = match ? sectionOfPerson.current.get(decodeURIComponent(match[1]!)) : undefined;
+      if (!key) return;
+      setHashOpen((current) => (current.includes(key) ? current : [...current, key]));
+      window.requestAnimationFrame(() => document.getElementById(`member-${match![1]}`)?.scrollIntoView({ block: "center" }));
+    }
+    openForHash();
+    window.addEventListener("hashchange", openForHash);
+    return () => window.removeEventListener("hashchange", openForHash);
+  }, []);
+  function sectionIsOpen(section: { key: SectionKey; people: readonly unknown[] }) {
+    if (filtersActive && section.people.length > 0) {
+      return (filterChoice.signature === filterSignature ? filterChoice.open[section.key] : undefined) ?? true;
+    }
+    if (hashOpen.includes(section.key)) return true;
+    return remembered[section.key] ?? !sectionsStartClosed;
+  }
+  function sectionToggled(section: { key: SectionKey; people: readonly unknown[] }, open: boolean) {
+    if (open === sectionIsOpen(section)) return;
+    if (filtersActive && section.people.length > 0) {
+      setFilterChoice((current) => ({ signature: filterSignature, open: { ...(current.signature === filterSignature ? current.open : {}), [section.key]: open } }));
+      return;
+    }
+    setHashOpen((current) => current.filter((key) => key !== section.key));
+    setRemembered((current) => ({ ...current, [section.key]: open }));
+    try {
+      window.localStorage.setItem(rosterSectionStorageKey(organizationId, section.key), open ? "open" : "closed");
+    } catch {
+      // The choice then lasts only for this visit.
+    }
+  }
   /** The Health link's words and status; its accessible name starts with exactly these. */
   const healthLinkText = (id: string) => `${healthEntryOnly ? "Enter health record" : "Health record"}${healthTab?.[id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab?.[id]?.status === "NONE" ? ": none yet" : ""}`;
   const renderedOrder = sections.flatMap((section) => section.people.map((person) => person.id));
@@ -352,7 +419,8 @@ export function ClubRosterWorkspace({
       const candidates = [...request.order.slice(at + 1), ...request.order.slice(0, Math.max(at, 0)).reverse()];
       for (const id of candidates) {
         const edit = document.getElementById(`roster-edit-${id}`);
-        if (edit) {
+        // A row inside a closed section can't take focus; try the next one, else the result line.
+        if (edit && edit.closest("details")?.open !== false) {
           edit.focus();
           return;
         }
@@ -387,7 +455,9 @@ export function ClubRosterWorkspace({
     hasScreening: Boolean(complianceStatuses),
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
-  const rosterColumnCount = columns.length;
+  /** Relative column widths, so the two section tables share one grid. */
+  const columnShare = { name: 24, age: 6, birthDate: 11, type: 10, class: 12, details: 20, gender: 8, screening: 16, actions: 18 } as const;
+  const columnShareTotal = columns.reduce((total, column) => total + columnShare[column], 0);
 
   async function call(url: string, method: string, body: unknown, success: string) {
     setSaving(true);
@@ -707,49 +777,54 @@ export function ClubRosterWorkspace({
               : "Check the spelling, or clear the filters to see everyone on the roster."}
           </EmptyState>
         ) : (
-          <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
+          <div className={styles.sections}>
             {/*
-              One table for both sections (#435), not one per section: two
-              separate tables size their columns independently, so the Staff
-              table's columns drift out of step with the Members table's even
-              though the headings match. A single table with a full-width
-              section-title row keeps every column the same width all the way
-              down. What a person still needs sits in its own Details column
-              rather than the Name cell (which was stretching that column unevenly).
+              One table per section inside a native <details> (#1305): a details element can't live inside a table, and a
+              closed section should take no room. Every table gets the same column shares (colgroup, fixed layout), so Staff
+              and Members still line up the way the single shared table did (#435). The summary is the section heading and
+              names its table. Both tables keep the sortable Name header, so sorting works from whichever is open.
             */}
             <SortOrderNote>{`${sortOrderText(nameSortLabel, nameDirection)} Staff and Members are listed separately.`}</SortOrderNote>
-            <table aria-labelledby="club-roster-heading" className="report-table roster-card-table">
-              <thead>
-                <tr>
-                  {columns.map((column) => {
-                    switch (column) {
-                      case "name": return <SortableHeader active direction={nameDirection} key={column} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
-                      case "age": return <th key={column}>Age</th>;
-                      case "birthDate": return <th key={column}>Birth date</th>;
-                      case "type": return <th key={column}>Type</th>;
-                      case "class": return <th key={column}>Current class</th>;
-                      case "details": return <th key={column}>Details</th>;
-                      case "gender": return <th key={column}>Gender</th>;
-                      case "screening": return <th key={column}>Sterling Volunteers</th>;
-                      case "actions": return <th key={column}>Actions</th>;
-                    }
-                  })}
-                </tr>
-              </thead>
-              {/* One row group per section, so each section heading covers only its own rows. */}
-                {sections.map((section) => (
-                  <tbody key={section.key}>
-                    <tr className="roster-section-row">
-                      <th className="roster-section-heading" colSpan={rosterColumnCount} scope="rowgroup">
-                        {section.title} <span className="count-badge">{section.people.length}</span>
-                      </th>
-                    </tr>
-                    {section.people.length === 0 ? (
-                      <tr className="roster-section-empty-row">
-                        <td colSpan={rosterColumnCount}>{section.empty}</td>
-                      </tr>
-                    ) : (
-                      section.people.map((member) => {
+            {sections.map((section) => (
+              <details
+                className={styles.section}
+                data-roster-section={section.key}
+                key={section.key}
+                onToggle={(event) => sectionToggled(section, event.currentTarget.open)}
+                open={sectionIsOpen(section)}
+              >
+                <summary className={styles.summary}>
+                  <ChevronDown aria-hidden="true" className={styles.chevron} size={16} />
+                  <span id={`roster-section-${section.key.toLowerCase()}-title`}>{section.title}</span>{" "}
+                  <span className="count-badge">{section.people.length}</span>
+                </summary>
+                {section.people.length === 0 ? (
+                  <p className={styles.empty}>{section.empty}</p>
+                ) : (
+                  <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
+                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className={`report-table roster-card-table ${styles.table}`}>
+                      <colgroup>
+                        {columns.map((column) => <col key={column} style={{ width: `${(columnShare[column] / columnShareTotal) * 100}%` }} />)}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          {columns.map((column) => {
+                            switch (column) {
+                              case "name": return <SortableHeader active direction={nameDirection} key={column} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
+                              case "age": return <th key={column}>Age</th>;
+                              case "birthDate": return <th key={column}>Birth date</th>;
+                              case "type": return <th key={column}>Type</th>;
+                              case "class": return <th key={column}>Current class</th>;
+                              case "details": return <th key={column}>Details</th>;
+                              case "gender": return <th key={column}>Gender</th>;
+                              case "screening": return <th key={column}>Sterling Volunteers</th>;
+                              case "actions": return <th key={column}>Actions</th>;
+                            }
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.people.map((member) => {
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
                         // names only what else is missing (#1004); the Details needed list follows the same rule.
                         const needs = rosterDetailsNeededItems(member);
@@ -897,11 +972,13 @@ export function ClubRosterWorkspace({
                             })}
                           </tr>
                         );
-                      })
-                    )}
-                  </tbody>
-                ))}
-            </table>
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </details>
+            ))}
           </div>
         )}
       </section>
