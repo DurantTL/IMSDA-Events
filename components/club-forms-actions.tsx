@@ -158,6 +158,80 @@ export function RevokeClubFormLinkButton({ organizationId, linkId }: { organizat
   );
 }
 
+/** Deletes a link nobody has answered (#1323). The server refuses one that has a filled form. */
+export function DeleteClubFormLinkButton({ organizationId, linkId, formName }: { organizationId: string; linkId: string; formName: string }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
+  async function remove() {
+    if (!(await askConfirm({
+      title: `Delete the ${formName} link`,
+      body: <p>Delete this unused form link? This can&apos;t be undone.</p>,
+      confirmLabel: "Delete link",
+      destructive: true,
+    }))) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/forms/links/${encodeURIComponent(linkId)}/delete`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { message?: string };
+        setError(result.message ?? "The link could not be deleted.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("The link could not be deleted.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      {confirmDialog}
+      <button className="text-button" disabled={saving} onClick={remove} type="button">
+        Delete<span className="sr-only"> the {formName} link</span>
+      </button>
+      {error && <small className="club-report-problem" role="alert">{error}</small>}
+    </>
+  );
+}
+
+/** Moves earlier club years' forms and links under Past years (#1323). Nothing is deleted. */
+export function StartClubFormsYearButton({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function start() {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/attendee/clubs/${encodeURIComponent(organizationId)}/forms/year-start`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { message?: string };
+        setError(result.message ?? "The new year could not be started.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("The new year could not be started.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="primary-button" disabled={saving} onClick={start} type="button">Start the new year</button>
+      {error && <small className="club-report-problem" role="alert">{error}</small>}
+    </>
+  );
+}
+
 /** A system administrator's on/off switch for one club form. */
 export function ClubFormTemplateToggle({ templateKey, enabled, name, needsSync = false }: { templateKey: string; enabled: boolean; name: string; needsSync?: boolean }) {
   const router = useRouter();

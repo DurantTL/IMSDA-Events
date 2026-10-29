@@ -53,7 +53,7 @@ function senderOnly(viewer: ClubFormsViewer, organizationId: string) {
   return viewer;
 }
 
-function leaderOnly(viewer: ClubFormsViewer, organizationId: string) {
+export function leaderOnly(viewer: ClubFormsViewer, organizationId: string) {
   if (!viewerCanWriteForClub(viewer, organizationId) || viewer.kind !== "CLUB_LEADER") {
     throw new ClubFormError("FORBIDDEN", "Your club role doesn't include club forms.");
   }
@@ -167,6 +167,7 @@ export async function listClubFormLinks(viewer: ClubFormsViewer, organizationId:
       expiresAt: true,
       usedAt: true,
       createdAt: true,
+      clubYear: true,
       template: { select: { key: true, name: true } },
       submission: { select: { id: true } },
     },
@@ -190,6 +191,7 @@ export async function listClubFormLinks(viewer: ClubFormsViewer, organizationId:
     expiresAt: link.expiresAt.toISOString(),
     usedAt: link.usedAt?.toISOString() ?? null,
     createdAt: link.createdAt.toISOString(),
+    clubYear: link.clubYear,
     submissionId: link.submission?.id ?? null,
   }));
 }
@@ -219,6 +221,44 @@ export async function revokeClubFormLink(viewer: ClubFormsViewer, organizationId
       summary: "Withdrew a private link to a club form.",
       metadata: { ...who.metadata, organizationId, templateKey: link.template.key },
     }, tx);
+  });
+}
+
+/**
+ * Deletes a link of this club that nobody has answered (#1323): open, withdrawn
+ * or expired. A link with a filled form is never deleted. The link row is
+ * locked first, and the public submit spends it with a guarded update on the
+ * same row, so a submission racing this delete either lands first (and this is
+ * refused) or finds the link gone and is rolled back.
+ */
+export async function deleteUnusedClubFormLink(viewer: ClubFormsViewer, organizationId: string, linkId: string) {
+  const leader = leaderOnly(viewer, organizationId);
+  return getPrisma().$transaction(async (tx) => {
+    const link = await tx.clubFormLink.findFirst({
+      where: { id: linkId, organizationId },
+      select: { id: true, messageId: true, template: { select: { key: true } } },
+    });
+    if (!link) throw new ClubFormError("LINK_NOT_FOUND", "That link could not be found.");
+    await tx.$queryRaw`SELECT "id" FROM "ClubFormLink" WHERE "id" = ${link.id} FOR UPDATE`;
+    const answered = await tx.clubFormSubmission.findFirst({ where: { linkId: link.id }, select: { id: true } });
+    if (answered) {
+      throw new ClubFormError("LINK_HAS_ANSWERS", "This link already has a filled form, so it can't be deleted.");
+    }
+    const who = viewerAuditFields(leader);
+    // No recipient address: the form, the club and who deleted it.
+    await writeAuditLog({
+      actorUserId: who.actorUserId,
+      action: "CLUB_FORM_LINK_DELETED",
+      entityType: "ClubFormLink",
+      entityId: link.id,
+      summary: "Deleted an unused private link to a club form.",
+      metadata: { ...who.metadata, organizationId, templateKey: link.template.key },
+    }, tx);
+    // A link email still waiting to go out is cancelled; one already sent points at a link that no longer exists.
+    if (link.messageId) {
+      await tx.messageOutbox.updateMany({ where: { id: link.messageId, status: "PENDING" }, data: { status: "CANCELLED", lastError: "The link was deleted before this was sent." } });
+    }
+    await tx.clubFormLink.delete({ where: { id: link.id } });
   });
 }
 

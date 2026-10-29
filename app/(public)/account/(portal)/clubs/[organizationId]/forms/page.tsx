@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, Printer } from "lucide-react";
+import { FileText } from "lucide-react";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { EmptyState } from "@/components/empty-state";
-import { RevokeClubFormLinkButton, SendClubFormLink } from "@/components/club-forms-actions";
+import { SendClubFormLink, StartClubFormsYearButton } from "@/components/club-forms-actions";
+import { ClubFormLinksTable, CollapsibleList, FilledFormsList, PastYearsSection } from "@/components/club-forms-lists";
 import { getServerEnv } from "@/lib/env";
 import { groupClubFormsByFillMode, openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { listClubFormLinks } from "@/modules/club-forms/links";
+import { groupClubFormsByYear, showStartNewYear } from "@/modules/club-forms/past-years-domain";
+import { getClubFormsYearState } from "@/modules/club-forms/year-start";
 import { getRequiredFormsStatus } from "@/modules/club-forms/required";
 import { requirementSummary } from "@/modules/club-forms/required-domain";
 import { listRosterChoices, listSubmissionsForViewer } from "@/modules/club-forms/submissions";
@@ -18,21 +21,6 @@ import { clubYearFor } from "@/modules/club-rosters/domain";
 
 export const metadata: Metadata = { title: "Club forms" };
 export const dynamic = "force-dynamic";
-
-function formatDate(value: string | null) {
-  if (!value) return "";
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
-}
-
-const emailDeliveryLabel = {
-  QUEUED: "Sending",
-  SENT: "Sent",
-  DELIVERED: "Delivered",
-  NOT_DELIVERED: "Not delivered: link withdrawn, send a new one",
-  UNKNOWN: "",
-} as const;
-
-const linkStateLabel = { OPEN: "Waiting", USED: "Submitted", REVOKED: "Withdrawn", EXPIRED: "Expired" } as const;
 
 /**
  * A club's forms (#610): the forms the conference has turned on, filling one
@@ -58,13 +46,20 @@ export default async function ClubFormsPage({
   }
   const viewer = clubLeaderViewerFromAccess(access);
   const clubYear = clubYearFor(new Date());
-  const [templates, rosterMembers, submissions, links, requiredStatus] = await Promise.all([
+  const [templates, rosterMembers, allSubmissions, allLinks, requiredStatus, yearState] = await Promise.all([
     listEnabledClubFormTemplates(),
     listRosterChoices(organizationId),
     listSubmissionsForViewer(viewer, member ? { rosterMemberId: member } : {}),
     listClubFormLinks(viewer, organizationId),
     getRequiredFormsStatus(clubYear, [organizationId]),
+    getClubFormsYearState(viewer, organizationId, clubYear),
   ]);
+  const { currentLinks: links, currentSubmissions: submissions, pastYears } = groupClubFormsByYear({
+    links: allLinks,
+    submissions: allSubmissions,
+    currentClubYear: clubYear,
+    yearStarted: yearState.yearStarted,
+  });
   const requiredItems = requiredStatus[0]?.items ?? [];
   const fillModeByKey = new Map(templates.map((template) => [template.key, template.fillMode]));
   const base = `/account/clubs/${organizationId}/forms`;
@@ -142,6 +137,14 @@ export default async function ClubFormsPage({
         </section>
       )}
 
+      {showStartNewYear(yearState) && (
+        <section aria-labelledby="club-forms-start-year" className="public-manage-card" data-testid="start-new-year">
+          <h2 id="club-forms-start-year">Start the new year</h2>
+          <p className="field-help">Move forms from earlier club years into Past years. Nothing is deleted.</p>
+          <StartClubFormsYearButton organizationId={organizationId} />
+        </section>
+      )}
+
       {templates.length === 0 ? (
         <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>
       ) : null}
@@ -150,6 +153,8 @@ export default async function ClubFormsPage({
         <section aria-labelledby="club-forms-families" className="club-form-group">
           <h2 id="club-forms-families">Forms for families and individuals: send a link</h2>
           <p className="field-help">A parent, member, staff member or recommender fills these in through a private link you send. You can fill one in yourself too.</p>
+          {families.length > 0 && (
+          <CollapsibleList count={`${families.length} ${families.length === 1 ? "form" : "forms"}`} label="Family forms">
           {families.map((template) => (
             <section className="public-manage-card club-form-template" key={template.key}>
               <div>
@@ -171,33 +176,13 @@ export default async function ClubFormsPage({
               </div>
             </section>
           ))}
+          </CollapsibleList>
+          )}
           {links.length > 0 && (
             <section className="public-manage-card">
               <h3>Private links you sent</h3>
               <p className="field-help">A link works once. After it is used, the form appears under Filled forms.</p>
-              <div className="report-table-wrap">
-                <table className="report-table">
-                  <caption className="sr-only">Private links</caption>
-                  <thead>
-                    <tr><th scope="col">Form</th><th scope="col">Sent to</th><th scope="col">Status</th><th scope="col">Email</th><th scope="col">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr>
-                  </thead>
-                  <tbody>
-                    {links.map((link) => (
-                      <tr key={link.id}>
-                        <th scope="row">{link.templateName}</th>
-                        <td translate="no">{link.recipientEmail}{link.subjectName ? ` · ${link.subjectName}` : ""}</td>
-                        <td>{linkStateLabel[link.state]}</td>
-                        <td>{emailDeliveryLabel[link.delivery]}</td>
-                        <td>{formatDate(link.expiresAt)}</td>
-                        <td>
-                          {link.state === "OPEN" && <RevokeClubFormLinkButton linkId={link.id} organizationId={organizationId} />}
-                          {link.submissionId && <Link className="text-button" href={`${base}/submissions/${link.submissionId}`}>Open form</Link>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ClubFormLinksTable base={base} links={links} organizationId={organizationId} />
             </section>
           )}
         </section>
@@ -207,6 +192,7 @@ export default async function ClubFormsPage({
         <section aria-labelledby="club-forms-club" className="club-form-group">
           <h2 id="club-forms-club">Club forms: the club fills these in</h2>
           <p className="field-help">You fill these in directly, whenever they are needed. You can still send a link for one if someone else should fill it in.</p>
+          <CollapsibleList count={`${clubForms.length} ${clubForms.length === 1 ? "form" : "forms"}`} label="Club forms">
           {clubForms.map((template) => (
             <section className="public-manage-card club-form-template" key={template.key}>
               <div>
@@ -236,12 +222,12 @@ export default async function ClubFormsPage({
               )}
             </section>
           ))}
+          </CollapsibleList>
         </section>
       )}
 
       <section className="public-manage-card">
-        <h3>Filled forms</h3>
-        {rosterMembers.length > 0 && (
+        <FilledFormsList base={base} empty={<EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>} filter={rosterMembers.length > 0 && (
           <form action={base} className="club-form-filter" method="get">
             <label>
               Show forms for
@@ -252,35 +238,10 @@ export default async function ClubFormsPage({
             </label>
             <button className="secondary-button" type="submit">Show</button>
           </form>
-        )}
-        {submissions.length === 0 ? (
-          <EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>
-        ) : (
-          <div className="report-table-wrap">
-            <table className="report-table">
-              <caption className="sr-only">Filled forms</caption>
-              <thead>
-                <tr><th scope="col">Form</th><th scope="col">Member or subject</th><th scope="col">Status</th><th scope="col">Date</th><th scope="col"><span className="sr-only">Open</span></th></tr>
-              </thead>
-              <tbody>
-                {submissions.map((row) => (
-                  <tr key={row.id}>
-                    <th scope="row">{row.templateName}</th>
-                    <td translate="no">{row.subjectName || "Not named"}</td>
-                    <td>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
-                    <td>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
-                    <td>
-                      <Link className="secondary-button" href={`${base}/submissions/${row.id}`}>
-                        {row.status === "DRAFT" ? "Open" : <><Printer aria-hidden="true" size={13} /> View and print</>}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        )} submissions={submissions} />
       </section>
+
+      {pastYears.length > 0 && <PastYearsSection base={base} organizationId={organizationId} years={pastYears} />}
     </>
   );
 }

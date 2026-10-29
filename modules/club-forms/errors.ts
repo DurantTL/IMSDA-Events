@@ -6,6 +6,7 @@ export type ClubFormErrorCode =
   | "SUBMISSION_NOT_FOUND"
   | "LINK_NOT_FOUND"
   | "LINK_UNAVAILABLE"
+  | "LINK_HAS_ANSWERS"
   | "MEMBER_NOT_FOUND"
   | "FORBIDDEN"
   | "VALIDATION_FAILED"
