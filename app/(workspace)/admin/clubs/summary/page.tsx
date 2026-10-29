@@ -5,6 +5,7 @@ import { LayoutGrid, ClipboardList, ChartNoAxesColumn, CalendarDays } from "luci
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable, AreaPointsChart } from "@/components/area-clubs-views";
+import { StaffMonthlyRecords } from "@/components/staff-monthly-records";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { ClubSummaryLegacyAnchor } from "@/components/club-summary-legacy-anchor";
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
@@ -17,13 +18,14 @@ import { parseClubQuery, parseLeaderboardSort } from "@/modules/club-reports/are
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary, listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
 import { buildClubDirectory, clubDirectoryClubHref, clubSummaryAnchors, clubSummaryHref, parseClubSummaryView } from "@/modules/club-reports/club-directory-domain";
+import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import styles from "@/components/club-directory.module.css";
 
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
 
-type Search = { year?: string; sort?: string; q?: string | string[]; view?: string; attention?: string; page?: string };
+type Search = { year?: string; sort?: string; q?: string | string[]; view?: string; attention?: string; page?: string; month?: string; show?: string; all?: string };
 const views = [
   { key: "directory", label: "Club directory", icon: LayoutGrid },
   { key: "records", label: "Monthly Records", icon: ClipboardList },
@@ -107,8 +109,13 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       </>}
       {view === "records" && <>
         <Link className="secondary-button" href={`/admin/clubs/reports?year=${encodeURIComponent(clubYear)}`}>Review monthly records</Link>
-        <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
-        <details className={`panel ${styles.details}`}><summary>Club details and yearly totals</summary><p className={styles.note}>Directors, roster counts, report totals and Sterling Volunteers counts.</p><AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} /></details>
+        <StaffMonthlyRecords clubYear={clubYear} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all })} />
+        <details className={`panel ${styles.details}`}>
+          <summary>Full-year grid and yearly totals</summary>
+          <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
+          <p className={styles.note}>Directors, roster counts, report totals and Sterling Volunteers counts.</p>
+          <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
+        </details>
       </>}
       {view === "points" && <AreaPointsChart basePath="/admin/clubs/summary" clubYear={clubYear} clubs={clubs} sort={sort} sortHref={(value) => `${href({ view: "points", sort: value })}#points`} />}
       {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} />}

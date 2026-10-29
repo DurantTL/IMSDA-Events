@@ -41,13 +41,16 @@ export const clubSummaryAnchors: Record<ClubSummaryView, string> = {
   directory: "overview", records: "monthly-records", points: "points", events: "club-events",
 };
 
-export function clubSummaryHref(input: { clubYear: string; view?: ClubSummaryView; query?: string; attention?: boolean; page?: number; sort?: string }) {
+export function clubSummaryHref(input: { clubYear: string; view?: ClubSummaryView; query?: string; attention?: boolean; page?: number; sort?: string; month?: string; show?: "all"; all?: boolean }) {
   const params = new URLSearchParams({ year: input.clubYear });
   if (input.view) params.set("view", input.view);
   if (input.query) params.set("q", input.query);
   if (input.attention) params.set("attention", "needs-attention");
   if (input.page && input.page > 1) params.set("page", String(input.page));
   if (input.sort) params.set("sort", input.sort);
+  if (input.month) params.set("month", input.month);
+  if (input.show) params.set("show", input.show);
+  if (input.all) params.set("all", "1");
   return `/admin/clubs/summary?${params}`;
 }
 

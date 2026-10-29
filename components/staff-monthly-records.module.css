@@ -1,0 +1,52 @@
+.root { display: grid; gap: 16px; min-width: 0; }
+.heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; }
+.muted, .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.picker { display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.monthLink { display: grid; justify-items: center; align-content: center; min-height: 44px; min-width: 44px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
+.monthLink small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; color: #3f4b52; }
+.monthLink[aria-current="true"] { background: var(--imsda-navy); border-color: var(--imsda-navy); color: white; }
+.monthLink[aria-current="true"] small { color: white; }
+.phoneMonth { display: none; align-items: center; gap: 8px; }
+.monthSelect { flex: 1; min-width: 0; }
+.monthSelect select { width: 100%; min-height: 44px; }
+.step, .stepOff { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; color: var(--imsda-navy); font-size: 1.25rem; text-decoration: none; background: white; }
+.stepOff { opacity: 0.4; }
+.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
+.chip[aria-current="true"] { background: var(--imsda-navy); border-color: var(--imsda-navy); color: white; }
+.search { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.search label { display: grid; gap: 4px; flex: 1 1 220px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.search input { min-height: 44px; width: 100%; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.table thead th { color: #3f4b52; font-weight: 700; }
+.club { font-weight: 400; overflow-wrap: anywhere; }
+.club small { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.name { font-weight: 700; color: var(--ink); }
+.badge { display: inline-flex; gap: 4px; padding: 4px 10px; border-radius: 8px; background: var(--imsda-navy-soft); color: var(--imsda-navy); font-weight: 700; white-space: nowrap; }
+.badge[data-kind="MISSING"] { background: #fde8ea; color: #8a1220; }
+.badge[data-kind="DRAFT"], .badge[data-kind="DUE"] { background: var(--imsda-gold-soft); color: #76520b; }
+.badge[data-kind="REVIEWED"] { background: #e5f3eb; color: #245c3b; }
+.badge[data-kind="NOT_YET_DUE"] { background: #eef2f4; color: #3f4b52; }
+.late { margin-left: 6px; color: #8a1220; font-weight: 700; }
+.points { font-variant-numeric: tabular-nums; }
+.rowLink { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; font-weight: 700; }
+.showAll { justify-self: start; min-height: 44px; }
+.empty { margin: 0; padding: 12px 0; }
+
+@media (max-width: 860px) {
+  .months { display: none; }
+  .phoneMonth { display: flex; }
+  .table thead { display: none; }
+  .table, .table tbody { display: block; }
+  .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .table th, .table td { display: block; padding: 0; border: 0; }
+  .club { grid-column: 1 / -1; }
+  .status { grid-column: 1; grid-row: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .points { grid-column: 2; grid-row: 2; justify-self: end; }
+  .stripCell { display: none; }
+  .action { grid-column: 3; grid-row: 2; }
+}
