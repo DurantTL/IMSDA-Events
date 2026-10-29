@@ -135,7 +135,7 @@ describe("the Earned awards screen (#532)", () => {
 
 describe("earned awards on the order screen", () => {
   const orders: ClubOrderWorkspaceData = {
-    helper: [{ itemId: "camp", section: "OTHER", name: "Fall Camporee Patch", size: "", catalogNumber: null, computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 }],
+    helper: [{ itemId: "camp", honorId: null, section: "OTHER", name: "Fall Camporee Patch", size: "", catalogNumber: null, computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 }],
     unmatched: [],
     batches: [],
     awardable: [],

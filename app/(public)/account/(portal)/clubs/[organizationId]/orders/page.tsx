@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ClubOrderWorkspace } from "@/components/club-order-workspace";
-import { loadOrderWorkspace } from "@/modules/club-orders/repository";
+import { listOrderableUnlinkedHonors, loadOrderWorkspace } from "@/modules/club-orders/repository";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { listClubStock } from "@/modules/club-supplies/repository";
 import { syncHonorOrderNeeds } from "@/modules/honors/order-source";
@@ -30,6 +30,7 @@ export default async function ClubOrdersPage({ params }: { params: Promise<{ org
         initial={await loadOrderWorkspace(organizationId)}
         initialUniforms={uniforms}
         stock={await listClubStock(organizationId)}
+        orderableHonors={access.capabilities.manageTeam ? await listOrderableUnlinkedHonors() : []}
         organizationId={organizationId}
         printHref={`/account/clubs/${organizationId}/orders/print`}
         readOnly={!access.capabilities.manageTeam}

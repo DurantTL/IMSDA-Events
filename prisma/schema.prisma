@@ -2651,6 +2651,7 @@ model Organization {
   clubOrderNeeds     ClubOrderNeed[]
   clubOrderBatches   ClubSupplyOrderBatch[]
   clubOrderListLines ClubOrderListLine[]
+  clubOrderHonorLines ClubOrderHonorLine[]
   memberClassCompletions MemberClassCompletion[]
   sponsoredPromoCodes PromoCode[] @relation("PromoCodeSponsor")
   clubFormSubmissions ClubFormSubmission[]
@@ -5318,6 +5319,7 @@ model Honor {
   weekendCompletionLinks HonorWeekendCompletionLink[]
   memberEntries   MemberHonorEntry[]
   clubSupplyItems ClubSupplyItem[]
+  clubOrderHonorLines ClubOrderHonorLine[]
   masterAwardGroupHonors MasterAwardRuleGroupHonor[]
 
   @@index([isActive, name])
@@ -5503,6 +5505,27 @@ model ClubOrderListLine {
 
   @@unique([organizationId, itemId])
   @@index([itemId])
+}
+
+/// An honor a director added to the order helper list by hand when the honor has
+/// no active catalog item (#1330). A separate table from `ClubOrderListLine`,
+/// which is keyed on a catalog item. Always a positive quantity; removing the
+/// line deletes the row. Once staff link the honor to an active catalog item the
+/// helper list shows this row as that item's line (never as a second line). A
+/// planning aid only; nothing is ordered from it.
+model ClubOrderHonorLine {
+  id             String   @id @default(cuid())
+  organizationId String
+  honorId        String
+  quantity       Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  honor        Honor        @relation(fields: [honorId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, honorId])
+  @@index([honorId])
 }
 
 /// A `ClubSupplyOrderBatch`'s own two states: placed, or received.
