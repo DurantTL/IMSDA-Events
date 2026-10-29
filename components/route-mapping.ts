@@ -248,7 +248,7 @@ export type RegistrySnapshot = {
 };
 
 export function liveRegistries(): RegistrySnapshot {
-  const cards = buildMoreDirectoryCards({ permissions: eventPermissions, clubOversight: true, clubEvent: true, isSystemAdmin: true, clubFormsAccess: true, eventQuery: "", hiddenCardKeys: new Set() });
+  const cards = buildMoreDirectoryCards({ permissions: eventPermissions, clubOversight: true, clubEvent: true, isSystemAdmin: true, clubFormsAccess: true, eventQuery: "" });
   return {
     navigationHrefs: [...navigation, eventFeaturesItem].map((item) => item.href),
     systemGroups: systemNavGroups,

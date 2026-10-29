@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { effectivePermissions } from "@/modules/access/authorization";
@@ -35,7 +36,7 @@ async function putHandler(request: Request, context: RouteContext) {
     try {
       payload = await request.json();
     } catch {
-      return Response.json({ error: "INVALID_EMERGENCY_PLAN", message: "The request body must be valid JSON." }, { status: 400 });
+      return emergencyPlanApiError(new ZodError([{ code: "custom", path: [], message: "The request body must be valid JSON." }]), "Saving the emergency plan");
     }
     const draft = emergencyPlanDraftSchema.parse(payload);
     return Response.json({ draft: await saveEmergencyPlanDraft(eventId, draft, access.user.id) });

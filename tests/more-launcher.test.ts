@@ -32,7 +32,7 @@ import {
 import { buildMoreDirectoryCards, moreDirectoryGroupOrder, sidebarSections, type MoreDirectoryContext } from "@/components/staff-navigation";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { buildEventModulesView, removableModuleKeys } from "@/components/event-modules-page-model";
-import { disabledModuleCardKeys, eventModuleCatalog, eventModuleKeys, moduleForCard, type EventModuleKey } from "@/modules/event-modules/catalog";
+import { alwaysOnModuleKeys, disabledModuleCardKeys, eventModuleCatalog, eventModuleKeys, moduleForCard, type EventModuleKey } from "@/modules/event-modules/catalog";
 
 /** The More launcher (#741 slice 2): grouping, role limits, footers, keyboard and focus rules. Synthetic data only. */
 
@@ -94,8 +94,8 @@ describe("launcher grouping", () => {
     const readOnly = { permissions: ["VIEW_EVENT"] as EventPermission[], clubOversight: false, clubFormsAccess: false };
     expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys }))).toEqual(["emergency-plans"]);
     expect(keysOf(cardsFor({ ...readOnly, enabled: [] }))).toEqual([]);
-    // With no module state at all the card stays off.
-    expect(buildMoreDirectoryCards({ ...readOnly, clubEvent: false, isSystemAdmin: false, clubOversight: false, clubFormsAccess: false, eventQuery: "" }).filter((card) => card.allowed)).toEqual([]);
+    // The shell passes the always-on state when none was loaded, which leaves the card off.
+    expect(keysOf(cardsFor({ ...readOnly, enabled: alwaysOnModuleKeys }))).toEqual([]);
     // Viewing needs VIEW_EVENT: kitchen-only staff never get it.
     expect(keysOf(cardsFor({ permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubFormsAccess: false, enabled: eventModuleKeys }))).toEqual([]);
   });

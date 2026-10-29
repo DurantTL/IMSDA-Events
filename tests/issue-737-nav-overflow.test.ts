@@ -10,6 +10,7 @@ import {
   orderedMobileTabs,
   orderedSidebarItems,
 } from "@/components/staff-navigation";
+import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { areaClubPortalNavItems, clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -25,6 +26,8 @@ const launcher = (permissions: readonly EventPermission[], over: { clubEvent?: b
     clubEvent: over.clubEvent ?? false,
     isSystemAdmin: over.isSystemAdmin ?? false,
     clubFormsAccess: false,
+    // Module state as the shell passes it when the event has none stored: only the always-on modules are on.
+    hiddenCardKeys: disabledModuleCardKeys(new Set(alwaysOnModuleKeys)),
   });
 
 describe("More launcher follows permitted destinations (#737)", () => {
@@ -33,6 +36,7 @@ describe("More launcher follows permitted destinations (#737)", () => {
     expect(launcher(permissions, { clubEvent: true })).toBe(true);
     const cards = buildMoreDirectoryCards({
       permissions, clubOversight: false, clubEvent: true, isSystemAdmin: false, clubFormsAccess: false, eventQuery: "?event=e1",
+      hiddenCardKeys: disabledModuleCardKeys(new Set(alwaysOnModuleKeys)),
     }).filter((card) => card.allowed);
     expect(cards.map((card) => card.key)).toEqual(["event-health", "attendee-list"]);
   });

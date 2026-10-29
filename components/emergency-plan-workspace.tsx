@@ -156,28 +156,28 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
                   <select id={field(`loc-kind-${index}`)} {...fp(`loc-kind-${index}`)} value={location.kind} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, kind: e.target.value as typeof row.kind } : row) }))}>
                     {emergencyLocationKinds.map((kind) => <option key={kind} value={kind}>{emergencyLocationKindLabels[kind]}</option>)}
                   </select>
-                {err(`loc-kind-${index}`)}
                 </label>
+                {err(`loc-kind-${index}`)}
                 <label htmlFor={field(`loc-name-${index}`)}>Name
                   <input id={field(`loc-name-${index}`)} {...fp(`loc-name-${index}`)} maxLength={120} value={location.name} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, name: e.target.value } : row) }))} />
-                {err(`loc-name-${index}`)}
                 </label>
+                {err(`loc-name-${index}`)}
                 <label htmlFor={field(`loc-desc-${index}`)}>Description
                   <textarea id={field(`loc-desc-${index}`)} {...fp(`loc-desc-${index}`)} maxLength={600} rows={2} value={location.description} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, description: e.target.value } : row) }))} />
-                {err(`loc-desc-${index}`)}
                 </label>
+                {err(`loc-desc-${index}`)}
                 <label htmlFor={field(`loc-cap-${index}`)}>Capacity note
                   <input id={field(`loc-cap-${index}`)} {...fp(`loc-cap-${index}`)} maxLength={200} value={location.capacityNote} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, capacityNote: e.target.value } : row) }))} />
-                {err(`loc-cap-${index}`)}
                 </label>
+                {err(`loc-cap-${index}`)}
                 <label htmlFor={field(`loc-dir-${index}`)}>Directions
                   <textarea id={field(`loc-dir-${index}`)} {...fp(`loc-dir-${index}`)} maxLength={1000} rows={2} value={location.directions} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, directions: e.target.value } : row) }))} />
-                {err(`loc-dir-${index}`)}
                 </label>
+                {err(`loc-dir-${index}`)}
                 <label htmlFor={field(`loc-map-${index}`)}>Map reference (optional)
                   <input id={field(`loc-map-${index}`)} {...fp(`loc-map-${index}`)} maxLength={500} placeholder="https://… or Grid C4" value={location.mapReference ?? ""} onChange={(e) => change((d) => ({ ...d, locations: d.locations.map((row, i) => i === index ? { ...row, mapReference: e.target.value } : row) }))} />
-                {err(`loc-map-${index}`)}
                 </label>
+                {err(`loc-map-${index}`)}
                 <button className="secondary-button" type="button" onClick={() => change((d) => ({ ...d, locations: d.locations.filter((_, i) => i !== index) }))}><Trash2 aria-hidden="true" size={15} /> Remove location {index + 1}</button>
               </fieldset>
             ))}
@@ -194,26 +194,26 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
                   <select id={field(`proc-kind-${index}`)} {...fp(`proc-kind-${index}`)} value={procedure.kind} onChange={(e) => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, kind: e.target.value as typeof row.kind } : row) }))}>
                     {emergencyProcedureKinds.map((kind) => <option key={kind} value={kind}>{emergencyProcedureKindLabels[kind]}</option>)}
                   </select>
-                {err(`proc-kind-${index}`)}
                 </label>
+                {err(`proc-kind-${index}`)}
                 <label htmlFor={field(`proc-title-${index}`)}>Title
                   <input id={field(`proc-title-${index}`)} {...fp(`proc-title-${index}`)} maxLength={120} value={procedure.title} onChange={(e) => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, title: e.target.value } : row) }))} />
-                {err(`proc-title-${index}`)}
                 </label>
+                {err(`proc-title-${index}`)}
                 <label htmlFor={field(`proc-body-${index}`)}>Overview
                   <textarea id={field(`proc-body-${index}`)} {...fp(`proc-body-${index}`)} maxLength={20000} rows={4} value={procedure.body} onChange={(e) => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, body: e.target.value } : row) }))} />
-                {err(`proc-body-${index}`)}
                 </label>
+                {err(`proc-body-${index}`)}
                 {procedure.items.map((item, itemIndex) => (
                   <div className={styles.step} key={itemIndex}>
                     <label htmlFor={field(`step-title-${index}-${itemIndex}`)}>Step {itemIndex + 1}
                       <input id={field(`step-title-${index}-${itemIndex}`)} {...fp(`step-title-${index}-${itemIndex}`)} maxLength={120} value={item.title} onChange={(e) => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, items: row.items.map((s, j) => j === itemIndex ? { ...s, title: e.target.value } : s) } : row) }))} />
-                    {err(`step-title-${index}-${itemIndex}`)}
                     </label>
+                    {err(`step-title-${index}-${itemIndex}`)}
                     <label htmlFor={field(`step-text-${index}-${itemIndex}`)}>Step {itemIndex + 1} detail
                       <input id={field(`step-text-${index}-${itemIndex}`)} {...fp(`step-text-${index}-${itemIndex}`)} maxLength={600} value={item.text} onChange={(e) => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, items: row.items.map((s, j) => j === itemIndex ? { ...s, text: e.target.value } : s) } : row) }))} />
-                    {err(`step-text-${index}-${itemIndex}`)}
                     </label>
+                    {err(`step-text-${index}-${itemIndex}`)}
                     <button className="secondary-button" type="button" onClick={() => change((d) => ({ ...d, procedures: d.procedures.map((row, i) => i === index ? { ...row, items: row.items.filter((_, j) => j !== itemIndex) } : row) }))}><Trash2 aria-hidden="true" size={15} /> Remove step {itemIndex + 1}</button>
                   </div>
                 ))}
@@ -232,20 +232,20 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
                 <legend className={styles.legend}>Contact {index + 1}</legend>
                 <label htmlFor={field(`con-order-${index}`)}>Escalation order
                   <input id={field(`con-order-${index}`)} {...fp(`con-order-${index}`)} inputMode="numeric" value={contact.escalationOrder} onChange={(e) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, escalationOrder: e.target.value } : row) }))} />
-                {err(`con-order-${index}`)}
                 </label>
+                {err(`con-order-${index}`)}
                 <label htmlFor={field(`con-role-${index}`)}>Role
                   <input id={field(`con-role-${index}`)} {...fp(`con-role-${index}`)} maxLength={100} value={contact.role} onChange={(e) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, role: e.target.value } : row) }))} />
-                {err(`con-role-${index}`)}
                 </label>
+                {err(`con-role-${index}`)}
                 <label htmlFor={field(`con-name-${index}`)}>Name
                   <input id={field(`con-name-${index}`)} {...fp(`con-name-${index}`)} maxLength={120} value={contact.name} onChange={(e) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, name: e.target.value } : row) }))} />
-                {err(`con-name-${index}`)}
                 </label>
+                {err(`con-name-${index}`)}
                 <label htmlFor={field(`con-phone-${index}`)}>Phone
                   <input id={field(`con-phone-${index}`)} {...fp(`con-phone-${index}`)} inputMode="tel" maxLength={40} placeholder="(515) 555-0100" value={contact.phone} onChange={(e) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, phone: e.target.value } : row) }))} />
-                {err(`con-phone-${index}`)}
                 </label>
+                {err(`con-phone-${index}`)}
                 <button className="secondary-button" type="button" onClick={() => change((d) => ({ ...d, contacts: d.contacts.filter((_, i) => i !== index) }))}><Trash2 aria-hidden="true" size={15} /> Remove contact {index + 1}</button>
               </fieldset>
             ))}
