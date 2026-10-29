@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText } from "lucide-react";
+import styles from "@/components/club-forms-lists.module.css";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { EmptyState } from "@/components/empty-state";
+import { ClubFormsStatus } from "@/components/club-forms-status";
 import { SendClubFormLink, StartClubFormsYearButton } from "@/components/club-forms-actions";
 import { ClubFormLinksTable, CollapsibleList, FilledFormsList, PastYearsSection } from "@/components/club-forms-lists";
 import { getServerEnv } from "@/lib/env";
@@ -57,8 +59,7 @@ export default async function ClubFormsPage({
   const { currentLinks: links, currentSubmissions: submissions, pastYears } = groupClubFormsByYear({
     links: allLinks,
     submissions: allSubmissions,
-    currentClubYear: clubYear,
-    yearStarted: yearState.yearStarted,
+    startedClubYear: yearState.startedClubYear,
   });
   const requiredItems = requiredStatus[0]?.items ?? [];
   const fillModeByKey = new Map(templates.map((template) => [template.key, template.fillMode]));
@@ -67,6 +68,7 @@ export default async function ClubFormsPage({
 
   return (
     <>
+      <ClubFormsStatus />
       <section className="public-manage-card club-forms-intro">
         <p className="public-registration-eyebrow">Club forms</p>
         <h2>Forms for your club&apos;s files</h2>
@@ -140,7 +142,7 @@ export default async function ClubFormsPage({
       {showStartNewYear(yearState) && (
         <section aria-labelledby="club-forms-start-year" className="public-manage-card" data-testid="start-new-year">
           <h2 id="club-forms-start-year">Start the new year</h2>
-          <p className="field-help">Move forms from earlier club years into Past years. Nothing is deleted.</p>
+          <p className={`field-help ${styles.startYearHelp}`}>Move forms from earlier club years into Past years. Nothing is deleted.</p>
           <StartClubFormsYearButton organizationId={organizationId} />
         </section>
       )}

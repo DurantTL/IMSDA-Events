@@ -45,7 +45,7 @@ beforeEach(() => {
   mocks.listSubmissions.mockResolvedValue([]);
   mocks.listLinks.mockResolvedValue([]);
   mocks.getRequired.mockResolvedValue([{ id: "club-a", name: "Alpha", church: "", items: [] }]);
-  mocks.yearState.mockResolvedValue({ yearStarted: false, hasEarlierYears: false });
+  mocks.yearState.mockResolvedValue({ startedClubYear: null, yearStarted: false, hasEarlierYears: false });
   mocks.listTemplates.mockResolvedValue([template("permission", "Permission Slip", "FAMILY"), template("can", "Can Collecting Report", "CLUB")]);
 });
 
@@ -89,7 +89,7 @@ describe("Delete on the links table", () => {
 
 describe("Start the new year and Past years", () => {
   it("shows the button, with its help text, when earlier years exist and the year is not started", async () => {
-    mocks.yearState.mockResolvedValue({ yearStarted: false, hasEarlierYears: true });
+    mocks.yearState.mockResolvedValue({ startedClubYear: null, yearStarted: false, hasEarlierYears: true });
     mocks.listLinks.mockResolvedValue([link({ clubYear: "2025-26" })]);
     const html = await render();
     expect(html).toContain("Start the new year");
@@ -101,12 +101,12 @@ describe("Start the new year and Past years", () => {
 
   it("hides the button when there is nothing earlier, or the year is already started", async () => {
     expect(await render()).not.toContain("Start the new year");
-    mocks.yearState.mockResolvedValue({ yearStarted: true, hasEarlierYears: true });
+    mocks.yearState.mockResolvedValue({ startedClubYear: "2026-27", yearStarted: true, hasEarlierYears: false });
     expect(await render()).not.toContain("Start the new year");
   });
 
   it("moves earlier years into a closed Past years section, grouped newest first", async () => {
-    mocks.yearState.mockResolvedValue({ yearStarted: true, hasEarlierYears: true });
+    mocks.yearState.mockResolvedValue({ startedClubYear: "2026-27", yearStarted: true, hasEarlierYears: false });
     mocks.listLinks.mockResolvedValue([link({ id: "now" }), link({ id: "old", clubYear: "2025-26", recipientEmail: "old-parent@example.test" }), link({ id: "older", clubYear: "2024-25", recipientEmail: "older-parent@example.test" })]);
     mocks.listSubmissions.mockResolvedValue([filled({ id: "s-now" }), filled({ id: "s-old", clubYear: "2025-26", subjectName: "Old Sample" })]);
     const html = await render();
@@ -124,5 +124,12 @@ describe("Start the new year and Past years", () => {
     // Each year is its own closed details.
     expect(past.match(/data-club-year="/g)).toHaveLength(2);
     expect(past).not.toMatch(/<details[^>]*open=""/);
+  });
+});
+
+describe("announcements", () => {
+  it("keeps one polite status region mounted on the page", async () => {
+    const html = await render();
+    expect(html).toMatch(/<div aria-live="polite" role="status"[^>]*data-testid="club-forms-status"/);
   });
 });

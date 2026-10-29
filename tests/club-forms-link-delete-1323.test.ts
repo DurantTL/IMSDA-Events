@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   linkDelete: vi.fn(),
   submissionFindFirst: vi.fn(),
   outboxUpdateMany: vi.fn(),
-  yearFindUnique: vi.fn(),
-  yearUpsert: vi.fn(),
+  yearFindFirst: vi.fn(),
+  yearCreateMany: vi.fn(),
 }));
 
 const calls: string[] = [];
@@ -23,7 +23,7 @@ const client = {
   },
   clubFormSubmission: { findFirst: (...args: unknown[]) => { calls.push("check"); return mocks.submissionFindFirst(...args); } },
   messageOutbox: { updateMany: mocks.outboxUpdateMany },
-  clubFormYearStart: { findUnique: mocks.yearFindUnique, upsert: mocks.yearUpsert },
+  clubFormYearStart: { findFirst: mocks.yearFindFirst, createMany: mocks.yearCreateMany },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };
 
@@ -54,8 +54,8 @@ beforeEach(() => {
   mocks.submissionFindFirst.mockResolvedValue(null);
   mocks.linkDelete.mockResolvedValue({});
   mocks.outboxUpdateMany.mockResolvedValue({ count: 1 });
-  mocks.yearFindUnique.mockResolvedValue(null);
-  mocks.yearUpsert.mockResolvedValue({});
+  mocks.yearFindFirst.mockResolvedValue(null);
+  mocks.yearCreateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("deleting an unused link", () => {
@@ -126,35 +126,67 @@ describe("starting the new year", () => {
   it("records the current club year for the club and audits it without personal details", async () => {
     const result = await startClubFormsYear(director, "club-a", new Date("2026-10-29T15:00:00Z"));
     expect(result).toEqual({ clubYear: "2026-27", alreadyStarted: false });
-    expect(mocks.yearUpsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { organizationId_clubYear: { organizationId: "club-a", clubYear: "2026-27" } },
-      create: expect.objectContaining({ organizationId: "club-a", clubYear: "2026-27", startedByAccountId: "acct-1" }),
-    }));
+    expect(mocks.yearCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ organizationId: "club-a", clubYear: "2026-27", startedByAccountId: "acct-1" })],
+      skipDuplicates: true,
+    });
     const audit = mocks.writeAuditLog.mock.calls[0]![0];
     expect(audit).toMatchObject({ action: "CLUB_FORMS_YEAR_STARTED", entityId: "club-a" });
     expect(audit.metadata).toMatchObject({ organizationId: "club-a", clubYear: "2026-27" });
     expect(mocks.writeAuditLog.mock.calls[0]![1]).toBe(client);
   });
 
-  it("is idempotent: a second start changes nothing and writes no second audit row", async () => {
-    mocks.yearFindUnique.mockResolvedValue({ organizationId: "club-a" });
+  it("is idempotent and race-safe: a start that inserts nothing writes no audit row", async () => {
+    mocks.yearCreateMany.mockResolvedValue({ count: 0 });
     const result = await startClubFormsYear(director, "club-a", new Date("2026-10-29T15:00:00Z"));
     expect(result).toEqual({ clubYear: "2026-27", alreadyStarted: true });
-    expect(mocks.yearUpsert).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("refuses anyone who is not a leader of this club", async () => {
     await expect(startClubFormsYear(otherDirector, "club-a")).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(startClubFormsYear(staff, "club-a")).rejects.toMatchObject({ code: "FORBIDDEN" });
-    expect(mocks.yearUpsert).not.toHaveBeenCalled();
+    expect(mocks.yearCreateMany).not.toHaveBeenCalled();
   });
 
-  it("reports the state the page needs, for leaders only", async () => {
-    Object.assign(client, {});
-    (client.clubFormLink as unknown as Record<string, unknown>).findFirst = vi.fn().mockResolvedValue({ id: "old-link" });
-    (client.clubFormSubmission as unknown as Record<string, unknown>).findFirst = vi.fn().mockResolvedValue(null);
-    await expect(getClubFormsYearState(director, "club-a", "2026-27")).resolves.toEqual({ yearStarted: false, hasEarlierYears: true });
-    await expect(getClubFormsYearState(otherDirector, "club-a", "2026-27")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  describe("the state the page needs", () => {
+    const linkFind = vi.fn();
+    const formFind = vi.fn();
+    beforeEach(() => {
+      linkFind.mockReset().mockResolvedValue(null);
+      formFind.mockReset().mockResolvedValue(null);
+      (client.clubFormLink as unknown as Record<string, unknown>).findFirst = linkFind;
+      (client.clubFormSubmission as unknown as Record<string, unknown>).findFirst = formFind;
+    });
+
+    it("is for leaders only", async () => {
+      await expect(getClubFormsYearState(otherDirector, "club-a", "2026-27")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    it("looks for the latest started year not after the current one", async () => {
+      await getClubFormsYearState(director, "club-a", "2027-28");
+      expect(mocks.yearFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: { organizationId: "club-a", clubYear: { lte: "2027-28" } },
+        orderBy: { clubYear: "desc" },
+      }));
+    });
+
+    it("with no start, anything before this year is not moved yet", async () => {
+      linkFind.mockResolvedValue({ id: "old-link" });
+      await expect(getClubFormsYearState(director, "club-a", "2026-27")).resolves.toEqual({ startedClubYear: null, yearStarted: false, hasEarlierYears: true });
+      expect(linkFind).toHaveBeenCalledWith({ where: { organizationId: "club-a", clubYear: { lt: "2026-27" } }, select: { id: true } });
+    });
+
+    it("after a start last year, only forms from that year on count as not moved", async () => {
+      mocks.yearFindFirst.mockResolvedValue({ clubYear: "2026-27" });
+      formFind.mockResolvedValue({ id: "s" });
+      await expect(getClubFormsYearState(director, "club-a", "2027-28")).resolves.toEqual({ startedClubYear: "2026-27", yearStarted: false, hasEarlierYears: true });
+      expect(formFind).toHaveBeenCalledWith({ where: { organizationId: "club-a", clubYear: { lt: "2027-28", gte: "2026-27" } }, select: { id: true } });
+    });
+
+    it("once this year is started there is nothing to move", async () => {
+      mocks.yearFindFirst.mockResolvedValue({ clubYear: "2027-28" });
+      await expect(getClubFormsYearState(director, "club-a", "2027-28")).resolves.toEqual({ startedClubYear: "2027-28", yearStarted: true, hasEarlierYears: false });
+    });
   });
 });

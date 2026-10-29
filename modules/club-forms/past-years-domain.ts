@@ -31,14 +31,16 @@ export type ClubFormsByYear<L, S> = {
 
 /**
  * Splits links and filled forms into the current lists and past club years.
- * Before the club has started `current`, everything stays in the current lists.
+ * `startedClubYear` is the latest club year (not after the current one) the
+ * club started: everything from an earlier club year than that is past, and it
+ * stays past when later years begin. With no start, everything stays current.
  * Each list keeps its incoming order. The caller filters by member before this,
  * so a member's filter applies to the current and the past lists alike.
  */
 export function groupClubFormsByYear<L extends HasClubYear, S extends HasClubYear>(
-  input: { links: L[]; submissions: S[]; currentClubYear: string; yearStarted: boolean },
+  input: { links: L[]; submissions: S[]; startedClubYear: string | null },
 ): ClubFormsByYear<L, S> {
-  if (!input.yearStarted) {
+  if (!input.startedClubYear) {
     return { currentLinks: input.links, currentSubmissions: input.submissions, pastYears: [] };
   }
   const years = new Map<string, PastYearGroup<L, S>>();
@@ -53,18 +55,18 @@ export function groupClubFormsByYear<L extends HasClubYear, S extends HasClubYea
   const currentLinks: L[] = [];
   const currentSubmissions: S[] = [];
   for (const link of input.links) {
-    if (isEarlierClubYear(link.clubYear, input.currentClubYear)) group(link.clubYear!).links.push(link);
+    if (isEarlierClubYear(link.clubYear, input.startedClubYear)) group(link.clubYear!).links.push(link);
     else currentLinks.push(link);
   }
   for (const submission of input.submissions) {
-    if (isEarlierClubYear(submission.clubYear, input.currentClubYear)) group(submission.clubYear!).submissions.push(submission);
+    if (isEarlierClubYear(submission.clubYear, input.startedClubYear)) group(submission.clubYear!).submissions.push(submission);
     else currentSubmissions.push(submission);
   }
   const pastYears = [...years.values()].sort((a, b) => clubYearStartYear(b.clubYear)! - clubYearStartYear(a.clubYear)!);
   return { currentLinks, currentSubmissions, pastYears };
 }
 
-/** The "Start the new year" button shows only when there is something to move and the year is not started yet. */
+/** The "Start the new year" button shows only when something from before this year is not moved yet and this year is not started. */
 export function showStartNewYear(state: { hasEarlierYears: boolean; yearStarted: boolean }) {
   return state.hasEarlierYears && !state.yearStarted;
 }

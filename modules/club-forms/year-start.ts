@@ -12,19 +12,30 @@ import { clubYearFor } from "@/modules/club-rosters/domain";
  * records the choice: nothing is deleted, and who may read a form is unchanged.
  */
 
-/** Whether the club has started `currentClubYear`, and whether any form or link is from an earlier year. */
+/**
+ * The latest club year the club started that is not after the current one
+ * (club years are "YYYY-YY", so they sort as text), and whether any link or
+ * form is from before the current year yet not moved into Past years.
+ */
 export async function getClubFormsYearState(viewer: ClubFormsViewer, organizationId: string, currentClubYear: string) {
   leaderOnly(viewer, organizationId);
   const prisma = getPrisma();
-  const [started, earlierLink, earlierForm] = await Promise.all([
-    prisma.clubFormYearStart.findUnique({
-      where: { organizationId_clubYear: { organizationId, clubYear: currentClubYear } },
-      select: { startedAt: true },
-    }),
-    prisma.clubFormLink.findFirst({ where: { organizationId, clubYear: { lt: currentClubYear } }, select: { id: true } }),
-    prisma.clubFormSubmission.findFirst({ where: { organizationId, clubYear: { lt: currentClubYear } }, select: { id: true } }),
+  const latest = await prisma.clubFormYearStart.findFirst({
+    where: { organizationId, clubYear: { lte: currentClubYear } },
+    orderBy: { clubYear: "desc" },
+    select: { clubYear: true },
+  });
+  const startedClubYear = latest?.clubYear ?? null;
+  const unmoved = { organizationId, clubYear: { lt: currentClubYear, ...(startedClubYear ? { gte: startedClubYear } : {}) } };
+  const [earlierLink, earlierForm] = await Promise.all([
+    prisma.clubFormLink.findFirst({ where: unmoved, select: { id: true } }),
+    prisma.clubFormSubmission.findFirst({ where: unmoved, select: { id: true } }),
   ]);
-  return { yearStarted: Boolean(started), hasEarlierYears: Boolean(earlierLink || earlierForm) };
+  return {
+    startedClubYear,
+    yearStarted: startedClubYear === currentClubYear,
+    hasEarlierYears: Boolean(earlierLink || earlierForm),
+  };
 }
 
 /** Starts the current club year for the club. Safe to repeat: a second call changes nothing and writes no second audit row. */
@@ -35,16 +46,12 @@ export async function startClubFormsYear(viewer: ClubFormsViewer, organizationId
   const actor = leader.actor;
   const startedBy = actor.kind === "ATTENDEE" ? { startedByAccountId: actor.accountId } : { startedByUserId: actor.userId };
   return getPrisma().$transaction(async (tx) => {
-    const existing = await tx.clubFormYearStart.findUnique({
-      where: { organizationId_clubYear: { organizationId, clubYear } },
-      select: { organizationId: true },
+    // One insert that ignores a duplicate, so two requests at once start the year once and audit it once.
+    const created = await tx.clubFormYearStart.createMany({
+      data: [{ organizationId, clubYear, startedAt: now, ...startedBy }],
+      skipDuplicates: true,
     });
-    if (existing) return { clubYear, alreadyStarted: true };
-    await tx.clubFormYearStart.upsert({
-      where: { organizationId_clubYear: { organizationId, clubYear } },
-      create: { organizationId, clubYear, startedAt: now, ...startedBy },
-      update: {},
-    });
+    if (created.count !== 1) return { clubYear, alreadyStarted: true };
     await writeAuditLog({
       actorUserId: who.actorUserId,
       action: "CLUB_FORMS_YEAR_STARTED",

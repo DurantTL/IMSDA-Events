@@ -1,5 +1,6 @@
 "use client";
 
+import { announceClubForms } from "@/components/club-forms-status";
 import { clubFormLinkRequestBody } from "@/components/club-form-link-body";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
@@ -181,6 +182,7 @@ export function DeleteClubFormLinkButton({ organizationId, linkId, formName }: {
         setError(result.message ?? "The link could not be deleted.");
         return;
       }
+      announceClubForms("Link deleted.");
       router.refresh();
     } catch {
       setError("The link could not be deleted.");
@@ -205,8 +207,14 @@ export function StartClubFormsYearButton({ organizationId }: { organizationId: s
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
 
   async function start() {
+    if (!(await askConfirm({
+      title: "Start the new year",
+      body: <p>Move forms from earlier club years into Past years? Nothing is deleted, and past forms stay open to view and print.</p>,
+      confirmLabel: "Start the new year",
+    }))) return;
     setSaving(true);
     setError("");
     try {
@@ -216,6 +224,7 @@ export function StartClubFormsYearButton({ organizationId }: { organizationId: s
         setError(result.message ?? "The new year could not be started.");
         return;
       }
+      announceClubForms("Earlier forms moved to Past years.");
       router.refresh();
     } catch {
       setError("The new year could not be started.");
@@ -226,6 +235,7 @@ export function StartClubFormsYearButton({ organizationId }: { organizationId: s
 
   return (
     <>
+      {confirmDialog}
       <button className="primary-button" disabled={saving} onClick={start} type="button">Start the new year</button>
       {error && <small className="club-report-problem" role="alert">{error}</small>}
     </>

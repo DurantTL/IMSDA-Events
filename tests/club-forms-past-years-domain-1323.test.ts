@@ -22,14 +22,14 @@ describe("grouping by club year", () => {
   const submissions = [form("s1", "2026-27"), form("s2", "2024-25"), form("s3", "2025-26")];
 
   it("keeps everything in the current lists before the club starts the new year", () => {
-    const result = groupClubFormsByYear({ links, submissions, currentClubYear: "2026-27", yearStarted: false });
+    const result = groupClubFormsByYear({ links, submissions, startedClubYear: null });
     expect(result.currentLinks).toHaveLength(4);
     expect(result.currentSubmissions).toHaveLength(3);
     expect(result.pastYears).toEqual([]);
   });
 
   it("moves earlier years into Past years, newest first, once started", () => {
-    const result = groupClubFormsByYear({ links, submissions, currentClubYear: "2026-27", yearStarted: true });
+    const result = groupClubFormsByYear({ links, submissions, startedClubYear: "2026-27" });
     expect(result.currentLinks.map((row) => row.id)).toEqual(["l1"]);
     expect(result.currentSubmissions.map((row) => row.id)).toEqual(["s1"]);
     expect(result.pastYears.map((year) => year.clubYear)).toEqual(["2025-26", "2024-25"]);
@@ -39,7 +39,7 @@ describe("grouping by club year", () => {
   });
 
   it("includes a year that has only filled forms or only links", () => {
-    const result = groupClubFormsByYear({ links: [link("l", "2023-24")], submissions: [form("s", "2022-23")], currentClubYear: "2026-27", yearStarted: true });
+    const result = groupClubFormsByYear({ links: [link("l", "2023-24")], submissions: [form("s", "2022-23")], startedClubYear: "2026-27" });
     expect(result.pastYears).toEqual([
       { clubYear: "2023-24", links: [{ id: "l", clubYear: "2023-24" }], submissions: [] },
       { clubYear: "2022-23", links: [], submissions: [{ id: "s", clubYear: "2022-23", rosterMemberId: null }] },
@@ -49,15 +49,34 @@ describe("grouping by club year", () => {
   it("applies a member filter made before grouping to the current and the past list alike", () => {
     const all = [form("a-now", "2026-27", "m1"), form("a-old", "2025-26", "m1"), form("b-now", "2026-27", "m2"), form("b-old", "2025-26", "m2")];
     const filtered = all.filter((row) => row.rosterMemberId === "m1");
-    const result = groupClubFormsByYear({ links: [], submissions: filtered, currentClubYear: "2026-27", yearStarted: true });
+    const result = groupClubFormsByYear({ links: [], submissions: filtered, startedClubYear: "2026-27" });
     expect(result.currentSubmissions.map((row) => row.id)).toEqual(["a-now"]);
     expect(result.pastYears[0]!.submissions.map((row) => row.id)).toEqual(["a-old"]);
   });
 
   it("treats a row with no club year as current", () => {
-    const result = groupClubFormsByYear({ links: [], submissions: [{ clubYear: undefined }], currentClubYear: "2026-27", yearStarted: true });
+    const result = groupClubFormsByYear({ links: [], submissions: [{ clubYear: undefined }], startedClubYear: "2026-27" });
     expect(result.currentSubmissions).toHaveLength(1);
     expect(result.pastYears).toEqual([]);
+  });
+});
+
+describe("the next club year", () => {
+  const links = [link("a", "2027-28"), link("b", "2026-27"), link("c", "2025-26")];
+  const submissions = [form("x", "2026-27"), form("y", "2024-25")];
+
+  it("keeps years moved earlier in Past years and leaves last year current until the new year is started", () => {
+    const result = groupClubFormsByYear({ links, submissions, startedClubYear: "2026-27" });
+    expect(result.currentLinks.map((row) => row.id)).toEqual(["a", "b"]);
+    expect(result.currentSubmissions.map((row) => row.id)).toEqual(["x"]);
+    expect(result.pastYears.map((year) => year.clubYear)).toEqual(["2025-26", "2024-25"]);
+  });
+
+  it("moves last year too after the club starts 2027-28", () => {
+    const result = groupClubFormsByYear({ links, submissions, startedClubYear: "2027-28" });
+    expect(result.currentLinks.map((row) => row.id)).toEqual(["a"]);
+    expect(result.currentSubmissions).toEqual([]);
+    expect(result.pastYears.map((year) => year.clubYear)).toEqual(["2026-27", "2025-26", "2024-25"]);
   });
 });
 

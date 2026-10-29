@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   resolveClubFormLinkForFill: vi.fn(),
   submitClubFormViaLink: vi.fn(),
   revokeClubFormLink: vi.fn(),
+  deleteUnusedClubFormLink: vi.fn(),
+  startClubFormsYear: vi.fn(),
   saveClubFormSubmission: vi.fn(),
   setClubFormTemplateEnabled: vi.fn(),
   buildClubFormsCsv: vi.fn(),
@@ -32,7 +34,9 @@ vi.mock("@/modules/club-forms/links", () => ({
   resolveClubFormLinkForFill: mocks.resolveClubFormLinkForFill,
   submitClubFormViaLink: mocks.submitClubFormViaLink,
   revokeClubFormLink: mocks.revokeClubFormLink,
+  deleteUnusedClubFormLink: mocks.deleteUnusedClubFormLink,
 }));
+vi.mock("@/modules/club-forms/year-start", () => ({ startClubFormsYear: mocks.startClubFormsYear }));
 vi.mock("@/modules/club-forms/submissions", () => ({ saveClubFormSubmission: mocks.saveClubFormSubmission }));
 vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled }));
 vi.mock("@/modules/club-forms/csv", () => ({ buildClubFormsCsv: mocks.buildClubFormsCsv }));
@@ -54,6 +58,8 @@ vi.mock("@/modules/club-rosters/api-errors", () => ({
 }));
 
 import { DELETE as REVOKE } from "@/app/api/attendee/clubs/[organizationId]/forms/links/[linkId]/route";
+import { POST as DELETE_LINK } from "@/app/api/attendee/clubs/[organizationId]/forms/links/[linkId]/delete/route";
+import { POST as START_YEAR } from "@/app/api/attendee/clubs/[organizationId]/forms/year-start/route";
 import { POST as SEND_LINK } from "@/app/api/attendee/clubs/[organizationId]/forms/links/route";
 import { POST as SAVE } from "@/app/api/attendee/clubs/[organizationId]/forms/submissions/route";
 import { PATCH as TOGGLE } from "@/app/api/admin/club-forms/[templateKey]/route";
@@ -199,6 +205,45 @@ describe("sending and withdrawing links from the club portal (#610)", () => {
     expect(mocks.revokeClubFormLink).toHaveBeenCalledWith(leader, "club-a", "link-1");
     mocks.revokeClubFormLink.mockRejectedValue(new ClubFormError("LINK_NOT_FOUND", "That link could not be found."));
     expect((await REVOKE(new Request("https://events.imsda.test/x", { method: "DELETE" }), club("club-a", "link-of-club-b"))).status).toBe(404);
+  });
+
+  it("deletes an unused link, scoped to the club in the URL (#1323)", async () => {
+    const request = () => new Request("https://events.imsda.test/x", { method: "POST" });
+    const response = await DELETE_LINK(request(), club("club-a", "link-1"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(mocks.deleteUnusedClubFormLink).toHaveBeenCalledWith(leader, "club-a", "link-1");
+
+    mocks.rejectCrossOriginRequest.mockReturnValueOnce(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+    expect((await DELETE_LINK(request(), club())).status).toBe(403);
+    expect(mocks.deleteUnusedClubFormLink).toHaveBeenCalledTimes(1);
+
+    mocks.requireClubLeaderViewer.mockRejectedValueOnce(new ClubFormError("FORBIDDEN", "Club forms are for the club's director and deputy."));
+    expect((await DELETE_LINK(request(), club())).status).toBe(403);
+
+    mocks.deleteUnusedClubFormLink.mockRejectedValueOnce(new ClubFormError("LINK_NOT_FOUND", "That link could not be found."));
+    expect((await DELETE_LINK(request(), club("club-a", "link-of-club-b"))).status).toBe(404);
+
+    mocks.deleteUnusedClubFormLink.mockRejectedValueOnce(new ClubFormError("LINK_HAS_ANSWERS", "This link already has a filled form."));
+    expect((await DELETE_LINK(request(), club())).status).toBe(409);
+  });
+
+  it("starts the new year for the club in the URL (#1323)", async () => {
+    mocks.startClubFormsYear.mockResolvedValue({ clubYear: "2026-27", alreadyStarted: false });
+    const request = () => new Request("https://events.imsda.test/x", { method: "POST" });
+    const response = await START_YEAR(request(), club("club-a"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, clubYear: "2026-27" });
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(mocks.startClubFormsYear).toHaveBeenCalledWith(leader, "club-a");
+
+    mocks.rejectCrossOriginRequest.mockReturnValueOnce(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+    expect((await START_YEAR(request(), club())).status).toBe(403);
+    expect(mocks.startClubFormsYear).toHaveBeenCalledTimes(1);
+
+    mocks.requireClubLeaderViewer.mockRejectedValueOnce(new ClubFormError("FORBIDDEN", "Club forms are for the club's director and deputy."));
+    expect((await START_YEAR(request(), club("club-b"))).status).toBe(403);
+    expect(mocks.startClubFormsYear).toHaveBeenCalledTimes(1);
   });
 
   it("saves a form for the club in the URL", async () => {

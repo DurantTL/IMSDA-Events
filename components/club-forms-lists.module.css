@@ -15,6 +15,5 @@
 .year { border-top: 1px solid var(--line, #d9dde3); padding-top: 4px; }
 .yearBody { display: grid; gap: 14px; padding-bottom: 8px; }
 .yearBody h4 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.startYear { display: grid; gap: 8px; justify-items: start; }
-.startYear h2 { margin: 0; }
-.startYear p { margin: 0; }
+.startYearHelp { margin: 4px 0 8px; }
+.focusTarget:focus { outline: none; }
