@@ -174,7 +174,7 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
 
 function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatusTotals[]; title: string; clubYear: string }) {
   return (
-    <table className={styles.table}>
+    <table className={`report-table ${styles.table}`}>
       <caption className="sr-only">{title}, {clubYear}: club counts for each month</caption>
       <thead>
         <tr>
@@ -198,7 +198,7 @@ function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatu
 
 function CoordinatorTable({ totals, title, clubYear }: { totals: readonly CoordinatorMonthTotals[]; title: string; clubYear: string }) {
   return (
-    <table className={styles.table}>
+    <table className={`report-table ${styles.table}`}>
       <caption className="sr-only">{title}, {clubYear}: club counts for each month</caption>
       <thead>
         <tr><th scope="col">Month</th><th scope="col">Clubs</th><th scope="col">Submitted</th><th scope="col">Not submitted</th><th scope="col">Not due yet</th></tr>
@@ -267,7 +267,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
       <details className={styles.details}>
         <summary className={styles.summary}>Show as a table</summary>
         <div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}>
-          <table className={styles.table}>
+          <table className={`report-table ${styles.table}`}>
             <caption className="sr-only">{title}, {clubYear}, highest total first</caption>
             <thead>
               <tr><th scope="col">Rank</th><th scope="col">Club</th><th scope="col">Report points</th><th scope="col">Yearly registration</th><th scope="col">Total</th></tr>
