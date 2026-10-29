@@ -8492,20 +8492,21 @@ a.calendar-year-day:hover { background: #eef3f6; }
   .calendar-week .calendar-day-number { width: 30px; height: 30px; font-size: 1rem; }
   .calendar-day .calendar-dots { display: none; }
   .calendar-bar {
-    position: relative; z-index: 1; display: flex; align-items: center; align-self: center; gap: 6px; min-width: 0; height: 20px; margin: 0 8px;
+    position: relative; z-index: 1; display: flex; align-items: center; align-self: center; flex-wrap: wrap; align-content: flex-start; gap: 0 6px; min-width: 0; height: 20px; margin: 0 8px;
     padding: 0 10px; overflow: hidden; border-left: 4px solid var(--cal-edge); border-radius: 8px; background: var(--cal-fill); color: var(--cal-ink);
-    font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap;
+    font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; line-height: 20px; text-decoration: none; white-space: nowrap;
     transition: filter 0.2s ease;
   }
   .calendar-bar.continues-before { margin-left: 0; border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-  .calendar-bar.continues-after { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .calendar-bar.continues-after { margin-right: 0; padding-right: 22px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .calendar-bar.calendar-tone-closure { border: 1px dashed var(--cal-edge); border-left: 4px dashed var(--cal-edge); background: repeating-linear-gradient(135deg, #fff4e8, #fff4e8 6px, #fde4cc 6px, #fde4cc 12px); }
   .calendar-bar.calendar-tone-closure.continues-before { border-left-width: 0; }
   .calendar-bar.calendar-status-cancelled .calendar-bar-title { text-decoration: line-through; }
   .calendar-bar-title { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .calendar-bar-dates { flex: 0 1 auto; min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; }
-  .calendar-bar-edge { flex: none; font-size: 1.15rem; line-height: 1; }
-  .calendar-bar-edge-end { margin-left: auto; }
+  /* Dates are shown whole or not at all (#1306): when they do not fit beside the title they wrap to a clipped second line instead of being squeezed. */
+  .calendar-bar-dates { flex: 0 0 auto; font-weight: 500; }
+  .calendar-bar-edge { flex: none; font-size: 1.15rem; line-height: 20px; }
+  .calendar-bar-edge-end { position: absolute; top: 0; right: 6px; }
   .calendar-bar svg { flex: none; }
   .calendar-bar:hover { filter: brightness(0.94); }
   .calendar-bar:focus-visible, .calendar-week > .calendar-more-link:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
