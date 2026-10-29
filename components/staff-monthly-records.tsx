@@ -31,7 +31,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           {view.picker.map((item) => (
             <li key={item.month}>
               <Link aria-current={item.month === view.month ? "true" : undefined} className={styles.monthLink} href={here({ month: item.month })} prefetch={false}>
-                <span>{item.short}<span className="sr-only"> {item.label.slice(-4)}:</span></span><small>{item.submitted}/{item.clubs}<span className="sr-only"> submitted</span></small>
+                <span>{item.short}</span><small>{item.submitted}/{item.clubs}<span className="sr-only"> submitted</span></small>
               </Link>
             </li>
           ))}
@@ -90,6 +90,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
                   <tr key={row.id} role="row">
                     <th className={styles.club} role="rowheader" scope="row" translate="no"><span className={styles.name}>{row.name}</span>{row.church && <small>{row.church}</small>}</th>
                     <td className={styles.status} role="cell">
+                      <span className="sr-only">{view.monthLabel} record: </span>
                       <span className={styles.badge} data-kind={row.kind}><span aria-hidden="true">{display.icon}</span> {display.word}</span>
                       {row.late && <span className={styles.late}>late</span>}
                     </td>
