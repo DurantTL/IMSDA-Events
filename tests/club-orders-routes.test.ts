@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   listPickList: vi.fn(),
   syncHonorOrderNeeds: vi.fn(),
   staffActing: vi.fn(),
+  crossOrigin: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -42,7 +43,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: () => mocks.staffActing() }));
-vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
+vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: (request: Request) => mocks.crossOrigin(request) }));
 vi.mock("@/modules/honors/order-source", () => ({ syncHonorOrderNeeds: mocks.syncHonorOrderNeeds }));
 vi.mock("@/modules/club-orders/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-orders/repository")>("@/modules/club-orders/repository");
@@ -325,6 +326,12 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
       expect(mocks.setOrderHonorLineQuantity).not.toHaveBeenCalled();
     });
 
+    it("refuses a cross-origin honor line write and writes nothing", async () => {
+      mocks.crossOrigin.mockReturnValueOnce(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx())).status).toBe(403);
+      expect(mocks.setOrderHonorLineQuantity).not.toHaveBeenCalled();
+    });
+
     it("maps an unknown honor to 404 and an inactive or now-linked honor to 409", async () => {
       mocks.setOrderHonorLineQuantity.mockRejectedValueOnce(new ClubOrderError("HONOR_NOT_FOUND", "Missing."));
       expect((await PUT_HONOR_LINE(putRequest({ quantity: 1 }), honorCtx())).status).toBe(404);
@@ -342,7 +349,7 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
       );
       mocks.listHelperLines.mockResolvedValue(lines);
       const list = parseCsvMatrix(await (await GET_CSV(new Request("https://events.imsda.test/x?view=list"), ctx())).text());
-      expect(list.find((row) => row[1] === "Archery")).toEqual(["Honors", "Archery", "", "", "5", "0", "", "5"]);
+      expect(list.find((row) => row[1] === "Archery")).toEqual(["Honors", "Archery", "", "", "5", "", "", "5"]);
       const all = parseCsvMatrix(await (await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx())).text());
       expect(all.find((row) => row[1] === "Archery")).toEqual(["Honors", "Archery", "", "", "5", "", "5"]);
     });

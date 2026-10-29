@@ -333,6 +333,8 @@ describe("honors with no catalog item on the order list (#1330)", () => {
     expect(block).toContain('aria-label="Add to list: Orienteering, quantity 2"');
     expect(block).not.toContain("Add to list: Archery");
     expect(block).toContain("On the list");
+    // Focus lands here after "Add to list" replaces the button.
+    expect(block).toMatch(/<span class="[^"]*" id="club-order-on-list-honor-arch" tabindex="-1">On the list<\/span>/i);
   });
 
   it("shows no Add to list button or picker to a viewer, and none for an honor that is not addable", () => {

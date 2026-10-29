@@ -202,7 +202,7 @@ describe("honors added by hand with no catalog item (#1330)", () => {
     const lines = buildHelperLines(items, new Map([["knots", 3]]), new Map(), new Map([["knots", 1]]), honorLines);
     const list = parseCsvMatrix(orderListCsv(header, lines));
     const listRow = list.find((row) => row[1] === "Archery")!;
-    expect(listRow).toEqual(["Honors", "Archery", "", "", "5", "0", "", "5"]);
+    expect(listRow).toEqual(["Honors", "Archery", "", "", "5", "", "", "5"]);
     const everything = parseCsvMatrix(orderEverythingCsv(lines));
     const row = everything.find((entry) => entry[1] === "Archery")!;
     expect(row).toEqual(["Honors", "Archery", "", "", "5", "", "5"]);

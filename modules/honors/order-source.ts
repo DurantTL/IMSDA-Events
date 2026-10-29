@@ -8,6 +8,7 @@ import {
   reconcileNeededNeeds,
   syncOrderNeeds,
 } from "@/modules/club-orders/repository";
+import { firstLinkedItemId } from "@/modules/club-orders/domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 
 /**
@@ -73,8 +74,10 @@ async function honorCompletionsForClub(organizationId: string, now: Date) {
     orderBy: { id: "asc" },
     select: { id: true, honorId: true },
   });
+  const itemsByHonor = new Map<string, Array<{ id: string }>>();
+  for (const item of items) if (item.honorId) itemsByHonor.set(item.honorId, [...(itemsByHonor.get(item.honorId) ?? []), { id: item.id }]);
   const itemByHonor = new Map<string, string>();
-  for (const item of items) if (item.honorId && !itemByHonor.has(item.honorId)) itemByHonor.set(item.honorId, item.id);
+  for (const [honorId, linked] of itemsByHonor) itemByHonor.set(honorId, firstLinkedItemId(linked)!);
   const candidates = completed.map((entry): NeedCandidate => ({
     sourceId: honorNeedSourceId(entry.personId, entry.honorId),
     personId: entry.personId,

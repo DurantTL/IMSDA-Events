@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
@@ -198,6 +198,7 @@ export function ClubOrderWorkspace({
   const [pickerItem, setPickerItem] = useState("");
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
+  const focusHonorId = useRef<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const base = ordersBase(organizationId);
@@ -241,6 +242,12 @@ export function ClubOrderWorkspace({
   const earlier = useMemo(() => data.waiting.filter((need) => need.sourceType === "HONOR" && need.beforeFirstOrder), [data.waiting]);
   // Shown only while the club hasn't edited the helper list or handed anything out here: a one-time cleanup, never in read-only mode.
   const showPrompt = !readOnly && !promptDismissed && earlier.length > 0 && !data.helper.some((line) => line.edited);
+  useEffect(() => {
+    const honorId = focusHonorId.current;
+    if (!honorId || !listedHonorIds.has(honorId)) return;
+    focusHonorId.current = null;
+    document.getElementById(`club-order-on-list-${honorId}`)?.focus();
+  }, [listedHonorIds]);
   const waitingBatches = data.batches.filter((batch) => batch.status === "ORDERED");
 
   function dismissPrompt() {
@@ -319,8 +326,10 @@ export function ClubOrderWorkspace({
   }
 
   /** "Honors to order separately": adds the honor with the number of members who completed it (#1330). */
-  function addHonorLine(honor: { honorId: string; name: string; members: number }) {
-    return setQuantity(`${HONOR_PICK_PREFIX}${honor.honorId}`, honor.members, `Added ${honor.name} to the list, quantity ${honor.members}.`);
+  async function addHonorLine(honor: { honorId: string; name: string; members: number }) {
+    // The button is replaced by "On the list" once saved, so focus moves there instead of falling to the page.
+    focusHonorId.current = honor.honorId;
+    if (!await setQuantity(`${HONOR_PICK_PREFIX}${honor.honorId}`, honor.members, `Added ${honor.name} to the list, quantity ${honor.members}.`)) focusHonorId.current = null;
   }
 
   function removeLine(line: HelperLine) {
@@ -513,7 +522,7 @@ export function ClubOrderWorkspace({
                       <li className={styles.unmatchedItem} key={honor.honorId ?? honor.name}>
                         <span><span translate="no">{honor.name}</span> · {honor.members} {honor.members === 1 ? "member" : "members"}</span>
                         {onTheList ? (
-                          <span className={styles.unmatchedState}>On the list</span>
+                          <span className={styles.unmatchedState} id={`club-order-on-list-${honor.honorId}`} tabIndex={-1}>On the list</span>
                         ) : canAdd && (
                           <button
                             aria-label={`Add to list: ${honor.name}, quantity ${honor.members}`}

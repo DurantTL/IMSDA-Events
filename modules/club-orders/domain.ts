@@ -240,6 +240,18 @@ export const helperLineKey = (line: Pick<HelperLine, "itemId" | "honorId">) => (
 /** An unlinked honor line has no stock tracking, so "Available" is not a number (#1330). */
 export const hasStockTracking = (line: Pick<HelperLine, "itemId">) => line.itemId !== null;
 
+/**
+ * The one rule for "this honor's catalog item" (#1330): the linked item with the
+ * lowest id, active or not. The honor need sync, the fold of by-hand honor lines
+ * into item lines, the write-time check and the list of addable honors all use
+ * it, so an honor is never both an item line and an honor line.
+ */
+export function firstLinkedItemId(items: ReadonlyArray<{ id: string }>): string | null {
+  let first: string | null = null;
+  for (const item of items) if (first === null || item.id < first) first = item.id;
+  return first;
+}
+
 /** A catalog-free honor a director added to the list by hand (#1330). */
 export type HonorOrderLine = { honorId: string; name: string; quantity: number };
 
@@ -339,7 +351,7 @@ export function orderListCsv(header: OrderExportHeader, lines: readonly HelperLi
   const active = activeHelperLines(lines);
   for (const section of ORDER_LIST_SECTIONS) {
     for (const line of active.filter((entry) => entry.section === section)) {
-      rows.push([orderListSectionLabels[section], line.name, line.size, line.catalogNumber ?? "", line.needed, line.computedNeeded, hasStockTracking(line) ? line.onHand : "", line.toOrder]);
+      rows.push([orderListSectionLabels[section], line.name, line.size, line.catalogNumber ?? "", line.needed, hasStockTracking(line) ? line.computedNeeded : "", hasStockTracking(line) ? line.onHand : "", line.toOrder]);
     }
   }
   return toCsv(rows);

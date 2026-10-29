@@ -10,6 +10,7 @@ import {
   quantityToOrder,
   sortNeedsOldestFirst,
   splitNeedsByStock,
+  firstLinkedItemId,
   honorIdFromNeedSourceId,
   type HelperCatalogItem,
   type HelperLine,
@@ -738,12 +739,12 @@ async function helperLinesFrom(organizationId: string, picture: NeededPicture): 
     select: {
       honorId: true,
       quantity: true,
-      honor: { select: { name: true, clubSupplyItems: { where: { isActive: true }, orderBy: { id: "asc" }, take: 1, select: { id: true } } } },
+      honor: { select: { name: true, clubSupplyItems: { select: { id: true } } } },
     },
   });
   const unlinkedHonors: HonorOrderLine[] = [];
   for (const row of honorRows) {
-    const linkedItemId = row.honor.clubSupplyItems[0]?.id;
+    const linkedItemId = firstLinkedItemId(row.honor.clubSupplyItems);
     if (!linkedItemId) {
       unlinkedHonors.push({ honorId: row.honorId, name: row.honor.name, quantity: row.quantity });
     } else if (!overrideByItem.has(linkedItemId)) {
@@ -788,6 +789,14 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
     if (!item || (!item.isActive && quantity !== null)) {
       throw new ClubOrderError("ITEM_NOT_ORDERABLE", "That catalog item could not be found.");
     }
+    // The item line takes over (#1330): a by-hand honor line folded into this item must not keep
+    // supplying the quantity after a Remove, Reset or Save, so it is cleared whenever the item is written.
+    const folded = await tx.clubOrderHonorLine.findMany({
+      where: { organizationId, honor: { clubSupplyItems: { some: { id: itemId } } } },
+      select: { id: true, honor: { select: { clubSupplyItems: { select: { id: true } } } } },
+    });
+    const foldedIds = folded.filter((row) => firstLinkedItemId(row.honor.clubSupplyItems) === itemId).map((row) => row.id);
+    if (foldedIds.length > 0) await tx.clubOrderHonorLine.deleteMany({ where: { id: { in: foldedIds }, organizationId } });
     if (quantity === null) {
       await tx.clubOrderListLine.deleteMany({ where: { organizationId, itemId } });
     } else {
@@ -812,7 +821,7 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
 /**
  * Sets the quantity for an honor with no catalog item on a club's helper list
  * (#1330): a positive number adds or changes the line, 0 or `null` removes it.
- * Only an active honor with no active catalog item can be added; one that has an
+ * Only an active honor with no catalog item (see `firstLinkedItemId`) can be added; one that has an
  * active catalog item is refused (the catalog item's own line is the one to use,
  * so a thing is never on the list twice). Removing is always allowed, so a line
  * left over from before the honor was linked can still be cleared. Audited with
@@ -827,7 +836,7 @@ export async function setOrderHonorLineQuantity(organizationId: string, honorId:
     } else {
       const honor = await tx.honor.findUnique({
         where: { id: honorId },
-        select: { isActive: true, clubSupplyItems: { where: { isActive: true }, take: 1, select: { id: true } } },
+        select: { isActive: true, clubSupplyItems: { take: 1, select: { id: true } } },
       });
       if (!honor) throw new ClubOrderError("HONOR_NOT_FOUND", "That honor could not be found.");
       if (!honor.isActive) throw new ClubOrderError("HONOR_NOT_ORDERABLE", "That honor is not available to add.");
@@ -855,12 +864,12 @@ export async function setOrderHonorLineQuantity(organizationId: string, honorId:
 export type OrderableHonor = { honorId: string; name: string };
 
 /**
- * Active honors with no active catalog item (#1330): the ones a director can
+ * Active honors with no catalog item (#1330): the ones a director can
  * add to the list by hand. Names and ids only.
  */
 export async function listOrderableUnlinkedHonors(): Promise<OrderableHonor[]> {
   const honors = await getPrisma().honor.findMany({
-    where: { isActive: true, clubSupplyItems: { none: { isActive: true } } },
+    where: { isActive: true, clubSupplyItems: { none: {} } },
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: { id: true, name: true },
   });

@@ -36,6 +36,7 @@ vi.mock("@/lib/prisma", () => {
   return { getPrisma: () => client };
 });
 
+import { firstLinkedItemId } from "@/modules/club-orders/domain";
 import { listHelperLines, listOrderableUnlinkedHonors, loadOrderExportHeader, ClubOrderError, setOrderHonorLineQuantity, setOrderListQuantity } from "@/modules/club-orders/repository";
 
 const actor = { accountId: "director-1" };
@@ -230,6 +231,34 @@ describe("listOrderableUnlinkedHonors (#1330)", () => {
   it("asks only for active honors with no active catalog item and returns names and ids only", async () => {
     mocks.honorFindMany.mockResolvedValue([{ id: "h1", name: "Archery" }]);
     await expect(listOrderableUnlinkedHonors()).resolves.toEqual([{ honorId: "h1", name: "Archery" }]);
-    expect(mocks.honorFindMany.mock.calls[0][0].where).toEqual({ isActive: true, clubSupplyItems: { none: { isActive: true } } });
+    expect(mocks.honorFindMany.mock.calls[0][0].where).toEqual({ isActive: true, clubSupplyItems: { none: {} } });
+  });
+});
+
+describe("an item write clears the by-hand honor line folded into it (#1330)", () => {
+  const folded = (id: string, itemIds: string[]) => ({ id, honor: { clubSupplyItems: itemIds.map((itemId) => ({ id: itemId })) } });
+
+  it.each([null, 0, 3])("quantity %s deletes the honor row whose chosen item is this one", async (quantity) => {
+    mocks.honorLineFindMany.mockResolvedValue([folded("hl1", ["knots"])]);
+    await setOrderListQuantity("club-1", "knots", quantity, actor);
+    expect(mocks.honorLineDeleteMany).toHaveBeenCalledWith({ where: { id: { in: ["hl1"] }, organizationId: "club-1" } });
+  });
+
+  it("leaves an honor row alone when the honor's chosen item (lowest id) is another one", async () => {
+    mocks.honorLineFindMany.mockResolvedValue([folded("hl1", ["aaa", "knots"])]);
+    await setOrderListQuantity("club-1", "knots", null, actor);
+    expect(mocks.honorLineDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("uses one rule for an honor's item: the lowest id, active or not", async () => {
+    expect(firstLinkedItemId([{ id: "b" }, { id: "a" }])).toBe("a");
+    expect(firstLinkedItemId([])).toBeNull();
+  });
+
+  it("an honor linked only to an inactive item folds into that item's line, with no second line", async () => {
+    mocks.honorLineFindMany.mockResolvedValue([{ honorId: "honor-old", quantity: 3, honor: { name: "Old Honor", clubSupplyItems: [{ id: "old-item" }] } }]);
+    mocks.itemFindMany.mockResolvedValue([{ id: "old-item", section: "MISCELLANEOUS", name: "Old Honor Patch", catalogNumber: "000999", sizeLabel: null }]);
+    const lines = await listHelperLines("club-1");
+    expect(lines.map((line) => [line.itemId, line.honorId, line.needed])).toEqual([["old-item", null, 3]]);
   });
 });
