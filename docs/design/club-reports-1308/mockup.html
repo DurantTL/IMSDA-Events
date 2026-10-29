@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club Reports Mockup</title>
+<!--
+  Design mockup for issue #1308 (Monthly Records and Points, less scrolling, with charts).
+  Static and self-contained: fictional clubs, generated in the page from a fixed seed.
+  Not application code. Open with ?view=records (default) or ?view=points; add &all=1 to expand the tables.
+-->
+<style>
+  :root {
+    --navy: #003b5c; --navy-2: #7fa6bd; --navy-soft: #e6eef3;
+    --ink: #243640; --muted: #536872; --line: #dce6ea; --paper: #f4f7f8; --card: #fff;
+    --danger: #8f3a30; --danger-soft: #fdf4f2; --amber: #7a5200; --amber-soft: #fff5d7;
+    --green: #267357; --green-soft: #e5f3ed; --gold: #f0b323;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 20px 24px 40px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #582c83; font-weight: 700; margin: 0; }
+  h1 { font-size: 26px; margin: 2px 0 14px; }
+  h2 { font-size: 18px; margin: 0; }
+  h3 { font-size: 15px; margin: 0; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); display: inline-flex; align-items: center; font-weight: 600; color: var(--navy); text-decoration: none; }
+  .tab[aria-current="page"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .toolbar { position: relative; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
+  .field { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+  select, .btn { min-height: 44px; border-radius: 10px; border: 1px solid #6f8591; background: #fff; font: inherit; padding: 0 12px; color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--navy); text-decoration: none; cursor: pointer; border-color: var(--line); }
+  .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .toolbar .spacer { flex: 1; }
+  /* Month picker: one row of months; replaces stacked month tables and the 12-column grid. */
+  .months { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .months a { min-width: 52px; min-height: 44px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600; background: #fff; line-height: 1.1; padding: 4px 6px; }
+  .months a small { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .months a[aria-current="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .months a[aria-current="true"] small { color: #d6e4ec; }
+  .months a[aria-disabled="true"] { color: #8a9aa3; background: var(--paper); }
+  .month-phone { display: none; }
+  /* Summary band */
+  .band { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; text-decoration: none; color: inherit; display: block; min-height: 44px; }
+  .tile .label { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .tile .value { font-size: 28px; font-weight: 700; line-height: 1.15; color: var(--ink); }
+  .tile .value small { font-size: 15px; color: var(--muted); font-weight: 600; }
+  .tile .note { font-size: 14px; color: var(--muted); }
+  .tile.attn { border-color: var(--danger-line, #e3b8b1); background: var(--danger-soft); }
+  .tile.attn .value { color: var(--danger); }
+  .tile.leader .value { font-size: 20px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; }
+  .card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--muted); margin: 4px 0 6px; padding: 0; list-style: none; }
+  .legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .sw.rev { background: var(--navy); } .sw.sub { background: var(--navy-2); }
+  .sw.miss { background: repeating-linear-gradient(135deg, #b9c7ce 0 2px, #fff 2px 5px); border: 1px solid #8a9aa3; }
+  .sw.reg { background: var(--navy-2); } .sw.rep { background: var(--navy); }
+  svg text { font: 12px "Noto Sans", system-ui, sans-serif; fill: var(--muted); }
+  svg .val { fill: var(--ink); font-weight: 600; }
+  svg .hit:hover + g rect, svg .col:hover rect.rev { opacity: .85; }
+  details.alt { margin-top: 8px; }
+  details.alt > summary, details.more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; color: var(--navy); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; padding: 8px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .club-name { font-weight: 600; }
+  .club-church { color: var(--muted); font-size: 13px; }
+  /* Status badges: icon shape + word, never colour alone */
+  .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .badge::before { font-size: 12px; }
+  .b-missing { background: var(--danger-soft); color: var(--danger); } .b-missing::before { content: "✕"; }
+  .b-review { background: var(--amber-soft); color: var(--amber); } .b-review::before { content: "●"; }
+  .b-reviewed { background: var(--green-soft); color: var(--green); } .b-reviewed::before { content: "✓"; }
+  .b-draft { background: var(--paper); color: var(--muted); border: 1px dashed #8a9aa3; } .b-draft::before { content: "✎"; }
+  .b-due { background: var(--paper); color: var(--muted); } .b-due::before { content: "◷"; }
+  .late { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  /* Year strip: 12 small cells replace 12 table columns */
+  .strip { display: inline-grid; grid-template-columns: repeat(12, 12px); gap: 2px; vertical-align: middle; }
+  .strip i { width: 12px; height: 16px; border-radius: 3px; display: block; }
+  .strip i.rev { background: var(--navy); } .strip i.sub { background: var(--navy-2); }
+  .strip i.miss { background: repeating-linear-gradient(135deg, #b9c7ce 0 2px, #fff 2px 5px); outline: 1px solid #8a9aa3; outline-offset: -1px; }
+  .strip i.draft { background: #fff; outline: 1px dashed #8a9aa3; outline-offset: -1px; }
+  .strip i.fut { background: var(--paper); }
+  .strip i.sel { box-shadow: 0 0 0 2px var(--gold); }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+  .chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; text-decoration: none; }
+  .chip[aria-pressed="true"] { background: var(--navy-soft); border-color: var(--navy); color: var(--navy); }
+  .showall { width: 100%; margin-top: 10px; justify-content: center; }
+  .row-link { color: var(--navy); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+  .note-box { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+  .callout { position: relative; }
+  .pin { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: #000; font-size: 12px; font-weight: 800; margin-right: 6px; vertical-align: 2px; }
+  .annot { position: absolute; top: -9px; left: -9px; z-index: 2; }
+  .annot .pin { margin: 0; }
+  .annot-off .pin { display: none; }
+  .search { display: flex; gap: 6px; }
+  .search input { min-height: 44px; border-radius: 10px; border: 1px solid #6f8591; padding: 0 12px; font: inherit; width: 220px; }
+
+  .pbars { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+  .pbars li { display: grid; grid-template-columns: 210px minmax(0, 1fr) 64px; align-items: center; gap: 10px; font-size: 14px; min-height: 24px; }
+  .pb-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-track { display: flex; gap: 2px; height: 12px; }
+  .pb-rep { background: var(--navy); border-radius: 2px 0 0 2px; } .pb-reg { background: var(--navy-2); border-radius: 0 3px 3px 0; }
+  .pb-val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pb-axis { display: flex; justify-content: space-between; margin: 6px 74px 0 220px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4px; }
+  /* Phone */
+  @media (max-width: 700px) {
+    .page { padding: 12px 16px 32px; }
+    h1 { font-size: 22px; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; }
+    .tab { justify-content: center; padding: 0 8px; font-size: 14px; }
+    .toolbar { padding: 10px; }
+    .toolbar .field, .toolbar select { width: 100%; }
+    .months { display: none; }
+    .month-phone { display: grid; grid-template-columns: 44px 1fr 44px; gap: 6px; width: 100%; }
+    .month-phone select { width: 100%; }
+    .month-phone .btn { justify-content: center; padding: 0; }
+    .toolbar .exports { width: 100%; }
+    .band { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tile { padding: 10px 12px; }
+    .tile .value { font-size: 24px; }
+    .grid2 { grid-template-columns: 1fr; }
+    .search input { width: 100%; } .search { width: 100%; }
+    /* Table rows become two-line list rows: name + badge, then strip + points */
+    table.list thead { display: none; }
+    table.list tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    table.list td { border: 0; padding: 0; }
+    table.list td.c-strip { grid-column: 1; }
+    table.list td.c-act { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+    table.list td.c-pts { display: none; }
+    table.list td.c-status { grid-column: 1; }
+    .pbars li { grid-template-columns: minmax(0, 1fr) 56px; gap: 2px 8px; }
+    .pb-name { grid-column: 1 / -1; }
+    .pb-axis { margin: 6px 64px 0 0; }
+    table.points-list tr { grid-template-columns: 28px 1fr auto; }
+    table.points-list td.c-rank { grid-row: 1 / span 2; }
+    table.points-list td.c-pts { display: block; text-align: right; }
+    table.points-list td.c-hide { display: none; }
+    table.points-list td.c-act { grid-column: 2 / span 2; grid-row: auto; }
+  }
+</style>
+</head>
+<body>
+<main class="page" id="app"></main>
+<script>
+// Fictional clubs, fixed seed: identical every render.
+const NAMES = ["Trailblazers","Eagles","Pioneers","Lighthouse Rangers","Mustangs","Prairie Falcons","River Otters","Timber Wolves","Northstar Navigators","Cedar Hawks","Sonbeams","Bluffs Explorers","Kingdom Kids","Harvest Hornets","Valley Voyagers","Summit Seekers","Golden Lions","Creekside Cubs","Ozark Owls","Heartland Herons","Maple Badgers","Sunrise Sparrows","Lakeside Loons","Ironwood Elk"];
+const TOWNS = ["Ames","Hillcrest","Maple Grove","Riverton","Oak Ridge","Fairview"];
+const MONTHS = ["Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"];
+const LONG = ["September 2025","October 2025","November 2025","December 2025","January 2026","February 2026","March 2026","April 2026","May 2026","June 2026","July 2026","August 2026"];
+let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+const params = new URLSearchParams(location.search);
+const view = params.get("view") || "records";
+const showAll = params.get("all") === "1";
+const annotate = params.get("pins") !== "0";
+const SEL = 9; // June 2026 selected in the mock (club year 2025-26, last month ended: August)
+const clubs = NAMES.map((n, i) => {
+  const rel = 0.45 + r() * 0.55;
+  const months = MONTHS.map((_, m) => {
+    if (r() > rel) return { st: m === 11 && r() < 0.5 ? "draft" : "miss" };
+    const pts = 225 + Math.round(r() * 27) * 5; const late = r() < 0.18;
+    return { st: m >= 9 && r() < 0.55 ? "sub" : (r() < 0.9 ? "rev" : "sub"), pts: late ? pts - 25 : pts, late };
+  });
+  const report = months.reduce((a, c) => a + (c.pts || 0), 0);
+  const reg = r() < 0.7 ? 1500 : 0;
+  return { name: `${n} Pathfinder Club`, church: `${TOWNS[i % 6]} Fictional Church`, months, report, reg, total: report + reg };
+});
+const statusOf = (c, m) => c.months[m].st;
+const BADGE = { miss: ["b-missing", "Missing"], sub: ["b-review", "To review"], rev: ["b-reviewed", "Reviewed"], draft: ["b-draft", "Draft"] };
+const STRIPWORD = { rev: "reviewed", sub: "submitted, not reviewed", miss: "missing", draft: "draft", fut: "not due yet" };
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const fmt = (n) => n.toLocaleString("en-US");
+const pin = (n) => annotate ? `<span class="pin" aria-hidden="true">${n}</span>` : "";
+
+function tabs() {
+  const t = [["directory","Club directory"],["records","Monthly Records"],["points","Points"],["events","Event participation"]];
+  return `<p class="eyebrow">Clubs · Club summary</p><h1>Club summary</h1>
+  <nav class="tabs" aria-label="Club summary views">${t.map(([k, l]) => `<a class="tab" href="?view=${k}" ${k === view ? 'aria-current="page"' : ""}>${l}</a>`).join("")}</nav>`;
+}
+
+function toolbar(withMonth) {
+  const counts = MONTHS.map((_, m) => clubs.filter((c) => ["sub","rev"].includes(statusOf(c, m))).length);
+  return `<form class="toolbar callout" onsubmit="return false">${annotate ? '<span class="annot"><span class="pin">1</span></span>' : ""}
+    <label class="field">Club year <select><option>2026-27</option><option selected>2025-26</option><option>2024-25</option></select></label>
+    ${withMonth ? `<div class="field" style="min-width:0"><span id="mlabel">Month</span>
+      <nav class="months" aria-labelledby="mlabel">${MONTHS.map((m, i) => `<a href="#" ${i === SEL ? 'aria-current="true"' : ""} aria-label="${LONG[i]}: ${counts[i]} of ${clubs.length} submitted">${m}<small>${counts[i]}/${clubs.length}</small></a>`).join("")}</nav>
+      <div class="month-phone"><button class="btn" aria-label="Previous month">‹</button><select aria-labelledby="mlabel">${LONG.map((l, i) => `<option ${i === SEL ? "selected" : ""}>${l} · ${counts[i]}/${clubs.length}</option>`).join("")}</select><button class="btn" aria-label="Next month">›</button></div></div>` : ""}
+    <span class="spacer"></span>
+    <details class="more exports"><summary>Export ▾</summary><a class="btn" href="#">Summary CSV</a> <a class="btn" href="#">Points CSV</a></details>
+  </form>`;
+}
+
+// ---------- Records ----------
+function recordsBand() {
+  const st = clubs.map((c) => statusOf(c, SEL));
+  const sub = st.filter((x) => x === "sub" || x === "rev").length;
+  const rev = st.filter((x) => x === "rev").length;
+  const toRev = st.filter((x) => x === "sub").length;
+  const miss = st.filter((x) => x === "miss").length;
+  const late = clubs.filter((c) => c.months[SEL].late).length;
+  return `<section class="band callout" aria-label="${LONG[SEL]} at a glance">${annotate ? '<span class="annot"><span class="pin">2</span></span>' : ""}
+    <a class="tile" href="#"><div class="label">Submitted</div><div class="value">${sub} <small>of ${clubs.length}</small></div><div class="note">${late} late</div></a>
+    <a class="tile" href="#"><div class="label">Reviewed</div><div class="value">${rev}</div><div class="note">${Math.round(rev / Math.max(sub, 1) * 100)}% of submitted</div></a>
+    <a class="tile attn" href="#"><div class="label">To review</div><div class="value">${toRev}</div><div class="note">Submitted, not reviewed</div></a>
+    <a class="tile attn" href="#"><div class="label">Missing</div><div class="value">${miss}</div><div class="note">Plus ${st.filter((x) => x === "draft").length} draft (not submitted)</div></a>
+  </section>`;
+}
+
+function trendChart() {
+  const W = Math.max(300, Math.min(460, (window.__cw || 460))), H = 210, L = 30, B = 26, T = 18, n = clubs.length;
+  const bw = (W - L - 8) / 12;
+  const y = (v) => T + (H - T - B) * (1 - v / n);
+  const rows = MONTHS.map((m, i) => {
+    const st = clubs.map((c) => statusOf(c, i));
+    return { m, rev: st.filter((x) => x === "rev").length, sub: st.filter((x) => x === "sub").length, miss: st.filter((x) => x === "miss" || x === "draft").length };
+  });
+  const grid = [0, 12, 24].map((v) => `<line x1="${L}" x2="${W - 4}" y1="${y(v)}" y2="${y(v)}" stroke="#dce6ea"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+  const cols = rows.map((d, i) => {
+    const x = L + i * bw + 3, w = bw - 6;
+    const yRev = y(d.rev), ySub = y(d.rev + d.sub), yMiss = y(d.rev + d.sub + d.miss);
+    const sel = i === SEL ? `<rect x="${x - 2}" y="${T - 4}" width="${w + 4}" height="${H - T - B + 6}" fill="none" stroke="#f0b323" stroke-width="2" rx="4"/>` : "";
+    return `<g class="col"><title>${LONG[i]}: ${d.rev} reviewed, ${d.sub} awaiting review, ${d.miss} not submitted</title>${sel}
+      <rect class="rev" x="${x}" y="${yRev}" width="${w}" height="${y(0) - yRev}" fill="#003b5c" rx="2"/>
+      <rect x="${x}" y="${ySub}" width="${w}" height="${Math.max(0, yRev - ySub - 2)}" fill="#7fa6bd" rx="2"/>
+      <rect x="${x}" y="${yMiss}" width="${w}" height="${Math.max(0, ySub - yMiss - 2)}" fill="url(#hatch)" stroke="#8a9aa3" rx="2"/>
+      <text x="${x + w / 2}" y="${H - 8}" text-anchor="middle" ${i === SEL ? 'class="val"' : ""}>${d.m}</text></g>`;
+  }).join("");
+  const table = `<table><thead><tr><th>Month</th><th class="num">Reviewed</th><th class="num">Awaiting review</th><th class="num">Not submitted</th></tr></thead><tbody>${rows.map((d, i) => `<tr><td>${LONG[i]}</td><td class="num">${d.rev}</td><td class="num">${d.sub}</td><td class="num">${d.miss}</td></tr>`).join("")}</tbody></table>`;
+  return `<section class="card callout" aria-labelledby="trend-h">${annotate ? '<span class="annot"><span class="pin">3</span></span>' : ""}
+    <div class="card-head"><h2 id="trend-h">Records by month, 2025-26</h2><span class="muted">${clubs.length} clubs</span></div>
+    <ul class="legend"><li><span class="sw rev"></span>Reviewed</li><li><span class="sw sub"></span>Submitted, not reviewed</li><li><span class="sw miss"></span>Not submitted (missing or draft)</li></ul>
+    <figure style="margin:0"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-labelledby="trend-h trend-d">
+      <desc id="trend-d">Stacked columns, one per month. Most months have 15 to 20 of 24 clubs submitted. The table below lists every number.</desc>
+      <defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#b9c7ce" stroke-width="2"/></pattern></defs>
+      ${grid}${cols}</svg></figure>
+    <details class="alt"><summary>Show as a table</summary>${table}</details>
+  </section>`;
+}
+
+function recordsTable() {
+  const needs = (c) => ["miss", "draft", "sub"].includes(statusOf(c, SEL));
+  const order = { miss: 0, draft: 1, sub: 2, rev: 3 };
+  const sorted = [...clubs].sort((a, b) => order[statusOf(a, SEL)] - order[statusOf(b, SEL)] || a.name.localeCompare(b.name));
+  const attn = sorted.filter(needs).length;
+  const list = showAll ? sorted : sorted.slice(0, 8);
+  const strip = (c) => `<span class="strip" role="img" aria-label="Year so far: ${c.months.map((x, i) => `${MONTHS[i]} ${STRIPWORD[x.st]}`).join(", ")}">${c.months.map((x, i) => `<i class="${x.st}${i === SEL ? " sel" : ""}"></i>`).join("")}</span>`;
+  const rows = list.map((c) => {
+    const x = c.months[SEL]; const [cls, word] = BADGE[x.st];
+    return `<tr><td><div class="club-name">${esc(c.name)}</div><div class="club-church">${esc(c.church)}</div></td>
+      <td class="c-status"><span class="badge ${cls}">${word}</span>${x.late ? '<span class="late">late</span>' : ""}</td>
+      <td class="num c-pts">${x.pts ? fmt(x.pts) : "—"}</td>
+      <td class="c-strip">${strip(c)}</td>
+      <td class="c-act"><a class="row-link" href="#">${x.st === "sub" ? "Review" : x.st === "rev" ? "Open" : "Club"} <span class="sr-only" style="position:absolute;left:-9999px">${esc(c.name)}</span>›</a></td></tr>`;
+  }).join("");
+  return `<section class="card callout" aria-labelledby="rec-h">${annotate ? '<span class="annot"><span class="pin">4</span></span>' : ""}
+    <div class="card-head"><h2 id="rec-h">Clubs, ${LONG[SEL]}</h2><span class="muted">Needs attention first</span></div>
+    <div class="filters" role="group" aria-label="Show"><a class="chip" aria-pressed="true" href="#">Needs attention (${attn})</a><a class="chip" aria-pressed="false" href="#">All clubs (${clubs.length})</a>
+      <span class="search"><input type="search" aria-label="Search clubs by name" placeholder="Search clubs"></span></div>
+    <table class="list"><thead><tr><th>Club</th><th>${MONTHS[SEL]} record</th><th class="num">Points</th><th>Year so far</th><th><span style="position:absolute;left:-9999px">Action</span></th></tr></thead><tbody>${rows}</tbody></table>
+    ${showAll ? "" : `<a class="btn showall" href="?view=records&all=1">Show all ${clubs.length} clubs</a>`}
+    <p class="note-box">Year so far: one square per month, Sep to Aug. Same key as the chart; a yellow outline marks ${MONTHS[SEL]}. The full 12-month grid stays in the Summary CSV and under "Full-year grid" below.</p>
+    <details class="more"><summary>Full-year grid and yearly totals</summary><p class="muted">(Today's 12-column table and the club details table, unchanged, collapsed.)</p></details>
+  </section>`;
+}
+
+// ---------- Points ----------
+function pointsBand() {
+  const by = [...clubs].sort((a, b) => b.total - a.total);
+  const median = by[Math.floor(by.length / 2)].total;
+  const onTime = clubs.filter((c) => c.reg).length;
+  const report = clubs.reduce((a, c) => a + c.report, 0);
+  return `<section class="band callout" aria-label="Points at a glance">${annotate ? '<span class="annot"><span class="pin">2</span></span>' : ""}
+    <div class="tile leader"><div class="label">Points leader</div><div class="value">${esc(by[0].name.replace(" Pathfinder Club", ""))}</div><div class="note">${fmt(by[0].total)} total points</div></div>
+    <div class="tile"><div class="label">Middle club</div><div class="value">${fmt(median)}</div><div class="note">Median total points</div></div>
+    <div class="tile"><div class="label">On-time yearly registration</div><div class="value">${onTime} <small>of ${clubs.length}</small></div><div class="note">1,500 points each</div></div>
+    <div class="tile"><div class="label">Report points, all clubs</div><div class="value">${fmt(report)}</div><div class="note">From submitted records</div></div>
+  </section>`;
+}
+
+function pointsChart() {
+  const by = [...clubs].sort((a, b) => b.total - a.total);
+  const list = showAll ? by : by.slice(0, 10);
+  const max = Math.ceil(by[0].total / 1000) * 1000;
+  const pct = (v) => (v / max * 100).toFixed(2) + "%";
+  const bars = list.map((c, i) => `<li title="${esc(c.name)}: ${fmt(c.report)} report points + ${fmt(c.reg)} yearly registration = ${fmt(c.total)}">
+      <span class="pb-name">${i + 1}. ${esc(c.name.replace(" Pathfinder Club", ""))}</span>
+      <span class="pb-track" aria-hidden="true"><span class="pb-rep" style="width:${pct(c.report)}"></span>${c.reg ? `<span class="pb-reg" style="width:${pct(c.reg)}"></span>` : ""}</span>
+      <span class="pb-val">${fmt(c.total)}<span class="sr-only" style="position:absolute;left:-9999px"> total: ${fmt(c.report)} report points${c.reg ? " plus 1,500 yearly registration" : ""}</span></span></li>`).join("");
+  return `<section class="card" aria-labelledby="pts-h">${annotate ? '<span class="annot"><span class="pin">3</span></span>' : ""}
+    <div class="card-head"><h2 id="pts-h">${showAll ? "All clubs" : "Top 10 clubs"} by total points, 2025-26</h2><span class="search"><input type="search" aria-label="Search clubs by name" placeholder="Search clubs"></span></div>
+    <ul class="legend"><li><span class="sw rep"></span>Report points</li><li><span class="sw reg"></span>Yearly registration (1,500)</li></ul>
+    <figure style="margin:0" aria-labelledby="pts-h"><ol class="pbars">${bars}</ol>
+      <div class="pb-axis" aria-hidden="true"><span>0</span><span>${fmt(max / 2)}</span><span>${fmt(max)}</span></div></figure>
+    ${showAll ? "" : `<a class="btn showall" href="?view=points&all=1">Show all ${clubs.length} clubs</a>`}
+    ${pointsTable()}
+  </section>`;
+}
+
+function pointsTable() {
+  const by = [...clubs].sort((a, b) => b.total - a.total);
+  const rows = by.map((c, i) => `<tr><td class="c-rank num">${i + 1}</td><td><div class="club-name">${esc(c.name)}</div></td>
+    <td class="num c-hide">${fmt(c.report)}</td><td class="num c-hide">${c.reg ? "1,500" : "—"}</td><td class="num c-pts"><strong>${fmt(c.total)}</strong></td>
+    <td class="c-act"><a class="row-link" href="#">Records (${c.months.filter((m) => m.pts).length}) ›</a></td></tr>`).join("");
+  return `<details class="alt" ${showAll ? "open" : ""}>${annotate ? "" : ""}<summary>${pin(4)}Ranking table, all ${clubs.length} clubs (table view of the chart)</summary>
+    <table class="list points-list"><thead><tr><th class="num">Rank</th><th>Club</th><th class="num">Report points</th><th class="num">Yearly registration</th><th class="num">Total</th><th>Supporting records</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note-box">"Records (n)" opens that club's record list instead of 12 month links in every row.</p>
+  </details>`;
+}
+
+const app = document.getElementById("app");
+if (view === "points") {
+  app.innerHTML = tabs() + toolbar(false) + pointsBand() + pointsChart();
+} else {
+  window.__cw = window.innerWidth <= 700 ? app.clientWidth - 62 : 460;
+  app.innerHTML = tabs() + toolbar(true) + recordsBand() + `<div class="grid2">${trendChart()}${recordsTable()}</div>`;
+}
+</script>
+</body>
+</html>
