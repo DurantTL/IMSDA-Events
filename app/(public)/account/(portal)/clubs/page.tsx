@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, UsersRound } from "lucide-react";
+import { UsersRound } from "lucide-react";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
-import { AreaClubSearch } from "@/components/area-clubs-views";
-import { filterClubsByNameChurchOrCity, parseClubQuery } from "@/modules/club-reports/area-summary-domain";
+import { PortalClubDirectory } from "@/components/portal-club-directory";
+import { portalClubDirectory } from "@/modules/club-rosters/portal-directory";
+import { parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInRedirectPath, twoStepRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { isAreaCoordinator, listClubsForArea } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
-import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +19,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-export default async function MyClubsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+export default async function MyClubsPage({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string | string[] }> }) {
   const { account } = await getCurrentAttendee();
   const acting = await currentStaffActingContext();
   if (!account && !acting) redirect(await attendeeSignInRedirectPath());
@@ -41,13 +40,15 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
   const [clubs, areaCoordinator] = ownAccount
     ? await Promise.all([listDirectedClubs(ownAccount.id), isAreaCoordinator(ownAccount.id)])
     : [[], false];
+  const params = await searchParams;
+  const query = parseClubQuery(params.q);
+  const page = Number(Array.isArray(params.page) ? params.page[0] : params.page ?? 1);
+  const own = new Map(clubs.map((club) => [club.organizationId, club.role]));
   if (areaCoordinator || acting?.role === "AREA_COORDINATOR") {
     // An Area Coordinator sees every club (#387): their own open as usual;
     // the rest open view only.
-    const own = new Map(clubs.map((club) => [club.organizationId, club]));
-    const query = parseClubQuery((await searchParams).q);
     const everyClub = await listClubsForArea();
-    const allClubs = filterClubsByNameChurchOrCity(everyClub, query);
+    const directory = portalClubDirectory(everyClub, own, query, page);
     return (
       <>
         <CoordinatorShellHeader>
@@ -61,31 +62,7 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
         <div className="account-page-body">
           <section className="public-manage-card">
             <p className="field-help">Every active club. Clubs you don&apos;t run open view only, with ages instead of birth dates.</p>
-            <AreaClubSearch basePath="/account/clubs" label="Search by club, church or city" query={query} shown={allClubs.length} total={everyClub.length} />
-            {allClubs.length === 0 && <p className="public-manage-empty">{query ? `No club, church or city matches “${query}”.` : "No active clubs yet."}</p>}
-            <ul className="public-manage-club-list">
-              {allClubs.map((club) => {
-                const mine = own.get(club.organizationId);
-                return (
-                  <li key={club.organizationId}>
-                    <UsersRound size={17} aria-hidden="true" />
-                    <span>
-                      <strong translate="no">{club.name}</strong>
-                      <small>
-                        {mine ? clubDirectorRoleLabels[mine.role] : "View only"}
-                        {club.sponsoringChurch && <> · <span translate="no">{club.sponsoringChurch}</span></>}
-                      </small>
-                    </span>
-                    <Link
-                      className={`${mine ? "primary-button" : "secondary-button"} club-event-action`}
-                      href={mine ? `/account/clubs/${club.organizationId}` : `/account/area/${club.organizationId}`}
-                    >
-                      Open <ArrowRight size={14} aria-hidden="true" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <PortalClubDirectory slice={directory} query={query} total={everyClub.length} />
           </section>
         </div>
       </>
@@ -110,23 +87,7 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
               office adds club directors.
             </p>
           ) : (
-            <ul className="public-manage-club-list">
-              {clubs.map((club) => (
-                <li key={club.organizationId}>
-                  <UsersRound size={17} aria-hidden="true" />
-                  <span>
-                    <strong translate="no">{club.name}</strong>
-                    <small>
-                      {clubDirectorRoleLabels[club.role]}
-                      {club.sponsoringChurch && <> · <span translate="no">{club.sponsoringChurch}</span></>}
-                    </small>
-                  </span>
-                  <Link className="primary-button club-event-action" href={`/account/clubs/${club.organizationId}`}>
-                    Open <ArrowRight size={14} aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <PortalClubDirectory slice={portalClubDirectory(clubs, own, query, page)} query={query} total={clubs.length} searchLabel="Search by club or church" />
           )}
         </section>
       </div>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { LayoutDashboard, ShieldCheck } from "lucide-react";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import type { AccountSignOutMode, WorkspaceContext } from "@/modules/access/workspace-contexts";

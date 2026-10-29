@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import { filterClubsByName, eventHeadcount, eventStatusLabels, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
 import { eventCardDates, registrationAnchorId, registrationMoneySummary, registrationStateLabel, registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";

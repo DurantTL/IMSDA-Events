@@ -1,4 +1,6 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
+import { AccountContent } from "@/components/account-content";
+import { AccountWorkspaceMenu } from "@/components/account-workspace-menu";
 import { redirect } from "next/navigation";
 import { AccountHeaderActions } from "@/components/account-header-actions";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
@@ -80,15 +82,23 @@ export default async function AccountPortalLayout({ children }: { children: Reac
       : []),
     // Area Coordinators see every club (#387), so the tab is just "Clubs".
     ...(areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/clubs", label: "Clubs", matchChildren: true, alsoMatchPrefix: "/account/area" }]
+      ? [{ href: "/account/clubs", label: "Clubs", matchChildren: true, alsoMatchPrefix: "/account/area/" }]
       : clubs.length > 0 || actingAsDirector
         ? [{ href: "/account/clubs", label: clubs.length === 1 || actingAsDirector ? "My club" : "My clubs", matchChildren: true }]
         : []),
+    ...(areaCoordinator || actingAsAreaCoordinator
+      ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: "/account/area-clubs/" }]
+      : []),
     // An Area Coordinator sees the clubs waitlisted at the locations they coordinate (#599).
     ...(areaCoordinator ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
     // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
     { href: "/account/help", label: "Help", matchChildren: true },
   ];
+  // A separate attendee cookie must not add personal or coordinator destinations to a director act-as menu.
+  const workspaceMenuItems = acting
+    ? items.filter((item) => item.href === "/account/clubs" || item.href === "/account/help"
+      || (actingAsAreaCoordinator && item.href === "/account/area-clubs/overview"))
+    : items;
 
   return (
     <main className="public-registration-page public-manage-page account-portal">
@@ -109,7 +119,8 @@ export default async function AccountPortalLayout({ children }: { children: Reac
       <ActAsBanner acting={acting} inAccount />
       <AccountSectionNav items={items} label="Your account" />
       {chromeAccount && <AccountAnnouncementBanner accountId={chromeAccount.id} announcements={bannerAnnouncements} />}
-      {children}
+      <AccountWorkspaceMenu items={workspaceMenuItems} />
+      <AccountContent>{children}</AccountContent>
     </main>
   );
 }

@@ -13,7 +13,7 @@ export function workspacePageKey(pathname: string | null, search: { get(name: st
 }
 
 /** Same content element as the shell, never keyed/remounted. Opacity leaves dialogs, focus and layout in place. */
-export function WorkspaceContent({ pageKey, children }: { pageKey: string; children: ReactNode }) {
+export function WorkspaceContent({ pageKey, children, className = "workspace-content", id = "workspace-content" }: { pageKey: string; children: ReactNode; className?: string; id?: string }) {
   const element = useRef<HTMLDivElement>(null);
   const previousPage = useRef(pageKey);
 
@@ -47,5 +47,5 @@ export function WorkspaceContent({ pageKey, children }: { pageKey: string; child
     };
   }, [pageKey]);
 
-  return <div className="workspace-content" id="workspace-content" ref={element}>{children}</div>;
+  return <div className={className} id={id} ref={element}>{children}</div>;
 }

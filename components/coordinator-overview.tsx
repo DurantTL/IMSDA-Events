@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { Download } from "lucide-react";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";

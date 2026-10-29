@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { NavigationLink } from "@/components/navigation-link";
 import { ArrowLeft } from "lucide-react";
 
@@ -19,7 +18,7 @@ export function BackLink({
   variant?: "portal" | "staff";
 }) {
   const className = variant === "staff" ? "secondary-button more-back-link" : "text-button back-link";
-  const ParentLink = variant === "staff" ? NavigationLink : Link;
+  const ParentLink = NavigationLink;
   return (
     <ParentLink className={className} href={href}>
       <ArrowLeft aria-hidden="true" size={14} /> {children}

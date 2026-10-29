@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { ArrowRight, MapPinned } from "lucide-react";
 import { NeedsAttention } from "@/components/needs-attention";
 import { areaCardLinks } from "@/modules/club-reports/area-card-domain";

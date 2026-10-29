@@ -63,7 +63,7 @@
  *   MOBILE_LAYOUT_BASE_URL  default http://localhost:3000
  *   MOBILE_LAYOUT_OUT_DIR   screenshots and report.json are saved here (default: a temp dir)
  *   MOBILE_LAYOUT_WIDTHS    comma list of widths (default 360,390,768,1024)
- *   MOBILE_LAYOUT_ONLY      run only the pages whose name contains this text
+ *   MOBILE_LAYOUT_ONLY      run pages whose name contains any comma-separated text
  *   MOBILE_LAYOUT_BROWSER   path to a Chromium executable (default: Playwright's)
  *   MOBILE_LAYOUT_NO_SHOTS  set to 1 to skip the screenshots
  *   MOBILE_LAYOUT_CLEANUP   set to 1 to delete every `mobilecheck` row it created when the run ends
@@ -177,7 +177,7 @@ type PageSpec = {
   /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
   prepare?: (page: Page, width: number) => Promise<void>;
   /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
-  flow?: "general-link" | "pending-teams" | "workspace-navigation";
+  flow?: "general-link" | "pending-teams" | "workspace-navigation" | "portal-navigation";
 };
 
 const staff = (name: string, route: string, role: Role = "event-admin"): PageSpec => ({
@@ -233,7 +233,7 @@ const pages: PageSpec[] = [
   { name: "public-event-page-no-banner", path: "/events/womens-retreat-2026", role: "visitor" },
   // Club portal (a director of two clubs).
   { name: "account-overview", path: "/account", role: "director" },
-  { name: "account-overview-attendee", path: "/account", role: "attendee" },
+  { name: "account-overview-attendee", path: "/account", role: "attendee", flow: "portal-navigation" },
   { name: "account-registrations", path: "/account/registrations", role: "director" },
   { name: "account-profile", path: "/account/profile", role: "director" },
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
@@ -251,7 +251,7 @@ const pages: PageSpec[] = [
   { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
   { name: "account-help-area", path: "/account/help", role: "area" },
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
-  club("home", ""),
+  { ...club("home", ""), flow: "portal-navigation" },
   club("roster", "/roster"),
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
   { ...club("home-past-year", `?year=${previousClubYear}`), expectText: /read-only/i },
@@ -281,7 +281,8 @@ const pages: PageSpec[] = [
   club("forms", "/forms"),
   club("health", "/health"),
   // Area Coordinator.
-  area("overview", "/account/area-clubs/overview"),
+  { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
+  area("all-clubs", "/account/clubs"),
   area("events", "/account/area-clubs/events"),
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
@@ -3734,6 +3735,57 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
   }
 }
 
+/** Attendee links stay reachable from club/coordinator pages, and real transitions retain the account surface (#1302). */
+async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: number) {
+  const before = page.url();
+  try {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.evaluate(() => {
+      const surface = document.getElementById("account-content")!;
+      surface.dataset.portalAudit = "0";
+      const animate = surface.animate.bind(surface);
+      surface.animate = (frames, options) => {
+        surface.dataset.portalAudit = String(Number(surface.dataset.portalAudit) + 1);
+        return animate(frames, options);
+      };
+    });
+    const menu = page.locator(".account-workspace-menu:visible");
+    if (await menu.count()) {
+      await menu.locator("summary").click();
+      const fit = await page.evaluate(() => {
+        const nav = document.querySelector(".account-workspace-menu nav")!;
+        const box = nav.getBoundingClientRect();
+        return box.left >= 0 && box.right <= innerWidth && Array.from(nav.querySelectorAll("a")).every((link) => link.getBoundingClientRect().height >= 44);
+      });
+      if (!fit) throw new Error("Account destinations overflow or have undersized touch targets");
+      for (const href of ["/account/registrations", "/account/profile", "/account/help"]) {
+        if (!(await menu.locator(`a[href="${href}"]`).count())) throw new Error(`Missing account destination ${href}`);
+      }
+      await page.keyboard.press("Escape");
+      if (await menu.locator("details").getAttribute("open") !== null) throw new Error("Escape did not close the account menu");
+      await menu.locator("summary").click();
+      await menu.locator('a[href="/account/registrations"]').click();
+    } else {
+      await page.locator('.account-nav-primary a[href="/account/registrations"]').click();
+    }
+    await page.waitForURL(`${baseUrl}/account/registrations`, { timeout: 30_000 });
+    await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading]'), undefined, { timeout: 30_000 });
+    await page.waitForFunction(() => Number(document.getElementById("account-content")?.dataset.portalAudit) > 0, undefined, { timeout: 5000 });
+    const arrivals = await page.locator("#account-content").getAttribute("data-portal-audit");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goBack();
+    await page.waitForURL(before, { timeout: 30_000 });
+    await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading]'), undefined, { timeout: 30_000 });
+    if (await page.locator("#account-content").getAttribute("data-portal-audit") !== arrivals) throw new Error("Back remounted the account surface or animated under reduced motion");
+    console.log(`  portal  ${spec.name} @${width}: account destinations, navigation, Back and reduced motion passed`);
+  } catch (error) {
+    record("audit-failed", `${spec.name} (portal navigation)`, width, (error as Error).message.split("\n")[0] ?? "failed");
+  } finally {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(before, { waitUntil: "load" });
+  }
+}
+
 /** Waits for the shell's "Loading IMSDA Events…" fallback to go away (#996); true when it did. */
 async function waitForShell(page: Page) {
   return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMSDA Events/.test(document.body.innerText), undefined, { timeout: 20_000 })
@@ -4257,6 +4309,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   if (spec.flow === "general-link") await auditGeneralLinkFlow(page, spec, width, prefix);
   if (spec.flow === "pending-teams") await auditPendingTeamsFlow(page, spec, width, prefix);
   if (spec.flow === "workspace-navigation") await auditWorkspaceNavigationFlow(page, spec, width);
+  if (spec.flow === "portal-navigation") await auditPortalNavigationFlow(page, spec, width);
   pagesVisited.push(`${spec.name}@${width}`);
 }
 
@@ -4307,7 +4360,7 @@ async function main() {
     for (const width of widths) {
       const height = heightFor(width);
       for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen", "station"] as Role[]) {
-        const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
+        const specs = pages.filter((spec) => spec.role === role && (!only || only.split(",").some((part) => spec.name.includes(part.trim()))));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({
           viewport: { width, height },

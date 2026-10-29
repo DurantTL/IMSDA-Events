@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ArrowRight, CircleAlert, CircleDollarSign, CircleHelp, GraduationCap, Inbox, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";

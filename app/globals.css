@@ -10277,6 +10277,23 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 }
 
 
+/* Account context remains reachable when a club or coordinator masthead replaces the attendee tabs (#1302). */
+.account-content { min-width: 0; }
+.account-workspace-menu { display: none; position: relative; z-index: 40; width: min(1180px, calc(100% - 24px)); margin: 8px auto; }
+.account-portal:has(.club-shell, .coordinator-shell) > .account-workspace-menu { display: flex; justify-content: flex-end; }
+.account-workspace-menu details { position: relative; }
+.account-workspace-menu summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--imsda-navy); font-size: 0.95rem; font-weight: 700; cursor: pointer; list-style: none; }
+.account-workspace-menu summary::-webkit-details-marker { display: none; }
+.account-workspace-menu details[open] > summary { background: var(--imsda-navy-soft); }
+.account-workspace-menu nav { position: absolute; top: calc(100% + 4px); right: 0; width: 18rem; max-width: calc(100vw - 24px); padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 12px 28px rgb(0 44 69 / 18%); }
+.account-workspace-menu ul { margin: 0; padding: 0; list-style: none; }
+.account-workspace-menu a { display: flex; align-items: center; min-height: 44px; padding: 10px 12px; border-radius: 8px; color: var(--imsda-navy); font-size: 1rem; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.account-workspace-menu a[aria-current] { background: var(--imsda-navy-soft); box-shadow: inset 3px 0 var(--imsda-purple); }
+.account-workspace-menu a:hover { background: var(--imsda-navy-soft); }
+.account-workspace-menu :is(a, summary):focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
+.account-portal :is(.account-nav a, .club-primary-nav a, .club-more-button, .account-workspace-menu summary) { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
+@media print { .account-workspace-menu { display: none !important; } }
+
 /* Club shell (#1165): Club portal masthead, navy club banner and the Home / Roster / Forms / Club events / More bar. On club
    pages the shell's own masthead replaces the account header and the account tabs (My account stays a link in the masthead). */
 .account-portal:has(.club-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
@@ -10285,7 +10302,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
 .club-masthead-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 8px 0; }
 .club-masthead-brand { display: inline-flex; min-height: 44px; align-items: center; gap: 12px; color: var(--imsda-navy); text-decoration: none; }
-.club-masthead-brand > span:last-child { display: grid; line-height: 1.2; }
+.club-masthead-brand > span:not(.brand-mark):not([data-navigation-pending]) { display: grid; line-height: 1.2; }
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
 .club-masthead-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 12px; min-width: 0; }
@@ -13135,22 +13152,22 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
 /* Staff navigation and page arrival (#1300): no layout movement, extra requests or artificial waits. */
-.app-shell :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle) {
   transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
 }
 
-.app-shell :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active:not(:disabled):not([aria-disabled="true"]) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(1px);
 }
 
 /* The live region takes no space. The link's own background draws a thin, indeterminate cue. */
-.app-shell [data-navigation-pending] {
+:is(.app-shell, .account-portal) [data-navigation-pending] {
   /* A clipped absolute span must not inherit the offscreen position of a scrollable tab. */
   top: 0;
   left: 0;
 }
 
-.app-shell a:has(> [data-navigation-pending="true"]) {
+:is(.app-shell, .account-portal) a:has(> [data-navigation-pending="true"]) {
   cursor: progress;
   background-image: linear-gradient(90deg, transparent, currentColor, transparent);
   background-repeat: no-repeat;
@@ -13164,7 +13181,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   to { background-position-x: 200%; }
 }
 
-.app-shell .workspace-loading-label {
+:is(.app-shell, .account-portal) .workspace-loading-label {
   margin: 0;
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
@@ -13172,8 +13189,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .app-shell .content-skeleton { animation: staff-loading-arrive 120ms ease-out both; }
-  .app-shell .content-skeleton-bar { animation-duration: 1.8s; }
+  :is(.app-shell, .account-portal) .content-skeleton { animation: staff-loading-arrive 120ms ease-out both; }
+  :is(.app-shell, .account-portal) .content-skeleton-bar { animation-duration: 1.8s; }
 }
 
 @keyframes staff-loading-arrive {
@@ -13182,12 +13199,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-shell a:has(> [data-navigation-pending="true"]) {
+  :is(.app-shell, .account-portal) a:has(> [data-navigation-pending="true"]) {
     animation: none;
     background-size: 100% 2px;
     background-position: center calc(100% - 2px);
   }
-  .app-shell :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active { transform: none; }
+  :is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active { transform: none; }
 }
 
 /* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
