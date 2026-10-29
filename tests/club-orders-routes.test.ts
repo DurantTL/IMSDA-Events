@@ -62,7 +62,8 @@ import { PUT as PUT_LINE } from "@/app/api/attendee/clubs/[organizationId]/order
 import { POST as POST_AWARD } from "@/app/api/attendee/clubs/[organizationId]/orders/award/route";
 import { POST as POST_ALREADY } from "@/app/api/attendee/clubs/[organizationId]/orders/already-awarded/route";
 import { GET as GET_CSV } from "@/app/api/attendee/clubs/[organizationId]/orders/csv/route";
-import { buildHelperLines } from "@/modules/club-orders/domain";
+import { activeHelperLines, buildHelperLines } from "@/modules/club-orders/domain";
+import { parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { ClubOrderError } from "@/modules/club-orders/repository";
 
 const clubFor = (organizationId: string, role: string) => ({ organizationId, name: "Test Pathfinders", role, sponsoringChurch: null });
@@ -234,6 +235,59 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
     expect(text.indexOf("Uniforms")).toBeLessThan(text.indexOf("Honors"));
     // An editor's download syncs first.
     expect(mocks.syncHonorOrderNeeds).toHaveBeenCalledWith("club-1");
+  });
+
+  it("the combined export has one row per item, in the screen's order, with the same quantities and to-order totals (#1324)", async () => {
+    const lines = buildHelperLines(
+      [
+        { itemId: "h1", section: "OUTDOOR_INDUSTRIES", name: "Knot Tying", catalogNumber: "002120", sizeLabel: null },
+        { itemId: "u1", section: "CLASS_A_DRESS_APPAREL", name: "Boys' Shirt (Size 8)", catalogNumber: "011112", sizeLabel: "Size 8" },
+        { itemId: "o1", section: "MISCELLANEOUS", name: "Good Conduct Star", catalogNumber: null, sizeLabel: null },
+        { itemId: "h2", section: "RECREATION", name: "Camping Skills I", catalogNumber: "000450", sizeLabel: null },
+      ],
+      new Map([["h1", 3], ["u1", 2], ["h2", 1]]),
+      new Map([["o1", 4], ["h2", 0]]),
+      new Map([["h1", 1]]),
+    );
+    mocks.listHelperLines.mockResolvedValue(lines);
+    const response = await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("order-everything.csv");
+    const rows = parseCsvMatrix(await response.text());
+    expect(rows[0]).toEqual(["Section", "Item name", "Item number", "Size", "Quantity", "Available", "To order"]);
+    expect(rows.slice(1)).toEqual([
+      ["Uniforms", "Boys' Shirt", "011112", "Size 8", "2", "0", "2"],
+      ["Honors", "Knot Tying", "002120", "", "3", "1", "2"],
+      ["Other supplies and insignia", "Good Conduct Star", "", "", "4", "0", "4"],
+    ]);
+    // Same on-screen lines (taken-off ones are left out) and the same total.
+    const onScreen = activeHelperLines(lines);
+    expect(rows.length - 1).toBe(onScreen.length);
+    expect(rows.slice(1).reduce((sum, row) => sum + Number(row[6]), 0)).toBe(onScreen.reduce((sum, line) => sum + line.toOrder, 0));
+    expect(mocks.syncHonorOrderNeeds).toHaveBeenCalledWith("club-1");
+  });
+
+  it("the combined export is refused like the other exports: Area Coordinator 404, signed-out 401, registrar read-only without syncing (#1324)", async () => {
+    mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", "REGISTRAR")]);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx())).status).toBe(200);
+    expect(mocks.syncHonorOrderNeeds).not.toHaveBeenCalled();
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx("club-2"))).status).toBe(404);
+    mocks.listDirectedClubs.mockResolvedValue([]);
+    mocks.findAreaGrant.mockResolvedValue({ revokedAt: null, expiresAt: null });
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx())).status).toBe(404);
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.findAreaGrant.mockResolvedValue(null);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx())).status).toBe(401);
+  });
+
+  it("adding an honor by hand is the same line edit: a director adds it, a registrar and another club's director can't (#1324)", async () => {
+    expect((await PUT_LINE(putRequest({ quantity: 3 }), lineCtx("club-1", "honor-item-1"))).status).toBe(200);
+    expect(mocks.setOrderListQuantity).toHaveBeenCalledWith("club-1", "honor-item-1", 3, { accountId: "director-1" });
+    mocks.setOrderListQuantity.mockClear();
+    expect((await PUT_LINE(putRequest({ quantity: 3 }), lineCtx("club-2", "honor-item-1"))).status).toBe(404);
+    mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", "REGISTRAR")]);
+    expect((await PUT_LINE(putRequest({ quantity: 3 }), lineCtx("club-1", "honor-item-1"))).status).toBe(403);
+    expect(mocks.setOrderListQuantity).not.toHaveBeenCalled();
   });
 
   it("refuses the retired AdventSource and readable exports, and an unknown view, with 400", async () => {

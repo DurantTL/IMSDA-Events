@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   activeHelperLines,
   buildHelperLines,
+  formatSizeLabel,
+  groupUnmatchedByHonor,
+  orderEverythingCsv,
   orderListCsv,
   orderListSectionFor,
   type HelperCatalogItem,
@@ -142,5 +145,36 @@ describe("clubOrderListQuantitySchema (#654)", () => {
 
   it.each([{ quantity: -1 }, { quantity: 2.5 }, { quantity: 10_001 }, { quantity: "2" }, {}])("refuses %j", (body) => {
     expect(clubOrderListQuantitySchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe("combined export, size label and unmatched honors (#1324)", () => {
+  it("formatSizeLabel never doubles the word Size", () => {
+    expect(formatSizeLabel("Size 28")).toBe("Size 28");
+    expect(formatSizeLabel("size 8")).toBe("size 8");
+    expect(formatSizeLabel("M")).toBe("Size M");
+    expect(formatSizeLabel("")).toBe("");
+  });
+
+  it("groupUnmatchedByHonor counts members per honor, sorted by name, with no names of people", () => {
+    expect(groupUnmatchedByHonor([
+      { sourceLabel: "Orienteering" }, { sourceLabel: "Archery" }, { sourceLabel: "Orienteering" }, { sourceLabel: "" },
+    ])).toEqual([
+      { name: "Archery", members: 1 },
+      { name: "Orienteering", members: 2 },
+      { name: "Unnamed honor", members: 1 },
+    ]);
+    expect(groupUnmatchedByHonor([])).toEqual([]);
+  });
+
+  it("orderEverythingCsv matches the list's active lines and totals", () => {
+    const lines = buildHelperLines(items, new Map([["shirt-m", 2], ["knots", 3], ["star", 4], ["camping", 1]]), new Map([["camping", 0]]), new Map([["knots", 1]]));
+    const rows = parseCsvMatrix(orderEverythingCsv(lines));
+    const active = activeHelperLines(lines);
+    expect(rows[0]).toEqual(["Section", "Item name", "Item number", "Size", "Quantity", "Available", "To order"]);
+    expect(rows).toHaveLength(active.length + 1);
+    expect(rows.slice(1).map((row) => row[1])).toEqual(active.map((line) => line.name));
+    expect(rows.slice(1).reduce((sum, row) => sum + Number(row[6]), 0)).toBe(active.reduce((sum, line) => sum + line.toOrder, 0));
+    expect(rows.some((row) => row[1] === "Camping Skills I")).toBe(false);
   });
 });

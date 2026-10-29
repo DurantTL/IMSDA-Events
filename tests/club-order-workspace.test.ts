@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ADVENTSOURCE_URL, ClubOrderWorkspace, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
+import { ADVENTSOURCE_URL, ClubOrderWorkspace, filterPickerItems, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
 /**
@@ -21,7 +21,7 @@ const data: ClubOrderWorkspaceData = {
     { itemId: "i3", section: "HONORS", name: "Orienteering", size: "", catalogNumber: "005200", computedNeeded: 2, needed: 0, edited: true, onHand: 0, toOrder: 0 },
   ],
   batches: [{ id: "b1", status: "ORDERED", createdAt: "2026-08-20T15:00:00.000Z", receivedAt: null, itemCount: 1, totalQuantity: 4, lines: [] }],
-  unmatched: [{ sourceId: "s1", personId: "p1" }],
+  unmatched: [{ sourceId: "s1", personId: "p1", sourceLabel: "Orienteering" }, { sourceId: "s2", personId: "p2", sourceLabel: "Orienteering" }, { sourceId: "s3", personId: "p3", sourceLabel: "Archery" }],
   awardable: [
     { needId: "n1", itemId: "i1", itemName: "Camping Skills", firstName: "Alex", lastName: "Sample", fromStock: false },
     { needId: "n2", itemId: "i1", itemName: "Camping Skills", firstName: "Jordan", lastName: "Example", fromStock: true },
@@ -38,7 +38,7 @@ const clean: ClubOrderWorkspaceData = { ...data, helper: data.helper.map((line) 
 
 const stock: ClubStockRow[] = [
   { itemId: "i1", section: "OUTDOOR_INDUSTRIES", name: "Camping Skills", catalogNumber: "005157", sizeLabel: null, isActive: true, quantityOnHand: 1 },
-  { itemId: "x1", section: "MISCELLANEOUS", name: "Knot Tying Patch", catalogNumber: "002120", sizeLabel: null, isActive: true, quantityOnHand: 0 },
+  { itemId: "x1", section: "MISCELLANEOUS", name: "Knot Tying Patch", catalogNumber: "002120", sizeLabel: null, isActive: true, quantityOnHand: 0, honorName: "Knots and Lashings" },
 ];
 
 const render = (readOnly: boolean, initial = data) => renderToStaticMarkup(
@@ -76,9 +76,10 @@ describe("ClubOrderWorkspace (#654)", () => {
     expect(render(false, { ...data, batches: [] })).not.toContain("Mark received");
   });
 
-  it("shows the calculated count next to a quantity that differs from it, and explains Available", () => {
+  it("says in plain words what honors and uniform needs suggested next to a changed quantity, and explains Available", () => {
     const html = render(false);
-    expect(html).toContain("calculated: 2");
+    expect(html).toContain("Suggested from honors and uniform needs: 2");
+    expect(html).not.toContain("calculated:");
     expect(html).toContain("Available = in stock minus items set aside for someone.");
     expect(html).not.toContain("On hand</dt>");
   });
@@ -149,6 +150,59 @@ describe("ClubOrderWorkspace (#654)", () => {
       expect(html).toContain("No item number");
       expect(html).toContain("no matching catalog item");
     }
+  });
+
+  it("shows a size once, even when the catalog label already says Size (#1324)", () => {
+    const withSize: ClubOrderWorkspaceData = {
+      ...data,
+      helper: [
+        { itemId: "u8", section: "UNIFORMS", name: "Girls' Skirt", size: "Size 28", catalogNumber: "011200", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
+        { itemId: "u9", section: "UNIFORMS", name: "Girls' Blouse", size: "M", catalogNumber: "011201", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
+      ],
+    };
+    const html = render(false, withSize);
+    expect(html).not.toContain("Size Size");
+    expect(html).toContain("Size 28 · ");
+    expect(html).toContain("Size M · ");
+  });
+
+  it("names the honors with no catalog item, with member counts only, in a collapsible list (#1324)", () => {
+    for (const readOnly of [false, true]) {
+      const html = render(readOnly);
+      expect(html).toContain("Conference staff can link the honor in the supply catalog.");
+      expect(html).toContain("3 completed honors have no matching catalog item");
+      expect(html).toMatch(/<details[^>]*>\s*<summary>Honors to order separately \(2\)<\/summary>/);
+      expect(html).toContain("Archery</span> · 1 member<");
+      expect(html).toContain("Orienteering</span> · 2 members<");
+      const block = html.slice(html.indexOf('id="club-order-unmatched"'), html.indexOf("</details>"));
+      expect(block).not.toMatch(/Alex|Jordan|Riley|Drew|p1|p2|p3/);
+    }
+    expect(render(false, { ...data, unmatched: [] })).not.toContain("no matching catalog item");
+  });
+
+  it("offers Export everything (CSV) next to the list export, and not when the list is empty (#1324)", () => {
+    expect(render(false)).toContain("/api/attendee/clubs/club-1/orders/csv?view=all");
+    expect(render(true)).toContain("Export everything (CSV)");
+    expect(render(false, { ...data, helper: [], awardable: [] })).not.toContain("view=all");
+  });
+
+  it("lets a director search honors by name in the picker, and a viewer gets no picker (#1324)", () => {
+    const html = render(false);
+    expect(html).toContain("Search honors and items");
+    expect(html).toContain("Knot Tying Patch · 002120 · honor: Knots and Lashings");
+    expect(render(true)).not.toContain("Search honors and items");
+  });
+
+  it("the picker keeps an item whose linked honor name matches the search and drops a non-match (#1324)", () => {
+    expect(filterPickerItems(stock, new Set(), "lashings").map((row) => row.itemId)).toEqual(["x1"]);
+    expect(filterPickerItems(stock, new Set(), "lashings").map((row) => row.itemId)).not.toContain("i1");
+    expect(filterPickerItems(stock, new Set(["x1"]), "lashings")).toEqual([]);
+  });
+
+  it("keeps the unmatched sentence as the only live region, with the list outside it (#1324)", () => {
+    const html = render(false);
+    expect(html).toMatch(/<p role="status">3 completed honors/);
+    expect(html).not.toContain('id="club-order-unmatched" role="status"');
   });
 
   it("offers the list export (CSV and printable) and the pick list", () => {

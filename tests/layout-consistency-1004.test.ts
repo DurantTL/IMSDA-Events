@@ -66,7 +66,7 @@ describe("orders (#1004 item 7)", () => {
   const data: ClubOrderWorkspaceData = {
     helper: [],
     batches: [],
-    unmatched: [{ sourceId: "s1", personId: "p1" }],
+    unmatched: [{ sourceId: "s1", personId: "p1", sourceLabel: "Orienteering" }],
     awardable: [],
     waiting: Array.from({ length: 3 }, (_, index) => ({
       needId: `n${index}`, sourceType: "HONOR" as const, itemName: "Camping Skills", sourceLabel: "Camping Skills", sourceDate: "2025-05-01",
