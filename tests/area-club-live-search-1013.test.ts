@@ -51,7 +51,7 @@ describe("AreaClubSearch markup (#1013)", () => {
 describe("one announcement per search (#1013 review)", () => {
   it("leaves the club list's empty text out of the live region, so only the search status speaks", async () => {
     const { readFileSync } = await import("node:fs");
-    const page = readFileSync("app/(public)/account/(portal)/clubs/page.tsx", "utf8");
+    const page = readFileSync("components/portal-club-directory.tsx", "utf8");
     expect(page).toContain('<p className="public-manage-empty">{query ? `No club, church or city matches');
     expect(page).not.toMatch(/public-manage-empty" role="status">\{query \?/);
   });

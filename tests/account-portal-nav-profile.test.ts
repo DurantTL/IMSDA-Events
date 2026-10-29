@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/account",
+  useSearchParams: () => new URLSearchParams(),
   redirect: (path: string) => {
     throw new Error(`REDIRECT ${path}`);
   },

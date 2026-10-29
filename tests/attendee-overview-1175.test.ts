@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/account",
+  useSearchParams: () => new URLSearchParams(),
   redirect: (path: string) => {
     throw new Error(`REDIRECT ${path}`);
   },
@@ -284,6 +286,32 @@ describe("account header and tabs (#1175)", () => {
     mocks.clubs = [{ organizationId: "club-1", name: "Synthetic Club", role: "DIRECTOR" }];
     renderToStaticMarkup(await AccountPortalLayout({ children: null }));
     expect(mocks.navItems.map((item) => item.label)).toEqual(["Overview", "My registrations", "Profile", "My club", "Help"]);
+  });
+
+  it("offers the coordinator overview and keeps attendee destinations in the workspace menu", async () => {
+    mocks.areaCoordinator = true;
+    const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    expect(mocks.navItems).toContainEqual(expect.objectContaining({ href: "/account/area-clubs/overview", label: "Club coordination" }));
+    const menu = html.slice(html.indexOf('class="account-workspace-menu"'));
+    for (const path of ["/account/registrations", "/account/profile", "/account/help", "/account/area-clubs/overview"]) expect(menu).toContain(`href="${path}"`);
+  });
+
+  it("does not expose personal attendee destinations in the act-as workspace menu", async () => {
+    mocks.acting = { role: "AREA_COORDINATOR" };
+    const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    const menu = html.slice(html.indexOf('class="account-workspace-menu"'));
+    for (const path of ["/account", "/account/registrations", "/account/profile"]) expect(menu).not.toContain(`href="${path}"`);
+    expect(menu).toContain('href="/account/area-clubs/overview"');
+  });
+
+  it("does not add a separate attendee cookie's coordinator tools to a director act-as menu", async () => {
+    mocks.acting = { role: "CLUB_DIRECTOR" };
+    mocks.areaCoordinator = true;
+    const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
+    const menu = html.slice(html.indexOf('class="account-workspace-menu"'));
+    expect(menu).toContain('href="/account/clubs"');
+    expect(menu).not.toContain('href="/account/waitlists"');
+    expect(menu).not.toContain('href="/account/area-clubs/overview"');
   });
 
   it("shows no attendee name while a staff member is acting as a club role, even with an attendee cookie present", async () => {

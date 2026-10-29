@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { ArrowRight, FileText } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import {

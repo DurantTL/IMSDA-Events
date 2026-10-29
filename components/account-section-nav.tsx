@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { usePathname } from "next/navigation";
 import { useId, useLayoutEffect, useRef } from "react";
+import { isAccountNavItemActive } from "@/components/account-nav-model";
+export { isAccountNavItemActive } from "@/components/account-nav-model";
 
 export type AccountNavItem = {
   href: string;
@@ -37,11 +39,6 @@ export function arrowFocusTarget({ focused, fadeStart, fadeEnd }: { focused: "st
 /** Room kept clear on a scrolled edge of the tab row for its arrow button and fade (px); the CSS scroll-padding matches it. */
 const SCROLL_CLEARANCE = 46;
 
-export function isAccountNavItemActive(pathname: string, item: AccountNavItem) {
-  if (pathname === item.href) return true;
-  if (item.alsoMatchPrefix && pathname.startsWith(item.alsoMatchPrefix)) return true;
-  return Boolean(item.matchChildren) && pathname.startsWith(`${item.href}/`);
-}
 
 /**
  * Tabs across the attendee and club-director pages. On a phone the row

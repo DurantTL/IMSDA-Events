@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
 import { systemRoleText } from "@/modules/access/role-descriptions";

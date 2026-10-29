@@ -115,7 +115,13 @@ async function main() {
   // Everyone else's class, a missing class, a non-instructor: the same 404, by page and API, reading and marking.
   for (const [who, cookie, offeringId] of [["Ina on Ben's class", ina, o2.id], ["Ina on a missing class", ina, "nope"], ["a non-instructor", other, o1.id]] as const) {
     assert.equal((await call(api(offeringId), cookie)).status, 404, `${who}: roster API`);
-    assert.equal((await call(page(offeringId), cookie)).status, 404, `${who}: roster page`);
+    const deniedPage = await call(page(offeringId), cookie);
+    const deniedHtml = await deniedPage.text();
+    assert.equal(deniedPage.status, 404, `${who}: roster page`);
+    noSecrets(deniedHtml, `${who}: denied roster page`);
+    for (const name of ["Kidone", "Kidtwo", "Kidthree"]) {
+      assert.ok(!deniedHtml.includes(name), `${who}: denied page contains a roster name`);
+    }
     assert.equal((await call(`${api(offeringId)}/marks`, cookie, { method: "POST", body: JSON.stringify({ action: "ALL_COMPLETED" }) })).status, 404, `${who}: marks API`);
   }
   assert.equal(await prisma.honorEnrollment.count({ where: { eventId, instructorMark: { isNot: null } } }), 0, "no refused call marked anyone");
