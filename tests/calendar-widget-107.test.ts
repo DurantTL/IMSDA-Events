@@ -191,6 +191,17 @@ describe("embedded calendar page (#107)", () => {
     for (const text of ["7:00 PM Saturday", "Saturday Hall", "6:00 PM Friday", "Friday Hall"]) expect(html).not.toContain(text);
   });
 
+  it("never shows a cancelled linked item as a live event card", async () => {
+    listPublicCalendarItems.mockResolvedValue([
+      item({ key: "c", kind: "EVENT", href: "/events/synthetic-retreat", eventTitle: "Synthetic Retreat", eventStartsOn: "2026-11-20", eventEndsOn: "2026-11-22", title: "Retreat session", startsOn: "2026-11-20", endsOn: "2026-11-20", status: "CANCELLED", registrationOpen: true }),
+    ]);
+    const { default: Page } = await import("@/app/(public)/embed/calendar/page");
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ filter: "everything" }) }));
+    expect(html).toContain('data-status="cancelled"');
+    expect(html).toContain("Cancelled");
+    expect(html).not.toContain("Register");
+  });
+
   it("shows an empty state", async () => {
     listPublicCalendarItems.mockResolvedValue([]);
     const { default: Page } = await import("@/app/(public)/embed/calendar/page");

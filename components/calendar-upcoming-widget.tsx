@@ -34,9 +34,9 @@ export function CalendarUpcomingWidget({ items, calendarHref, emptyLabel }: { it
             const statusLine = calendarItemStatusLine(item);
             const managed = item.kind === "EVENT";
             // A card that shows the event's own name and dates (#1086) stands for the whole event, so one linked item's
-            // time, place and status (say, one postponed session) must not speak for it.
+            // time, place and status (say, one postponed session) must not speak for it. A cancelled item stays cancelled.
             const wholeEvent = item.eventTitle !== undefined;
-            const status = wholeEvent ? "SCHEDULED" : item.status;
+            const status = wholeEvent && item.status !== "CANCELLED" ? "SCHEDULED" : item.status;
             return (
               <li className={`${styles.item} ${managed ? styles.managed : styles.informational}${status === "CANCELLED" ? ` ${styles.off}` : ""}`} data-status={status.toLowerCase()} key={item.key}>
                 <div className={styles.tags}>
