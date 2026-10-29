@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { calendarFilterGroups } from "@/modules/calendar/filter-groups";
 import styles from "./calendar-widget-embed.module.css";
 
 /** The upcoming-events widget's embed code for staff (#107): read-only, with a copy button. */
@@ -30,7 +31,7 @@ export function CalendarWidgetEmbed({ code }: { code: string }) {
         Paste this block into a website&apos;s Custom HTML area to show the next five public events. It only appears on
         allow-listed sites (imsda.org and its subdomains by default). To change what it shows, add <code>?filter=camps</code>,
         {" "}<code>?limit=8</code> (1 to 12), or both as <code>?filter=camps&amp;limit=8</code> to the end of the
-        {" "}<code>/embed/calendar</code> address in the code. Filters: main, club, pathfinders, adventurers, camps, ministries, schools, meetings, closed, everything.
+        {" "}<code>/embed/calendar</code> address in the code. Filters: {calendarFilterGroups.map((group) => group.slug).join(", ")}.
       </p>
       <label className="sr-only" htmlFor="calendar-widget-embed-code">Upcoming events embed code</label>
       <textarea className={styles.code} id="calendar-widget-embed-code" readOnly rows={6} value={code} />

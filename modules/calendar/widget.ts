@@ -50,7 +50,7 @@ export function selectWidgetItems(items: CalendarItem[], options: WidgetOptions)
   const upcoming = items.filter((item) => shownEnd(item) >= options.today);
   const filtered = filterByCategory(filterByGroup(upcoming, slug), category);
   const ordered = [...filtered].sort((a, b) =>
-    shownStart(a).localeCompare(shownStart(b)) || shownEnd(a).localeCompare(shownEnd(b)) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+    shownStart(a).localeCompare(shownStart(b)) || shownEnd(a).localeCompare(shownEnd(b)) || a.startsOn.localeCompare(b.startsOn) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
   const seenEvents = new Set<string>();
   const onePerEvent = ordered.filter((item) => {
     if (item.kind !== "EVENT" || !item.href) return true;

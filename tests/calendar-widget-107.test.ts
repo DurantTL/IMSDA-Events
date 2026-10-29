@@ -171,9 +171,24 @@ describe("embedded calendar page (#107)", () => {
     expect(html).toContain("Join the waitlist");
     expect(html).toContain("Postponed");
     const lis = html.split("<li ").slice(1);
-    const struck = (title: string) => /_off_|off/.test(lis.find((li) => li.includes(title))!.split(">")[0]);
-    expect(struck("Synthetic Cancelled Entry")).toBe(true);
-    expect(struck("Synthetic Moved Event")).toBe(false);
+    const statusOf = (title: string) => /data-status="(\w+)"/.exec(lis.find((li) => li.includes(title))!)![1];
+    expect(statusOf("Synthetic Cancelled Entry")).toBe("cancelled");
+    expect(statusOf("Synthetic Moved Event")).toBe("postponed");
+  });
+
+  it("lets a linked event's card speak for the whole event, not one linked item", async () => {
+    const linked = { kind: "EVENT" as const, href: "/events/synthetic-convention", eventTitle: "Synthetic Convention", eventStartsOn: "2026-11-20", eventEndsOn: "2026-11-22" };
+    listPublicCalendarItems.mockResolvedValue([
+      // Alphabetically first and later in time: it must not be the surviving card, and its details must not show anyway.
+      item({ key: "a", ...linked, title: "A Saturday session", startsOn: "2026-11-22", endsOn: "2026-11-22", status: "POSTPONED", timeLabel: "7:00 PM Saturday", location: "Saturday Hall" }),
+      item({ key: "b", ...linked, title: "B Friday session", startsOn: "2026-11-20", endsOn: "2026-11-20", timeLabel: "6:00 PM Friday", location: "Friday Hall" }),
+    ]);
+    const { default: Page } = await import("@/app/(public)/embed/calendar/page");
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ filter: "everything" }) }));
+    expect(html.match(/<li /g)).toHaveLength(1);
+    expect(html).toContain("Synthetic Convention");
+    expect(html).not.toContain("Postponed");
+    for (const text of ["7:00 PM Saturday", "Saturday Hall", "6:00 PM Friday", "Friday Hall"]) expect(html).not.toContain(text);
   });
 
   it("shows an empty state", async () => {
