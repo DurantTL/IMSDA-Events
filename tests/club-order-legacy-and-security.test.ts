@@ -1,3 +1,5 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -43,6 +45,7 @@ vi.mock("@/modules/club-supplies/access", () => ({ requireClubSupplyEditAccess: 
 
 import { PUT } from "@/app/api/attendee/clubs/[organizationId]/orders/lines/[itemId]/route";
 import ClubOrderListPrintPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/orders/print/page";
+import { buildHelperLines } from "@/modules/club-orders/domain";
 import { markOrderBatchReceived } from "@/modules/club-orders/repository";
 
 beforeEach(() => {
@@ -117,5 +120,14 @@ describe("the printable order list (#654)", () => {
     }
     expect(mocks.listHelperLines).not.toHaveBeenCalled();
     expect(mocks.loadOrderExportHeader).not.toHaveBeenCalled();
+  });
+
+  it("lists an honor with no catalog item (#1330): its name, an empty item number, a dash for Available, and To order equal to the quantity", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN" });
+    mocks.loadOrderExportHeader.mockResolvedValue({ clubName: "Test Pathfinders", church: "Sample Church", directorName: "Test Director", directorEmail: "director@example.test", directorPhone: "(515) 555-0100", date: "2026-10-29" });
+    mocks.listHelperLines.mockResolvedValue(buildHelperLines([], new Map(), new Map(), new Map(), [{ honorId: "honor-1", name: "Archery", quantity: 5 }]));
+    const page = await ClubOrderListPrintPage({ params: Promise.resolve({ organizationId: "club-1" }) });
+    const html = renderToStaticMarkup(createElement("div", null, page));
+    expect(html).toContain("<td translate=\"no\">Archery</td><td></td><td></td><td>5</td><td>—</td><td>5</td>");
   });
 });

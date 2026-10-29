@@ -4,6 +4,9 @@ import {
   buildHelperLines,
   formatSizeLabel,
   groupUnmatchedByHonor,
+  honorIdFromNeedSourceId,
+  hasStockTracking,
+  helperLineKey,
   orderEverythingCsv,
   orderListCsv,
   orderListSectionFor,
@@ -160,9 +163,9 @@ describe("combined export, size label and unmatched honors (#1324)", () => {
     expect(groupUnmatchedByHonor([
       { sourceLabel: "Orienteering" }, { sourceLabel: "Archery" }, { sourceLabel: "Orienteering" }, { sourceLabel: "" },
     ])).toEqual([
-      { name: "Archery", members: 1 },
-      { name: "Orienteering", members: 2 },
-      { name: "Unnamed honor", members: 1 },
+      { name: "Archery", members: 1, honorId: null },
+      { name: "Orienteering", members: 2, honorId: null },
+      { name: "Unnamed honor", members: 1, honorId: null },
     ]);
     expect(groupUnmatchedByHonor([])).toEqual([]);
   });
@@ -176,5 +179,49 @@ describe("combined export, size label and unmatched honors (#1324)", () => {
     expect(rows.slice(1).map((row) => row[1])).toEqual(active.map((line) => line.name));
     expect(rows.slice(1).reduce((sum, row) => sum + Number(row[6]), 0)).toBe(active.reduce((sum, line) => sum + line.toOrder, 0));
     expect(rows.some((row) => row[1] === "Camping Skills I")).toBe(false);
+  });
+});
+
+describe("honors added by hand with no catalog item (#1330)", () => {
+  const honorLines = [{ honorId: "honor-arch", name: "Archery", quantity: 5 }];
+
+  it("become Honors lines with no item number, no stock and To order equal to the quantity", () => {
+    const lines = buildHelperLines(items, new Map([["knots", 3]]), new Map(), new Map([["knots", 1]]), honorLines);
+    const archery = lines.find((line) => line.honorId === "honor-arch")!;
+    expect(archery).toMatchObject({ itemId: null, section: "HONORS", name: "Archery", size: "", catalogNumber: null, computedNeeded: 0, needed: 5, edited: true, onHand: 0, toOrder: 5 });
+    expect(hasStockTracking(archery)).toBe(false);
+    expect(hasStockTracking(lines.find((line) => line.itemId === "knots")!)).toBe(true);
+    expect(helperLineKey(archery)).toBe("honor:honor-arch");
+    expect(helperLineKey(lines.find((line) => line.itemId === "knots")!)).toBe("item:knots");
+    // Sorted among the other Honors lines by name.
+    const honors = lines.filter((line) => line.section === "HONORS").map((line) => line.name);
+    expect(honors).toEqual([...honors].sort((a, b) => a.localeCompare(b)));
+  });
+
+  it("appear in both CSVs with an empty item number and an empty Available cell, and count in the to-order total", () => {
+    const lines = buildHelperLines(items, new Map([["knots", 3]]), new Map(), new Map([["knots", 1]]), honorLines);
+    const list = parseCsvMatrix(orderListCsv(header, lines));
+    const listRow = list.find((row) => row[1] === "Archery")!;
+    expect(listRow).toEqual(["Honors", "Archery", "", "", "5", "", "", "5"]);
+    const everything = parseCsvMatrix(orderEverythingCsv(lines));
+    const row = everything.find((entry) => entry[1] === "Archery")!;
+    expect(row).toEqual(["Honors", "Archery", "", "", "5", "", "5"]);
+    expect(everything.slice(1).reduce((sum, entry) => sum + Number(entry[6]), 0)).toBe(activeHelperLines(lines).reduce((sum, line) => sum + line.toOrder, 0));
+  });
+
+  it("a honor name that starts like a formula is neutralised in the CSV", () => {
+    const lines = buildHelperLines([], new Map(), new Map(), new Map(), [{ honorId: "h", name: "=SUM(A1)", quantity: 1 }]);
+    expect(parseCsvMatrix(orderEverythingCsv(lines))[1][1]).not.toMatch(/^=/);
+  });
+
+  it("groupUnmatchedByHonor carries the honor id so a group can be added, and the id comes from the need's source id", () => {
+    expect(honorIdFromNeedSourceId("person-1:honor-9")).toBe("honor-9");
+    expect(honorIdFromNeedSourceId("garbage")).toBeNull();
+    expect(groupUnmatchedByHonor([
+      { sourceLabel: "Archery", honorId: "h1" }, { sourceLabel: "Archery", honorId: "h1" }, { sourceLabel: "Archery", honorId: "h2" },
+    ])).toEqual([
+      { name: "Archery", members: 2, honorId: "h1" },
+      { name: "Archery", members: 1, honorId: "h2" },
+    ]);
   });
 });

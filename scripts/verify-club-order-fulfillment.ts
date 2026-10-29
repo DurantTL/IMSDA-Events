@@ -82,6 +82,7 @@ async function cleanup() {
   await prisma.clubSupplyOrderLine.deleteMany({ where: { batchId: { in: batches.map((row) => row.id) } } });
   await prisma.clubSupplyOrderBatch.deleteMany({ where: { organizationId: startsWithP } });
   await prisma.clubSupplyStock.deleteMany({ where: { organizationId: startsWithP } });
+  await prisma.clubOrderHonorLine.deleteMany({ where: { organizationId: startsWithP } });
   await prisma.clubSupplyItem.deleteMany({ where: { id: startsWithP } });
   await prisma.memberHonorEntry.deleteMany({ where: { organizationId: startsWithP } });
   await prisma.honor.deleteMany({ where: { id: startsWithP } });
@@ -140,6 +141,7 @@ async function main() {
     createOrderBatch,
     getOrderBatch,
     listAwardableNeeds,
+    listHelperLines,
     listOrderBatches,
     listOrderList,
     listPickList,
@@ -147,6 +149,8 @@ async function main() {
     markNeedsAlreadyAwarded,
     markNeedsAwarded,
     markOrderBatchReceived,
+    setOrderHonorLineQuantity,
+    setOrderListQuantity,
   } = await import("../modules/club-orders/repository");
   const { removeRosterMember } = await import("../modules/club-rosters/repository");
   const { adventSourceOrderCsv, applyExtras, readableOrderCsv } = await import("../modules/club-orders/domain");
@@ -512,6 +516,22 @@ async function main() {
   const beforeLink = await listOrderList(clubs.link);
   assert(beforeLink.unmatched.length === 3 && beforeLink.lines.length === 0, "with no catalog item yet, the needs are unmatched");
   await expectCode(createOrderBatch(clubs.link, {}, actor), "NOTHING_TO_ORDER", "nothing orderable before the honor is linked");
+  // #1330: an honor with no catalog item can be added to the helper list by hand, with no stock and To order = quantity.
+  const handLines = await loadOrderWorkspace(clubs.link);
+  assert(handLines.unmatched.every((need) => need.honorId === honors.late), "an unmatched honor need carries its honor id");
+  await setOrderHonorLineQuantity(clubs.link, honors.late, 4, actor);
+  const byHand = (await loadOrderWorkspace(clubs.link)).helper;
+  assert(byHand.length === 1 && byHand[0].itemId === null && byHand[0].honorId === honors.late && byHand[0].name === "Birds" && byHand[0].catalogNumber === null && byHand[0].needed === 4 && byHand[0].toOrder === 4,
+    `an honor with no catalog item is a helper line with To order = quantity, got ${JSON.stringify(byHand)}`);
+  await setOrderHonorLineQuantity(clubs.link, honors.late, 6, actor);
+  assert((await listHelperLines(clubs.link))[0].needed === 6, "changing the quantity updates the one line");
+  assert(await prisma.clubOrderHonorLine.count({ where: { organizationId: clubs.link } }) === 1, "one row per club and honor");
+  await expectCode(setOrderHonorLineQuantity(clubs.link, `${P}_no_such_honor`, 1, actor), "HONOR_NOT_FOUND", "an unknown honor");
+  await expectCode(setOrderHonorLineQuantity(clubs.link, honors.linked, 1, actor), "HONOR_HAS_CATALOG_ITEM", "an honor with an active catalog item");
+  const honorAudit = await prisma.auditLog.findMany({ where: { action: "CLUB_ORDER_HONOR_LINE_SET", metadata: { path: ["organizationId"], equals: clubs.link } }, select: { metadata: true } });
+  assert(honorAudit.length === 2 && honorAudit.every((row) => !JSON.stringify(row.metadata).includes("Linklater")), "honor line writes are audited with ids and numbers only");
+  console.log("ok  an honor with no catalog item can be added by hand: no item number or stock, To order = quantity, audited, one row per honor");
+
   const itemA = `${P}_item_late_a`;
   const itemB = `${P}_item_late_b`;
   await prisma.clubSupplyItem.create({ data: { id: itemA, section: "OUTDOOR_INDUSTRIES", name: "Birds (A)", normalizedName: `${P} birds a`, catalogNumber: "006601", honorId: honors.late } });
@@ -520,6 +540,30 @@ async function main() {
   assert(afterLink.unmatched.length === 0 && afterLink.lines[0]?.item.itemId === itemA && afterLink.lines[0].needed === 3,
     `linking the honor later moves its NEEDED needs onto the item, got ${JSON.stringify(afterLink)}`);
   console.log("ok  an honor linked in the catalog after sync: its NEEDED needs pick up the item on the next sync");
+  // #1330: once the honor is linked, the by-hand line shows as that catalog item, never as a second line.
+  const linkedHelper = await listHelperLines(clubs.link);
+  assert(linkedHelper.length === 1 && linkedHelper[0].itemId === itemA && linkedHelper[0].honorId === null && linkedHelper[0].needed === 6,
+    `a by-hand honor line folds into its catalog item once linked, got ${JSON.stringify(linkedHelper)}`);
+  await prisma.clubOrderListLine.create({ data: { organizationId: clubs.link, itemId: itemA, quantity: 2 } });
+  assert((await listHelperLines(clubs.link))[0].needed === 2, "the catalog item's own line wins over the folded honor line");
+  await prisma.clubOrderListLine.deleteMany({ where: { organizationId: clubs.link, itemId: itemA } });
+  await expectCode(setOrderHonorLineQuantity(clubs.link, honors.late, 1, actor), "HONOR_HAS_CATALOG_ITEM", "adding an honor that now has a catalog item");
+  await setOrderHonorLineQuantity(clubs.link, honors.late, null, actor);
+  assert(await prisma.clubOrderHonorLine.count({ where: { organizationId: clubs.link } }) === 0, "a leftover honor line can still be removed");
+  // Remove and Reset on the folded line go through the item's route and must clear the honor row too.
+  const honorRow = () => prisma.clubOrderHonorLine.create({ data: { organizationId: clubs.link, honorId: honors.late, quantity: 6 } });
+  await honorRow();
+  await setOrderListQuantity(clubs.link, itemA, null, actor);
+  const resetLine = (await listHelperLines(clubs.link))[0];
+  assert(resetLine.needed === 3 && !resetLine.edited && await prisma.clubOrderHonorLine.count({ where: { organizationId: clubs.link } }) === 0,
+    `Reset on a folded line returns to the suggested count and clears the honor row, got ${JSON.stringify(resetLine)}`);
+  await honorRow();
+  await setOrderListQuantity(clubs.link, itemA, 0, actor);
+  const removedLine = (await listHelperLines(clubs.link))[0];
+  assert(removedLine.needed === 0 && await prisma.clubOrderHonorLine.count({ where: { organizationId: clubs.link } }) === 0,
+    `Remove on a folded line takes it off the list and leaves no hidden honor row, got ${JSON.stringify(removedLine)}`);
+  await setOrderListQuantity(clubs.link, itemA, null, actor);
+  console.log("ok  linking the honor later: the by-hand line becomes the catalog item's line, no duplicate; the item's own line wins; Remove and Reset clear the honor row");
 
   await prisma.clubSupplyItem.update({ where: { id: itemA }, data: { honorId: null } });
   await prisma.clubSupplyItem.create({ data: { id: itemB, section: "OUTDOOR_INDUSTRIES", name: "Birds (B)", normalizedName: `${P} birds b`, catalogNumber: "006602", honorId: honors.late } });

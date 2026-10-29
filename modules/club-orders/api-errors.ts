@@ -16,7 +16,7 @@ export function clubOrderApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof ClubOrderError) {
-    const status = error.code === "BATCH_NOT_FOUND" || error.code === "CLASS_NOT_COMPLETED" ? 404 : error.code === "DATE_IN_FUTURE" ? 400 : 409;
+    const status = error.code === "BATCH_NOT_FOUND" || error.code === "CLASS_NOT_COMPLETED" || error.code === "HONOR_NOT_FOUND" ? 404 : error.code === "DATE_IN_FUTURE" ? 400 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
   }
   logError(`${action} failed`, error);

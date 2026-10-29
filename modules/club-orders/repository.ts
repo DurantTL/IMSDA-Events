@@ -10,8 +10,11 @@ import {
   quantityToOrder,
   sortNeedsOldestFirst,
   splitNeedsByStock,
+  firstLinkedItemId,
+  honorIdFromNeedSourceId,
   type HelperCatalogItem,
   type HelperLine,
+  type HonorOrderLine,
   type OrderCatalogItem,
   type OrderExportHeader,
   type OrderLine,
@@ -48,6 +51,8 @@ import { itemAndSize } from "@/modules/uniforms/domain";
 export type ClubOrderActor = ClubSupplyStockActor;
 
 export type ClubOrderErrorCode = "NOTHING_TO_ORDER" | "BATCH_NOT_FOUND" | "ALREADY_RECEIVED" | "ORDER_CHANGED" | "NOT_ENOUGH_STOCK" | "ITEM_NOT_ORDERABLE" | "MEMBER_NOT_ON_ROSTER"
+  // Honors added to the list by hand (#1330).
+  | "HONOR_NOT_FOUND" | "HONOR_NOT_ORDERABLE" | "HONOR_HAS_CATALOG_ITEM"
   // Earned awards (#532): a confirmation must match what was suggested or earned.
   | "NOT_SUGGESTED" | "NOT_ELIGIBLE" | "RULE_HAS_NO_ITEM"
   // A person's class history (#1011).
@@ -312,7 +317,7 @@ async function neededPicture(organizationId: string) {
 
 type NeededPicture = Awaited<ReturnType<typeof neededPicture>>;
 
-export type UnmatchedNeed = { sourceId: string; personId: string; sourceLabel: string };
+export type UnmatchedNeed = { sourceId: string; personId: string; sourceLabel: string; honorId: string | null };
 
 function orderListFrom(picture: NeededPicture, extraByItem: ReadonlyMap<string, number>) {
   const items = [...picture.byItem.values()].map((group) => toCatalogItem(group[0].item!));
@@ -320,7 +325,12 @@ function orderListFrom(picture: NeededPicture, extraByItem: ReadonlyMap<string, 
   const lines = buildOrderLines(items, neededByItem, picture.available, extraByItem);
   const unmatched: UnmatchedNeed[] = picture.needs
     .filter((need) => need.itemId === null)
-    .map((need) => ({ sourceId: need.sourceId, personId: need.personId, sourceLabel: need.sourceLabel ?? "" }));
+    .map((need) => ({
+      sourceId: need.sourceId,
+      personId: need.personId,
+      sourceLabel: need.sourceLabel ?? "",
+      honorId: need.sourceType === "HONOR" ? honorIdFromNeedSourceId(need.sourceId) : null,
+    }));
   return { lines, unmatched };
 }
 
@@ -720,12 +730,33 @@ async function helperLinesFrom(organizationId: string, picture: NeededPicture): 
     select: { itemId: true, quantity: true },
   });
   const overrideByItem = new Map(overrides.map((row) => [row.itemId, row.quantity]));
+  // Honors added by hand (#1330). One whose honor now has a catalog item
+  // (`firstLinkedItemId`, active or not) folds into that item's line, as its quantity override, unless the
+  // item has a line of its own (that one wins); the rest are catalog-free lines.
+  const honorRows = await getPrisma().clubOrderHonorLine.findMany({
+    where: { organizationId },
+    orderBy: { honorId: "asc" },
+    select: {
+      honorId: true,
+      quantity: true,
+      honor: { select: { name: true, clubSupplyItems: { select: { id: true } } } },
+    },
+  });
+  const unlinkedHonors: HonorOrderLine[] = [];
+  for (const row of honorRows) {
+    const linkedItemId = firstLinkedItemId(row.honor.clubSupplyItems);
+    if (!linkedItemId) {
+      unlinkedHonors.push({ honorId: row.honorId, name: row.honor.name, quantity: row.quantity });
+    } else if (!overrideByItem.has(linkedItemId)) {
+      overrideByItem.set(linkedItemId, row.quantity);
+    }
+  }
   const itemsById = new Map<string, HelperCatalogItem>();
   for (const [itemId, group] of picture.byItem) {
     const item = group[0].item!;
     itemsById.set(itemId, { itemId, section: item.section, name: item.name, catalogNumber: item.catalogNumber, sizeLabel: item.sizeLabel });
   }
-  const extraIds = overrides.map((row) => row.itemId).filter((itemId) => !itemsById.has(itemId));
+  const extraIds = [...overrideByItem.keys()].filter((itemId) => !itemsById.has(itemId));
   if (extraIds.length > 0) {
     const extra = await getPrisma().clubSupplyItem.findMany({
       where: { id: { in: extraIds } },
@@ -737,7 +768,7 @@ async function helperLinesFrom(organizationId: string, picture: NeededPicture): 
   }
   const available = await availableByItem(getPrisma(), organizationId, [...itemsById.keys()]);
   const computedByItem = new Map([...picture.byItem].map(([itemId, group]) => [itemId, group.length]));
-  return buildHelperLines([...itemsById.values()], computedByItem, overrideByItem, available);
+  return buildHelperLines([...itemsById.values()], computedByItem, overrideByItem, available, unlinkedHonors);
 }
 
 /** The helper list on its own (the export and the print page). */
@@ -755,9 +786,18 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
   return getPrisma().$transaction(async (tx) => {
     await lockClubOrders(tx, organizationId);
     const item = await tx.clubSupplyItem.findUnique({ where: { id: itemId }, select: { isActive: true } });
-    if (!item || (!item.isActive && quantity !== null)) {
+    // A retired item can still be taken off the list (0) or reset, never ordered.
+    if (!item || (!item.isActive && quantity !== null && quantity !== 0)) {
       throw new ClubOrderError("ITEM_NOT_ORDERABLE", "That catalog item could not be found.");
     }
+    // The item line takes over (#1330): a by-hand honor line folded into this item must not keep
+    // supplying the quantity after a Remove, Reset or Save, so it is cleared whenever the item is written.
+    const folded = await tx.clubOrderHonorLine.findMany({
+      where: { organizationId, honor: { clubSupplyItems: { some: { id: itemId } } } },
+      select: { id: true, honor: { select: { clubSupplyItems: { select: { id: true } } } } },
+    });
+    const foldedIds = folded.filter((row) => firstLinkedItemId(row.honor.clubSupplyItems) === itemId).map((row) => row.id);
+    if (foldedIds.length > 0) await tx.clubOrderHonorLine.deleteMany({ where: { id: { in: foldedIds }, organizationId } });
     if (quantity === null) {
       await tx.clubOrderListLine.deleteMany({ where: { organizationId, itemId } });
     } else {
@@ -773,10 +813,68 @@ export async function setOrderListQuantity(organizationId: string, itemId: strin
       action: "CLUB_ORDER_LIST_LINE_SET",
       entityType: "ClubOrderListLine",
       summary: quantity === null ? "Reset a club order list line to its computed count." : `Set a club order list line to ${quantity}.`,
-      metadata: { organizationId, itemId, quantity, ...who.metadata },
+      metadata: { organizationId, itemId, quantity, clearedHonorLines: foldedIds.length, ...who.metadata },
     }, tx);
     return { itemId, quantity };
   });
+}
+
+/**
+ * Sets the quantity for an honor with no catalog item on a club's helper list
+ * (#1330): a positive number adds or changes the line, 0 or `null` removes it.
+ * Only an active honor with no catalog item (see `firstLinkedItemId`) can be added; one that has a
+ * catalog item (active or not) is refused (the catalog item's own line is the one to use,
+ * so a thing is never on the list twice). Removing is always allowed, so a line
+ * left over from before the honor was linked can still be cleared. Audited with
+ * ids and the number only.
+ */
+export async function setOrderHonorLineQuantity(organizationId: string, honorId: string, quantity: number | null, actor: ClubOrderActor) {
+  return getPrisma().$transaction(async (tx) => {
+    await lockClubOrders(tx, organizationId);
+    const remove = quantity === null || quantity === 0;
+    if (remove) {
+      await tx.clubOrderHonorLine.deleteMany({ where: { organizationId, honorId } });
+    } else {
+      const honor = await tx.honor.findUnique({
+        where: { id: honorId },
+        select: { isActive: true, clubSupplyItems: { take: 1, select: { id: true } } },
+      });
+      if (!honor) throw new ClubOrderError("HONOR_NOT_FOUND", "That honor could not be found.");
+      if (!honor.isActive) throw new ClubOrderError("HONOR_NOT_ORDERABLE", "That honor is not available to add.");
+      if (honor.clubSupplyItems.length > 0) {
+        throw new ClubOrderError("HONOR_HAS_CATALOG_ITEM", "That honor has a catalog item now. Add the catalog item to the list instead.");
+      }
+      await tx.clubOrderHonorLine.upsert({
+        where: { organizationId_honorId: { organizationId, honorId } },
+        create: { organizationId, honorId, quantity },
+        update: { quantity },
+      });
+    }
+    const who = auditActorFields(actor);
+    await writeAuditLog({
+      ...who.actorFields,
+      action: "CLUB_ORDER_HONOR_LINE_SET",
+      entityType: "ClubOrderHonorLine",
+      summary: remove ? "Removed an honor with no catalog item from a club order list." : `Set an honor with no catalog item on a club order list to ${quantity}.`,
+      metadata: { organizationId, honorId, quantity: remove ? 0 : quantity, ...who.metadata },
+    }, tx);
+    return { honorId, quantity: remove ? 0 : quantity };
+  });
+}
+
+export type OrderableHonor = { honorId: string; name: string };
+
+/**
+ * Active honors with no catalog item (#1330): the ones a director can
+ * add to the list by hand. Names and ids only.
+ */
+export async function listOrderableUnlinkedHonors(): Promise<OrderableHonor[]> {
+  const honors = await getPrisma().honor.findMany({
+    where: { isActive: true, clubSupplyItems: { none: {} } },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: { id: true, name: true },
+  });
+  return honors.map((honor) => ({ honorId: honor.id, name: honor.name }));
 }
 
 /**

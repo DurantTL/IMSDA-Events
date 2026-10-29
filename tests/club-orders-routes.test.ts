@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   findOrganization: vi.fn(),
   loadOrderWorkspace: vi.fn(),
   setOrderListQuantity: vi.fn(),
+  setOrderHonorLineQuantity: vi.fn(),
   listHelperLines: vi.fn(),
   loadOrderExportHeader: vi.fn(),
   markNeedsAwarded: vi.fn(),
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   listPickList: vi.fn(),
   syncHonorOrderNeeds: vi.fn(),
   staffActing: vi.fn(),
+  crossOrigin: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -41,7 +43,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: () => mocks.staffActing() }));
-vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
+vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: (request: Request) => mocks.crossOrigin(request) }));
 vi.mock("@/modules/honors/order-source", () => ({ syncHonorOrderNeeds: mocks.syncHonorOrderNeeds }));
 vi.mock("@/modules/club-orders/repository", async () => {
   const actual = await vi.importActual<typeof import("@/modules/club-orders/repository")>("@/modules/club-orders/repository");
@@ -49,6 +51,7 @@ vi.mock("@/modules/club-orders/repository", async () => {
     ...actual,
     loadOrderWorkspace: mocks.loadOrderWorkspace,
     setOrderListQuantity: mocks.setOrderListQuantity,
+    setOrderHonorLineQuantity: mocks.setOrderHonorLineQuantity,
     listHelperLines: mocks.listHelperLines,
     loadOrderExportHeader: mocks.loadOrderExportHeader,
     markNeedsAwarded: mocks.markNeedsAwarded,
@@ -59,6 +62,7 @@ vi.mock("@/modules/club-orders/repository", async () => {
 
 import { GET } from "@/app/api/attendee/clubs/[organizationId]/orders/route";
 import { PUT as PUT_LINE } from "@/app/api/attendee/clubs/[organizationId]/orders/lines/[itemId]/route";
+import { PUT as PUT_HONOR_LINE } from "@/app/api/attendee/clubs/[organizationId]/orders/honor-lines/[honorId]/route";
 import { POST as POST_AWARD } from "@/app/api/attendee/clubs/[organizationId]/orders/award/route";
 import { POST as POST_ALREADY } from "@/app/api/attendee/clubs/[organizationId]/orders/already-awarded/route";
 import { GET as GET_CSV } from "@/app/api/attendee/clubs/[organizationId]/orders/csv/route";
@@ -70,6 +74,7 @@ const clubFor = (organizationId: string, role: string) => ({ organizationId, nam
 const account = { id: "director-1", verifiedEmail: "director@example.test", displayName: "Test Director" };
 const ctx = (organizationId = "club-1") => ({ params: Promise.resolve({ organizationId }) });
 const lineCtx = (organizationId = "club-1", itemId = "item-1") => ({ params: Promise.resolve({ organizationId, itemId }) });
+const honorCtx = (organizationId = "club-1", honorId = "honor-1") => ({ params: Promise.resolve({ organizationId, honorId }) });
 const putRequest = (body: unknown) => new Request("https://events.imsda.test/api/attendee/x", {
   method: "PUT",
   headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
@@ -96,6 +101,7 @@ beforeEach(() => {
   mocks.syncHonorOrderNeeds.mockResolvedValue({ count: 0 });
   mocks.loadOrderWorkspace.mockResolvedValue({ helper: [], unmatched: [], awardable: [], waiting: [], firstOrderAt: null });
   mocks.setOrderListQuantity.mockResolvedValue({ itemId: "item-1", quantity: 2 });
+  mocks.setOrderHonorLineQuantity.mockResolvedValue({ honorId: "honor-1", quantity: 3 });
   mocks.loadOrderExportHeader.mockResolvedValue({ clubName: "Test Pathfinders", church: "Sample Church", directorName: "Test Director", directorEmail: "director@example.test", directorPhone: "555-0100", date: "2026-09-30" });
   mocks.listHelperLines.mockResolvedValue([]);
   mocks.markNeedsAwarded.mockResolvedValue({ awarded: 1, fromStock: 0 });
@@ -288,6 +294,65 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
     mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", "REGISTRAR")]);
     expect((await PUT_LINE(putRequest({ quantity: 3 }), lineCtx("club-1", "honor-item-1"))).status).toBe(403);
     expect(mocks.setOrderListQuantity).not.toHaveBeenCalled();
+  });
+
+  describe("honors with no catalog item (#1330)", () => {
+    it.each(["DIRECTOR", "DEPUTY"])("a %s adds, changes and removes an honor line", async (role) => {
+      mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", role)]);
+      const added = await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx());
+      expect(added.status).toBe(200);
+      expect(await added.json()).toEqual({ line: { honorId: "honor-1", quantity: 3 } });
+      expect(mocks.setOrderHonorLineQuantity).toHaveBeenLastCalledWith("club-1", "honor-1", 3, { accountId: "director-1" });
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 0 }), honorCtx())).status).toBe(200);
+      expect(mocks.setOrderHonorLineQuantity).toHaveBeenLastCalledWith("club-1", "honor-1", 0, { accountId: "director-1" });
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: null }), honorCtx())).status).toBe(200);
+      expect(mocks.setOrderHonorLineQuantity).toHaveBeenLastCalledWith("club-1", "honor-1", null, { accountId: "director-1" });
+      // Never touches the catalog item line.
+      expect(mocks.setOrderListQuantity).not.toHaveBeenCalled();
+    });
+
+    it("a registrar gets 403, another club's director 404, a signed-out request 401, and nothing is written", async () => {
+      mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", "REGISTRAR")]);
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx())).status).toBe(403);
+      mocks.listDirectedClubs.mockResolvedValue([clubFor("club-1", "DIRECTOR")]);
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx("club-2"))).status).toBe(404);
+      mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx())).status).toBe(401);
+      expect(mocks.setOrderHonorLineQuantity).not.toHaveBeenCalled();
+    });
+
+    it.each([{ quantity: -1 }, { quantity: 1.5 }, { quantity: 10_001 }, { quantity: "3" }, {}, { quantity: 1, extra: 1 }])("refuses %j with 400", async (body) => {
+      expect((await PUT_HONOR_LINE(putRequest(body), honorCtx())).status).toBe(400);
+      expect(mocks.setOrderHonorLineQuantity).not.toHaveBeenCalled();
+    });
+
+    it("refuses a cross-origin honor line write and writes nothing", async () => {
+      mocks.crossOrigin.mockReturnValueOnce(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 3 }), honorCtx())).status).toBe(403);
+      expect(mocks.setOrderHonorLineQuantity).not.toHaveBeenCalled();
+    });
+
+    it("maps an unknown honor to 404 and an inactive or now-linked honor to 409", async () => {
+      mocks.setOrderHonorLineQuantity.mockRejectedValueOnce(new ClubOrderError("HONOR_NOT_FOUND", "Missing."));
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 1 }), honorCtx())).status).toBe(404);
+      mocks.setOrderHonorLineQuantity.mockRejectedValueOnce(new ClubOrderError("HONOR_NOT_ORDERABLE", "Inactive."));
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 1 }), honorCtx())).status).toBe(409);
+      mocks.setOrderHonorLineQuantity.mockRejectedValueOnce(new ClubOrderError("HONOR_HAS_CATALOG_ITEM", "Linked."));
+      expect((await PUT_HONOR_LINE(putRequest({ quantity: 1 }), honorCtx())).status).toBe(409);
+    });
+
+    it("both CSVs include the honor line with an empty item number", async () => {
+      const lines = buildHelperLines(
+        [{ itemId: "h1", section: "OUTDOOR_INDUSTRIES", name: "Knot Tying", catalogNumber: "002120", sizeLabel: null }],
+        new Map([["h1", 3]]), new Map(), new Map(),
+        [{ honorId: "honor-1", name: "Archery", quantity: 5 }],
+      );
+      mocks.listHelperLines.mockResolvedValue(lines);
+      const list = parseCsvMatrix(await (await GET_CSV(new Request("https://events.imsda.test/x?view=list"), ctx())).text());
+      expect(list.find((row) => row[1] === "Archery")).toEqual(["Honors", "Archery", "", "", "5", "", "", "5"]);
+      const all = parseCsvMatrix(await (await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx())).text());
+      expect(all.find((row) => row[1] === "Archery")).toEqual(["Honors", "Archery", "", "", "5", "", "5"]);
+    });
   });
 
   it("refuses the retired AdventSource and readable exports, and an unknown view, with 400", async () => {

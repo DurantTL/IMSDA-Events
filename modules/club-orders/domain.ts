@@ -211,7 +211,13 @@ export type HelperCatalogItem = {
 };
 
 export type HelperLine = {
-  itemId: string;
+  /**
+   * The catalog item, or null for an honor line added by hand with no catalog
+   * item (#1330): those carry `honorId` instead and have no stock tracking.
+   */
+  itemId: string | null;
+  /** Set only on an honor line with no catalog item (#1330). */
+  honorId: string | null;
   section: OrderListSection;
   /** The item's name without its size (a uniform's size is split off). */
   name: string;
@@ -228,6 +234,54 @@ export type HelperLine = {
   toOrder: number;
 };
 
+/** A stable key for one line: a catalog item or an unlinked honor (#1330). */
+export const helperLineKey = (line: Pick<HelperLine, "itemId" | "honorId">) => (line.itemId ? `item:${line.itemId}` : `honor:${line.honorId}`);
+
+/** An unlinked honor line has no stock tracking, so "Available" is not a number (#1330). */
+export const hasStockTracking = (line: Pick<HelperLine, "itemId">) => line.itemId !== null;
+
+/**
+ * The one rule for "this honor's catalog item" (#1330): the linked item with the
+ * lowest id, active or not. The honor need sync, the fold of by-hand honor lines
+ * into item lines, the write-time check and the list of addable honors all use
+ * it, so an honor is never both an item line and an honor line.
+ */
+export function firstLinkedItemId(items: ReadonlyArray<{ id: string }>): string | null {
+  let first: string | null = null;
+  for (const item of items) if (first === null || item.id < first) first = item.id;
+  return first;
+}
+
+/** A catalog-free honor a director added to the list by hand (#1330). */
+export type HonorOrderLine = { honorId: string; name: string; quantity: number };
+
+function sortHelperLines(lines: HelperLine[]) {
+  return lines.sort((a, b) =>
+    ORDER_LIST_SECTIONS.indexOf(a.section) - ORDER_LIST_SECTIONS.indexOf(b.section)
+    || a.name.localeCompare(b.name) || a.size.localeCompare(b.size, undefined, { numeric: true }));
+}
+
+/**
+ * Lines for honors added by hand with no catalog item (#1330): the honor's
+ * name, no item number, no stock (so To order is the quantity). Merged into the
+ * list by `buildHelperLines`.
+ */
+export function buildHonorHelperLines(honorLines: readonly HonorOrderLine[]): HelperLine[] {
+  return honorLines.map((line): HelperLine => ({
+    itemId: null,
+    honorId: line.honorId,
+    section: "HONORS",
+    name: line.name,
+    size: "",
+    catalogNumber: null,
+    computedNeeded: 0,
+    needed: line.quantity,
+    edited: true,
+    onHand: 0,
+    toOrder: line.quantity,
+  }));
+}
+
 /**
  * The helper list's lines. `overrideByItem` holds a director's quantity per
  * item (0 takes it off the list). Lines are ordered by section, then name,
@@ -239,8 +293,9 @@ export function buildHelperLines(
   computedByItem: ReadonlyMap<string, number>,
   overrideByItem: ReadonlyMap<string, number>,
   onHandByItem: ReadonlyMap<string, number>,
+  honorLines: readonly HonorOrderLine[] = [],
 ): HelperLine[] {
-  return items
+  const catalogLines = items
     .map((item): HelperLine => {
       const parts = itemAndSize(item);
       const computedNeeded = computedByItem.get(item.itemId) ?? 0;
@@ -249,6 +304,7 @@ export function buildHelperLines(
       const onHand = onHandByItem.get(item.itemId) ?? 0;
       return {
         itemId: item.itemId,
+        honorId: null,
         section: orderListSectionFor(item.section),
         name: parts.itemName,
         size: parts.size || item.sizeLabel || "",
@@ -259,10 +315,8 @@ export function buildHelperLines(
         onHand,
         toOrder: Math.max(0, needed - onHand),
       };
-    })
-    .sort((a, b) =>
-      ORDER_LIST_SECTIONS.indexOf(a.section) - ORDER_LIST_SECTIONS.indexOf(b.section)
-      || a.name.localeCompare(b.name) || a.size.localeCompare(b.size, undefined, { numeric: true }));
+    });
+  return sortHelperLines([...catalogLines, ...buildHonorHelperLines(honorLines)]);
 }
 
 /** Lines that are on the list (quantity above zero). */
@@ -297,7 +351,7 @@ export function orderListCsv(header: OrderExportHeader, lines: readonly HelperLi
   const active = activeHelperLines(lines);
   for (const section of ORDER_LIST_SECTIONS) {
     for (const line of active.filter((entry) => entry.section === section)) {
-      rows.push([orderListSectionLabels[section], line.name, line.size, line.catalogNumber ?? "", line.needed, line.computedNeeded, line.onHand, line.toOrder]);
+      rows.push([orderListSectionLabels[section], line.name, line.size, line.catalogNumber ?? "", line.needed, hasStockTracking(line) ? line.computedNeeded : "", hasStockTracking(line) ? line.onHand : "", line.toOrder]);
     }
   }
   return toCsv(rows);
@@ -324,23 +378,38 @@ export function orderEverythingCsv(lines: readonly HelperLine[]) {
   const active = activeHelperLines(lines);
   for (const section of ORDER_LIST_SECTIONS) {
     for (const line of active.filter((entry) => entry.section === section)) {
-      rows.push([orderListSectionLabels[section], line.name, line.catalogNumber ?? "", line.size, line.needed, line.onHand, line.toOrder]);
+      rows.push([orderListSectionLabels[section], line.name, line.catalogNumber ?? "", line.size, line.needed, hasStockTracking(line) ? line.onHand : "", line.toOrder]);
     }
   }
   return toCsv(rows);
 }
 
-export type UnmatchedHonorGroup = { name: string; members: number };
+export type UnmatchedHonorGroup = {
+  name: string;
+  members: number;
+  /** The honor, when the need names one (#1330), so it can be added to the list by hand. */
+  honorId: string | null;
+};
+
+/** The honor id inside an honor need's source id (`<personId>:<honorId>`, `honorNeedSourceId`). */
+export function honorIdFromNeedSourceId(sourceId: string) {
+  const at = sourceId.indexOf(":");
+  return at > 0 && at < sourceId.length - 1 ? sourceId.slice(at + 1) : null;
+}
 
 /**
  * Completed honors with no catalog item, one entry per honor with how many
  * members completed it (#1324). Counts only: no member is named.
  */
-export function groupUnmatchedByHonor(unmatched: ReadonlyArray<{ sourceLabel: string }>): UnmatchedHonorGroup[] {
-  const counts = new Map<string, number>();
+export function groupUnmatchedByHonor(unmatched: ReadonlyArray<{ sourceLabel: string; honorId?: string | null }>): UnmatchedHonorGroup[] {
+  const groups = new Map<string, UnmatchedHonorGroup>();
   for (const need of unmatched) {
     const name = need.sourceLabel.trim() || "Unnamed honor";
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+    const honorId = need.honorId ?? null;
+    const key = honorId ?? `name:${name}`;
+    const group = groups.get(key) ?? { name, members: 0, honorId };
+    group.members += 1;
+    groups.set(key, group);
   }
-  return [...counts].map(([name, members]) => ({ name, members })).sort((a, b) => a.name.localeCompare(b.name));
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

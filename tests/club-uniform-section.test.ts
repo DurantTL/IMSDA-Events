@@ -12,7 +12,7 @@ import { groupUniformCatalog } from "@/modules/uniforms/domain";
 
 const orders: ClubOrderWorkspaceData = {
   helper: [
-    { itemId: "scarf", section: "UNIFORMS", name: "Adult Scarf", size: "", catalogNumber: "020001", computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 },
+    { itemId: "scarf", honorId: null, section: "UNIFORMS", name: "Adult Scarf", size: "", catalogNumber: "020001", computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 },
   ],
   unmatched: [],
   batches: [],

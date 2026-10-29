@@ -24,6 +24,9 @@ vi.mock("react", async (importOriginal) => {
       return [runtime.slots[i], set];
     },
     useMemo: (factory: () => unknown) => factory(),
+    // A ref is a fresh object per render and effects never run (no DOM), enough for the orders focus handling (#1330).
+    useRef: (initial: unknown) => ({ current: initial }),
+    useEffect: () => {},
     useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
   };
 });

@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ADVENTSOURCE_URL, ClubOrderWorkspace, filterPickerItems, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
+import { ADVENTSOURCE_URL, ClubOrderWorkspace, NO_CATALOG_ITEM_LABEL, filterPickerHonors, filterPickerItems, ORDER_SECTION_IDS, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
 /**
@@ -13,15 +13,15 @@ import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
 const data: ClubOrderWorkspaceData = {
   helper: [
-    { itemId: "u1", section: "UNIFORMS", name: "Boys' Shirt", size: "M", catalogNumber: "011112", computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 },
-    { itemId: "u2", section: "UNIFORMS", name: "Boys' Shirt", size: "L", catalogNumber: "011113", computedNeeded: 2, needed: 1, edited: true, onHand: 0, toOrder: 1 },
-    { itemId: "i1", section: "HONORS", name: "Camping Skills", size: "", catalogNumber: "005157", computedNeeded: 3, needed: 3, edited: false, onHand: 1, toOrder: 2 },
-    { itemId: "i2", section: "HONORS", name: "Wilderness Living", size: "", catalogNumber: null, computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
-    { itemId: "o1", section: "OTHER", name: "Good Conduct Star", size: "", catalogNumber: "000123", computedNeeded: 0, needed: 4, edited: true, onHand: 0, toOrder: 4 },
-    { itemId: "i3", section: "HONORS", name: "Orienteering", size: "", catalogNumber: "005200", computedNeeded: 2, needed: 0, edited: true, onHand: 0, toOrder: 0 },
+    { itemId: "u1", honorId: null, section: "UNIFORMS", name: "Boys' Shirt", size: "M", catalogNumber: "011112", computedNeeded: 2, needed: 2, edited: false, onHand: 0, toOrder: 2 },
+    { itemId: "u2", honorId: null, section: "UNIFORMS", name: "Boys' Shirt", size: "L", catalogNumber: "011113", computedNeeded: 2, needed: 1, edited: true, onHand: 0, toOrder: 1 },
+    { itemId: "i1", honorId: null, section: "HONORS", name: "Camping Skills", size: "", catalogNumber: "005157", computedNeeded: 3, needed: 3, edited: false, onHand: 1, toOrder: 2 },
+    { itemId: "i2", honorId: null, section: "HONORS", name: "Wilderness Living", size: "", catalogNumber: null, computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
+    { itemId: "o1", honorId: null, section: "OTHER", name: "Good Conduct Star", size: "", catalogNumber: "000123", computedNeeded: 0, needed: 4, edited: true, onHand: 0, toOrder: 4 },
+    { itemId: "i3", honorId: null, section: "HONORS", name: "Orienteering", size: "", catalogNumber: "005200", computedNeeded: 2, needed: 0, edited: true, onHand: 0, toOrder: 0 },
   ],
   batches: [{ id: "b1", status: "ORDERED", createdAt: "2026-08-20T15:00:00.000Z", receivedAt: null, itemCount: 1, totalQuantity: 4, lines: [] }],
-  unmatched: [{ sourceId: "s1", personId: "p1", sourceLabel: "Orienteering" }, { sourceId: "s2", personId: "p2", sourceLabel: "Orienteering" }, { sourceId: "s3", personId: "p3", sourceLabel: "Archery" }],
+  unmatched: [{ sourceId: "s1", personId: "p1", sourceLabel: "Orienteering", honorId: null }, { sourceId: "s2", personId: "p2", sourceLabel: "Orienteering", honorId: null }, { sourceId: "s3", personId: "p3", sourceLabel: "Archery", honorId: null }],
   awardable: [
     { needId: "n1", itemId: "i1", itemName: "Camping Skills", firstName: "Alex", lastName: "Sample", fromStock: false },
     { needId: "n2", itemId: "i1", itemName: "Camping Skills", firstName: "Jordan", lastName: "Example", fromStock: true },
@@ -156,8 +156,8 @@ describe("ClubOrderWorkspace (#654)", () => {
     const withSize: ClubOrderWorkspaceData = {
       ...data,
       helper: [
-        { itemId: "u8", section: "UNIFORMS", name: "Girls' Skirt", size: "Size 28", catalogNumber: "011200", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
-        { itemId: "u9", section: "UNIFORMS", name: "Girls' Blouse", size: "M", catalogNumber: "011201", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
+        { itemId: "u8", honorId: null, section: "UNIFORMS", name: "Girls' Skirt", size: "Size 28", catalogNumber: "011200", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
+        { itemId: "u9", honorId: null, section: "UNIFORMS", name: "Girls' Blouse", size: "M", catalogNumber: "011201", computedNeeded: 1, needed: 1, edited: false, onHand: 0, toOrder: 1 },
       ],
     };
     const html = render(false, withSize);
@@ -286,5 +286,63 @@ describe("Orders page jump links (#810)", () => {
 
   it("shows the same nav to a view-only registrar", () => {
     expect(render(true)).toContain('href="#club-uniforms"');
+  });
+});
+
+describe("honors with no catalog item on the order list (#1330)", () => {
+  const honorLine = { itemId: null, honorId: "honor-arch", section: "HONORS" as const, name: "Archery", size: "", catalogNumber: null, computedNeeded: 0, needed: 5, edited: true, onHand: 0, toOrder: 5 };
+  const withHonors: ClubOrderWorkspaceData = {
+    ...data,
+    helper: [...data.helper, honorLine],
+    unmatched: [
+      { sourceId: "p1:honor-orient", personId: "p1", sourceLabel: "Orienteering", honorId: "honor-orient" },
+      { sourceId: "p2:honor-orient", personId: "p2", sourceLabel: "Orienteering", honorId: "honor-orient" },
+      { sourceId: "p3:honor-arch", personId: "p3", sourceLabel: "Archery", honorId: "honor-arch" },
+    ],
+  };
+  const orderableHonors = [{ honorId: "honor-arch", name: "Archery" }, { honorId: "honor-orient", name: "Orienteering" }, { honorId: "honor-kayak", name: "Kayaking" }];
+  const renderHonors = (readOnly: boolean, initial = withHonors) => renderToStaticMarkup(
+    createElement(ClubOrderWorkspace, { organizationId: "club-1", initial, stock, orderableHonors, printHref: "/account/clubs/club-1/orders/print", readOnly }),
+  );
+
+  it("shows the honor with its name, no item number, Available as a dash and To order equal to the quantity", () => {
+    const html = renderHonors(false);
+    const at = html.indexOf('id="club-order-quantity-honor-honor-arch"');
+    const row = html.slice(html.lastIndexOf("<li", at), html.indexOf("</li>", at));
+    expect(html).toContain("club-order-quantity-honor-honor-arch");
+    expect(row).toContain(NO_CATALOG_ITEM_LABEL);
+    expect(row).toMatch(/<dt>Available<\/dt><dd><span aria-hidden="true">—<\/span><span class="sr-only">Not tracked<\/span><\/dd>/);
+    expect(row).toMatch(/<dt>To order<\/dt><dd><strong>5<\/strong><\/dd>/);
+    expect(row).not.toContain("Suggested from honors");
+    expect(html).toContain('aria-label="Save quantity: Archery"');
+    expect(html).toContain('aria-label="Remove from the list: Archery"');
+  });
+
+  it("offers a not-yet-listed honor in the picker, labelled, and not one already on the list", () => {
+    const html = renderHonors(false);
+    expect(html).toContain(`<option value="honor:honor-orient">Orienteering · ${NO_CATALOG_ITEM_LABEL}</option>`);
+    expect(html).toContain(`<option value="honor:honor-kayak">Kayaking · ${NO_CATALOG_ITEM_LABEL}</option>`);
+    expect(html).not.toContain('value="honor:honor-arch"');
+    expect(filterPickerHonors(orderableHonors, new Set(["honor-arch"]), "kay").map((honor) => honor.honorId)).toEqual(["honor-kayak"]);
+    expect(filterPickerHonors(orderableHonors, new Set(), "").map((honor) => honor.honorId)).toHaveLength(3);
+  });
+
+  it("gives an unlisted honor an Add to list button named for it, and says On the list for one already added", () => {
+    const html = renderHonors(false);
+    const block = html.slice(html.indexOf('id="club-order-unmatched"'), html.indexOf("</details>"));
+    expect(block).toContain('aria-label="Add to list: Orienteering, quantity 2"');
+    expect(block).not.toContain("Add to list: Archery");
+    expect(block).toContain("On the list");
+    // Focus lands here after "Add to list" replaces the button.
+    expect(block).toMatch(/<span class="[^"]*" id="club-order-on-list-honor-arch" tabindex="-1">On the list<\/span>/i);
+  });
+
+  it("shows no Add to list button or picker to a viewer, and none for an honor that is not addable", () => {
+    const viewer = renderHonors(true);
+    expect(viewer).not.toContain("Add to list:");
+    expect(viewer).not.toContain("Search honors and items");
+    expect(viewer).toContain("Archery");
+    const noOptions = renderToStaticMarkup(createElement(ClubOrderWorkspace, { organizationId: "club-1", initial: withHonors, stock, readOnly: false }));
+    expect(noOptions).not.toContain("Add to list: Orienteering");
   });
 });

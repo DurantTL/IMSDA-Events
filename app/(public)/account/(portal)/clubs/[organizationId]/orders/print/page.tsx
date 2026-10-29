@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BackLink } from "@/components/back-link";
 import { PrintReportButton } from "@/components/print-report-button";
 import styles from "@/components/club-orders.module.css";
-import { ORDER_LIST_SECTIONS, activeHelperLines, orderListSectionLabels } from "@/modules/club-orders/domain";
+import { ORDER_LIST_SECTIONS, activeHelperLines, hasStockTracking, helperLineKey, orderListSectionLabels } from "@/modules/club-orders/domain";
 import { listHelperLines, loadOrderExportHeader } from "@/modules/club-orders/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
@@ -38,7 +38,7 @@ export default async function ClubOrderListPrintPage({ params }: { params: Promi
           <div><dt>Director phone</dt><dd translate="no">{header.directorPhone || "—"}</dd></div>
           <div><dt>Date</dt><dd>{formatCalendarDate(header.date)}</dd></div>
         </dl>
-        <p className="field-help">Available = in stock minus items set aside for someone.</p>
+        <p className="field-help">Available = in stock minus items set aside for someone. A dash means an honor with no catalog item, ordered from AdventSource separately.</p>
         {lines.length === 0 && <p className="quiet-copy">Nothing on the list.</p>}
         {ORDER_LIST_SECTIONS.map((section) => {
           const rows = lines.filter((line) => line.section === section);
@@ -52,12 +52,12 @@ export default async function ClubOrderListPrintPage({ params }: { params: Promi
                 </thead>
                 <tbody>
                   {rows.map((line) => (
-                    <tr key={line.itemId}>
+                    <tr key={helperLineKey(line)}>
                       <td translate="no">{line.name}</td>
                       <td>{line.size}</td>
                       <td>{line.catalogNumber ?? ""}</td>
-                      <td>{line.needed}{line.edited && line.needed !== line.computedNeeded ? ` (calculated: ${line.computedNeeded})` : ""}</td>
-                      <td>{line.onHand}</td>
+                      <td>{line.needed}{line.itemId && line.edited && line.needed !== line.computedNeeded ? ` (calculated: ${line.computedNeeded})` : ""}</td>
+                      <td>{hasStockTracking(line) ? line.onHand : "—"}</td>
                       <td>{line.toOrder}</td>
                     </tr>
                   ))}

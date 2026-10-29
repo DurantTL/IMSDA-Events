@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
-import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
+import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, hasStockTracking, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
-import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
+import type { AwardableNeed, OrderBatchSummary, OrderableHonor, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
@@ -92,8 +92,27 @@ export function filterPickerItems(stock: readonly ClubStockRow[], listed: Readon
   return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
 }
 
+/** Shown beside an honor with no catalog item (#1330). */
+export const NO_CATALOG_ITEM_LABEL = "No catalog item: order from AdventSource separately";
+
+/** The picker's honors (#1330): active honors with no catalog item that aren't on the list yet, found by name. */
+export function filterPickerHonors(honors: readonly OrderableHonor[], listed: ReadonlySet<string>, query: string) {
+  const matches = makeSearchMatcher(query);
+  return honors.filter((honor) => !listed.has(honor.honorId) && matches([honor.name]));
+}
+
 /** Most items the "add an item" picker lists at once. */
 const PICKER_LIMIT = 100;
+
+const HONOR_PICK_PREFIX = "honor:";
+
+/** What a line is addressed by: its catalog item id, or `honor:<id>` (#1330). */
+const lineKey = (line: HelperLine) => (line.itemId ?? `${HONOR_PICK_PREFIX}${line.honorId}`);
+
+/** The route for one line's quantity: a catalog item's, or an honor with no catalog item's (#1330). */
+const lineTarget = (key: string) => (key.startsWith(HONOR_PICK_PREFIX)
+  ? `honor-lines/${encodeURIComponent(key.slice(HONOR_PICK_PREFIX.length))}`
+  : `lines/${encodeURIComponent(key)}`);
 
 const promptDismissedKey = (organizationId: string) => `imsda:orders:earlier-honors-dismissed:${organizationId}`;
 
@@ -151,6 +170,7 @@ export function ClubOrderWorkspace({
   initial,
   initialUniforms = emptyUniformData,
   stock = [],
+  orderableHonors = [],
   printHref,
   readOnly = false,
 }: {
@@ -159,6 +179,8 @@ export function ClubOrderWorkspace({
   initialUniforms?: ClubUniformData;
   /** The catalog with this club's quantities: the add-an-item picker and the Inventory. */
   stock?: ClubStockRow[];
+  /** Active honors with no catalog item, which a director can add by hand (#1330). */
+  orderableHonors?: OrderableHonor[];
   /** The printable page, when the viewer has one. */
   printHref?: string;
   readOnly?: boolean;
@@ -176,6 +198,7 @@ export function ClubOrderWorkspace({
   const [pickerItem, setPickerItem] = useState("");
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
+  const focusHonorId = useRef<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const base = ordersBase(organizationId);
@@ -193,9 +216,20 @@ export function ClubOrderWorkspace({
     }
     return [...groups.entries()];
   }, [data.awardable]);
+  // Honors on the list by hand (#1330), so the picker and "Add to list" never offer one twice.
+  const listedHonorIds = useMemo(() => new Set(data.helper.flatMap((line) => (line.honorId ? [line.honorId] : []))), [data.helper]);
+  const orderableHonorIds = useMemo(() => new Set(orderableHonors.map((honor) => honor.honorId)), [orderableHonors]);
+  // Catalog items first, then honors with no catalog item. A honor's value is prefixed so it can't collide with an item id.
   const pickerItems = useMemo(() => {
-    return filterPickerItems(stock, new Set(onList.map((line) => line.itemId)), pickerQuery);
-  }, [stock, pickerQuery, onList]);
+    const items = filterPickerItems(stock, new Set(onList.flatMap((line) => (line.itemId ? [line.itemId] : []))), pickerQuery)
+      .map((row) => ({
+        itemId: row.itemId,
+        label: `${row.name}${row.catalogNumber ? ` · ${row.catalogNumber}` : ""}${row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}`,
+      }));
+    const honors = filterPickerHonors(orderableHonors, listedHonorIds, pickerQuery)
+      .map((honor) => ({ itemId: `${HONOR_PICK_PREFIX}${honor.honorId}`, label: `${honor.name} · ${NO_CATALOG_ITEM_LABEL}` }));
+    return [...items, ...honors];
+  }, [stock, orderableHonors, listedHonorIds, pickerQuery, onList]);
   const shownPickerItems = useMemo(() => pickerItems.slice(0, PICKER_LIMIT), [pickerItems]);
   const pickerSummary = pickerItems.length > PICKER_LIMIT
     ? hasSearchText(pickerQuery)
@@ -208,6 +242,12 @@ export function ClubOrderWorkspace({
   const earlier = useMemo(() => data.waiting.filter((need) => need.sourceType === "HONOR" && need.beforeFirstOrder), [data.waiting]);
   // Shown only while the club hasn't edited the helper list or handed anything out here: a one-time cleanup, never in read-only mode.
   const showPrompt = !readOnly && !promptDismissed && earlier.length > 0 && !data.helper.some((line) => line.edited);
+  useEffect(() => {
+    const honorId = focusHonorId.current;
+    if (!honorId || !listedHonorIds.has(honorId)) return;
+    focusHonorId.current = null;
+    document.getElementById(`club-order-on-list-${honorId}`)?.focus();
+  }, [listedHonorIds]);
   const waitingBatches = data.batches.filter((batch) => batch.status === "ORDERED");
 
   function dismissPrompt() {
@@ -258,13 +298,17 @@ export function ClubOrderWorkspace({
     }
   }
 
-  /** Sets one line's quantity (0 takes it off the list), or `null` to put it back to the computed count. */
-  function setQuantity(itemId: string, quantity: number | null, message: string) {
+  /**
+   * Sets one line's quantity (0 takes it off the list), or `null` to put it back to the computed count.
+   * `key` is a catalog item id, or `honor:<id>` for an honor with no catalog item (#1330), whose
+   * line is removed by 0 or `null` alike.
+   */
+  function setQuantity(key: string, quantity: number | null, message: string) {
     return act(async () => {
-      await send(`${base}/lines/${encodeURIComponent(itemId)}`, "PUT", { quantity });
+      await send(`${base}/${lineTarget(key)}`, "PUT", { quantity });
       setDrafts((current) => {
         const next = { ...current };
-        delete next[itemId];
+        delete next[key];
         return next;
       });
       return message;
@@ -272,18 +316,25 @@ export function ClubOrderWorkspace({
   }
 
   function saveDraft(line: HelperLine) {
-    const draft = drafts[line.itemId];
+    const draft = drafts[lineKey(line)];
     if (draft === undefined) return;
     if (!/^\d+$/.test(draft.trim())) {
       setError("Enter a whole number, 0 or more.");
       return;
     }
-    return setQuantity(line.itemId, Number(draft), "Quantity saved.");
+    return setQuantity(lineKey(line), Number(draft), "Quantity saved.");
+  }
+
+  /** "Honors to order separately": adds the honor with the number of members who completed it (#1330). */
+  async function addHonorLine(honor: { honorId: string; name: string; members: number }) {
+    // The button is replaced by "On the list" once saved, so focus moves there instead of falling to the page.
+    focusHonorId.current = honor.honorId;
+    if (!await setQuantity(`${HONOR_PICK_PREFIX}${honor.honorId}`, honor.members, `Added ${honor.name} to the list, quantity ${honor.members}.`)) focusHonorId.current = null;
   }
 
   function removeLine(line: HelperLine) {
     // A line nothing calls for was added by hand: forget it. Otherwise keep a 0 so it stays off the list.
-    return setQuantity(line.itemId, line.computedNeeded > 0 ? 0 : null, `Took ${line.name} off the list.`);
+    return setQuantity(lineKey(line), line.computedNeeded > 0 ? 0 : null, `Took ${line.name} off the list.`);
   }
 
   async function addLine() {
@@ -464,9 +515,28 @@ export function ClubOrderWorkspace({
               <details className={styles.earlierDetails}>
                 <summary>{`${unmatchedHonors.length === 1 ? "Honor" : "Honors"} to order separately (${unmatchedHonors.length})`}</summary>
                 <ul className={styles.unmatchedList}>
-                  {unmatchedHonors.map((honor) => (
-                    <li key={honor.name}><span translate="no">{honor.name}</span> · {honor.members} {honor.members === 1 ? "member" : "members"}</li>
-                  ))}
+                  {unmatchedHonors.map((honor) => {
+                    const canAdd = !readOnly && honor.honorId !== null && orderableHonorIds.has(honor.honorId);
+                    const onTheList = honor.honorId !== null && listedHonorIds.has(honor.honorId);
+                    return (
+                      <li className={styles.unmatchedItem} key={honor.honorId ?? honor.name}>
+                        <span><span translate="no">{honor.name}</span> · {honor.members} {honor.members === 1 ? "member" : "members"}</span>
+                        {onTheList ? (
+                          <span className={styles.unmatchedState} id={`club-order-on-list-${honor.honorId}`} tabIndex={-1}>On the list</span>
+                        ) : canAdd && (
+                          <button
+                            aria-label={`Add to list: ${honor.name}, quantity ${honor.members}`}
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() => void addHonorLine({ honorId: honor.honorId!, name: honor.name, members: honor.members })}
+                            type="button"
+                          >
+                            <Plus aria-hidden="true" size={14} /> Add to list
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </details>
             </div>
@@ -483,18 +553,19 @@ export function ClubOrderWorkspace({
                 <div className={styles.groupHead}><strong>{orderListSectionLabels[section]}</strong></div>
                 <ul className={styles.list}>
                   {lines.map((line) => {
-                    const inputId = `club-order-quantity-${line.itemId}`;
-                    const draft = drafts[line.itemId];
+                    const key = lineKey(line);
+                    const inputId = `club-order-quantity-${key.replace(":", "-")}`;
+                    const draft = drafts[key];
                     return (
-                      <li className={styles.row} key={line.itemId}>
+                      <li className={styles.row} key={key}>
                         <span className={styles.text}>
                           <strong translate="no">{line.name}</strong>
                           <small>
                             {line.size && <>{formatSizeLabel(line.size)} · </>}
-                            {line.catalogNumber ? <>Item no. <code>{line.catalogNumber}</code></> : (
+                            {line.honorId ? NO_CATALOG_ITEM_LABEL : line.catalogNumber ? <>Item no. <code>{line.catalogNumber}</code></> : (
                               <span className={styles.flagInline}><AlertTriangle aria-hidden="true" size={12} /> No item number</span>
                             )}
-                            {line.edited && line.needed !== line.computedNeeded && <> · Suggested from honors and uniform needs: {line.computedNeeded}</>}
+                            {line.itemId && line.edited && line.needed !== line.computedNeeded && <> · Suggested from honors and uniform needs: {line.computedNeeded}</>}
                           </small>
                         </span>
                         <dl className={styles.numbers}>
@@ -509,7 +580,7 @@ export function ClubOrderWorkspace({
                                     id={inputId}
                                     inputMode="numeric"
                                     min={0}
-                                    onChange={(event) => setDrafts((current) => ({ ...current, [line.itemId]: event.target.value }))}
+                                    onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))}
                                     type="number"
                                     value={draft ?? String(line.needed)}
                                   />
@@ -517,7 +588,10 @@ export function ClubOrderWorkspace({
                               )}
                             </dd>
                           </div>
-                          <div><dt>Available</dt><dd>{line.onHand}</dd></div>
+                          <div>
+                            <dt>Available</dt>
+                            <dd>{hasStockTracking(line) ? line.onHand : <><span aria-hidden="true">—</span><span className="sr-only">Not tracked</span></>}</dd>
+                          </div>
                           <div><dt>To order</dt><dd><strong>{line.toOrder}</strong></dd></div>
                         </dl>
                         {!readOnly && (
@@ -536,7 +610,7 @@ export function ClubOrderWorkspace({
                                 aria-label={`Reset to ${line.computedNeeded}: ${line.name}${line.size ? `, ${line.size}` : ""}`}
                                 className="text-button"
                                 disabled={busy}
-                                onClick={() => void setQuantity(line.itemId, null, "Quantity reset.")}
+                                onClick={() => void setQuantity(key, null, "Quantity reset.")}
                                 type="button"
                               >
                                 <RotateCcw aria-hidden="true" size={14} /> Reset
@@ -570,10 +644,10 @@ export function ClubOrderWorkspace({
             <div className={styles.groupHead}><strong>Taken off the list</strong></div>
             <ul className={styles.people}>
               {takenOff.map((line) => (
-                <li className={styles.rowStatic} key={line.itemId}>
+                <li className={styles.rowStatic} key={lineKey(line)}>
                   <span translate="no">{line.name}{line.size ? ` (${line.size})` : ""}</span>
                   {!readOnly && (
-                    <button className="text-button" disabled={busy} onClick={() => void setQuantity(line.itemId, null, "Put back on the list.")} type="button">Put back</button>
+                    <button className="text-button" disabled={busy} onClick={() => void setQuantity(lineKey(line), null, "Put back on the list.")} type="button">Put back</button>
                   )}
                 </li>
               ))}
@@ -594,9 +668,7 @@ export function ClubOrderWorkspace({
                 <select className={styles.select} id="club-order-picker-item" onChange={(event) => setPickerItem(event.target.value)} value={chosenItem}>
                   <option value="">Choose an item</option>
                   {shownPickerItems.map((row) => (
-                    <option key={row.itemId} value={row.itemId}>
-                      {row.name}{row.catalogNumber ? ` · ${row.catalogNumber}` : ""}{row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}
-                    </option>
+                    <option key={row.itemId} value={row.itemId}>{row.label}</option>
                   ))}
                 </select>
               </label>
@@ -609,7 +681,7 @@ export function ClubOrderWorkspace({
               </button>
             </div>
             <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{pickerSummary}</p>
-            <p className={`field-help ${styles.helpText}`}>Only honors linked to a catalog item can be added. If an honor is missing, conference staff can link it in the supply catalog.</p>
+            <p className={`field-help ${styles.helpText}`}>Honors with no catalog item can be added too; they are marked as ordered from AdventSource separately and have no item number. If an honor is missing, conference staff can link it in the supply catalog.</p>
           </div>
         )}
 

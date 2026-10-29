@@ -23,7 +23,10 @@
 .flag svg { flex: 0 0 auto; margin-top: 3px; }
 .unmatched { display: grid; gap: 4px; min-width: 0; }
 .unmatched p { margin: 0; }
-.unmatchedList { display: grid; gap: 4px; margin: 0; padding: 0 0 0 18px; font-size: max(var(--type-body-floor, 0px), .875rem); }
+.unmatchedList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: max(var(--type-body-floor, 0px), .875rem); }
+.unmatchedItem { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; min-height: 44px; }
+.unmatchedItem :global(.secondary-button) { min-height: 44px; min-width: 44px; }
+.unmatchedState { font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
 .flagInline { display: inline-flex; align-items: center; gap: 4px; color: var(--coral); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .actions :global(.secondary-button), .actions :global(.primary-button), .groupHead :global(.text-button) { min-height: 44px; min-width: 44px; }
