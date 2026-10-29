@@ -248,7 +248,7 @@ export type RegistrySnapshot = {
 };
 
 export function liveRegistries(): RegistrySnapshot {
-  const cards = buildMoreDirectoryCards({ permissions: eventPermissions, clubOversight: true, clubEvent: true, isSystemAdmin: true, clubFormsAccess: true, eventQuery: "" });
+  const cards = buildMoreDirectoryCards({ permissions: eventPermissions, clubOversight: true, clubEvent: true, isSystemAdmin: true, clubFormsAccess: true, eventQuery: "", hiddenCardKeys: new Set() });
   return {
     navigationHrefs: [...navigation, eventFeaturesItem].map((item) => item.href),
     systemGroups: systemNavGroups,
@@ -276,7 +276,7 @@ export function missingFromRegistries(rows: readonly RouteMappingRow[], registri
 
 /** Viewers whose menus together must reach every mapped route: an administrator with every permission, and kitchen staff, who hold the counts page instead of the dashboard (#1029). */
 export const reachabilityContexts: readonly DestinationSearchContext[] = [
-  { isSystemAdmin: true, selectedEventId: "event_synthetic", permissions: eventPermissions, clubOversight: true, clubEvent: true, clubFormsAccess: true },
+  { isSystemAdmin: true, selectedEventId: "event_synthetic", permissions: eventPermissions, clubOversight: true, clubEvent: true, clubFormsAccess: true, hiddenCardKeys: new Set() },
   { isSystemAdmin: false, selectedEventId: "event_synthetic", permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubEvent: false, clubFormsAccess: false },
 ];
 

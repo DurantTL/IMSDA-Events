@@ -60,6 +60,19 @@ export function getEmergencyPlanDraft(eventId: string): Promise<EmergencyPlanDra
 
 /** Replaces the draft with the validated input, in one transaction, and audits it. Published versions are untouched. */
 export async function saveEmergencyPlanDraft(eventId: string, draft: EmergencyPlanDraft, actorUserId: string): Promise<EmergencyPlanDraft> {
+  try {
+    await saveDraftRows(eventId, draft, actorUserId);
+  } catch (error) {
+    // Two first saves racing on the plan row: the loser is told to try again (no optimistic concurrency here).
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new EmergencyPlanError("The plan was saved at the same moment. Reload and save again.", "SAVE_CONFLICT", 409);
+    }
+    throw error;
+  }
+  return getEmergencyPlanDraft(eventId);
+}
+
+async function saveDraftRows(eventId: string, draft: EmergencyPlanDraft, actorUserId: string) {
   await getPrisma().$transaction(async (tx) => {
     const plan = await tx.emergencyPlan.upsert({ where: { eventId }, create: { eventId }, update: {}, select: { id: true } });
     await Promise.all([
@@ -87,7 +100,6 @@ export async function saveEmergencyPlanDraft(eventId: string, draft: EmergencyPl
       metadata: { locations: draft.locations.length, procedures: draft.procedures.length, contacts: draft.contacts.length },
     }, tx);
   });
-  return getEmergencyPlanDraft(eventId);
 }
 
 /**

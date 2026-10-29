@@ -8,7 +8,7 @@ import { findActiveMembership } from "@/modules/events/repository";
 export class EmergencyPlanError extends Error {
   constructor(
     message: string,
-    public readonly code: "MODULE_DISABLED" | "VERSION_NOT_FOUND" | "EMPTY_PLAN" | "PUBLISH_CONFLICT" | "EVENT_NOT_FOUND",
+    public readonly code: "MODULE_DISABLED" | "VERSION_NOT_FOUND" | "EMPTY_PLAN" | "PUBLISH_CONFLICT" | "SAVE_CONFLICT" | "EVENT_NOT_FOUND",
     public readonly status: 404 | 409,
   ) {
     super(message);

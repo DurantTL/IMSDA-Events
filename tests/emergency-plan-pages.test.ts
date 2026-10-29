@@ -77,11 +77,16 @@ describe("emergency plan page gates", () => {
     const node = await EmergencyPlanPage({ searchParams: search() });
     expect(isRestricted(node)).toBe(false);
     expect((node as { props: { canEdit: boolean } }).props.canEdit).toBe(false);
+    // Drafts are administrators' only: no draft is read, and none (no names, phones or procedure text) reaches the client.
+    expect(mocks.getEmergencyPlanDraft).not.toHaveBeenCalled();
+    expect((node as { props: { initialDraft: unknown } }).props.initialDraft).toBeNull();
+    expect(JSON.stringify((node as { props: unknown }).props)).not.toMatch(/Sample|555-0100/);
   });
 
   it("gives administrators the editor", async () => {
     const node = await EmergencyPlanPage({ searchParams: search() });
     expect((node as { props: { canEdit: boolean } }).props.canEdit).toBe(true);
+    expect((node as { props: { initialDraft: unknown } }).props.initialDraft).toEqual(draftPlan);
   });
 });
 

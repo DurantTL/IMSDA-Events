@@ -31,10 +31,9 @@ export function EmergencyReferenceSheetView({ sheet, generatedAtIso, actions }: 
   return (
     <article className={styles.sheet} data-draft={sheet.isDraft ? "true" : "false"}>
       {actions && <div className={styles.screenOnly}>{actions}</div>}
-      <table className={styles.frame} role="presentation">
-        <tbody>
-          <tr>
-            <td>
+      <div className={styles.frame}>
+        <div className={styles.frameBody}>
+          <div>
               {sheet.banner && <p className={styles.draftBanner} role="status">{sheet.banner}</p>}
               <header className={styles.header}>
                 <p className={styles.eyebrow}>Emergency reference</p>
@@ -45,7 +44,7 @@ export function EmergencyReferenceSheetView({ sheet, generatedAtIso, actions }: 
               <section className={styles.section}>
                 <h3>Contacts, in escalation order</h3>
                 {sheet.contacts.length === 0 ? <p className={styles.empty}>No contacts listed.</p> : (
-                  <table className={styles.contacts}>
+                  <table className={styles.printTable}>
                     <thead><tr><th scope="col">Order</th><th scope="col">Role</th><th scope="col">Name</th><th scope="col">Phone</th></tr></thead>
                     <tbody>
                       {sheet.contacts.map((contact) => (
@@ -77,15 +76,12 @@ export function EmergencyReferenceSheetView({ sheet, generatedAtIso, actions }: 
                   </div>
                 ))}
               </section>
-            </td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td><EmergencyPrintFooter initialPrintedAt={generatedAtIso} timezone={sheet.timezone} prefix={emergencyReferenceFooterPrefix(sheet)} /></td>
-          </tr>
-        </tfoot>
-      </table>
+          </div>
+        </div>
+        <div className={styles.frameFoot}>
+          <div><EmergencyPrintFooter initialPrintedAt={generatedAtIso} timezone={sheet.timezone} prefix={emergencyReferenceFooterPrefix(sheet)} /></div>
+        </div>
+      </div>
     </article>
   );
 }

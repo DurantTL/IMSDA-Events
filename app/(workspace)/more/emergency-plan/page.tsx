@@ -20,10 +20,12 @@ export default async function EmergencyPlanPage({ searchParams }: { searchParams
   if (!(await isModuleEnabled(event.id, "emergency-plans"))) {
     return <AccessRestricted title="The emergency plan is not turned on" detail="A system administrator turns on the Emergency plan for an event before staff can use it." />;
   }
-  const [draft, versions] = await Promise.all([getEmergencyPlanDraft(event.id), listEmergencyPlanVersions(event.id)]);
+  const canEdit = permissions.includes("CONFIGURE_EVENT");
+  // Drafts are administrators' working copy: read-only staff are sent no draft content at all, only the published versions.
+  const [draft, versions] = await Promise.all([canEdit ? getEmergencyPlanDraft(event.id) : null, listEmergencyPlanVersions(event.id)]);
   return (
     <EmergencyPlanWorkspace
-      canEdit={permissions.includes("CONFIGURE_EVENT")}
+      canEdit={canEdit}
       eventId={event.id}
       eventName={event.name}
       initialDraft={draft}

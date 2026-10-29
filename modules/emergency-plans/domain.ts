@@ -52,6 +52,8 @@ export const emergencyProcedureInputSchema = z.object({
 }).strict();
 
 export const emergencyPhoneSchema = z.string().trim().min(1, "Give each contact a phone number.").max(MAX_PHONE_LENGTH).transform((value, context) => {
+  // A blank phone already has its own message from the check above.
+  if (value === "") return z.NEVER;
   const check = validatePhone(value);
   if (!check.ok) {
     context.addIssue({ code: "custom", message: "Enter a valid phone number, like (515) 555-0100." });
@@ -64,7 +66,7 @@ export const emergencyContactInputSchema = z.object({
   role: required(100, "Give each contact a role."),
   name: required(120, "Give each contact a name."),
   phone: emergencyPhoneSchema,
-  escalationOrder: z.number().int("Escalation order is a whole number.").min(1, "Escalation order starts at 1.").max(99),
+  escalationOrder: z.number({ error: "Give each contact an escalation order, a whole number starting at 1." }).int("Escalation order is a whole number.").min(1, "Escalation order starts at 1.").max(99),
 }).strict();
 
 export const emergencyPlanDraftSchema = z.object({
@@ -211,4 +213,30 @@ export function formatPrintTimestamp(date: Date, timezone: string): string {
   } catch {
     return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(date);
   }
+}
+
+// --- Mapping a server issue back to a field ---------------------------------
+
+const locationFieldKeys: Record<string, string> = { kind: "loc-kind", name: "loc-name", description: "loc-desc", capacityNote: "loc-cap", directions: "loc-dir", mapReference: "loc-map" };
+const procedureFieldKeys: Record<string, string> = { kind: "proc-kind", title: "proc-title", body: "proc-body" };
+const contactFieldKeys: Record<string, string> = { escalationOrder: "con-order", role: "con-role", name: "con-name", phone: "con-phone" };
+
+/**
+ * Where a validation issue belongs on the editor: the field key (the editor
+ * prefixes it to make an element id; null when the issue is not about one
+ * field) and the entry's name for the message ("Contact 4"). Pure, so the
+ * editor and its test share one mapping.
+ */
+export function emergencyIssueTarget(path: ReadonlyArray<string | number>): { fieldKey: string | null; entry: string | null } {
+  const [section, index, field, itemIndex, itemField] = path;
+  if (typeof index !== "number") return { fieldKey: null, entry: null };
+  if (section === "locations") return { fieldKey: locationFieldKeys[String(field)] ? `${locationFieldKeys[String(field)]}-${index}` : null, entry: `Location ${index + 1}` };
+  if (section === "contacts") return { fieldKey: contactFieldKeys[String(field)] ? `${contactFieldKeys[String(field)]}-${index}` : null, entry: `Contact ${index + 1}` };
+  if (section === "procedures") {
+    if (field === "items" && typeof itemIndex === "number") {
+      return { fieldKey: itemField === "title" || itemField === "text" ? `step-${itemField}-${index}-${itemIndex}` : null, entry: `Procedure ${index + 1}, step ${itemIndex + 1}` };
+    }
+    return { fieldKey: procedureFieldKeys[String(field)] ? `${procedureFieldKeys[String(field)]}-${index}` : null, entry: `Procedure ${index + 1}` };
+  }
+  return { fieldKey: null, entry: null };
 }

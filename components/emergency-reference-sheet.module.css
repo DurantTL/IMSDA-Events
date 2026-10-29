@@ -1,7 +1,9 @@
 /* The printed emergency reference (#114). Legible on paper first; the screen view is the same page. */
 .sheet { display: grid; gap: 12px; padding: 16px 0 32px; color: #111; }
-.frame { width: 100%; border-collapse: collapse; }
-.frame > tbody > tr > td, .frame > tfoot > tr > td { padding: 0; }
+/* A table-layout frame, not a table, so the footer group repeats on every printed page. */
+.frame { display: table; width: 100%; }
+.frameBody { display: table-row-group; }
+.frameFoot { display: table-footer-group; }
 .screenOnly { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .screenOnly :global(.secondary-button), .screenOnly :global(.primary-button) { min-height: 44px; min-width: 44px; }
 .draftBanner { margin: 0 0 12px; border: 3px solid #111; padding: 10px 14px; font-size: max(var(--type-staff-floor, 0px), 1.1rem); font-weight: 800; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
@@ -23,13 +25,12 @@
 .kind { font-weight: 400; }
 .steps { margin: 4px 0 0; padding-left: 22px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); line-height: 1.45; }
 .steps li { margin-bottom: 3px; overflow-wrap: anywhere; }
-.contacts { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
-.contacts th, .contacts td { border: 1px solid #777; padding: 6px 8px; text-align: left; overflow-wrap: anywhere; }
-.contacts th { background: #eee; }
+.printTable { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.printTable th, .printTable td { border: 1px solid #777; padding: 6px 8px; text-align: left; overflow-wrap: anywhere; }
+.printTable th { background: #eee; }
 .footer { margin: 10px 0 0; border-top: 1px solid #555; padding-top: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 
 @media print {
   .screenOnly { display: none !important; }
   .sheet { padding: 0; }
-  .frame > tfoot { display: table-footer-group; }
 }

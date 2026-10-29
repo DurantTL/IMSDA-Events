@@ -325,6 +325,9 @@ const pages: PageSpec[] = [
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
   staff("lodging-assignments", "/more/lodging/assignments"),
+  // The emergency plan (#114): the editor with a saved draft and one published version, and the printed reference sheet.
+  staff("emergency-plan", "/more/emergency-plan"),
+  staff("emergency-plan-print", "/more/emergency-plan/print"),
   staff("issued-assets", "/more/issued-assets"),
   staff("issued-assets-desk", "/check-in/assets"),
   // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
@@ -1284,6 +1287,48 @@ async function seedScheduledEmails(prisma: PrismaClient) {
  */
 let launcherModuleCreated = false;
 /**
+ * The emergency plan (#114): turns the module on for the audit's event and gives it a small synthetic draft with one
+ * published version, so the editor and the print page render real content. Both are the audit's own; the end of the run
+ * removes them (the plan's tables cascade from the plan row), whether or not MOBILE_LAYOUT_CLEANUP is set.
+ */
+let emergencyModuleCreated = false;
+let emergencyPlanCreated = false;
+async function seedEmergencyPlan(prisma: PrismaClient) {
+  if (!(await prisma.eventModule.findUnique({ where: { eventId_moduleKey: { eventId, moduleKey: "emergency-plans" } }, select: { id: true } }))) {
+    await prisma.eventModule.create({ data: { eventId, moduleKey: "emergency-plans" } });
+    emergencyModuleCreated = true;
+  }
+  if (await prisma.emergencyPlan.findUnique({ where: { eventId }, select: { id: true } })) return;
+  const long = (text: string, size: number) => text.padEnd(size, " and more words").slice(0, size).trim();
+  const { buildEmergencyPlanSnapshot } = await import("../modules/emergency-plans/domain");
+  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { name: true, startsAt: true, endsAt: true, timezone: true } });
+  const locations = [
+    { kind: "ASSEMBLY" as const, name: long("Main field flagpole assembly point", 90), description: "Open lawn north of the dining hall.", capacityNote: "About 400 people", directions: "Leave by the nearest door and walk to the flagpole.", mapReference: "Grid C4" },
+    { kind: "SHELTER" as const, name: "Gymnasium", description: "", capacityNote: "250 seated", directions: "", mapReference: "https://maps.example.test/gym" },
+  ];
+  const procedures = [
+    { kind: "EVACUATION" as const, title: "Evacuate a building", body: "Leave calmly.\n\nDo not use elevators.", items: [{ title: "Leave", text: "Use the nearest marked exit." }, { title: "Gather", text: long("Meet at the assembly point and wait for a head count by your leader.", 160) }] },
+    { kind: "SEVERE_WEATHER" as const, title: "Tornado warning", body: "Move to the shelter.", items: [] },
+  ];
+  const contacts = [
+    { role: "Camp director", name: "Sample Director", phone: "(515) 555-0100", escalationOrder: 1 },
+    { role: "Site security", name: "Sample Guard", phone: "(515) 555-0101", escalationOrder: 2 },
+  ];
+  const planId = `${P}_emergency_plan`;
+  await prisma.emergencyPlan.create({
+    data: {
+      id: planId,
+      eventId,
+      locations: { create: locations.map((row, index) => ({ ...row, sortOrder: index })) },
+      procedures: { create: procedures.map((row, index) => ({ ...row, sortOrder: index })) },
+      contacts: { create: contacts },
+      versions: { create: { versionNumber: 1, snapshot: buildEmergencyPlanSnapshot({ locations, procedures, contacts }, event) as object } },
+    },
+  });
+  emergencyPlanCreated = true;
+}
+
+/**
  * Hub content at its longest (#111): three notices (one of each level), six announcements, six header links and a full
  * footer. Published only when nothing is published yet, so every public page in the run shows the notices and links;
  * the same content is the draft the preview page renders. Both rows are the audit's own and cleanup removes them.
@@ -1658,6 +1703,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedScheduledEmails(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
+  await seedEmergencyPlan(prisma);
   await seedHubContent(prisma);
   await seedIssuedAssets(prisma);
   await seedKitchenCounts(prisma);
@@ -4408,6 +4454,13 @@ async function main() {
     if (launcherModuleCreated) {
       await prisma.eventModule.deleteMany({ where: { eventId, moduleKey: "attendee-community" } }).catch((error: Error) => console.error(`Could not remove the synthetic module row: ${error.message}`));
       await prisma.auditLog.deleteMany({ where: { eventId, action: { startsWith: "EVENT_MODULE_" }, entityId: "attendee-community" } }).catch(() => undefined);
+    }
+    if (emergencyPlanCreated) {
+      await prisma.emergencyPlan.deleteMany({ where: { eventId } }).catch((error: Error) => console.error(`Could not remove the synthetic emergency plan: ${error.message}`));
+    }
+    if (emergencyModuleCreated) {
+      await prisma.eventModule.deleteMany({ where: { eventId, moduleKey: "emergency-plans" } }).catch((error: Error) => console.error(`Could not remove the synthetic emergency plan module row: ${error.message}`));
+      await prisma.auditLog.deleteMany({ where: { eventId, action: { startsWith: "EVENT_MODULE_" }, entityId: "emergency-plans" } }).catch(() => undefined);
     }
     if (seeded && process.env.MOBILE_LAYOUT_CLEANUP === "1") {
       await cleanupSynthetic(prisma).catch((error: Error) => console.error(`Cleanup failed: ${error.message}`));

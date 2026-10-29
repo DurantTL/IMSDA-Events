@@ -86,9 +86,18 @@ describe("launcher grouping", () => {
   });
 
   it("does not let a module being on grant a card the role cannot open", () => {
-    const keys = keysOf(cardsFor({ permissions: ["VIEW_EVENT"], clubOversight: false, clubFormsAccess: false }));
-    // The emergency plan (#114) is the one card read-only event staff may open: viewing and printing follow VIEW_EVENT.
-    expect(keys).toEqual(["emergency-plans"]);
+    const keys = keysOf(cardsFor({ permissions: ["VIEW_EVENT"], clubOversight: false, clubFormsAccess: false, enabled: eventModuleKeys.filter((key) => key !== "emergency-plans") }));
+    expect(keys).toEqual([]);
+  });
+
+  it("lists the emergency plan for read-only event staff only while its module is on (#114)", () => {
+    const readOnly = { permissions: ["VIEW_EVENT"] as EventPermission[], clubOversight: false, clubFormsAccess: false };
+    expect(keysOf(cardsFor({ ...readOnly, enabled: eventModuleKeys }))).toEqual(["emergency-plans"]);
+    expect(keysOf(cardsFor({ ...readOnly, enabled: [] }))).toEqual([]);
+    // With no module state at all the card stays off.
+    expect(buildMoreDirectoryCards({ ...readOnly, clubEvent: false, isSystemAdmin: false, clubOversight: false, clubFormsAccess: false, eventQuery: "" }).filter((card) => card.allowed)).toEqual([]);
+    // Viewing needs VIEW_EVENT: kitchen-only staff never get it.
+    expect(keysOf(cardsFor({ permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubFormsAccess: false, enabled: eventModuleKeys }))).toEqual([]);
   });
 });
 

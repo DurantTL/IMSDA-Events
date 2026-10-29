@@ -237,6 +237,7 @@ function allowedMoreCardHrefs(scenario: Scenario): string[] {
     isSystemAdmin: scenario.isSystemAdmin,
     clubFormsAccess: scenario.clubFormsAccess,
     eventQuery: "",
+    hiddenCardKeys: new Set(),
   })
     .filter((card) => card.allowed)
     .map((card) => card.href);

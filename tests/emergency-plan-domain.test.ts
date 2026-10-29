@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEmergencyPlanSnapshot,
+  emergencyIssueTarget,
   emergencyPlanDraftSchema,
   parseEmergencyPlanSnapshot,
   snapshotAllowedKeys,
@@ -106,5 +107,22 @@ describe("emergency plan snapshot", () => {
     expect(parseEmergencyPlanSnapshot(JSON.parse(JSON.stringify(snapshot)))).toEqual(snapshot);
     expect(parseEmergencyPlanSnapshot({ ...snapshot, attendees: [] })).toBeNull();
     expect(parseEmergencyPlanSnapshot(null)).toBeNull();
+  });
+});
+
+describe("mapping an issue back to its field", () => {
+  it("names the entry and the field the editor marks invalid", () => {
+    expect(emergencyIssueTarget(["contacts", 3, "phone"])).toEqual({ fieldKey: "con-phone-3", entry: "Contact 4" });
+    expect(emergencyIssueTarget(["contacts", 0, "escalationOrder"])).toEqual({ fieldKey: "con-order-0", entry: "Contact 1" });
+    expect(emergencyIssueTarget(["locations", 1, "mapReference"])).toEqual({ fieldKey: "loc-map-1", entry: "Location 2" });
+    expect(emergencyIssueTarget(["procedures", 0, "title"])).toEqual({ fieldKey: "proc-title-0", entry: "Procedure 1" });
+    expect(emergencyIssueTarget(["procedures", 2, "items", 1, "title"])).toEqual({ fieldKey: "step-title-2-1", entry: "Procedure 3, step 2" });
+    expect(emergencyIssueTarget(["contacts"])).toEqual({ fieldKey: null, entry: null });
+  });
+
+  it("gives a blank escalation order a sentence, not a type error", () => {
+    const result = emergencyPlanDraftSchema.safeParse(draft({ contacts: [{ role: "Director", name: "Sample", phone: "(515) 555-0100", escalationOrder: "" as unknown as number }] }));
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0].message).toContain("escalation order");
   });
 });

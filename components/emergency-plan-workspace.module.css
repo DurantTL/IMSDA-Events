@@ -8,6 +8,7 @@
 .legend { padding: 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
 .step { display: grid; gap: 8px; border-left: 3px solid var(--line); padding-left: 10px; }
 .item :global(.secondary-button), .block > :global(.secondary-button), .actions :global(.secondary-button), .actions :global(.primary-button) { min-height: 44px; min-width: 44px; }
+.fieldError { color: #9b1c1c; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .hint { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .versions { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }

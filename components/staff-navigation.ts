@@ -679,6 +679,8 @@ export function buildMoreDirectoryCards({
 }: MoreDirectoryContext): readonly MoreDirectoryCard[] {
   const granted = new Set(permissions);
   const has = (permission: EventPermission) => granted.has(permission);
+  // The emergency plan (#114) is off unless the caller says the module is on: no module state means no card.
+  const moduleIsOn = (cardKey: string) => hiddenCardKeys !== undefined && !hiddenCardKeys.has(cardKey);
   const attendeeConfigurationPermission = requiredPermissionFor("/more/attendee-configuration");
   const tagsPermission = requiredPermissionFor("/more/tags");
 
@@ -726,7 +728,7 @@ export function buildMoreDirectoryCards({
     },
     { key: "club-assignments", group: "people-access", allowed: clubEvent && canManageClubAssignments(permissions), href: `/more/club-assignments${eventQuery}`, icon: Tent, title: "Club assignments", description: "Set each registered club's campsite, duty, and activity, then email directors after review.", cta: "Assign clubs" },
     { key: "event-patches", group: "setup", allowed: clubEvent && has("CONFIGURE_EVENT"), href: `/more/event-patches${eventQuery}`, icon: Trophy, title: "Event patches", description: "Link the patch or pin a club event gives, so directors are suggested it for every member who attended.", cta: "Link patches" },
-    { key: "emergency-plans", group: "setup", allowed: has("VIEW_EVENT"), href: `/more/emergency-plan${eventQuery}`, icon: Siren, title: "Emergency plan", description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.", cta: "Open emergency plan" },
+    { key: "emergency-plans", group: "setup", allowed: has("VIEW_EVENT") && moduleIsOn("emergency-plans"), href: `/more/emergency-plan${eventQuery}`, icon: Siren, title: "Emergency plan", description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.", cta: "Open emergency plan" },
     // Club forms (#610) belong to no event: system administrators, Clubs Administrators and Event Admins of a current event only.
     { key: "club-forms", group: "people-access", allowed: clubFormsAccess, href: `/more/club-forms${eventQuery}`, icon: FileText, title: "Club forms", description: "Membership applications, staff service forms, permission slips, and passenger lists clubs have filled in.", cta: "Open club forms" },
     // Health information for club events (#658): system administrators, plus staff a system administrator gave VIEW_HEALTH_INFORMATION. No role carries it.

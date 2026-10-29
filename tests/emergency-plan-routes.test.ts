@@ -126,7 +126,43 @@ describe("emergency plan permissions", () => {
   });
 });
 
+describe("emergency plan drafts are administrators' only", () => {
+  it("returns the published versions but no draft to read-only staff, and does not read the draft", async () => {
+    signInAs("READ_ONLY_STAFF");
+    mocks.listEmergencyPlanVersions.mockResolvedValue([{ versionNumber: 1, publishedAt: new Date("2026-07-01T15:00:00Z") }]);
+    const body = await (await getPlan(new Request(url()), context)).json();
+    expect(body).not.toHaveProperty("draft");
+    expect(body.versions).toHaveLength(1);
+    expect(mocks.getEmergencyPlanDraft).not.toHaveBeenCalled();
+  });
+
+  it("returns the draft too for CONFIGURE_EVENT, whether by role or by an extra grant", async () => {
+    signInAs("EVENT_ADMIN");
+    expect(await (await getPlan(new Request(url()), context)).json()).toHaveProperty("draft");
+    signInAs("READ_ONLY_STAFF", ["CONFIGURE_EVENT"]);
+    expect(await (await getPlan(new Request(url()), context)).json()).toHaveProperty("draft");
+  });
+});
+
 describe("emergency plan input and export", () => {
+  it("answers 400 INVALID_EMERGENCY_PLAN for a body that is not JSON", async () => {
+    signInAs("EVENT_ADMIN");
+    const response = await putPlan(new Request(url(), { method: "PUT", body: "{not json" }), context);
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("INVALID_EMERGENCY_PLAN");
+    expect(mocks.saveEmergencyPlanDraft).not.toHaveBeenCalled();
+  });
+
+  it("reports every invalid row at once, with paths the editor maps to fields", async () => {
+    signInAs("EVENT_ADMIN");
+    const bad = { role: "Director", name: "Sample", phone: "(555) 010-0100", escalationOrder: 1 };
+    const response = await put({ locations: [], procedures: [], contacts: [bad, { ...bad, phone: "" }, { ...bad, phone: "(515) 555-0100", escalationOrder: "" }] });
+    expect(response.status).toBe(400);
+    const issues = (await response.json()).issues as Array<{ path: Array<string | number>; message: string }>;
+    expect(issues.map((issue) => issue.path.join("."))).toEqual(["contacts.0.phone", "contacts.1.phone", "contacts.2.escalationOrder"]);
+    expect(issues[2].message).toContain("escalation order");
+  });
+
   it("rejects an invalid draft with a 400 and saves nothing", async () => {
     signInAs("EVENT_ADMIN");
     const response = await put({ ...body, contacts: [{ role: "Director", name: "Sample", phone: "(555) 010-0100", escalationOrder: 1 }] });

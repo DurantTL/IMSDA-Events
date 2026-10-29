@@ -14,6 +14,7 @@ const store = vi.hoisted(() => ({
   audits: [] as Row[],
   event: { name: "Synthetic Camp Meeting", startsAt: new Date("2026-07-15T14:00:00Z"), endsAt: new Date("2026-07-19T20:00:00Z"), timezone: "America/Chicago" },
   nextId: 1,
+  failNextUpsertWith: null as Error | null,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -36,6 +37,7 @@ vi.mock("@/lib/prisma", () => {
         };
       },
       upsert: async ({ where, create }: { where: { eventId: string }; create: Row }) => {
+        if (store.failNextUpsertWith) { const failure = store.failNextUpsertWith; store.failNextUpsertWith = null; throw failure; }
         let plan = planFor(where);
         if (!plan) { plan = { id: `plan-${store.nextId++}`, ...create }; store.plans.push(plan); }
         return { id: plan.id };
@@ -82,7 +84,16 @@ const draftTwo = emergencyPlanDraftSchema.parse({
 });
 
 beforeEach(() => {
-  Object.assign(store, { plans: [], locations: [], procedures: [], contacts: [], versions: [], audits: [], nextId: 1 });
+  Object.assign(store, { plans: [], locations: [], procedures: [], contacts: [], versions: [], audits: [], nextId: 1, failNextUpsertWith: null });
+});
+
+describe("a racing first save", () => {
+  it("is a retryable 409, not a 500", async () => {
+    const { Prisma } = await import("@prisma/client");
+    store.failNextUpsertWith = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" });
+    await expect(saveEmergencyPlanDraft("event-1", draftOne, "staff-1")).rejects.toMatchObject({ code: "SAVE_CONFLICT", status: 409 });
+    expect(store.audits).toHaveLength(0);
+  });
 });
 
 describe("emergency plan versions", () => {
