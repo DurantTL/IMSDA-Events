@@ -23,7 +23,7 @@
 .flag svg { flex: 0 0 auto; margin-top: 3px; }
 .unmatched { display: grid; gap: 4px; min-width: 0; }
 .unmatched p { margin: 0; }
-.unmatchedList { display: grid; gap: 4px; margin: 0; padding: 0 0 0 18px; font-size: max(var(--type-floor, 0px), .74rem); }
+.unmatchedList { display: grid; gap: 4px; margin: 0; padding: 0 0 0 18px; font-size: max(var(--type-body-floor, 0px), .875rem); }
 .flagInline { display: inline-flex; align-items: center; gap: 4px; color: var(--coral); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .actions :global(.secondary-button), .actions :global(.primary-button), .groupHead :global(.text-button) { min-height: 44px; min-width: 44px; }
