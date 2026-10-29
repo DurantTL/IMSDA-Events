@@ -1,5 +1,6 @@
 import { CalendarDays, Clock3, DoorClosed, ExternalLink, MapPin } from "lucide-react";
 import {
+  calendarItemActionLabel,
   calendarItemStatusLine,
   calendarStatusLabels,
   closureLabel,
@@ -33,7 +34,7 @@ export function CalendarUpcomingWidget({ items, calendarHref, emptyLabel }: { it
             const statusLine = calendarItemStatusLine(item);
             const managed = item.kind === "EVENT";
             return (
-              <li className={`${styles.item} ${managed ? styles.managed : styles.informational}${item.status !== "SCHEDULED" ? ` ${styles.off}` : ""}`} key={item.key}>
+              <li className={`${styles.item} ${managed ? styles.managed : styles.informational}${item.status === "CANCELLED" ? ` ${styles.off}` : ""}`} key={item.key}>
                 <div className={styles.tags}>
                   {item.isClosure ? (
                     <span className={styles.tag}><DoorClosed aria-hidden="true" size={13} /> {closureLabel}</span>
@@ -51,7 +52,7 @@ export function CalendarUpcomingWidget({ items, calendarHref, emptyLabel }: { it
                 {managed && statusLine && <p className={`${styles.registration}${item.registrationOpen ? ` ${styles.open}` : ""}`}>{statusLine}</p>}
                 {managed && item.registrationOpen && item.href && item.status !== "CANCELLED" && (
                   <WidgetLink className={styles.action} item={item}>
-                    Register<span className="sr-only"> for {title}</span>
+                    {calendarItemActionLabel(item)}<span className="sr-only"> for {title}</span>
                   </WidgetLink>
                 )}
                 {!managed && item.href && item.status !== "CANCELLED" && (

@@ -79,6 +79,31 @@ describe("widget selection (#107)", () => {
   });
 });
 
+describe("widget selection edge cases (#107)", () => {
+  const today = "2026-11-10";
+
+  it("shows an event linked to several items (#1086) once, by its own dates", () => {
+    const linked = { kind: "EVENT" as const, href: "/events/synthetic-camporee", eventTitle: "Synthetic Camporee", eventStartsOn: "2026-11-14", eventEndsOn: "2026-11-16" };
+    const items = [
+      item({ key: "link-b", ...linked, startsOn: "2026-11-15", endsOn: "2026-11-15" }),
+      item({ key: "link-a", ...linked, startsOn: "2026-11-14", endsOn: "2026-11-14" }),
+      item({ key: "other", startsOn: "2026-11-12", endsOn: "2026-11-12" }),
+    ];
+    expect(selectWidgetItems(items, { today, filter: "everything" }).map((i) => i.key)).toEqual(["other", "link-a"]);
+  });
+
+  it("uses the event's dates to decide an item is over", () => {
+    const items = [item({ key: "late", kind: "EVENT", href: "/events/x", startsOn: "2026-11-01", endsOn: "2026-11-01", eventStartsOn: "2026-11-01", eventEndsOn: "2026-11-12" })];
+    expect(selectWidgetItems(items, { today, filter: "everything" })).toHaveLength(1);
+  });
+
+  it("takes the first value of a repeated filter or category instead of throwing", () => {
+    const items = [item({ key: "camp", category: "Camps" }), item({ key: "retreat", category: "Retreat" })];
+    expect(selectWidgetItems(items, { today, category: ["retreat", "camps"] }).map((i) => i.key)).toEqual(["retreat"]);
+    expect(parseWidgetLimit(["3", "9"])).toBe(3);
+  });
+});
+
 describe("multi-day rendering (#107)", () => {
   it("shows a span as a range, across months and years", () => {
     expect(formatDateRange("2026-12-05", "2026-12-07")).toBe("December 5–7, 2026");
@@ -122,8 +147,10 @@ describe("embedded calendar page (#107)", () => {
     expect(html).toContain('href="/events/synthetic-camp" target="_top"');
     expect(html).toContain('href="/calendar?view=list&amp;filter=everything"');
     expect(html).not.toContain("Not returned");
-    // A cancelled entry gets no action link, so its external link is not offered at all.
+    // A cancelled entry still lists its title, but gets no "More info" action.
     expect(html).toContain("Synthetic Rally");
+    expect(html).not.toContain("More info");
+    expect(html).toContain("Register");
   });
 
   it("gives an external entry link target _top and rel", async () => {
@@ -131,6 +158,22 @@ describe("embedded calendar page (#107)", () => {
     const { default: Page } = await import("@/app/(public)/embed/calendar/page");
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ filter: "everything" }) }));
     expect(html).toContain('rel="noopener noreferrer" target="_top"');
+  });
+
+  it("words a waitlist action and strikes only cancelled items", async () => {
+    listPublicCalendarItems.mockResolvedValue([
+      item({ key: "event-w", kind: "EVENT", title: "Synthetic Waitlist Event", href: "/events/w", registrationOpen: true, registrationStatus: "WAITLIST" }),
+      item({ key: "event-p", kind: "EVENT", title: "Synthetic Moved Event", href: "/events/p", status: "POSTPONED" }),
+      item({ key: "entry-c", title: "Synthetic Cancelled Entry", status: "CANCELLED" }),
+    ]);
+    const { default: Page } = await import("@/app/(public)/embed/calendar/page");
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ filter: ["everything", "camps"], category: ["a", "b"] }) }));
+    expect(html).toContain("Join the waitlist");
+    expect(html).toContain("Postponed");
+    const lis = html.split("<li ").slice(1);
+    const struck = (title: string) => /_off_|off/.test(lis.find((li) => li.includes(title))!.split(">")[0]);
+    expect(struck("Synthetic Cancelled Entry")).toBe(true);
+    expect(struck("Synthetic Moved Event")).toBe(false);
   });
 
   it("shows an empty state", async () => {

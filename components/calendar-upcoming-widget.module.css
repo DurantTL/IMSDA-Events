@@ -1,11 +1,10 @@
-/* The embeddable upcoming-events widget (#107): a compact list that sits on a host page's own background. */
+/* The embeddable upcoming-events widget (#107): a compact list. The embed layout paints the site's paper colour behind it; the cards are white. */
 .widget {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   padding: 4px 0 8px;
-  background: transparent;
   color: #1b2a41;
   font-size: 1rem;
   line-height: 1.4;

@@ -66,6 +66,13 @@ export function calendarItemStatusLine(item: CalendarItem, now = new Date()): st
   return publicStatusLine({ status: item.registrationStatus, opensOn: item.registrationOpensOn, isClubEvent: item.clubEvent, timeZone: item.registrationTimeZone }, now);
 }
 
+/** The action link's words on an agenda or widget item ("Register", "Join the waitlist", "Details", "More info"). */
+export function calendarItemActionLabel(item: CalendarItem) {
+  if (item.kind !== "EVENT") return "More info";
+  if (!item.registrationOpen) return "Details";
+  return item.registrationStatus === "WAITLIST" ? "Join the waitlist" : "Register";
+}
+
 /** The first occurrence of each repeating entry; one-off items all stay. Items must already be in date order. */
 export function firstPerSeries(items: CalendarItem[]) {
   const seen = new Set<string>();

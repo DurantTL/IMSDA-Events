@@ -4,7 +4,7 @@
  */
 
 import { escapeHtmlAttribute } from "@/modules/forms/embed";
-import { filterByCategory, firstPerSeries, sortCalendarItems, type CalendarItem } from "@/modules/calendar/domain";
+import { filterByCategory, firstPerSeries, type CalendarItem } from "@/modules/calendar/domain";
 import { filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
 
 export const defaultWidgetLimit = 5;
@@ -12,9 +12,12 @@ export const minWidgetLimit = 1;
 export const maxWidgetLimit = 12;
 const maxCategoryLength = 40;
 
+/** A repeated query param arrives as an array; the first value wins. */
+const firstValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+
 /** `?limit=` as a whole number from 1 to 12; anything missing or unreadable is 5. */
 export function parseWidgetLimit(value: string | string[] | undefined) {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw = firstValue(value);
   if (!raw || !/^\s*-?\d+\s*$/.test(raw)) return defaultWidgetLimit;
   return Math.min(maxWidgetLimit, Math.max(minWidgetLimit, Number(raw)));
 }
@@ -22,26 +25,40 @@ export function parseWidgetLimit(value: string | string[] | undefined) {
 export type WidgetOptions = {
   /** Today's conference date, YYYY-MM-DD. */
   today: string;
-  filter?: string;
-  category?: string;
+  filter?: string | string[];
+  category?: string | string[];
   limit?: number;
 };
 
 /** The resolved filter the widget uses and the "View full calendar" link keeps. */
-export function resolveWidgetFilter(filter: string | undefined, category: string | undefined) {
-  return resolveCalendarFilter(filter, category?.slice(0, maxCategoryLength) || undefined);
+export function resolveWidgetFilter(filter: string | string[] | undefined, category: string | string[] | undefined) {
+  return resolveCalendarFilter(firstValue(filter), firstValue(category)?.slice(0, maxCategoryLength) || undefined);
 }
 
+/** An item shows its linked event's own dates when it has them (#1086), so ordering and "over" use those. */
+const shownStart = (item: CalendarItem) => item.eventStartsOn ?? item.startsOn;
+const shownEnd = (item: CalendarItem) => item.eventEndsOn ?? item.endsOn;
+
 /**
- * The next items for the widget: in the chosen filter, not yet over, in date order, a repeating series once, at most
- * `limit`. An item already under way (a multi-day event that started yesterday) stays until its last day.
+ * The next items for the widget: in the chosen filter, not yet over, in date order, a repeating series once, an event
+ * linked to several items (#1086) once, at most `limit`. An item already under way (a multi-day event that started
+ * yesterday) stays until its last day. Dates are the ones the widget shows (the linked event's when set).
  */
 export function selectWidgetItems(items: CalendarItem[], options: WidgetOptions) {
   const { slug, category } = resolveWidgetFilter(options.filter, options.category);
   const limit = Math.min(maxWidgetLimit, Math.max(minWidgetLimit, options.limit ?? defaultWidgetLimit));
-  const upcoming = items.filter((item) => item.endsOn >= options.today);
+  const upcoming = items.filter((item) => shownEnd(item) >= options.today);
   const filtered = filterByCategory(filterByGroup(upcoming, slug), category);
-  return firstPerSeries(sortCalendarItems(filtered)).slice(0, limit);
+  const ordered = [...filtered].sort((a, b) =>
+    shownStart(a).localeCompare(shownStart(b)) || shownEnd(a).localeCompare(shownEnd(b)) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+  const seenEvents = new Set<string>();
+  const onePerEvent = ordered.filter((item) => {
+    if (item.kind !== "EVENT" || !item.href) return true;
+    if (seenEvents.has(item.href)) return false;
+    seenEvents.add(item.href);
+    return true;
+  });
+  return firstPerSeries(onePerEvent).slice(0, limit);
 }
 
 export type CalendarWidgetEmbedInput = {

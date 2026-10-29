@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Clock3, DoorClosed, ExternalLink, MapPin } from "lucide-react";
 import { EventCardTransition } from "@/components/event-card-transition";
-import { calendarItemStatusLine, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
+import { calendarItemActionLabel, calendarItemStatusLine, calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -45,7 +45,7 @@ export function AgendaItem({ item, transitionName }: { item: CalendarItem; trans
           className={`${item.registrationOpen ? "primary-button" : "secondary-button"} calendar-agenda-action`}
           item={item}
         >
-          {item.kind === "EVENT" ? (item.registrationOpen ? (item.registrationStatus === "WAITLIST" ? "Join the waitlist" : "Register") : "Details") : "More info"}
+          {calendarItemActionLabel(item)}
           {item.href.startsWith("/") ? <ChevronRight size={14} aria-hidden="true" /> : <ExternalLink size={14} aria-hidden="true" />}
         </ItemLink>
       )}

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type SearchParams = Promise<{ filter?: string; category?: string; limit?: string }>;
+type SearchParams = Promise<{ filter?: string | string[]; category?: string | string[]; limit?: string | string[] }>;
 
 export default async function EmbeddedCalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
