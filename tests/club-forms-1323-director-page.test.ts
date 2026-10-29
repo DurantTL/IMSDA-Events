@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -131,5 +132,13 @@ describe("announcements", () => {
   it("keeps one polite status region mounted on the page", async () => {
     const html = await render();
     expect(html).toMatch(/<div aria-live="polite" role="status"[^>]*data-testid="club-forms-status"/);
+    // Inside the intro card, so an empty region adds no gap to the page grid.
+    expect(html).toMatch(/club-forms-intro">(?:(?!<\/section>)[\s\S])*data-testid="club-forms-status"/);
+  });
+
+  it("keys each announcement so the same message twice is announced again", () => {
+    const source = readFileSync("components/club-forms-status.tsx", "utf8");
+    expect(source).toContain("key={status.count}");
+    expect(source).toContain("count: current.count + 1");
   });
 });

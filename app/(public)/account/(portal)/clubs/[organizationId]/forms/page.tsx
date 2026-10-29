@@ -68,7 +68,6 @@ export default async function ClubFormsPage({
 
   return (
     <>
-      <ClubFormsStatus />
       <section className="public-manage-card club-forms-intro">
         <p className="public-registration-eyebrow">Club forms</p>
         <h2>Forms for your club&apos;s files</h2>
@@ -77,6 +76,7 @@ export default async function ClubFormsPage({
           directly. These files can hold health, conduct and contact details, so only your club&apos;s director
           and deputy and the conference office can open them.
         </p>
+        <ClubFormsStatus />
       </section>
 
       {requiredItems.length > 0 && (
