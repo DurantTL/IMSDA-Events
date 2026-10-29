@@ -38,7 +38,7 @@ const club = (role: string) => ({ organizationId: "club-1", name: "Fixture Pathf
 async function navLabels(access: unknown) {
   mocks.getRosterAccessStateForPage.mockResolvedValue(access);
   const tree = await ClubLayout({ children: null, params: Promise.resolve({ organizationId: "club-1" }) });
-  return navs(tree).map((nav) => [...(nav.props.primary as AccountNavItem[]), ...(nav.props.more as AccountNavItem[])].map((item) => item.label));
+  return navs(tree).map((nav) => (nav.props.items as AccountNavItem[]).map((item) => item.label));
 }
 
 beforeEach(() => vi.clearAllMocks());

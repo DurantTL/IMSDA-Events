@@ -22,7 +22,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false, nocac
 /**
  * Every club screen shares the club shell (#1165): the Club portal masthead,
  * the club banner (club, sponsoring church, actual role, club year), the
- * Home / Roster / Forms / Club events / More navigation, and the
+ * tab row of every section the role can open, and the
  * authenticator gate. Pages check access again before they load anything: a
  * layout is not a security boundary, and the navigation only hides links.
  */
@@ -71,7 +71,7 @@ export default async function ClubLayout({
           <ClubBannerYear currentYear={clubYearFor(new Date())} />
         </div>
       </section>
-      {shellNav.primary.length > 0 && <ClubPortalNav base={base} more={shellNav.more} primary={shellNav.primary} />}
+      {shellNav.length > 0 && <ClubPortalNav base={base} items={shellNav} />}
       <div className="club-roster-layout">
         {gated && (
           <ClubGateSlot>

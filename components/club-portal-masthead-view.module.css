@@ -1,0 +1,53 @@
+/* Club masthead account actions (#1319): My account, Switch club and Sign out read as outlined buttons, icon and text on one line. */
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--imsda-navy);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--imsda-navy);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.9rem);
+  font-weight: 800;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--imsda-navy-soft);
+}
+
+.action:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: 2px;
+}
+
+.action:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.action svg {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .account {
+    justify-content: flex-start;
+  }
+}
