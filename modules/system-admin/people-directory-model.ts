@@ -236,15 +236,32 @@ export function peopleRoleOptions(scope: PeopleScope): PeopleRoleOptionGroup[] {
   return [...groups.values()];
 }
 
-/**
- * Reads `?role=`. An unknown value, or one the viewer's scope may not use (a Clubs Administrator asking for a system
- * or event role), is no filter at all.
- */
+/** Most values kept per filter dimension, so a crafted link cannot build a huge query. */
+export const MAX_PEOPLE_FILTER_VALUES = 30;
+/** The quick select's "several chosen" option: keep the values the Filters panel set (read from `keep*`). */
+export const PEOPLE_FILTER_SEVERAL = "__several";
+
+const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : value === undefined ? [] : [value]);
+
+/** Reads every `?role=`: unknown values and ones the viewer's scope may not use (system or event roles for a Clubs Administrator) are dropped. */
+export function parsePeopleRoles(value: unknown, scope: PeopleScope): PeopleRoleFilter[] {
+  const seen = new Set<string>();
+  const roles: PeopleRoleFilter[] = [];
+  for (const item of asList(value)) {
+    if (typeof item !== "string") continue;
+    const found = allRoleFilters().find(({ filter }) => peopleRoleKey(filter) === item.trim());
+    if (!found || !roleAllowedForScope(found.filter, scope)) continue;
+    const key = peopleRoleKey(found.filter);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    roles.push(found.filter);
+  }
+  return roles.slice(0, MAX_PEOPLE_FILTER_VALUES);
+}
+
+/** The first valid `?role=`, or null (the single-value reader from #1277). */
 export function parsePeopleRole(value: unknown, scope: PeopleScope): PeopleRoleFilter | null {
-  const text = Array.isArray(value) ? value[0] : value;
-  if (typeof text !== "string") return null;
-  const found = allRoleFilters().find(({ filter }) => peopleRoleKey(filter) === text.trim());
-  return found && roleAllowedForScope(found.filter, scope) ? found.filter : null;
+  return parsePeopleRoles(Array.isArray(value) ? value.slice(0, 1) : value, scope)[0] ?? null;
 }
 
 /** Reads `?event=` / `?club=`: an id (letters, digits, `_`, `-`), or nothing. */
@@ -253,34 +270,131 @@ export function parsePeopleId(value: unknown): string | null {
   return typeof text === "string" && /^[\w-]{1,64}$/.test(text.trim()) ? text.trim() : null;
 }
 
-export type PeopleFilters = { role: PeopleRoleFilter | null; eventId: string | null; clubId: string | null };
+/** Every valid id in a repeated `?event=` / `?club=`, deduplicated, in URL order. */
+export function parsePeopleIds(value: unknown): string[] {
+  const ids: string[] = [];
+  for (const item of asList(value)) {
+    const id = parsePeopleId(item);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids.slice(0, MAX_PEOPLE_FILTER_VALUES);
+}
 
-export function parsePeopleFilters(
-  params: { role?: unknown; event?: unknown; club?: unknown },
-  scope: PeopleScope,
-): PeopleFilters {
-  const role = parsePeopleRole(params.role, scope);
+export type PeopleFilters = { roles: PeopleRoleFilter[]; eventIds: string[]; clubIds: string[] };
+
+export const NO_PEOPLE_FILTERS: PeopleFilters = { roles: [], eventIds: [], clubIds: [] };
+
+/**
+ * Keeps filters tidy: event ids only with an event role (and only for a full viewer), club ids only with a club role,
+ * and Pending invites (a list view, not a role) only when it is the one role chosen.
+ */
+export function tidyPeopleFilters(filters: PeopleFilters, scope: PeopleScope): PeopleFilters {
+  const roles = filters.roles.filter((role) => roleAllowedForScope(role, scope));
+  const kept = roles.length > 1 ? roles.filter((role) => role.kind !== "pending") : roles;
   return {
-    role,
-    // An event only matters to an event role, and a club only to a club role; drop it otherwise so links stay tidy.
-    eventId: role?.kind === "event" ? parsePeopleId(params.event) : null,
-    clubId: role?.kind === "club" ? parsePeopleId(params.club) : null,
+    roles: kept,
+    eventIds: scope === "full" && kept.some((role) => role.kind === "event") ? filters.eventIds : [],
+    clubIds: kept.some((role) => role.kind === "club") ? filters.clubIds : [],
   };
 }
 
-/** `/admin/people` with the search, filters and page kept in the URL. */
+export type PeopleFilterParams = {
+  role?: unknown;
+  event?: unknown;
+  club?: unknown;
+  /** Set by the quick selects' hidden inputs; used when the select says "Several" (no JavaScript needed). */
+  keepRole?: unknown;
+  keepEvent?: unknown;
+  keepClub?: unknown;
+};
+
+const withSeveral = (value: unknown, keep: unknown): unknown =>
+  asList(value).some((item) => item === PEOPLE_FILTER_SEVERAL) ? asList(keep) : value;
+
+export function parsePeopleFilters(params: PeopleFilterParams, scope: PeopleScope): PeopleFilters {
+  return tidyPeopleFilters({
+    roles: parsePeopleRoles(withSeveral(params.role, params.keepRole), scope),
+    eventIds: parsePeopleIds(withSeveral(params.event, params.keepEvent)),
+    clubIds: parsePeopleIds(withSeveral(params.club, params.keepClub)),
+  }, scope);
+}
+
+/** Removes event and club ids the viewer cannot choose from. Ignored means removed, so chips only show real values. */
+export function keepKnownFilterIds(
+  filters: PeopleFilters,
+  eventOptions: readonly { id: string }[],
+  clubOptions: readonly { id: string }[],
+): PeopleFilters {
+  const events = new Set(eventOptions.map((event) => event.id));
+  const clubs = new Set(clubOptions.map((club) => club.id));
+  return {
+    roles: filters.roles,
+    eventIds: filters.eventIds.filter((id) => events.has(id)),
+    clubIds: filters.clubIds.filter((id) => clubs.has(id)),
+  };
+}
+
+export function peopleFilterCount(filters: PeopleFilters): number {
+  return filters.roles.length + filters.eventIds.length + filters.clubIds.length;
+}
+
+/** `/admin/people` with the search, filters and page kept in the URL (repeated `role`, `event` and `club`). */
 export function peopleHref(input: { query?: string; page?: number; filters?: PeopleFilters }): string {
   const params = new URLSearchParams();
   if (input.query) params.set("q", input.query);
-  const role = input.filters?.role;
-  if (role) {
-    params.set("role", peopleRoleKey(role));
-    if (input.filters?.eventId) params.set("event", input.filters.eventId);
-    if (input.filters?.clubId) params.set("club", input.filters.clubId);
-  }
+  for (const role of input.filters?.roles ?? []) params.append("role", peopleRoleKey(role));
+  for (const id of input.filters?.eventIds ?? []) params.append("event", id);
+  for (const id of input.filters?.clubIds ?? []) params.append("club", id);
   if (input.page && input.page > 1) params.set("page", String(input.page));
   const text = params.toString();
   return text ? `/admin/people?${text}` : "/admin/people";
+}
+
+export type PeopleFilterChip = { key: string; label: string; removeLabel: string; href: string };
+
+/** One chip per active filter, each linking to the same list without that value (page back to 1). */
+export function peopleFilterChips(input: {
+  filters: PeopleFilters;
+  query: string;
+  scope: PeopleScope;
+  eventOptions: readonly { id: string; name: string }[];
+  clubOptions: readonly { id: string; name: string }[];
+}): PeopleFilterChip[] {
+  const { filters, query, scope } = input;
+  const href = (next: PeopleFilters) => peopleHref({ query, filters: tidyPeopleFilters(next, scope) });
+  const name = (list: readonly { id: string; name: string }[], id: string) => list.find((item) => item.id === id)?.name ?? id;
+  return [
+    ...filters.roles.map((role) => ({
+      key: `role-${peopleRoleKey(role)}`,
+      label: `Role: ${peopleRoleLabel(role)}`,
+      href: href({ ...filters, roles: filters.roles.filter((item) => peopleRoleKey(item) !== peopleRoleKey(role)) }),
+    })),
+    ...filters.eventIds.map((id) => ({
+      key: `event-${id}`,
+      label: `Event: ${name(input.eventOptions, id)}`,
+      href: href({ ...filters, eventIds: filters.eventIds.filter((item) => item !== id) }),
+    })),
+    ...filters.clubIds.map((id) => ({
+      key: `club-${id}`,
+      label: `Club: ${name(input.clubOptions, id)}`,
+      href: href({ ...filters, clubIds: filters.clubIds.filter((item) => item !== id) }),
+    })),
+  ].map((chip) => ({ ...chip, removeLabel: `Remove filter ${chip.label}` }));
+}
+
+/** "Director or Deputy director in 2 clubs at Synthetic Event" for the result count; empty when no role is chosen. */
+export function peopleFilterSummary(
+  filters: PeopleFilters,
+  names: { eventOptions: readonly { id: string; name: string }[]; clubOptions: readonly { id: string; name: string }[] },
+): string {
+  if (filters.roles.length === 0) return "";
+  const part = (ids: string[], list: readonly { id: string; name: string }[], one: string, many: string) =>
+    ids.length === 0 ? "" : ids.length === 1 ? ` ${one} ${list.find((item) => item.id === ids[0])?.name ?? "1 " + many.replace(/s$/, "")}` : ` ${one} ${ids.length} ${many}`;
+  const hasClubRole = filters.roles.some((role) => role.kind === "club");
+  const hasEventRole = filters.roles.some((role) => role.kind === "event");
+  return `${filters.roles.map(peopleRoleLabel).join(" or ")}`
+    + (hasClubRole ? part(filters.clubIds, names.clubOptions, "in", "clubs") : "")
+    + (hasEventRole ? part(filters.eventIds, names.eventOptions, "at", "events") : "");
 }
 
 export type PeopleRoleWhere = {
@@ -288,50 +402,63 @@ export type PeopleRoleWhere = {
   account?: Record<string, unknown>;
 };
 
+const oneOrAny = (clauses: Record<string, unknown>[]): Record<string, unknown> | undefined =>
+  clauses.length === 0 ? undefined : clauses.length === 1 ? clauses[0] : { OR: clauses };
+
 /**
- * The where-clauses that find the people who hold a role right now. `staff` is for `User`, `account` for
- * `AttendeeAccount`. `null` for `pending` (listed by its own module) and for an event role with no event picked
- * (nobody is listed across every event). A Clubs Administrator's club roles are limited to CLUB-type organizations.
+ * The where-clauses that find the people who hold any chosen role right now (several roles are OR). `staff` is for
+ * `User`, `account` for `AttendeeAccount`. `null` for Pending invites (listed by its own module) and when nothing can
+ * be listed: event roles with no event picked list nobody across every event. Roles the scope may not use are ignored
+ * here as well as in parsing, and a Clubs Administrator's club roles are limited to CLUB-type organizations.
  */
 export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now = new Date()): PeopleRoleWhere | null {
-  const role = filters.role;
-  if (!role || !roleAllowedForScope(role, scope)) return null;
-  switch (role.kind) {
-    case "system-admin":
-      return { staff: { globalRole: "SYSTEM_ADMIN" } };
-    case "clubs-admin":
-      return { staff: { clubsAdministratorGrant: { is: { revokedAt: null } } } };
-    case "area-coordinator":
-      return { account: { areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } } };
-    case "event":
-      if (!filters.eventId) return null;
-      return { staff: { memberships: { some: { role: role.role, status: "ACTIVE", eventId: filters.eventId } } } };
-    case "club":
-      return {
-        account: {
-          clubDirectorGrants: {
-            some: {
-              role: role.role,
-              revokedAt: null,
-              effectiveFrom: { lte: now },
-              OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-              organization: {
-                isActive: true,
-                ...(scope === "clubs" ? { type: "CLUB" } : {}),
-                ...(filters.clubId ? { id: filters.clubId } : {}),
-              },
-            },
+  const roles = filters.roles.filter((role) => roleAllowedForScope(role, scope));
+  const staff: Record<string, unknown>[] = [];
+  const account: Record<string, unknown>[] = [];
+  const eventRolesChosen = roles.flatMap((role) => (role.kind === "event" ? [role.role] : []));
+  const clubRolesChosen = roles.flatMap((role) => (role.kind === "club" ? [role.role] : []));
+  if (roles.some((role) => role.kind === "system-admin")) staff.push({ globalRole: "SYSTEM_ADMIN" });
+  if (roles.some((role) => role.kind === "clubs-admin")) staff.push({ clubsAdministratorGrant: { is: { revokedAt: null } } });
+  if (roles.some((role) => role.kind === "area-coordinator")) {
+    account.push({ areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } });
+  }
+  if (eventRolesChosen.length > 0 && scope === "full" && filters.eventIds.length > 0) {
+    staff.push({ memberships: { some: { role: { in: eventRolesChosen }, status: "ACTIVE", eventId: { in: filters.eventIds } } } });
+  }
+  if (clubRolesChosen.length > 0) {
+    account.push({
+      clubDirectorGrants: {
+        some: {
+          role: { in: clubRolesChosen },
+          revokedAt: null,
+          effectiveFrom: { lte: now },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+          organization: {
+            isActive: true,
+            ...(scope === "clubs" ? { type: "CLUB" } : {}),
+            ...(filters.clubIds.length > 0 ? { id: { in: filters.clubIds } } : {}),
           },
         },
-      };
-    case "pending":
-      return null;
+      },
+    });
   }
+  const where: PeopleRoleWhere = {};
+  const staffWhere = oneOrAny(staff);
+  const accountWhere = oneOrAny(account);
+  if (staffWhere) where.staff = staffWhere;
+  if (accountWhere) where.account = accountWhere;
+  return where.staff || where.account ? where : null;
 }
 
-/** True when the chosen role needs an event and none is picked yet. */
+/** True when the chosen roles are all event roles and no event is picked yet. */
 export function needsEventPick(filters: PeopleFilters): boolean {
-  return filters.role?.kind === "event" && !filters.eventId;
+  const hasEventRole = filters.roles.some((role) => role.kind === "event");
+  return hasEventRole && filters.eventIds.length === 0 && filters.roles.every((role) => role.kind === "event");
+}
+
+/** True when event roles are mixed with other roles but no event is picked, so those roles list nobody yet. */
+export function eventRolesNeedEvent(filters: PeopleFilters): boolean {
+  return filters.roles.some((role) => role.kind === "event") && filters.eventIds.length === 0 && !needsEventPick(filters);
 }
 
 // ---------------------------------------------------------------- Chosen in the invite (#1276)

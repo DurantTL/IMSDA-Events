@@ -146,7 +146,7 @@ export async function loadPeopleRows(people: readonly MergedPerson[], scope: Peo
 }
 
 /**
- * The people who hold the chosen role right now (#1277), merged and sorted like `findPeople`, with the text search
+ * The people who hold any chosen role right now (#1277, several at once #1321), merged and sorted like `findPeople`, with the text search
  * applied inside the role. A role that cannot be listed (no event picked, or not allowed for the scope) is nobody.
  */
 export async function findPeopleByRole(
@@ -178,7 +178,7 @@ export async function findPeopleByRole(
 }
 
 export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full", filters?: PeopleFilters) {
-  const matches = filters?.role ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
+  const matches = filters && filters.roles.length > 0 ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
   const page = pagePeople(matches, requestedPage);
   return { ...page, rows: await loadPeopleRows(page.items, scope) };
 }
