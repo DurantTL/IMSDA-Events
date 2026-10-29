@@ -64,7 +64,7 @@ describe("staff club directory page", () => {
     expect(points).toContain('view=points&amp;sort=points#points');
     expect(points).not.toContain('aria-label="Clubs"'); expect(points).not.toContain('id="monthly-records"');
     const records = await render({ year: clubYear, view: "records" });
-    expect(records).toContain('id="monthly-records"'); expect(records).toContain("Club details and yearly totals");
+    expect(records).toContain('id="monthly-records"'); expect(records).toContain("Full-year grid and yearly totals");
     expect(records).toContain("Sterling Volunteers counts"); expect(records).not.toContain('id="points"');
     const events = await render({ year: clubYear, view: "events" });
     expect(events).toContain("No club events this club year"); expect(events).not.toContain('id="points"');
@@ -81,10 +81,16 @@ describe("staff club directory page", () => {
     const html = await render({ year: "2024-25", q: "Cedar", attention: "needs-attention", view: "records" });
     expect(html).toContain('href="/admin/clubs/summary?year=2024-25&amp;view=points&amp;sort=points#points"');
     expect(html).toContain('href="/admin/clubs/summary?year=2024-25&amp;view=events#club-events"');
-    expect(html).not.toContain("q=Cedar");
+    // The records view has its own search (#1313), so only the other views' links are checked for dropped filters.
     expect(html).not.toContain("attention=needs-attention");
-    expect(html).not.toContain('name="q"');
     expect(html).not.toContain('name="attention"');
+    for (const view of ["points", "events"]) {
+      const other = await render({ year: "2024-25", q: "Cedar", attention: "needs-attention", view });
+      expect(other).not.toContain("q=Cedar");
+      expect(other).not.toContain("attention=needs-attention");
+      expect(other).not.toContain('name="q"');
+      expect(other).not.toContain('name="attention"');
+    }
     // The directory view still carries its own filters.
     expect(await render({ q: "Cedar", attention: "needs-attention" })).toContain("q=Cedar&amp;attention=needs-attention");
   });
