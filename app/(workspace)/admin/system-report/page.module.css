@@ -1,0 +1,343 @@
+/* System report (#1357). Layout from the approved mockup: an at-a-glance card, then one card per section of rows
+   (name / when / result / fix). Chips reuse the shared status-chip colors; everything else is local. */
+.workspace {
+  padding-bottom: 40px;
+}
+
+.chip.chip {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.4;
+  font-weight: 700;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.chipUnavailable.chipUnavailable {
+  background: transparent;
+  border: 1px dashed var(--muted);
+  color: var(--muted);
+}
+
+.chipInfo.chipInfo {
+  background: var(--secondary-bg, #f9fbfb);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+/* ---------- At a glance ---------- */
+.glance {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 59, 92, 0.045);
+  padding: 20px;
+}
+
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.verdictIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--secondary-bg, #f9fbfb);
+  color: var(--muted);
+}
+
+.verdict_attention {
+  background: #fff1ef;
+  color: var(--coral);
+}
+
+.verdict_watch {
+  background: var(--imsda-gold-soft);
+  color: #805807;
+}
+
+.verdict_ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.verdictText {
+  display: grid;
+  flex: 1 1 260px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.verdictText h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 1.2rem);
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.verdictText p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tiles a {
+  display: grid;
+  gap: 6px;
+  height: 100%;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--secondary-bg, #f9fbfb);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.tiles a:hover {
+  border-color: var(--imsda-navy);
+  background: #fff;
+}
+
+.tiles strong {
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+}
+
+.tiles .chip {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* ---------- Sections ---------- */
+.section {
+  scroll-margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 59, 92, 0.045);
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sectionHead > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.sectionHead h2 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+  line-height: 1.3;
+  font-weight: 800;
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, auto);
+  align-items: center;
+  gap: 6px 18px;
+  padding: 12px 20px;
+  border-top: 1px solid #eaf0f2;
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.isAttention {
+  box-shadow: inset 4px 0 var(--coral);
+}
+
+.isWatch {
+  box-shadow: inset 4px 0 var(--imsda-gold);
+}
+
+.isUnavailable {
+  box-shadow: inset 4px 0 var(--muted);
+}
+
+.rowName {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowName strong {
+  font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
+}
+
+.rowName span {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.rowWhen {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowWhen b {
+  display: none;
+}
+
+.rowResult {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.rowResult > span:not(:first-child) {
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.items {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.rowFix {
+  justify-self: end;
+}
+
+.fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--imsda-purple);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.fix:hover {
+  text-decoration: underline;
+}
+
+.noFix {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.noteLine {
+  margin: 0;
+  padding: 10px 20px 14px;
+  border-top: 1px solid #eaf0f2;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.footerLine {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.footerLine code {
+  font-size: 0.85em;
+}
+
+/* ---------- Narrower widths ---------- */
+@media (max-width: 1080px) {
+  .tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  }
+
+  .rowName,
+  .rowWhen {
+    grid-column: 1 / -1;
+  }
+
+  .rowWhen b {
+    display: inline;
+    color: var(--ink);
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 860px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .glance {
+    padding: 16px;
+  }
+
+  .sectionHead {
+    padding: 14px 16px;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px 16px;
+  }
+
+  .rowFix {
+    justify-self: start;
+  }
+
+  .noteLine {
+    padding: 10px 16px 14px;
+  }
+}

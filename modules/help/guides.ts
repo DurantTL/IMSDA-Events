@@ -332,7 +332,7 @@ export const helpGuides: readonly HelpGuide[] = [
       "The signals are Email sweep, Email queue, Open alerts and Email delivery problems.",
       "Read the word beside each name. Stale means the evidence is old and does not show whether the job is running now. Partial means some of what the signal needs could not be read, so a number may be a floor. Unavailable means no reading was made. Never reported means nothing has ever reported.",
       "Reload the page to take a new reading.",
-      "Full health report opens Email, where the delivery details are.",
+      "Full health report opens the System report, which lists every reading with what was checked, when and what it found. Problems come first.",
     ],
     verify: [
       "For each signal you can say what it checked, when it was observed, and whether that reading is current, stale, partial or unavailable.",

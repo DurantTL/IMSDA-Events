@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 function cleanReleaseSha(value: string | undefined) {
@@ -23,5 +23,25 @@ export function getReleaseIdentity(environment = process.env) {
       environment.APP_RELEASE_SHA ?? environment.XCLOUD_DEPLOYED_COMMIT,
     ),
     buildId: nextBuildId(),
+  };
+}
+
+/**
+ * When this release went live, as far as the server can tell, without any secret: when the running process started
+ * (from its uptime) and when the build was written (the modification time of `.next/BUILD_ID`). Either is `null` when
+ * it cannot be read, so a caller shows it as unavailable. Kept out of `getReleaseIdentity` because `/api/health` is
+ * public and returns that object whole.
+ */
+export function getReleaseTimes(now = new Date()) {
+  const uptimeSeconds = process.uptime();
+  let builtAt: Date | null = null;
+  try {
+    builtAt = statSync(path.join(process.cwd(), ".next", "BUILD_ID")).mtime;
+  } catch {
+    builtAt = null;
+  }
+  return {
+    startedAt: Number.isFinite(uptimeSeconds) ? new Date(now.getTime() - uptimeSeconds * 1000) : null,
+    builtAt,
   };
 }

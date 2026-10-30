@@ -84,6 +84,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/analytics", "System", "System management", "Catalogs and settings", "Public analytics"],
   ["/admin/settings", "System", "System management", "Catalogs and settings", "Platform settings"],
   ["/admin/readiness", "System", "System management", "Catalogs and settings", "System readiness"],
+  ["/admin/system-report", "System", "System management", "Catalogs and settings", "System report"],
   // Event sidebar
   ["/overview", "Event", "Event sidebar", "Daily", "Dashboard"],
   ["/more/kitchen-report/counts", "Event", "Event sidebar", "Daily", "Kitchen counts"],

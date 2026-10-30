@@ -103,7 +103,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
             </li>
           ))}
         </ul>
-        <p className={styles.detail}>Live health readings are on the <Link href="/admin#system-health">System health panel</Link>, not on this page.</p>
+        <p className={styles.detail}>Live health readings are on the <Link href="/admin#system-health">System health panel</Link>, not on this page. The <Link href="/admin/system-report">System report</Link> lists every reading in full.</p>
       </section>
 
       <section className="panel" aria-labelledby="readiness-behavior" data-testid="readiness-behavior">

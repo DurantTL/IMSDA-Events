@@ -119,6 +119,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/analytics": ["analytics", "statistics", "page views", "traffic", "funnel", "sign-in rate", "broken links", "web vitals"],
   "/admin/settings": ["platform", "configuration", "preferences", "options", "sign-in settings", "payment settings"],
   "/admin/readiness": ["ready", "checklist", "go live", "launch"],
+  "/admin/system-report": ["health", "status", "report", "problems", "errors", "monitoring"],
   "/profile": ["account", "password", "multi-factor", "mfa", "security", "my details", "sign in"],
   "/overview": ["home", "dashboard", "summary"],
   "/check-in": ["arrival", "scan", "badge"],

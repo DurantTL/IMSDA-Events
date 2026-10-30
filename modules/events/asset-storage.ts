@@ -78,7 +78,7 @@ export function safeDisplayName(rawName: string, type: AllowedAssetType) {
 // Uploaded files live outside the app bundle, at a path set at runtime. The
 // turbopackIgnore markers stop the build from treating that as a reason to
 // copy the whole project into the server output.
-function storageRoot() {
+export function storageRoot() {
   return process.env.ASSET_STORAGE_DIR?.trim()
     || path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "event-assets");
 }

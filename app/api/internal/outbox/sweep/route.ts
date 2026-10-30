@@ -16,7 +16,8 @@ import { runHealthSnapshotSweep } from "@/modules/health-records/snapshot-hooks"
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
-import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
+import { recordJobRun, recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
+import { CALENDAR_FEED_REFRESH_JOB, MESSAGE_FILE_CLEANUP_JOB } from "@/modules/operations/sweep-heartbeat";
 import { withRequestContext } from "@/lib/request-context";
 import { sweepMessageFiles } from "@/modules/communications/message-file-sweep";
 import { messageFileSweepDeletes } from "@/modules/communications/message-file-config";
@@ -82,6 +83,14 @@ async function postHandler(request: Request) {
     const calendarFeeds = await refreshDueCalendarFeeds().catch((error) => {
       logError("The calendar feed refresh failed after a successful outbox sweep", error);
       return null;
+    });
+    // The System report (#1357) shows when this step last ran and what it found: counts only. Recording never fails the sweep.
+    await recordJobRun(
+      CALENDAR_FEED_REFRESH_JOB,
+      calendarFeeds ? "SUCCEEDED" : "FAILED",
+      calendarFeeds ? { due: calendarFeeds.due, refreshed: calendarFeeds.refreshed, failed: calendarFeeds.failed } : undefined,
+    ).catch((error) => {
+      logError("Could not record the calendar feed refresh run", error);
     });
     // Deadline reminders (#910): prepares the 14-day and 2-day reminder batches that have come due and brings the
     // waiting ones in line with the calendar. It only prepares: nothing is emailed until a system administrator sends
@@ -150,6 +159,21 @@ async function postHandler(request: Request) {
         logError("The message file sweep failed after a successful outbox sweep", error);
         return null;
       });
+    await recordJobRun(
+      MESSAGE_FILE_CLEANUP_JOB,
+      messageFiles ? "SUCCEEDED" : "FAILED",
+      messageFiles
+        ? {
+            mode: messageFiles.mode,
+            candidates: messageFiles.candidates,
+            deleted: messageFiles.deleted,
+            cleanupPending: messageFiles.cleanupPending,
+            cleanupFailed: messageFiles.cleanupFailed,
+          }
+        : undefined,
+    ).catch((error) => {
+      logError("Could not record the message file cleanup run", error);
+    });
     return Response.json({
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,

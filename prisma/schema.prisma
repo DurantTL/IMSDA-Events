@@ -1395,6 +1395,8 @@ model SystemJobHeartbeat {
   job             String    @id
   lastSucceededAt DateTime?
   lastFailedAt    DateTime?
+  /// The latest successful run's counts (never names, paths or addresses). Null until a job records one.
+  lastSummary     Json?
   updatedAt       DateTime  @updatedAt
 }
 
