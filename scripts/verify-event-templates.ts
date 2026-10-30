@@ -726,6 +726,8 @@ async function verifyFromEvent() {
     assert(await prisma.registrationForm.count({ where: { eventId: roundTrip.event.id } }) === 1, "applying the round-tripped version creates the form once");
     console.log("ok  a seeded form saved from an event and applied again exists once, not twice");
   } else {
+    // CI syncs the form templates before this script, so a skip there would hide the check.
+    assert(!process.env.CI, "the source form has a seeded template version in CI (npm run form-templates:sync runs first)");
     console.log("skip  the source form has no seeded template version here (run npm run form-templates:sync for the round-trip check)");
   }
 

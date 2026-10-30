@@ -108,7 +108,16 @@ export function reduceRedactedLink(link: string) {
     first = "";
   }
   const route = fixedRouteNames.has(first) ? `/${first}` : "";
-  return `${match?.[1] ?? ""}${route}` || "(relative link)";
+  // The origin is rebuilt so sign-in details in the address (user:password@) are never stored.
+  let origin = "";
+  if (match?.[1]) {
+    try {
+      origin = new URL(match[1]).origin;
+    } catch {
+      origin = "(other site)";
+    }
+  }
+  return `${origin}${route}` || "(relative link)";
 }
 
 const reasonKeysByLabel = new Map(Object.entries(privateLinkReasonLabels).map(([key, label]) => [label, key]));
@@ -485,7 +494,9 @@ export function buildTemplateFromEvent(
   const droppedFormTemplateKeys = (existing?.formTemplateKeys ?? []).filter((key) => copiedFormKeys.has(key));
   // The event's own deadline wins; an older kept one may be from a past year, so it is flagged for review.
   const sourceClosesOn = source.registrationClosesOn ?? null;
-  const registrationClosesOn = existing ? (sourceClosesOn ?? existing.registrationClosesOn) : undefined;
+  // Only a template that already carries a deadline (one made for one year's event) takes the event's: most templates
+  // leave the dates to staff, and one that had none must not pick up this year's.
+  const registrationClosesOn = existing?.registrationClosesOn ? (sourceClosesOn ?? existing.registrationClosesOn) : undefined;
   if (existing) {
     const keptReports = existing.reportSelections ?? [];
     if (keptFormTemplateKeys.length > 0) kept.push({ key: "formTemplateKeys", label: "Form templates", count: keptFormTemplateKeys.length });

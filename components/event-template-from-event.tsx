@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { postJson } from "@/lib/post-json";
 import type { TemplateFromEventPreview } from "@/modules/event-templates/from-event-domain";
 import styles from "./event-template-from-event.module.css";
@@ -28,6 +28,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
   const [releaseNote, setReleaseNote] = useState("");
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
+  const previewRequest = useRef(0);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
 
@@ -38,11 +39,14 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
     && (mode === "NEW" ? name.trim().length >= 2 : Boolean(targetTemplate) && !targetTemplate?.hasDraft);
 
   async function loadPreview(targetTemplateId = "") {
+    // Only the latest request may show its answer: a slower one for an earlier target must not replace it.
+    const request = ++previewRequest.current;
     setBusy(true);
     setFailure(null);
     setSaved(null);
     try {
       const { ok, body } = await postJson("/api/event-templates/from-event/preview", { sourceEventId, ...(targetTemplateId ? { targetTemplateId } : {}) }, "The preview could not be prepared.");
+      if (request !== previewRequest.current) return;
       if (!ok) {
         setFailure({ message: typeof body.message === "string" ? body.message : "The preview could not be prepared.", stale: false });
         setPreview(null);
@@ -56,6 +60,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
         if (!name) setName(`${next.source.name} template`);
       }
     } catch (error) {
+      if (request !== previewRequest.current) return;
       setFailure({ message: error instanceof Error ? error.message : "The preview could not be prepared.", stale: false });
     }
     setBusy(false);

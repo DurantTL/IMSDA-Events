@@ -4,6 +4,7 @@ import { cloneNeverCopied } from "@/modules/event-clones/domain";
 import { eventTemplatePayloadSchema, validateEventTemplatePayloadReferences, EventTemplateReferenceError } from "@/modules/event-templates/domain";
 import {
   buildTemplateFromEvent,
+  reduceRedactedLink,
   saveTemplateFromEventInputSchema,
   saveTemplateRequestInputOf,
 } from "@/modules/event-templates/from-event-domain";
@@ -331,6 +332,19 @@ describe("a new version keeps the template's own settings (#154)", () => {
     expect(stale.kept.find((entry) => entry.key === "registrationClosesOn")!.label).toContain("review it");
     expect(stale.preview.exclusions.some((entry) => entry.key === "reportSelections")).toBe(false);
     expect(build().preview.exclusions.some((entry) => entry.key === "reportSelections")).toBe(true);
+  });
+
+  it("never gives a template that had no deadline the event's one-year deadline", () => {
+    const existing = { reportSelections: [], formTemplateKeys: [], registrationClosesOn: undefined, starterKey: undefined };
+    const built = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false, registrationClosesOn: "2027-04-02" }, origins, existing);
+    expect(built.payload.registrationClosesOn).toBeUndefined();
+    expect(built.kept.some((entry) => entry.key === "registrationClosesOn")).toBe(false);
+  });
+
+  it("stores a removed link's origin without sign-in details", () => {
+    expect(reduceRedactedLink("https://user:SECRETPW@other.example/x?token=a")).toBe("https://other.example");
+    expect(reduceRedactedLink("https://events.example/manage/…")).toBe("https://events.example/manage");
+    expect(reduceRedactedLink("/some-slug/x")).toBe("(relative link)");
   });
 
   it("carries reportSelections, formTemplateKeys, registrationClosesOn and starterKey forward and says so", () => {
