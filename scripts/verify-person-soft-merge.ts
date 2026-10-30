@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
+import { generateMatchCandidates } from "../modules/people/duplicate-match-repository";
 import { anonymizePerson, PERSON_ANONYMIZED_FIELDS } from "../modules/people/anonymization";
 import {
   getMergedPersonView,
@@ -282,6 +283,18 @@ async function main() {
   assert(raced.every((result) => !result.alreadyAnonymized), "two people anonymize independently");
   const sameOne = await Promise.all([anonymizePerson({ personId: hub!.id, approvedByUserId: ids.staff, approvalReference: "Synthetic request 4" }), anonymizePerson({ personId: hub!.id, approvedByUserId: ids.staff, approvalReference: "Synthetic request 4" })]);
   assert(sameOne.filter((result) => !result.alreadyAnonymized).length === 1 && await prisma.personAnonymization.count({ where: { personId: hub!.id } }) === 1, "racing anonymizations of one person write once");
+
+  // ---- An anonymized person never comes back into the review queue ----
+  // (Two people cannot share one external identity: the database makes the tuple unique, so a shared phone drives the pair.)
+  const [qa, qb] = await Promise.all(["qa", "qb"].map((label) => newPerson(label, { phone: "(515) 555-0177" })));
+  await generateMatchCandidates();
+  const pairOpen = () => prisma.personMatchCandidate.count({ where: { state: "OPEN", OR: [{ personAId: { in: [qa!.id, qb!.id] } }, { personBId: { in: [qa!.id, qb!.id] } }], AND: [{ OR: [{ personAId: { in: [qa!.id, qb!.id] }, personBId: { in: [qa!.id, qb!.id] } }] }] } });
+  assert(await pairOpen() === 1, "control: a scan surfaces the pair before anonymization");
+  await anonymizePerson({ personId: qa!.id, approvedByUserId: ids.staff, approvalReference: "Synthetic request 5" });
+  assert(await pairOpen() === 0, "anonymizing supersedes the open candidate");
+  await generateMatchCandidates();
+  assert(await pairOpen() === 0, "a rescan does not bring the anonymized person's pair back");
+  assert(await prisma.personMatchCandidate.count({ where: { state: "OPEN", OR: [{ personAId: qa!.id }, { personBId: qa!.id }] } }) === 0, "no OPEN candidate involves the anonymized person at all");
 
   console.log("verify-person-soft-merge: all checks passed");
 }

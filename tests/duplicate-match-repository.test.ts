@@ -10,10 +10,11 @@ import {
   dismissMatchCandidate,
   deferMatchCandidate,
   generateMatchCandidates,
+  listOpenMatchCandidates,
   PersonMatchCandidateError,
 } from "@/modules/people/duplicate-match-repository";
 
-type PersonRow = { id: string; firstName: string; lastName: string; normalizedEmail: string | null; phone: string | null };
+type PersonRow = { id: string; firstName: string; lastName: string; normalizedEmail: string | null; phone: string | null; anonymizedAt?: Date | null };
 type HouseholdMemberRow = { personId: string; householdId: string; effectiveTo: Date | null };
 type ExternalIdentityRow = { personId: string | null; provider: string; providerScope: string; externalId: string };
 type CandidateRow = {
@@ -39,6 +40,7 @@ function buildFakePrisma(fixture: {
   householdMembers?: HouseholdMemberRow[];
   externalIdentities?: ExternalIdentityRow[];
   candidates?: CandidateRow[];
+  merges?: Array<{ secondaryPersonId: string; primaryPersonId: string }>;
 }) {
   const people = fixture.people ?? [];
   const householdMembers = fixture.householdMembers ?? [];
@@ -91,9 +93,11 @@ function buildFakePrisma(fixture: {
       Object.assign(row, data);
       return { ...row };
     }),
-    findMany: vi.fn(async ({ where }: { where?: Partial<Pick<CandidateRow, "state" | "personAId" | "personBId">> } = {}) => {
+    findMany: vi.fn(async ({ where }: { where?: Partial<Pick<CandidateRow, "state" | "personAId" | "personBId">> & { personA?: { anonymizedAt: null }; personB?: { anonymizedAt: null } } } = {}) => {
       return candidates
         .filter((row) => {
+          if (where?.personA && personById.get(row.personAId)?.anonymizedAt) return false;
+          if (where?.personB && personById.get(row.personBId)?.anonymizedAt) return false;
           if (where?.state && row.state !== where.state) return false;
           if (where?.personAId && row.personAId !== where.personAId) return false;
           if (where?.personBId && row.personBId !== where.personBId) return false;
@@ -108,7 +112,7 @@ function buildFakePrisma(fixture: {
   };
 
   const prisma = {
-    person: { findMany: vi.fn(async () => people) },
+    person: { findMany: vi.fn(async ({ where }: { where?: { anonymizedAt?: null } } = {}) => (where?.anonymizedAt === null ? people.filter((row) => !row.anonymizedAt) : people)) },
     householdMember: {
       findMany: vi.fn(async ({ where }: { where?: { effectiveTo?: null } } = {}) =>
         where?.effectiveTo === null ? householdMembers.filter((row) => row.effectiveTo === null) : householdMembers,
@@ -118,7 +122,10 @@ function buildFakePrisma(fixture: {
       findMany: vi.fn(async () => externalIdentities.filter((row) => row.personId !== null)),
     },
     personMatchCandidate,
-    personMerge: { findMany: vi.fn(async () => [] as unknown[]) },
+    personMerge: {
+      findMany: vi.fn(async ({ where }: { where: { secondaryPersonId: { in: string[] } } }) =>
+        (fixture.merges ?? []).filter((row) => where.secondaryPersonId.in.includes(row.secondaryPersonId))),
+    },
     $transaction: vi.fn(async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma)),
   };
   return prisma;
@@ -325,7 +332,62 @@ async function candidatesFor(prisma: ReturnType<typeof buildFakePrisma>, personA
   return prisma.personMatchCandidate.findMany({ where: { personAId, personBId } }) as Promise<CandidateRow[]>;
 }
 
+describe("anonymized people and merged pairs stay out of the queue", () => {
+  const candidate = (id: string, a: string, b: string): CandidateRow => ({
+    id, personAId: a, personBId: b, matchedSignals: ["PHONE_MATCH"], contradictingSignals: [], confidence: "HIGH", ruleVersion: 1,
+    state: "OPEN", fingerprint: `fp_${id}`, computedAt: new Date(), dismissedAt: null, dismissedByUserId: null, dismissalReason: null,
+  });
+  const sharedPhone = [
+    person({ id: "per_a", phone: "5551234567" }),
+    person({ id: "per_b", firstName: "Other", lastName: "Person", phone: "5551234567" }),
+  ];
+
+  it("generation skips an anonymized person", async () => {
+    const prisma = buildFakePrisma({ people: [{ ...sharedPhone[0], anonymizedAt: new Date() }, sharedPhone[1]] });
+    mocks.getPrisma.mockReturnValue(prisma);
+    expect((await generateMatchCandidates()).created).toBe(0);
+  });
+
+  it("the listing drops a pair when either person is anonymized", async () => {
+    const prisma = buildFakePrisma({
+      people: [sharedPhone[0], { ...sharedPhone[1], anonymizedAt: new Date() }, person({ id: "per_c", phone: "5559876543" }), person({ id: "per_d", phone: "5559876543" })],
+      candidates: [candidate("c1", "per_a", "per_b"), candidate("c2", "per_c", "per_d")],
+    });
+    mocks.getPrisma.mockReturnValue(prisma);
+    expect((await listOpenMatchCandidates()).map((row) => row.id)).toEqual(["c2"]);
+  });
+
+  it("generation and the listing skip a pair that already shares a canonical person", async () => {
+    const merged = { secondaryPersonId: "per_b", primaryPersonId: "per_a" };
+    const generating = buildFakePrisma({ people: sharedPhone, merges: [merged] });
+    mocks.getPrisma.mockReturnValue(generating);
+    expect((await generateMatchCandidates()).created).toBe(0);
+    expect(generating.personMerge.findMany).toHaveBeenCalled();
+
+    const listing = buildFakePrisma({ people: sharedPhone, candidates: [candidate("c1", "per_a", "per_b")], merges: [merged] });
+    mocks.getPrisma.mockReturnValue(listing);
+    expect(await listOpenMatchCandidates()).toEqual([]);
+    const unmerged = buildFakePrisma({ people: sharedPhone, candidates: [candidate("c1", "per_a", "per_b")] });
+    mocks.getPrisma.mockReturnValue(unmerged);
+    expect(await listOpenMatchCandidates()).toHaveLength(1);
+  });
+});
+
 describe("dismissMatchCandidate", () => {
+  it("refuses when the candidate stopped being open between the read and the write", async () => {
+    const prisma = buildFakePrisma({
+      candidates: [{
+        id: "cand_1", personAId: "per_a", personBId: "per_b", matchedSignals: [], contradictingSignals: [],
+        confidence: "HIGH", ruleVersion: 1, state: "OPEN", fingerprint: "fp1", computedAt: new Date(),
+        dismissedAt: null, dismissedByUserId: null, dismissalReason: null,
+      }],
+    });
+    prisma.personMatchCandidate.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+    mocks.getPrisma.mockReturnValue(prisma);
+    await expect(dismissMatchCandidate("cand_1", "user_1", "Confirmed two different people.")).rejects.toMatchObject({ code: "NOT_OPEN" });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("requires a reason", async () => {
     const prisma = buildFakePrisma({
       candidates: [{

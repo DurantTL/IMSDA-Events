@@ -104,5 +104,5 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
       metadata: { personId: person.id, fields: [...PERSON_ANONYMIZED_FIELDS] },
     }, tx);
     return { personId: person.id, alreadyAnonymized: false as const };
-  });
+  }, { timeout: 15000 });
 }

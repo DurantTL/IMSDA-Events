@@ -278,7 +278,7 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
     }
     const others = await tx.personMerge.findMany({
       where: { state: "ACTIVE", id: { not: mergeId } },
-      select: { id: true, secondaryPersonId: true, evidence: true },
+      select: { id: true, primaryPersonId: true, secondaryPersonId: true, evidence: true },
     });
     const dependent = others.find((other) => {
       if (detached.has(other.secondaryPersonId)) return false;
@@ -286,7 +286,19 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
       return [evidence.requestedPrimaryPersonId, evidence.requestedSecondaryPersonId].some((id) => id !== undefined && detached.has(id));
     });
     if (dependent) {
-      throw new PersonMergeError("DEPENDENT_MERGE", "Undo the later merge first: it was made through one of these people and relies on this merge.");
+      // Names go to the administrator in the response only (as the "Merged people" list shows them), never to the audit log.
+      const named = await tx.person.findMany({
+        where: { id: { in: [dependent.primaryPersonId, dependent.secondaryPersonId] } },
+        select: { id: true, firstName: true, lastName: true },
+      });
+      const nameOf = (id: string) => {
+        const row = named.find((person) => person.id === id);
+        return row ? `${row.firstName} ${row.lastName}` : id;
+      };
+      throw new PersonMergeError(
+        "DEPENDENT_MERGE",
+        `Undo the later merge first: ${nameOf(dependent.secondaryPersonId)} merged under ${nameOf(dependent.primaryPersonId)} was made through one of these people and relies on this merge.`,
+      );
     }
 
     const reversed = await tx.personMerge.update({
@@ -306,7 +318,12 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
             select: { id: true },
           })
           : null;
-        const restoreTo = newer ? "SUPERSEDED" : prior.state;
+        // An anonymized person is not a duplicate to review, so the pair does not come back to the queue.
+        const anonymized = await tx.person.findMany({
+          where: { id: { in: [candidate.personAId, candidate.personBId] }, anonymizedAt: { not: null } },
+          select: { id: true },
+        });
+        const restoreTo = newer || anonymized.length > 0 ? "SUPERSEDED" : prior.state;
         const restored = await tx.personMatchCandidate.updateMany({
           where: { id: existing.sourceCandidateId, state: "MERGED" },
           data: { state: restoreTo as Prisma.PersonMatchCandidateUpdateInput["state"] },

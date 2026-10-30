@@ -61,7 +61,7 @@ function link(secondaryPersonId: string, primaryPersonId: string, id = `m_${seco
 }
 
 function buildFake(fixture: { people?: string[]; merges?: MergeRow[]; candidates?: CandidateRow[]; anonymized?: string[]; users?: Array<{ id: string; globalRole: string | null }> }) {
-  const people: PersonRow[] = (fixture.people ?? []).map((id) => ({ id, anonymizedAt: fixture.anonymized?.includes(id) ? new Date() : null, firstName: "First" }));
+  const people: PersonRow[] = (fixture.people ?? []).map((id) => ({ id, anonymizedAt: fixture.anonymized?.includes(id) ? new Date() : null, firstName: "First", lastName: "Last" }));
   const merges = fixture.merges ?? [];
   const candidates = fixture.candidates ?? [];
   const anonymizations: unknown[] = [];
@@ -69,7 +69,7 @@ function buildFake(fixture: { people?: string[]; merges?: MergeRow[]; candidates
   const tx = {
     $executeRaw: vi.fn(async () => 1),
     person: {
-      findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => people.filter((p) => where.id.in.includes(p.id))),
+      findMany: vi.fn(async ({ where }: { where: { id: { in: string[] }; anonymizedAt?: { not: null } } }) => people.filter((p) => where.id.in.includes(p.id) && (!where.anonymizedAt || p.anonymizedAt !== null))),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => people.find((p) => p.id === where.id) ?? null),
       updateMany: vi.fn(async ({ where, data }: { where: { id: string; anonymizedAt: null }; data: Record<string, unknown> }) => {
         const row = people.find((p) => p.id === where.id && p.anonymizedAt === null);
@@ -287,6 +287,9 @@ describe("unmergePeople", () => {
     const later = await mergeMatchCandidate("c2", "c", "u1", "same person");
     expect(later).toMatchObject({ primaryPersonId: "c", secondaryPersonId: "a" });
     expect(await codeOf(unmergePeople("m1", "u1", "valid reason"))).toBe("DEPENDENT_MERGE");
+    const refusal = await unmergePeople("m1", "u1", "valid reason").then(() => new Error("not refused"), (error: unknown) => error as Error);
+    expect(refusal.message).toContain("First Last merged under First Last");
+    expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("First Last");
     expect(fake.merges.find((m) => m.id === "m1")!.state).toBe("ACTIVE");
     await unmergePeople(later.id, "u1", "valid reason");
     expect((await unmergePeople("m1", "u1", "valid reason")).state).toBe("REVERSED");
@@ -301,6 +304,16 @@ describe("unmergePeople", () => {
     await unmergePeople(merge.id, "u1", "valid reason");
     expect(candidates.find((c) => c.id === "c1")!.state).toBe("SUPERSEDED");
     expect(candidates.find((c) => c.id === "c9")!.state).toBe("OPEN");
+  });
+
+  it("restores the candidate as SUPERSEDED when either person has been anonymized since", async () => {
+    const candidates: CandidateRow[] = [{ id: "c1", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: [], ruleVersion: 1 }];
+    const fake = buildFake({ people: ["a", "b"], candidates });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    const merge = await mergeMatchCandidate("c1", "a", "u1", "same person");
+    fake.people[1].anonymizedAt = new Date();
+    await unmergePeople(merge.id, "u1", "valid reason");
+    expect(candidates[0].state).toBe("SUPERSEDED");
   });
 
   it("does not overwrite a candidate that is no longer open when merging", async () => {
@@ -353,6 +366,7 @@ describe("anonymization", () => {
     mocks.getPrisma.mockReturnValue(fake.prisma);
     await anonymizePerson({ personId: "p1", approvedByUserId: "admin", approvalReference: "Request 2026-14" });
     expect(fake.tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(fake.prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { timeout: 15000 });
     expect(candidates.map((c) => c.state)).toEqual(["SUPERSEDED", "OPEN"]);
   });
 
@@ -375,7 +389,7 @@ describe("anonymization", () => {
       "app/api/people/merges/route.ts",
     ];
     for (const file of files) expect(readFileSync(file, "utf8")).not.toMatch(/people\/anonymization|anonymizePerson/);
-    expect(readFileSync("modules/people/anonymization.ts", "utf8")).not.toMatch(/from\s+"[^"]*person-merge/);
+    expect(readFileSync("modules/people/anonymization.ts", "utf8")).not.toMatch(/(from\s+|import\(\s*|require\(\s*)["'][^"']*person-merge/);
   });
 });
 
@@ -404,6 +418,13 @@ describe("merge routes", () => {
     expect((await merge(post({ primaryPersonId: "a", reason: "same person" }), mergeContext)).status).toBe(401);
     expect(mocks.mergeMatchCandidate).not.toHaveBeenCalled();
     expect(mocks.unmergePeople).not.toHaveBeenCalled();
+  });
+
+  it("maps a resolution failure to a clear 409 instead of an unhandled error", async () => {
+    const { duplicateMatchApiError } = await import("@/modules/people/duplicate-match-api-errors");
+    const response = duplicateMatchApiError(new PersonMergeResolutionError("CYCLE", "cycle"), "Loading");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "RESOLUTION_FAILED" });
   });
 
   it("refuses a non-administrator and an anonymous caller on GET /api/people/merges", async () => {
