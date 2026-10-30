@@ -2,11 +2,22 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { getReleaseIdentity } from "@/lib/release";
+import { getReleaseIdentity, getReleaseTimes } from "@/lib/release";
 import { getMessageFileStorageUsage } from "@/modules/communications/message-file-usage";
 import { conferenceToday } from "@/modules/calendar/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
+import { getEmailAvailability } from "@/integrations/email/provider";
 import { checkDatabaseLiveness } from "@/modules/operations/database-liveness";
+import { readDiskSpace } from "@/modules/operations/disk-space";
+import {
+  CALENDAR_FEED_REFRESH_JOB,
+  EMAIL_REACHABILITY_JOB,
+  MESSAGE_FILE_CLEANUP_JOB,
+  SQUARE_REACHABILITY_JOB,
+  SWEEP_STEP_STALE_AFTER_MS,
+} from "@/modules/operations/sweep-heartbeat";
+import { getJobRun } from "@/modules/operations/sweep-heartbeat-repository";
+import { getSquareConfiguration } from "@/modules/payments/square-config";
 import { getOperationalHealth } from "@/modules/operations/repository";
 import { getAnalyticsSummary } from "@/modules/public-metrics/repository";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
@@ -15,6 +26,7 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
+import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -218,6 +230,28 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
   };
 }
 
+/* ---------- Stored job runs and connection tests ---------- */
+
+/** A step the sweep records on `SystemJobHeartbeat`: judged stale after an hour without a success. */
+async function jobRow(ctx: ReportContext, job: string, key: string, fields: typeof calendarRefreshFields) {
+  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, SWEEP_STEP_STALE_AFTER_MS));
+  if (!read.ok) return { key, ...tried(read, "The last run could not be read. It is not shown as healthy.") };
+  return fields(key, read.value, read.readAt);
+}
+
+/** The stored result of an on-demand connection test. Never run on page load: the Test connections button runs it. */
+async function reachabilityRow(ctx: ReportContext, kind: "email" | "square", key: string, job: string, isConfigured: () => boolean) {
+  let configured: boolean;
+  try {
+    configured = isConfigured();
+  } catch {
+    return { key, checkedAt: iso(new Date()), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+  }
+  if (!configured) return reachabilityFields(kind, key, { configured: false, run: null }, ctx.now);
+  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now));
+  return reachabilityFields(kind, key, { configured: true, run: read.ok ? read.value : null }, ctx.now);
+}
+
 /* ---------- Event roll-ups ---------- */
 
 function namesOf(events: Array<{ name: string }>, limit = 3) {
@@ -271,13 +305,19 @@ const serverFix = "Fixed on the server";
 export const systemReportProviders: readonly SignalProvider[] = [
   defineProvider("release", [
     m("release-version", "Running version", "The code release this server is running."),
-  ], async () => {
+    m("release-deployed", "Last deploy", "When this version went live: when the server process started, and when the build was written."),
+  ], async (ctx) => {
     const release = getReleaseIdentity();
     const checkedAt = iso(new Date());
-    if (!release.sha) {
-      return [{ key: "release-version", state: "unavailable", checkedAt, whenLabel: "Tried", resultText: "The release code is not recorded on this server, so the version is not known." }];
-    }
-    return [{ key: "release-version", state: "ok", checkedAt, whenLabel: "Read", resultText: `Release ${release.sha.slice(0, 7)}${release.buildId ? `, build ${release.buildId}` : ""}.` }];
+    const version = !release.sha
+      ? { key: "release-version", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The release code is not recorded on this server, so the version is not known." }
+      : { key: "release-version", state: "ok" as const, checkedAt, whenLabel: "Read", resultText: `Release ${release.sha.slice(0, 7)}${release.buildId ? `, build ${release.buildId}` : ""}.` };
+    const { startedAt, builtAt } = getReleaseTimes(ctx.now);
+    const built = builtAt ? ` Built ${builtAt.toISOString().slice(0, 16).replace("T", " ")} UTC.` : " The build time is not recorded.";
+    const deployed = startedAt
+      ? { key: "release-deployed", state: "ok" as const, checkedAt: iso(startedAt), whenLabel: "Server started", resultText: `The server process has been running since it started.${built}` }
+      : { key: "release-deployed", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The server's start time could not be read, so the deploy time is not known." };
+    return [version, deployed];
   }),
 
   defineProvider("database", [
@@ -297,10 +337,14 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("email-sweep", "Email sweep", "The scheduled job that sends queued email succeeded in the last 15 minutes.", null, serverFix),
     m("backup-last", "Last backup", "The last backup succeeded recently and reached its offsite copy.", "/admin/readiness", "Open readiness"),
     m("backup-restore-test", "Restore test", "A backup was restored as a test recently.", "/admin/readiness", "Open readiness"),
+    m("calendar-feed-refresh", "Calendar feed refresh", "The imported calendar feeds that came due were refreshed by the last sweep.", "/admin/calendar", "Open calendar"),
+    m("message-file-cleanup", "Message file cleanup", "The last sweep's cleanup of message attachments nothing refers to.", "/admin/email", "Open email settings"),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
     await readinessRow(ctx, "backup-offsite", "backup-last"),
     await readinessRow(ctx, "restore-rehearsal", "backup-restore-test"),
+    await jobRow(ctx, CALENDAR_FEED_REFRESH_JOB, "calendar-feed-refresh", calendarRefreshFields),
+    await jobRow(ctx, MESSAGE_FILE_CLEANUP_JOB, "message-file-cleanup", messageFileCleanupFields),
   ]),
 
   defineProvider("email", [
@@ -308,16 +352,19 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("email-queue", "Email queue", "Messages waiting, processing or given up.", "/admin/email", "Open email settings"),
     m("email-provider", "Email provider", "An email service is set up.", "/admin/settings", "Platform settings"),
     m("email-sender", "Sender address", "The sender address is set and is not a placeholder.", "/admin/settings", "Platform settings"),
+    m("email-reachable", "Email service reachable", "A read-only test that the email service answers and accepts our key. It sends nothing.", null, "Press Test connections"),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-delivery", "email-queue"])),
     await readinessRow(ctx, "email-provider", "email-provider"),
     await readinessRow(ctx, "email-sender", "email-sender"),
+    await reachabilityRow(ctx, "email", "email-reachable", EMAIL_REACHABILITY_JOB, () => getEmailAvailability().deliveryConfigured),
   ]),
 
   defineProvider("payments", [
     m("payment-attempts", "Payment attempts", "Failed, or stuck over 15 minutes, on unpaid registrations.", "/more/health", "Open operational health"),
     m("payment-setup", "Payment setup", "Square and its payment notices are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("square-environment", "Square environment", "Whether Square is in test or live mode.", "/admin/settings", "Platform settings"),
+    m("square-reachable", "Square reachable", "A read-only test that Square answers and accepts our token. It charges nothing.", null, "Press Test connections"),
   ], async (ctx) => {
     const attempts = await rollupIssues(ctx, {
       key: "payment-attempts",
@@ -328,7 +375,12 @@ export const systemReportProviders: readonly SignalProvider[] = [
     });
     const env = await environment(ctx);
     const setup = !env.ok ? { key: "payment-setup", ...tried(env) } : paymentSetup(env.value, env.readAt);
-    return [attempts, setup, await readinessRow(ctx, "square-environment", "square-environment")];
+    return [
+      attempts,
+      setup,
+      await readinessRow(ctx, "square-environment", "square-environment"),
+      await reachabilityRow(ctx, "square", "square-reachable", SQUARE_REACHABILITY_JOB, () => getSquareConfiguration().paymentConfigured),
+    ];
   }),
 
   defineProvider("ledger", [
@@ -369,9 +421,12 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
   defineProvider("storage", [
     m("message-file-storage", "Message file storage", "Attachment space used against each event's limit.", "/admin/email", "Open email settings"),
+    m("server-disk-space", "Server disk space", "Free space left on the disk that holds uploads.", null, serverFix),
   ], async (ctx) => {
+    const disk = await ctx.once("disk-space", () => readDiskSpace());
+    const diskRow = disk.ok ? { ...diskFields("server-disk-space", disk.value, disk.readAt) } : { key: "server-disk-space", ...tried(disk, "Free space could not be read. It is not shown as healthy.") };
     const read = await ctx.once("message-file-usage", getMessageFileStorageUsage);
-    if (!read.ok) return [{ key: "message-file-storage", ...tried(read, "Storage use could not be read. Check again in a few minutes.") }];
+    if (!read.ok) return [{ key: "message-file-storage", ...tried(read, "Storage use could not be read. Check again in a few minutes.") }, diskRow];
     const usage = read.value;
     const quota = usage.quotaBytes;
     const percent = (event: { usedBytes: number }) => (quota > 0 ? (event.usedBytes / quota) * 100 : 0);
@@ -381,9 +436,9 @@ export const systemReportProviders: readonly SignalProvider[] = [
     const pending = usage.events.reduce((sum, event) => sum + event.pendingCleanupCount, 0);
     const tail = `${pending} ${pending === 1 ? "file" : "files"} waiting to be removed from disk. ${usage.expiredReservations} expired upload ${usage.expiredReservations === 1 ? "reservation" : "reservations"}. Cleanup is in ${usage.sweepMode === "delete" ? "delete" : "dry-run"} mode.`;
     const common = { key: "message-file-storage", checkedAt: iso(read.readAt), whenLabel: "Checked" };
-    if (full.length > 0) return [{ ...common, state: "attention", resultText: `${full.length} ${full.length === 1 ? "event is" : "events are"} at the attachment limit: ${namesOf(full.map(name))}. ${tail}` }];
-    if (near.length > 0) return [{ ...common, state: "watch", resultText: `${near.length} ${near.length === 1 ? "event is" : "events are"} at 90% or more of the attachment limit: ${namesOf(near.map(name))}. ${tail}` }];
-    return [{ ...common, state: "ok", resultText: `${usage.events.length} ${usage.events.length === 1 ? "event uses" : "events use"} attachment space, none near the limit. ${tail}` }];
+    if (full.length > 0) return [{ ...common, state: "attention", resultText: `${full.length} ${full.length === 1 ? "event is" : "events are"} at the attachment limit: ${namesOf(full.map(name))}. ${tail}` }, diskRow];
+    if (near.length > 0) return [{ ...common, state: "watch", resultText: `${near.length} ${near.length === 1 ? "event is" : "events are"} at 90% or more of the attachment limit: ${namesOf(near.map(name))}. ${tail}` }, diskRow];
+    return [{ ...common, state: "ok", resultText: `${usage.events.length} ${usage.events.length === 1 ? "event uses" : "events use"} attachment space, none near the limit. ${tail}` }, diskRow];
   }),
 
   defineProvider("imports", [

@@ -15,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   getAnalyticsSummary: vi.fn(),
   checkDatabaseLiveness: vi.fn(),
   getReleaseIdentity: vi.fn(),
+  getReleaseTimes: vi.fn(),
+  readDiskSpace: vi.fn(),
+  getJobRun: vi.fn(),
+  getEmailAvailability: vi.fn(),
+  getSquareConfiguration: vi.fn(),
   logError: vi.fn(),
 }));
 
@@ -31,7 +36,11 @@ vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: asyn
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
-vi.mock("@/lib/release", () => ({ getReleaseIdentity: mocks.getReleaseIdentity }));
+vi.mock("@/lib/release", () => ({ getReleaseIdentity: mocks.getReleaseIdentity, getReleaseTimes: mocks.getReleaseTimes }));
+vi.mock("@/modules/operations/disk-space", () => ({ readDiskSpace: mocks.readDiskSpace }));
+vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ getJobRun: mocks.getJobRun }));
+vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: mocks.getEmailAvailability }));
+vi.mock("@/modules/payments/square-config", () => ({ getSquareConfiguration: mocks.getSquareConfiguration }));
 vi.mock("@/modules/system-admin/repository", () => ({ getSystemHealth: mocks.getSystemHealth }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));
 vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadiness: mocks.getSystemReadiness }));
@@ -234,6 +243,11 @@ describe("providers", () => {
       mocks.getMessageFileStorageUsage.mockRejectedValue(new Error("down"));
       mocks.getAnalyticsSummary.mockRejectedValue(new Error("down"));
       mocks.checkDatabaseLiveness.mockRejectedValue(new Error("down"));
+      mocks.getReleaseTimes.mockReturnValue({ startedAt: new Date("2026-10-29T08:00:00.000Z"), builtAt: null });
+      mocks.readDiskSpace.mockRejectedValue(new Error("down"));
+      mocks.getJobRun.mockRejectedValue(new Error("down"));
+      mocks.getEmailAvailability.mockReturnValue({ deliveryConfigured: true, webhookConfigured: false });
+      mocks.getSquareConfiguration.mockReturnValue({ paymentConfigured: true });
     }
 
     it("shows every reading as unavailable when every source fails, and never as OK", async () => {
@@ -241,10 +255,10 @@ describe("providers", () => {
       const report = await loadSystemReport(now);
       const rows = report.sections.flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "payment-setup", "connected-services"].includes(row.key));
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(1); // only the release identity, read from the environment
+      expect(report.overall.tally.ok).toBe(2); // only the release identity and start time, read from the process
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");
     });

@@ -49,6 +49,8 @@ export type Signal = {
   countsTowardOverall?: boolean;
   /** A short list under the result, such as the titles of open alerts. Titles of alert kinds only. */
   items?: string[];
+  /** What to show in place of a time when there is none ("Never"). Defaults to "Not recorded". */
+  noTimeLabel?: string;
   /** Replaces the section's status chip text when the section is not counted (for example "11 of 13 ticked"). */
   sectionLabel?: string;
 };

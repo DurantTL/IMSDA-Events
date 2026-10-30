@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   isAuthorizedSweepRequest: vi.fn(),
   sweepOutbox: vi.fn(),
   recordSweepHeartbeat: vi.fn(),
+  recordJobRun: vi.fn(),
   runAlertScan: vi.fn(),
   pruneExpiredCommunityContent: vi.fn(),
   sendDueLocationWaitlistDigests: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("@/modules/communications/outbox-sweep", () => ({
 }));
 vi.mock("@/modules/community/repository", () => ({ pruneExpiredCommunityContent: mocks.pruneExpiredCommunityContent }));
 vi.mock("@/modules/operations/alert-scan", () => ({ runAlertScan: mocks.runAlertScan }));
-vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordSweepHeartbeat: mocks.recordSweepHeartbeat }));
+vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordSweepHeartbeat: mocks.recordSweepHeartbeat, recordJobRun: mocks.recordJobRun }));
 vi.mock("@/modules/payments/square-hosted-invalidation", () => ({ sweepHostedCheckouts: mocks.sweepHostedCheckouts }));
 vi.mock("@/modules/health-records/snapshot-hooks", () => ({ runHealthSnapshotSweep: mocks.runHealthSnapshotSweep }));
 vi.mock("@/modules/general-link-registrations/repository", () => ({ expireStalePendingTeams: mocks.expireStalePendingTeams }));
@@ -52,6 +53,7 @@ beforeEach(() => {
   mocks.isAuthorizedSweepRequest.mockReturnValue(true);
   mocks.sweepOutbox.mockResolvedValue({ sweptEventIds: [], skipped: [], sweptAccountMessages: false, snapshotBefore: { pending: 0 } });
   mocks.recordSweepHeartbeat.mockResolvedValue(undefined);
+  mocks.recordJobRun.mockResolvedValue(undefined);
   mocks.runAlertScan.mockResolvedValue({ sent: [], suppressed: [], undelivered: [], cleared: [] });
   mocks.pruneExpiredCommunityContent.mockResolvedValue({ removed: 0 });
   mocks.refreshDueCalendarFeeds.mockResolvedValue({ due: 0, refreshed: 0, failed: 0 });
@@ -196,5 +198,31 @@ describe("the sweep and public analytics retention (#111)", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect((await response.json()).publicMetricsRetention).toBeNull();
+  });
+});
+
+describe("the sweep records its steps for the System report (#1357)", () => {
+  it("stores calendar and message file counts only, with no file name or path", async () => {
+    mocks.refreshDueCalendarFeeds.mockResolvedValueOnce({ due: 2, refreshed: 1, failed: 1 });
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("calendar-feed-refresh", "SUCCEEDED", { due: 2, refreshed: 1, failed: 1 });
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("message-file-cleanup", "SUCCEEDED", { mode: "dry-run", candidates: 2, deleted: 0, cleanupPending: 0, cleanupFailed: 0 });
+    expect(JSON.stringify(mocks.recordJobRun.mock.calls)).not.toContain("x.pdf");
+  });
+
+  it("records a step that failed as FAILED", async () => {
+    mocks.refreshDueCalendarFeeds.mockRejectedValueOnce(new Error("synthetic"));
+    mocks.sweepMessageFiles.mockRejectedValueOnce(new Error("synthetic"));
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("calendar-feed-refresh", "FAILED", undefined);
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("message-file-cleanup", "FAILED", undefined);
+  });
+
+  it("stays a successful sweep when recording a step fails", async () => {
+    mocks.recordJobRun.mockRejectedValue(new Error("synthetic database fault"));
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("Could not record the calendar feed refresh run"), expect.any(Error));
+    expect(mocks.recordSweepHeartbeat).toHaveBeenCalledWith("SUCCEEDED");
   });
 });

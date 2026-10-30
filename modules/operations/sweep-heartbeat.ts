@@ -12,6 +12,18 @@
 
 export const OUTBOX_SWEEP_JOB = "outbox-sweep";
 
+/** Other unattended steps and on-demand tests that record a run on the same row (#1357). */
+export const CALENDAR_FEED_REFRESH_JOB = "calendar-feed-refresh";
+export const MESSAGE_FILE_CLEANUP_JOB = "message-file-cleanup";
+export const EMAIL_REACHABILITY_JOB = "email-reachability";
+export const SQUARE_REACHABILITY_JOB = "square-reachability";
+
+/**
+ * Calendar refresh and message file cleanup run on every five-minute sweep, so twelve missed runs (an hour without a
+ * success) is long enough not to flag one slow sweep and short enough to notice a step that has stopped.
+ */
+export const SWEEP_STEP_STALE_AFTER_MS = 60 * 60 * 1000;
+
 /**
  * Three missed runs at the default five-minute interval. Long enough that one
  * slow or skipped run is not reported, short enough to catch a stopped sweeper

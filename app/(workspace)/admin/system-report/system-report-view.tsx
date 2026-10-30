@@ -10,6 +10,7 @@ import {
   type SystemReport,
 } from "@/modules/system-admin/system-report/model";
 import styles from "./page.module.css";
+import { TestConnectionsButton } from "./test-connections-button";
 
 /** The shared status chip colors. "Count only" has no verdict, so it is drawn plain, never green. */
 const chipColor: Record<SignalState, string> = { ok: "green", watch: "gold", attention: "coral", unavailable: "neutral", info: "neutral" };
@@ -37,7 +38,7 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
       </div>
       <div className={styles.rowWhen}>
         <b>{signal.whenLabel} </b>
-        {reportTimeLabel(signal.checkedAt, now)}
+        {signal.checkedAt ? reportTimeLabel(signal.checkedAt, now) : signal.noTimeLabel ?? reportTimeLabel(null, now)}
       </div>
       <div className={styles.rowResult}>
         <StateChip state={signal.state} />
@@ -93,6 +94,7 @@ export function SystemReportView({ report }: { report: SystemReport }) {
           <p>Every reading the system makes, in one place. Each row says what was checked, when, and what it found. A reading that could not be made shows as unavailable, never as OK.</p>
         </div>
         <div className="page-intro-actions">
+          <TestConnectionsButton />
           <Link className="secondary-button" href="/admin/system-report"><RefreshCw aria-hidden="true" size={16} />Check again</Link>
         </div>
       </div>
