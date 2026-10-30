@@ -4,6 +4,7 @@ import {
   remainingEventCapacity,
   type EventRegistrationPhase,
 } from "@/modules/events/lifecycle";
+import { closesRegistration, effectiveLifecycleState, type EventLifecycleStateName } from "@/modules/events/lifecycle-state";
 import { publicStatusLine, resolvePublicCapacityStatus, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
@@ -68,6 +69,7 @@ export type PublicEventAnnouncement = {
 type PublicEventLifecycleInput = {
   isPublished: boolean;
   archivedAt: Date | null;
+  lifecycleState: EventLifecycleStateName | null;
   timezone: string;
   capacity: number | null;
   registrationOpensOn: string | null;
@@ -227,7 +229,8 @@ function presentPublicEventLifecycle(
   }
 
   if (phase === "CLOSED" || phase === "DRAFT") {
-    const closed = event.registrationClosesOn
+    // A state that closes registration (#156) says no date: the date, if any, may still be ahead.
+    const closed = event.registrationClosesOn && !closesRegistration(effectiveLifecycleState(event))
       ? ` on ${calendarDateLabel(event.registrationClosesOn)}`
       : "";
     return {

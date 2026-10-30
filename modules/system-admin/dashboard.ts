@@ -1,4 +1,5 @@
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
+import type { EventLifecycleStateName } from "@/modules/events/lifecycle-state";
 
 const activeRegistrationStatuses = new Set(["SUBMITTED", "CONFIRMED"]);
 
@@ -13,6 +14,7 @@ export type SystemAdminEventSource = {
   capacity: number | null;
   isPublished: boolean;
   archivedAt: Date | null;
+  lifecycleState: EventLifecycleStateName | null;
   registrationOpensOn: string | null;
   registrationClosesOn: string | null;
   waitlistEnabled: boolean;

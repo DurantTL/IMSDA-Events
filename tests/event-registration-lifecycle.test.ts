@@ -6,7 +6,7 @@ import {
 } from "@/modules/events/lifecycle";
 
 const openEvent = {
-  isPublished: true, archivedAt: null,
+  isPublished: true, archivedAt: null, lifecycleState: null,
   timezone: "America/Chicago",
   registrationOpensOn: "2026-08-01",
   registrationClosesOn: "2026-09-17",

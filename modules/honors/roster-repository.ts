@@ -62,7 +62,7 @@ export async function getHonorRosterData(
   };
   const activeInScope = { status: { in: ["SUBMITTED" as const, "CONFIRMED" as const] }, ...(options.locationId ? { locationId: options.locationId } : {}) };
   const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations, seatTotals, countedSeatTotals, liveOfferTotals] = await Promise.all([
-    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true, isPublished: true, archivedAt: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true } }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true, isPublished: true, archivedAt: true, lifecycleState: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true } }),
     prisma.honorSession.findMany({
       where: { eventId, ...(options.locationId ? { OR: [{ locationId: options.locationId }, { locationId: null }] } : {}) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { name: "asc" }],

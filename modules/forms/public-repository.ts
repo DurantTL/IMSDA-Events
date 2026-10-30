@@ -355,6 +355,7 @@ const publicEventSelect = {
   capacity: true,
   isPublished: true,
   archivedAt: true,
+  lifecycleState: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,

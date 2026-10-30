@@ -90,6 +90,7 @@ function eventSource(overrides: Partial<SystemAdminEventSource> = {}): SystemAdm
     capacity: 100,
     isPublished: true,
     archivedAt: null,
+    lifecycleState: null,
     registrationOpensOn: "2026-01-01",
     registrationClosesOn: "2026-11-15",
     waitlistEnabled: true,

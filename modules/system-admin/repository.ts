@@ -18,6 +18,7 @@ export function moneyToCents(value: { toString(): string } | number) {
 const dashboardEventSelect = {
   id: true,
   archivedAt: true,
+  lifecycleState: true,
   slug: true,
   name: true,
   startsAt: true,
@@ -129,6 +130,7 @@ export function toDashboardEventSource(event: DashboardEventRow): SystemAdminEve
     capacity: event.capacity,
     isPublished: event.isPublished,
     archivedAt: event.archivedAt,
+    lifecycleState: event.lifecycleState,
     registrationOpensOn: event.registrationOpensOn,
     registrationClosesOn: event.registrationClosesOn,
     waitlistEnabled: event.waitlistEnabled,

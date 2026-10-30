@@ -17,7 +17,7 @@ function event(id: string, startsAt: string, overrides: Partial<EventSelectionCa
     id,
     startsAt: new Date(startsAt),
     isPublished: true,
-    archivedAt: null,
+    archivedAt: null, lifecycleState: null,
     timezone: "America/Chicago",
     registrationOpensOn: null,
     registrationClosesOn: null,

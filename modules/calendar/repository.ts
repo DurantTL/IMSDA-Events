@@ -37,6 +37,7 @@ const publicEventSelect = {
   calendarCategory: true,
   isPublished: true,
   archivedAt: true,
+  lifecycleState: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -250,7 +251,7 @@ export async function listCalendarEntries(now = new Date()) {
     take: calendarEntryListLimit,
     include: {
       sourceFeed: { select: { name: true } },
-      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
+      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, lifecycleState: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
     },
   });
 

@@ -7,6 +7,7 @@ import {
   type EventArchiveActor,
   type EventArchiveAuditMetadata,
 } from "@/modules/events/archive";
+import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { EventOperationError } from "@/modules/events/repository";
 
 export class EventArchiveForbiddenError extends Error {
@@ -41,6 +42,21 @@ async function setEventArchived(input: { eventId: string; actor: ArchiveActor; a
         : { archivedAt: null, archivedByUserId: null },
     });
     if (count !== 1) return { archived: input.archive, changed: false };
+
+    // The lifecycle history (#156) records the archive overlay too: the state it left and the state it returns to.
+    // Written only because the row changed, so a repeated request adds nothing.
+    const state = await tx.event.findUnique({ where: { id: input.eventId }, select: { lifecycleState: true, isPublished: true } });
+    if (state) {
+      const underlying = effectiveLifecycleState({ ...state, archivedAt: null });
+      await tx.eventLifecycleTransition.create({
+        data: {
+          eventId: input.eventId,
+          fromState: input.archive ? underlying : "ARCHIVED",
+          toState: input.archive ? "ARCHIVED" : underlying,
+          actorUserId: input.actor.userId,
+        },
+      });
+    }
 
     const metadata: EventArchiveAuditMetadata = { eventId: input.eventId };
     await writeAuditLog({

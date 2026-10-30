@@ -8,7 +8,7 @@ function event(id: string, offsetDays: number): EventSelectionCandidate {
   return {
     id,
     startsAt: new Date(now.getTime() + offsetDays * day),
-    isPublished: true, archivedAt: null,
+    isPublished: true, archivedAt: null, lifecycleState: null,
     timezone: "America/Chicago",
     registrationOpensOn: null,
     registrationClosesOn: null,

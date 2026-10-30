@@ -52,6 +52,7 @@ function source(overrides: Partial<EventsAdminEventSource> = {}): EventsAdminEve
     capacity: 100,
     isPublished: true,
     archivedAt: null,
+    lifecycleState: null,
     registrationOpensOn: "2026-01-01",
     registrationClosesOn: "2026-11-15",
     waitlistEnabled: true,
@@ -197,7 +198,7 @@ describe("the read's scope", () => {
 
   const row = {
     id: "event-a", slug: "a", name: "Synthetic A", startsAt: new Date("2026-11-20T15:00:00Z"), endsAt: new Date("2026-11-22T15:00:00Z"), timezone: "America/Chicago",
-    location: null, capacity: null, isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
+    location: null, capacity: null, isPublished: true, archivedAt: null, lifecycleState: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false,
     registrations: [], attendees: [], checkIns: [], memberships: [], registrationForms: [], waitlistEntries: [], importRuns: [], messageOutbox: [],
   };
 

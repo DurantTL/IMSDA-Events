@@ -17,7 +17,7 @@ import PublicEventPage from "@/app/(public)/events/[eventSlug]/page";
  */
 
 const base = {
-  isPublished: true, archivedAt: null, timezone: "America/Chicago", capacity: 10,
+  isPublished: true, archivedAt: null, lifecycleState: null, timezone: "America/Chicago", capacity: 10,
   registrationOpensOn: "2026-12-01", registrationClosesOn: "2027-01-15", waitlistEnabled: true, endsAt: new Date("2027-02-07T18:00:00Z"),
 };
 const form = (n: number) => ({

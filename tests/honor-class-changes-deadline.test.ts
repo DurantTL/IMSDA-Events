@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 import { classChangesClosedMessage, classChangesEnded, classChangesOpen } from "@/modules/honors/locations";
 
 const event = {
-  isPublished: true, archivedAt: null,
+  isPublished: true, archivedAt: null, lifecycleState: null,
   timezone: "America/Chicago",
   registrationOpensOn: "2026-10-01",
   registrationClosesOn: "2026-11-30",
