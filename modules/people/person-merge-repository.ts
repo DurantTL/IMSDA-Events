@@ -453,7 +453,7 @@ export type PersonMergeRecord = {
   mergedAt: string;
 };
 
-const mergePersonSelect = personColumnSelect("SYSTEM_ADMIN", ["firstName", "lastName"]) as { id: true; firstName: true; lastName: true };
+const mergePersonSelect = personColumnSelect("SYSTEM_ADMIN", ["firstName", "lastName"]);
 
 /** ACTIVE merges for the "Merged people" list: names only, like the review queue. */
 export async function listActivePersonMerges(actorUserId: string): Promise<PersonMergeRecord[]> {

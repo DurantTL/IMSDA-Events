@@ -19,9 +19,10 @@ import { maskEmail, normalizeEmail } from "../account-merge/dry-run-domain";
 
 export const ACCOUNT_LINK_RULE = "VERIFIED_EMAIL_EXACT" as const;
 export const HUMAN_STEP =
-  "Nothing is applied by this report. Ambiguous rows are for a human to settle through the existing duplicate-candidate generation and review queue (/people/matches); production runs and any resulting link, backfill or merge are human-only.";
+  "Nothing is applied by this report. Duplicate pairs the matcher surfaces (routing REVIEW_QUEUE) are for a human to settle through candidate generation and the review queue (/people/matches). Account-link ambiguity (routing ACCOUNT_LINK_REVIEW) is NOT visible in that queue, which compares people, not accounts: it is a manual review list in this report. DATA_FIX rows need a data correction. Production runs and any resulting link, backfill or merge are human-only.";
 
-export type Routing = "REVIEW_QUEUE" | "DATA_FIX";
+/** REVIEW_QUEUE: the duplicate matcher surfaces it. ACCOUNT_LINK_REVIEW: a person reviews the listed accounts by hand. DATA_FIX: correct the data. */
+export type Routing = "REVIEW_QUEUE" | "ACCOUNT_LINK_REVIEW" | "DATA_FIX";
 
 export type AccountRow = {
   id: string;
@@ -73,6 +74,8 @@ export type IdentityDryRunReport = {
   householdsNeedingBackfill: Array<{ householdId: string; memberRowIds: string[]; personIds: string[] }>;
   duplicateCandidates: Array<{ personAId: string; personBId: string; action: "WOULD_CREATE" | "WOULD_SUPERSEDE_OPEN"; matchedSignals: string[]; confidence: string; routing: "REVIEW_QUEUE" }>;
   exceptions: ExceptionRow[];
+  /** The exceptions routed ACCOUNT_LINK_REVIEW: the manual review list for account links. */
+  accountLinkReview: ExceptionRow[];
   reconciliation: TableReconciliation[];
   reconciled: boolean;
 };
@@ -116,10 +119,10 @@ export function classifyIdentityMigration(input: DryRunInput, options: IdentityD
   let personExceptions = 0;
   for (const person of [...input.persons].sort((a, b) => byText(a.id, b.id))) {
     if (person.anonymized) {
-      exceptions.push({ table: "Person", rowId: person.id, code: "ANONYMIZED_PERSON", routing: "DATA_FIX", relatedIds: [] });
-      personExceptions += 1;
+      // A legitimate end state, not a problem: counted in its own bucket and left out of matching and linking.
+      increment(personBuckets, "ANONYMIZED");
     } else if (root(person.id) === null) {
-      exceptions.push({ table: "Person", rowId: person.id, code: "MERGE_CHAIN_UNRESOLVABLE", routing: "REVIEW_QUEUE", relatedIds: [] });
+      exceptions.push({ table: "Person", rowId: person.id, code: "MERGE_CHAIN_UNRESOLVABLE", routing: "DATA_FIX", relatedIds: [] });
       personExceptions += 1;
     } else increment(personBuckets, mergedSecondaries.has(person.id) ? "MERGED_SECONDARY" : "ACTIVE");
   }
@@ -137,14 +140,14 @@ export function classifyIdentityMigration(input: DryRunInput, options: IdentityD
   const wouldLink: IdentityDryRunReport["wouldLinkAccounts"] = [];
   const accountBuckets: Record<string, number> = {};
   let accountExceptions = 0;
-  const fail = (account: AccountRow, code: string, relatedIds: string[], routing: Routing = "REVIEW_QUEUE") => {
+  const fail = (account: AccountRow, code: string, relatedIds: string[], routing: Routing = "ACCOUNT_LINK_REVIEW") => {
     exceptions.push({ table: "AttendeeAccount", rowId: account.id, code, routing, relatedIds: [...relatedIds].sort(byText) });
     accountExceptions += 1;
   };
   for (const account of [...input.accounts].sort((a, b) => byText(a.id, b.id))) {
     if (account.linkedPersonIds.length > 1) { fail(account, "ACCOUNT_LINKED_TO_SEVERAL_PEOPLE", account.linkedPersonIds); continue; }
     if (account.linkedPersonIds.length === 1) { increment(accountBuckets, "ALREADY_LINKED"); continue; }
-    if (!account.emailVerifiedAt || account.status !== "ACTIVE" || account.disabled) { fail(account, "ACCOUNT_NOT_VERIFIED_ACTIVE", [], "DATA_FIX"); continue; }
+    if (!account.emailVerifiedAt || account.status !== "ACTIVE" || account.disabled) { increment(accountBuckets, "NOT_VERIFIED_ACTIVE"); continue; }
     const matches = personByEmail.get(normalizeEmail(account.email)) ?? [];
     if (matches.length === 0) { increment(accountBuckets, "NO_PERSON_MATCH"); continue; }
     if (matches.length > 1) { fail(account, "SEVERAL_PEOPLE_MATCH_EMAIL", matches); continue; }
@@ -193,10 +196,8 @@ export function classifyIdentityMigration(input: DryRunInput, options: IdentityD
     if (!attendee.personId || !person) {
       exceptions.push({ table: "RegistrationAttendee", rowId: attendee.id, code: "NO_PERSON", routing: "DATA_FIX", relatedIds: attendee.personId ? [attendee.personId] : [] });
       attendeeExceptions += 1;
-    } else if (person.anonymized) {
-      exceptions.push({ table: "RegistrationAttendee", rowId: attendee.id, code: "PERSON_ANONYMIZED", routing: "DATA_FIX", relatedIds: [person.id] });
-      attendeeExceptions += 1;
-    } else increment(attendeeBuckets, mergedSecondaries.has(person.id) ? "ON_MERGED_SECONDARY" : "ON_ACTIVE_PERSON");
+    } else if (person.anonymized) increment(attendeeBuckets, "ON_ANONYMIZED_PERSON");
+    else increment(attendeeBuckets, mergedSecondaries.has(person.id) ? "ON_MERGED_SECONDARY" : "ON_ACTIVE_PERSON");
   }
   reconciliation.push(reconcile("RegistrationAttendee", input.attendees.length, attendeeBuckets, attendeeExceptions));
 
@@ -240,7 +241,7 @@ export function classifyIdentityMigration(input: DryRunInput, options: IdentityD
     const rootA = root(a.id);
     const rootB = root(b.id);
     if (rootA === null || rootB === null) {
-      exceptions.push({ table: "PersonPair", rowId: key.replace(" ", ":"), code: "MERGE_CHAIN_UNRESOLVABLE", routing: "REVIEW_QUEUE", relatedIds: [a.id, b.id] });
+      exceptions.push({ table: "PersonPair", rowId: key.replace(" ", ":"), code: "MERGE_CHAIN_UNRESOLVABLE", routing: "DATA_FIX", relatedIds: [a.id, b.id] });
       pairExceptions += 1;
       continue;
     }
@@ -267,6 +268,7 @@ export function classifyIdentityMigration(input: DryRunInput, options: IdentityD
       .map(([householdId, entry]) => ({ householdId, memberRowIds: entry.memberRowIds, personIds: [...entry.personIds].sort(byText) })),
     duplicateCandidates,
     exceptions,
+    accountLinkReview: exceptions.filter((row) => row.routing === "ACCOUNT_LINK_REVIEW"),
     reconciliation,
     reconciled: reconciliation.every((table) => table.reconciled),
   };
@@ -280,6 +282,7 @@ export function formatIdentityDryRunText(report: IdentityDryRunReport): string {
     `Would receive account links (${report.accountLinkRule}): ${report.wouldLinkAccounts.length}`,
     `Households needing effective-date backfill: ${report.householdsNeedingBackfill.length}`,
     `Likely duplicate candidates for the review queue: ${report.duplicateCandidates.length}`,
+    `Account links for manual review (ACCOUNT_LINK_REVIEW): ${report.accountLinkReview.length}`,
     `Exceptions: ${report.exceptions.length}`,
     "",
     "Reconciliation (input = classified + exceptions):",

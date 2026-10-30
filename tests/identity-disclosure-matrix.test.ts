@@ -27,6 +27,7 @@ import {
   IDENTITY_FIELDS,
   disclosureDecision,
   isDisclosureAllowed,
+  isEventScopedDisclosureAllowed,
   personColumnSelect,
   staffIdentityAudience,
   type DisclosureAudience,
@@ -39,11 +40,11 @@ import { listOpenMatchCandidates } from "@/modules/people/duplicate-match-reposi
 import { listActivePersonMerges } from "@/modules/people/person-merge-repository";
 import { anonymizePerson } from "@/modules/people/anonymization";
 
-/** R = read, E = edit, X = export, A = view audit; "-" = denied. Audiences in `DISCLOSURE_AUDIENCES` order. */
+/** R = read, E = edit, X = export, A = view audit (upper case: allowed; lower case r/x: EVENT_SCOPED marker, no grant by itself); "-" = denied. Audiences in `DISCLOSURE_AUDIENCES` order. */
 const EXPECTED: Record<IdentityField, { classification: FieldClassification; grid: [string, string, string, string, string] }> = {
-  PERSON_NAME: { classification: "PERSONAL_IDENTIFIER", grid: ["REXA", "R-X-", "R---", "----", "----"] },
-  EMAIL: { classification: "CONTACT_DETAIL", grid: ["REXA", "R-X-", "R---", "----", "----"] },
-  PHONE: { classification: "CONTACT_DETAIL", grid: ["REXA", "R-X-", "R---", "----", "----"] },
+  PERSON_NAME: { classification: "PERSONAL_IDENTIFIER", grid: ["REXA", "r-x-", "----", "----", "----"] },
+  EMAIL: { classification: "CONTACT_DETAIL", grid: ["REXA", "r-x-", "----", "----", "----"] },
+  PHONE: { classification: "CONTACT_DETAIL", grid: ["REXA", "r-x-", "----", "----", "----"] },
   HOUSEHOLD_MEMBERSHIP: { classification: "RELATIONSHIP", grid: ["RE-A", "----", "----", "----", "----"] },
   ACCOUNT_LINKS: { classification: "RELATIONSHIP", grid: ["RE-A", "----", "----", "----", "----"] },
   MERGE_HISTORY: { classification: "DERIVED_JUDGEMENT", grid: ["RE-A", "----", "----", "----", "----"] },
@@ -83,15 +84,31 @@ describe("matrix shape", () => {
     }
   });
 
-  it("only the system administrator audience has global reach, and a global read is refused to every other audience", () => {
+  it("is deny-by-default: only the system administrator passes, and an event-staff read of a name or email is not a grant", () => {
     expect(AUDIENCE_REACH).toEqual({ SYSTEM_ADMIN: "GLOBAL", EVENT_STAFF: "OWN_EVENT", ATTENDEE_SELF: "SELF", HOUSEHOLD_MEMBER: "NONE", ANONYMOUS: "NONE" });
-    // Even where the cell reads ALLOWED (event staff reading a name in their own event), a cross-event read is denied.
-    expect(isDisclosureAllowed("PERSON_NAME", "EVENT_STAFF", "READ")).toBe(true);
     for (const field of IDENTITY_FIELDS) {
       for (const audience of DISCLOSURE_AUDIENCES.filter((a) => a !== "SYSTEM_ADMIN")) {
-        expect(isDisclosureAllowed(field, audience, "READ", { reach: "GLOBAL" }), `${field} ${audience}`).toBe(false);
+        for (const action of DISCLOSURE_ACTIONS) {
+          expect(isDisclosureAllowed(field, audience, action), `${field} ${audience} ${action}`).toBe(false);
+        }
       }
     }
+    expect(isDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ")).toBe(false);
+    expect(isDisclosureAllowed("EMAIL", "ATTENDEE_SELF", "READ")).toBe(false);
+  });
+
+  it("an event-scoped cell applies only with explicit proof for one event, and never to other audiences or cells", () => {
+    const proof = { eventId: "evt_a", hasEventPermission: true, personInEvent: true };
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ", proof)).toBe(true);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ", { ...proof, eventId: "" })).toBe(false);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ", { ...proof, hasEventPermission: false })).toBe(false);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ", { ...proof, personInEvent: false })).toBe(false);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "READ", undefined as never)).toBe(false);
+    // Cells that are denied, or granted globally, are not event-scoped grants.
+    expect(isEventScopedDisclosureAllowed("EMAIL", "EVENT_STAFF", "EDIT", proof)).toBe(false);
+    expect(isEventScopedDisclosureAllowed("MERGE_HISTORY", "EVENT_STAFF", "READ", proof)).toBe(false);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "ATTENDEE_SELF", "READ", proof)).toBe(false);
+    expect(isEventScopedDisclosureAllowed("EMAIL", "SYSTEM_ADMIN", "READ", proof)).toBe(false);
   });
 
   it("denies anything it does not recognise", () => {
@@ -114,9 +131,11 @@ describe.each(IDENTITY_FIELDS)("matrix row %s", (field) => {
     DISCLOSURE_AUDIENCES.forEach((audience, row) => {
       LETTERS.forEach((letter, column) => {
         const action = DISCLOSURE_ACTIONS[column]!;
-        const want = expected.grid[row]![column] === letter ? "ALLOWED" : "DENIED";
+        const cell = expected.grid[row]![column];
+        const want = cell === letter ? "ALLOWED" : cell === letter.toLowerCase() ? "EVENT_SCOPED" : "DENIED";
         expect(disclosureDecision(field, audience, action), `${audience} ${action}`).toBe(want);
-        expect(isDisclosureAllowed(field, audience, action), `${audience} ${action}`).toBe(want === "ALLOWED");
+        // Enforcement: only an ALLOWED cell held by the global-reach audience passes; a marker or denial never does.
+        expect(isDisclosureAllowed(field, audience, action), `${audience} ${action}`).toBe(want === "ALLOWED" && audience === "SYSTEM_ADMIN");
       });
     });
   });
@@ -126,7 +145,7 @@ describe("enforcement: the code decides through the matrix", () => {
   it("MATCH_CANDIDATE_EVIDENCE READ is the review queue gate", async () => {
     for (const [user, audience] of [[adminUser, "SYSTEM_ADMIN"], [staffUser, "EVENT_STAFF"]] as const) {
       mocks.getCurrentSession.mockResolvedValue({ user });
-      expect(await passes(requireSystemAdministrator), audience).toBe(isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", audience, "READ", { reach: "GLOBAL" }));
+      expect(await passes(requireSystemAdministrator), audience).toBe(isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", audience, "READ"));
     }
   });
 
@@ -134,7 +153,7 @@ describe("enforcement: the code decides through the matrix", () => {
     for (const [user, audience] of [[adminUser, "SYSTEM_ADMIN"], [staffUser, "EVENT_STAFF"]] as const) {
       mocks.getCurrentSession.mockResolvedValue({ user });
       for (const action of ["READ", "EDIT"] as const) {
-        expect(await passes(() => requirePersonMergePermission(action)), `${audience} ${action}`).toBe(isDisclosureAllowed("MERGE_HISTORY", audience, action, { reach: "GLOBAL" }));
+        expect(await passes(() => requirePersonMergePermission(action)), `${audience} ${action}`).toBe(isDisclosureAllowed("MERGE_HISTORY", audience, action));
       }
     }
   });
@@ -151,15 +170,16 @@ describe("enforcement: the code decides through the matrix", () => {
         expect(error.code).toBe("APPROVER_NOT_ALLOWED");
         return false;
       });
-      expect(allowed, audience).toBe(isDisclosureAllowed("ANONYMIZATION_RECORD", audience, "EDIT", { reach: "GLOBAL" }));
+      expect(allowed, audience).toBe(isDisclosureAllowed("ANONYMIZATION_RECORD", audience, "EDIT"));
     }
   });
 
-  it("PERSON_NAME, EMAIL and PHONE: the projection includes exactly the columns the audience may read", () => {
+  it("PERSON_NAME, EMAIL and PHONE: the projection is the requested columns for the system administrator and an error for anyone else", () => {
     const columns = ["firstName", "lastName", "normalizedEmail", "phone"] as const;
     expect(personColumnSelect("SYSTEM_ADMIN", columns)).toEqual({ id: true, firstName: true, lastName: true, normalizedEmail: true, phone: true });
+    // A denied column is refused outright rather than silently dropped from a typed result.
     for (const audience of ["EVENT_STAFF", "ATTENDEE_SELF", "HOUSEHOLD_MEMBER", "ANONYMOUS"] as const) {
-      expect(personColumnSelect(audience, columns), audience).toEqual({ id: true });
+      expect(() => personColumnSelect(audience, columns), audience).toThrow(/may not read/);
     }
   });
 

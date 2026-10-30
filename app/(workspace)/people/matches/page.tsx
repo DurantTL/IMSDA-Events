@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Possible duplicate people" };
 export default async function DuplicateMatchQueuePage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ", { reach: "GLOBAL" })) redirect("/no-access");
+  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");
 
   const [candidates, merges] = await Promise.all([listOpenMatchCandidates(user.id), listActivePersonMerges(user.id)]);
   return <DuplicateMatchReviewWorkspace initialCandidates={candidates} initialMerges={merges} />;

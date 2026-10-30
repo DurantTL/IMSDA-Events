@@ -27,6 +27,14 @@ export async function auditCrossEventIdentityRead(input: {
 }) {
   if (!input.actorUserId) throw new Error("A cross-event identity read needs an actor to audit.");
   const resultIds = input.resultIds.slice(0, CROSS_EVENT_READ_ID_CAP);
+  let extraTruncated = false;
+  const extra: Record<string, string | number | string[]> = {};
+  for (const [key, value] of Object.entries(input.extra ?? {})) {
+    if (Array.isArray(value) && value.length > CROSS_EVENT_READ_ID_CAP) {
+      extra[key] = value.slice(0, CROSS_EVENT_READ_ID_CAP);
+      extraTruncated = true;
+    } else extra[key] = value;
+  }
   await writeAuditLog({
     actorUserId: input.actorUserId,
     action: PERSON_CROSS_EVENT_READ_ACTION,
@@ -37,8 +45,8 @@ export async function auditCrossEventIdentityRead(input: {
       surface: input.surface,
       resultCount: input.resultIds.length,
       resultIds,
-      truncated: input.resultIds.length > resultIds.length,
-      ...(input.extra ?? {}),
+      truncated: input.resultIds.length > resultIds.length || extraTruncated,
+      ...extra,
     },
   });
 }

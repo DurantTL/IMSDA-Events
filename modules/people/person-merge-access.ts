@@ -19,7 +19,7 @@ export async function requirePersonMergePermission(action: DisclosureAction = "E
   const user = requireAuthenticatedUser(await getCurrentSession());
   // The matrix decides (`disclosure-matrix.ts`): merging and unmerging are EDIT
   // of merge history, listing merges is READ; both are global-reach.
-  if (!isDisclosureAllowed("MERGE_HISTORY", staffIdentityAudience(user), action, { reach: "GLOBAL" })) {
+  if (!isDisclosureAllowed("MERGE_HISTORY", staffIdentityAudience(user), action)) {
     throw new AccessDeniedError(
       action === "READ"
         ? "System administrator access is required to see merged people."

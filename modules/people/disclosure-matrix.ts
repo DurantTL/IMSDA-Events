@@ -38,7 +38,14 @@ export type DisclosureAudience = (typeof DISCLOSURE_AUDIENCES)[number];
 export const DISCLOSURE_ACTIONS = ["READ", "EDIT", "EXPORT", "VIEW_AUDIT"] as const;
 export type DisclosureAction = (typeof DISCLOSURE_ACTIONS)[number];
 
-export type DisclosureDecision = "ALLOWED" | "DENIED";
+/**
+ * ALLOWED is a grant the matrix makes by itself (global reach, system
+ * administrator only). EVENT_SCOPED is a marker, not a grant: the audience may
+ * have this only inside one event, and only when that event's own membership
+ * and the person's footprint in the event are proven by the caller
+ * (`isEventScopedDisclosureAllowed`). It never evaluates to true on its own.
+ */
+export type DisclosureDecision = "ALLOWED" | "EVENT_SCOPED" | "DENIED";
 
 /** How sensitive a field is. Informational and tested; it is not a permission by itself. */
 export type FieldClassification = "PERSONAL_IDENTIFIER" | "CONTACT_DETAIL" | "RELATIONSHIP" | "DERIVED_JUDGEMENT" | "COMPLIANCE_RECORD";
@@ -66,13 +73,17 @@ type Row = {
 
 const A = "ALLOWED" as const;
 const D = "DENIED" as const;
+const S = "EVENT_SCOPED" as const;
 const NONE = [D, D, D, D] as const;
 
 /**
  * Notes on the declared values (today's behavior, not new policy):
  * - A household member has no standing over another member's identity record;
  *   household membership is a convenience grouping, not authority (#43).
- * - An attendee reaches their own registration by verified email, never by
+ * - EVENT_SCOPED cells are markers for rosters that event permissions govern:
+ *   they grant nothing here and need explicit proof (see `isEventScopedDisclosureAllowed`).
+ * - An attendee never reaches `Person` at all, so every attendee cell is denied;
+ *   an attendee reaches their own registration by verified email, never by
  *   Person, household or account link (ADR 0003), so links are not theirs to read.
  * - Event staff see a person's name and contact details only through that
  *   event's own registrations (OWN_EVENT reach); they cannot edit the global
@@ -88,8 +99,8 @@ export const DISCLOSURE_MATRIX: Readonly<Record<IdentityField, Row>> = {
     classification: "PERSONAL_IDENTIFIER",
     grants: {
       SYSTEM_ADMIN: [A, A, A, A],
-      EVENT_STAFF: [A, D, A, D],
-      ATTENDEE_SELF: [A, D, D, D],
+      EVENT_STAFF: [S, D, S, D],
+      ATTENDEE_SELF: NONE,
       HOUSEHOLD_MEMBER: NONE,
       ANONYMOUS: NONE,
     },
@@ -98,8 +109,8 @@ export const DISCLOSURE_MATRIX: Readonly<Record<IdentityField, Row>> = {
     classification: "CONTACT_DETAIL",
     grants: {
       SYSTEM_ADMIN: [A, A, A, A],
-      EVENT_STAFF: [A, D, A, D],
-      ATTENDEE_SELF: [A, D, D, D],
+      EVENT_STAFF: [S, D, S, D],
+      ATTENDEE_SELF: NONE,
       HOUSEHOLD_MEMBER: NONE,
       ANONYMOUS: NONE,
     },
@@ -108,8 +119,8 @@ export const DISCLOSURE_MATRIX: Readonly<Record<IdentityField, Row>> = {
     classification: "CONTACT_DETAIL",
     grants: {
       SYSTEM_ADMIN: [A, A, A, A],
-      EVENT_STAFF: [A, D, A, D],
-      ATTENDEE_SELF: [A, D, D, D],
+      EVENT_STAFF: [S, D, S, D],
+      ATTENDEE_SELF: NONE,
       HOUSEHOLD_MEMBER: NONE,
       ANONYMOUS: NONE,
     },
@@ -181,20 +192,36 @@ export function disclosureDecision(field: IdentityField, audience: DisclosureAud
 }
 
 /**
- * Whether the audience may take the action. `reach: "GLOBAL"` asks about a
- * cross-event read (a global search, the review queue, the merges list); only
- * an audience whose declared reach is GLOBAL can pass it, however the cell
- * reads. Unknown fields, audiences and actions are denied.
+ * Deny by default. True only when the matrix itself grants the action
+ * (decision ALLOWED), which only an audience with GLOBAL reach can hold. An
+ * EVENT_SCOPED cell is never true here, so an event-staff or attendee
+ * audience can never pass a gate written with this function; unknown fields,
+ * audiences and actions are denied.
  */
-export function isDisclosureAllowed(
-  field: IdentityField,
-  audience: DisclosureAudience,
-  action: DisclosureAction,
-  options: { reach?: "GLOBAL" | "SCOPED" } = {},
-): boolean {
+export function isDisclosureAllowed(field: IdentityField, audience: DisclosureAudience, action: DisclosureAction): boolean {
   if (!(field in DISCLOSURE_MATRIX) || !DISCLOSURE_AUDIENCES.includes(audience) || !DISCLOSURE_ACTIONS.includes(action)) return false;
-  if (options.reach === "GLOBAL" && AUDIENCE_REACH[audience] !== "GLOBAL") return false;
-  return disclosureDecision(field, audience, action) === "ALLOWED";
+  return AUDIENCE_REACH[audience] === "GLOBAL" && disclosureDecision(field, audience, action) === "ALLOWED";
+}
+
+/** What a caller must have established before an EVENT_SCOPED cell can apply. */
+export type EventScopeProof = {
+  eventId: string;
+  /** The signed-in user holds an ACTIVE membership (and the needed permission) on `eventId`. */
+  hasEventPermission: boolean;
+  /** The person has a footprint in `eventId` (`personBelongsToEvent`). */
+  personInEvent: boolean;
+};
+
+/**
+ * An EVENT_SCOPED cell applies only with explicit proof for one event. Without
+ * a non-empty event id and both proofs it is false, so it can never act as a
+ * global lookup. No caller uses it today; event rosters keep their own
+ * permission checks.
+ */
+export function isEventScopedDisclosureAllowed(field: IdentityField, audience: DisclosureAudience, action: DisclosureAction, proof: EventScopeProof): boolean {
+  if (!(field in DISCLOSURE_MATRIX) || !DISCLOSURE_AUDIENCES.includes(audience) || !DISCLOSURE_ACTIONS.includes(action)) return false;
+  if (!proof || !proof.eventId || proof.hasEventPermission !== true || proof.personInEvent !== true) return false;
+  return disclosureDecision(field, audience, action) === "EVENT_SCOPED";
 }
 
 /**
@@ -217,14 +244,18 @@ export const PERSON_COLUMN_FIELDS = {
 export type PersonColumn = keyof typeof PERSON_COLUMN_FIELDS;
 
 /**
- * The Prisma `select` for a global-reach person read: `id` plus only the
- * columns whose field the audience may read. A column the matrix denies is
- * left out of the query, so it can never reach a response.
+ * The Prisma `select` for a person read: `id` plus the requested columns, each
+ * decided by the matrix for the audience. It throws if the audience may not
+ * read a requested column, so a denied column can never silently go missing
+ * from a typed result (or be fetched).
  */
-export function personColumnSelect(audience: DisclosureAudience, columns: readonly PersonColumn[]): { id: true } & Partial<Record<PersonColumn, true>> {
-  const select: { id: true } & Partial<Record<PersonColumn, true>> = { id: true };
+export function personColumnSelect<C extends PersonColumn>(audience: DisclosureAudience, columns: readonly C[]): { id: true } & Record<C, true> {
+  const select: Record<string, true> = { id: true };
   for (const column of columns) {
-    if (isDisclosureAllowed(PERSON_COLUMN_FIELDS[column], audience, "READ", { reach: "GLOBAL" })) select[column] = true;
+    if (!isDisclosureAllowed(PERSON_COLUMN_FIELDS[column], audience, "READ")) {
+      throw new Error(`Audience ${audience} may not read ${column}.`);
+    }
+    select[column] = true;
   }
-  return select;
+  return select as { id: true } & Record<C, true>;
 }

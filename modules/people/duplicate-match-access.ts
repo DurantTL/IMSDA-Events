@@ -20,7 +20,7 @@ import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/dis
  */
 export async function requireSystemAdministrator() {
   const user = requireAuthenticatedUser(await getCurrentSession());
-  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ", { reach: "GLOBAL" })) {
+  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) {
     throw new AccessDeniedError(
       "System administrator access is required to review possible duplicate people.",
       403,

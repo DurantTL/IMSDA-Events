@@ -161,20 +161,19 @@ async function main() {
   const exDelta = (table: string) => exceptionCount(first, table) - exceptionCount(baseline, table);
   assert(delta("AttendeeAccount", "ALREADY_LINKED") === 2, "two accounts already linked (the linked one and the holder)");
   assert(delta("AttendeeAccount", "WOULD_LINK") === 1 && delta("AttendeeAccount", "NO_PERSON_MATCH") === 1, "one account would link, one has no person match");
-  assert(exDelta("AttendeeAccount") === 4, "four account exceptions (an account cannot hold two links: accountId is unique)");
+  assert(exDelta("AttendeeAccount") === 3 && delta("AttendeeAccount", "NOT_VERIFIED_ACTIVE") === 1, "three account exceptions and one unverified account counted in its own bucket (an account cannot hold two links: accountId is unique)");
   const codes = (table: string) => first.exceptions.filter((row) => row.table === table && mine(row.rowId)).map((row) => `${row.rowId.replace(`${P}_`, "")}:${row.code}`).sort();
   assert(codes("AttendeeAccount").join() === [
     "acct_anon:MATCHED_PERSON_ANONYMIZED", "acct_msecondary:MATCHED_PERSON_IS_MERGED", "acct_taken:PERSON_ALREADY_LINKED_TO_ANOTHER_ACCOUNT",
-    "acct_unverified:ACCOUNT_NOT_VERIFIED_ACTIVE",
-  ].join(), `account exceptions as expected, got ${codes("AttendeeAccount").join()}`);
-  assert(first.exceptions.filter((row) => mine(row.rowId) && row.table === "AttendeeAccount" && row.code !== "ACCOUNT_NOT_VERIFIED_ACTIVE").every((row) => row.routing === "REVIEW_QUEUE"), "ambiguous account cases are routed to the review queue");
+    ].join(), `account exceptions as expected, got ${codes("AttendeeAccount").join()}`);
+  assert(first.accountLinkReview.filter((row) => mine(row.rowId)).length === 3 && first.exceptions.filter((row) => mine(row.rowId) && row.table === "AttendeeAccount").every((row) => row.routing === "ACCOUNT_LINK_REVIEW"), "ambiguous account cases are routed to the manual account-link review list");
   const wouldLink = first.wouldLinkAccounts.filter((row) => mine(row.accountId));
   assert(wouldLink.length === 1 && wouldLink[0]!.personId === `${P}_would` && wouldLink[0]!.rule === "VERIFIED_EMAIL_EXACT", "the one link is the verified exact-email match");
   assert(delta("HouseholdMember", "NEEDS_BACKFILL") === 2 && delta("HouseholdMember", "HAS_EFFECTIVE_FROM") === 1 && exDelta("HouseholdMember") === 1, "households: two need backfill, one dated, one would invert");
   assert(first.householdsNeedingBackfill.filter((row) => mine(row.householdId)).map((row) => row.householdId).join() === [ids.house, ids.house2].sort().join(), "both households with legacy rows are listed");
   assert(codes("HouseholdMember").join() === "hm_inverted:BACKFILL_WOULD_INVERT_INTERVAL", "the row whose backfill would invert its interval is an exception");
-  assert(delta("RegistrationAttendee", "ON_ACTIVE_PERSON") === 1 && delta("RegistrationAttendee", "ON_MERGED_SECONDARY") === 1 && exDelta("RegistrationAttendee") === 1, "attendees: active, merged secondary, and one on an anonymized person");
-  assert(exDelta("Person") >= 1 && codes("Person").join() === "anon:ANONYMIZED_PERSON", "the anonymized person is an exception");
+  assert(delta("RegistrationAttendee", "ON_ACTIVE_PERSON") === 1 && delta("RegistrationAttendee", "ON_MERGED_SECONDARY") === 1 && delta("RegistrationAttendee", "ON_ANONYMIZED_PERSON") === 1 && exDelta("RegistrationAttendee") === 0, "attendees: active, merged secondary, and one on an anonymized person (a bucket, not an exception)");
+  assert(delta("Person", "ANONYMIZED") === 1 && codes("Person").length === 0, "the anonymized person is counted in its own bucket");
   const mineAll = first.duplicateCandidates.filter((row) => mine(row.personAId));
   assert(mineAll.every((row) => row.routing === "REVIEW_QUEUE"), "every proposed pair is routed to the review queue");
   // Same-surname people who share a household are also surfaced (the "twins" rule); the phone pairs are the ones seeded for this check.

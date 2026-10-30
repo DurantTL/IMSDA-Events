@@ -11,8 +11,16 @@
   `npm run household-membership:backfill` selects);
 - likely duplicate pairs, from the same matcher as the review queue, minus
   pairs that already share a canonical person or are already recorded;
-- exceptions: rows that cannot be classified, each routed `REVIEW_QUEUE` (a
-  human decides in `/people/matches`) or `DATA_FIX`;
+- exceptions: rows that cannot be classified, each routed one of three ways.
+  `REVIEW_QUEUE` is only for duplicate pairs the matcher surfaces (a human
+  decides in `/people/matches`). Account-link ambiguity (several people share
+  the email, the person is anonymized, merged or already linked elsewhere, an
+  account with several links) is `ACCOUNT_LINK_REVIEW`: that queue compares
+  people, not accounts, so these are a manual review list in the report
+  (`accountLinkReview`). `DATA_FIX` rows need a data correction (an inverted
+  interval, an attendee row with no person, an unresolvable merge chain).
+  Anonymized people, attendees on them, and unverified, pending or disabled
+  accounts are normal states and get their own buckets, not exceptions;
 - reconciliation per source table: input = classified buckets + exceptions.
 
 It is read-only (`SET TRANSACTION READ ONLY`), idempotent, ids only (emails are

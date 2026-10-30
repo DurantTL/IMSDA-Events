@@ -131,4 +131,13 @@ describe("cross-event identity reads write an ids-only audit entry", () => {
     expect(metadata.resultIds).toHaveLength(CROSS_EVENT_READ_ID_CAP);
     expect(metadata).toMatchObject({ resultCount: CROSS_EVENT_READ_ID_CAP + 5, truncated: true });
   });
+
+  it("caps the other id lists (people, events) the same way", async () => {
+    const many = Array.from({ length: CROSS_EVENT_READ_ID_CAP + 3 }, (_, index) => `x_${index}`);
+    await auditCrossEventIdentityRead({ actorUserId: "usr_admin", surface: "MERGED_PERSON_VIEW", resultIds: [], extra: { memberPersonIds: many, eventIds: ["evt_a"] } });
+    const metadata = mocks.writeAuditLog.mock.calls[0][0].metadata;
+    expect(metadata.memberPersonIds).toHaveLength(CROSS_EVENT_READ_ID_CAP);
+    expect(metadata.eventIds).toEqual(["evt_a"]);
+    expect(metadata.truncated).toBe(true);
+  });
 });

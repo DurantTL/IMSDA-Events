@@ -46,12 +46,15 @@ describe("account link classification", () => {
     });
     expect(report.wouldLinkAccounts).toEqual([]);
     expect(codes(report, "AttendeeAccount")).toEqual([
-      "disabled:ACCOUNT_NOT_VERIFIED_ACTIVE", "isanon:MATCHED_PERSON_ANONYMIZED", "ismerged:MATCHED_PERSON_IS_MERGED",
-      "istaken:PERSON_ALREADY_LINKED_TO_ANOTHER_ACCOUNT", "multi:SEVERAL_PEOPLE_MATCH_EMAIL", "pending:ACCOUNT_NOT_VERIFIED_ACTIVE",
-      "two:ACCOUNT_LINKED_TO_SEVERAL_PEOPLE", "unverified:ACCOUNT_NOT_VERIFIED_ACTIVE",
+      "isanon:MATCHED_PERSON_ANONYMIZED", "ismerged:MATCHED_PERSON_IS_MERGED",
+      "istaken:PERSON_ALREADY_LINKED_TO_ANOTHER_ACCOUNT", "multi:SEVERAL_PEOPLE_MATCH_EMAIL", "two:ACCOUNT_LINKED_TO_SEVERAL_PEOPLE",
     ]);
-    const review = report.exceptions.filter((row) => row.routing === "REVIEW_QUEUE").map((row) => row.rowId);
-    expect(review).toEqual(["isanon", "ismerged", "istaken", "multi", "two"]);
+    // Account-link ambiguity has its own routing: the duplicate review queue compares people and cannot show it.
+    expect(report.accountLinkReview.map((row) => row.rowId)).toEqual(["isanon", "ismerged", "istaken", "multi", "two"]);
+    expect(report.exceptions.filter((row) => row.routing === "REVIEW_QUEUE")).toEqual([]);
+    expect(report.humanStep).toMatch(/ACCOUNT_LINK_REVIEW/);
+    // Unverified, pending and disabled accounts are a normal state: their own bucket, not an exception.
+    expect(report.reconciliation.find((table) => table.table === "AttendeeAccount")).toMatchObject({ input: 9, buckets: { NOT_VERIFIED_ACTIVE: 3, ALREADY_LINKED: 1 }, exceptions: 5, reconciled: true });
   });
 });
 
@@ -78,8 +81,9 @@ describe("household backfill and attendee rows", () => {
       activeMerges: [{ secondaryPersonId: "sec", primaryPersonId: "p1" }],
       attendees: [{ id: "r1", personId: "p1" }, { id: "r2", personId: "anon" }, { id: "r3", personId: null }, { id: "r4", personId: "ghost" }, { id: "r5", personId: "sec" }],
     });
-    expect(report.reconciliation.find((table) => table.table === "RegistrationAttendee")).toMatchObject({ input: 5, buckets: { ON_ACTIVE_PERSON: 1, ON_MERGED_SECONDARY: 1 }, exceptions: 3, reconciled: true });
-    expect(codes(report, "RegistrationAttendee")).toEqual(["r2:PERSON_ANONYMIZED", "r3:NO_PERSON", "r4:NO_PERSON"]);
+    expect(report.reconciliation.find((table) => table.table === "RegistrationAttendee")).toMatchObject({ input: 5, buckets: { ON_ACTIVE_PERSON: 1, ON_MERGED_SECONDARY: 1, ON_ANONYMIZED_PERSON: 1 }, exceptions: 2, reconciled: true });
+    expect(codes(report, "RegistrationAttendee")).toEqual(["r3:NO_PERSON", "r4:NO_PERSON"]);
+    expect(report.reconciliation.find((table) => table.table === "Person")!.buckets).toMatchObject({ ANONYMIZED: 1 });
   });
 });
 
@@ -100,6 +104,7 @@ describe("duplicate candidates", () => {
     expect(run({ persons: [twins[0]!, { ...twins[1]!, anonymized: true }] }).duplicateCandidates).toEqual([]);
     const cyclic = run({ persons: twins, activeMerges: [{ secondaryPersonId: "a", primaryPersonId: "b" }, { secondaryPersonId: "b", primaryPersonId: "a" }] });
     expect(cyclic.exceptions.map((row) => row.code)).toContain("MERGE_CHAIN_UNRESOLVABLE");
+    expect(cyclic.exceptions.every((row) => row.routing === "DATA_FIX")).toBe(true);
     expect(cyclic.reconciled).toBe(true);
   });
 });

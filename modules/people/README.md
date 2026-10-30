@@ -139,8 +139,10 @@ classification. It is configuration the code consults, not prose: the queue
 gate, the merge/unmerge/merges-list gate, the anonymization approver check and
 the person-column projections of the queue and merges list all decide through
 `isDisclosureAllowed` / `personColumnSelect`. Only the system administrator
-audience has global reach; event staff reach people through their own event's
-registrations, whatever event permissions they hold. `tests/identity-disclosure-matrix.test.ts`
+audience has global reach, and `isDisclosureAllowed` is deny-by-default: it is
+true only for an `ALLOWED` cell. Event-staff cells are `EVENT_SCOPED` markers
+that never grant by themselves (`isEventScopedDisclosureAllowed` needs an
+explicit event, membership and footprint proof); every attendee cell is denied. `tests/identity-disclosure-matrix.test.ts`
 has a test per row.
 
 `tests/identity-authorization-invariants.test.ts` proves a link, a merge, a
@@ -159,8 +161,10 @@ write fails the read.
 `npm run people:identity-dry-run` classifies existing rows without changing any
 (read-only transaction, ids only, deterministic): accounts that would receive a
 link (`VERIFIED_EMAIL_EXACT`), households needing an effective-date backfill,
-likely duplicate pairs (the slice 2 matcher), and exceptions, each routed to the
-review queue or a data fix, with per-table reconciliation totals. It applies
+likely duplicate pairs (the slice 2 matcher, routed to the review queue), and
+exceptions: account-link ambiguity goes to its own manual review list
+(`ACCOUNT_LINK_REVIEW`, because the queue compares people not accounts), other
+problems to a data fix, with per-table reconciliation totals. It applies
 nothing; running it on production is human-only. See
 `docs/PEOPLE-IDENTITY-MIGRATION-DRY-RUN.md`.
 
