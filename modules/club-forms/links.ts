@@ -28,6 +28,7 @@ import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-fo
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-alert";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Single-use private links to a club form (#610). A director or deputy types
@@ -94,7 +95,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
     clubName: club.name,
     formName: template.name,
     days,
-    expiresOn: expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" }),
+    expiresOn: formatInConferenceTime(expiresAt, { month: "long", day: "numeric", year: "numeric" }),
   });
   const actor = leader.actor;
   const creator = actor.kind === "ATTENDEE"

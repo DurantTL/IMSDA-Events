@@ -7,7 +7,8 @@ import { useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Copy, GripVertical, Plus, Settings2, Trash2 } from "lucide-react";
 import { directorySourceNoun, isDirectoryOptionSource, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { isPublicReviewSection } from "@/modules/forms/public-registration-steps";
-import { fieldTypeLabels, money } from "./builder-types";
+import { fieldTypeLabels } from "./builder-types";
+import { formatCents } from "@/modules/payments/format-cents";
 import { deriveFieldChips } from "./field-chips";
 import { BuilderSectionHead } from "./builder-section-card";
 import { InformationFieldIssues, InformationFormIssues, InformationSectionIssues } from "./builder-information-issues";
@@ -56,7 +57,7 @@ export function FieldPreviewControl({ field }: { field: RegistrationFormField })
     case "SIGNATURE":
       return <span className="fb-acknowledgment">{field.signature?.text ? field.signature.text : "The statement to be signed is shown here."}<span className="fb-input">Type your full name to sign</span></span>;
     case "CALCULATED":
-      return <span className="fb-fee">{field.priceCents === undefined ? "Fee set in the question settings" : `Fee: ${money(field.priceCents)}`}</span>;
+      return <span className="fb-fee">{field.priceCents === undefined ? "Fee set in the question settings" : `Fee: ${formatCents(field.priceCents)}`}</span>;
     case "ADDRESS":
       return <span className="fb-address"><span className="fb-input">Street address</span><span className="fb-input">City, state, ZIP</span></span>;
     case "MEMBER_LIST":

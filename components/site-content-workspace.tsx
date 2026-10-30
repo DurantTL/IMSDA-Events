@@ -19,6 +19,7 @@ import {
 } from "@/modules/site-content/hub-content-domain";
 import type { RevisionSummary } from "@/modules/site-content/hub-content";
 import styles from "./site-content-workspace.module.css";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type FeaturableEvent = { id: string; name: string; startsOn: string; endsOn: string };
 
@@ -32,7 +33,7 @@ type Props = {
 };
 
 const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", dateStyle: "medium", timeStyle: "short" }) : "";
+  iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "";
 
 const newId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`).replace(/-/g, "").slice(0, 12);
 

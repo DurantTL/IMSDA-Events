@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 
 /**
  * Versioned cancellation rules for one event (#169). This file is the shape of a policy version and nothing else:
@@ -143,18 +144,13 @@ export function parseCancellationRules(value: unknown): CancellationRules {
   return cancellationRulesSchema.parse(value);
 }
 
-export function formatCents(cents: number) {
-  const sign = cents < 0 ? "-" : "";
-  return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
-}
-
 /** The terms in plain words, for the staff screen and the result's explanation lines. */
 export function describeTerms(terms: CancellationTerms) {
   const parts: string[] = [];
   if (terms.refund.kind === "FULL") parts.push("full refund");
   else if (terms.refund.kind === "NONE") parts.push("no refund");
   else parts.push(`${terms.refund.percent}% refund`);
-  if (terms.flatWithholdCents > 0) parts.push(`minus a ${formatCents(terms.flatWithholdCents)} ${terms.flatWithholdLabel.toLowerCase()}`);
+  if (terms.flatWithholdCents > 0) parts.push(`minus a ${formatCentsPlain(terms.flatWithholdCents)} ${terms.flatWithholdLabel.toLowerCase()}`);
   parts.push(terms.depositTreatment === "FORFEIT" ? "deposit forfeited" : "deposit refunded");
   if (terms.creditAllowed) parts.push("future-event credit may be offered");
   return parts.join(", ");

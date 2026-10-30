@@ -11,7 +11,7 @@ import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
 
 type Option = { id: string; name: string };
@@ -272,7 +272,7 @@ function InviteOutcome({ name, result }: { name: string; result: InviteResult })
             ? (
               <>
                 <p>A staff login was created for {name}. Account email isn&apos;t set up on this server, so give {name} this one-time link to set a password
-                  {created.setupExpiresAt ? ` (it expires ${new Date(created.setupExpiresAt).toLocaleDateString("en-US", { timeZone: CONFERENCE_TIME_ZONE })})` : ""}.</p>
+                  {created.setupExpiresAt ? ` (it expires ${formatInConferenceTime(created.setupExpiresAt)})` : ""}.</p>
                 <CopyApplicationLink label="Copy setup link" noun="setup link" url={created.setupUrl} />
               </>
             )

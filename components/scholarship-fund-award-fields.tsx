@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatCents } from "@/modules/scholarship-funds/domain";
+import { formatCents } from "@/modules/payments/format-cents";
 import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-funds/repository";
 
 /**

@@ -3,9 +3,9 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   ScholarshipFundError,
-  formatCents,
   fundTotals,
   sponsorKey,
   summarizeFund,

@@ -12,7 +12,8 @@ import {
   previewCancellation,
   type PreviewRequest,
 } from "@/modules/cancellation-policy/repository";
-import { formatCents, type CancellationScope } from "@/modules/cancellation-policy/rules";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
+import { type CancellationScope } from "@/modules/cancellation-policy/rules";
 import { stateFingerprint } from "@/modules/cancellation-requests/fingerprint";
 import { enqueueCancellationRequestMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
@@ -627,9 +628,9 @@ async function conflictsFor(
           severity: registrationUnchanged ? "NOTE" : "CHANGE",
           message: registrationUnchanged
             ? (newerPolicy
-              ? `A newer refund policy is in effect. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`
-              : `Time has passed since the request. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`)
-            : `Today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`,
+              ? `A newer refund policy is in effect. The registration is unchanged, but today the policy would propose a ${formatCentsPlain(current.result.money.refundCents)} refund; the registrant was shown ${formatCentsPlain(request.proposedRefundCents)}.`
+              : `Time has passed since the request. The registration is unchanged, but today the policy would propose a ${formatCentsPlain(current.result.money.refundCents)} refund; the registrant was shown ${formatCentsPlain(request.proposedRefundCents)}.`)
+            : `Today the policy would propose a ${formatCentsPlain(current.result.money.refundCents)} refund; the registrant was shown ${formatCentsPlain(request.proposedRefundCents)}.`,
         });
       }
       if (request.policyVersion !== null && current.result.policy && current.result.policy.version !== request.policyVersion) {

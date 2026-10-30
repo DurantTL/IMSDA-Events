@@ -10,7 +10,8 @@ import {
   type AssetCondition,
   type AssigneeKind,
 } from "@/modules/issued-assets/domain";
-import { depositShortfalls, depositShortfallLabels, formatCents } from "@/modules/issued-assets/returns-domain";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
+import { depositShortfalls, depositShortfallLabels } from "@/modules/issued-assets/returns-domain";
 import type { CatalogAsset, CatalogType, CatalogView } from "@/modules/issued-assets/view";
 
 type Result = { created?: number; skipped?: number };
@@ -116,7 +117,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
   };
   return <section className="panel form-stack">
     <h3>{type.name}{type.active ? "" : " (switched off)"}</h3>
-    <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}{type.depositCents > 0 ? ` Usual cash deposit ${formatCents(type.depositCents)}.` : ""}{type.replacementFeeCents > 0 ? ` Replacement fee ${formatCents(type.replacementFeeCents)}.` : ""}</p>
+    <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}{type.depositCents > 0 ? ` Usual cash deposit ${formatCentsPlain(type.depositCents)}.` : ""}{type.replacementFeeCents > 0 ? ` Replacement fee ${formatCentsPlain(type.replacementFeeCents)}.` : ""}</p>
     <div>
       <label className="checkbox-label"><input type="checkbox" checked={type.active} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, active: event.target.checked }, () => `${type.name} ${event.target.checked ? "switched on" : "switched off"}.`)} /> Active</label>{" "}
       <label className="checkbox-label"><input type="checkbox" checked={type.roomLinked} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, roomLinked: event.target.checked }, () => `${type.name} updated.`)} /> Room-linked</label>

@@ -19,7 +19,7 @@
  * - People registered: the event's headcount across registered clubs only.
  * - Roster members: active roster members across active clubs, for the selected club year.
  */
-import { calendarDateIn, CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
+import { calendarDateIn } from "@/modules/calendar/domain";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import {
   eventHeadcount,
@@ -30,6 +30,7 @@ import { clubYearOptions } from "@/modules/club-rosters/domain";
 import { clubsWithFormsMissing, clubsFormsMissingHref, type ClubRequiredForms } from "@/modules/club-forms/required-domain";
 import { recordsToReview, recordsToReviewHref } from "@/modules/club-reports/review-domain";
 import { buildClubDirectory, chooseReportMonth, clubSummaryHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 export { chooseReportMonth, recordStatusLabel } from "@/modules/club-reports/club-directory-domain";
 
 // Lives in the roster domain so the Clubs sidebar (a client component) can use it.
@@ -117,7 +118,7 @@ function longDate(iso: string) {
 }
 
 function submittedDate(iso: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: CONFERENCE_TIME_ZONE }).format(new Date(iso));
+  return formatInConferenceTime(iso, { dateStyle: "medium" });
 }
 
 export function applicationReviewReasons(application: ClubsAdminApplicationSource): string[] {

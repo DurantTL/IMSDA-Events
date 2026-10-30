@@ -4,11 +4,13 @@
  * director panel and the staff queue describe the same event the same way.
  */
 
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+
 export function formatTransferDate(iso: string) {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
     ? iso
-    : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "America/Chicago" });
+    : formatInConferenceTime(date, { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** A date that never breaks across lines ("Oct 12, 2026"). */

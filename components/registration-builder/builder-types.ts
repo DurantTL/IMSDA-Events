@@ -113,10 +113,6 @@ export function statusLabel(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
-export function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
-
 export function firstPreviewStepId(definition: RegistrationFormDefinition) {
   return getPublicRegistrationStepPlan(definition)[0]?.id ?? "review";
 }

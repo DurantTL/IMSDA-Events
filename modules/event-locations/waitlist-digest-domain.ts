@@ -9,6 +9,8 @@
  * immediate.
  */
 
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+
 export const digestTimeZone = "America/Chicago";
 /** Local hour (Central) from which the day's digest may be sent. */
 export const digestSendHour = 7;
@@ -95,7 +97,7 @@ function people(count: number) {
 }
 
 function changeLine(change: DigestChange) {
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: digestTimeZone, hour: "numeric", minute: "2-digit" }).format(change.occurredAt);
+  const time = formatInConferenceTime(change.occurredAt, { hour: "numeric", minute: "2-digit" });
   const place = change.place === null
     ? ""
     : change.kind === "JOINED"

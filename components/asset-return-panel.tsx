@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
-import { chargeCategoryLabels, facilitySeverities, formatCents, holdKindLabels, returnOutcomeLabels, type ReturnOutcome } from "@/modules/issued-assets/returns-domain";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
+import { chargeCategoryLabels, facilitySeverities, holdKindLabels, returnOutcomeLabels, type ReturnOutcome } from "@/modules/issued-assets/returns-domain";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
 import type { DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
 import type { DeskMoney } from "@/modules/issued-assets/returns-view";
@@ -213,15 +214,15 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
     </div> : null}
 
     <h4>Cash key deposit</h4>
-    {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents }, `Recorded a ${formatCents(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
+    {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents }, `Recorded a ${formatCentsPlain(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
     {money.deposits.length === 0 && uncoveredByType.length === 0 ? <p>No deposit has been taken for this person.</p> : null}
     {money.deposits.map((deposit) => <div key={deposit.entryId} className="panel form-stack">
-      <p><strong>{formatCents(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {new Date(deposit.takenAt).toLocaleString()}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
-      {deposit.settled ? <p role="status">Settled: {formatCents(deposit.settled.refundCents)} handed back, {formatCents(deposit.settled.keepCents)} kept{deposit.settled.lateHandedBackCents > 0 ? ` (${formatCents(deposit.settled.lateHandedBackCents)} of that handed back later after a found item; ${formatCents(deposit.keptRemainingCents)} still held)` : ""} ({new Date(deposit.settled.at).toLocaleString()}, {deposit.settled.byName}).</p>
+      <p><strong>{formatCentsPlain(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {new Date(deposit.takenAt).toLocaleString()}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
+      {deposit.settled ? <p role="status">Settled: {formatCentsPlain(deposit.settled.refundCents)} handed back, {formatCentsPlain(deposit.settled.keepCents)} kept{deposit.settled.lateHandedBackCents > 0 ? ` (${formatCentsPlain(deposit.settled.lateHandedBackCents)} of that handed back later after a found item; ${formatCentsPlain(deposit.keptRemainingCents)} still held)` : ""} ({new Date(deposit.settled.at).toLocaleString()}, {deposit.settled.byName}).</p>
         : deposit.outcome && deposit.outcome.ok ? <div>
           <p role="status">{deposit.outcome.message}</p>
-          <button className="primary-button" type="button" disabled={busy} onClick={() => void post("deposits", { action: "settle", depositEntryId: deposit.entryId }, deposit.outcome && deposit.outcome.ok && deposit.outcome.refundCents > 0 ? `Recorded: ${formatCents(deposit.outcome.refundCents)} handed back${deposit.outcome.keepCents > 0 ? `, ${formatCents(deposit.outcome.keepCents)} kept` : ""}.` : `Recorded: the ${formatCents(deposit.outcome?.ok ? deposit.outcome.keepCents : 0)} deposit is kept.`)}>
-            {deposit.outcome.refundCents > 0 ? `I handed back ${formatCents(deposit.outcome.refundCents)}${deposit.outcome.keepCents > 0 ? ` and kept ${formatCents(deposit.outcome.keepCents)}` : ""}` : `Record the ${formatCents(deposit.outcome.keepCents)} deposit as kept`}
+          <button className="primary-button" type="button" disabled={busy} onClick={() => void post("deposits", { action: "settle", depositEntryId: deposit.entryId }, deposit.outcome && deposit.outcome.ok && deposit.outcome.refundCents > 0 ? `Recorded: ${formatCentsPlain(deposit.outcome.refundCents)} handed back${deposit.outcome.keepCents > 0 ? `, ${formatCentsPlain(deposit.outcome.keepCents)} kept` : ""}.` : `Recorded: the ${formatCentsPlain(deposit.outcome?.ok ? deposit.outcome.keepCents : 0)} deposit is kept.`)}>
+            {deposit.outcome.refundCents > 0 ? `I handed back ${formatCentsPlain(deposit.outcome.refundCents)}${deposit.outcome.keepCents > 0 ? ` and kept ${formatCentsPlain(deposit.outcome.keepCents)}` : ""}` : `Record the ${formatCentsPlain(deposit.outcome.keepCents)} deposit as kept`}
           </button>
         </div>
         : <p>{deposit.outcome && !deposit.outcome.ok ? deposit.outcome.message : ""}</p>}
@@ -235,9 +236,9 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
         // A deposit that already kept money for this loss: charging the whole fee as well would take it twice.
         const kept = money.deposits.find((deposit) => deposit.entryId === row.depositEntryId)?.keptRemainingCents ?? 0;
         return <ChargeForm key={row.id} row={row} lost={fateOf(row) === "LOST"} fee={fee} keptByDeposit={kept} canManageMoney={canManageMoney} busy={busy}
-          onCharge={(category, amountCents, reason, confirmKeptDeposit) => post("charges", { action: "charge", issuanceId: row.id, category, amountCents, reason, post: true, ...(confirmKeptDeposit ? { confirmKeptDeposit: true } : {}) }, `Charged ${formatCents(amountCents)} for ${row.identifier} to the registration.`)} />;
+          onCharge={(category, amountCents, reason, confirmKeptDeposit) => post("charges", { action: "charge", issuanceId: row.id, category, amountCents, reason, post: true, ...(confirmKeptDeposit ? { confirmKeptDeposit: true } : {}) }, `Charged ${formatCentsPlain(amountCents)} for ${row.identifier} to the registration.`)} />;
       })}
-      {money.charges.length > 0 ? <ul>{money.charges.map((charge) => <li key={charge.entryId}>{charge.identifier}: {chargeCategoryLabels[charge.category]} charge {formatCents(charge.amountCents)}{charge.posted ? " (posted to the registration)" : " (recorded only)"}{charge.waived ? ", waived" : ""}{charge.depositOffsetCents > 0 ? `; the deposit that was kept covered ${formatCents(charge.depositOffsetCents)} of it` : ""}. {charge.reason}</li>)}</ul> : null}
+      {money.charges.length > 0 ? <ul>{money.charges.map((charge) => <li key={charge.entryId}>{charge.identifier}: {chargeCategoryLabels[charge.category]} charge {formatCentsPlain(charge.amountCents)}{charge.posted ? " (posted to the registration)" : " (recorded only)"}{charge.waived ? ", waived" : ""}{charge.depositOffsetCents > 0 ? `; the deposit that was kept covered ${formatCentsPlain(charge.depositOffsetCents)} of it` : ""}. {charge.reason}</li>)}</ul> : null}
       {money.charges.some((charge) => !charge.waived) ? <p>Waiving a charge needs finance or an event administrator and is done from the <a href={`/more/issued-assets/closeout?event=${encodeURIComponent(eventId)}`}>closeout</a>.</p> : null}
     </> : null}
 
@@ -251,9 +252,9 @@ function DepositForm({ type, rows, busy, onSubmit }: { type: DeskType; rows: Iss
   const [amount, setAmount] = useState((type.depositCents / 100).toFixed(2));
   const cents = Math.round(Number(amount) * 100);
   return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (cents >= 1) void onSubmit(cents); }}>
-    <p>{rows.map((row) => row.identifier).join(", ")} ({type.name}) has no deposit yet. Usual deposit {formatCents(type.depositCents)}.</p>
+    <p>{rows.map((row) => row.identifier).join(", ")} ({type.name}) has no deposit yet. Usual deposit {formatCentsPlain(type.depositCents)}.</p>
     <label>Cash taken (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
-    <button className="secondary-button" type="submit" disabled={busy || !(cents >= 1)}>Record {Number.isFinite(cents) && cents >= 1 ? formatCents(cents) : "the"} deposit taken</button>
+    <button className="secondary-button" type="submit" disabled={busy || !(cents >= 1)}>Record {Number.isFinite(cents) && cents >= 1 ? formatCentsPlain(cents) : "the"} deposit taken</button>
   </form>;
 }
 
@@ -268,17 +269,17 @@ function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCha
   const what = `${row.identifier} (${row.typeName}) ${lost ? "was lost" : "came back damaged"}`;
   if (keptByDeposit > 0) {
     return <div>
-      <p>{what}. The cash deposit already kept {formatCents(keptByDeposit)} for lost or damaged items, so the standard fee is not offered: charging it as well would take the guest&apos;s money twice.</p>
+      <p>{what}. The cash deposit already kept {formatCentsPlain(keptByDeposit)} for lost or damaged items, so the standard fee is not offered: charging it as well would take the guest&apos;s money twice.</p>
       {canManageMoney ? <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category === "OTHER" ? "REPLACEMENT" : category, cents, reason.trim(), true); }}>
-        <label>Full cost of the loss (dollars); only the part above {formatCents(keptByDeposit)} is charged <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
+        <label>Full cost of the loss (dollars); only the part above {formatCentsPlain(keptByDeposit)} is charged <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
         <label>Reason <input value={reason} maxLength={500} minLength={3} required onChange={(event) => setReason(event.target.value)} /></label>
         <button className="secondary-button" type="submit" disabled={busy}>Charge only the part above the kept deposit</button>
       </form> : <p>Finance or an event administrator can charge the part above what the deposit kept.</p>}
     </div>;
   }
   return <div>
-    <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCents(fee)}. If the cash deposit is settled before this is charged, it will not be kept for this item as well.` : "This kind has no standard replacement fee."}</p>
-    {fee > 0 ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void onCharge("REPLACEMENT", fee, `Replacement fee for ${row.identifier}`)}>Charge {formatCents(fee)} to the registration</button> : null}
+    <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCentsPlain(fee)}. If the cash deposit is settled before this is charged, it will not be kept for this item as well.` : "This kind has no standard replacement fee."}</p>
+    {fee > 0 ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void onCharge("REPLACEMENT", fee, `Replacement fee for ${row.identifier}`)}>Charge {formatCentsPlain(fee)} to the registration</button> : null}
     {canManageMoney ? <>{" "}<button className="secondary-button" type="button" onClick={() => setCustom(!custom)}>{custom ? "Cancel" : "Another amount"}</button></> : null}
     {custom && canManageMoney ? <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category, cents, reason.trim()); }}>
       <label>Kind of charge <select value={category} onChange={(event) => setCategory(event.target.value as typeof category)}>{(["REPLACEMENT", "DAMAGE", "OTHER"] as const).map((value) => <option key={value} value={value}>{chargeCategoryLabels[value]}</option>)}</select></label>

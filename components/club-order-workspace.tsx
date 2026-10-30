@@ -11,6 +11,7 @@ import type { AwardableNeed, OrderBatchSummary, OrderableHonor, UnmatchedNeed, W
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type ClubOrderWorkspaceData = {
   helper: HelperLine[];
@@ -150,7 +151,7 @@ function writeDismissed(organizationId: string) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { dateStyle: "long" });
 }
 
 /**

@@ -1,12 +1,12 @@
 import { UserRoundCog } from "lucide-react";
 import { StopActingButton } from "@/components/stop-acting-button";
 import { getPrisma } from "@/lib/prisma";
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { StaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /** The act-as end time, in the conference's time zone (never the server's). */
 export function actAsEndTime(expiresAt: Date) {
-  return expiresAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: CONFERENCE_TIME_ZONE, timeZoneName: "short" });
+  return formatInConferenceTime(expiresAt, { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
 /**

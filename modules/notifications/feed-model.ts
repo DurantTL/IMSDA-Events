@@ -1,4 +1,5 @@
 import { getNotificationDefinition, isNotificationKey, type NotificationKey } from "@/modules/notifications/catalog";
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 
 /**
  * The system administrator alert feed (#1033, slice 2 of the notification bell): pure rules.
@@ -82,8 +83,7 @@ export function announcementText(text: string, count: number) {
   return text === "" ? "" : `${text}${count % 2 === 0 ? "" : " "}`;
 }
 
-const feedTimeFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/Chicago",
+const feedTimeFormat = conferenceDateFormat({
   month: "short",
   day: "numeric",
   year: "numeric",

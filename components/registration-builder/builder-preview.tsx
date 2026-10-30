@@ -6,7 +6,8 @@ import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
 import type { AddressValue } from "@/modules/forms/address";
 import { getAvailabilityMode, isFieldVisible, isLatePricingActive, type RegistrationFormField } from "@/modules/forms/definition";
-import { type PreviewValue, localId, money } from "./builder-types";
+import { type PreviewValue, localId } from "./builder-types";
+import { formatCents } from "@/modules/payments/format-cents";
 import { useLoadedBuilder } from "./builder-context";
 
 export function BuilderPreview() {
@@ -47,7 +48,7 @@ export function BuilderPreview() {
       const tracksAvailability = getAvailabilityMode(field) !== "NONE";
       const price = isLatePricingActive(field, pricingPreviewDate) ? field.latePricing?.choicePricesCents?.[option] ?? field.choicePricesCents?.[option] : field.choicePricesCents?.[option];
       if (price === undefined && !tracksAvailability) return null;
-      return <small className={full ? "choice-availability full" : "choice-availability"}>{price !== undefined && <>{money(price)}{tracksAvailability ? " · " : ""}</>}{tracksAvailability && <>{ranked && <>{stats.first} first · {stats.second} second · </>}{stats.total} interested{limit ? ` · limit ${limit}` : " · unlimited"}</>}</small>;
+      return <small className={full ? "choice-availability full" : "choice-availability"}>{price !== undefined && <>{formatCents(price)}{tracksAvailability ? " · " : ""}</>}{tracksAvailability && <>{ranked && <>{stats.first} first · {stats.second} second · </>}{stats.total} interested{limit ? ` · limit ${limit}` : " · unlimited"}</>}</small>;
     };
     const choiceDescription = (option: string) => {
       const description = field.optionDescriptions?.[option]?.trim();
@@ -209,7 +210,7 @@ export function BuilderPreview() {
                 <h4>Review before submitting</h4>
                 <p>{roster?.enabled ? `${previewAttendees.length} ${pluralAttendeeLabel(roster.attendeeLabel, previewAttendees.length)} will be included. ` : ""}The public form shows entered answers here before the registrant submits.</p>
               </section>}
-              {!information && calculation && (calculation.lineItems.length > 0 || definition.payment?.enabled) && <section className="preview-order-summary" aria-label="Order summary"><h4>Order summary</h4>{calculation.lineItems.length === 0 ? <p>Select a priced option to see the total.</p> : <>{calculation.lineItems.map((item) => <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong>{money(item.amountCents)}</strong></div>)}<div><span>Subtotal</span><strong>{money(calculation.subtotalCents)}</strong></div>{calculation.processingFeeCents > 0 && <div><span>Card processing</span><strong>{money(calculation.processingFeeCents)}</strong></div>}<div className="preview-total"><span>Total</span><strong>{money(calculation.totalCents)}</strong></div></>}</section>}
+              {!information && calculation && (calculation.lineItems.length > 0 || definition.payment?.enabled) && <section className="preview-order-summary" aria-label="Order summary"><h4>Order summary</h4>{calculation.lineItems.length === 0 ? <p>Select a priced option to see the total.</p> : <>{calculation.lineItems.map((item) => <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong>{formatCents(item.amountCents)}</strong></div>)}<div><span>Subtotal</span><strong>{formatCents(calculation.subtotalCents)}</strong></div>{calculation.processingFeeCents > 0 && <div><span>Card processing</span><strong>{formatCents(calculation.processingFeeCents)}</strong></div>}<div className="preview-total"><span>Total</span><strong>{formatCents(calculation.totalCents)}</strong></div></>}</section>}
               {previewStep && <nav className="preview-step-actions" aria-label="Move through preview">
                 <button className="secondary-button" type="button" disabled={previewStepIndex === 0} onClick={() => setPreviewStepId(previewSteps[previewStepIndex - 1]!.id)}>Back</button>
                 {!previewStep.isReview && <button className="secondary-button" type="button" onClick={() => setPreviewStepId(previewSteps[previewStepIndex + 1]!.id)}>Continue</button>}

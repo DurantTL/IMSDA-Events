@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CalculationFacts, CancellationResult } from "@/modules/cancellation-policy/calculator";
-import { formatCents, type CancellationScope } from "@/modules/cancellation-policy/rules";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
+import { type CancellationScope } from "@/modules/cancellation-policy/rules";
 
 /**
  * Cancellation requests (#170): the pure rules. No database, no clock, no email.
@@ -222,7 +223,7 @@ export function diffRegistrationState(then: RegistrationStateSnapshot, now: Regi
     conflicts.push({
       code: "PAYMENTS_CHANGED",
       severity: "CHANGE",
-      message: `Paid money changed since the request: ${formatCents(then.paidCents)} then, ${formatCents(now.paidCents)} now.`,
+      message: `Paid money changed since the request: ${formatCentsPlain(then.paidCents)} then, ${formatCentsPlain(now.paidCents)} now.`,
     });
   }
   if (then.depositCents !== now.depositCents) {

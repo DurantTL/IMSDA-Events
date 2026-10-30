@@ -1,6 +1,6 @@
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import {
   describeTerms,
-  formatCents,
   type CancellationRules,
   type CancellationScope,
   type CancellationTerms,
@@ -484,16 +484,16 @@ export function calculateCancellation(input: {
         ? `A first-night no-show was recorded: ${timing.label}, ${timing.termsText}.`
         : `Every window has closed: ${timing.label}, ${timing.termsText}.`,
     ...notes,
-    `Charged ${formatCents(chargedCents)}; ${formatCents(inScopeCents)} is part of this cancellation and ${formatCents(keptChargesCents)} stays charged.`,
-    `Of the cancelled charges, ${formatCents(Math.max(linesEligible - flatApplied, 0))} is eligible and ${formatCents(linesWithheld + flatApplied)} is withheld${flatApplied > 0 ? `, including the ${formatCents(flatApplied)} ${terms.flatWithholdLabel.toLowerCase()}` : ""}.`,
-    `${formatCents(paidCents)} has been paid. After the charges that stay, ${formatCents(retainedCents)} would be kept and ${formatCents(refundCents)} would be refundable.`,
+    `Charged ${formatCentsPlain(chargedCents)}; ${formatCentsPlain(inScopeCents)} is part of this cancellation and ${formatCentsPlain(keptChargesCents)} stays charged.`,
+    `Of the cancelled charges, ${formatCentsPlain(Math.max(linesEligible - flatApplied, 0))} is eligible and ${formatCentsPlain(linesWithheld + flatApplied)} is withheld${flatApplied > 0 ? `, including the ${formatCentsPlain(flatApplied)} ${terms.flatWithholdLabel.toLowerCase()}` : ""}.`,
+    `${formatCentsPlain(paidCents)} has been paid. After the charges that stay, ${formatCentsPlain(retainedCents)} would be kept and ${formatCentsPlain(refundCents)} would be refundable.`,
   ];
-  if (depositOutcome === "FORFEITED") explanation.push(`The ${formatCents(facts.depositCents)} reservation deposit is forfeited: ${formatCents(forfeitedCents)} of paid money is kept and the reservation is cancelled.`);
-  if (depositOutcome === "REFUNDED") explanation.push(`The ${formatCents(facts.depositCents)} reservation deposit is refunded with the other paid money.`);
+  if (depositOutcome === "FORFEITED") explanation.push(`The ${formatCentsPlain(facts.depositCents)} reservation deposit is forfeited: ${formatCentsPlain(forfeitedCents)} of paid money is kept and the reservation is cancelled.`);
+  if (depositOutcome === "REFUNDED") explanation.push(`The ${formatCentsPlain(facts.depositCents)} reservation deposit is refunded with the other paid money.`);
   if (waitlisted) explanation.push(wholeRegistration ? "This registration is on the waitlist: its waitlist place would be released; no seat or capacity is freed." : "This registration is on the waitlist, so no seat or capacity is freed.");
   if (depositOutcome === "FORFEITED") explanation.push("Any card fee charged on the deposit is not part of the deposit; it follows the card fee rule.");
   if (depositOutcome === "STAYS_WITH_REGISTRATION") explanation.push("The reservation deposit belongs to the registration, so it stays with it when only part of it is cancelled.");
-  if (unpaidWithholdingCents > 0) explanation.push(`${formatCents(unpaidWithholdingCents)} of the withheld amount was never paid, so there is nothing to keep; this calculation does not charge it.`);
+  if (unpaidWithholdingCents > 0) explanation.push(`${formatCentsPlain(unpaidWithholdingCents)} of the withheld amount was never paid, so there is nothing to keep; this calculation does not charge it.`);
   explanation.push("Nothing has been cancelled, refunded or credited. This is a proposed outcome only.");
 
   return {

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useConfirm } from "@/components/use-confirm";
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { PendingInvite } from "@/modules/system-admin/pending-invites";
 import styles from "./people-directory.module.css";
 
@@ -107,7 +107,7 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
               {invite.name ? <small translate="no">{invite.email}</small> : null}
               <p>{invite.what}</p>
               <p className={invite.expired ? styles.fieldError : styles.note}>
-                {invite.expired ? "Expired" : invite.sentAt ? `Sent ${new Date(invite.sentAt).toLocaleDateString("en-US", { timeZone: CONFERENCE_TIME_ZONE })}` : "Not sent yet"}
+                {invite.expired ? "Expired" : invite.sentAt ? `Sent ${formatInConferenceTime(invite.sentAt)}` : "Not sent yet"}
               </p>
               <div className={styles.pendingActions}>
                 {copyInstead ? (

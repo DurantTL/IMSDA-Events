@@ -6,6 +6,7 @@ vi.mock("@/modules/issued-assets/view", () => ({ describeIssuances: vi.fn() }));
 vi.mock("@/modules/issued-assets/returns-view", () => ({ listFacilityIssues: vi.fn() }));
 
 import { closeoutCsv, type CloseoutReport } from "@/modules/issued-assets/closeout";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import {
   applyOutcomeCorrections,
   chargeActionSchema,
@@ -19,7 +20,6 @@ import {
   decideDepositOutcome,
   depositActionSchema,
   facilityActionSchema,
-  formatCents,
   reconcileUnits,
   resolveReturnQuantity,
   returnRequestSchema,
@@ -75,8 +75,8 @@ describe("the cash key deposit outcome", () => {
   });
 
   it("formats cents as dollars", () => {
-    expect(formatCents(1000)).toBe("$10.00");
-    expect(formatCents(-250)).toBe("-$2.50");
+    expect(formatCentsPlain(1000)).toBe("$10.00");
+    expect(formatCentsPlain(-250)).toBe("-$2.50");
   });
 });
 

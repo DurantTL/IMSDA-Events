@@ -9,7 +9,7 @@ import type {
   RegistrationFormDefinition,
   RegistrationFormField,
 } from "@/modules/forms/definition";
-import { toCsv } from "@/modules/reporting/csv";
+import { csvCell, toCsv } from "@/modules/reporting/csv";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 export type AttendeeRosterCsvValue = string | boolean | string[] | AddressValue;
@@ -29,14 +29,10 @@ function attendeeFields(definition: RegistrationFormDefinition) {
     .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED" && field.type !== "ACKNOWLEDGMENT" && field.type !== "SIGNATURE");
 }
 
-function escapeCsvCell(value: string) {
-  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
-}
-
 export function createAttendeeRosterCsvTemplate(
   definition: RegistrationFormDefinition,
 ) {
-  return `${attendeeFields(definition).map((field) => escapeCsvCell(field.key)).join(",")}\n`;
+  return `${attendeeFields(definition).map((field) => csvCell(field.key, { minimalQuoting: true })).join(",")}\n`;
 }
 
 function parseCsvRows(csv: string) {

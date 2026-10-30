@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { entryMethods, type AssetCondition } from "@/modules/issued-assets/domain";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 
 /**
  * Issued assets (#214, slice 2): the pure rules for returns, cash deposits, charges, waivers, facility issues and the
@@ -43,11 +44,6 @@ export const facilitySources = ["REPORT", "CHECKOUT_INSPECTION"] as const;
 export type FacilitySource = (typeof facilitySources)[number];
 
 export const holdKindLabels: Record<(typeof lodgingHoldKinds)[number], string> = { STAFF: "Staff hold", MAINTENANCE: "Maintenance", SAFETY: "Safety", DAMAGE: "Damage" };
-
-export function formatCents(cents: number) {
-  const sign = cents < 0 ? "-" : "";
-  return `${sign}$${(Math.abs(cents) / 100).toFixed(2)}`;
-}
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -328,7 +324,7 @@ export function decideDepositOutcome(input: DepositOutcomeInput): DepositOutcome
     ok: true,
     outcome: refund > 0 ? "PARTIAL_REFUND" : "KEPT",
     refundCents: refund, keepCents: keep, shortfallCents: shortfall, missing, damaged,
-    message: `${what}: keep ${formatCents(keep)} toward replacement${refund > 0 ? ` and hand back ${formatCents(refund)}` : ""}.${shortfall > 0 ? ` The fee is ${formatCents(shortfall)} more than the deposit; charge it separately if it should be collected.` : ""}`,
+    message: `${what}: keep ${formatCentsPlain(keep)} toward replacement${refund > 0 ? ` and hand back ${formatCentsPlain(refund)}` : ""}.${shortfall > 0 ? ` The fee is ${formatCentsPlain(shortfall)} more than the deposit; charge it separately if it should be collected.` : ""}`,
   };
 }
 

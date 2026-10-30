@@ -10,6 +10,7 @@ import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailCo
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { clubFormClubLabel, type ClubFormActor } from "@/modules/club-forms/domain";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * "Club form submitted" alert (#1017). One internal email per address the form's settings list, queued in the same
@@ -56,11 +57,7 @@ function staffLink(submissionId: string) {
 export function clubFormSubmittedContent(input: { formName: string; clubName: string; submitterName: string | null; submittedAt: Date; submissionId: string; openApplication?: boolean }) {
   const formName = neutralizePlaceholders(input.formName);
   const clubName = neutralizePlaceholders(input.clubName);
-  const when = input.submittedAt.toLocaleString("en-US", {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: "America/Chicago",
-  });
+  const when = formatInConferenceTime(input.submittedAt, { dateStyle: "long", timeStyle: "short" });
   return {
     subject: `Club form submitted: ${formName} (${clubName})`,
     bodyText: [
