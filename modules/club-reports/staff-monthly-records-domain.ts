@@ -29,6 +29,16 @@ export const staffRecordKindDisplay: Record<StaffRecordKind, { icon: string; wor
   NOT_YET_DUE: { icon: "○", word: "Not yet due" },
 };
 
+/** Shared `.status-chip` tone for each record state (#1351). */
+export const staffRecordKindTone: Record<StaffRecordKind, "green" | "gold" | "purple" | "coral" | "neutral"> = {
+  MISSING: "coral",
+  DRAFT: "gold",
+  DUE: "gold",
+  TO_REVIEW: "purple",
+  REVIEWED: "green",
+  NOT_YET_DUE: "neutral",
+};
+
 export type StaffRecordAction = "Review" | "Open" | "Club";
 
 export type StaffRecordRow = {

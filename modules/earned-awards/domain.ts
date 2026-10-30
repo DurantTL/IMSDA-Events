@@ -207,6 +207,8 @@ export function ruleReadinessProblems(rule: {
 }
 
 export const masterAwardStatusLabels = { DRAFT: "Draft", ACTIVE: "Active", INACTIVE: "Inactive" } as const;
+/** Shared `.status-chip` tone for each rule status (#1351). */
+export const masterAwardStatusTone = { DRAFT: "gold", ACTIVE: "green", INACTIVE: "neutral" } as const;
 
 // ---------------------------------------------------------------- dates
 

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Plus, Trash2, Trophy, X } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import ruleStyles from "@/components/master-award-rules.module.css";
-import { masterAwardStatusLabels } from "@/modules/earned-awards/domain";
+import { masterAwardStatusLabels, masterAwardStatusTone } from "@/modules/earned-awards/domain";
 import type { MasterAwardImportPlan } from "@/modules/earned-awards/master-award-import";
 import type { MasterAwardRuleRecord } from "@/modules/earned-awards/rules-repository";
 
@@ -345,8 +345,8 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
                   <summary>
                     <span translate="no"><strong>{rule.name}</strong></span>
                     <span className={ruleStyles.badges}>
-                      <span className={`${ruleStyles.badge} ${ruleStyles[rule.status]}`}>{masterAwardStatusLabels[rule.status]}</span>
-                      {rule.needsManualCheck && <span className={`${ruleStyles.badge} ${ruleStyles.check_flag}`}>Manual check</span>}
+                      <span className={`status-chip ${masterAwardStatusTone[rule.status]}`}>{masterAwardStatusLabels[rule.status]}</span>
+                      {rule.needsManualCheck && <span className="status-chip coral">Manual check</span>}
                     </span>
                   </summary>
                   <p className="field-help">
