@@ -123,7 +123,7 @@ describe("one search field in the CSS (#1347)", () => {
     expect(finder).not.toMatch(/\.search \{[^}]*border/);
     expect(finder).not.toMatch(/\.search \{[^}]*border-radius: 12px/);
     expect(roster).not.toMatch(/\.rosterSearchInput[^{]*\{[^}]*(border|outline)/);
-    expect(events).toContain(".eventsDirectoryField :global(.search-field) input { min-height: 42px; border: 0;");
+    expect(events).toContain(".eventsDirectoryField :global(.search-field) input { border: 0;");
     expect(readFileSync("components/public-club-directory.tsx", "utf8")).toContain("search-field ${styles.search}");
     expect(readFileSync("components/club-roster-workspace.tsx", "utf8")).toContain("search-field ${styles.rosterSearchInput}");
   });

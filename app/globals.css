@@ -1239,8 +1239,6 @@ select:focus-visible {
 .search-field { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; min-height: var(--touch-target, 44px); border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: var(--muted); padding: 0 4px 0 12px; }
 .search-field:hover { border-color: var(--field-border-hover); }
 .search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
-:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark) .search-field { border-color: var(--imsda-navy-deep); }
-:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark) .search-field:focus-within { border-color: var(--field-focus); }
 .search-field input { flex: 1; width: 100%; min-width: 0; min-height: 42px; border: 0; background: transparent; box-shadow: none; color: var(--ink); outline: 0; padding: 0; }
 .search-field input::placeholder { color: var(--muted); }
 .search-field > svg { flex: none; }
@@ -9558,8 +9556,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 
   /* Search and filter controls: the input itself is 44px tall. */
   :root :is(.filter-field select) { min-height: var(--touch-target); }
-  /* Inside the 44px .search-field box the input is 42px, so the box stays 44px. */
-  :root .search-field input { min-height: 42px; }
+  /* Touch widths: the input and its clear button are full 44px targets inside the .search-field box. */
+  :root .search-field input { min-height: var(--touch-target); }
+  :root .search-field-clear { height: var(--touch-target); }
 }
 
 /* Every input, select and textarea gets one clear keyboard/typing focus ring

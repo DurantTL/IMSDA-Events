@@ -3254,7 +3254,8 @@ function openComboboxListInPage() {
   if (!input || !list) return { problems: ["the combobox or its list is missing"] };
   const problems: string[] = [];
   const rect = list.getBoundingClientRect();
-  const inputRect = input.getBoundingClientRect();
+  // The visible field is the shared .search-field box around the input (#1347) when there is one.
+  const inputRect = (input.closest(".search-field") ?? input).getBoundingClientRect();
   const style = getComputedStyle(list);
   const viewport = window.visualViewport;
   const width = window.innerWidth;
