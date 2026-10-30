@@ -258,7 +258,9 @@ describe("the phone builder wiring (#1071)", () => {
     for (const text of [modal]) {
       expect(text).toContain("makeBackgroundInert");
       expect(text).toContain("trappedTabIndex");
-      expect(text).toContain('event.key === "Escape"');
+      // Escape and the Tab loop run in the shared dialog core (#1354).
+      expect(text).toContain("dialogKeyDown(");
+      expect(read("components/use-accessible-dialog.ts")).toContain('event.key === "Escape"');
       expect(text).toContain("pushOpenDialog()");
       expect(text).toContain("removeOpenDialog(token)");
       expect(text).toContain("opener.focus");

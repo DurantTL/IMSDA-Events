@@ -182,8 +182,10 @@ describe("phone System menu", () => {
     expect(source).toContain('role="dialog"');
     expect(source).toContain('aria-modal="true"');
     expect(source).toContain("system-menu-close");
-    expect(source).toContain("triggerRef.current?.focus()");
-    expect(source).toContain('event.key === "Escape"');
+    // Focus return, Escape and the Tab loop moved to the shared dialog hook (#1354).
+    expect(source).toContain("useAccessibleDialog<HTMLDivElement>(showing");
+    expect(source).toMatch(/returnFocus: \(\) => \(systemMenuReturnsFocus\(closeReason\.current\) \? triggerRef\.current : null\)/);
+    expect(read("components/use-accessible-dialog.ts")).toContain('event.key === "Escape"');
     expect(source).toContain("setBackgroundInert(false)");
     expect(systemMenuReturnsFocus("close")).toBe(true);
     expect(systemMenuReturnsFocus("escape")).toBe(true);
@@ -491,7 +493,6 @@ describe("phone search on System pages", () => {
     expect(source).toContain("escapeBubbles");
     expect(source).toContain('onNavigated={() => close("navigate")}');
     expect(read("components/app-shell.tsx")).toContain("destinations={searchDestinations}");
-    expect(source).toMatch(/focusableSelector = "input:not\(\[disabled\]\)/);
     const admin = buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
     expect(searchDestinations(admin, "invite staff").map((entry) => entry.label)).toContain("People & access");
     const other = buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });

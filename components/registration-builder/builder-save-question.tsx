@@ -1,9 +1,10 @@
 // "Save to library" (#1070): one question's configuration goes to the question library, where anyone who can build forms
 // can add an independent copy of it to any form. Answers, registrations and people are never part of it.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 import { useBuilder } from "./builder-context";
 import { libraryFieldsFromForm } from "./library-insert";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 type SaveResult = { id?: string; replacedAcknowledgments?: string[]; message?: string };
@@ -24,9 +25,10 @@ export function BuilderSaveQuestionDialog() {
     setDescription("");
     setError("");
   }
-  useEffect(() => { if (field) nameRef.current?.focus(); }, [field]);
-  if (!libraryTarget || !field || !definition) return null;
   const close = () => { if (!saving) setLibraryTarget(null); };
+  // Focus trap, Escape and focus return are the shared dialog's; the first focusable is the X, so focus goes to the name.
+  const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(libraryTarget && field && definition), close, { initialFocus: () => nameRef.current });
+  if (!libraryTarget || !field || !definition) return null;
   const referencesOthers = Boolean(hasVisibilityRule(field) || field.optionalWhen);
 
   async function save() {
@@ -51,7 +53,7 @@ export function BuilderSaveQuestionDialog() {
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-      <section className="modal-card confirm-import-modal" role="dialog" aria-modal="true" aria-labelledby="save-question-title" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") close(); }}>
+      <section className="modal-card confirm-import-modal" role="dialog" aria-modal="true" aria-labelledby="save-question-title" tabIndex={-1} ref={dialogRef}>
         <div className="modal-head">
           <div><p className="eyebrow">Question library</p><h2 id="save-question-title">Save “{field.label}” to the library</h2></div>
           <button className="icon-button modal-close-button" type="button" aria-label="Close dialog" onClick={close}><X size={18} /></button>

@@ -75,7 +75,9 @@ describe("the dialog", () => {
     const source = readFileSync(join(root, "components/contextual-help.tsx"), "utf8");
     expect(source).toContain("showModal()");
     expect(source).toContain(".close()");
-    expect(source).toMatch(/onClose=\{\(\) => triggerRef\.current\?\.focus\(\)\}/);
+    // Focus return moved to the shared dialog hook (#1354).
+    expect(source).toContain("returnFocus: () => triggerRef.current");
+    expect(source).toMatch(/onClose=\{\(event\) => \{ if \(!event.currentTarget.open\) close\(\); \}\}/);
     const css = readFileSync(join(root, "components/contextual-help.module.css"), "utf8");
     expect(css).toMatch(/\.trigger,\s*\.action\s*\{[^}]*min-height: 44px/);
   });

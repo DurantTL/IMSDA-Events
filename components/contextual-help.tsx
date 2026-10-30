@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ContextualHelpData } from "@/modules/help/contextual";
 import styles from "./contextual-help.module.css";
 
@@ -12,15 +13,29 @@ import styles from "./contextual-help.module.css";
  */
 export function ContextualHelp({ help }: { help: ContextualHelpData }) {
   const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const close = () => setOpen(false);
+
+  // The dialog stays the browser's own (top layer, ::backdrop): state drives showModal() and close(). This runs before
+  // the shared hook below, so the native dialog is already closed when the hook gives focus back to the button. It also
+  // means showModal() has moved focus before the hook notes the opener, so returnFocus names the button.
+  const nativeRef = useRef<HTMLDialogElement | null>(null);
+  useEffect(() => {
+    const dialog = nativeRef.current;
+    if (!open || !dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, [open]);
+  const hookRef = useAccessibleDialog<HTMLDialogElement>(open, close, { returnFocus: () => triggerRef.current });
+  const dialogRef = useCallback((node: HTMLDialogElement | null) => { nativeRef.current = node; hookRef.current = node; }, [hookRef]);
 
   return (
     <div className={styles.row}>
       <button
         aria-haspopup="dialog"
         className={`secondary-button ${styles.trigger}`}
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={() => setOpen(true)}
         ref={triggerRef}
         type="button"
       >
@@ -29,8 +44,11 @@ export function ContextualHelp({ help }: { help: ContextualHelpData }) {
       <dialog
         aria-labelledby={titleId}
         className={styles.dialog}
-        // The native dialog returns focus on close; this makes it explicit for browsers that do not.
-        onClose={() => triggerRef.current?.focus()}
+        // Escape is the shared hook's; this stops the browser closing the dialog a second time and keeps the state in step.
+        onCancel={(event) => { event.preventDefault(); close(); }}
+        // Any native close (the hook then gives focus back to the button). The event arrives a task later, so a dialog
+        // reopened in between is still open and ignores it.
+        onClose={(event) => { if (!event.currentTarget.open) close(); }}
         ref={dialogRef}
       >
         <div className={styles.body}>
@@ -42,7 +60,7 @@ export function ContextualHelp({ help }: { help: ContextualHelpData }) {
             <a className={`secondary-button ${styles.action}`} href={help.fullHref} rel="noopener noreferrer" target="_blank">
               Open the full guide<span className="sr-only"> (opens in a new tab)</span>
             </a>
-            <button className={`primary-button ${styles.action}`} onClick={() => dialogRef.current?.close()} type="button">Close</button>
+            <button className={`primary-button ${styles.action}`} onClick={close} type="button">Close</button>
           </div>
         </div>
       </dialog>

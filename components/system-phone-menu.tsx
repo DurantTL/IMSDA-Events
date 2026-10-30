@@ -7,8 +7,9 @@ import { LayoutDashboard, ShieldCheck, X } from "lucide-react";
 import { DestinationSearch } from "@/components/destination-search";
 import type { SearchDestination } from "@/components/destination-search-model";
 import { GuardedLink } from "@/components/guarded-link";
-import { desktopBreakpointQuery, isPlainClick, nextLauncherIndex } from "@/components/more-launcher-model";
+import { desktopBreakpointQuery, isPlainClick } from "@/components/more-launcher-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import {
   systemMenuReturnsFocus,
   systemMenuStillAllowed,
@@ -28,8 +29,6 @@ import {
  * page keeps its own server authorization, and a role removed while the sheet
  * is open closes it on the next render.
  */
-
-const focusableSelector = "input:not([disabled]), a[href], button:not([disabled])";
 
 /** The page behind the sheet is inert while it is open, as in the More sheet. The bottom bar stays live for the opener. */
 function setBackgroundInert(inert: boolean) {
@@ -56,25 +55,32 @@ export function SystemPhoneMenu({
   const [open, setOpen] = useState(false);
   const [openedOn, setOpenedOn] = useState(pathname);
   const triggerRef = useRef<HTMLAnchorElement>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  // Why the sheet last closed, read when it has: focus goes back to the opener except after "navigate". A close nobody
+  // asked for (a role removed, another page) leaves focus alone.
+  const closeReason = useRef<SystemMenuCloseReason>("navigate");
   const titleId = useId();
   const sheetId = useId();
 
   const close = useCallback((reason: SystemMenuCloseReason) => {
     setBackgroundInert(false);
+    closeReason.current = reason;
     setOpen(false);
-    if (systemMenuReturnsFocus(reason)) triggerRef.current?.focus();
   }, []);
 
   // A followed link or Back/Forward to another page closes the sheet. So does a role removed while it is
   // open (revalidated on the next render); the effect below then lifts `inert` as `showing` turns false.
   if (open && (openedOn !== pathname || !allowed)) setOpen(false);
   const showing = open && allowed;
+  // Focus trap, Escape and focus return are the shared dialog's. Focus starts on the sheet itself, not the search field,
+  // so a phone's keyboard stays closed.
+  const sheetRef = useAccessibleDialog<HTMLDivElement>(showing, () => close("escape"), {
+    initialFocus: "dialog",
+    returnFocus: () => (systemMenuReturnsFocus(closeReason.current) ? triggerRef.current : null),
+  });
 
   useEffect(() => {
     if (!showing) return;
     setBackgroundInert(true);
-    sheetRef.current?.focus();
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
       if (target && (sheetRef.current?.contains(target) || triggerRef.current?.contains(target))) return;
@@ -97,23 +103,7 @@ export function SystemPhoneMenu({
       desktop?.removeEventListener("change", onDesktop);
       setBackgroundInert(false);
     };
-  }, [showing, close]);
-
-  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      close("escape");
-      return;
-    }
-    if (event.key !== "Tab") return;
-    // Tab and Shift+Tab loop inside the sheet.
-    const items = Array.from(sheetRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
-    const next = nextLauncherIndex(items.indexOf(document.activeElement as HTMLElement), items.length, event.shiftKey ? "ArrowUp" : "ArrowDown");
-    if (next === null) return;
-    event.preventDefault();
-    items[next]?.focus();
-  }
+  }, [showing, close, sheetRef]);
 
   if (!allowed) return null;
 
@@ -133,7 +123,7 @@ export function SystemPhoneMenu({
             if (!isPlainClick(event.nativeEvent)) return;
             event.preventDefault();
             if (showing) close("close");
-            else { setOpenedOn(pathname); setOpen(true); }
+            else { setOpenedOn(pathname); closeReason.current = "navigate"; setOpen(true); }
           }}
         >
           <ShieldCheck aria-hidden="true" size={22} />
@@ -158,7 +148,6 @@ export function SystemPhoneMenu({
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            onKeyDown={onKeyDown}
           >
             <div className="system-menu-head">
               <div>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Search } from "lucide-react";
-import type { HTMLAttributes, ReactNode, Ref } from "react";
+import type { HTMLAttributes, ReactNode, Ref, RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
   desktopBreakpointQuery,
@@ -29,6 +29,7 @@ import { GuardedLink } from "@/components/guarded-link";
 import { moduleStateLabels, type ModuleDestinationEntry } from "@/components/module-destination-states";
 import type { SearchDestination } from "@/components/destination-search-model";
 import type { MoreDirectoryCard } from "@/components/staff-navigation";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { eventModuleDefinition, moduleForCard } from "@/modules/event-modules/catalog";
 
 /**
@@ -55,6 +56,20 @@ function setBackgroundInert(inert: boolean) {
   for (const element of document.querySelectorAll<HTMLElement>(".app-shell > .sidebar, .app-shell > .workspace")) {
     element.inert = inert;
   }
+}
+
+/**
+ * Coming back: focus the card last opened (#741 slice 4); otherwise the first link on the phone sheet, so no keyboard
+ * pops up, and the search box on desktop (#967). The memory applies only back on the page it opened (or a child).
+ */
+function launcherInitialFocus(
+  panel: HTMLElement | null | undefined,
+  { variant, userId, eventQuery, pathname }: { variant: "sidebar" | "tab"; userId: string; eventQuery: string; pathname: string },
+) {
+  const remembered = recallLauncherPosition({ userId, eventQuery, pathname });
+  const rememberedCard = remembered?.cardKey ? panel?.querySelector<HTMLElement>(`a[data-card="${remembered.cardKey}"]`) : null;
+  const firstFocus = variant === "sidebar" ? panel?.querySelector<HTMLElement>("input.more-launcher-search-input") : panel?.querySelector<HTMLElement>("a[href]");
+  return { remembered, rememberedCard, target: rememberedCard ?? firstFocus ?? panel?.querySelector<HTMLElement>("a[href]") };
 }
 
 export function MoreLauncherPanel({
@@ -366,29 +381,38 @@ export function MoreLauncher({
   if (open && openedOn !== pathname) setOpen(false);
   const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(null);
   const triggerRef = useRef<HTMLAnchorElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  // Why the launcher last closed, read when it has. A close nobody asked for (the route changed) leaves focus alone.
+  const closeReason = useRef<LauncherCloseReason>("navigate");
 
   const close = useCallback((reason: LauncherCloseReason) => {
     setBackgroundInert(false);
+    closeReason.current = reason;
     setOpen(false);
     // Escape means "start over": the next open begins at the first card.
     if (reason === "escape") forgetLauncherPosition();
-    if (returnsFocusToTrigger(reason)) triggerRef.current?.focus();
-  }, []);
+    // The phone sheet gives focus back through the shared dialog hook below; the desktop popover does it here.
+    if (variant === "sidebar" && returnsFocusToTrigger(reason)) triggerRef.current?.focus();
+  }, [variant]);
+
+  // The phone sheet is a modal dialog (aria-modal, page behind inert), so it takes the shared focus trap, Escape and focus
+  // return. The desktop popover is not modal (no inert page, an outside press closes it): it keeps its own handling below.
+  // This panel's arrow and Tab keys, and the search's and confirm's Escape, are handled first, so the hook yields to them.
+  const panelRef: RefObject<HTMLDivElement | null> = useAccessibleDialog<HTMLDivElement>(open && variant === "tab", () => close("escape"), {
+    initialFocus: () => launcherInitialFocus(panelRef.current, { variant, userId, eventQuery, pathname }).target,
+    returnFocus: () => (returnsFocusToTrigger(closeReason.current) ? triggerRef.current : null),
+    skipHandled: "all",
+  });
 
   // Open: move focus to the first item. Outside press: close without taking focus.
   useEffect(() => {
     if (!open) return;
     if (variant === "tab") setBackgroundInert(true);
-    // Coming back: focus the card last opened and restore the scroll (#741 slice 4); otherwise the first item.
-    const panel = panelRef.current;
-    // The memory applies only back on the page it opened (or a child); otherwise first card, top.
-    const remembered = recallLauncherPosition({ userId, eventQuery, pathname });
-    const rememberedCard = remembered?.cardKey ? panel?.querySelector<HTMLElement>(`a[data-card="${remembered.cardKey}"]`) : null;
-    // Desktop opens in the search box; the phone sheet starts on the first link so no keyboard pops up (#967).
-    const firstFocus = variant === "sidebar" ? panel?.querySelector<HTMLElement>("input.more-launcher-search-input") : panel?.querySelector<HTMLElement>("a[href]");
-    (rememberedCard ?? firstFocus ?? panel?.querySelector<HTMLElement>("a[href]"))?.focus({ preventScroll: Boolean(rememberedCard) });
+    const panel = document.getElementById(panelId);
+    const { remembered, rememberedCard, target } = launcherInitialFocus(panel, { variant, userId, eventQuery, pathname });
+    // The desktop popover focuses here; the phone sheet's focus comes from the hook (a frame later, without scrolling).
+    if (variant === "sidebar") target?.focus({ preventScroll: Boolean(rememberedCard) });
+    // Restore the scroll (#741 slice 4); otherwise the top.
     if (panel) panel.scrollTop = rememberedCard && remembered ? remembered.scrollTop : 0;
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
@@ -413,9 +437,10 @@ export function MoreLauncher({
       desktop?.removeEventListener("change", onDesktop);
       setBackgroundInert(false);
     };
-  }, [open, close, variant, eventQuery, userId, pathname]);
+  }, [open, close, variant, eventQuery, userId, pathname, panelId, panelRef]);
 
   function openFromTrigger() {
+    closeReason.current = "navigate";
     if (variant === "sidebar" && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       // Anchored beside the item, bottom edges aligned, kept inside the viewport.
