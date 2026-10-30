@@ -598,6 +598,7 @@ async function verifyStarters() {
 }
 
 const fromEventSecret = "SYNTHETICTOKEN0123456789";
+const otherSecret = "OTHERTOKEN9";
 
 async function verifyFromEvent() {
   // A source event, made the ordinary way, then given what a real event holds that a template must never copy.
@@ -613,7 +614,7 @@ async function verifyFromEvent() {
   await prisma.registrationFormVersion.update({ where: { id: sourceForm.versions[0]!.id }, data: { status: "PUBLISHED", publishedAt: new Date() } });
   await prisma.messageTemplateVersion.updateMany({
     where: { template: { eventId: sourceEventId } },
-    data: { bodyTemplate: `Hello {{recipient_name}}. Your private page: /manage/${fromEventSecret}` },
+    data: { bodyTemplate: `Hello {{recipient_name}}. Your private page: /manage/${fromEventSecret} Other site: https://other.example.test/page?token=${otherSecret} Photos: /${sourceSlug}/photos` },
   });
   const person = await prisma.person.create({ data: { firstName: "Evttpl", lastName: "Zzsynthetic", normalizedEmail: `${P}-attendee@example.test`, phone: "(515) 555-0100" } });
   const registration = await prisma.registration.create({
@@ -629,7 +630,7 @@ async function verifyFromEvent() {
   const privateLinks = preview.exclusions.find((entry) => entry.key === "privateLinks");
   assert(privateLinks && privateLinks.count !== null && privateLinks.count >= 1, "the private link in the message is reported");
   const leakCheck = (text: string, where: string, allowSourceId = false) => {
-    for (const forbidden of [fromEventSecret, ...(allowSourceId ? [] : [sourceEventId]), sourceSlug, registration.id, person.id, "EVTTPL-CONF-1", `${P}-attendee`, `${P}-token-hash`, "Zzsynthetic"]) {
+    for (const forbidden of [fromEventSecret, otherSecret, ...(allowSourceId ? [] : [sourceEventId, sourceSlug]), registration.id, person.id, "EVTTPL-CONF-1", `${P}-attendee`, `${P}-token-hash`, "Zzsynthetic"]) {
       assert(!text.includes(forbidden), `${where} must not contain ${forbidden}`);
     }
   };
@@ -648,7 +649,7 @@ async function verifyFromEvent() {
   const provenance = savedVersion.source!.provenance as { forms: Array<{ formId: string }>; fingerprint: string };
   assert(provenance.forms[0]?.formId === sourceForm.id && provenance.fingerprint === preview.fingerprint, "provenance records the source form and fingerprint");
   leakCheck(JSON.stringify(savedVersion.payload), "the saved payload");
-  leakCheck(JSON.stringify(savedVersion.source!.exclusions), "the stored exclusions", true);
+  leakCheck(JSON.stringify(savedVersion.source!.exclusions), "the stored exclusions");
   assert(!JSON.stringify(savedVersion.source!.exclusions).includes("Evttpl"), "the stored exclusions hold no copied names");
   assert(JSON.stringify(Object.keys(savedVersion.payload as object).sort()) === JSON.stringify(["attendeeClassifications", "attendeeTypes", "audience", "billingMode", "brandingDefaults", "formTemplateKeys", "messageTemplateDefaults", "moduleEnablement", "registrationForms", "reportSelections"]), "the payload has exactly the allow-listed keys");
   assert(!JSON.stringify(savedVersion.payload).includes("/manage/"), "the private link was removed from the copied message");
@@ -705,6 +706,28 @@ async function verifyFromEvent() {
   const statuses = Object.fromEntries((await prisma.eventTemplateVersion.findMany({ where: { templateId: first.template.id } })).map((version) => [version.versionNumber, version.status]));
   assert(statuses[1] === "ARCHIVED" && statuses[2] === "PUBLISHED", `publishing version 2 archives only version 1, got ${JSON.stringify(statuses)}`);
   console.log("ok  a revision after prior use is a new draft; version 1, its applications and its payload are untouched; publishing archives only version 1");
+
+  // 5b. Round trip: a form made from a seeded code template is not duplicated when its key is kept in a new version.
+  const sourceFormNow = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: sourceEventId }, include: { sourceTemplateVersion: { include: { template: true } } } });
+  const seededKey = sourceFormNow.sourceTemplateVersion?.template.key;
+  if (seededKey) {
+    const keyed = await createEventTemplate(adminId, { name: "Evttpl Keyed", description: "", audience: "GENERAL" });
+    await save(keyed.id, goodPayload({ audience: "GENERAL", formTemplateKeys: [seededKey], attendeeTypes: [], messageTemplateDefaults: [] }));
+    await publishEventTemplateVersion(keyed.id, adminId);
+    const preview3 = await previewTemplateFromEvent({ sourceEventId, targetTemplateId: keyed.id });
+    assert(JSON.stringify(preview3.domains).includes("replaced by the event's own copy"), "the preview says the kept form template is replaced");
+    const third = await saveTemplateFromEvent(adminId, {
+      sourceEventId, fingerprint: preview3.fingerprint, releaseNote: "Round trip.", requestKey: `${P}-key-save-roundtrip`, target: { mode: "NEW_VERSION", templateId: keyed.id },
+    });
+    const keyedPayload = eventTemplatePayloadSchema.parse((await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: third.versionId } })).payload);
+    assert(keyedPayload.formTemplateKeys.length === 0 && (keyedPayload.registrationForms ?? []).length === 1, "the new version has the form once, as the event's copy");
+    await publishEventTemplateVersion(keyed.id, adminId);
+    const roundTrip = await applyEventTemplate(keyed.id, adminId, { name: "Evttpl Round Trip", slug: `${P}-round-trip`, startsOn: "2028-06-01", endsOn: "2028-06-02", requestKey: `${P}-key-apply-roundtrip` });
+    assert(await prisma.registrationForm.count({ where: { eventId: roundTrip.event.id } }) === 1, "applying the round-tripped version creates the form once");
+    console.log("ok  a seeded form saved from an event and applied again exists once, not twice");
+  } else {
+    console.log("skip  the source form has no seeded template version here (run npm run form-templates:sync for the round-trip check)");
+  }
 
   // 6. An archived template refuses a new version.
   await archiveEventTemplate(first.template.id, adminId);

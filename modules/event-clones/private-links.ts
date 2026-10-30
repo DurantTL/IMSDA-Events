@@ -57,15 +57,22 @@ export const tokenRoutePrefixes: readonly (readonly string[])[] = [
   ["api", "public", "health-records"],
   ["api", "public", "staff-invitations"],
   ["api", "public", "unsubscribe"],
+  // The Pay on Square return id is an opaque bearer id for a status view (`/pay/square/return/<returnId>`).
+  ["pay", "square", "return"],
+  ["api", "public", "square-return"],
 ];
 
+/** The route names a stored link may keep as its first path segment: the app's fixed route names, never a slug, id or token. */
+export const fixedRouteNames: ReadonlySet<string> = new Set(tokenRoutePrefixes.map((prefix) => prefix[0]!));
+
+/** How many leading segments are fixed route names, when the path is a token route: only at the start of the path (`/admin/club-forms/<key>` is not one). */
+function tokenRouteDepth(segments: readonly string[]) {
+  const prefix = tokenRoutePrefixes.find((candidate) => segments.length > candidate.length && candidate.every((part, index) => segments[index] === part));
+  return prefix ? prefix.length : null;
+}
+
 function hasTokenRoute(segments: readonly string[]) {
-  return tokenRoutePrefixes.some((prefix) => {
-    for (let start = 0; start + prefix.length < segments.length; start += 1) {
-      if (prefix.every((part, offset) => segments[start + offset] === part)) return true;
-    }
-    return false;
-  });
+  return tokenRouteDepth(segments) !== null;
 }
 
 const urlChars = "[^\\s<>\"'`()\\[\\]]";
@@ -136,12 +143,21 @@ export function privateLinkReasons(url: string, context: PrivateLinkContext): Pr
  * segment after `/manage/` are masked, so the plan never repeats a secret.
  */
 export function redactPrivateLink(url: string) {
+  // Mask by decoded path segments, so `/club%2Dforms/TOKEN` and `/%6Danage/TOKEN` are masked as well as the plain spelling.
+  const parts = /^(https?:\/\/[^/?#]*)?([^?#]*)(.*)$/i.exec(url);
   let masked = url;
-  for (const prefix of tokenRoutePrefixes) {
-    masked = masked.replace(new RegExp(`(\\/${prefix.join("\\/")}\\/)[^/?#\\s]+`, "gi"), "$1…");
+  if (parts) {
+    const segments = parts[2]!.split("/");
+    const named = segments.map((segment, index) => ({ index, name: decode(segment).toLowerCase() })).filter((entry) => segments[entry.index] !== "");
+    const names = named.map((entry) => entry.name);
+    const depth = tokenRouteDepth(names) ?? (names.includes("manage") && names.indexOf("manage") < names.length - 1 ? names.indexOf("manage") + 1 : null);
+    if (depth !== null) {
+      for (const entry of named.slice(depth)) segments[entry.index] = "…";
+      masked = `${parts[1] ?? ""}${segments.join("/")}${parts[3] ?? ""}`;
+    }
   }
   return masked
-    .replace(/(\/manage\/)[^/?#\s]+/gi, "$1…")
+    .replace(/(\/manage\/)[^/?#\s…]+/gi, "$1…")
     .replace(/([?&#](?:[a-z0-9_-]*token|sig|signature)=)[^&#\s]*/gi, "$1…");
 }
 

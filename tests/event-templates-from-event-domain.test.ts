@@ -250,12 +250,89 @@ describe("private links in every copied string (#154)", () => {
     for (const forbidden of [SECRET, "token=", "Retreat form", "Synthetic Inn", "Camp policy", "North Site", "Extra meal"]) expect(stored).not.toContain(forbidden);
     const links = built.storedExclusions.find((entry) => entry.key === "privateLinks")!.links!;
     expect(links.length).toBeGreaterThan(0);
-    for (const entry of links) expect(entry.link).toMatch(/^(https:\/\/events\.imsda\.test)?\/[a-z-]*$/);
+    for (const entry of links) {
+      expect(entry.link).toMatch(/^(https:\/\/events\.imsda\.test(\/(manage|api|club-forms|health-records|unsubscribe|staff-invite|clubs|pay))?|\/(manage|api))$/);
+      expect(entry.reasons.length).toBeGreaterThan(0);
+    }
     expect(built.storedExclusions.every((entry) => Object.keys(entry).every((key) => ["key", "count", "links"].includes(key)))).toBe(true);
   });
 });
 
+describe("stored links, labels and form details (#154)", () => {
+  it("never stores a slug, an id or a secret from another site, and keeps the reason keys", () => {
+    const config = source({
+      messageTemplates: [{ key: "EVENT_ANNOUNCEMENT", isEnabled: true, versionId: "mv-1", versionNumber: 1, subjectTemplate: "News", bodyTemplate: "See https://other.example.test/page?token=OTHERSECRET9 and /synthetic-retreat-2027/photos and /api/events/event-src/x" }],
+    });
+    const built = build(config);
+    const stored = JSON.stringify(built.storedExclusions);
+    for (const forbidden of ["OTHERSECRET9", "synthetic-retreat-2027", "event-src", "photos", "page"]) expect(stored).not.toContain(forbidden);
+    const links = built.storedExclusions.find((entry) => entry.key === "privateLinks")!.links!;
+    expect(links.some((entry) => entry.link === "https://other.example.test" && entry.reasons.includes("tokenParameter"))).toBe(true);
+    expect(links.some((entry) => entry.reasons.includes("sourceReference"))).toBe(true);
+    expect(links.some((entry) => entry.link === "/api" && entry.reasons.includes("sourceAdminApi"))).toBe(true);
+  });
+
+  it("scans attendee type labels, location names and meal names, and says why an item could not be copied", () => {
+    const built = build(source({
+      attendeeTypes: [{ code: "ADULT", label: `${manageLink}`, description: "", sortOrder: 0, isActive: true, minimumAge: null, maximumAge: null }],
+      attendeeClassifications: [{ kind: "CATEGORY", code: "GUEST", label: `Guest ${manageLink}`, description: "", sortOrder: 0, isActive: true }],
+      locations: [{ name: `Camp ${manageLink}`, address: null, capacity: null, sortOrder: 0, firstDay: null, lastDay: null, registrationClosesOn: null }],
+      meals: {
+        services: [{ name: `Supper ${manageLink}`, mealType: "SUPPER", serviceDate: "2027-05-07", startTime: "18:00", endTime: null, location: null, ticketing: "TICKETED", capacity: null, position: 1 }],
+        plans: [{ code: "FULL", name: `Plan ${manageLink}`, description: "", payer: "ATTENDEE", isDefaultTicketPlan: true, includesAllServices: false, defaultEntitlement: "PAID", position: 1, services: [{ serviceName: `Supper ${manageLink}`, serviceDate: "2027-05-07", entitlement: "PAID" }], prices: [] }],
+      },
+    }));
+    expect(JSON.stringify(built.payload)).not.toContain(SECRET);
+    expect(built.payload.attendeeTypes).toEqual([]);
+    expect(built.payload.attendeeClassifications[0]!.label).toBe("Guest");
+    expect(built.payload.locations![0]!.name).toBe("Camp");
+    expect(built.payload.meals!.services[0]!.name).toBe("Supper");
+    expect(built.payload.meals!.plans[0]!.services).toEqual([{ serviceName: "Supper", dayOffset: 2, entitlement: "PAID" }]);
+    const invalid = built.preview.exclusions.find((entry) => entry.key === "invalidItems")!;
+    expect(invalid.details).toEqual(["Attendee type ADULT (a label or text was only a private link)"]);
+    expect(JSON.stringify(built.preview)).not.toContain(SECRET);
+  });
+
+  it("keeps the event's form name, and says why a form was not copied", () => {
+    const only = registrationFormDefinitionSchema.parse({
+      title: "Only link form", confirmationMessage: "Received.",
+      sections: [{ id: "sec_one", title: "Everything", description: "", fields: [{ id: "f_a", key: "field_a", label: manageLink, type: "TEXT", scope: "REGISTRATION", required: false, options: [] }] }],
+    });
+    const config = source({
+      registrationForms: [
+        { formId: "form-1", name: "Event form name", slug: "event-form", versionId: "v1", versionNumber: 1, definition: { ...formDefinition(), title: "Different definition title" } },
+        { formId: "form-2", name: "Link form", slug: "link-form", versionId: "v2", versionNumber: 1, definition: only },
+      ],
+    });
+    const built = build(config);
+    expect(built.payload.registrationForms!.map((form) => form.name)).toEqual(["Event form name"]);
+    const details = built.preview.exclusions.find((entry) => entry.key === "formsNotCopyable")!.details;
+    expect(details).toEqual(["Link form: a label or text was only a private link"]);
+  });
+});
+
 describe("a new version keeps the template's own settings (#154)", () => {
+  it("drops a kept form template key the event's own copy replaces, so a round trip does not duplicate the form", () => {
+    const built = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false, formTemplateKeys: { "form-1": "simple_rsvp" } }, origins, {
+      reportSelections: [], formTemplateKeys: ["simple_rsvp", "other_form"], registrationClosesOn: undefined, starterKey: undefined,
+    });
+    expect(built.payload.formTemplateKeys).toEqual(["other_form"]);
+    expect(built.payload.registrationForms).toHaveLength(1);
+    expect(JSON.stringify(built.preview.domains)).toContain("replaced by the event's own copy");
+  });
+
+  it("takes the event's own deadline, else keeps the old one flagged for review, and never lists kept report selections as excluded", () => {
+    const existing = { reportSelections: operationalReportKinds.slice(0, 1), formTemplateKeys: [], registrationClosesOn: "2026-04-01", starterKey: undefined };
+    const fromEvent = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false, registrationClosesOn: "2027-04-02" }, origins, existing);
+    expect(fromEvent.payload.registrationClosesOn).toBe("2027-04-02");
+    expect(fromEvent.kept.find((entry) => entry.key === "registrationClosesOn")!.label).toContain("taken from the event");
+    const stale = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false }, origins, existing);
+    expect(stale.payload.registrationClosesOn).toBe("2026-04-01");
+    expect(stale.kept.find((entry) => entry.key === "registrationClosesOn")!.label).toContain("review it");
+    expect(stale.preview.exclusions.some((entry) => entry.key === "reportSelections")).toBe(false);
+    expect(build().preview.exclusions.some((entry) => entry.key === "reportSelections")).toBe(true);
+  });
+
   it("carries reportSelections, formTemplateKeys, registrationClosesOn and starterKey forward and says so", () => {
     const built = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false }, origins, {
       reportSelections: operationalReportKinds.slice(0, 2),

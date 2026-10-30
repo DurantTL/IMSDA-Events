@@ -8,7 +8,7 @@ import {
   sanitizeSourceForClone,
   type SourceConfiguration,
 } from "@/modules/event-clones/domain";
-import { stripPrivateLinks, type PrivateLinkContext } from "@/modules/event-clones/private-links";
+import { fixedRouteNames, privateLinkReasonLabels, stripPrivateLinks, type PrivateLinkContext } from "@/modules/event-clones/private-links";
 import {
   eventTemplateDescriptionSchema,
   eventTemplateNameSchema,
@@ -38,6 +38,10 @@ import { teamSettingsInputSchema } from "@/modules/club-teams/domain";
 export type TemplateSourceConfiguration = {
   config: SourceConfiguration;
   generalRegistrationLink: boolean;
+  /** The event's own registration deadline, when it has one (a calendar date). */
+  registrationClosesOn?: string | null;
+  /** For each source form made from a seeded code template, that template's key: the event's copy replaces a kept key. */
+  formTemplateKeys?: Record<string, string>;
 };
 
 export type TemplateFromEventDomain = {
@@ -79,7 +83,7 @@ export type TemplateFromEventProvenance = {
 export type TemplateKeptSettings = Pick<EventTemplatePayload, "reportSelections" | "formTemplateKeys" | "registrationClosesOn" | "starterKey">;
 
 /** What is stored as a version's `exclusions`: keys and counts, plus the redacted link origin and first path segment. No copied text. */
-export type StoredTemplateExclusion = { key: string; count: number | null; links?: Array<{ domain: string; link: string }> };
+export type StoredTemplateExclusion = { key: string; count: number | null; links?: Array<{ domain: string; link: string; reasons: string[] }> };
 
 export type TemplateFromEventBuild = {
   payload: EventTemplatePayload;
@@ -90,12 +94,24 @@ export type TemplateFromEventBuild = {
   kept: Array<{ key: string; label: string; count: number }>;
 };
 
-/** A redacted link reduced to its origin and first path segment: no query, no deeper path, no token. */
+/**
+ * A redacted link reduced to what is safe to store: its origin, plus the first path segment only when that is one of the
+ * app's fixed route names (never a slug, an id or a token). No query and nothing deeper.
+ */
 export function reduceRedactedLink(link: string) {
   const bare = link.split(/[?#]/)[0] ?? "";
-  const match = /^(https?:\/\/[^/]+)?(\/[^/]*)?/i.exec(bare);
-  return `${match?.[1] ?? ""}${match?.[2] ?? ""}` || "(link)";
+  const match = /^(https?:\/\/[^/]+)?(?:\/([^/]*))?/i.exec(bare);
+  let first = "";
+  try {
+    first = decodeURIComponent(match?.[2] ?? "").toLowerCase();
+  } catch {
+    first = "";
+  }
+  const route = fixedRouteNames.has(first) ? `/${first}` : "";
+  return `${match?.[1] ?? ""}${route}` || "(relative link)";
 }
+
+const reasonKeysByLabel = new Map(Object.entries(privateLinkReasonLabels).map(([key, label]) => [label, key]));
 
 const MESSAGE_DEFAULT_LIMIT = 30;
 const FORM_LIMIT = 20;
@@ -125,11 +141,14 @@ export function buildTemplateFromEvent(
   const audience = config.eventDetails.audience;
 
   /** Free text a template copies is scanned for private links too, beyond what the clone's sanitizing covers. */
+  let emptiedByScrub = 0;
   const scrub = (domain: PrivateLinkFinding["domain"], location: string, value: string) => {
     const result = stripPrivateLinks(value, context);
-    for (const match of result.matches) findings.push({ domain, location, link: match.redacted, reasons: [] });
+    for (const match of result.matches) findings.push({ domain, location, link: match.redacted, reasons: match.reasons.map((reason) => privateLinkReasonLabels[reason]) });
+    if (result.matches.length > 0 && value.trim() !== "" && result.text.trim() === "") emptiedByScrub += 1;
     return result.text;
   };
+  const ONLY_LINK = "a label or text was only a private link";
   const scrubOptional = (domain: PrivateLinkFinding["domain"], location: string, value: string | null) => {
     if (value === null) return null;
     const next = scrub(domain, location, value).trim();
@@ -171,12 +190,13 @@ export function buildTemplateFromEvent(
   const attendeeTypes: EventTemplatePayload["attendeeTypes"] = [];
   const typeCodes = new Set<string>();
   for (const type of config.attendeeTypes) {
+    const emptiedBefore = emptiedByScrub;
     const parsed = templateAttendeeTypeSchema.safeParse({
-      code: type.code, label: type.label, description: scrub("attendeeTypes", `Attendee type ${type.code} description`, type.description), sortOrder: type.sortOrder,
+      code: type.code, label: scrub("attendeeTypes", `Attendee type ${type.code} label`, type.label).trim(), description: scrub("attendeeTypes", `Attendee type ${type.code} description`, type.description), sortOrder: type.sortOrder,
       isActive: type.isActive, minimumAge: type.minimumAge, maximumAge: type.maximumAge,
     });
     if (!parsed.success || typeCodes.has(parsed.data.code) || attendeeTypes.length >= 60) {
-      invalid.push(`Attendee type ${type.label}`);
+      invalid.push(`Attendee type ${type.code}${emptiedByScrub > emptiedBefore ? ` (${ONLY_LINK})` : ""}`);
       continue;
     }
     typeCodes.add(parsed.data.code);
@@ -187,13 +207,14 @@ export function buildTemplateFromEvent(
   const attendeeClassifications: EventTemplatePayload["attendeeClassifications"] = [];
   const classificationKeys = new Set<string>();
   for (const classification of config.attendeeClassifications) {
+    const emptiedBefore = emptiedByScrub;
     const parsed = templateAttendeeClassificationSchema.safeParse({
-      kind: classification.kind, code: classification.code, label: classification.label,
+      kind: classification.kind, code: classification.code, label: scrub("attendeeClassifications", `Classification ${classification.code} label`, classification.label).trim(),
       description: scrub("attendeeClassifications", `Classification ${classification.code} description`, classification.description), sortOrder: classification.sortOrder, isActive: classification.isActive,
     });
     const key = parsed.success ? `${parsed.data.kind}:${parsed.data.code}` : "";
     if (!parsed.success || classificationKeys.has(key) || attendeeClassifications.length >= 60) {
-      invalid.push(`Classification ${classification.label}`);
+      invalid.push(`Classification ${classification.code}${emptiedByScrub > emptiedBefore ? ` (${ONLY_LINK})` : ""}`);
       continue;
     }
     classificationKeys.add(key);
@@ -254,7 +275,9 @@ export function buildTemplateFromEvent(
   const locations: NonNullable<EventTemplatePayload["locations"]> = [];
   const locationNames = new Set<string>();
   let locationDatesDropped = 0;
-  for (const location of config.locations) {
+  for (const [locationIndex, location] of config.locations.entries()) {
+    const emptiedBefore = emptiedByScrub;
+    const locationName = scrub("locations", `Location ${locationIndex + 1} name`, location.name).trim();
     const offset = (date: string | null, minimum: number) => {
       if (date === null) return null;
       const days = calendarDayDifference(startsOn, date);
@@ -265,13 +288,13 @@ export function buildTemplateFromEvent(
       return days;
     };
     const parsed = templateLocationSchema.safeParse({
-      name: location.name, address: scrubOptional("locations", `Location ${location.name} address`, location.address), capacity: location.capacity,
+      name: locationName, address: scrubOptional("locations", `Location ${locationIndex + 1} address`, location.address), capacity: location.capacity,
       firstDayOffset: offset(location.firstDay, 0), lastDayOffset: offset(location.lastDay, 0),
       registrationClosesOffset: offset(location.registrationClosesOn, -365),
     });
     const key = parsed.success ? normalizedName(parsed.data.name) : "";
     if (!parsed.success || locationNames.has(key) || locations.length >= 20) {
-      invalid.push(`Location ${location.name}`);
+      invalid.push(`Location ${locationIndex + 1}${emptiedByScrub > emptiedBefore ? ` (${ONLY_LINK})` : ""}`);
       continue;
     }
     locationNames.add(key);
@@ -284,9 +307,20 @@ export function buildTemplateFromEvent(
 
   // --- Meals ---------------------------------------------------------------
   const sourceMeals = original.meals ?? { services: [], plans: [] };
+  // A plan row names its service, so a service name is scrubbed once and reused wherever it appears.
+  const mealNames = new Map<string, string>();
+  const mealName = (name: string, what: string) => {
+    if (!mealNames.has(name)) mealNames.set(name, scrub("meals", what, name).trim());
+    return mealNames.get(name)!;
+  };
   const sanitizedMeals = {
-    services: sourceMeals.services.map((service) => ({ ...service, location: scrubOptional("meals", `Meal ${service.name} location`, service.location) })),
-    plans: sourceMeals.plans.map((plan) => ({ ...plan, description: scrub("meals", `Meal plan ${plan.code} description`, plan.description).trim() })),
+    services: sourceMeals.services.map((service, index) => ({
+      ...service, name: mealName(service.name, `Meal service ${index + 1} name`), location: scrubOptional("meals", `Meal service ${index + 1} location`, service.location),
+    })),
+    plans: sourceMeals.plans.map((plan) => ({
+      ...plan, name: scrub("meals", `Meal plan ${plan.code} name`, plan.name).trim(), description: scrub("meals", `Meal plan ${plan.code} description`, plan.description).trim(),
+      services: plan.services.map((row) => ({ ...row, serviceName: mealName(row.serviceName, "Meal plan service name") })),
+    })),
   };
   const mealResult = templateMealsFromDefinitions(sanitizedMeals, startsOn);
   if (mealResult.issue) invalid.push(`Meal definitions (${mealResult.issue})`);
@@ -310,7 +344,7 @@ export function buildTemplateFromEvent(
     });
     if (parsed.success) teamSettings = parsed.data;
     else invalid.push("Team rules");
-    for (const match of books.matches) findings.push({ domain: "eventDetails", location: "Team rules books line", link: match.redacted, reasons: [] });
+    for (const match of books.matches) findings.push({ domain: "eventDetails", location: "Team rules books line", link: match.redacted, reasons: match.reasons.map((reason) => privateLinkReasonLabels[reason]) });
   }
   const generalRegistrationLink = audience === "CLUB" && source.generalRegistrationLink ? true : undefined;
   if (audience === "CLUB") {
@@ -329,15 +363,27 @@ export function buildTemplateFromEvent(
   const latePriceDetails: string[] = [];
   const policyDetails: string[] = [];
   let choiceLimitCount = 0;
-  let formsNotCopied = 0;
-  for (const form of config.registrationForms) {
+  const formsNotCopiedDetails: string[] = [];
+  for (const [formIndex, form] of config.registrationForms.entries()) {
+    const emptiedBefore = emptiedByScrub;
+    // The event's own form name is kept as the template form's name (scrubbed of private links like any copied text).
+    const formName = scrub("registrationForms", `Form ${formIndex + 1} name`, form.name).trim();
+    const formLabel = formName === "" ? `Form ${formIndex + 1}` : formName;
     const definition = parseFormDefinition(form.definition);
-    if (!definition || registrationForms.length >= FORM_LIMIT || formSlugs.has(form.slug)) {
-      formsNotCopied += 1;
+    if (!definition) {
+      formsNotCopiedDetails.push(`${formLabel}: its stored definition is no longer valid`);
+      continue;
+    }
+    if (registrationForms.length >= FORM_LIMIT) {
+      formsNotCopiedDetails.push(`${formLabel}: a template holds at most ${FORM_LIMIT} forms`);
+      continue;
+    }
+    if (formSlugs.has(form.slug)) {
+      formsNotCopiedDetails.push(`${formLabel}: another copied form has the same address`);
       continue;
     }
     const scrubbed = structuredClone(definition);
-    const where = (detail: string) => `Form "${form.name}" ${detail}`;
+    const where = (detail: string) => `Form "${formLabel}" ${detail}`;
     scrubbed.title = scrub("registrationForms", where("title"), scrubbed.title).trim();
     if (scrubbed.requireAtLeastOne) scrubbed.requireAtLeastOne.message = scrub("registrationForms", where("required-one message"), scrubbed.requireAtLeastOne.message).trim();
     if (scrubbed.attendeeRoster) {
@@ -358,18 +404,19 @@ export function buildTemplateFromEvent(
     for (const section of next.sections) {
       for (const field of section.fields) {
         if (field.latePricing) {
-          latePriceDetails.push(`Form "${form.name}" field "${field.label}"`);
+          latePriceDetails.push(`Form "${formLabel}" field "${field.label}"`);
           delete field.latePricing;
         }
         choiceLimitCount += Object.keys(field.choiceLimits ?? {}).length;
       }
     }
-    const parsed = templateRegistrationFormSchema.safeParse({ name: next.title, slug: form.slug, definition: next });
+    const parsed = templateRegistrationFormSchema.safeParse({ name: formName === "" ? next.title : formName, slug: form.slug, definition: next });
     if (!parsed.success) {
-      formsNotCopied += 1;
+      const issue = parsed.error.issues[0];
+      formsNotCopiedDetails.push(`${formLabel}: ${emptiedByScrub > emptiedBefore ? ONLY_LINK : `it does not meet the template's rules (${issue?.path.join(".") || "form"}: ${issue?.message ?? "invalid"})`}`);
       continue;
     }
-    for (const label of replaced.replacedLabels) policyDetails.push(`Form "${form.name}" field "${label}"`);
+    for (const label of replaced.replacedLabels) policyDetails.push(`Form "${formLabel}" field "${label}"`);
     formSlugs.add(parsed.data.slug);
     registrationForms.push(parsed.data);
     formProvenance.push({ formId: form.formId, versionId: form.versionId, versionNumber: form.versionNumber });
@@ -413,7 +460,7 @@ export function buildTemplateFromEvent(
   exclude("formsWithoutPublishedVersion", "Forms without a published version", "Only a form's current published version is copied; a draft-only or archived form has nothing current to save.", original.formsWithoutPublishedVersion);
   exclude("messageTemplatesWithoutPublishedVersion", "Message templates without a published version", "Only the current published wording is copied.", original.messageTemplatesWithoutPublishedVersion);
   exclude("messageTemplatesNotCopyable", "Message templates that cannot be copied", "Account-only keys, and wording that no longer passes the message checks, are left out.", nonCopyableMessages);
-  exclude("formsNotCopyable", "Forms that cannot be copied", "A form whose stored definition is no longer valid, whose address repeats, or beyond the 20 a template holds.", formsNotCopied);
+  exclude("formsNotCopyable", "Forms that cannot be copied", "A form whose stored definition is no longer valid, whose address repeats, beyond the 20 a template holds, or that no longer meets the template's rules. Each is listed with its reason.", formsNotCopiedDetails.length, formsNotCopiedDetails);
   exclude("latePricing", "Late-pricing dates", "These dates are for one year, so the form field is copied without its late price.", latePriceDetails.length, latePriceDetails);
   exclude("policyAcknowledgments", "Policy acknowledgments replaced", "A policy version belongs to one event, so the acknowledgment becomes typed wording with a placeholder to reword.", policyDetails.length, policyDetails);
   const copiedLinkDomains = new Set<string>(["registrationForms", "messageTemplates", "attendeeTypes", "attendeeClassifications", "locations", "meals"]);
@@ -424,23 +471,41 @@ export function buildTemplateFromEvent(
   exclude("privateLinks", "Private links removed", "Links that name the source event or carry a token are removed from copied text and settings. Each is shown with its token masked.", privateLinkDetails.length, privateLinkDetails);
   exclude("invalidItems", "Items that cannot be saved in a template", "These no longer pass the template's rules, so they are left out.", invalid.length, invalid);
   exclude("locationDatesOutsideRange", "Location dates outside the template's range", "A date more than a year from the first day cannot be saved as an offset.", locationDatesDropped);
-  exclude("reportSelections", "Report selections", "An event has no report configuration of its own.", null);
+  if ((existing?.reportSelections ?? []).length === 0) {
+    exclude("reportSelections", "Report selections", "An event has no report configuration of its own.", null);
+  }
   exclude("registrationThemes", "Registration themes and presentation blocks", "Not available yet.", null);
 
   // A new version of an existing template keeps the settings an event can never supply (#154).
   const kept: TemplateFromEventBuild["kept"] = [];
+  const keptNotes: string[] = [];
+  // A form the event copied from a seeded code template is the reviewed version, so the template's own key is dropped.
+  const copiedFormKeys = new Set(formProvenance.map((form) => source.formTemplateKeys?.[form.formId]).filter((key): key is string => typeof key === "string"));
+  const keptFormTemplateKeys = (existing?.formTemplateKeys ?? []).filter((key) => !copiedFormKeys.has(key));
+  const droppedFormTemplateKeys = (existing?.formTemplateKeys ?? []).filter((key) => copiedFormKeys.has(key));
+  // The event's own deadline wins; an older kept one may be from a past year, so it is flagged for review.
+  const sourceClosesOn = source.registrationClosesOn ?? null;
+  const registrationClosesOn = existing ? (sourceClosesOn ?? existing.registrationClosesOn) : undefined;
   if (existing) {
-    const keptKeys = existing.formTemplateKeys ?? [];
     const keptReports = existing.reportSelections ?? [];
-    if (keptKeys.length > 0) kept.push({ key: "formTemplateKeys", label: "Form templates", count: keptKeys.length });
+    if (keptFormTemplateKeys.length > 0) kept.push({ key: "formTemplateKeys", label: "Form templates", count: keptFormTemplateKeys.length });
+    if (droppedFormTemplateKeys.length > 0) {
+      keptNotes.push(`${plural(droppedFormTemplateKeys.length, "form template")} (${droppedFormTemplateKeys.join(", ")}) replaced by the event's own copy of the form, so the form is not created twice.`);
+    }
     if (keptReports.length > 0) kept.push({ key: "reportSelections", label: "Report selections", count: keptReports.length });
-    if (existing.registrationClosesOn) kept.push({ key: "registrationClosesOn", label: "Registration deadline", count: 1 });
+    if (registrationClosesOn) {
+      kept.push({
+        key: "registrationClosesOn",
+        label: sourceClosesOn ? "Registration deadline (taken from the event)" : "Registration deadline (kept from the current version; review it, it may be from a past year)",
+        count: 1,
+      });
+    }
     if (existing.starterKey) kept.push({ key: "starterKey", label: "Starter template identity", count: 1 });
   }
-  if (kept.length > 0) {
+  if (kept.length > 0 || keptNotes.length > 0) {
     domains.push({
       key: "keptFromTemplate", label: "Kept from the current template version", count: kept.length,
-      items: kept.map((entry) => entry.label), notes: ["The event cannot supply these, so the new version keeps them as they are. Its forms are added alongside any form templates."],
+      items: kept.map((entry) => entry.label), notes: ["The event cannot supply these, so the new version keeps them. Its forms are added alongside any form templates.", ...keptNotes],
     });
   }
 
@@ -448,8 +513,8 @@ export function buildTemplateFromEvent(
     ...(existing?.starterKey ? { starterKey: existing.starterKey } : {}),
     audience,
     billingMode: config.eventDetails.billingMode,
-    formTemplateKeys: existing?.formTemplateKeys ?? [],
-    ...(existing?.registrationClosesOn ? { registrationClosesOn: existing.registrationClosesOn } : {}),
+    formTemplateKeys: keptFormTemplateKeys,
+    ...(registrationClosesOn ? { registrationClosesOn } : {}),
     attendeeTypes,
     attendeeClassifications,
     moduleEnablement,
@@ -473,7 +538,10 @@ export function buildTemplateFromEvent(
     },
     provenance: { sourceEventId: original.event.id, forms: formProvenance, messageTemplates: messageProvenance },
     storedExclusions: exclusions.map((entry) => (entry.key === "privateLinks"
-      ? { key: entry.key, count: entry.count, links: copiedFindings.map((finding) => ({ domain: finding.domain, link: reduceRedactedLink(finding.link) })) }
+      ? { key: entry.key, count: entry.count, links: copiedFindings.map((finding) => ({
+          domain: finding.domain, link: reduceRedactedLink(finding.link),
+          reasons: finding.reasons.map((label) => reasonKeysByLabel.get(label)).filter((key): key is string => key !== undefined),
+        })) }
       : { key: entry.key, count: entry.count })),
     kept,
   };
@@ -485,6 +553,8 @@ export function buildTemplateFromEvent(
 
 export const previewTemplateFromEventInputSchema = z.object({
   sourceEventId: z.string().trim().min(1).max(100),
+  /** The template a new version would be saved to, so the preview can show what is kept from its current version. */
+  targetTemplateId: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
 export const releaseNoteSchema = z.string().trim().min(3, "Enter a release note of at least 3 characters.").max(2000, "The release note is too long.");

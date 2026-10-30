@@ -71,6 +71,7 @@ function mockSave(options: { templateStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED"
   const prisma = {
     eventTemplateVersionSource: { findUnique: vi.fn().mockResolvedValue(options.existingSource ?? null) },
     eventTemplate: { findUnique: vi.fn().mockResolvedValue({ id: "template-1", name: "Weekend Retreat", description: "", status: "PUBLISHED", createdAt: loadedAt, updatedAt: loadedAt, createdBy: { displayName: "A" }, versions: [] }) },
+    eventTemplateVersion: { findMany: vi.fn().mockResolvedValue(options.versions ?? [versionRow()]) },
     event: { findUnique: vi.fn().mockResolvedValue({ generalRegistrationLinkEnabled: false }) },
     $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
   };
@@ -134,6 +135,41 @@ describe("fingerprint and kept settings (#154)", () => {
     const stored = JSON.stringify(tx.eventTemplateVersionSource.create.mock.calls[0]![0].data.exclusions);
     expect(stored).not.toContain(SECRET);
     expect(JSON.parse(stored).every((entry: object) => Object.keys(entry).every((key) => ["key", "count", "links"].includes(key)))).toBe(true);
+  });
+});
+
+describe("preview with a target template and retries (#154)", () => {
+  const existing = eventTemplatePayloadSchema.parse({ audience: "GENERAL", reportSelections: [operationalReportKinds[0]], registrationClosesOn: "2026-04-01" });
+
+  it("shows what a new version keeps from the target's current version", async () => {
+    mocks.getPrisma.mockReturnValue(mockSave({ versions: [versionRow({ payload: existing })] }).prisma);
+    const preview = await previewTemplateFromEvent({ sourceEventId: "event-src", targetTemplateId: "template-1" });
+    const kept = preview.domains.find((domain) => domain.key === "keptFromTemplate")!;
+    expect(kept.items.join(" ")).toContain("Report selections");
+    expect(kept.items.join(" ")).toContain("review it");
+    expect(preview.exclusions.some((entry) => entry.key === "reportSelections")).toBe(false);
+    mocks.getPrisma.mockReturnValue(mockSave().prisma);
+    expect((await previewTemplateFromEvent({ sourceEventId: "event-src" })).domains.some((domain) => domain.key === "keptFromTemplate")).toBe(false);
+  });
+
+  it("returns the first save's kept list on an idempotent retry", async () => {
+    const fingerprint = await freshFingerprint();
+    const input = saveTemplateFromEventInputSchema.parse({ ...newVersionInput, fingerprint });
+    const kept = [{ key: "reportSelections", label: "Report selections", count: 1 }];
+    const { prisma } = mockSave({
+      existingSource: { requestInput: saveTemplateRequestInputOf(input), provenance: { kept }, templateVersion: { id: "version-2", templateId: "template-1", versionNumber: 2 } },
+    });
+    mocks.getPrisma.mockReturnValue(prisma);
+    expect((await saveTemplateFromEvent("usr_actor", { ...newVersionInput, fingerprint })).kept).toEqual(kept);
+  });
+
+  it("stores the kept list with the provenance", async () => {
+    const fingerprint = await freshFingerprint();
+    const { prisma, tx } = mockSave({ versions: [versionRow({ payload: existing })] });
+    mocks.getPrisma.mockReturnValue(prisma);
+    await saveTemplateFromEvent("usr_actor", { ...newVersionInput, fingerprint });
+    const provenance = tx.eventTemplateVersionSource.create.mock.calls[0]![0].data.provenance;
+    expect(provenance.kept.map((entry: { key: string }) => entry.key).sort()).toEqual(["registrationClosesOn", "reportSelections"]);
   });
 });
 

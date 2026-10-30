@@ -37,20 +37,22 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
     && releaseNote.trim().length >= 3
     && (mode === "NEW" ? name.trim().length >= 2 : Boolean(targetTemplate) && !targetTemplate?.hasDraft);
 
-  async function loadPreview() {
+  async function loadPreview(targetTemplateId = "") {
     setBusy(true);
     setFailure(null);
     setSaved(null);
     try {
-      const { ok, body } = await postJson("/api/event-templates/from-event/preview", { sourceEventId }, "The preview could not be prepared.");
+      const { ok, body } = await postJson("/api/event-templates/from-event/preview", { sourceEventId, ...(targetTemplateId ? { targetTemplateId } : {}) }, "The preview could not be prepared.");
       if (!ok) {
         setFailure({ message: typeof body.message === "string" ? body.message : "The preview could not be prepared.", stale: false });
         setPreview(null);
       } else {
         const next = body.preview as Preview;
         setPreview(next);
-        setRequestKey(crypto.randomUUID());
-        setTemplateId("");
+        if (!targetTemplateId) {
+          setRequestKey(crypto.randomUUID());
+          setTemplateId("");
+        }
         if (!name) setName(`${next.source.name} template`);
       }
     } catch (error) {
@@ -107,7 +109,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
       {failure ? (
         <div className="inline-notice error" role="alert">
           <p>{failure.message}</p>
-          {failure.stale ? <button type="button" className="secondary-button" onClick={loadPreview} disabled={busy}>Preview again</button> : null}
+          {failure.stale ? <button type="button" className="secondary-button" onClick={() => loadPreview(mode === "NEW_VERSION" ? templateId : "")} disabled={busy}>Preview again</button> : null}
         </div>
       ) : null}
 
@@ -119,7 +121,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
           </select>
         </label>
         <div className={styles.actions}>
-          <button type="button" className="secondary-button" onClick={loadPreview} disabled={busy || !sourceEventId}>
+          <button type="button" className="secondary-button" onClick={() => loadPreview(mode === "NEW_VERSION" ? templateId : "")} disabled={busy || !sourceEventId}>
             {busy && !preview ? "Preparing the preview..." : preview ? "Refresh the preview" : "Preview what will be copied"}
           </button>
         </div>
@@ -161,7 +163,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
           <section className="panel form-stack event-settings-panel">
             <h2 className={styles.heading}>Save it</h2>
             <label className={styles.choice}>
-              <input type="radio" name="template-target" checked={mode === "NEW"} onChange={() => setMode("NEW")} />
+              <input type="radio" name="template-target" checked={mode === "NEW"} onChange={() => { setMode("NEW"); if (templateId) loadPreview(); }} />
               A new template
             </label>
             <label className={styles.choice}>
@@ -179,7 +181,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
               </>
             ) : (
               <label className={styles.label}>Template
-                <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+                <select value={templateId} onChange={(event) => { setTemplateId(event.target.value); loadPreview(event.target.value); }}>
                   <option value="">Choose a template</option>
                   {availableTemplates.map((template) => (
                     <option key={template.id} value={template.id}>{template.name}{template.hasDraft ? " (has a draft)" : ""}</option>

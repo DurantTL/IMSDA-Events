@@ -45,25 +45,48 @@ const sourceLockTimeout = "5s";
 async function loadTemplateSource(db: Db | ReturnType<typeof getPrisma>, eventId: string): Promise<TemplateSourceConfiguration | null> {
   const config = await loadSourceConfiguration(db as Db, eventId);
   if (!config) return null;
-  const flags = await db.event.findUnique({ where: { id: eventId }, select: { generalRegistrationLinkEnabled: true } });
-  return { config, generalRegistrationLink: flags?.generalRegistrationLinkEnabled ?? false };
+  const flags = await db.event.findUnique({ where: { id: eventId }, select: { generalRegistrationLinkEnabled: true, registrationClosesOn: true } });
+  // Which source forms were made from a seeded code template: ids and keys only.
+  const madeFromTemplates = config.registrationForms.length === 0 ? [] : await db.registrationForm.findMany({
+    where: { eventId, id: { in: config.registrationForms.map((form) => form.formId) }, sourceTemplateVersionId: { not: null } },
+    select: { id: true, sourceTemplateVersion: { select: { template: { select: { key: true } } } } },
+  });
+  const formTemplateKeys: Record<string, string> = {};
+  for (const form of madeFromTemplates) {
+    const key = form.sourceTemplateVersion?.template.key;
+    if (key) formTemplateKeys[form.id] = key;
+  }
+  return { config, generalRegistrationLink: flags?.generalRegistrationLinkEnabled ?? false, registrationClosesOn: flags?.registrationClosesOn ?? null, formTemplateKeys };
 }
 
 /** Hash of what a save would copy, so a save after the event changed is refused. */
 function templateFingerprintOf(source: TemplateSourceConfiguration) {
   // The event's dates are in it because the saved day offsets depend on the start date.
   const dates = `${source.config.event.startsOn}:${source.config.event.endsOn}`;
-  return createHash("sha256").update(`${fingerprintOf(source.config)}:${dates}:${source.generalRegistrationLink ? "link" : "nolink"}`).digest("hex");
+  // The deadline and the seeded-template keys can change what a new version keeps, so they are in it too.
+  const extra = canonicalJson({ closes: source.registrationClosesOn ?? null, keys: source.formTemplateKeys ?? {} });
+  return createHash("sha256").update(`${fingerprintOf(source.config)}:${dates}:${source.generalRegistrationLink ? "link" : "nolink"}:${extra}`).digest("hex");
 }
 
 export type TemplateFromEventPreviewResult = TemplateFromEventPreview & { fingerprint: string };
 
 /** The preview for saving `sourceEventId` as a template (#154): exactly what would be copied, and everything that would not. */
 export async function previewTemplateFromEvent(rawInput: unknown): Promise<TemplateFromEventPreviewResult> {
-  const { sourceEventId } = previewTemplateFromEventInputSchema.parse(rawInput);
-  const source = await loadTemplateSource(getPrisma(), sourceEventId);
+  const { sourceEventId, targetTemplateId } = previewTemplateFromEventInputSchema.parse(rawInput);
+  const prisma = getPrisma();
+  const source = await loadTemplateSource(prisma, sourceEventId);
   if (!source) throw new EventTemplateOperationError("SOURCE_NOT_FOUND", "That source event was not found.");
-  const { preview } = buildTemplateFromEvent(source, appOrigins());
+  // With a target template, the preview shows what a new version would keep from its current version.
+  let existing: ReturnType<typeof settingsToKeep> | null = null;
+  if (targetTemplateId) {
+    const template = await prisma.eventTemplate.findUnique({ where: { id: targetTemplateId }, select: { id: true } });
+    if (!template) throw new EventTemplateOperationError("TEMPLATE_NOT_FOUND", "That event template was not found.");
+    const versions = await prisma.eventTemplateVersion.findMany({ where: { templateId: targetTemplateId }, orderBy: { versionNumber: "desc" } });
+    const current = versions.find((version) => version.status === "PUBLISHED") ?? versions[0];
+    const parsed = current ? eventTemplatePayloadSchema.safeParse(current.payload) : null;
+    existing = parsed?.success ? settingsToKeep(parsed.data) : null;
+  }
+  const { preview } = buildTemplateFromEvent(source, appOrigins(), existing);
   return { ...preview, fingerprint: templateFingerprintOf(source) };
 }
 
@@ -81,12 +104,14 @@ async function resolveExistingSave(actorUserId: string, input: SaveTemplateFromE
   if (canonicalJson(existing.requestInput) !== canonicalJson(saveTemplateRequestInputOf(input))) {
     throw new EventTemplateOperationError("REQUEST_KEY_REUSED", "This request was already used to save a different template version. Reload the page and try again.");
   }
+  // The first save's kept list was stored with its provenance (keys, labels and counts only).
+  const storedKept = (existing.provenance as { kept?: unknown } | null)?.kept;
   return {
     template: await getEventTemplate(existing.templateVersion.templateId),
     versionId: existing.templateVersion.id,
     versionNumber: existing.templateVersion.versionNumber,
     alreadySaved: true,
-    kept: [] as Array<{ key: string; label: string; count: number }>,
+    kept: (Array.isArray(storedKept) ? storedKept : []) as Array<{ key: string; label: string; count: number }>,
   };
 }
 
@@ -181,7 +206,7 @@ export async function saveTemplateFromEvent(actorUserId: string, rawInput: unkno
           releaseNote: input.releaseNote,
           requestKey: input.requestKey,
           requestInput: saveTemplateRequestInputOf(input) as unknown as Prisma.InputJsonValue,
-          provenance: { ...build.provenance, fingerprint } as unknown as Prisma.InputJsonValue,
+          provenance: { ...build.provenance, fingerprint, kept: build.kept } as unknown as Prisma.InputJsonValue,
           // Keys, counts and reduced link origins only: never copied text.
           exclusions: build.storedExclusions as unknown as Prisma.InputJsonValue,
         },
