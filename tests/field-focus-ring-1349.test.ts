@@ -1,15 +1,32 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /** One focus ring for every field (#1349): purple border plus one 2px ring, no halo. */
 
 const css = readFileSync("app/globals.css", "utf8");
 
+function moduleCss(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    if (name === "node_modules" || name.startsWith(".")) return [];
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return moduleCss(path);
+    return name.endsWith(".module.css") ? [path] : [];
+  });
+}
+
 describe("field focus ring (#1349)", () => {
-  it("has no purple halo box-shadow on any focus rule", () => {
-    const rules = css.match(/[^{}]*:focus[^{}]*\{[^}]*\}/g) ?? [];
-    const halos = rules.filter((rule) => /box-shadow:\s*0 0 0 \d+px rgba\(88, 44, 131/.test(rule));
+  it("has no purple halo box-shadow on any focus rule, in globals or CSS modules", () => {
+    const sources = [css, ...[...moduleCss("app"), ...moduleCss("components")].map((f) => readFileSync(f, "utf8"))];
+    const halos = sources.flatMap((source) => (source.match(/[^{}]*:focus[^{}]*\{[^}]*\}/g) ?? []).filter((rule) => /box-shadow:\s*0 0 0 \d+px rgba\(88, 44, 131/.test(rule)));
     expect(halos).toEqual([]);
+  });
+
+  it("sets the field border colour on focus only in the shared rule, so a per-form rule cannot beat the red invalid border", () => {
+    const rules = css.match(/[^{}]*:focus(?:-within)?[^{}]*\{[^}]*\}/g) ?? [];
+    const offenders = rules.filter((rule) => /border-color:\s*var\(--(field-focus|imsda-purple)\)/.test(rule) && /\b(input|select|textarea)\b|-input|-field|searchable-select/.test(rule.split("{")[0]) && !rule.trimStart().startsWith(":root:root:root"));
+    // .field-select is a single attendee select with its own test (#1176).
+    expect(offenders.map((r) => r.split("{")[0].trim()).filter((sel) => sel !== ".field-select:focus-visible")).toEqual([]);
   });
 
   it("draws one 2px field-focus ring on bare fields and wrapper boxes", () => {
