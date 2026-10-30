@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => {
     reportCommunityPost: vi.fn(),
     markCommunityNotificationsRead: vi.fn(),
     searchAttendeeCommunityPosts: vi.fn(),
+    getAttendeeCommunityPostPage: vi.fn(),
     updateCommunitySettings: vi.fn(),
     moderateCommunityPost: vi.fn(),
     resolveCommunityReport: vi.fn(),
@@ -58,6 +59,7 @@ vi.mock("@/modules/community/repository", () => ({
   reportCommunityPost: mocks.reportCommunityPost,
   markCommunityNotificationsRead: mocks.markCommunityNotificationsRead,
   searchAttendeeCommunityPosts: mocks.searchAttendeeCommunityPosts,
+  getAttendeeCommunityPostPage: mocks.getAttendeeCommunityPostPage,
   updateCommunitySettings: mocks.updateCommunitySettings,
   moderateCommunityPost: mocks.moderateCommunityPost,
   resolveCommunityReport: mocks.resolveCommunityReport,
@@ -165,8 +167,26 @@ describe("attendee community route", () => {
     expect(mocks.searchAttendeeCommunityPosts).toHaveBeenCalledWith(account, "event-1", "ride");
   });
 
-  it("rejects a too-short community search without querying posts", async () => {
-    const response = await attendeeGet(new Request("https://events.imsda.test/api/community?q=x"), context);
+  it("treats an empty community search as the normal paged board list", async () => {
+    mocks.getAttendeeCommunityPostPage.mockResolvedValue({ posts: [{ id: "post-1" }], nextPostCursor: null });
+    const response = await attendeeGet(new Request("https://events.imsda.test/api/community?q="), context);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ posts: [{ id: "post-1" }], nextPostCursor: null });
+    expect(mocks.getAttendeeCommunityPostPage).toHaveBeenCalledWith(account, "event-1");
+    expect(mocks.searchAttendeeCommunityPosts).not.toHaveBeenCalled();
+  });
+
+  it("still requires an attendee sign-in for an empty community search", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account, via: "staff", sessionId: null });
+    const response = await attendeeGet(new Request("https://events.imsda.test/api/community?q="), context);
+
+    expect(response.status).toBe(401);
+    expect(mocks.getAttendeeCommunityPostPage).not.toHaveBeenCalled();
+  });
+
+  it("rejects an over-long community search without querying posts", async () => {
+    const response = await attendeeGet(new Request(`https://events.imsda.test/api/community?q=${"x".repeat(81)}`), context);
 
     expect(response.status).toBe(400);
     expect(mocks.searchAttendeeCommunityPosts).not.toHaveBeenCalled();

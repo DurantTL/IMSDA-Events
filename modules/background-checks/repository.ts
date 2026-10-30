@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage, paginate } from "@/lib/pagination";
 import { logError, logInfo } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
@@ -1582,8 +1583,28 @@ export async function matchRejectedBackgroundCheckPairing(entryId: string, perso
   });
 }
 
-const MAX_LOOKUP_ROWS = 25;
-const MAX_LOOKUP_PEOPLE = 25;
+/** The name lookup lists rows and people a page at a time: this many each, paged on the server. */
+export const LOOKUP_PAGE_SIZE = 25;
+
+const LOOKUP_ENTRY_SELECT = {
+  id: true, identityKey: true, firstName: true, lastName: true, normalizedName: true, email: true, sealedBirthDate: true, site: true,
+} satisfies Prisma.BackgroundCheckEntrySelect;
+type LookupEntry = Prisma.BackgroundCheckEntryGetPayload<{ select: typeof LOOKUP_ENTRY_SELECT }>;
+type LookupPerson = { id: string; firstName: string; lastName: string };
+
+/** Where one of the lookup's two lists stands: the same numbers `ListPager` reads. */
+export type BackgroundCheckLookupPage = { page: number; pageCount: number; total: number; from: number; to: number };
+
+function lookupPageInfo(shown: number, page: number, total: number): BackgroundCheckLookupPage {
+  const start = (page - 1) * LOOKUP_PAGE_SIZE;
+  return {
+    page,
+    pageCount: Math.max(1, Math.ceil(total / LOOKUP_PAGE_SIZE)),
+    total,
+    from: shown ? start + 1 : 0,
+    to: shown ? start + shown : 0,
+  };
+}
 
 export type BackgroundCheckLookupPair = {
   entryId: string;
@@ -1603,7 +1624,9 @@ export type BackgroundCheckLookup = {
   pairs: BackgroundCheckLookupPair[];
   /** Pairs staff said are not the same person, with the ids "Match them anyway" needs. */
   rejected: Array<{ entryId: string; personId: string; rowName: string; personName: string }>;
-  truncated: boolean;
+  /** Paging of `rows` and of `people`: each list is its own page of 25, with a total. */
+  rowsPage: BackgroundCheckLookupPage;
+  peoplePage: BackgroundCheckLookupPage;
 };
 
 const MATCH_SOURCE_LABEL: Record<string, string> = {
@@ -1643,35 +1666,86 @@ async function personsWithLastName(tx: PrismaLike, lastName: string) {
  * staff-only; it reads the same rules matching uses and never returns a
  * birth date (or an email).
  */
-export async function lookupBackgroundCheckName(rawQuery: string, now = new Date()): Promise<BackgroundCheckLookup> {
+export async function lookupBackgroundCheckName(
+  rawQuery: string,
+  now = new Date(),
+  paging: { rowPage?: number; peoplePage?: number } = {},
+): Promise<BackgroundCheckLookup> {
   const prisma = getPrisma();
   const query = rawQuery.replace(/\s+/g, " ").trim().slice(0, 100);
-  const empty: BackgroundCheckLookup = { query, hasList: false, rows: [], people: [], pairs: [], rejected: [], truncated: false };
-  // A multi-word last name ("Van Buren") can split several ways; search the union.
-  const splits = lookupNameSplits(query).filter((split) => matchableName(split.lastName));
-  if (splits.length === 0) return empty;
-  const lastKeys = new Set(splits.map((split) => matchableName(split.lastName)));
+  const noPage = lookupPageInfo(0, 1, 0);
+  const empty: BackgroundCheckLookup = { query, hasList: false, rows: [], people: [], pairs: [], rejected: [], rowsPage: noPage, peoplePage: noPage };
   const latest = await latestUpload(prisma);
-  const [rowLists, personLists] = await Promise.all([
-    Promise.all([...lastKeys].map((lastKey) => (latest
-      ? prisma.backgroundCheckEntry.findMany({
-        where: { uploadId: latest.id, normalizedName: { endsWith: lastKey } },
-        select: { id: true, identityKey: true, firstName: true, lastName: true, normalizedName: true, email: true, sealedBirthDate: true, site: true },
-      })
-      : Promise.resolve([])))),
-    Promise.all(splits.map((split) => personsWithLastName(prisma, split.lastName))),
-  ]);
-  const rowCandidates = [...new Map(rowLists.flat().map((row) => [row.id, row])).values()];
-  const personCandidates = [...new Map(personLists.flat().map((person) => [person.id, person])).values()];
-  const sameLast = rowCandidates.filter((row) => lastKeys.has(matchableName(row.lastName)));
-  const rowCounts = countRowsByName(sameLast);
-  const namesakes = namesakeCounts(personCandidates);
-  const allRows = sameLast.filter((row) => similarToAnySplit(splits, row)).sort((a, b) => a.firstName.localeCompare(b.firstName));
-  const allPeople = personCandidates.filter((person) => similarToAnySplit(splits, person)).sort((a, b) => a.firstName.localeCompare(b.firstName));
-  const rows = allRows.slice(0, MAX_LOOKUP_ROWS);
-  const people = allPeople.slice(0, MAX_LOOKUP_PEOPLE);
-  const truncated = allRows.length > rows.length || allPeople.length > people.length;
-  if (rows.length === 0 && people.length === 0) return { ...empty, hasList: Boolean(latest) };
+  let rows: LookupEntry[];
+  let people: LookupPerson[];
+  let rowCounts: Map<string, number>;
+  let namesakes: Map<string, number>;
+  let rowsPage: BackgroundCheckLookupPage;
+  let peoplePage: BackgroundCheckLookupPage;
+  if (query === "") {
+    // An empty lookup lists the latest upload's rows and the people on file, by last then first name. Each list is
+    // paged on the server (a count, then one page); only the items on those pages are looked into further.
+    const rowTotal = latest ? await prisma.backgroundCheckEntry.count({ where: { uploadId: latest.id } }) : 0;
+    const peopleTotal = await prisma.person.count();
+    const rowPageNumber = clampPage(paging.rowPage ?? 1, rowTotal, LOOKUP_PAGE_SIZE);
+    const peoplePageNumber = clampPage(paging.peoplePage ?? 1, peopleTotal, LOOKUP_PAGE_SIZE);
+    [rows, people] = await Promise.all([
+      latest
+        ? prisma.backgroundCheckEntry.findMany({
+          where: { uploadId: latest.id },
+          orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+          skip: (rowPageNumber - 1) * LOOKUP_PAGE_SIZE,
+          take: LOOKUP_PAGE_SIZE,
+          select: LOOKUP_ENTRY_SELECT,
+        })
+        : Promise.resolve([]),
+      prisma.person.findMany({
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+        skip: (peoplePageNumber - 1) * LOOKUP_PAGE_SIZE,
+        take: LOOKUP_PAGE_SIZE,
+        select: { id: true, firstName: true, lastName: true },
+      }),
+    ]);
+    rowsPage = lookupPageInfo(rows.length, rowPageNumber, rowTotal);
+    peoplePage = lookupPageInfo(people.length, peoplePageNumber, peopleTotal);
+    // The "more than one has this name" counts, for the names on these pages only.
+    const pageRowNames = [...new Set(rows.map((row) => row.normalizedName).filter((name): name is string => Boolean(name)))];
+    const sameNamedRows = latest && pageRowNames.length > 0
+      ? await prisma.backgroundCheckEntry.findMany({ where: { uploadId: latest.id, normalizedName: { in: pageRowNames } }, select: { normalizedName: true } })
+      : [];
+    rowCounts = countRowsByName(sameNamedRows);
+    const pageLastNames = [...new Set(people.map((person) => person.lastName))];
+    namesakes = namesakeCounts((await Promise.all(pageLastNames.map((lastName) => personsWithLastName(prisma, lastName)))).flat());
+  } else {
+    // A multi-word last name ("Van Buren") can split several ways; search the union.
+    const splits = lookupNameSplits(query).filter((split) => matchableName(split.lastName));
+    if (splits.length === 0) return empty;
+    const lastKeys = new Set(splits.map((split) => matchableName(split.lastName)));
+    const [rowLists, personLists] = await Promise.all([
+      Promise.all([...lastKeys].map((lastKey) => (latest
+        ? prisma.backgroundCheckEntry.findMany({
+          where: { uploadId: latest.id, normalizedName: { endsWith: lastKey } },
+          select: LOOKUP_ENTRY_SELECT,
+        })
+        : Promise.resolve([])))),
+      Promise.all(splits.map((split) => personsWithLastName(prisma, split.lastName))),
+    ]);
+    const rowCandidates = [...new Map(rowLists.flat().map((row) => [row.id, row])).values()];
+    const personCandidates = [...new Map(personLists.flat().map((person) => [person.id, person])).values()];
+    const sameLast = rowCandidates.filter((row) => lastKeys.has(matchableName(row.lastName)));
+    rowCounts = countRowsByName(sameLast);
+    namesakes = namesakeCounts(personCandidates);
+    const byFirstName = (a: { firstName: string; id: string }, b: { firstName: string; id: string }) => a.firstName.localeCompare(b.firstName) || a.id.localeCompare(b.id);
+    const allRows = sameLast.filter((row) => similarToAnySplit(splits, row)).sort(byFirstName);
+    const allPeople = personCandidates.filter((person) => similarToAnySplit(splits, person)).sort(byFirstName);
+    const rowSlice = paginate(allRows, paging.rowPage ?? 1, LOOKUP_PAGE_SIZE);
+    const peopleSlice = paginate(allPeople, paging.peoplePage ?? 1, LOOKUP_PAGE_SIZE);
+    rows = rowSlice.items;
+    people = peopleSlice.items;
+    rowsPage = lookupPageInfo(rows.length, rowSlice.page, rowSlice.total);
+    peoplePage = lookupPageInfo(people.length, peopleSlice.page, peopleSlice.total);
+  }
+  if (rows.length === 0 && people.length === 0) return { ...empty, hasList: Boolean(latest), rowsPage, peoplePage };
 
   const personIds = people.map((person) => person.id);
   const entryIds = rows.map((row) => row.id);
@@ -1798,7 +1872,7 @@ export async function lookupBackgroundCheckName(rawQuery: string, now = new Date
   const rejectedOut = rows.flatMap((row) => people
     .filter((person) => rejected.get(row.identityKey)?.has(person.id))
     .map((person) => ({ entryId: row.id, personId: person.id, rowName: fullName(row), personName: fullName(person) })));
-  return { query, hasList: true, rows: rowsOut, people: peopleOut, pairs, rejected: rejectedOut, truncated };
+  return { query, hasList: true, rows: rowsOut, people: peopleOut, pairs, rejected: rejectedOut, rowsPage, peoplePage };
 }
 
 /** No review waiting on staff: none at all, or one staff dismissed ("none of these"). */

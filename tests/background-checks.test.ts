@@ -156,22 +156,39 @@ function makeFakeDb() {
     return true;
   }
 
-  const entryFindMany = async ({ where }: { where?: Row } = {}) => {
+  /** orderBy + skip/take, the way Prisma applies them (the lookup pages on the server). */
+  function pageRows<T extends Row>(list: T[], args: { orderBy?: Array<Record<string, "asc" | "desc">>; skip?: number; take?: number }): T[] {
+    const sorted = args.orderBy
+      ? [...list].sort((a, b) => {
+        for (const order of args.orderBy!) {
+          const [field, direction] = Object.entries(order)[0]!;
+          const compared = String(a[field]).localeCompare(String(b[field]));
+          if (compared !== 0) return direction === "asc" ? compared : -compared;
+        }
+        return 0;
+      })
+      : list;
+    const start = args.skip ?? 0;
+    return args.take === undefined ? sorted.slice(start) : sorted.slice(start, start + args.take);
+  }
+
+  const entryFindMany = async ({ where, ...paging }: { where?: Row; orderBy?: Array<Record<string, "asc" | "desc">>; skip?: number; take?: number } = {}) => {
     if (lock.exclusive && lock.onEntryRead) {
       const hook = lock.onEntryRead;
       lock.onEntryRead = null;
       await hook();
     }
-    return [...entries.values()].filter((entry) => entryWhere(entry, where)).map(withEntryRelations);
+    return pageRows([...entries.values()].filter((entry) => entryWhere(entry, where)), paging).map(withEntryRelations);
   };
 
   const client = {
     person: {
       findUnique: async ({ where }: { where: { id: string } }) => (persons.get(where.id) ? { ...persons.get(where.id) } : null),
-      findMany: async ({ where }: { where?: { id?: { in: string[] } } } = {}) => {
+      count: async () => persons.size,
+      findMany: async ({ where, ...paging }: { where?: { id?: { in: string[] } }; orderBy?: Array<Record<string, "asc" | "desc">>; skip?: number; take?: number } = {}) => {
         let list = [...persons.values()];
         if (where?.id?.in) list = list.filter((person) => where.id!.in.includes(person.id as string));
-        return list.map((person) => {
+        return pageRows(list, paging).map((person) => {
           const match = matchForPerson(person.id);
           return {
             ...person,
@@ -2604,7 +2621,66 @@ describe("name-only matches, variants, adults by age, and the lookup (#598)", ()
       expect(lastOnly.people).toHaveLength(2);
       const none = await lookupBackgroundCheckName("Nobodyfound", now);
       expect(none).toMatchObject({ hasList: true, rows: [], people: [], pairs: [] });
-      expect(await lookupBackgroundCheckName("   ", now)).toMatchObject({ rows: [], people: [], pairs: [] });
+    });
+
+    it("an empty lookup lists the latest upload's rows and the people on file, a page of 25 each", async () => {
+      const seed = await seededLookup();
+      // An older upload's row is not "the list".
+      seed.uploads.set("u-0", { id: "u-0", createdAt: new Date("2026-08-01") });
+      seedEntry(seed, "e-old", { uploadId: "u-0", identityKey: "userId:99", firstName: "Zed", lastName: "Old", normalizedName: "zed old" });
+      const all = await lookupBackgroundCheckName("   ", now);
+      expect(all.hasList).toBe(true);
+      expect(all.rows.map((row) => row.name)).toEqual(["Rex Dunn", "Yara Grant", "Mina Osei", "Lee Park", "Jon Reyes", "Ana Wolf", "Ana Wolf", "Sam Yoon"]);
+      expect(all.rows.map((row) => row.name)).not.toContain("Zed Old");
+      expect(all.rowsPage).toEqual({ page: 1, pageCount: 1, total: 8, from: 1, to: 8 });
+      expect(all.peoplePage.total).toBe(seed.persons.size);
+      expect(all.people.map((person) => person.name.split(" ")[1])).toEqual([...all.people.map((person) => person.name.split(" ")[1]!)].sort((a, b) => a.localeCompare(b)));
+      // Reasons are worked out for the listed rows and people, with the existing rules.
+      expect(all.pairs.find((pair) => pair.rowName === "Jon Reyes" && pair.personName === "Jonathan Reyes")?.reason).toMatch(/first name differs/i);
+    });
+
+    it("pages the empty lookup on the server, 25 at a time, and clamps a bad page", async () => {
+      const { client, seed } = makeFakeDb();
+      currentClient = client;
+      seed.uploads.set("u-1", { id: "u-1", createdAt: new Date("2026-09-01") });
+      for (let index = 1; index <= 60; index += 1) {
+        const last = `Row${String(index).padStart(3, "0")}`;
+        seedEntry(seed, `e-${index}`, { identityKey: `userId:${index}`, firstName: "Pat", lastName: last, normalizedName: `pat ${last.toLowerCase()}` });
+        seed.persons.set(`p-${index}`, { id: `p-${index}`, firstName: "Pat", lastName: last, normalizedEmail: null });
+      }
+      const second = await lookupBackgroundCheckName("", now, { rowPage: 2, peoplePage: 3 });
+      expect(second.rows).toHaveLength(25);
+      expect(second.rows[0]!.name).toBe("Pat Row026");
+      expect(second.rowsPage).toEqual({ page: 2, pageCount: 3, total: 60, from: 26, to: 50 });
+      expect(second.people).toHaveLength(10);
+      expect(second.people[0]!.name).toBe("Pat Row051");
+      expect(second.peoplePage).toEqual({ page: 3, pageCount: 3, total: 60, from: 51, to: 60 });
+      // Pairs and reasons only cover the people and rows on the returned pages.
+      expect(second.pairs.every((pair) => Number(pair.rowName.slice(-3)) > 25 && Number(pair.rowName.slice(-3)) <= 50)).toBe(true);
+      const huge = await lookupBackgroundCheckName("", now, { rowPage: 9999, peoplePage: -4 });
+      expect(huge.rowsPage.page).toBe(3);
+      expect(huge.rows).toHaveLength(10);
+      expect(huge.peoplePage.page).toBe(1);
+      expect(huge.people).toHaveLength(25);
+    });
+
+    it("pages a named lookup with the same totals instead of cutting it off", async () => {
+      const { client, seed } = makeFakeDb();
+      currentClient = client;
+      seed.uploads.set("u-1", { id: "u-1", createdAt: new Date("2026-09-01") });
+      for (let index = 1; index <= 30; index += 1) {
+        seedEntry(seed, `e-${index}`, { identityKey: `userId:${index}`, firstName: "Sam", lastName: "Kim", normalizedName: "sam kim" });
+      }
+      const named = await lookupBackgroundCheckName("Sam Kim", now, { rowPage: 2 });
+      expect(named.rows).toHaveLength(5);
+      expect(named.rowsPage).toEqual({ page: 2, pageCount: 2, total: 30, from: 26, to: 30 });
+      expect("truncated" in named).toBe(false);
+    });
+
+    it("an empty lookup says no list has been uploaded when there is none", async () => {
+      const { client } = makeFakeDb();
+      currentClient = client;
+      expect(await lookupBackgroundCheckName("", now)).toMatchObject({ hasList: false, rows: [], people: [], rowsPage: { total: 0 } });
     });
 
     it("never shows a birth date or an email", async () => {
@@ -2613,6 +2689,7 @@ describe("name-only matches, variants, adults by age, and the lookup (#598)", ()
         await lookupBackgroundCheckName("Osei", now),
         await lookupBackgroundCheckName("Grant", now),
         await lookupBackgroundCheckName("Park", now),
+        await lookupBackgroundCheckName("", now),
       ]);
       expect(everything).not.toMatch(/1985|2012|sealed|birth date":|@/);
     });

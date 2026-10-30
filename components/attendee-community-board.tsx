@@ -243,8 +243,10 @@ export function AttendeeCommunityBoard({
   async function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const query = searchQuery.trim();
-    if (query.length < 2) {
-      setError("Enter at least two characters to search posts.");
+    if (query === "") {
+      // An empty search shows the board as usual.
+      setError("");
+      setSearchResults(null);
       return;
     }
     setSearching(true);
@@ -363,7 +365,6 @@ export function AttendeeCommunityBoard({
               <input
                 id="community-search"
                 maxLength={80}
-                minLength={2}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search questions, rides, or updates"
                 type="search"

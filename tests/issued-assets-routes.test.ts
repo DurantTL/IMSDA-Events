@@ -66,7 +66,7 @@ beforeEach(() => {
   mocks.issueAssets.mockResolvedValue({ issued: 1, items: [] });
   mocks.applyIssuanceAction.mockResolvedValue({ issuanceId: "i2" });
   mocks.lookupAsset.mockResolvedValue(null);
-  mocks.searchDeskPeople.mockResolvedValue([]);
+  mocks.searchDeskPeople.mockResolvedValue({ items: [], page: 1, pageCount: 1, total: 0, from: 0, to: 0 });
 });
 
 describe("issued-asset route authorization", () => {
@@ -185,8 +185,18 @@ describe("issued-asset route behaviour", () => {
     await lookupRoute(new Request(`${origin}/api/x?code=k-214`), { params: Promise.resolve(params) });
     expect(mocks.lookupAsset).toHaveBeenCalledWith("ev1", "k-214");
     await lookupRoute(new Request(`${origin}/api/x?person=smith`), { params: Promise.resolve(params) });
-    expect(mocks.searchDeskPeople).toHaveBeenCalledWith("ev1", "smith");
+    expect(mocks.searchDeskPeople).toHaveBeenCalledWith("ev1", "smith", undefined, 1);
     expect((await lookupRoute(new Request(`${origin}/api/x`), { params: Promise.resolve(params) })).status).toBe(400);
+  });
+
+  it("lists people for an empty person lookup, paged and with a clamped page", async () => {
+    mocks.searchDeskPeople.mockResolvedValueOnce({ items: [{ attendeeId: "a1", name: "Ann Lee", confirmationCode: "ABC123" }], page: 2, pageCount: 3, total: 31, from: 16, to: 16 });
+    const response = await lookupRoute(new Request(`${origin}/api/x?person=&page=2`), { params: Promise.resolve(params) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ people: [{ attendeeId: "a1", name: "Ann Lee", confirmationCode: "ABC123" }], page: 2, pageCount: 3, total: 31, from: 16, to: 16 });
+    expect(mocks.searchDeskPeople).toHaveBeenLastCalledWith("ev1", "", undefined, 2);
+    await lookupRoute(new Request(`${origin}/api/x?person=&page=-3`), { params: Promise.resolve(params) });
+    expect(mocks.searchDeskPeople).toHaveBeenLastCalledWith("ev1", "", undefined, 1);
   });
 
   it("never caches an answer", async () => {

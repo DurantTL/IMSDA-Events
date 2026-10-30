@@ -74,7 +74,7 @@ beforeEach(() => {
   mocks.findActiveMembership.mockImplementation(async (userId: string, eventId: string) => memberships(userId, eventId));
   mocks.service.setInvoiceGrouping.mockResolvedValue({ changed: true });
   mocks.service.setOrganizationBillingContact.mockResolvedValue({ id: "contact-1", replaced: false });
-  mocks.service.searchResponsibleOrganizations.mockResolvedValue([]);
+  mocks.service.searchResponsibleOrganizations.mockResolvedValue({ items: [], page: 1, pageCount: 1, total: 0, from: 0, to: 0 });
   mocks.service.getBillingResponsibilityExport.mockResolvedValue({ groups: [], invoiceGrouping: "PER_CHURCH" });
 });
 
@@ -127,6 +127,7 @@ describe("billing responsibility reads", () => {
     expect((await searchGet(searchRequest, context("event-c"))).status).toBe(403);
     expect((await searchGet(searchRequest, context("event-b"))).status).toBe(403);
     expect(mocks.service.searchResponsibleOrganizations).toHaveBeenCalledTimes(1);
+    expect(mocks.service.searchResponsibleOrganizations).toHaveBeenCalledWith("alpha", 1);
 
     const exported = await exportGet(new Request("https://events.imsda.test/api/x"), context());
     expect(exported.status).toBe(200);
@@ -134,6 +135,19 @@ describe("billing responsibility reads", () => {
     expect((await exportGet(new Request("https://events.imsda.test/api/x"), context("event-c"))).status).toBe(403);
     expect((await exportGet(new Request("https://events.imsda.test/api/x"), context("event-b"))).status).toBe(403);
     expect(mocks.service.getBillingResponsibilityExport).toHaveBeenCalledTimes(1);
+  });
+
+  it("an empty search lists organizations a page at a time, with the page clamped, and is still MANAGE_FINANCE only", async () => {
+    mocks.service.searchResponsibleOrganizations.mockClear();
+    mocks.service.searchResponsibleOrganizations.mockResolvedValueOnce({ items: [{ id: "org-1", name: "Alpha Church", type: "CHURCH", city: "Ames" }], page: 2, pageCount: 2, total: 11, from: 11, to: 11 });
+    const response = await searchGet(new Request("https://events.imsda.test/api/x?q=&page=2"), context());
+    expect(await response.json()).toEqual({ organizations: [{ id: "org-1", name: "Alpha Church", type: "CHURCH", city: "Ames" }], page: 2, pageCount: 2, total: 11, from: 11, to: 11 });
+    expect(mocks.service.searchResponsibleOrganizations).toHaveBeenLastCalledWith("", 2);
+    await searchGet(new Request("https://events.imsda.test/api/x?page=-1"), context());
+    expect(mocks.service.searchResponsibleOrganizations).toHaveBeenLastCalledWith("", 1);
+    mocks.service.searchResponsibleOrganizations.mockClear();
+    expect((await searchGet(new Request("https://events.imsda.test/api/x?q="), context("event-c"))).status).toBe(403);
+    expect(mocks.service.searchResponsibleOrganizations).not.toHaveBeenCalled();
   });
 
   it("the page shows the restricted notice and loads nothing without MANAGE_FINANCE", async () => {

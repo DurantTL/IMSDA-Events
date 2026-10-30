@@ -40,7 +40,8 @@ describe("community action validation", () => {
 
   it("bounds attendee community search text", () => {
     expect(attendeeCommunitySearchSchema.parse(" airport ride ")).toBe("airport ride");
-    expect(() => attendeeCommunitySearchSchema.parse("x")).toThrow();
+    expect(attendeeCommunitySearchSchema.parse("x")).toBe("x");
+    expect(attendeeCommunitySearchSchema.parse("   ")).toBe("");
     expect(() => attendeeCommunitySearchSchema.parse("x".repeat(81))).toThrow();
   });
 

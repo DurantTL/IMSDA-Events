@@ -126,6 +126,8 @@ async function getHandler(
       return json(await getAttendeeCommunityPostPage(current.account, eventId, validCursor));
     }
     const query = attendeeCommunitySearchSchema.parse(params.get("q") ?? "");
+    // An empty search is the board's normal list, paged by cursor like any other load.
+    if (query === "") return json(await getAttendeeCommunityPostPage(current.account, eventId));
     return json({ results: await searchAttendeeCommunityPosts(current.account, eventId, query) });
   } catch (error) {
     return apiError(error);

@@ -13,6 +13,7 @@ import {
   type LodgingReferenceStatus,
 } from "@/modules/issued-assets/domain";
 import { resolveAssetByCode } from "@/modules/issued-assets/service";
+import { clampPage, sliceFromCount } from "@/lib/pagination";
 
 /**
  * What the issued-asset screens read (#213). Everything is a plain, serializable shape. Names are read for display
@@ -284,25 +285,42 @@ export async function getDeskPerson(eventId: string, attendeeId: string, client:
   };
 }
 
-/** Attendees by name or confirmation code, for the desk's lookup. Active registrations only; a short list. */
-export async function searchDeskPeople(eventId: string, query: string, client: Client = getPrisma()) {
+export const DESK_PEOPLE_PAGE_SIZE = 15;
+
+/**
+ * Attendees by name or confirmation code, for the desk's lookup. Active registrations of this event only. An empty
+ * query lists every such attendee by last then first name; the list is always paged on the server with a total.
+ */
+export async function searchDeskPeople(eventId: string, query: string, client: Client = getPrisma(), requestedPage = 1) {
   const q = query.trim();
-  if (q.length < 2) return [];
+  const where = {
+    eventId,
+    registration: { status: { in: [...activeRegistrationStatuses] } },
+    ...(q
+      ? {
+          OR: [
+            { person: { firstName: { contains: q, mode: "insensitive" as const } } },
+            { person: { lastName: { contains: q, mode: "insensitive" as const } } },
+            { registration: { confirmationCode: { startsWith: q.toUpperCase() } } },
+          ],
+        }
+      : {}),
+  };
+  const total = await client.registrationAttendee.count({ where });
+  const page = clampPage(requestedPage, total, DESK_PEOPLE_PAGE_SIZE);
   const rows = await client.registrationAttendee.findMany({
-    where: {
-      eventId,
-      registration: { status: { in: [...activeRegistrationStatuses] } },
-      OR: [
-        { person: { firstName: { contains: q, mode: "insensitive" } } },
-        { person: { lastName: { contains: q, mode: "insensitive" } } },
-        { registration: { confirmationCode: { startsWith: q.toUpperCase() } } },
-      ],
-    },
-    take: 15,
-    orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }],
+    where,
+    skip: (page - 1) * DESK_PEOPLE_PAGE_SIZE,
+    take: DESK_PEOPLE_PAGE_SIZE,
+    orderBy: [{ person: { lastName: "asc" } }, { person: { firstName: "asc" } }, { id: "asc" }],
     select: { id: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } }, registration: { select: { confirmationCode: true } } },
   });
-  return rows.map((row) => ({ attendeeId: row.id, name: attendeeName(row), confirmationCode: row.registration.confirmationCode }));
+  return sliceFromCount(
+    rows.map((row) => ({ attendeeId: row.id, name: attendeeName(row), confirmationCode: row.registration.confirmationCode })),
+    page,
+    total,
+    DESK_PEOPLE_PAGE_SIZE,
+  );
 }
 
 // ---------------------------------------------------------------------------

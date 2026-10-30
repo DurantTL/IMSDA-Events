@@ -3,6 +3,7 @@ import "server-only";
 import { teamLabel } from "@/modules/club-teams/domain";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage, sliceFromCount, type PageSlice } from "@/lib/pagination";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
@@ -766,22 +767,30 @@ export async function getOrganizationBillingContactAdminView(organizationId: str
 
 export type OrganizationOption = { id: string; name: string; type: string; city: string | null };
 
+export const ORGANIZATION_PICKER_PAGE_SIZE = 10;
+
 /**
  * Staff search for an organization to link: active churches, companies, schools, clubs and ministries,
  * matched on the name only, and returning only the name, type and city (to tell two
- * same-named churches apart). Never an address, code, contact or roster.
+ * same-named churches apart). Never an address, code, contact or roster. An empty query lists every
+ * matching organization by name; the list is always paged on the server with a total.
  */
-export async function searchResponsibleOrganizations(query: string): Promise<OrganizationOption[]> {
+export async function searchResponsibleOrganizations(query: string, requestedPage = 1): Promise<PageSlice<OrganizationOption>> {
   const terms = query.normalize("NFKC").trim().split(/\s+/).filter(Boolean).slice(0, 5);
-  if (terms.join(" ").length < 2) return [];
-  return getPrisma().organization.findMany({
-    where: {
-      isActive: true,
-      type: { in: [...RESPONSIBLE_ORGANIZATION_TYPES] },
-      AND: terms.map((term) => ({ name: { contains: term.slice(0, 80), mode: "insensitive" as const } })),
-    },
-    orderBy: [{ name: "asc" }],
-    take: 10,
+  const where = {
+    isActive: true,
+    type: { in: [...RESPONSIBLE_ORGANIZATION_TYPES] },
+    AND: terms.map((term) => ({ name: { contains: term.slice(0, 80), mode: "insensitive" as const } })),
+  };
+  const prisma = getPrisma();
+  const total = await prisma.organization.count({ where });
+  const page = clampPage(requestedPage, total, ORGANIZATION_PICKER_PAGE_SIZE);
+  const items = await prisma.organization.findMany({
+    where,
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    skip: (page - 1) * ORGANIZATION_PICKER_PAGE_SIZE,
+    take: ORGANIZATION_PICKER_PAGE_SIZE,
     select: { id: true, name: true, type: true, city: true },
   });
+  return sliceFromCount(items, page, total, ORGANIZATION_PICKER_PAGE_SIZE);
 }
