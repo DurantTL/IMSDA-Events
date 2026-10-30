@@ -78,7 +78,7 @@ export function BackgroundCheckReviewPanel() {
   const [dismissals, setDismissals] = useState<Array<{ reviewId: string; name: string }>>([]);
   const [unmatchedPage, setUnmatchedPage] = useState(1);
   const lookupTicket = useRef(0);
-  const lookupPages = useRef({ row: 1, people: 1 });
+  const lookupOpen = useRef<{ query: string; row: number; people: number } | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -219,12 +219,16 @@ export function BackgroundCheckReviewPanel() {
     return (result.lookup ?? null) as LookupResult | null;
   }
 
-  /** Re-run the lookup on show, at the pages already open, after a match changes. */
+  /**
+   * Re-run the lookup on show, at the pages and name now open, after a match changes. It never takes a new ticket:
+   * a lookup staff start themselves always wins, and this answer is dropped if one began meanwhile.
+   */
   async function reloadLookup() {
-    if (!lookup) return;
-    const ticket = (lookupTicket.current += 1);
+    const open = lookupOpen.current;
+    if (!open) return;
+    const ticket = lookupTicket.current;
     try {
-      const next = await fetchLookup(lookup.query, lookupPages.current.row, lookupPages.current.people);
+      const next = await fetchLookup(open.query, open.row, open.people);
       if (ticket === lookupTicket.current) setLookup(next);
     } catch {
       // The change itself is saved; the list simply stays as it was.
@@ -232,15 +236,17 @@ export function BackgroundCheckReviewPanel() {
   }
 
   async function showLookup(name: string, rowPage: number, peoplePage: number) {
-    // Both pages are kept here, so a click on one pager never loses the other list's page, and an older answer
-    // can never replace a newer one.
-    lookupPages.current = { row: rowPage, people: peoplePage };
+    // The open name and both pages are kept in a ref, set only when an answer is applied, so a click on one pager
+    // never loses the other list's page, a failed fetch changes nothing, and an older answer never replaces a newer one.
     const ticket = (lookupTicket.current += 1);
     setLookingUp(true);
     setError("");
     try {
       const next = await fetchLookup(name.trim(), rowPage, peoplePage);
-      if (ticket === lookupTicket.current) setLookup(next);
+      if (ticket === lookupTicket.current) {
+        lookupOpen.current = { query: name.trim(), row: rowPage, people: peoplePage };
+        setLookup(next);
+      }
     } catch (caught) {
       if (ticket === lookupTicket.current) setError(caught instanceof Error ? caught.message : "That name couldn't be looked up.");
     } finally {
@@ -437,7 +443,7 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
-          <ListPager label="List rows pages" onPage={(page) => void showLookup(lookup.query, page, lookupPages.current.people)} slice={lookup.rowsPage} />
+          <ListPager label="List rows pages" onPage={(page) => void showLookup(lookup.query, page, lookupOpen.current?.people ?? 1)} slice={lookup.rowsPage} />
           <h4>Roster and registration people ({lookup.peoplePage.total})</h4>
           {lookup.people.length === 0 ? <p className="report-empty">No one on file has that name or a similar one.</p> : (
             <div className="report-table-wrap">
@@ -456,7 +462,7 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
-          <ListPager label="People pages" onPage={(page) => void showLookup(lookup.query, lookupPages.current.row, page)} slice={lookup.peoplePage} />
+          <ListPager label="People pages" onPage={(page) => void showLookup(lookup.query, lookupOpen.current?.row ?? 1, page)} slice={lookup.peoplePage} />
           <h4>Row and person pairs ({lookup.pairs.length})</h4>
           {lookup.pairs.length === 0 ? <p className="report-empty">No row and person share a last name and a similar first name.</p> : (
             <div className="report-table-wrap">

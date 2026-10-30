@@ -436,9 +436,9 @@ function makeFakeDb() {
       if (strings.join("?").includes("FOR NO KEY UPDATE")) return [];
       // The lookup's coarse last-name filter.
       if (strings.join("?").includes('normalize("lastName"')) {
-        const wanted = values[0] as string;
+        const wanted = ([] as string[]).concat(values[0] as string | string[]);
         return [...persons.values()]
-          .filter((person) => compactName("", person.lastName as string) === wanted)
+          .filter((person) => wanted.includes(compactName("", person.lastName as string)))
           .map((person) => ({ id: person.id, firstName: person.firstName, lastName: person.lastName }));
       }
       const compacts = values.find((value): value is string[] => Array.isArray(value)) ?? [];
@@ -2680,7 +2680,12 @@ describe("name-only matches, variants, adults by age, and the lookup (#598)", ()
       expect(lookup.people.map((person) => person.name)).not.toContain("Ann Adams");
       expect(lookup.pairs.filter((pair) => pair.rowName === "Ann Adams").map((pair) => pair.personName)).toEqual(["Ann Adams"]);
       // The other way round: a listed person pairs with a list row that is on another rows page.
+      for (let index = 1; index <= 30; index += 1) {
+        seedEntry(seed, `e-aa-${index}`, { identityKey: `userId:${100 + index}`, firstName: "Al", lastName: `Aaron${String(index).padStart(3, "0")}`, normalizedName: `al aaron${String(index).padStart(3, "0")}` });
+      }
       const back = await lookupBackgroundCheckName("", now, { rowPage: 1, peoplePage: 1 });
+      expect(back.rows.map((row) => row.name)).not.toContain("Ann Adams");
+      expect(back.rowsPage.pageCount).toBe(2);
       expect(back.people.map((person) => person.name)).toContain("Ann Adams");
       expect(back.pairs.some((pair) => pair.rowName === "Ann Adams" && pair.personName === "Ann Adams")).toBe(true);
     });
