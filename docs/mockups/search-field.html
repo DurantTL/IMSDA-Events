@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Search Field Mockup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700;800&display=swap">
+<style>
+/* Mockup for the first follow-up of #1342 (consistency audit).
+   Light only on purpose: the app's core palette has no dark values (docs/design-system/README.md).
+   Layout: one column of labelled specimen boards, each a row of states that wraps to one column on phones.
+   Field tokens (--field-*, --imsda-*, --ink, --muted, --line, --paper, --danger, --danger-soft) are copied from app/globals.css :root.
+   Page-chrome tokens --radius-card, --radius-pill and --coral-soft come from docs/design-system/tokens.css;
+   --touch-target is defined in the app only inside a media block (app/globals.css:9489). */
+:root {
+  color-scheme: light;
+  --imsda-navy: #003b5c;
+  --imsda-navy-deep: #002c45;
+  --imsda-navy-soft: #e6f0f4;
+  --imsda-purple: #582c83;
+  --imsda-purple-soft: #f1eaf7;
+  --imsda-gold: #f0b323;
+  --focus-ring-on-dark: var(--imsda-gold);
+  --ink: #243640;
+  --muted: #536872;
+  --line: #dce6ea;
+  --paper: #f4f7f8;
+  --card: #ffffff;
+  --field-border: #6f8591;
+  --field-border-hover: #4a6270;
+  --field-bg: #ffffff;
+  --field-focus: var(--imsda-purple);
+  --field-radius: 10px;
+  --danger: #8f3a30;
+  --danger-soft: #fdf4f2;
+  --coral-soft: #fff1ef;
+  --green: #267357;
+  --green-soft: #e5f3ed;
+  --radius-card: 12px;
+  --radius-pill: 999px;
+  --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
+  --shadow-metric: 0 8px 28px rgba(0, 59, 92, 0.045);
+  --touch-target: 44px;
+  --font-sans: "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px/1.5 var(--font-sans);
+}
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 22px;
+}
+.eyebrow { margin: 0; color: var(--imsda-purple); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+h1 { margin: 4px 0 6px; color: var(--imsda-navy); font-size: 1.7rem; line-height: 1.2; font-weight: 800; text-wrap: balance; }
+h2 { margin: 0; color: var(--imsda-navy); font-size: 1.3rem; line-height: 1.3; font-weight: 800; text-wrap: balance; }
+h3 { margin: 0; font-size: 0.875rem; font-weight: 700; }
+p { margin: 0; }
+.lede { max-width: 68ch; color: var(--muted); }
+.board {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-metric);
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.board > header { display: grid; gap: 4px; }
+.board > header p { color: var(--muted); font-size: 0.875rem; max-width: 72ch; }
+.states { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 22px 28px; }
+.state { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.state-tag { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.note { font-size: 0.8125rem; color: var(--muted); }
+.note code, .spec code { font-family: var(--font-mono); font-size: 0.8em; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700; }
+.pill-before { background: var(--coral-soft); color: var(--danger); }
+.pill-after { background: var(--green-soft); color: var(--green); }
+.label { font-size: 0.875rem; font-weight: 700; }
+
+/* ---------- AFTER: the one shared search field ---------- */
+.sf {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
+  color: var(--muted);
+}
+.sf:hover, .sf.is-hover { border-color: var(--field-border-hover); }
+.sf:focus-within, .sf.is-focus { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
+.sf input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  padding: 0;
+}
+.sf input::placeholder { color: var(--muted); }
+.sf input::-webkit-search-cancel-button { display: none; }
+.sf svg { flex: none; }
+.sf-clear {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-target);
+  height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sf-clear:hover { color: var(--ink); background: var(--paper); }
+.sf-clear:focus-visible { outline: 2px solid var(--field-focus); outline-offset: -4px; }
+.sf.is-error, .sf[data-invalid] { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+.sf.is-error:hover { border-color: var(--danger); }
+.sf.is-disabled { background: var(--paper); border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+.sf.is-disabled input { color: var(--muted); cursor: not-allowed; }
+.field-error { margin: 4px 0 0; color: var(--danger); font-size: 0.8125rem; font-weight: 700; }
+.field-hint { margin: 4px 0 0; color: var(--muted); font-size: 0.8125rem; }
+.dark-surface { background: var(--imsda-navy); border-radius: var(--radius-card); padding: 18px; display: grid; gap: 8px; }
+.dark-surface .state-tag { color: #d5e5ed; }
+.dark-surface .sf { border-color: var(--imsda-navy-deep); }
+.dark-surface .sf:focus-within, .dark-surface .sf.is-focus { border-color: var(--field-focus); outline-color: var(--focus-ring-on-dark); }
+
+/* ---------- BEFORE: recreations of what ships today ---------- */
+.b-dest { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--field-focus); border-radius: 10px; background: #fff; color: var(--muted); outline: 2px solid var(--field-focus); outline-offset: 2px; }
+.b-dest span { flex: 1; padding: 9px 8px; border-radius: 10px; outline: 2px solid var(--focus-ring-on-dark); color: var(--muted); }
+.b-club { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 12px; background: #fff; color: var(--muted); }
+.b-club span { flex: 1; padding: 9px 8px; outline: 2px solid var(--field-focus); color: var(--muted); }
+.b-triple { display: block; min-height: 44px; padding: 10px 12px; border: 1px solid var(--field-focus); border-radius: 11px; background: #fff; color: var(--ink); box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1); outline: 2px solid var(--field-focus); outline-offset: 2px; }
+.b-roster { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 10px; background: #fff; color: var(--muted); outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
+.b-roster span { flex: 1; padding: 9px 8px; outline: 2px solid var(--field-focus); }
+.b-type { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
+
+/* ---------- Empty-search list ---------- */
+.picker { position: relative; max-width: 460px; }
+.list {
+  margin: 6px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  max-height: 264px;
+  overflow-y: auto;
+}
+.list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 10px; min-height: var(--touch-target); border-radius: 8px; align-items: center; cursor: pointer; }
+.list li small { color: var(--muted); font-size: 0.8125rem; white-space: nowrap; }
+.list li[aria-selected="true"], .list li:hover { background: var(--imsda-purple-soft); }
+.list mark { background: transparent; color: var(--imsda-purple); font-weight: 700; }
+.list-status { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px 8px; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.list-empty { padding: 14px 10px; color: var(--ink); font-size: 0.875rem; }
+.list-empty button { margin-left: 4px; border: 0; background: none; color: var(--imsda-purple); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; min-height: 0; }
+.static-list { position: static; }
+
+.spec { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.spec th, .spec td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.spec th { background: #f6f9fa; font-weight: 700; white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+.rules { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <p class="eyebrow">Issue #1342 · follow-up 1 (#1347) · approved October 30</p>
+    <h1>One search field, one focus ring, full list when empty</h1>
+    <p class="lede">Every search box and picker would use this one field. The box itself draws the border; the text inside never draws its own. Focus shows one purple ring around the box. Clicking into an empty box shows the whole list, and typing only narrows it. Club names below are fictional.</p>
+  </header>
+
+  <section class="board" aria-labelledby="before-h">
+    <header>
+      <h2 id="before-h">Today <span class="pill pill-before">Before</span></h2>
+      <p>Recreations of focused fields from the seeded app (screenshots are in <code>docs/consistency-audit-2026-10/</code>).</p>
+    </header>
+    <div class="states">
+      <div class="state">
+        <span class="state-tag">Sidebar page search</span>
+        <div class="b-dest" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Find a page or task</span></div>
+        <p class="note">Gold ring on the text inside a purple ring on the box. Empty box shows no list.</p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Public club finder</span>
+        <div class="b-club" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Town, ZIP, club or church</span></div>
+        <p class="note">Square ring inside a 12px rounded box; the box never changes on focus.</p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Club roster search</span>
+        <div class="b-roster" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Find a person by name</span></div>
+        <p class="note">Navy ring on the box plus a purple ring on the text.</p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Sign-in and registration fields</span>
+        <div class="b-triple" aria-hidden="true">morgan.reed@example.org</div>
+        <p class="note">Purple border, soft halo and a second outline: three rings, 11px corners.</p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Honor picker</span>
+        <div class="b-type" aria-hidden="true">Type to search honors</div>
+        <p class="note">"Type to search" placeholder; Tab into it does not open the list.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="board" aria-labelledby="after-h">
+    <header>
+      <h2 id="after-h">Proposed <span class="pill pill-after">After</span></h2>
+      <p>The fixed states are drawn with classes so you can compare them side by side. The last field is live: hover it, Tab into it, type, and clear.</p>
+    </header>
+    <div class="states">
+      <div class="state">
+        <span class="state-tag">Default</span>
+        <div class="sf"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-default" type="search" placeholder="Club, church or town" aria-label="Search clubs (default example)"></div>
+      </div>
+      <div class="state">
+        <span class="state-tag">Hover</span>
+        <div class="sf is-hover"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-hover" type="search" placeholder="Club, church or town" aria-label="Search clubs (hover example)" tabindex="-1"></div>
+      </div>
+      <div class="state">
+        <span class="state-tag">Focus</span>
+        <div class="sf is-focus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-focus" type="search" value="River" aria-label="Search clubs (focus example)" tabindex="-1"><button class="sf-clear" type="button" aria-label="Clear search" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+      </div>
+      <div class="state">
+        <span class="state-tag">Error</span>
+        <div class="sf is-error"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-error" type="search" placeholder="Choose a club" aria-label="Club (error example)" aria-invalid="true" aria-describedby="s-error-msg" tabindex="-1"></div>
+        <p class="field-error" id="s-error-msg">Choose the club this person belongs to.</p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Disabled</span>
+        <div class="sf is-disabled"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-disabled" type="search" placeholder="Club, church or town" aria-label="Search clubs (disabled example)" disabled></div>
+        <p class="field-hint">Opens once an event is chosen.</p>
+      </div>
+      <div class="state dark-surface">
+        <span class="state-tag">Focus on navy (sidebar)</span>
+        <div class="sf is-focus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="s-dark" type="search" placeholder="Find a page or task" aria-label="Find a page or task (dark example)" tabindex="-1"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="board" aria-labelledby="empty-h">
+    <header>
+      <h2 id="empty-h">Empty search shows everything</h2>
+      <p>Caleb's rule (Oct 30): clicking or tabbing into the box, or searching with it empty, shows the full list, sorted and paged as usual. Typing only narrows it. No minimum length and no "type to search" message.</p>
+    </header>
+    <div class="states">
+      <div class="state">
+        <span class="state-tag">Focused, nothing typed</span>
+        <div class="sf is-focus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="e-empty" type="search" placeholder="Club, church or town" aria-label="Club (empty example)" tabindex="-1"></div>
+        <ul class="list static-list" aria-label="All clubs (example)">
+          <li><span>Cedar Falls Adventurers</span><small>Cedar Falls, IA</small></li>
+          <li><span>Clearwater Pathfinders</span><small>Clearwater, MO</small></li>
+          <li aria-selected="true"><span>Maple Grove Pathfinders</span><small>Ames, IA</small></li>
+          <li><span>Prairie View Eagles</span><small>Joplin, MO</small></li>
+        </ul>
+        <p class="list-status"><span>All 24 clubs, A to Z</span><span>Scroll for more</span></p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Typing narrows</span>
+        <div class="sf is-focus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="e-typed" type="search" value="ri" aria-label="Club (typed example)" tabindex="-1"><button class="sf-clear" type="button" aria-label="Clear search" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+        <ul class="list static-list" aria-label="Matching clubs (example)">
+          <li aria-selected="true"><span><mark>Ri</mark>verton Pathfinders</span><small>Riverton, IA</small></li>
+          <li><span>P<mark>ri</mark>mrose Adventurers</span><small>Sedalia, MO</small></li>
+        </ul>
+        <p class="list-status"><span>2 of 24 clubs match "ri"</span></p>
+      </div>
+      <div class="state">
+        <span class="state-tag">Nothing matches</span>
+        <div class="sf is-focus"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="e-none" type="search" value="Zion Hill" aria-label="Club (no match example)" tabindex="-1"><button class="sf-clear" type="button" aria-label="Clear search" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+        <div class="list static-list"><p class="list-empty">No clubs match "Zion Hill". <button type="button" tabindex="-1">Show all 24 clubs</button></p></div>
+      </div>
+    </div>
+
+    <div class="state">
+      <h3 id="live-h">Try it</h3>
+      <div class="picker">
+        <label class="label" for="live">Club</label>
+        <div class="sf" style="margin-top:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="live" type="search" role="combobox" aria-expanded="false" aria-controls="live-list" aria-autocomplete="list" autocomplete="off" placeholder="Club, church or town"><button class="sf-clear" id="live-clear" type="button" aria-label="Clear search" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+        <div id="live-panel" hidden>
+          <ul class="list" id="live-list" role="listbox" aria-label="Clubs"></ul>
+          <p class="list-status" id="live-status" aria-live="polite"></p>
+        </div>
+        <p class="field-hint" id="live-picked"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="board" aria-labelledby="spec-h">
+    <header>
+      <h2 id="spec-h">What the fix changes</h2>
+      <p>Uses tokens that already exist in <code>app/globals.css</code>. No new colors.</p>
+    </header>
+    <div class="table-wrap">
+      <table class="spec">
+        <thead><tr><th scope="col">State</th><th scope="col">Box (the wrapper)</th><th scope="col">Text inside</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Default</th><td>1px <code>--field-border</code>, radius <code>--field-radius</code> (10px), white, at least 44px tall</td><td>No border, no outline, placeholder in <code>--muted</code></td></tr>
+          <tr><th scope="row">Hover</th><td>Border <code>--field-border-hover</code></td><td>Unchanged</td></tr>
+          <tr><th scope="row">Focus</th><td>Border <code>--field-focus</code> plus one 2px <code>--field-focus</code> outline, 2px offset. Gold outline on navy surfaces. No halo.</td><td>No ring of its own</td></tr>
+          <tr><th scope="row">Error</th><td>Border and 1px inset line in <code>--danger</code>; message below in words. Focus ring still purple.</td><td><code>aria-invalid="true"</code>, <code>aria-describedby</code> the message</td></tr>
+          <tr><th scope="row">Disabled</th><td>Background <code>--paper</code>, border <code>--line</code></td><td>Text <code>--muted</code>; a hint says why</td></tr>
+          <tr><th scope="row">Clear button</th><td>44 by 42px tap area inside the box, shown only when there is text</td><td>Browser's own clear "x" hidden</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="rules">
+      <li>Every search box and picker uses the shared <code>.search-field</code> wrapper (or <code>SearchableSelect</code>, which gets the same rules). One-off module copies are removed.</li>
+      <li>The design-system README's "soft halo" is dropped: one 2px outline is the visible ring the app already uses on <code>.search-field</code>. Caleb decided on October 30: no glow, one ring only, on every field.</li>
+      <li>Empty or focused box opens the full list; typing narrows; no minimum length; no "type to search" text. The status line says how many are shown.</li>
+    </ul>
+  </section>
+</main>
+<script>
+(function () {
+  var clubs = [
+    ["Ash Creek Pathfinders", "Ottumwa, IA"], ["Bluff City Adventurers", "Hannibal, MO"], ["Briar Hill Pathfinders", "Rolla, MO"],
+    ["Cedar Falls Adventurers", "Cedar Falls, IA"], ["Clearwater Pathfinders", "Clearwater, MO"], ["Deer Run Adventurers", "Marshalltown, IA"],
+    ["Elm Street Pathfinders", "Mason City, IA"], ["Fox Hollow Eagles", "Sikeston, MO"], ["Glenwood Trailblazers", "Glenwood, IA"],
+    ["Hawk Ridge Pathfinders", "Dubuque, IA"], ["Iron Gate Adventurers", "Cape Girardeau, MO"], ["Juniper Hill Pathfinders", "Kirksville, MO"],
+    ["Lakeview Navigators", "Spirit Lake, IA"], ["Maple Grove Pathfinders", "Ames, IA"], ["North Star Pathfinders", "Fort Dodge, IA"],
+    ["Oak Ridge Adventurers", "Lebanon, MO"], ["Primrose Adventurers", "Sedalia, MO"], ["Prairie View Eagles", "Joplin, MO"],
+    ["Quarry Point Pathfinders", "Waterloo, IA"], ["Riverton Pathfinders", "Riverton, IA"], ["Stone Bridge Explorers", "Branson, MO"],
+    ["Timber Lake Adventurers", "Chillicothe, MO"], ["Valley Forge Pathfinders", "Burlington, IA"], ["Willow Bend Pathfinders", "Columbia, MO"]
+  ];
+  var input = document.getElementById("live"), panel = document.getElementById("live-panel"), list = document.getElementById("live-list");
+  var status = document.getElementById("live-status"), clear = document.getElementById("live-clear"), picked = document.getElementById("live-picked");
+  var active = -1, shown = [];
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function mark(text, q) {
+    if (!q) return esc(text);
+    var i = text.toLowerCase().indexOf(q.toLowerCase());
+    return i < 0 ? esc(text) : esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+  }
+  function render() {
+    var q = input.value.trim();
+    shown = clubs.filter(function (c) { return !q || (c[0] + " " + c[1]).toLowerCase().indexOf(q.toLowerCase()) >= 0; });
+    clear.hidden = input.value === "";
+    if (shown.length === 0) {
+      list.innerHTML = '<li class="list-empty" role="option" aria-disabled="true">No clubs match "' + esc(q) + '".</li>';
+      status.innerHTML = '<span>0 of ' + clubs.length + ' clubs</span><button type="button" class="sf-show-all" style="border:0;background:none;color:var(--imsda-purple);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">Show all ' + clubs.length + ' clubs</button>';
+      status.querySelector("button").onclick = function () { input.value = ""; render(); input.focus(); };
+    } else {
+      list.innerHTML = shown.map(function (c, i) {
+        return '<li role="option" id="opt-' + i + '" aria-selected="' + (i === active) + '"><span>' + mark(c[0], q) + '</span><small>' + esc(c[1]) + '</small></li>';
+      }).join("");
+      status.innerHTML = q ? "<span>" + shown.length + " of " + clubs.length + ' clubs match "' + esc(q) + '"</span>' : "<span>All " + clubs.length + " clubs, A to Z</span>";
+    }
+    Array.prototype.forEach.call(list.querySelectorAll('li[id^="opt-"]'), function (li, i) {
+      li.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
+    });
+    if (active >= 0) input.setAttribute("aria-activedescendant", "opt-" + active); else input.removeAttribute("aria-activedescendant");
+  }
+  function open() { panel.hidden = false; input.setAttribute("aria-expanded", "true"); render(); }
+  function close() { panel.hidden = true; input.setAttribute("aria-expanded", "false"); active = -1; input.removeAttribute("aria-activedescendant"); }
+  function choose(i) { var c = shown[i]; if (!c) return; input.value = c[0]; picked.textContent = "Selected: " + c[0] + " (" + c[1] + ")"; close(); clear.hidden = false; }
+  input.addEventListener("focus", open);
+  input.addEventListener("click", open);
+  input.addEventListener("input", function () { active = -1; open(); });
+  input.addEventListener("blur", function () { setTimeout(close, 120); });
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); if (panel.hidden) open(); active = Math.min(active + 1, shown.length - 1); render(); var el = document.getElementById("opt-" + active); if (el) el.scrollIntoView({ block: "nearest" }); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); render(); var el2 = document.getElementById("opt-" + active); if (el2) el2.scrollIntoView({ block: "nearest" }); }
+    else if (e.key === "Enter" && active >= 0) { e.preventDefault(); choose(active); }
+    else if (e.key === "Escape") { close(); }
+  });
+  clear.addEventListener("click", function () { input.value = ""; picked.textContent = ""; input.focus(); open(); });
+})();
+</script>
+</body>
+</html>
