@@ -72,7 +72,11 @@ function diffCounts(before: Map<string, number>, after: Map<string, number>) {
 async function cleanup() {
   const events = { id: { startsWith: `${P}_` } };
   await prisma.auditLog.deleteMany({ where: { OR: [{ actorUserId: { startsWith: `${P}_` } }, { entityId: { startsWith: `${P}_` } }] } });
-  await prisma.event.deleteMany({ where: events });
+  await prisma.$transaction(async (tx) => {
+    // Event deletion is the one way lifecycle history may be deleted (#156).
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await tx.event.deleteMany({ where: events });
+  });
   await prisma.honor.deleteMany({ where: events });
   await prisma.person.deleteMany({ where: events });
   await prisma.user.deleteMany({ where: { id: { startsWith: `${P}_` } } });
@@ -117,7 +121,7 @@ async function main() {
   const readEvent = () => prisma.event.findUniqueOrThrow({ where: { id: eventId } });
   const original = await readEvent();
   assert(original.archivedAt === null && original.archivedByUserId === null, "a new event is not archived");
-  const phaseSource = { isPublished: true, timezone: "America/Chicago", registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false, endsAt: null };
+  const phaseSource = { isPublished: true, lifecycleState: null, timezone: "America/Chicago", registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false, endsAt: null };
   const { evaluateEventRegistrationPhase } = await import("../modules/events/lifecycle");
 
   // ---- Permissions: refusals change nothing. ----
@@ -153,7 +157,7 @@ async function main() {
   const archived = await archiveEvent({ eventId, actor: actor(eventAdminId, "EVENT_ADMIN") });
   assert(archived.archived && archived.changed, "the Event Admin archives their event");
   const afterArchive = diffCounts(beforeArchive, await tableCounts());
-  assert(JSON.stringify(afterArchive) === JSON.stringify({ AuditLog: 1 }), `archiving adds one audit row and nothing else (got ${JSON.stringify(afterArchive)})`);
+  assert(JSON.stringify(afterArchive) === JSON.stringify({ AuditLog: 1, EventLifecycleTransition: 1 }), `archiving adds one audit row and one lifecycle history row and nothing else (got ${JSON.stringify(afterArchive)})`);
   const archivedRow = await readEvent();
   assert(archivedRow.archivedAt instanceof Date && archivedRow.archivedByUserId === eventAdminId, "archivedAt and archivedByUserId are set");
   assert(JSON.stringify(without(archivedRow, ["archivedAt", "archivedByUserId", "updatedAt"])) === JSON.stringify(without(original, ["archivedAt", "archivedByUserId", "updatedAt"])), "archiving changes no other column");
@@ -189,7 +193,7 @@ async function main() {
   const beforeUnarchive = await tableCounts();
   const restored = await unarchiveEvent({ eventId, actor: actor(adminId, null, "SYSTEM_ADMIN") });
   assert(!restored.archived && restored.changed, "a system administrator unarchives");
-  assert(JSON.stringify(diffCounts(beforeUnarchive, await tableCounts())) === JSON.stringify({ AuditLog: 1 }), "unarchiving adds one audit row and nothing else");
+  assert(JSON.stringify(diffCounts(beforeUnarchive, await tableCounts())) === JSON.stringify({ AuditLog: 1, EventLifecycleTransition: 1 }), "unarchiving adds one audit row and one lifecycle history row and nothing else");
   const restoredRow = await readEvent();
   assert(restoredRow.archivedAt === null && restoredRow.archivedByUserId === null, "unarchiving clears both fields");
   assert(JSON.stringify(without(restoredRow, ["updatedAt"])) === JSON.stringify(without(original, ["updatedAt"])), "every column is back exactly as it was");

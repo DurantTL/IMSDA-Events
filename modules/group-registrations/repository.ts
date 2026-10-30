@@ -10,6 +10,7 @@ import {
   clubLocationSelect,
   clubLocationView,
   clubPhase,
+  quotedClosingDate,
   locationSeatCounts,
   publishedClubForm,
   recordFromJson,
@@ -18,7 +19,7 @@ import {
 } from "@/modules/club-registrations/repository";
 import { currentPricingSnapshot, lineItemsFromPricingSnapshot } from "@/modules/club-registrations/per-person-price";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
-import { effectiveLocationDates, hasLocationEnded } from "@/modules/event-locations/domain";
+import { hasLocationEnded } from "@/modules/event-locations/domain";
 import { EventLocationError } from "@/modules/event-locations/errors";
 import { locationOpenProblem } from "@/modules/event-locations/admission";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
@@ -361,7 +362,7 @@ export async function getGroupRegistrationWorkspace(token: string, now = new Dat
       slug: event.slug,
       eventDate: calendarDateInEventTimeZone(event.startsAt, event.timezone),
       ended: hasLocationEnded(event, registeredLocation, now),
-      registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
+      registrationClosesOn: quotedClosingDate(event, registeredLocation),
       edit: clubEditWindow(event, registeredLocation, now),
     },
     registration: {

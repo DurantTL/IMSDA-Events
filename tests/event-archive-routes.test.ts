@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
     findUnique: vi.fn(),
     updateMany: vi.fn(),
     auditCreate: vi.fn(),
+    historyCreate: vi.fn(),
   };
 });
 
@@ -40,6 +41,7 @@ vi.mock("@/lib/prisma", () => ({
     $transaction: async (run: (tx: unknown) => unknown) => run({
       event: { findUnique: mocks.findUnique, updateMany: mocks.updateMany },
       auditLog: { create: mocks.auditCreate },
+      eventLifecycleTransition: { create: mocks.historyCreate },
     }),
   }),
 }));
@@ -71,6 +73,7 @@ beforeEach(() => {
   mocks.findUnique.mockResolvedValue({ id: "event-a" });
   mocks.updateMany.mockResolvedValue({ count: 1 });
   mocks.auditCreate.mockResolvedValue({});
+  mocks.historyCreate.mockResolvedValue({});
   // A lookup that, like the real one, only knows each user's own event.
   mocks.findActiveMembership.mockImplementation(async (userId: string, eventId: string) => {
     if (userId === "admin-a" && eventId === "event-a") return membership("event-a", userId, "EVENT_ADMIN");
@@ -91,6 +94,13 @@ describe.each(routes)("POST /api/events/[eventId]/%s", (name, post) => {
     const data = mocks.auditCreate.mock.calls[0][0].data;
     expect(data).toMatchObject({ eventId: "event-a", actorUserId: "admin-a", entityId: "event-a", metadata: { eventId: "event-a" } });
     expect(data.correlationId).toBe("corr-fixed-1");
+    // The lifecycle history (#156) records the overlay too, once, for the actor.
+    expect(mocks.historyCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.historyCreate.mock.calls[0][0].data).toMatchObject({
+      eventId: "event-a",
+      actorUserId: "admin-a",
+      ...(name === "archive" ? { toState: "ARCHIVED" } : { fromState: "ARCHIVED" }),
+    });
   });
 
   it("lets a system administrator through", async () => {
@@ -104,6 +114,7 @@ describe.each(routes)("POST /api/events/[eventId]/%s", (name, post) => {
     expect(response.status).toBe(403);
     expect(mocks.updateMany).not.toHaveBeenCalled();
     expect(mocks.auditCreate).not.toHaveBeenCalled();
+    expect(mocks.historyCreate).not.toHaveBeenCalled();
   });
 
   it("refuses a registration manager on the event with 403 and changes nothing", async () => {
@@ -137,5 +148,14 @@ describe.each(routes)("POST /api/events/[eventId]/%s", (name, post) => {
     mocks.findUnique.mockResolvedValue(null);
     expect((await post(request(), context)).status).toBe(404);
     expect(mocks.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("writes no audit or history row when the request changed nothing", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: user("admin-a") });
+    mocks.updateMany.mockResolvedValue({ count: 0 });
+    const response = await post(request(), context);
+    expect(await response.json()).toEqual({ archived: name === "archive", changed: false });
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+    expect(mocks.historyCreate).not.toHaveBeenCalled();
   });
 });

@@ -11,21 +11,16 @@ import {
   remainingEventCapacity,
 } from "@/modules/events/lifecycle";
 import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/events/readiness";
+import { EventOperationError } from "@/modules/events/operation-error";
+import { EventLifecycleError, transitionEventLifecycle } from "@/modules/events/lifecycle-repository";
+import { isPublicState, type EventLifecycleStateName } from "@/modules/events/lifecycle-state";
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
 import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
-export class EventOperationError extends Error {
-  constructor(
-    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY" | "EVENT_CHANGED",
-    message: string,
-  ) {
-    super(message);
-    this.name = "EventOperationError";
-  }
-}
+export { EventOperationError } from "@/modules/events/operation-error";
 
 function eventDate(value: string) {
   return new Date(`${value}T12:00:00.000Z`);
@@ -62,6 +57,7 @@ export async function listEventsForUser(
     select: {
       id: true,
       archivedAt: true,
+      lifecycleState: true,
       slug: true,
       name: true,
       startsAt: true,
@@ -604,89 +600,16 @@ export async function updateEventSettings(
 /**
  * Publishing is its own action (#471), gated by the same readiness checklist
  * the settings form always showed (checked against the saved event), but no
- * longer reachable by saving that form. Idempotent under concurrency: the
- * flip is a conditional `updateMany` on `isPublished: false`, and the audit
- * entry is written only by the one request that actually changed it, so a
- * doubled click or a race with another tab never errors or double-audits.
+ * longer reachable by saving that form. It is a lifecycle transition to
+ * PUBLISHED (#156), so the stored state and `isPublished` move together.
+ * Idempotent under concurrency: the event row is locked, an event that is
+ * already public (in any public state) is left alone, and the audit entry is
+ * written only by the one request that actually changed it, so a doubled
+ * click or a race with another tab never errors or double-audits. Callers
+ * have already required CONFIGURE_EVENT.
  */
 export async function publishEvent(eventId: string, actorUserId: string) {
-  const prisma = getPrisma();
-  await prisma.$transaction(async (tx) => {
-    // Lock the event row before reading it, so a settings save that clears a
-    // checklist field waits for this publish (or runs first and is seen)
-    // rather than landing between the readiness check and the flip.
-    await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE`;
-    const [current, publishedFormCount] = await Promise.all([
-      tx.event.findUnique({
-        where: { id: eventId },
-        select: {
-          name: true,
-          slug: true,
-          startsAt: true,
-          endsAt: true,
-          timezone: true,
-          location: true,
-          publicInfoUrl: true,
-          supportContact: true,
-          isPublished: true,
-          audience: true,
-          billingMode: true,
-        },
-      }),
-      tx.registrationFormVersion.count({
-        where: { status: "PUBLISHED", form: { eventId } },
-      }),
-    ]);
-    if (!current) {
-      throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
-    }
-    if (current.isPublished) return;
-    const readiness = getEventPublishReadiness(
-      {
-        name: current.name,
-        slug: current.slug,
-        startsOn: current.startsAt.toISOString().slice(0, 10),
-        endsOn: current.endsAt.toISOString().slice(0, 10),
-        timezone: current.timezone,
-        location: current.location,
-        publicInfoUrl: current.publicInfoUrl,
-        supportContact: current.supportContact,
-        audience: current.audience,
-        billingMode: current.billingMode,
-      },
-      publishedFormCount,
-    );
-    if (!readiness.ready) {
-      const incomplete = readiness.items.filter((item) => !item.complete);
-      if (incomplete.length === 1 && incomplete[0]!.id === "club-billing") {
-        throw new EventOperationError("EVENT_NOT_READY", CLUB_EVENT_BILLING_MESSAGE);
-      }
-      const missing = incomplete.map((item) =>
-        item.label.toLowerCase(),
-      );
-      throw new EventOperationError(
-        "EVENT_NOT_READY",
-        `Finish the publish checklist first: ${missing.join(", ")}.`,
-      );
-    }
-    const { count } = await tx.event.updateMany({
-      where: { id: eventId, isPublished: false },
-      data: { isPublished: true },
-    });
-    if (count !== 1) return;
-    await tx.auditLog.create({
-      data: {
-        eventId,
-        actorUserId,
-        action: "EVENT_PUBLISHED",
-        entityType: "Event",
-        entityId: eventId,
-        correlationId: crypto.randomUUID(),
-        summary: `Published event: ${current.name}.`,
-        metadata: { name: current.name },
-      },
-    });
-  });
+  await runLegacyTransition({ eventId, actorUserId, toState: "PUBLISHED", alreadyDone: isPublicState });
   return getEventSettings(eventId);
 }
 
@@ -694,39 +617,33 @@ export async function publishEvent(eventId: string, actorUserId: string) {
  * Unpublish is its own action (#471), confirmed in-page rather than folded
  * into a settings save: it names the event and warns that every public
  * registration form closes immediately, since that's the whole effect.
- * Idempotent under concurrency the same way as `publishEvent`: a conditional
- * `updateMany` on `isPublished: true`, audited only when it changed a row.
+ * Idempotent under concurrency the same way as `publishEvent`. An event that is in
+ * progress, complete, in financial reconciliation or closed is refused
+ * with a 409 instead of being taken off the public site.
  */
 export async function unpublishEvent(eventId: string, actorUserId: string) {
-  const prisma = getPrisma();
-  await prisma.$transaction(async (tx) => {
-    const current = await tx.event.findUnique({
-      where: { id: eventId },
-      select: { name: true, isPublished: true },
-    });
-    if (!current) {
-      throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
-    }
-    if (!current.isPublished) return;
-    const { count } = await tx.event.updateMany({
-      where: { id: eventId, isPublished: true },
-      data: { isPublished: false },
-    });
-    if (count !== 1) return;
-    await tx.auditLog.create({
-      data: {
-        eventId,
-        actorUserId,
-        action: "EVENT_UNPUBLISHED",
-        entityType: "Event",
-        entityId: eventId,
-        correlationId: crypto.randomUUID(),
-        summary: `Unpublished event: ${current.name}.`,
-        metadata: { name: current.name },
-      },
-    });
-  });
+  await runLegacyTransition({ eventId, actorUserId, toState: "DRAFT", alreadyDone: (state) => !isPublicState(state) });
   return getEventSettings(eventId);
+}
+
+async function runLegacyTransition(input: {
+  eventId: string;
+  actorUserId: string;
+  toState: EventLifecycleStateName;
+  alreadyDone: (state: EventLifecycleStateName) => boolean;
+}) {
+  try {
+    await transitionEventLifecycle({
+      eventId: input.eventId,
+      toState: input.toState,
+      // The routes require CONFIGURE_EVENT before calling, which is the permission these transitions declare.
+      actor: { userId: input.actorUserId, permissions: ["CONFIGURE_EVENT"] },
+      legacy: { alreadyDone: input.alreadyDone },
+    });
+  } catch (error) {
+    if (error instanceof EventLifecycleError) throw new EventOperationError("EVENT_LIFECYCLE_REFUSED", error.message);
+    throw error;
+  }
 }
 
 export async function getEventOverview(eventId: string) {
@@ -745,6 +662,7 @@ export async function getEventOverview(eventId: string) {
         capacity: true,
         isPublished: true,
         archivedAt: true,
+        lifecycleState: true,
         registrationOpensOn: true,
         registrationClosesOn: true,
         waitlistEnabled: true,
@@ -850,6 +768,7 @@ export async function getEventLifecycle(eventId: string, now = new Date()) {
         capacity: true,
         isPublished: true,
         archivedAt: true,
+        lifecycleState: true,
         registrationOpensOn: true,
         registrationClosesOn: true,
         waitlistEnabled: true,

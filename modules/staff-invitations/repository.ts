@@ -45,6 +45,7 @@ import {
   type StaffInvitationGroupValue,
 } from "@/modules/staff-invitations/domain";
 import { invitationIdFromToken, invitationToken, invitationTokenMatches } from "@/modules/staff-invitations/link";
+import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 
 type Tx = Prisma.TransactionClient;
 
@@ -123,6 +124,7 @@ const eventSelect = {
   timezone: true,
   isPublished: true,
   archivedAt: true,
+  lifecycleState: true,
   audience: true,
   supportContact: true,
 } satisfies Prisma.EventSelect;
@@ -704,9 +706,10 @@ async function loadByToken(client: Tx | ReturnType<typeof getPrisma>, token: str
   return invitation;
 }
 
-/** Whether the event takes registrations through a personal link now: published, a general event, and not over. */
-export function eventAcceptsInvitationRegistration(event: Pick<InviteEvent, "isPublished" | "archivedAt" | "audience" | "timezone" | "endsAt">, now = new Date()) {
-  return event.audience === "GENERAL" && event.isPublished && !event.archivedAt && !hasEventEnded({ timezone: event.timezone, endsAt: event.endsAt }, now);
+/** Whether the event takes registrations through a personal link now: published, a general event, registration not closed by its state, and not over. */
+export function eventAcceptsInvitationRegistration(event: Pick<InviteEvent, "isPublished" | "archivedAt" | "lifecycleState" | "audience" | "timezone" | "endsAt">, now = new Date()) {
+  // A lifecycle state that closes registration (#156) closes personal links too.
+  return event.audience === "GENERAL" && event.isPublished && !event.archivedAt && !closesRegistration(effectiveLifecycleState(event)) && !hasEventEnded({ timezone: event.timezone, endsAt: event.endsAt }, now);
 }
 
 export type InvitationExperience =

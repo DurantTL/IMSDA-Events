@@ -71,7 +71,7 @@ const activeStatuses: ActiveStatus[] = ["SUBMITTED", "CONFIRMED"];
 const locationDates = { firstDay: true, lastDay: true, registrationClosesOn: true } satisfies Prisma.EventLocationSelect;
 
 const lifecycleEvent = {
-  id: true, name: true, isPublished: true, archivedAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true,
+  id: true, name: true, isPublished: true, archivedAt: true, lifecycleState: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true,
   waitlistEnabled: true, honorWaitlistOfferHours: true,
 } satisfies Prisma.EventSelect;
 

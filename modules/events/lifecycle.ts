@@ -1,3 +1,5 @@
+import { closesRegistration, effectiveLifecycleState, type EventLifecycleStateName } from "@/modules/events/lifecycle-state";
+
 export const activeRegistrationStatuses = ["SUBMITTED", "CONFIRMED"] as const;
 
 export type ActiveRegistrationStatus = typeof activeRegistrationStatuses[number];
@@ -21,6 +23,12 @@ export type EventLifecycleSource = {
    * leaving registration open on an archived event.
    */
   archivedAt: Date | null;
+  /**
+   * The stored lifecycle state (#156); null for a legacy event, which is derived from `isPublished`. Required for
+   * the same reason as `archivedAt`: a query that forgets to select it must fail to type-check, not quietly ignore
+   * a closed registration.
+   */
+  lifecycleState: EventLifecycleStateName | null;
   /**
    * The event's last instant. When present, public registration also closes
    * once the event's last calendar day (in its own time zone) has passed (#575),
@@ -69,6 +77,9 @@ export function evaluateEventRegistrationPhase(
   // registrations (#635), whatever its dates say. Either way registration is not open.
   if (!event.isPublished) return "DRAFT";
   if (event.archivedAt) return "CLOSED";
+  // A lifecycle state that closes registration (#156) closes it whatever the dates say. A legacy null reads from
+  // isPublished and so never closes here, exactly as before.
+  if (closesRegistration(effectiveLifecycleState(event))) return "CLOSED";
   if (hasEventEnded(event, now)) return "CLOSED";
   const today = calendarDateInEventTimeZone(now, event.timezone);
   if (event.registrationOpensOn && today < event.registrationOpensOn) return "UPCOMING";

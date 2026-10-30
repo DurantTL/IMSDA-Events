@@ -43,7 +43,8 @@ describe("emergency plan data model", () => {
   it("is added by an additive migration that only creates", () => {
     const folders = readdirSync("prisma/migrations").filter((name) => /^\d{14}_/.test(name)).sort();
     const folder = "20261217100000_event_emergency_plans";
-    expect(folders.indexOf(folder)).toBe(folders.length - 1);
+    // Sorts after the migration before it; later migrations may follow it.
+    expect(folders.indexOf(folder)).toBeGreaterThan(folders.indexOf("20261216100000_club_order_honor_lines"));
     const sql = readFileSync(`prisma/migrations/${folder}/migration.sql`, "utf8");
     expect(sql).not.toMatch(/DROP |RENAME |ALTER TABLE "(?!Emergency)/i);
     expect(sql).toContain('CREATE TABLE "EmergencyPlanVersion"');

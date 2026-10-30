@@ -15,7 +15,7 @@ import { buildEventsAdminHome, type EventsAdminEventSource } from "@/modules/eve
 const now = new Date("2026-10-26T18:00:00.000Z");
 const source = (id: string, overrides: Partial<EventsAdminEventSource>): EventsAdminEventSource => ({
   id, slug: id, name: `Synthetic ${id}`, startsAt: new Date("2026-11-20T15:00:00Z"), endsAt: new Date("2026-11-22T15:00:00Z"), timezone: "America/Chicago",
-  location: "Synthetic Camp", capacity: 100, isPublished: true, archivedAt: null, registrationOpensOn: "2026-01-01", registrationClosesOn: "2026-11-15",
+  location: "Synthetic Camp", capacity: 100, isPublished: true, archivedAt: null, lifecycleState: null, registrationOpensOn: "2026-01-01", registrationClosesOn: "2026-11-15",
   waitlistEnabled: false, registrations: [], attendeeCount: 0, checkedInCount: 0, activeStaffCount: 1, publishedFormCount: 1, waitingCount: 0,
   importIssueCount: 0, importWarningCount: 0, deliveryIssueCount: 0, billingMode: "ATTENDEE_PAY", draftRegistrationCount: 0, failedEmailCount: 0, ...overrides,
 });

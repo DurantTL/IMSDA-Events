@@ -132,7 +132,7 @@ const registrationForLoading = {
   },
 } satisfies Prisma.RegistrationSelect;
 
-const eventForLoading = { id: true, isPublished: true, archivedAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true, honorWaitlistOfferHours: true } satisfies Prisma.EventSelect;
+const eventForLoading = { id: true, isPublished: true, archivedAt: true, lifecycleState: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true, honorWaitlistOfferHours: true } satisfies Prisma.EventSelect;
 
 export async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwner, eventId: string) {
   // Class picking works on a club's one registration (#809: an event with several teams per club cannot have classes).

@@ -1747,9 +1747,17 @@ model Event {
   archivedAt           DateTime?
   /// Who archived it. Kept as an id only; cleared with `archivedAt`, and null if that account is later deleted.
   archivedByUserId     String?
+  /// The stored lifecycle state (#156). Null means a legacy event whose state is derived from `isPublished` and
+  /// `archivedAt`; it is never ARCHIVED (archive stays the `archivedAt` overlay; a CHECK enforces it). Read it only
+  /// through `effectiveLifecycleState`, and change it only through `transitionEventLifecycle`, which keeps
+  /// `isPublished` (the public-visibility column) in step.
+  lifecycleState       EventLifecycleState?
+  /// Bumped by every lifecycle transition; the transition is a conditional update on it, so two at once cannot both win.
+  lifecycleVersion     Int                @default(0)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+  lifecycleTransitions                EventLifecycleTransition[]
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
   calendarEntryLinks                  CalendarEntry[]    @relation("CalendarEntryLinkedEvent")
@@ -10767,4 +10775,39 @@ model EmergencyPlanVersion {
 
   @@unique([planId, versionNumber])
   @@index([publishedByUserId])
+}
+
+/// Where an event is in its life (#156). DRAFT and TEST are not public (TEST is a staff preview); PUBLISHED through CLOSED
+/// are public. Closing registration (REGISTRATION_CLOSED) never implies COMPLETE or financial closeout. ARCHIVED is only ever
+/// an effective state (the `archivedAt` overlay) and is never stored on the event.
+enum EventLifecycleState {
+  DRAFT
+  TEST
+  PUBLISHED
+  REGISTRATION_CLOSED
+  IN_PROGRESS
+  COMPLETE
+  FINANCIAL_RECONCILIATION
+  CLOSED
+  ARCHIVED
+}
+
+/// One lifecycle change of an event (#156), kept as history: who, when, from and to which state, why, and the readiness
+/// evidence the change relied on. A database trigger refuses every UPDATE and every DELETE except event deletion's.
+/// `actorUserId` is a plain id with no foreign key so deleting an account never touches this row. Older events have no
+/// rows: no transition is invented for history that was never recorded.
+model EventLifecycleTransition {
+  id          String              @id @default(cuid())
+  eventId     String
+  fromState   EventLifecycleState
+  toState     EventLifecycleState
+  actorUserId String?
+  reason      String?
+  /// What the change relied on, e.g. the publish readiness checklist result. Ids and flags only.
+  evidence    Json?
+  createdAt   DateTime            @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
 }

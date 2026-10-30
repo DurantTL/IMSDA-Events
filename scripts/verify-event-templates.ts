@@ -58,7 +58,11 @@ function isOperationError(error: unknown, code: EventTemplateOperationError["cod
 async function cleanup() {
   await prisma.auditLog.deleteMany({ where: { actorUserId: { in: actors } } });
   await prisma.eventTemplateApplication.deleteMany({ where: { actorUserId: { in: actors } } });
-  await prisma.event.deleteMany({ where: { slug: { startsWith: `${P}-` } } });
+  await prisma.$transaction(async (tx) => {
+    // Event deletion is the one way lifecycle history may be deleted (#156).
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await tx.event.deleteMany({ where: { slug: { startsWith: `${P}-` } } });
+  });
   await prisma.eventTemplate.deleteMany({ where: { createdByUserId: { in: actors } } });
   await prisma.organization.deleteMany({ where: { name: { startsWith: "Evttpl " } } });
   await prisma.user.deleteMany({ where: { id: { in: actors } } });

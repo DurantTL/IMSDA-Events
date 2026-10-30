@@ -73,6 +73,9 @@ const eventRow = (overrides: RowOverrides = {}) => ({
   hotelRate: null,
   hotelInstructions: null,
   isPublished: overrides.isPublished ?? false,
+  archivedAt: null,
+  lifecycleState: null,
+  lifecycleVersion: 0,
   registrationOpensOn: "2027-05-01",
   registrationClosesOn: "2027-10-01",
   waitlistEnabled: true,
@@ -122,6 +125,7 @@ function mockPrisma(
     promoCode: { count: vi.fn().mockResolvedValue(0) },
     eventModule: { createMany: vi.fn().mockResolvedValue({ count: 0 }), deleteMany: vi.fn() },
     auditLog: { create: auditLogCreate },
+    eventLifecycleTransition: { create: vi.fn().mockResolvedValue({}) },
   };
   const prisma = {
     $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
@@ -188,9 +192,10 @@ describe("publishEvent (#467, #471)", () => {
 
     const result = await publishEvent("event-1", "usr_1");
 
+    // One conditional update on the lifecycle version moves the state and the public flag together (#156).
     expect(eventUpdateMany).toHaveBeenCalledWith({
-      where: { id: "event-1", isPublished: false },
-      data: { isPublished: true },
+      where: { id: "event-1", lifecycleVersion: 0 },
+      data: { lifecycleState: "PUBLISHED", isPublished: true, lifecycleVersion: { increment: 1 } },
     });
     expect(eventUpdate).not.toHaveBeenCalled();
     expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
@@ -311,8 +316,8 @@ describe("unpublishEvent (#471)", () => {
     const result = await unpublishEvent("event-1", "usr_1");
 
     expect(eventUpdateMany).toHaveBeenCalledWith({
-      where: { id: "event-1", isPublished: true },
-      data: { isPublished: false },
+      where: { id: "event-1", lifecycleVersion: 0 },
+      data: { lifecycleState: "DRAFT", isPublished: false, lifecycleVersion: { increment: 1 } },
     });
     expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: "EVENT_UNPUBLISHED", summary: "Unpublished event: Synthetic Retreat.", actorUserId: "usr_1" }),

@@ -124,7 +124,7 @@ async function restoreClassSeatsCore(tx: Prisma.TransactionClient, input: Restor
     }),
     tx.event.findUnique({
       where: { id: input.eventId },
-      select: { id: true, name: true, isPublished: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true, archivedAt: true },
+      select: { id: true, name: true, isPublished: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true, archivedAt: true, lifecycleState: true },
     }),
     tx.registration.findUnique({
       where: { id: input.registrationId },
