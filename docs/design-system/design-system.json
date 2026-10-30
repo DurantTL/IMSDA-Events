@@ -1,0 +1,38 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-30T15:26:27Z"
+  },
+  "title": "IMSDA Events",
+  "namespace": "IMSDAEvents",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Map"
+  ],
+  "assetGroups": {
+    "Map": {
+      "files": {
+        "pathfinder-logo-pin.png": {
+          "name": "pathfinder-logo-pin.png",
+          "blob": "35d4425ebc1d020eb887195dcfbbe535",
+          "size": 3044,
+          "type": "image/png"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Caleb Durant",
+    "at": "2026-10-30T15:26:27Z",
+    "via": "Claude Code \u00b7 DurantTL/IMSDA-Events@81f03c93",
+    "note": "Tokens, 20 components and tool mockups recreated from app/globals.css and component CSS."
+  }
+}

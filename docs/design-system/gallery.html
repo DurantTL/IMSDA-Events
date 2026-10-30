@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMSDA Events design system</title>
+<link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="components/bundle.css">
+<style>
+ .g-wrap { width: min(1000px, calc(100% - 32px)); margin: 24px auto 60px; display: grid; gap: 18px; }
+ .g-cover svg { display: block; width: 100%; height: auto; border-radius: 18px; border: 1px solid var(--line); }
+ .g-intro { margin: 0; color: var(--muted); font-size: 0.875rem; }
+ .g-head { margin: 22px 0 0; color: var(--imsda-navy); font-size: 1.3rem; }
+ .g-card { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); overflow: hidden; box-shadow: var(--shadow-metric); }
+ .g-meta { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+ .g-meta h3 { margin: 0; font-size: 1rem; }
+ .g-meta p { margin: 4px 0; color: var(--muted); font-size: 0.875rem; }
+ .g-meta a { color: var(--imsda-purple); font-size: 0.875rem; font-weight: 700; }
+ .g-meta code { font-size: 0.8rem; }
+ .g-frame { background: var(--paper); overflow-x: auto; }
+</style></head>
+<body><main class="g-wrap">
+<div class="g-cover"><!-- Derivation: blocks = the brand mark (gold tile + purple disc) and the club banner (navy) / navy-soft tab strip;
+     arrangement = stacked rounded tiles to the right like the portal header layers; pattern = 3px tab underlines
+     from the club nav; scales = radius-card, radius-pill. All fills use tokens. -->
+<svg width="960" height="288" viewBox="0 0 960 288" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IMSDA Events">
+  <rect width="960" height="288" style="fill:var(--paper)"/>
+  <rect x="520" y="28" width="400" height="140" rx="18" style="fill:var(--imsda-navy)"/>
+  <rect x="520" y="182" width="400" height="78" rx="18" style="fill:var(--imsda-navy-soft)"/>
+  <rect x="544" y="236" width="64" height="4" rx="2" style="fill:var(--imsda-purple)"/>
+  <rect x="628" y="236" width="64" height="4" rx="2" style="fill:var(--line)"/>
+  <rect x="712" y="236" width="64" height="4" rx="2" style="fill:var(--line)"/>
+  <rect x="796" y="236" width="64" height="4" rx="2" style="fill:var(--line)"/>
+  <rect x="768" y="56" width="120" height="84" rx="16" style="fill:var(--imsda-gold)"/>
+  <circle cx="878" cy="134" r="34" style="fill:var(--imsda-purple)"/>
+  <rect x="548" y="64" width="150" height="10" rx="5" style="fill:var(--hero-mid)"/>
+  <rect x="548" y="88" width="96" height="10" rx="5" style="fill:var(--imsda-navy-deep)"/>
+  <text x="40" y="214" style="fill:var(--imsda-navy);font-family:var(--font-sans);font-weight:700;font-size:60px">IMSDA Events</text>
+  <text x="42" y="252" style="fill:var(--muted);font-family:var(--font-sans);font-size:20px">Events and clubs, Iowa-Missouri</text>
+</svg>
+</div>
+<p class="g-intro">Generated from components/*/preview.html. Static recreations with fictional data; see README.md for the rules.</p>
+<h2 class="g-head">Brand</h2><section class="g-card" id="BrandMark"><header class="g-meta"><h3>BrandMark</h3><p>The CSS-only IMSDA Events mark: a gold tile with an italic Georgia "i" and a purple disc in the corner, beside the two-line wordmark.</p><a href="components/BrandMark/README.md">Usage rules</a></header><div class="g-frame" style="min-height:200px"><div class="ds-stage">
+  <div class="ds-row" style="gap:40px">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span class="brand-words"><strong>IMSDA Events</strong><small>Iowa-Missouri Conference</small></span></div>
+    <div class="sidebar on-dark" style="width:auto;padding:18px 20px;border-radius:14px"><div class="brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span class="brand-words"><strong>IMSDA Events</strong><small>Iowa-Missouri Conference</small></span></div></div>
+  </div>
+  <p class="ds-caption">Light header and navy sidebar placements.</p>
+</div>
+</div></section><h2 class="g-head">Actions</h2><section class="g-card" id="ActionsMenu"><header class="g-meta"><h3>ActionsMenu</h3><p>A disclosure menu (<code>&lt;details&gt;</code>) that collects a row's less common actions behind one <strong>Actions</strong> button.</p><a href="components/ActionsMenu/README.md">Usage rules</a></header><div class="g-frame" style="min-height:300px"><div class="ds-stage" style="justify-items:end;padding-right:40px">
+  <details class="actions-menu" open>
+    <summary class="secondary-button actions-menu-trigger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg> Actions</summary>
+    <ul class="actions-menu-list">
+      <li><button>Edit details</button></li>
+      <li><button>Send a private link</button></li>
+      <li><button>Print record</button></li>
+      <li class="actions-menu-divider" role="separator"></li>
+      <li><button class="actions-menu-danger">Remove from roster</button></li>
+    </ul>
+  </details>
+</div>
+</div></section><section class="g-card" id="Button"><header class="g-meta"><h3>Button</h3><p>Buttons for every action: navy primary, outlined secondary, purple text button and the outlined danger button.</p><a href="components/Button/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
+  <div class="ds-row">
+    <button class="primary-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Submit report</button>
+    <button class="secondary-button">Save draft</button>
+    <button class="text-button">Edit</button>
+    <button class="danger-outline-button">Remove from roster</button>
+    <button class="primary-button" disabled>Saving…</button>
+  </div>
+  <div class="ds-row"><button class="primary-button cta">Register for Fall Camporee</button><button class="secondary-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg> Download CSV</button></div>
+  <p class="ds-caption">Primary · secondary · text · danger outline · busy · public call to action (48px).</p>
+</div>
+</div></section><h2 class="g-head">Forms</h2><section class="g-card" id="Field"><header class="g-meta"><h3>Field</h3><p>Labelled inputs, selects, checkboxes, help and error text, as used in every form.</p><a href="components/Field/README.md">Usage rules</a></header><div class="g-frame" style="min-height:540px"><div class="ds-stage">
+  <form class="form-stack" style="max-width:560px" onsubmit="return false">
+    <div class="form-grid two-column">
+      <label>First name<input value="Morgan"></label>
+      <label>Last name<input value="Reed"></label>
+    </div>
+    <label>Birth date<input class="is-focus" placeholder="MM/DD/YYYY"><span class="field-help">Used to check age limits for honors at events.</span></label>
+    <label>Member type<select><option>Pathfinder</option><option>Staff</option></select></label>
+    <p class="form-error">Enter a birth date to finish this person's details.</p>
+    <label class="check-label"><input type="checkbox" checked> Show inactive people</label>
+    <label class="search-field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Find a person by name</span><input placeholder="Find a person by name"></label>
+  </form>
+</div>
+</div></section><h2 class="g-head">Feedback</h2><section class="g-card" id="InfoCard"><header class="g-meta"><h3>InfoCard</h3><p>Event info cards for public event pages: a toned left edge, an uppercase tone label, a heading and short text.</p><a href="components/InfoCard/README.md">Usage rules</a></header><div class="g-frame" style="min-height:420px"><div class="ds-stage" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+  <article class="event-info-card is-deadline"><p class="event-info-card-tone">Deadline</p><h2>Registration closes October 1</h2><p>Late registrations go to the waitlist.</p></article>
+  <article class="event-info-card is-requirement"><p class="event-info-card-tone">Requirement</p><h2>Health form for every camper</h2><p>Directors can fill it in or send a private link.</p></article>
+  <article class="event-info-card is-info"><p class="event-info-card-tone">Good to know</p><h2>Check-in opens Friday at 2 p.m.</h2><p>Bring the club packet or the QR code.</p></article>
+  <article class="event-info-card is-help"><p class="event-info-card-tone">Need help?</p><h2>Contact the conference office</h2><p>Include the club and event name.</p></article>
+</div>
+</div></section><section class="g-card" id="Notice"><header class="g-meta"><h3>Notice</h3><p>Inline notices that confirm a save, warn before a deadline or report an error, placed at the top of the panel they concern.</p><a href="components/Notice/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
+  <p class="inline-notice">Saved. Morgan Reed is on the 2026–2027 roster.</p>
+  <p class="inline-notice warning">The October report is due November 10. <a href="#">Open report</a></p>
+  <p class="inline-notice error">That link has expired. Send a new private link.</p>
+</div>
+</div></section><section class="g-card" id="StatusChip"><header class="g-meta"><h3>StatusChip</h3><p>Pill labels that state a record's status in a real word, plus the navy count badge.</p><a href="components/StatusChip/README.md">Usage rules</a></header><div class="g-frame" style="min-height:170px"><div class="ds-stage">
+  <div class="ds-row">
+    <span class="status-chip green">Registered</span>
+    <span class="status-chip gold">Draft</span>
+    <span class="status-chip gold">Waitlisted</span>
+    <span class="status-chip purple">Invited</span>
+    <span class="status-chip coral">Expired</span>
+    <span class="status-chip neutral">Not registered</span>
+    <span class="count-badge">24 members</span>
+  </div>
+</div>
+</div></section><h2 class="g-head">Navigation</h2><section class="g-card" id="AccountNav"><header class="g-meta"><h3>AccountNav</h3><p>Rounded tab bar used on the account pages and as the Area Coordinator sub-navigation.</p><a href="components/AccountNav/README.md">Usage rules</a></header><div class="g-frame" style="min-height:190px"><div class="ds-stage">
+  <nav class="account-nav" aria-label="Area coordinator"><ul>
+    <li class="account-nav-group-label">Area coordinator</li>
+    <li><a href="#">Overview</a></li><li><a href="#">All clubs</a></li><li><a href="#" aria-current="page">Monthly Records</a></li><li><a href="#">Points</a></li><li><a href="#">Club events</a></li><li><a href="#">Team approvals</a></li><li><a href="#">New clubs</a></li><li><a href="#">Waitlists</a></li>
+  </ul></nav>
+</div>
+</div></section><section class="g-card" id="ClubPortalNav"><header class="g-meta"><h3>ClubPortalNav</h3><p>The club portal header: white masthead, navy club banner and a single flat tab row with every club tool.</p><a href="components/ClubPortalNav/README.md">Usage rules</a></header><div class="g-frame" style="min-height:250px"><header class="club-masthead"><div class="club-masthead-inner">
+  <div class="club-masthead-brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span><small>IMSDA Events · Club portal</small><strong>Riverton Pathfinders</strong></span></div>
+  <div class="club-masthead-actions"><a class="masthead-action" href="#">My account</a><a class="masthead-action" href="#">Sign out</a></div>
+</div></header>
+<div class="club-banner on-dark"><div class="club-banner-inner"><small>2026–2027 club year</small><h1>Roster</h1></div></div>
+<nav class="club-nav" aria-label="Club"><div class="club-nav-strip"><a class="club-nav-link" href="#">Home</a><a class="club-nav-link" href="#" aria-current="page">Roster</a><a class="club-nav-link" href="#">Forms</a><a class="club-nav-link" href="#">Club events</a><a class="club-nav-link" href="#">Honors</a><a class="club-nav-link" href="#">Class tracking</a><a class="club-nav-link" href="#">Monthly Records</a><a class="club-nav-link" href="#">Orders</a><a class="club-nav-link" href="#">Health</a><a class="club-nav-link" href="#">Club settings</a></div></nav>
+</div></section><section class="g-card" id="StaffShell"><header class="g-meta"><h3>StaffShell</h3><p>The staff workspace frame: a 260px navy sidebar on desktop and a five-slot bottom tab bar on phones.</p><a href="components/StaffShell/README.md">Usage rules</a></header><div class="g-frame" style="min-height:460px"><div class="ds-stage" style="grid-template-columns:260px 1fr;align-items:start;gap:28px">
+  <aside class="sidebar on-dark" style="border-radius:16px;min-height:400px">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span class="brand-words"><strong>IMSDA Events</strong><small>Iowa-Missouri Conference</small></span></div>
+    <nav aria-label="Staff">
+      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard</a>
+      <a href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Events</a>
+      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> People</a>
+      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Reports</a>
+      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</a>
+    </nav>
+  </aside>
+  <div style="display:grid;gap:10px;justify-items:center">
+    <div style="width:360px;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--paper)">
+      <div style="height:300px;padding:16px"><p class="eyebrow">Events</p><strong>Fall Camporee 2026</strong></div>
+      <nav class="mobile-nav" aria-label="Staff">
+        <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Home</a><a href="#" class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Events</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M20 14v7"/><path d="M14 20h3"/></svg>Check-in</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a>
+      </nav>
+    </div>
+    <p class="ds-caption">Phone width: bottom tab bar.</p>
+  </div>
+</div>
+</div></section><h2 class="g-head">Data</h2><section class="g-card" id="EmptyState"><header class="g-meta"><h3>EmptyState</h3><p>What a list shows when it has nothing yet: an icon, a short heading and the next step.</p><a href="components/EmptyState/README.md">Usage rules</a></header><div class="g-frame" style="min-height:230px"><div class="ds-stage">
+  <div class="panel empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><h3>No private links sent yet</h3><p>Links you send to members for a form show up here.</p><div style="margin-top:12px"><button class="primary-button">Send a private link</button></div></div>
+</div>
+</div></section><section class="g-card" id="MetricCard"><header class="g-meta"><h3>MetricCard</h3><p>A summary number with its label and a one-line note, marked by a colored left rule.</p><a href="components/MetricCard/README.md">Usage rules</a></header><div class="g-frame" style="min-height:220px"><div class="ds-stage" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+  <div class="metric-card"><strong>24</strong><p>Active members</p><small>2026–2027 roster</small></div>
+  <div class="metric-card accent-purple"><strong>3</strong><p>Details needed</p><small>Missing birth dates</small></div>
+  <div class="metric-card accent-gold"><strong>Nov 10</strong><p>October report due</p><small>Draft saved</small></div>
+  <div class="metric-card accent-green"><strong>2,150</strong><p>Points this year</p><small>Includes 1,500 registration</small></div>
+</div>
+</div></section><section class="g-card" id="MonthlyRecordsGrid"><header class="g-meta"><h3>MonthlyRecordsGrid</h3><p>The coordinator's Monthly Records grid: one row per club, one cell per month, each cell stating its state in words.</p><a href="components/MonthlyRecordsGrid/README.md">Usage rules</a></header><div class="g-frame" style="min-height:240px"><div class="ds-stage">
+  <div class="report-table-wrap"><table class="report-table">
+    <thead><tr><th scope="col">Club</th><th scope="col">August</th><th scope="col">September</th><th scope="col">October</th><th scope="col">November</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Riverton Pathfinders</th><td><span class="records-cell submitted">Submitted</span></td><td><span class="records-cell submitted">Submitted</span></td><td><span class="records-cell not-submitted">Not submitted <small>(draft saved)</small></span></td><td><span class="records-cell not-due">Not due yet</span></td></tr>
+      <tr><th scope="row">Cedar Hollow Trailblazers</th><td><span class="records-cell submitted">Submitted</span></td><td><span class="records-cell submitted">Submitted <small>(late)</small></span></td><td><span class="records-cell not-submitted">Not submitted</span></td><td><span class="records-cell not-due">Not due yet</span></td></tr>
+      <tr><th scope="row">Prairie Ridge Eagles</th><td><span class="records-cell submitted">Submitted</span></td><td><span class="records-cell not-submitted">Not submitted</span></td><td><span class="records-cell not-submitted">Not submitted</span></td><td><span class="records-cell not-due">Not due yet</span></td></tr>
+    </tbody>
+  </table></div>
+</div>
+</div></section><section class="g-card" id="ReportTable"><header class="g-meta"><h3>ReportTable</h3><p>The standard data table: bordered, rounded wrapper, uppercase muted headers and quiet row lines.</p><a href="components/ReportTable/README.md">Usage rules</a></header><div class="g-frame" style="min-height:300px"><div class="ds-stage">
+  <div class="report-table-wrap"><table class="report-table">
+    <thead><tr><th scope="col">Club</th><th scope="col">Church</th><th scope="col">Headcount</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Riverton Pathfinders</th><td>Riverton</td><td>18</td><td><span class="status-chip green">Registered</span></td></tr>
+      <tr><th scope="row">Cedar Hollow Trailblazers</th><td>Cedar Hollow</td><td>11</td><td><span class="status-chip gold">Draft</span></td></tr>
+      <tr><th scope="row">Prairie Ridge Eagles</th><td>Prairie Ridge</td><td>—</td><td><span class="status-chip neutral">Not registered</span></td></tr>
+      <tr><th scope="row">Maple Bend Navigators</th><td>Maple Bend</td><td>9</td><td><span class="status-chip gold">Waitlisted</span></td></tr>
+    </tbody>
+  </table></div>
+</div>
+</div></section><h2 class="g-head">Overlays</h2><section class="g-card" id="Dialog"><header class="g-meta"><h3>Dialog</h3><p>A centered confirmation dialog on a dimmed navy backdrop, used before any step that can't be undone.</p><a href="components/Dialog/README.md">Usage rules</a></header><div class="g-frame" style="min-height:360px"><div class="modal-backdrop" style="min-height:360px">
+  <div class="modal-card" role="dialog" aria-labelledby="dlg-t">
+    <div class="modal-head"><h2 id="dlg-t">Remove Morgan Reed?</h2><button class="text-button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+    <p class="confirm-copy">This erases Morgan Reed's roster details and cannot be undone. To keep the person on file, choose Deactivate instead.</p>
+    <div class="form-actions"><button class="secondary-button">Keep on roster</button><button class="primary-button lifecycle-danger-button">Remove permanently</button></div>
+  </div>
+</div>
+</div></section><h2 class="g-head">Tool mockups</h2><section class="g-card" id="CalendarMonth"><header class="g-meta"><h3>CalendarMonth</h3><p>Mockup of the month calendar: a ruled grid with toned event chips and a key.</p><a href="components/CalendarMonth/README.md">Usage rules</a></header><div class="g-frame" style="min-height:630px"><div class="ds-stage"><div class="calendar-month"><div class="calendar-weekdays"><div class="calendar-weekday">Sun</div><div class="calendar-weekday">Mon</div><div class="calendar-weekday">Tue</div><div class="calendar-weekday">Wed</div><div class="calendar-weekday">Thu</div><div class="calendar-weekday">Fri</div><div class="calendar-weekday">Sat</div></div><div class="calendar-week"><div class="calendar-day is-outside"><span class="calendar-day-number"></span></div><div class="calendar-day is-outside"><span class="calendar-day-number"></span></div><div class="calendar-day is-outside"><span class="calendar-day-number"></span></div><div class="calendar-day is-outside"><span class="calendar-day-number"></span></div><div class="calendar-day"><span class="calendar-day-number">1</span></div><div class="calendar-day"><span class="calendar-day-number">2</span></div><div class="calendar-day"><span class="calendar-day-number">3</span><ul><li class="calendar-chip calendar-tone-1"><span>Pathfinder Bible Experience</span></li></ul></div></div><div class="calendar-week"><div class="calendar-day"><span class="calendar-day-number">4</span></div><div class="calendar-day"><span class="calendar-day-number">5</span></div><div class="calendar-day"><span class="calendar-day-number">6</span></div><div class="calendar-day"><span class="calendar-day-number">7</span></div><div class="calendar-day"><span class="calendar-day-number">8</span></div><div class="calendar-day"><span class="calendar-day-number">9</span><ul><li class="calendar-chip calendar-tone-event"><span>Fall Camporee</span></li></ul></div><div class="calendar-day"><span class="calendar-day-number">10</span><ul><li class="calendar-chip calendar-tone-event"><span>Fall Camporee</span></li></ul></div></div><div class="calendar-week"><div class="calendar-day"><span class="calendar-day-number">11</span><ul><li class="calendar-chip calendar-tone-event"><span>Fall Camporee</span></li></ul></div><div class="calendar-day"><span class="calendar-day-number">12</span></div><div class="calendar-day"><span class="calendar-day-number">13</span></div><div class="calendar-day"><span class="calendar-day-number">14</span></div><div class="calendar-day"><span class="calendar-day-number">15</span></div><div class="calendar-day"><span class="calendar-day-number">16</span></div><div class="calendar-day"><span class="calendar-day-number">17</span><ul><li class="calendar-chip calendar-tone-2"><span>Area 3 directors' meeting</span></li></ul></div></div><div class="calendar-week"><div class="calendar-day"><span class="calendar-day-number">18</span></div><div class="calendar-day"><span class="calendar-day-number">19</span></div><div class="calendar-day"><span class="calendar-day-number">20</span><ul><li class="calendar-chip calendar-tone-3"><span>Honors day</span></li></ul></div><div class="calendar-day"><span class="calendar-day-number">21</span></div><div class="calendar-day"><span class="calendar-day-number">22</span></div><div class="calendar-day"><span class="calendar-day-number">23</span></div><div class="calendar-day"><span class="calendar-day-number">24</span><ul><li class="calendar-chip calendar-tone-closure"><span>Office closed</span></li></ul></div></div><div class="calendar-week"><div class="calendar-day"><span class="calendar-day-number">25</span></div><div class="calendar-day"><span class="calendar-day-number">26</span><ul><li class="calendar-chip calendar-tone-4"><span>Teen leadership</span></li></ul></div><div class="calendar-day"><span class="calendar-day-number">27</span></div><div class="calendar-day"><span class="calendar-day-number">28</span></div><div class="calendar-day"><span class="calendar-day-number">29</span></div><div class="calendar-day is-today"><span class="calendar-day-number">30</span></div><div class="calendar-day"><span class="calendar-day-number">31</span></div></div></div><div class="calendar-key"><span class="calendar-key-item calendar-tone-event"><span class="calendar-swatch"></span>Conference event</span><span class="calendar-key-item calendar-tone-1"><span class="calendar-swatch"></span>Pathfinders</span><span class="calendar-key-item calendar-tone-2"><span class="calendar-swatch"></span>Area meetings</span><span class="calendar-key-item calendar-tone-3"><span class="calendar-swatch"></span>Honors</span><span class="calendar-key-item calendar-tone-4"><span class="calendar-swatch"></span>Youth</span><span class="calendar-key-item calendar-tone-closure"><span class="calendar-swatch"></span>Office closed</span></div></div>
+</div></section><section class="g-card" id="CheckIn"><header class="g-meta"><h3>CheckIn</h3><p>Mockup of event check-in: the hero with live tallies and the purple scan card.</p><a href="components/CheckIn/README.md">Usage rules</a></header><div class="g-frame" style="min-height:280px"><div class="ds-stage">
+  <section class="checkin-hero on-dark">
+    <div><h2>Fall Camporee check-in</h2><p>Friday, October 9 · Main gate</p></div>
+    <div class="checkin-tallies"><span><strong>142</strong><small>Checked in</small></span><span><strong>38</strong><small>Still to come</small></span><span><strong>12</strong><small>Clubs here</small></span></div>
+  </section>
+  <div class="ds-row">
+    <button class="scan-card"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M20 14v7"/><path d="M14 20h3"/></svg><span><strong>Scan a QR code</strong><small>Club packet or registration email</small></span></button>
+    <label class="search-field" style="max-width:420px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Find a person or club</span><input placeholder="Or find a person or club"></label>
+  </div>
+</div>
+</div></section><section class="g-card" id="ClubHome"><header class="g-meta"><h3>ClubHome</h3><p>Mockup of the club director's Home: the club-year summary, the next task and the month's report.</p><a href="components/ClubHome/README.md">Usage rules</a></header><div class="g-frame" style="min-height:640px"><header class="club-masthead"><div class="club-masthead-inner">
+  <div class="club-masthead-brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span><small>IMSDA Events · Club portal</small><strong>Riverton Pathfinders</strong></span></div>
+  <div class="club-masthead-actions"><a class="masthead-action" href="#">My account</a><a class="masthead-action" href="#">Sign out</a></div>
+</div></header>
+<div class="club-banner on-dark"><div class="club-banner-inner"><small>2026–2027 club year</small><h1>Home</h1></div></div>
+<nav class="club-nav" aria-label="Club"><div class="club-nav-strip"><a class="club-nav-link" href="#" aria-current="page">Home</a><a class="club-nav-link" href="#">Roster</a><a class="club-nav-link" href="#">Forms</a><a class="club-nav-link" href="#">Club events</a><a class="club-nav-link" href="#">Honors</a><a class="club-nav-link" href="#">Class tracking</a><a class="club-nav-link" href="#">Monthly Records</a><a class="club-nav-link" href="#">Orders</a><a class="club-nav-link" href="#">Health</a><a class="club-nav-link" href="#">Club settings</a></div></nav>
+<div style="width:min(1180px,calc(100% - 32px));margin:20px auto;display:grid;gap:16px">
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+    <div class="metric-card"><strong>24</strong><p>Active members</p><small>2026–2027 roster</small></div>
+    <div class="metric-card accent-purple"><strong>3</strong><p>Details needed</p><small>Missing birth dates</small></div>
+    <div class="metric-card accent-gold"><strong>Nov 10</strong><p>October report due</p><small>Draft saved</small></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px">
+    <section class="panel"><p class="eyebrow">Your club this year</p><h2>Continue club work</h2>
+      <p class="inline-notice warning">3 people need a birth date before Fall Camporee. <a href="#">Open Details needed</a></p>
+      <div class="ds-row" style="margin-top:14px"><button class="primary-button">Finish details</button><button class="secondary-button">Open roster</button></div></section>
+    <section class="panel"><p class="eyebrow">Monthly Records</p><h2>October report</h2>
+      <p style="margin:0 0 12px;color:var(--muted);font-size:.875rem">Due November 10 · 2 meeting notes added</p>
+      <div class="ds-row"><span class="status-chip gold">Draft saved</span><button class="primary-button">Open report</button></div></section>
+  </div>
+</div>
+</div></section><section class="g-card" id="RegistrationProgress"><header class="g-meta"><h3>RegistrationProgress</h3><p>Mockup of a club event registration: the step tracker over the first step's form.</p><a href="components/RegistrationProgress/README.md">Usage rules</a></header><div class="g-frame" style="min-height:600px"><div style="max-width:760px;margin:0 auto;padding:20px;display:grid;gap:16px">
+  <div class="public-registration-progress">
+    <div class="public-registration-progress-heading"><span>Step 1 of 3</span><strong>Who's going</strong></div>
+    <div class="public-registration-progress-track"><span style="width:33%"></span></div>
+    <ol><li class="is-current">1. Who's going</li><li>2. Each person's details</li><li>3. Review and submit</li></ol>
+  </div>
+  <section class="panel"><p class="eyebrow">Fall Camporee 2026 · Riverton Pathfinders</p><h2>Who's going?</h2>
+    <form class="form-stack" onsubmit="return false">
+      <label class="check-label"><input type="checkbox" checked> Morgan Reed · Pathfinder, 13</label>
+      <label class="check-label"><input type="checkbox" checked> Riley Moss · Pathfinder, 12</label>
+      <label class="check-label"><input type="checkbox" checked> Jordan Park · Staff</label>
+      <label class="check-label"><input type="checkbox"> Avery Lin · Details needed</label>
+      <div class="form-actions"><button class="secondary-button">Save draft</button><button class="primary-button">Continue</button></div>
+    </form></section>
+</div>
+</div></section><section class="g-card" id="RosterTool"><header class="g-meta"><h3>RosterTool</h3><p>Mockup of the club Roster: search, the <strong>Add to roster</strong> action, the Details needed filter and the member table.</p><a href="components/RosterTool/README.md">Usage rules</a></header><div class="g-frame" style="min-height:560px"><header class="club-masthead"><div class="club-masthead-inner">
+  <div class="club-masthead-brand"><span class="brand-mark" aria-hidden="true"><span class="brand-flame">i</span></span><span><small>IMSDA Events · Club portal</small><strong>Riverton Pathfinders</strong></span></div>
+  <div class="club-masthead-actions"><a class="masthead-action" href="#">My account</a><a class="masthead-action" href="#">Sign out</a></div>
+</div></header>
+<div class="club-banner on-dark"><div class="club-banner-inner"><small>2026–2027 club year</small><h1>Roster</h1></div></div>
+<nav class="club-nav" aria-label="Club"><div class="club-nav-strip"><a class="club-nav-link" href="#">Home</a><a class="club-nav-link" href="#" aria-current="page">Roster</a><a class="club-nav-link" href="#">Forms</a><a class="club-nav-link" href="#">Club events</a><a class="club-nav-link" href="#">Honors</a><a class="club-nav-link" href="#">Class tracking</a><a class="club-nav-link" href="#">Monthly Records</a><a class="club-nav-link" href="#">Orders</a><a class="club-nav-link" href="#">Health</a><a class="club-nav-link" href="#">Club settings</a></div></nav>
+<div style="width:min(1180px,calc(100% - 32px));margin:20px auto;display:grid;gap:14px">
+  <div class="ds-row" style="flex-wrap:nowrap">
+    <label class="search-field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Find a person by name</span><input placeholder="Find a person by name"></label>
+    <button class="secondary-button">Details needed <span class="count-badge" style="padding:2px 8px">1</span></button>
+    <button class="primary-button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add to roster</button>
+  </div>
+  <div class="report-table-wrap"><table class="report-table">
+    <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Class</th><th scope="col">Age</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+    <tbody><tr><th scope="row">Morgan Reed</th><td>Pathfinder</td><td>Friend</td><td>13</td><td><span class="status-chip green">Active</span></td><td><button class="text-button">Edit</button></td></tr><tr><th scope="row">Avery Lin</th><td>Pathfinder</td><td>Companion</td><td>—</td><td><span class="status-chip coral">Details needed</span></td><td><button class="text-button">Edit</button></td></tr><tr><th scope="row">Jordan Park</th><td>Staff</td><td>Counselor</td><td>34</td><td><span class="status-chip green">Active</span></td><td><button class="text-button">Edit</button></td></tr><tr><th scope="row">Riley Moss</th><td>Pathfinder</td><td>Explorer</td><td>12</td><td><span class="status-chip green">Active</span></td><td><button class="text-button">Edit</button></td></tr></tbody>
+  </table></div>
+  <label class="check-label"><input type="checkbox"> Show inactive people</label>
+</div>
+</div></section>
+</main></body></html>
