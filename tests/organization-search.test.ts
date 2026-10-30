@@ -1,3 +1,4 @@
+import { parseLeadingPageParam } from "@/lib/pagination";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +21,6 @@ import {
   listSearchParams,
   ORGANIZATION_SEARCH_MAX_LENGTH,
   organizationSearchWhere,
-  parsePageParam,
   searchTerms,
 } from "@/modules/organizations/search";
 
@@ -140,10 +140,10 @@ describe("the query stays in the URL (#723)", () => {
   });
 
   it("reads a page number defensively", () => {
-    expect(parsePageParam(undefined)).toBe(1);
-    expect(parsePageParam("abc")).toBe(1);
-    expect(parsePageParam("-4")).toBe(1);
-    expect(parsePageParam("7")).toBe(7);
+    expect(parseLeadingPageParam(undefined)).toBe(1);
+    expect(parseLeadingPageParam("abc")).toBe(1);
+    expect(parseLeadingPageParam("-4")).toBe(1);
+    expect(parseLeadingPageParam("7")).toBe(7);
   });
 
   it("the filter bar writes the query to the URL and submits on Enter", () => {

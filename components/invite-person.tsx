@@ -13,6 +13,7 @@ import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
 import styles from "./people-directory.module.css";
+import { isLooseEmail } from "@/lib/field-validation";
 
 type Option = { id: string; name: string };
 type EventRow = { key: number; eventId: string; role: EventRole };
@@ -78,7 +79,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   function validate(): FieldErrors {
     const found: FieldErrors = {};
     if (name.trim().length < 2) found.name = "Enter the person's name.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) found.email = "Enter a valid email address.";
+    if (!isLooseEmail(email.trim())) found.email = "Enter a valid email address.";
     if (events.some((row) => !row.eventId)) found.events = "Choose an event for each event row, or remove the row.";
     else if (new Set(events.map((row) => row.eventId)).size !== events.length) found.events = "Each event can be chosen once.";
     if (clubs.some((row) => !row.organizationId)) found.clubs = "Choose a club for each club row, or remove the row.";

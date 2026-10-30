@@ -9,8 +9,9 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { listDirectoryContacts } from "@/modules/organizations/contacts-repository";
 import { disbandedNotice, organizationKindLabels, safeWebsiteHref } from "@/modules/organizations/eadventist-import";
 import { listDirectoryOrganizations, type DirectoryStatusFilter } from "@/modules/organizations/eadventist-import-repository";
-import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
+import { cleanSearchQuery } from "@/modules/organizations/search";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { pageCountFor, parseLeadingPageParam } from "@/lib/pagination";
 
 export const metadata: Metadata = { title: "Organization directory" };
 
@@ -32,7 +33,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
   const kind = kinds.find((candidate) => candidate === params.kind) ?? null;
   const status = statuses.find((candidate) => candidate.value === params.status)?.value ?? "ALL";
   const query = cleanSearchQuery(params.q);
-  const { organizations, total, page, pageSize } = await listDirectoryOrganizations({ kind, status, query, page: parsePageParam(params.page) });
+  const { organizations, total, page, pageSize } = await listDirectoryOrganizations({ kind, status, query, page: parseLeadingPageParam(params.page) });
   const contacts = await listDirectoryContacts(organizations.map((organization) => organization.id), { id: user.id, globalRole: user.globalRole });
   const state = { q: query, kind: kind ?? "", status };
   const searching = query.trim() !== "" || kind !== null || status !== "ALL";
@@ -147,7 +148,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
               </tbody>
             </table>
           </div>
-          <OrganizationListPager basePath="/admin/organizations/directory" page={page} pageCount={Math.max(1, Math.ceil(total / pageSize))} pageSize={pageSize} state={state} total={total} />
+          <OrganizationListPager basePath="/admin/organizations/directory" page={page} pageCount={pageCountFor(total, pageSize)} pageSize={pageSize} state={state} total={total} />
         </div>
       </section>
     </>

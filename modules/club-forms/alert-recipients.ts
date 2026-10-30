@@ -1,4 +1,4 @@
-import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, validateEmail } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, isEmail, isUnchangedEmail } from "@/lib/field-validation";
 
 /**
  * The addresses emailed when a club form is submitted (#1017). Pure, with no server-only import, so the settings
@@ -21,7 +21,7 @@ export function parseAlertRecipients(raw: string | string[], stored: readonly st
   const emails: string[] = [];
   for (const [index, part] of parts.entries()) {
     const email = part.toLowerCase();
-    if (!stored.some((saved) => isUnchangedEmail(email, saved)) && !validateEmail(email).ok) {
+    if (!stored.some((saved) => isUnchangedEmail(email, saved)) && !isEmail(email)) {
       return { ok: false, message: `Address ${index + 1}: ${EMAIL_FIELD_MESSAGE}`, reason: "ADDRESS" };
     }
     if (!emails.includes(email)) emails.push(email);

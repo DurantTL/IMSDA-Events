@@ -27,6 +27,7 @@ import type { BillingContactInput } from "@/modules/billing-responsibility/schem
 import { resolveResponsibleOrganization } from "@/modules/forms/definition";
 import { moneyToCents } from "@/modules/payments/square-domain";
 import { storedRegistrationResponses } from "@/modules/registrations/amendments-repository";
+import { everyTermMatches, insensitiveContains, searchTerms } from "@/lib/server-search";
 
 /**
  * Billing responsibility and organization billing contacts (#165, slice 1). Every function takes
@@ -776,11 +777,11 @@ export const ORGANIZATION_PICKER_PAGE_SIZE = 10;
  * matching organization by name; the list is always paged on the server with a total.
  */
 export async function searchResponsibleOrganizations(query: string, requestedPage = 1): Promise<PageSlice<OrganizationOption>> {
-  const terms = query.normalize("NFKC").trim().split(/\s+/).filter(Boolean).slice(0, 5);
+  const terms = searchTerms(query, { maxTerms: 5, maxTermLength: 80 });
   const where = {
     isActive: true,
     type: { in: [...RESPONSIBLE_ORGANIZATION_TYPES] },
-    AND: terms.map((term) => ({ name: { contains: term.slice(0, 80), mode: "insensitive" as const } })),
+    ...everyTermMatches(terms, (term) => ({ name: insensitiveContains(term) })),
   };
   const prisma = getPrisma();
   const total = await prisma.organization.count({ where });

@@ -7,6 +7,7 @@ import {
 } from "@/modules/club-reports/area-summary-domain";
 import { YEARLY_REGISTRATION_POINTS } from "@/modules/club-reports/domain";
 import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
+import { firstParam } from "@/lib/search-params";
 
 /** The chart shows this many clubs until "Show all". */
 export const STAFF_POINTS_CHART_LIMIT = 10;
@@ -52,8 +53,6 @@ export type StaffPointsOptions = {
   all?: string | string[];
 };
 
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
 /** An in-view address: keeps year, view=points, the search, and `all` only when set. */
 export function staffPointsHref(input: { clubYear: string; query?: string; expanded?: boolean }) {
   return `${clubSummaryHref({ clubYear: input.clubYear, view: "points", query: input.query, all: input.expanded })}#points`;
@@ -61,7 +60,7 @@ export function staffPointsHref(input: { clubYear: string; query?: string; expan
 
 export function buildStaffPoints(input: StaffPointsOptions) {
   const query = parseClubQuery(input.q);
-  const expanded = first(input.all) === "1";
+  const expanded = firstParam(input.all) === "1";
   // Rank always comes from the whole year, so a search never renumbers a club.
   const ranked = sortLeaderboard(input.clubs, "points");
   const ranks = new Map(ranked.map((club, index) => [club.id, index + 1]));

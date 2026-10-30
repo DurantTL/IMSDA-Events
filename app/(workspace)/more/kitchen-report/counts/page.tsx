@@ -8,6 +8,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { kitchenCountKinds } from "@/modules/meals/kitchen-counts";
 import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-repository";
 import { eventLocalDateTime } from "@/modules/meals/scanner-import";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: staffPageTitles.kitchenCounts };
 
@@ -17,7 +18,7 @@ export const metadata: Metadata = { title: staffPageTitles.kitchenCounts };
  */
 export default async function KitchenCountsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const requested = Array.isArray(params.event) ? params.event[0] : params.event;
+  const requested = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   const canEnter = permissions.includes("MANAGE_KITCHEN_COUNTS");
   if (!canEnter && !permissions.includes("VIEW_REPORTS")) {

@@ -14,6 +14,7 @@ import {
   type MergedPerson,
   type PeopleCandidate,
 } from "@/modules/system-admin/people-directory-model";
+import { containsAnyOf } from "@/lib/server-search";
 
 /**
  * People & access (#1275): one directory over staff logins (`User`) and website accounts
@@ -29,10 +30,6 @@ export type PeopleRow = MergedPerson & {
   signIn: SignInChip[];
   access: string[];
 };
-
-function textFilter(text: string) {
-  return text ? { contains: text, mode: "insensitive" as const } : undefined;
-}
 
 function staffChip(accountStatus: string, disabled: boolean): SignInChip {
   if (disabled) return { side: "Staff login", label: "Sign-in off", tone: "coral" };
@@ -66,11 +63,11 @@ export async function findPeople(query: string): Promise<MergedPerson[]> {
   const text = query.trim().slice(0, 120);
   const [users, accounts] = await Promise.all([
     prisma.user.findMany({
-      where: text ? { OR: [{ email: textFilter(text) }, { displayName: textFilter(text) }] } : undefined,
+      where: text ? containsAnyOf(["email", "displayName"], text) : undefined,
       select: { id: true, email: true, displayName: true, attendeeAccountId: true },
     }),
     prisma.attendeeAccount.findMany({
-      where: text ? { OR: [{ email: textFilter(text) }, { displayName: textFilter(text) }] } : undefined,
+      where: text ? containsAnyOf(["email", "displayName"], text) : undefined,
       select: { id: true, email: true, displayName: true, linkedUser: { select: { id: true } } },
     }),
   ]);
@@ -160,7 +157,7 @@ export async function findPeopleByRole(
   if (!where) return [];
   const prisma = getPrisma();
   const text = query.trim().slice(0, 120);
-  const textWhere = text ? { OR: [{ email: textFilter(text) }, { displayName: textFilter(text) }] } : undefined;
+  const textWhere = text ? containsAnyOf(["email", "displayName"], text) : undefined;
   const combine = (roleWhere: Record<string, unknown>) => (textWhere ? { AND: [roleWhere, textWhere] } : roleWhere);
   const [users, accounts] = await Promise.all([
     where.staff ? prisma.user.findMany({

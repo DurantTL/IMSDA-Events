@@ -5,6 +5,7 @@ import { MealCloseout } from "@/components/meal-closeout";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadMealCloseout } from "@/modules/meals/closeout-repository";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: staffPageTitles.mealCloseout };
 
@@ -15,7 +16,7 @@ export const metadata: Metadata = { title: staffPageTitles.mealCloseout };
  */
 export default async function MealCloseoutPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const requested = Array.isArray(params.event) ? params.event[0] : params.event;
+  const requested = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   if (!permissions.includes("MANAGE_FINANCE")) {
     return <AccessRestricted title="The meal closeout is restricted" detail="Your event role does not include finance access." />;

@@ -5,7 +5,7 @@ import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
-import { EMAIL_PROBLEM, inlineFieldProblem, problemMessage, validateEmail } from "@/lib/field-validation";
+import { EMAIL_PROBLEM, inlineFieldProblem, isEmail, problemMessage } from "@/lib/field-validation";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -478,7 +478,7 @@ export function CommunicationsWorkspace({
   // flagged but never blocks; the address list names the line that fails, never the address.
   const [settingsTouched, setSettingsTouched] = useState({ replyTo: false, recipients: false });
   const replyToProblem = inlineFieldProblem("Reply-to email", "email", settingsDraft.replyToEmail, messaging?.settings.replyToEmail, settingsTouched.replyTo);
-  const badRecipientLine = settingsDraft.internalNotificationEmails.split(/[\n,;]+/).map((email) => email.trim()).filter(Boolean).findIndex((email) => !validateEmail(email).ok);
+  const badRecipientLine = settingsDraft.internalNotificationEmails.split(/[\n,;]+/).map((email) => email.trim()).filter(Boolean).findIndex((email) => !isEmail(email));
   const recipientsProblem = badRecipientLine >= 0 && settingsTouched.recipients ? problemMessage(`Recipient ${badRecipientLine + 1}`, EMAIL_PROBLEM) : "";
   const savedSettingsDraft = settingsDraftFromMessaging(messaging);
   const settingsDirty = JSON.stringify(settingsDraft) !== JSON.stringify(savedSettingsDraft);

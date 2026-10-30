@@ -46,6 +46,7 @@ import {
 } from "@/modules/staff-invitations/domain";
 import { invitationIdFromToken, invitationToken, invitationTokenMatches } from "@/modules/staff-invitations/link";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
+import { isLooseEmail } from "@/lib/field-validation";
 
 type Tx = Prisma.TransactionClient;
 
@@ -660,7 +661,7 @@ export async function queueNotices(tx: Tx, input: { eventId: string; registratio
 
 async function officeEmails(tx: Tx, eventId: string) {
   const row = await loadEventEmailSettings(tx, eventId);
-  return [...new Set(stringArray(row?.internalNotificationEmails).map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)))];
+  return [...new Set(stringArray(row?.internalNotificationEmails).map((entry) => entry.trim().toLowerCase()).filter((entry) => isLooseEmail(entry, 254)))];
 }
 
 async function deliverAfterCommit(messageIds: readonly string[]) {

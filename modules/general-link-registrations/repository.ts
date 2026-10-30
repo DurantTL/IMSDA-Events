@@ -71,6 +71,7 @@ import {
 } from "@/modules/general-link-registrations/domain";
 import { readTypedInTeam, requestHash, rosterOverMaximumMessage, typedInPersonId, withoutRetiredAnswers } from "@/modules/general-link-registrations/typed-team";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
+import { isLooseEmail } from "@/lib/field-validation";
 
 /**
  * The general registration link (#931): a club director with no account registers a team through the event's one public link,
@@ -391,7 +392,7 @@ async function staffEmails(tx: Tx, eventId: string) {
   const row = await loadEventEmailSettings(tx, eventId);
   const value = row?.internalNotificationEmails;
   if (!Array.isArray(value)) return [] as string[];
-  return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)))];
+  return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim().toLowerCase()).filter((entry) => isLooseEmail(entry, 254)))];
 }
 
 async function sendAfterCommit(messageIds: string[]) {

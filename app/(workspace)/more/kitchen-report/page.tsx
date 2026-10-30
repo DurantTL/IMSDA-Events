@@ -11,13 +11,14 @@ import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-reposito
 import { loadServedReport } from "@/modules/meals/scanner-import-repository";
 import { loadKitchenReport } from "@/modules/registrations/kitchen-report-loader";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
 
 /** Kitchen report (#787). VIEW_REPORTS only: it holds counts and anonymous answers, so it needs no sensitive or health access. */
 export default async function KitchenReportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const requestedEvent = Array.isArray(params.event) ? params.event[0] : params.event;
+  const requestedEvent = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requestedEvent, { allowWithoutEventView: true });
   // Kitchen staff hold no report access: their page is the counts page, which holds no registration data (#1029).
   if (!permissions.includes("VIEW_REPORTS") && permissions.includes("MANAGE_KITCHEN_COUNTS")) {

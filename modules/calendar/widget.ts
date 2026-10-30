@@ -6,18 +6,16 @@
 import { escapeHtmlAttribute } from "@/modules/forms/embed";
 import { filterByCategory, firstPerSeries, type CalendarItem } from "@/modules/calendar/domain";
 import { filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
+import { firstParam } from "@/lib/search-params";
 
 export const defaultWidgetLimit = 5;
 export const minWidgetLimit = 1;
 export const maxWidgetLimit = 12;
 const maxCategoryLength = 40;
 
-/** A repeated query param arrives as an array; the first value wins. */
-const firstValue = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
 /** `?limit=` as a whole number from 1 to 12; anything missing or unreadable is 5. */
 export function parseWidgetLimit(value: string | string[] | undefined) {
-  const raw = firstValue(value);
+  const raw = firstParam(value);
   if (!raw || !/^\s*-?\d+\s*$/.test(raw)) return defaultWidgetLimit;
   return Math.min(maxWidgetLimit, Math.max(minWidgetLimit, Number(raw)));
 }
@@ -32,7 +30,7 @@ export type WidgetOptions = {
 
 /** The resolved filter the widget uses and the "View full calendar" link keeps. */
 export function resolveWidgetFilter(filter: string | string[] | undefined, category: string | string[] | undefined) {
-  return resolveCalendarFilter(firstValue(filter), firstValue(category)?.slice(0, maxCategoryLength) || undefined);
+  return resolveCalendarFilter(firstParam(filter), firstParam(category)?.slice(0, maxCategoryLength) || undefined);
 }
 
 /** An item shows its linked event's own dates when it has them (#1086), so ordering and "over" use those. */

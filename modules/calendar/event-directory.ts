@@ -1,5 +1,6 @@
 import type { CalendarItem } from "@/modules/calendar/domain";
 import { parseOpenRegistrationFilter, type OpenRegistrationFilter } from "@/modules/calendar/open-registration";
+import { firstParam } from "@/lib/search-params";
 
 /**
  * Search and filters for the public events list (#106): text, date range, category, location and audience, all read
@@ -21,7 +22,7 @@ export type EventDirectorySearchParams = Record<string, Param>;
 
 export const eventDirectoryQueryMaxLength = 100;
 
-const firstValue = (value: Param) => (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+const firstValue = (value: Param) => firstParam(value)?.trim() ?? "";
 
 /** A real calendar date written YYYY-MM-DD, or "". */
 function parseDate(value: Param) {

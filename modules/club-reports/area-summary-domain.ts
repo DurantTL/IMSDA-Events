@@ -1,6 +1,7 @@
 import { clubYearMonths, isLockedForClub, reportMonthLabel, yearToDate } from "@/modules/club-reports/domain";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { toCsv } from "@/modules/reporting/csv";
+import { firstParam } from "@/lib/search-params";
 
 /**
  * Cross-club monthly report summary for Area Coordinators and the conference
@@ -156,7 +157,7 @@ export function sortLeaderboard<T extends { name: string; totalPoints: number }>
 
 /** The club-name search the area-coordinator tabs share (#791): the text typed, trimmed and capped. */
 export function parseClubQuery(value: string | string[] | undefined) {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   return (text ?? "").trim().slice(0, 80);
 }
 
