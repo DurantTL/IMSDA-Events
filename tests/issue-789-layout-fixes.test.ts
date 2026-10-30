@@ -48,7 +48,7 @@ describe("meeting note and monthly report dialogs (#789)", () => {
   });
 
   it("pulls focus back into the dialog when Tab is pressed from outside it", () => {
-    expect(read("components/use-accessible-dialog.ts")).toMatch(/!dialogElement\.contains\(document\.activeElement\)/);
+    expect(read("components/use-accessible-dialog.ts")).toMatch(/!dialog\.contains\(active\)/);
   });
 
   it("keeps the dialog form mounted so typed values survive closing it", () => {

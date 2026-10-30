@@ -2,7 +2,7 @@
 // screen: while it covers the page the page behind is inert, Tab stays inside, Escape closes it, and focus goes back to
 // the control that opened it (or, when that control is gone, to `fallback`). Closing only hides it: nothing is saved.
 import { useEffect, useRef, type RefObject } from "react";
-import { isTopDialog, pushOpenDialog, removeOpenDialog } from "@/components/use-accessible-dialog";
+import { dialogKeyDown, pushOpenDialog, removeOpenDialog } from "@/components/use-accessible-dialog";
 import { makeBackgroundInert } from "@/components/use-attendee-sheet";
 import { pickerViewportBox, trappedTabIndex } from "@/modules/forms/searchable-choice";
 
@@ -13,6 +13,13 @@ export function tabStops(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((candidate) => (
     !candidate.hidden && candidate.getClientRects().length > 0 && candidate.getAttribute("role") !== "separator"
   ));
+}
+
+/** Tab inside the sheet: also loops when focus is on the sheet itself, and Shift+Tab from outside lands on the last stop. */
+function phoneNextStop(stops: HTMLElement[], active: Element | null, backwards: boolean, element: HTMLElement): HTMLElement | null {
+  const next = trappedTabIndex(stops.indexOf(active as HTMLElement), stops.length, backwards);
+  if (next !== null) return stops[next] ?? null;
+  return element.contains(active) ? null : (stops[0] ?? element);
 }
 
 export function usePhoneModal({ active, ref, onClose, fallback, fit = true }: {
@@ -38,25 +45,17 @@ export function usePhoneModal({ active, ref, onClose, fallback, fit = true }: {
     // Focus lands in the sheet, on the sheet itself, so the keyboard does not open and a screen reader announces its name.
     if (!element.contains(document.activeElement)) element.focus({ preventScroll: true });
 
+    // Escape, Tab and the top-of-stack check are the shared dialog core; only the tab stops and where Tab goes differ.
     function onKeyDown(event: KeyboardEvent) {
-      if (!isTopDialog(token)) return;
-      if (event.key === "Escape") {
+      dialogKeyDown(event, {
+        token,
+        dialog: element,
+        stops: () => tabStops(element),
         // An open menu or picker inside takes its own Escape first; they stop it.
-        if (event.defaultPrevented) return;
-        event.preventDefault();
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const stops = tabStops(element);
-      const next = trappedTabIndex(stops.indexOf(document.activeElement as HTMLElement), stops.length, event.shiftKey);
-      if (next !== null) {
-        event.preventDefault();
-        stops[next]?.focus();
-      } else if (!element.contains(document.activeElement)) {
-        event.preventDefault();
-        (stops[0] ?? element).focus();
-      }
+        skipHandled: "escape",
+        onEscape: () => closeRef.current(),
+        nextStop: phoneNextStop,
+      });
     }
     const viewport = window.visualViewport;
     function fitToViewport() {
