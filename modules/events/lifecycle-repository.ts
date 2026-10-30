@@ -173,9 +173,11 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
     const alreadyDone = input.legacy ? input.legacy.alreadyDone(effective) : effective === input.toState;
     if (alreadyDone) {
       // Even a no-op needs the permission that moving into this state needs, so a member without it learns nothing.
-      const entering = eventLifecycleTransitions.filter((rule) => rule.to === input.toState);
-      if (entering.length > 0 && !entering.some((rule) => input.actor.permissions.includes(rule.permission))) {
-        throw new EventLifecycleError("PERMISSION_DENIED", `The ${entering[0]!.permission} permission is required for this change.`, effective);
+      // A state no rule enters (Archived) needs CONFIGURE_EVENT.
+      const entering = eventLifecycleTransitions.filter((rule) => rule.to === input.toState).map((rule) => rule.permission);
+      const required = entering.length > 0 ? entering : ["CONFIGURE_EVENT" as const];
+      if (!required.some((permission) => input.actor.permissions.includes(permission))) {
+        throw new EventLifecycleError("PERMISSION_DENIED", `The ${required[0]!} permission is required for this change.`, effective);
       }
       return { changed: false, fromState: effective, toState: effective, lifecycleVersion: current.lifecycleVersion };
     }

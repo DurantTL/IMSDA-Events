@@ -122,6 +122,19 @@ describe("transitionEventLifecycle (#156)", () => {
     expect(tx.eventLifecycleTransition.create).not.toHaveBeenCalled();
   });
 
+  it("asks a finance-only state's no-op for MANAGE_FINANCE, not CONFIGURE_EVENT", async () => {
+    const { tx } = mockPrisma(row({ lifecycleState: "CLOSED", isPublished: true }));
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "CLOSED", expectedFromState: "CLOSED", actor: configure, now })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "CLOSED", expectedFromState: "CLOSED", actor: { userId: "usr_1", permissions: ["MANAGE_FINANCE"] }, now })).resolves.toMatchObject({ changed: false });
+    expect(tx.eventLifecycleTransition.create).not.toHaveBeenCalled();
+  });
+
+  it("asks an Archived no-op, which no rule enters, for CONFIGURE_EVENT", async () => {
+    mockPrisma(row({ lifecycleState: "PUBLISHED", isPublished: true, archivedAt: new Date("2026-10-01T00:00:00Z") }));
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "ARCHIVED", expectedFromState: "ARCHIVED", actor: { userId: "usr_1", permissions: ["VIEW_EVENT"] }, now })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "ARCHIVED", expectedFromState: "ARCHIVED", actor: configure, now })).resolves.toMatchObject({ changed: false });
+  });
+
   it("refuses a stale expected state with a conflict and changes nothing", async () => {
     const { tx } = mockPrisma(row({ lifecycleState: "TEST" }));
     const error = await transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "DRAFT", actor: configure, now }).catch((caught: unknown) => caught);
