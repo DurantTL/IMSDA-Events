@@ -24,6 +24,8 @@ export function duplicateMatchApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status });
   }
   if (error instanceof PersonMergeResolutionError) {
+    // A cycle or over-long chain is a data-integrity problem; log it (ids only) so a developer can find it.
+    logError(`${action} failed`, error);
     return Response.json({
       error: "RESOLUTION_FAILED",
       message: "The merge records for these people could not be followed safely. Ask a developer to check them.",

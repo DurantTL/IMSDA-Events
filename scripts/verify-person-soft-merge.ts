@@ -21,7 +21,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
-import { generateMatchCandidates } from "../modules/people/duplicate-match-repository";
+import { generateMatchCandidates, listOpenMatchCandidates } from "../modules/people/duplicate-match-repository";
 import { anonymizePerson, PERSON_ANONYMIZED_FIELDS } from "../modules/people/anonymization";
 import {
   getMergedPersonView,
@@ -295,6 +295,12 @@ async function main() {
   await generateMatchCandidates();
   assert(await pairOpen() === 0, "a rescan does not bring the anonymized person's pair back");
   assert(await prisma.personMatchCandidate.count({ where: { state: "OPEN", OR: [{ personAId: qa!.id }, { personBId: qa!.id }] } }) === 0, "no OPEN candidate involves the anonymized person at all");
+  // Anonymization blanks the phone, so give the anonymized person the shared phone back: only the anonymizedAt filter keeps the pair out now.
+  await prisma.person.update({ where: { id: qa!.id }, data: { phone: "(515) 555-0177" } });
+  await generateMatchCandidates();
+  assert(await pairOpen() === 0, "a rescan skips an anonymized person even when a signal still matches");
+  await prisma.personMatchCandidate.create({ data: { personAId: [qa!.id, qb!.id].sort()[0]!, personBId: [qa!.id, qb!.id].sort()[1]!, confidence: "MEDIUM", ruleVersion: 0, fingerprint: `synthetic-${randomUUID()}`, matchedSignals: ["PHONE_MATCH"] } });
+  assert(!(await listOpenMatchCandidates()).some((candidate) => [candidate.personA.id, candidate.personB.id].includes(qa!.id)), "the review queue drops an OPEN pair with an anonymized person");
 
   console.log("verify-person-soft-merge: all checks passed");
 }

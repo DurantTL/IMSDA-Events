@@ -323,7 +323,7 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
           where: { id: { in: [candidate.personAId, candidate.personBId] }, anonymizedAt: { not: null } },
           select: { id: true },
         });
-        const restoreTo = newer || anonymized.length > 0 ? "SUPERSEDED" : prior.state;
+        const restoreTo = prior.state === "OPEN" && (newer || anonymized.length > 0) ? "SUPERSEDED" : prior.state;
         const restored = await tx.personMatchCandidate.updateMany({
           where: { id: existing.sourceCandidateId, state: "MERGED" },
           data: { state: restoreTo as Prisma.PersonMatchCandidateUpdateInput["state"] },
