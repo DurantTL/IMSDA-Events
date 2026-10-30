@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   SQUARE_IN_PERSON_CARD_RATE,
-  formatCents,
   inPersonCardQuote,
 } from "@/modules/payments/in-person-card";
 

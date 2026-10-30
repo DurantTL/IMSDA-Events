@@ -29,6 +29,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { readDraftShape, type BuilderIssue, type ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
 import { conditionPhrase } from "@/modules/forms/visibility-rule";
 import { conditionOperators, fieldDisplayLabel, formFieldTypes, isChoiceFieldType, type RegistrationFormField } from "@/modules/forms/definition";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * The club form builder (#712): a desktop editor for one club form template,
@@ -360,7 +361,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
         <p className="field-help">Every published version is kept. A form that was filled in shows, prints and exports on the version it was filled in on.</p>
         <ul>
           {props.versions.map((entry) => (
-            <li key={entry.version}>Version {entry.version}{entry.version === props.version ? " (current)" : ""} · recorded {new Date(entry.recordedAt).toLocaleDateString("en-US", { timeZone: "America/Chicago" })}</li>
+            <li key={entry.version}>Version {entry.version}{entry.version === props.version ? " (current)" : ""} · recorded {formatInConferenceTime(entry.recordedAt)}</li>
           ))}
         </ul>
       </section>

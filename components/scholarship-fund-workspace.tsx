@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, HandCoins, WalletCards } from "lucide-react";
 import { postJson } from "@/lib/post-json";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   CONTRIBUTION_METHODS,
   contributionMethodLabels,
-  formatCents,
   type ContributionMethod,
 } from "@/modules/scholarship-funds/domain";
 import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-funds/repository";

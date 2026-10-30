@@ -1,5 +1,6 @@
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 import styles from "./event-template-provenance.module.css";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type Provenance = {
   forms?: Array<{ versionNumber?: number }>;
@@ -29,7 +30,7 @@ export function EventTemplateProvenance({ template }: { template: EventTemplateR
           return (
             <li key={version.id} className={styles.entry}>
               <p className={styles.line}><strong>Version {version.versionNumber}</strong> saved from {source.sourceEventId ? source.sourceEventName : `${source.sourceEventName} (deleted event)`}</p>
-              <p className={styles.line}>Saved by {source.savedBy} on {new Date(source.savedAt).toLocaleDateString("en-US", { timeZone: "America/Chicago" })}.</p>
+              <p className={styles.line}>Saved by {source.savedBy} on {formatInConferenceTime(source.savedAt)}.</p>
               <p className={styles.line}>Release note: {source.releaseNote}</p>
               <p className={styles.line}>Copied from {forms} published {forms === 1 ? "form" : "forms"}{formVersions ? ` (${formVersions})` : ""} and {messages} message {messages === 1 ? "template" : "templates"}{messageVersions ? ` (${messageVersions})` : ""}.</p>
             </li>

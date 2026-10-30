@@ -4,11 +4,11 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AssetError } from "@/modules/issued-assets/errors";
 import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import {
   chargeActionSchema,
   decideDepositOutcome,
   depositActionSchema,
-  formatCents,
   type DepositOutcome,
 } from "@/modules/issued-assets/returns-domain";
 import { lockAssets, requireEvent, rowHolderKey, transact, type Tx } from "@/modules/issued-assets/service";
@@ -110,7 +110,7 @@ export async function recordDeposit(eventId: string, actorUserId: string, rawInp
     await tx.assetDepositCover.createMany({ data: rows.map((row) => ({ eventId, issuanceId: row.id, depositEntryId: entry.id })) });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_DEPOSIT_RECORDED", entityType: "AssetLedgerEntry", entityId: entry.id,
-      summary: `Recorded a cash deposit of ${formatCents(input.amountCents)} for ${rows.length} item${rows.length === 1 ? "" : "s"}.`,
+      summary: `Recorded a cash deposit of ${formatCentsPlain(input.amountCents)} for ${rows.length} item${rows.length === 1 ? "" : "s"}.`,
       metadata: { amountCents: input.amountCents, typeId: type.id, issuanceIds: ids.slice(0, 50), registrationId },
     }, tx);
     return { depositEntryId: entry.id, amountCents: entry.amountCents, covered: rows.length, replayed: false };
@@ -172,7 +172,7 @@ export async function settleDeposit(eventId: string, actorUserId: string, rawInp
     if (outcome.keepCents > 0) await tx.assetLedgerEntry.create({ data: { ...common, kind: "DEPOSIT_KEPT", amountCents: outcome.keepCents, idempotencyKey: input.idempotencyKey ? `${input.idempotencyKey}:K` : null } });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_DEPOSIT_SETTLED", entityType: "AssetLedgerEntry", entityId: found.id,
-      summary: `Settled a cash deposit: ${formatCents(outcome.refundCents)} handed back, ${formatCents(outcome.keepCents)} kept.`,
+      summary: `Settled a cash deposit: ${formatCentsPlain(outcome.refundCents)} handed back, ${formatCentsPlain(outcome.keepCents)} kept.`,
       metadata: { outcome: outcome.outcome, refundCents: outcome.refundCents, keepCents: outcome.keepCents, missing: outcome.missing, damaged: outcome.damaged },
     }, tx);
     return { depositEntryId: found.id, outcome: outcome.outcome, refundCents: outcome.refundCents, keepCents: outcome.keepCents, shortfallCents: outcome.shortfallCents, message: outcome.message, replayed: false };
@@ -231,7 +231,7 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
       const standard = input.category === "REPLACEMENT" && lostOrDamaged && type.replacementFeeCents > 0 && input.amountCents === type.replacementFeeCents * quantity;
       if (!standard) {
         throw new AssetError("MONEY_PERMISSION_REQUIRED", type.replacementFeeCents > 0
-          ? `Check-in staff can record only the standard replacement fee (${formatCents(type.replacementFeeCents * quantity)}). Another amount needs finance or an event administrator.`
+          ? `Check-in staff can record only the standard replacement fee (${formatCentsPlain(type.replacementFeeCents * quantity)}). Another amount needs finance or an event administrator.`
           : "This kind has no standard replacement fee. A charge needs finance or an event administrator.");
       }
     }
@@ -245,7 +245,7 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
         const held = await depositHeldCents(tx, eventId, cover.depositEntryId);
         if (held > 0) {
           if (!options.canManageMoney || !input.confirmKeptDeposit) {
-            throw new AssetError("DEPOSIT_ALREADY_KEPT", `The cash deposit still holds ${formatCents(held)} that it kept for lost or damaged items, so charging the full amount would take the guest's money twice. ${options.canManageMoney ? "Confirm to charge only the part above what the deposit holds." : "Finance or an event administrator can charge only the part above it."}`);
+            throw new AssetError("DEPOSIT_ALREADY_KEPT", `The cash deposit still holds ${formatCentsPlain(held)} that it kept for lost or damaged items, so charging the full amount would take the guest's money twice. ${options.canManageMoney ? "Confirm to charge only the part above what the deposit holds." : "Finance or an event administrator can charge only the part above it."}`);
           }
           offset = Math.min(input.amountCents, held);
           if (offset >= input.amountCents) throw new AssetError("CHARGE_NOT_ALLOWED", "The deposit that was kept already covers that amount. Nothing more is charged.");
@@ -274,7 +274,7 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
     });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_CHARGE_RECORDED", entityType: "AssetLedgerEntry", entityId: entry.id,
-      summary: `Recorded a ${input.category.toLowerCase()} charge of ${formatCents(chargeCents)}${adjustmentId ? " and posted it to the registration" : ""}.`,
+      summary: `Recorded a ${input.category.toLowerCase()} charge of ${formatCentsPlain(chargeCents)}${adjustmentId ? " and posted it to the registration" : ""}.`,
       metadata: { amountCents: chargeCents, depositOffsetCents: offset, category: input.category, issuanceId: row.id, posted: adjustmentId !== null, registrationId },
     }, tx);
     return { chargeEntryId: entry.id, amountCents: entry.amountCents, offsetCents: offset, posted: adjustmentId !== null, replayed: false };
@@ -335,7 +335,7 @@ export async function waiveCharge(eventId: string, actorUserId: string, rawInput
     });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_CHARGE_WAIVED", entityType: "AssetLedgerEntry", entityId: entry.id,
-      summary: `Waived a charge of ${formatCents(charge.amountCents)}.`,
+      summary: `Waived a charge of ${formatCentsPlain(charge.amountCents)}.`,
       metadata: { chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive },
     }, tx);
     return { waiverEntryId: entry.id, chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive, replayed: false };
@@ -378,7 +378,7 @@ export async function recordLateDepositRefund(eventId: string, actorUserId: stri
       throw new AssetError("CORRECTION_INVALID", "No item this deposit covers was corrected from lost or damaged to returned after the deposit was kept, so the kept deposit stands.");
     }
     const held = await depositHeldCents(tx, eventId, found.id);
-    if (input.amountCents > held) throw new AssetError("CORRECTION_INVALID", `Only ${formatCents(held)} of the kept deposit is still held (some may already be handed back or counted against a charge).`);
+    if (input.amountCents > held) throw new AssetError("CORRECTION_INVALID", `Only ${formatCentsPlain(held)} of the kept deposit is still held (some may already be handed back or counted against a charge).`);
     const entry = await tx.assetLedgerEntry.create({
       data: {
         eventId, kind: "DEPOSIT_HANDED_BACK_LATE", amountCents: input.amountCents, assetTypeId: found.assetTypeId, registrationId: found.registrationId, depositEntryId: found.id,
@@ -387,7 +387,7 @@ export async function recordLateDepositRefund(eventId: string, actorUserId: stri
     });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_DEPOSIT_HANDED_BACK_AFTER_CORRECTION", entityType: "AssetLedgerEntry", entityId: entry.id,
-      summary: `Recorded ${formatCents(input.amountCents)} of a kept deposit handed back after a correction.`, metadata: { depositEntryId: found.id, amountCents: input.amountCents },
+      summary: `Recorded ${formatCentsPlain(input.amountCents)} of a kept deposit handed back after a correction.`, metadata: { depositEntryId: found.id, amountCents: input.amountCents },
     }, tx);
     return { entryId: entry.id, amountCents: input.amountCents, remainingKeptCents: held - input.amountCents, replayed: false };
   });

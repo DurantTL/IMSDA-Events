@@ -1,5 +1,6 @@
 import { CreditCard } from "lucide-react";
-import { formatCents, inPersonCardQuote } from "@/modules/payments/in-person-card";
+import { formatCents } from "@/modules/payments/format-cents";
+import { inPersonCardQuote } from "@/modules/payments/in-person-card";
 
 /**
  * Shown at check-in when a registration still owes money. Staff take card

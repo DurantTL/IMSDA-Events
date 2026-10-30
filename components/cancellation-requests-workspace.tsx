@@ -7,7 +7,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { CancellationCarryOut } from "@/components/cancellation-carry-out";
 import { postJson } from "@/lib/post-json";
 import type { CarryOutPanel } from "@/modules/cancellation-execution/views";
-import { formatCents } from "@/modules/cancellation-policy/rules";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { requestStatuses, requestStatusLabels, type RequestStatus } from "@/modules/cancellation-requests/domain";
 import type { StaffQueueRow, StaffRequestDetail } from "@/modules/cancellation-requests/views";
 
@@ -87,7 +87,7 @@ export function CancellationRequestsWorkspace({
                   <span translate="no">{row.confirmationCode}</span>
                   <span>{row.statusLabel}</span>
                   <span>{scopeWords[row.scope]}{row.afterDeadline ? ", after deadline" : ""}</span>
-                  <span translate="no">Proposed refund {formatCents(row.proposedRefundCents)}</span>
+                  <span translate="no">Proposed refund {formatCentsPlain(row.proposedRefundCents)}</span>
                   <small>Asked {when(row.createdAt, timezone)}</small>
                 </Link>
               </li>
@@ -162,10 +162,10 @@ function RequestDetail({ detail, eventId, timezone, carryOut }: { detail: StaffR
         {detail.proposal.afterDeadline ? " Requested after the refund deadline." : ""}
       </p>
       <dl className="cancel-request-facts">
-        <div><dt>Charged</dt><dd translate="no">{formatCents(detail.proposal.chargedCents)}</dd></div>
-        <div><dt>Paid</dt><dd translate="no">{formatCents(detail.proposal.paidCents)}</dd></div>
-        <div><dt>Proposed refund</dt><dd translate="no">{formatCents(detail.proposal.refundCents)}</dd></div>
-        <div><dt>Kept</dt><dd translate="no">{formatCents(detail.proposal.retainedCents)}</dd></div>
+        <div><dt>Charged</dt><dd translate="no">{formatCentsPlain(detail.proposal.chargedCents)}</dd></div>
+        <div><dt>Paid</dt><dd translate="no">{formatCentsPlain(detail.proposal.paidCents)}</dd></div>
+        <div><dt>Proposed refund</dt><dd translate="no">{formatCentsPlain(detail.proposal.refundCents)}</dd></div>
+        <div><dt>Kept</dt><dd translate="no">{formatCentsPlain(detail.proposal.retainedCents)}</dd></div>
       </dl>
       <details><summary>How it was worked out</summary><ul>{detail.proposal.explanation.map((line, index) => <li key={index}>{line}</li>)}</ul></details>
 

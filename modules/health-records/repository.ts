@@ -40,6 +40,7 @@ import {
 import { HEALTH_LINK_UNAVAILABLE_MESSAGE, HEALTH_MEMBER_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled, requireHealthRecordsEnabled } from "@/modules/health-records/flag";
 import { HEALTH_RECORD_LINK_TEMPLATE_KEY, healthRecordLinkEmailContent } from "@/modules/health-records/link-email";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Pathfinder Health Record storage and use (#611). Every entry point checks
@@ -658,7 +659,7 @@ export async function createHealthRecordLink(viewer: HealthViewer, input: Create
   const content = healthRecordLinkEmailContent({
     clubName: member.organization.name,
     days,
-    expiresOn: expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" }),
+    expiresOn: formatInConferenceTime(expiresAt, { month: "long", day: "numeric", year: "numeric" }),
   });
   const who = healthAuditActor(viewer);
 

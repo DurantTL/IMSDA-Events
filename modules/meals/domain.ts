@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatCents } from "@/modules/payments/format-cents";
 
 /**
  * Meals (#210): pure rules for meal services, plans, prices, selections and the ledger. No database and no clock,
@@ -50,10 +51,6 @@ export const mealDietaryCategoryLabels: Record<MealDietaryCategory, string> = {
   VEGAN: "Vegan",
   GLUTEN_FREE: "Gluten-free",
 };
-
-export function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 // ---------------------------------------------------------------------------
 // Input schemas (staff configuration)
@@ -359,7 +356,7 @@ export function applyMealPricesToDefinition<F extends FormFieldLike, D extends F
         const binding = field.type === "NUMBER" && field.scope === "REGISTRATION" ? mealTicketBinding(field.key) : null;
         const cents = binding ? prices.get(`${binding.mealType}:${binding.ageGroup}`) : undefined;
         if (!binding || cents === undefined) return field;
-        const label = LABEL_PRICE.test(field.label) ? field.label.replace(LABEL_PRICE, ` — ${money(cents).replace(/\.00$/, "")} each`) : field.label;
+        const label = LABEL_PRICE.test(field.label) ? field.label.replace(LABEL_PRICE, ` — ${formatCents(cents).replace(/\.00$/, "")} each`) : field.label;
         return { ...field, priceCents: cents, label, latePricing: undefined };
       }),
     })),

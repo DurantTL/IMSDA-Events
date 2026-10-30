@@ -3,6 +3,7 @@ import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import type { LabelledAnswer } from "@/modules/information-forms/responses";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type ResponseRowView = {
   id: string;
@@ -11,8 +12,6 @@ export type ResponseRowView = {
   signedIn: boolean;
   answers: LabelledAnswer[];
 };
-
-const submittedFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" });
 
 /** One answer as readable text: lists joined, yes/no for a checkbox, an address on one line. */
 export function answerText(value: unknown): string {
@@ -69,7 +68,7 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
         {selected && (
           <article className="information-form-response-detail" aria-label="One response">
             <header>
-              <h3>Response from {submittedFormat.format(selected.submittedAt)}</h3>
+              <h3>Response from {formatInConferenceTime(selected.submittedAt, { dateStyle: "medium", timeStyle: "short" })}</h3>
               <p className="quiet-copy">Form version {selected.versionNumber} · {selected.signedIn ? "Signed in" : "Not signed in"}</p>
             </header>
             {selected.answers.length === 0
@@ -104,7 +103,7 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
                     const byKey = new Map(row.answers.map((answer) => [answer.key, answer.value]));
                     return (
                       <tr role="row" key={row.id}>
-                        <th role="rowheader" scope="row"><Link href={rowHref(row.id)}>{submittedFormat.format(row.submittedAt)}</Link></th>
+                        <th role="rowheader" scope="row"><Link href={rowHref(row.id)}>{formatInConferenceTime(row.submittedAt, { dateStyle: "medium", timeStyle: "short" })}</Link></th>
                         {columns.map((column) => <td {...cardCell(column.label)} key={column.key}>{clip(answerText(byKey.get(column.key)))}</td>)}
                       </tr>
                     );

@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate } from "@/components/transfer-format";
 import { registrationMoveBlockerLabels, type RegistrationMoveBlocker } from "@/modules/club-transfers/domain";
 import type { RegistrationMoveRecord } from "@/modules/club-transfers/repository";
+import { formatCents } from "@/modules/payments/format-cents";
 
 /**
  * The registration-move approval list (#489 decision 2). Completing a
@@ -17,10 +18,6 @@ import type { RegistrationMoveRecord } from "@/modules/club-transfers/repository
  */
 
 const API = "/api/admin/club-transfers/registration-moves";
-
-export function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 type Decision = { move: RegistrationMoveRecord; kind: "approve" | "skip" };
 
@@ -39,15 +36,15 @@ export function RegistrationMoveCard({ move, onDecide }: { move: RegistrationMov
       <dl className="transfer-totals">
         <div>
           <dt>From <span translate="no">{move.fromClubName}</span></dt>
-          <dd>{move.fromRegistration ? `${move.fromRegistration.confirmationCode} · ${money(move.fromRegistration.totalCents)} (paid ${money(move.fromRegistration.paidCents)})` : "Gone"}</dd>
+          <dd>{move.fromRegistration ? `${move.fromRegistration.confirmationCode} · ${formatCents(move.fromRegistration.totalCents)} (paid ${formatCents(move.fromRegistration.paidCents)})` : "Gone"}</dd>
         </div>
         <div>
           <dt>To <span translate="no">{move.toClubName}</span></dt>
-          <dd>{move.toRegistration ? `${move.toRegistration.confirmationCode} · ${money(move.toRegistration.totalCents)} (paid ${money(move.toRegistration.paidCents)})` : "No registration yet"}</dd>
+          <dd>{move.toRegistration ? `${move.toRegistration.confirmationCode} · ${formatCents(move.toRegistration.totalCents)} (paid ${formatCents(move.toRegistration.paidCents)})` : "No registration yet"}</dd>
         </div>
         <div>
           <dt>This person&apos;s adjustment lines</dt>
-          <dd>{money(move.adjustmentCents)}</dd>
+          <dd>{formatCents(move.adjustmentCents)}</dd>
         </div>
       </dl>
       {move.fromRegistration?.locationName !== move.toRegistration?.locationName && (move.fromRegistration?.locationName || move.toRegistration?.locationName) && (
@@ -175,13 +172,13 @@ export function RegistrationMoveApprovals() {
                   honor class seats, capacity choices and history.
                 </p>
                 <dl className="transfer-totals">
-                  <div><dt>{move.fromClubName} total</dt><dd>{money(move.fromRegistration.totalCents)} → {money(move.fromRegistration.totalCents - shift)}</dd></div>
-                  <div><dt>{move.toClubName} total</dt><dd>{money(move.toRegistration.totalCents)} → {money(move.toRegistration.totalCents + shift)}</dd></div>
+                  <div><dt>{move.fromClubName} total</dt><dd>{formatCents(move.fromRegistration.totalCents)} → {formatCents(move.fromRegistration.totalCents - shift)}</dd></div>
+                  <div><dt>{move.toClubName} total</dt><dd>{formatCents(move.toRegistration.totalCents)} → {formatCents(move.toRegistration.totalCents + shift)}</dd></div>
                 </dl>
                 <p>
                   <strong>Nothing is repriced.</strong> {move.fromClubName}&apos;s registration still carries this
                   person&apos;s base price, and {move.toClubName}&apos;s doesn&apos;t, until you adjust both with the
-                  registration&apos;s own tools. Only this person&apos;s adjustment lines ({money(shift)}) move with them,
+                  registration&apos;s own tools. Only this person&apos;s adjustment lines ({formatCents(shift)}) move with them,
                   which is the only change to the totals above. Payments stay where they were made.
                 </p>
               </>

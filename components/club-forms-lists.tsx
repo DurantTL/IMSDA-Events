@@ -5,12 +5,13 @@ import type { PastYearGroup } from "@/modules/club-forms/past-years-domain";
 import type { ClubFormLinkRow } from "@/modules/club-forms/links";
 import type { ClubFormSubmissionListRow } from "@/modules/club-forms/submissions";
 import styles from "./club-forms-lists.module.css";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /** The director's Forms page tables (#1323), shared by the current lists and each past club year. */
 
 function formatDate(value: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 const emailDeliveryLabel = {

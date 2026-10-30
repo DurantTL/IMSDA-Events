@@ -64,10 +64,6 @@ export class ScholarshipFundError extends Error {
   }
 }
 
-export function formatCents(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
-
 /** The text a sponsor is matched on: case, spacing and Unicode form never split one sponsor in two. */
 export function normalizeSponsorName(name: string) {
   return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();

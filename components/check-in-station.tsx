@@ -13,7 +13,7 @@ import {
   type StationFamily,
   type StationPaymentSummary,
 } from "@/modules/checkin-stations/domain";
-import { formatCents } from "@/modules/payments/in-person-card";
+import { formatCents } from "@/modules/payments/format-cents";
 import styles from "@/components/check-in-station.module.css";
 
 type ApiFailure = { error?: string; message?: string };

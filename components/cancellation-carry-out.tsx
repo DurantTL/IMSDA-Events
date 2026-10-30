@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { postJson } from "@/lib/post-json";
-import { formatCents } from "@/modules/cancellation-policy/rules";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { refundMethodLabels, type RefundMethod } from "@/modules/cancellation-execution/domain";
 import type { CarryOutPanel } from "@/modules/cancellation-execution/views";
 
@@ -125,7 +125,7 @@ export function CancellationCarryOut({
             Carrying out is a separate step from approving, and only a named staff member can do it. It applies exactly what was
             approved: {scope === "FULL_REGISTRATION" ? "cancel the whole registration" : `remove ${attendeeCount} approved attendee${attendeeCount === 1 ? "" : "s"}`},
             release their seats{options.waitlistedInEvent > 0 ? ` (${options.waitlistedInEvent} registration${options.waitlistedInEvent === 1 ? " is" : "s are"} on the waitlist and may be offered them)` : ""},
-            and {needsMethod ? <>refund <strong translate="no">{formatCents(options.approvedRefundCents)}</strong></> : "refund nothing, because the approved refund is zero"}.
+            and {needsMethod ? <>refund <strong translate="no">{formatCentsPlain(options.approvedRefundCents)}</strong></> : "refund nothing, because the approved refund is zero"}.
             Nothing is credited toward a future event; that comes later.
           </p>
           {noMethod && (
@@ -184,7 +184,7 @@ export function CancellationCarryOut({
             </li>
             {execution.legs.map((leg) => (
               <li key={leg.id}>
-                Refund <span translate="no">{formatCents(leg.amountCents)}</span>: <strong>{leg.withProcessor ? "Waiting for Square" : stepWords[leg.status]}</strong>
+                Refund <span translate="no">{formatCentsPlain(leg.amountCents)}</span>: <strong>{leg.withProcessor ? "Waiting for Square" : stepWords[leg.status]}</strong>
                 {failureText(leg.failureCode) ? <> <span className="field-help">{failureText(leg.failureCode)}</span></> : null}
                 {leg.resolved ? <> <span className="field-help">Recorded as settled outside this tool by <span translate="no">{leg.resolvedByName}</span>: {leg.resolutionNote}</span></> : null}
               </li>

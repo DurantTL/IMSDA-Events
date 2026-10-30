@@ -8,6 +8,7 @@ import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-se
 import { attendeeSignInPathFor, twoStepPathFor } from "@/modules/attendee-accounts/return-destination";
 import { publicInformationFormKey, publicInformationFormPath, resolvePublicInformationForm, type PublicInformationFormTarget } from "@/modules/information-forms/public";
 import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -38,7 +39,7 @@ function Notice({ eyebrow, title, children }: { eyebrow: string; title: string; 
 }
 
 function when(date: Date) {
-  return `${new Intl.DateTimeFormat("en-US", { dateStyle: "full", timeStyle: "short", timeZone: "America/Chicago" }).format(date)} Central time`;
+  return `${formatInConferenceTime(date, { dateStyle: "full", timeStyle: "short" })} Central time`;
 }
 
 /**

@@ -7,11 +7,11 @@ import { cardCell } from "@/components/table-card-labels";
 import { postJson } from "@/lib/post-json";
 import type { CancellationResult } from "@/modules/cancellation-policy/calculator";
 import { localDateKey, localInstant, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import {
   chargeCategories,
   classifiableCategories,
   describeTerms,
-  formatCents,
   type CancellationRules,
   type CancellationRulesInput,
 } from "@/modules/cancellation-policy/rules";
@@ -116,7 +116,7 @@ function when(iso: string, timezone: string) {
 }
 
 function dollars(cents: number) {
-  return formatCents(cents);
+  return formatCentsPlain(cents);
 }
 
 export function CancellationPolicyWorkspace({

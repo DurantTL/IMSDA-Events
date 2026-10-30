@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { mealAgeGroupLabels, mealTypeLabels, money, type MealAgeGroupValue, type MealTypeValue } from "@/modules/meals/domain";
+import { formatCents } from "@/modules/payments/format-cents";
+import { mealAgeGroupLabels, mealTypeLabels, type MealAgeGroupValue, type MealTypeValue } from "@/modules/meals/domain";
 import type { loadRegistrationMeals } from "@/modules/meals/view-repository";
 
 type Selections = Awaited<ReturnType<typeof loadRegistrationMeals>>;
@@ -36,12 +37,12 @@ export function RegistrationMealsHistory({ eventId, registrationId }: { eventId:
       <span>
         <strong>
           {selection.quantity} × {mealTypeLabels[selection.mealType as MealTypeValue]} ({mealAgeGroupLabels[selection.ageGroup as MealAgeGroupValue]})
-          {selection.service ? ` · ${selection.service.name}` : " · any service"} · {selection.payer === "CONFERENCE" ? "conference pays" : money(selection.unitPriceCents)} each · {selection.status.toLowerCase()}
+          {selection.service ? ` · ${selection.service.name}` : " · any service"} · {selection.payer === "CONFERENCE" ? "conference pays" : formatCents(selection.unitPriceCents)} each · {selection.status.toLowerCase()}
         </strong>
         <small>{selection.planName} · {selection.source.toLowerCase().replace("_", " ")}</small>
         <ul>
           {selection.changes.map((change) => <li key={change.id}><small>{new Date(change.createdAt).toLocaleString()} · {change.type.toLowerCase().replaceAll("_", " ")} · {change.actorName}{change.reason ? ` · ${change.reason}` : ""}</small></li>)}
-          {selection.ledger.map((entry) => <li key={entry.id}><small>{entry.kind === "CREDIT" ? "Credit" : "Charge"} {money(Math.abs(entry.amountCents))} ({entry.quantity} × {money(entry.unitPriceCents)}) · {entry.settlement.toLowerCase().replaceAll("_", " ")}</small></li>)}
+          {selection.ledger.map((entry) => <li key={entry.id}><small>{entry.kind === "CREDIT" ? "Credit" : "Charge"} {formatCents(Math.abs(entry.amountCents))} ({entry.quantity} × {formatCents(entry.unitPriceCents)}) · {entry.settlement.toLowerCase().replaceAll("_", " ")}</small></li>)}
         </ul>
       </span>
     </div>)}

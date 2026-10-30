@@ -9,6 +9,7 @@ import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * "Information form response received" alert (#1222), after the club form alert (#1017). One internal email per address
@@ -50,7 +51,7 @@ function staffLink(path: string) {
 /** What the alert says. It takes a form name, a time and a link only, so there is nowhere for an answer to get in. */
 export function informationFormSubmittedContent(input: { formName: string; submittedAt: Date; path: string }) {
   const formName = neutralizePlaceholders(input.formName);
-  const when = input.submittedAt.toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "America/Chicago" });
+  const when = formatInConferenceTime(input.submittedAt, { dateStyle: "long", timeStyle: "short" });
   return {
     subject: `New response: ${formName}`,
     bodyText: [

@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   mealAgeGroupLabels,
   mealAgeGroups,
   mealPayerLabels,
   mealTypeLabels,
   mealTypes,
-  money,
   type MealAgeGroupValue,
   type MealTypeValue,
 } from "@/modules/meals/domain";
@@ -129,7 +129,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
         <tbody>{view.recentOrders.map((order) => <tr key={order.id}>
           <th scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
           <td>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td>{order.quantity}</td>
-          <td>{order.payer === "CONFERENCE" ? "Conference" : money(order.unitPriceCents)}</td><td>{order.source.toLowerCase().replace("_", " ")}</td><td>{order.status.toLowerCase()}</td>
+          <td>{order.payer === "CONFERENCE" ? "Conference" : formatCents(order.unitPriceCents)}</td><td>{order.source.toLowerCase().replace("_", " ")}</td><td>{order.status.toLowerCase()}</td>
           <td>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={() => {
             const reason = window.prompt(`Why is this order being cancelled? ${reasonHint}`);
             if (reason) void run(() => call(`${base}/selections/${order.id}`, "POST", { action: "cancel", reason }), "Order cancelled and credited.");
@@ -240,13 +240,13 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
             <label className="visually-hidden" htmlFor={`price-${plan.id}-${mealType}-${group}`}>{plan.name} {mealTypeLabels[mealType]} {mealAgeGroupLabels[group]} price in dollars</label>
             <input id={`price-${plan.id}-${mealType}-${group}`} name="amount" inputMode="decimal" defaultValue={price ? (price.amountCents / 100).toFixed(2) : ""} placeholder="not set" />
             <button type="submit" disabled={busy}>Save</button>
-          </form> : price ? money(price.amountCents) : "Not set"}</td>;
+          </form> : price ? formatCents(price.amountCents) : "Not set"}</td>;
         })}
       </tr>)}</tbody>
     </table></div>
     {typePrices.length > 0 ? <p>Attendee-type prices (a price for a type wins over the age group; $0 makes that role complimentary): {typePrices.map((price) => {
       const type = view.attendeeTypes.find((candidate) => candidate.id === price.attendeeTypeId);
-      return `${type?.label ?? "Type"} ${mealTypeLabels[price.mealType as MealTypeValue].toLowerCase()} ${money(price.amountCents)}`;
+      return `${type?.label ?? "Type"} ${mealTypeLabels[price.mealType as MealTypeValue].toLowerCase()} ${formatCents(price.amountCents)}`;
     }).join("; ")}.</p> : null}
     {canManageFinance && view.attendeeTypes.length > 0 ? <form onSubmit={(event) => {
       event.preventDefault();

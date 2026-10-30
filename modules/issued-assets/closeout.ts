@@ -2,13 +2,13 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import {
   applyOutcomeCorrections,
   chargeCategoryLabels,
   decideDepositOutcome,
   depositHeldCents,
   unpaidChargeCents,
-  formatCents,
   reconcileUnits,
   returnOutcomeLabels,
   unitCountsFromHistory,
@@ -287,7 +287,7 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     exceptions.push({ code: "UNCHARGED_LOSS", label: exceptionLabels.UNCHARGED_LOSS, subject: subject(row), detail: `${returnOutcomeLabels[row.endReason === "LOST" ? "LOST" : "DAMAGED"]} ${row.endedAt?.slice(0, 10) ?? ""}. Charge it, settle its deposit, or have finance write it off with a reason.`, holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
   }
   for (const deposit of depositRows.filter((row) => row.state === "HELD")) {
-    exceptions.push({ code: "DEPOSIT_UNSETTLED", label: exceptionLabels.DEPOSIT_UNSETTLED, subject: `${formatCents(deposit.amountCents)} ${deposit.typeName} deposit`, detail: deposit.stillOut > 0 ? `${deposit.stillOut} covered item${deposit.stillOut === 1 ? " is" : "s are"} still out.` : deposit.readyToSettle ? "Every covered item is accounted for: ready to settle at the desk." : "Covered items have no recorded outcome.", holderLabel: deposit.holderLabel, amountCents: deposit.amountCents, deskAttendeeId: deposit.deskAttendeeId, refId: deposit.entryId });
+    exceptions.push({ code: "DEPOSIT_UNSETTLED", label: exceptionLabels.DEPOSIT_UNSETTLED, subject: `${formatCentsPlain(deposit.amountCents)} ${deposit.typeName} deposit`, detail: deposit.stillOut > 0 ? `${deposit.stillOut} covered item${deposit.stillOut === 1 ? " is" : "s are"} still out.` : deposit.readyToSettle ? "Every covered item is accounted for: ready to settle at the desk." : "Covered items have no recorded outcome.", holderLabel: deposit.holderLabel, amountCents: deposit.amountCents, deskAttendeeId: deposit.deskAttendeeId, refId: deposit.entryId });
   }
   const heldDepositOf = new Map<string, string>();
   for (const cover of covers) heldDepositOf.set(cover.issuanceId, cover.depositEntryId);
@@ -327,12 +327,12 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     const row = described.get(issuanceId);
     if (!row) continue;
     if (waiver.registrationAdjustmentId === null && !reviewedFor(issuanceId, "WAIVED_ON_INACTIVE_REGISTRATION", waiver.id)) {
-      exceptions.push({ code: "WAIVED_ON_INACTIVE_REGISTRATION", label: exceptionLabels.WAIVED_ON_INACTIVE_REGISTRATION, subject: subject(row), detail: `${formatCents(charge.amountCents)} was waived in the asset ledger, but the registration is not active, so the charge line is still on its total. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
+      exceptions.push({ code: "WAIVED_ON_INACTIVE_REGISTRATION", label: exceptionLabels.WAIVED_ON_INACTIVE_REGISTRATION, subject: subject(row), detail: `${formatCentsPlain(charge.amountCents)} was waived in the asset ledger, but the registration is not active, so the charge line is still on its total. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
     }
     const depositId = heldDepositOf.get(issuanceId);
     const refund = depositId ? (settlementsByDeposit.get(depositId) ?? []).find((entry) => entry.kind === "DEPOSIT_RETURNED") : undefined;
     if (refund && refund.createdAt.getTime() > charge.createdAt.getTime() && waiver.createdAt.getTime() > refund.createdAt.getTime() && !reviewedFor(issuanceId, "WAIVED_AFTER_REFUND", waiver.id)) {
-      exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCents(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
+      exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCentsPlain(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
     }
   }
   // A posted, unwaived key or item charge on a registration that is no longer live, whose balance still owes it: someone decides
@@ -357,7 +357,7 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
       if (!unpaid || !row || reviewedFor(charge.issuanceId as string, "CHARGED_ON_CANCELLED_REGISTRATION", charge.id)) continue;
       exceptions.push({
         code: "CHARGED_ON_CANCELLED_REGISTRATION", label: exceptionLabels.CHARGED_ON_CANCELLED_REGISTRATION, subject: subject(row),
-        detail: `${formatCents(charge.amountCents)} was charged to a registration that is no longer active, and ${formatCents(unpaid)} of it is unpaid. Decide whether to collect it or write it off; nothing was changed automatically.`,
+        detail: `${formatCentsPlain(charge.amountCents)} was charged to a registration that is no longer active, and ${formatCentsPlain(unpaid)} of it is unpaid. Decide whether to collect it or write it off; nothing was changed automatically.`,
         holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: charge.issuanceId as string, triggerId: charge.id,
       });
     }
@@ -407,13 +407,13 @@ export function closeoutCsv(report: CloseoutReport, section: CloseoutSection): s
         ["Kind", "Went out", "Returned", "Lost", "Damaged", "Withdrawn in error", "Replaced originals unaccounted", "Still out", "Difference", "Reconciles"],
         ...report.types.map((row) => [row.typeName, row.inflow, row.returned, row.lost, row.damaged, row.corrected, row.replacedUnaccounted, row.outstanding, row.difference, row.balanced ? "yes" : "NO"]),
         [],
-        ["Cash deposits received", formatCents(report.money.depositsReceivedCents)],
-        ["Handed back", formatCents(report.money.depositsHandedBackCents)],
-        ["Kept", formatCents(report.money.depositsKeptCents)],
-        ["Still held", formatCents(report.money.depositsHeldCents)],
-        ["Charged", formatCents(report.money.chargedCents)],
-        ["Waived", formatCents(report.money.waivedCents)],
-        ["Net charged", formatCents(report.money.netChargedCents)],
+        ["Cash deposits received", formatCentsPlain(report.money.depositsReceivedCents)],
+        ["Handed back", formatCentsPlain(report.money.depositsHandedBackCents)],
+        ["Kept", formatCentsPlain(report.money.depositsKeptCents)],
+        ["Still held", formatCentsPlain(report.money.depositsHeldCents)],
+        ["Charged", formatCentsPlain(report.money.chargedCents)],
+        ["Waived", formatCentsPlain(report.money.waivedCents)],
+        ["Net charged", formatCentsPlain(report.money.netChargedCents)],
       ]);
     case "outstanding": return toCsv(issueRows(report.outstanding));
     case "lost": return toCsv(issueRows(report.lost));
@@ -421,12 +421,12 @@ export function closeoutCsv(report: CloseoutReport, section: CloseoutSection): s
     case "charges":
       return toCsv([
         ["Item", "Kind", "Holder", "Category", "Amount", "State", "Posted to registration", "Reason", "By", "When", "Waiver reason", "Waived by", "Waived when"],
-        ...report.charges.map((row) => [row.identifier, row.typeName, row.holderLabel, chargeCategoryLabels[row.category], formatCents(row.amountCents), row.state === "WAIVED" ? "waived" : "charged", row.posted ? "yes" : "no", row.reason, row.actorName, when(row.at), row.waiver?.reason ?? "", row.waiver?.actorName ?? "", when(row.waiver?.at ?? null)]),
+        ...report.charges.map((row) => [row.identifier, row.typeName, row.holderLabel, chargeCategoryLabels[row.category], formatCentsPlain(row.amountCents), row.state === "WAIVED" ? "waived" : "charged", row.posted ? "yes" : "no", row.reason, row.actorName, when(row.at), row.waiver?.reason ?? "", row.waiver?.actorName ?? "", when(row.waiver?.at ?? null)]),
       ]);
     case "deposits":
       return toCsv([
         ["Kind", "Holder", "Deposit", "State", "Handed back", "Kept", "Kept, still held", "Items covered", "Still out", "Taken by", "Taken"],
-        ...report.deposits.map((row) => [row.typeName, row.holderLabel, formatCents(row.amountCents), row.state.toLowerCase().replaceAll("_", " "), formatCents(row.refundCents), formatCents(row.keepCents), formatCents(row.stillHeldCents), row.covered, row.stillOut, row.takenByName, when(row.takenAt)]),
+        ...report.deposits.map((row) => [row.typeName, row.holderLabel, formatCentsPlain(row.amountCents), row.state.toLowerCase().replaceAll("_", " "), formatCentsPlain(row.refundCents), formatCentsPlain(row.keepCents), formatCentsPlain(row.stillHeldCents), row.covered, row.stillOut, row.takenByName, when(row.takenAt)]),
       ]);
     case "facility":
       return toCsv([
@@ -436,7 +436,7 @@ export function closeoutCsv(report: CloseoutReport, section: CloseoutSection): s
     case "exceptions":
       return toCsv([
         ["Exception", "Item", "Holder", "Amount", "Detail"],
-        ...report.exceptions.map((row) => [row.label, row.subject, row.holderLabel ?? "", row.amountCents === null ? "" : formatCents(row.amountCents), row.detail]),
+        ...report.exceptions.map((row) => [row.label, row.subject, row.holderLabel ?? "", row.amountCents === null ? "" : formatCentsPlain(row.amountCents), row.detail]),
       ]);
   }
 }

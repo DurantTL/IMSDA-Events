@@ -2,12 +2,13 @@ import { LockKeyhole } from "lucide-react";
 import { formatClubFormAnswer, RESTRICTED_LABEL } from "@/modules/club-forms/domain";
 import type { ClubFormSubmissionView as SubmissionView } from "@/modules/club-forms/submissions";
 import { fieldDisplayLabel, isFieldVisible } from "@/modules/forms/definition";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 const statusLabel = { DRAFT: "Draft", SUBMITTED: "Submitted" } as const;
 
 function submittedOn(value: string | null) {
   if (!value) return "Not submitted";
-  return new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "long", day: "numeric", year: "numeric" });
 }
 
 /**

@@ -105,7 +105,7 @@ describe("settings another module owns (#1139)", () => {
     const advanced = read("components/registration-builder/builder-field-advanced.tsx");
     expect(advanced).toContain("<ModuleOwnedSettingRow");
     expect(advanced).toContain("!ownedPrice && ");
-    expect(advanced).toContain("value={money(ownedPrice.valueCents)}");
+    expect(advanced).toContain("value={formatCents(ownedPrice.valueCents)}");
     expect(advanced).toContain("Not priced in Meals yet — this form&apos;s price is used.");
     expect(advanced).toContain("{!ownedPrice && !hasCredit(field)");
     // Late pricing never applies to meal tickets, priced in Meals or not: the server clears it once a plan price exists.

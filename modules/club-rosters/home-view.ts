@@ -14,6 +14,7 @@ import type { ClubEventSummary } from "@/modules/club-registrations/repository";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { formatDueDate, isLockedForClub, reportDueDate, reportMonthLabel, reportableMonths } from "@/modules/club-reports/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /** A saved, unsubmitted club form (a DRAFT submission): metadata only, never an answer. */
 export type ClubHomeFormDraft = { id: string; templateName: string; updatedAt: string };
@@ -164,7 +165,7 @@ export function peopleNeedingDetails(members: readonly ClubHomeMember[]) {
 }
 
 function formatChicagoDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** One task per saved club-form draft, each a link back into the draft. The wording says it is saved, not submitted. */

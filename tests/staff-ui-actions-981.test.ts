@@ -11,7 +11,8 @@ vi.mock("next/navigation", () => ({
 }));
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
-import { formatCents, inPersonCardQuote } from "@/modules/payments/in-person-card";
+import { formatCents } from "@/modules/payments/format-cents";
+import { inPersonCardQuote } from "@/modules/payments/in-person-card";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { staffSubpageTitle } from "@/components/staff-navigation";
 import { isSystemWorkspacePath, systemNavActiveItem } from "@/components/system-navigation";
