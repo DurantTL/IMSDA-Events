@@ -4156,7 +4156,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     try {
       // Scoped to the honors-taught widget: the prerequisite honors widget (#832) sits in the same form.
       const taught = page.locator('[data-testid="honor-multi-taught"]:visible').first();
-      const search = taught.locator('input[placeholder="Type to search honors"]');
+      const search = taught.locator('input[placeholder="Search honors"]');
       await search.scrollIntoViewIfNeeded({ timeout: 3000 });
       await search.fill("mobilecheck");
       await page.waitForTimeout(150);
@@ -4170,7 +4170,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await auditBuilder("add form, several honors chosen", "several-honors-add");
       // The prerequisite honors widget (#832) fits and works too: search, tick one, and it is the only chosen prerequisite.
       const prerequisite = page.locator('[data-testid="honor-multi-prerequisite"]:visible').first();
-      const prerequisiteSearch = prerequisite.locator('input[placeholder="Type to search prerequisite honors"]');
+      const prerequisiteSearch = prerequisite.locator('input[placeholder="Search prerequisite honors"]');
       await prerequisiteSearch.scrollIntoViewIfNeeded({ timeout: 3000 });
       await prerequisiteSearch.fill("mobilecheck");
       await page.waitForTimeout(150);

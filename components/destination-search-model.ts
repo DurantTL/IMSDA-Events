@@ -379,9 +379,42 @@ export function searchDestinations(
   return [...pages.slice(0, limit - reserved), ...guides.slice(0, Math.max(reserved, limit - pages.length))];
 }
 
-/** The live status line: how many results, and how to use them. Empty while nothing is typed. */
+/** The order the sidebar and menus list the scopes in. */
+const scopeOrder: readonly DestinationScope[] = ["System", "Clubs", "Event", "Profile", "Help"];
+
+/**
+ * Every destination the viewer may open (#1347), grouped by scope in menu order: what an empty, focused box lists. It
+ * only reorders the permission-filtered set it is given (stable within a scope), so it can never show a destination
+ * `buildSearchDestinations` did not build, and it applies no result limit.
+ */
+export function allDestinations(destinations: readonly SearchDestination[]): SearchDestination[] {
+  return scopeOrder.flatMap((scope) => destinations.filter((destination) => destination.scope === scope));
+}
+
+/** The list for a query: ranked matches when words are typed, else every destination, grouped. */
+export function listDestinations(destinations: readonly SearchDestination[], query: string): SearchDestination[] {
+  return hasSearchWords(query) ? searchDestinations(destinations, query) : allDestinations(destinations);
+}
+
+/** Whether a query holds any word to search for (letters or digits). */
+export function hasSearchWords(query: string): boolean {
+  return /[A-Za-z0-9]/.test(query);
+}
+
+/** The scope groups of a list that is already in `allDestinations` order, each with its starting index in the list. */
+export function groupDestinationsByScope(list: readonly SearchDestination[]): { scope: DestinationScope; start: number; items: SearchDestination[] }[] {
+  const groups: { scope: DestinationScope; start: number; items: SearchDestination[] }[] = [];
+  list.forEach((destination, index) => {
+    const last = groups[groups.length - 1];
+    if (last && last.scope === destination.scope) last.items.push(destination);
+    else groups.push({ scope: destination.scope, start: index, items: [destination] });
+  });
+  return groups;
+}
+
+/** The live status line: how many results, and how to use them. */
 export function destinationSearchStatus(query: string, count: number): string {
-  if (query.trim() === "") return "";
+  if (!hasSearchWords(query)) return count === 0 ? "" : `${count} ${count === 1 ? "page" : "pages"}, grouped. Use the up and down arrow keys, then Enter to open.`;
   if (count === 0) return "No pages match. Try a different word.";
   return `${count} ${count === 1 ? "result" : "results"}. Use the up and down arrow keys, then Enter to open.`;
 }
@@ -394,9 +427,9 @@ export function nextDestinationIndex(current: number, count: number, key: string
   return null;
 }
 
-/** Whether the list is showing: asked open, something typed, and at least one result. */
-export function listExpanded(open: boolean, query: string, count: number): boolean {
-  return open && query.trim() !== "" && count > 0;
+/** Whether the list is showing: asked open and at least one entry (an empty box lists every destination, #1347). */
+export function listExpanded(open: boolean, count: number): boolean {
+  return open && count > 0;
 }
 
 /** The active index kept inside the results: -1 (none) when there are none or it fell off the end. */
@@ -434,12 +467,12 @@ export function destinationKeyAction(input: {
   active: number;
 }): DestinationKeyAction {
   if (input.composing) return { type: "none" };
-  const expanded = listExpanded(input.open, input.query, input.count);
+  const expanded = listExpanded(input.open, input.count);
   const active = clampActiveIndex(input.active, input.count);
   switch (input.key) {
     case "ArrowDown":
     case "ArrowUp": {
-      if (input.count <= 0 || input.query.trim() === "") return { type: "none" };
+      if (input.count <= 0) return { type: "none" };
       const next = nextDestinationIndex(expanded ? active : -1, input.count, input.key);
       return next === null ? { type: "none" } : { type: "move", index: next };
     }

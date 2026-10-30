@@ -219,7 +219,7 @@ describe("the honor multi-select on the class form", () => {
     expect(html).toContain("primary");
     expect(html.match(/type="checkbox"/g)).toHaveLength(3);
     expect(html.match(/checked=""/g)).toHaveLength(2);
-    expect(html).toContain('placeholder="Type to search honors"');
+    expect(html).toContain('placeholder="Search honors"');
   });
 
   it("names the prerequisite widget apart from the honors-taught one (#832)", () => {
@@ -229,7 +229,7 @@ describe("the honor multi-select on the class form", () => {
     expect(taught).toContain('data-testid="honor-multi-taught"');
     expect(taught).toContain('data-testid="honor-multi-options"');
     expect(prerequisite).toContain('aria-label="Chosen prerequisite honors (2)"');
-    expect(prerequisite).toContain('placeholder="Type to search prerequisite honors"');
+    expect(prerequisite).toContain('placeholder="Search prerequisite honors"');
     expect(prerequisite).toContain('data-testid="honor-multi-prerequisite"');
     expect(prerequisite).toContain('data-testid="honor-multi-prerequisite-options"');
     expect(prerequisite).not.toContain('aria-label="Chosen honors');

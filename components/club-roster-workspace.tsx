@@ -694,7 +694,7 @@ export function ClubRosterWorkspace({
           <div className={styles.rosterSearchRow}>
             <label className={styles.rosterSearchField} htmlFor="roster-search">
               Search roster
-              <span className={styles.rosterSearchInput}>
+              <span className={`search-field ${styles.rosterSearchInput}`}>
                 <Search aria-hidden="true" size={16} />
                 <input
                   autoComplete="off"

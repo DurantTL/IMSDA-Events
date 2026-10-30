@@ -1236,11 +1236,20 @@ select:focus-visible {
 
 .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px; }
 /* The wrapper is the field: it draws the visible boundary, the input inside stays borderless. */
-.search-field { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: #5a6e79; padding: 0 12px; }
+.search-field { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; min-height: var(--touch-target, 44px); border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: var(--muted); padding: 0 4px 0 12px; }
 .search-field:hover { border-color: var(--field-border-hover); }
 .search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
-.search-field input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); outline: 0; padding: 9px 0; }
-.search-field input::placeholder { color: #5a6e79; }
+:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark) .search-field { border-color: var(--imsda-navy-deep); }
+:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark) .search-field:focus-within { border-color: var(--field-focus); }
+.search-field input { flex: 1; width: 100%; min-width: 0; min-height: 42px; border: 0; background: transparent; box-shadow: none; color: var(--ink); outline: 0; padding: 0; }
+.search-field input::placeholder { color: var(--muted); }
+.search-field > svg { flex: none; }
+/* The one clear button for a search field (a 44px-wide tap area, shown only when there is text). */
+.search-field-clear { display: inline-grid; flex: none; place-items: center; width: var(--touch-target, 44px); height: 42px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.search-field-clear:hover { background: var(--paper); color: var(--ink); }
+.search-field-clear:focus-visible { outline: 2px solid var(--field-focus); outline-offset: -4px; }
+/* The native clear "x" is hidden on every search input; each field has its own 44px clear button. */
+input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .secondary-button,
 .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
 .secondary-button { border: 1px solid var(--line); background: #f9fbfb; color: var(--imsda-navy); text-decoration: none; }
@@ -3739,15 +3748,12 @@ body:has(.auth-page) { padding-bottom: 0; }
   align-items: center;
   gap: 8px;
   border: 1px solid var(--field-border);
-  border-radius: 11px;
-  background: #fcfdfd;
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
   padding: 0 11px;
   color: var(--muted);
 }
-.searchable-select-control:focus-within {
-  border-color: var(--imsda-purple);
-  box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1);
-}
+.searchable-select-control:focus-within { border-color: var(--field-focus); }
 .searchable-select-control > input {
   width: 100%;
   min-width: 0;
@@ -3763,8 +3769,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .searchable-select-control > input::-webkit-search-cancel-button { display: none; }
 .searchable-select-control > button {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: var(--touch-target, 44px);
+  height: 42px;
   flex: 0 0 auto;
   place-items: center;
   border: 0;
@@ -3891,12 +3897,12 @@ body:has(.auth-page) { padding-bottom: 0; }
   gap: 8px;
   margin: 10px 12px 0;
   border: 1px solid var(--field-border);
-  border-radius: 11px;
-  background: #fcfdfd;
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
   padding: 0 11px;
   color: var(--muted);
 }
-.searchable-select-picker-search:focus-within { border-color: var(--imsda-purple); box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1); }
+.searchable-select-picker-search:focus-within { border-color: var(--field-focus); }
 .searchable-select-picker-search > input {
   width: 100%;
   min-width: 0;
@@ -10185,8 +10191,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
    no room below, flips it above the field (data-placement="above"); it scrolls inside itself. */
 .honor-combobox { position: relative; display: grid; gap: 4px; min-width: min(100%, 220px); }
 .honor-combobox > label { color: var(--ink); font-size: var(--text-helper-min, 0.8rem); font-weight: 700; }
-.honor-combobox > input[role="combobox"] { width: 100%; min-height: 44px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; padding: 8px 10px; font-size: var(--text-helper-min, 0.8rem); }
-.honor-combobox-list { position: absolute; top: 100%; right: 0; left: 0; z-index: 35; box-sizing: border-box; margin: 4px 0 0; list-style: none; padding: 4px; max-height: 14rem; overflow-y: auto; border: 1px solid #cbdbe2; border-radius: 10px; background: #fff; box-shadow: 0 10px 25px rgba(0, 59, 92, 0.16); overscroll-behavior: contain; }
+/* The input sits in the shared .search-field wrapper (one border, one ring); the list anchors to the wrapper. */
+.honor-combobox .search-field input { font-size: var(--text-helper-min, 0.8rem); }
+.honor-combobox-list { position: absolute; top: 100%; right: 0; left: 0; z-index: 35; box-sizing: border-box; margin: 4px 0 0; list-style: none; padding: 4px; max-height: 14rem; overflow-y: auto; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--card); box-shadow: 0 10px 25px rgba(0, 59, 92, 0.16); overscroll-behavior: contain; }
 .honor-combobox-list[data-placement="above"] { margin: 0; }
 .honor-combobox-list[hidden] { display: none; }
 /* A filter row that holds one: keep every field on one baseline, whatever the label above it wraps to. */
@@ -10606,7 +10613,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 
 /* --- More: compact groups and the optional task search ----------------------- */
 .more-task-search { display: grid; gap: 4px; }
-.more-task-search .search-field { padding: 0 14px; border-radius: 12px; }
+.more-task-search .search-field { padding: 0 4px 0 14px; }
 .more-task-search .search-field input { font-size: max(var(--type-body-floor, 0px), 0.9rem); }
 .more-task-search-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8rem); }
 .event-modules-page .more-task-groups { display: grid; gap: 14px; }
@@ -13771,12 +13778,8 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 #fb-version-chip-draft:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
 /* Find a page (#1177): the destination search in the sidebar (desktop) and at the top of the More sheet (phones). New rules only; shared type scale untouched. */
 .destination-search { position: relative; margin: 0; }
-.destination-search-field { display: flex; min-width: 0; min-height: var(--touch-target, 44px); align-items: center; gap: 9px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: var(--muted); padding: 0 12px; }
-.destination-search-field:hover { border-color: var(--field-border-hover); }
-.destination-search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
-.destination-search-field svg { flex: none; }
-.destination-search-input { width: 100%; min-width: 0; min-height: 44px; border: 0; background: transparent; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.875rem); outline: 0; padding: 0; }
-.destination-search-input::placeholder { color: var(--muted); }
+/* The field itself is the shared .search-field wrapper (one border, one ring; gold on the navy sidebar). */
+.destination-search-input { font-size: max(var(--type-body-floor, 0px), 0.875rem); }
 /* In flow, not floating: the sidebar and the sheet both scroll, and would clip a popover. */
 .destination-search-list { max-height: min(50dvh, 22rem); margin: 6px 0 0; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--field-radius); background: var(--card); padding: 4px; list-style: none; }
 .destination-search-list[hidden] { display: none; }

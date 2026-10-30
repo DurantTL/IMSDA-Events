@@ -107,7 +107,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     <div className={styles.layout}>
       <div className={styles.searchBlock}>
         <label className={styles.searchLabel} htmlFor={searchId}>Search town, ZIP, club or church</label>
-        <div className={styles.search}>
+        <div className={`search-field ${styles.search}`}>
           <Search aria-hidden="true" size={17} />
           <input
             id={searchId}

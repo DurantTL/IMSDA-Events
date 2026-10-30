@@ -21,10 +21,9 @@
 .rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .rosterSearchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
 .rosterSearchField { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
-.rosterSearchInput { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
-.rosterSearchInput:focus-within { outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
-.rosterSearchInput svg { flex: 0 0 auto; }
-.rosterSearchInput input { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent; padding: 0; box-shadow: none; outline: 0; font-weight: 500; }
+/* The box is the shared .search-field wrapper (one border, one ring); the input inside draws nothing. */
+.rosterSearchInput { min-width: 0; }
+.rosterSearchInput input { font-weight: 500; }
 .rosterFilterButtons { display: flex; flex-wrap: wrap; gap: 8px; }
 .rosterFilterButton { min-height: 44px; }
 .rosterFilterButton[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }

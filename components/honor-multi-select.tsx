@@ -69,7 +69,7 @@ export function HonorMultiSelect({
                 onChange={(event) => setQuery(event.target.value)}
                 // Enter in the search box must not submit the class form.
                 onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
-                placeholder={prerequisite ? "Type to search prerequisite honors" : "Type to search honors"}
+                placeholder={prerequisite ? "Search prerequisite honors" : "Search honors"}
                 type="search"
                 value={query}
               />

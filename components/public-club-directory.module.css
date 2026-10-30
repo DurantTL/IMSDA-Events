@@ -3,25 +3,13 @@
   gap: 16px;
 }
 
+/* The box itself is the shared .search-field wrapper (one border, one ring); only the width is set here. */
 .search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--field-border);
-  border-radius: 12px;
-  background: #fff;
-  padding: 10px 14px;
-  color: var(--muted);
   max-width: 760px;
 }
 
 .search input {
-  border: none;
-  outline: none;
-  flex: 1;
   font-size: 0.95rem;
-  color: var(--ink);
-  background: transparent;
 }
 
 .content {
@@ -159,9 +147,10 @@
   color: var(--ink);
 }
 
-.search input {
-  min-width: 0;
-  min-height: 44px;
+/* Inside the box the clear button draws no border of its own. */
+.search .clearButton {
+  border: 0;
+  background: transparent;
 }
 
 .clearButton,

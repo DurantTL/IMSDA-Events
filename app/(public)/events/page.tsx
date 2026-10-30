@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
+import { CalendarDays, ChevronRight, MapPin, Search } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
@@ -138,7 +138,10 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
           {filter !== "all" && <input name="for" type="hidden" value={filter} />}
           <div className={`${styles.eventsDirectoryField} ${styles.eventsDirectorySearch}`}>
             <label htmlFor="events-q">Search events</label>
-            <input defaultValue={filters.q} id="events-q" maxLength={100} name="q" type="search" />
+            <span className="search-field">
+              <Search aria-hidden="true" size={16} />
+              <input defaultValue={filters.q} id="events-q" maxLength={100} name="q" type="search" />
+            </span>
           </div>
           <div className={styles.eventsDirectoryField}>
             <label htmlFor="events-from">From</label>

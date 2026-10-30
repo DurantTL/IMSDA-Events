@@ -1,0 +1,10 @@
+/* Scope groups in the empty-box list (#1347): a heading, then that scope's destinations. */
+.group { margin: 0; padding: 0; list-style: none; }
+.group > ul { margin: 0; padding: 0; list-style: none; }
+.groupHeading {
+  display: block;
+  padding: 8px 10px 4px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}

@@ -21,6 +21,9 @@ import {
   clampActiveIndex,
   destinationKeyAction,
   destinationSearchStatus,
+  allDestinations,
+  groupDestinationsByScope,
+  listDestinations,
   listExpanded,
   selectDestination,
   nextDestinationIndex,
@@ -185,7 +188,9 @@ describe("task words and synonyms", () => {
   });
 
   it("reports counts and arrow movement", () => {
-    expect(destinationSearchStatus("", 3)).toBe("");
+    expect(destinationSearchStatus("", 0)).toBe("");
+    expect(destinationSearchStatus("", 3)).toMatch(/^3 pages, grouped\./);
+    expect(destinationSearchStatus("", 1)).toMatch(/^1 page, grouped\./);
     expect(destinationSearchStatus("team", 1)).toMatch(/^1 result\./);
     expect(destinationSearchStatus("team", 2)).toMatch(/^2 results\./);
     expect(destinationSearchStatus("zzz", 0)).toMatch(/^No pages match/);
@@ -248,7 +253,6 @@ describe("key and selection behaviour", () => {
 
   it("ignores Enter while the list is closed, empty, or composing", () => {
     expect(key({ open: false })).toEqual({ type: "none" });
-    expect(key({ query: "" })).toEqual({ type: "none" });
     expect(key({ count: 0 })).toEqual({ type: "none" });
     expect(key({ composing: true })).toEqual({ type: "none" });
   });
@@ -259,7 +263,8 @@ describe("key and selection behaviour", () => {
     expect(key({ key: "ArrowUp", active: 0 })).toEqual({ type: "move", index: 2 });
     expect(key({ key: "ArrowDown", open: false, active: 2 })).toEqual({ type: "move", index: 0 });
     expect(key({ key: "ArrowDown", count: 0 })).toEqual({ type: "none" });
-    expect(key({ key: "ArrowDown", query: "" })).toEqual({ type: "none" });
+    expect(key({ key: "ArrowDown", query: "" })).toEqual({ type: "move", index: 0 });
+    expect(key({ key: "ArrowDown", query: "", open: false, active: -1 })).toEqual({ type: "move", index: 0 });
     expect(key({ key: "a" })).toEqual({ type: "none" });
   });
 
@@ -287,10 +292,9 @@ describe("key and selection behaviour", () => {
     expect(activeDescendantId(true, 1, id)).toBe("opt-1");
     expect(activeDescendantId(true, -1, id)).toBeUndefined();
     expect(activeDescendantId(false, 1, id)).toBeUndefined();
-    expect(listExpanded(true, "team", 2)).toBe(true);
-    expect(listExpanded(true, "team", 0)).toBe(false);
-    expect(listExpanded(false, "team", 2)).toBe(false);
-    expect(listExpanded(true, "  ", 2)).toBe(false);
+    expect(listExpanded(true, 2)).toBe(true);
+    expect(listExpanded(true, 0)).toBe(false);
+    expect(listExpanded(false, 2)).toBe(false);
   });
 
   it("clamps the active index when results shrink", () => {
@@ -373,5 +377,58 @@ describe("shell wiring", () => {
     }));
     expect(panel("tab")).toContain("destination-search-input");
     expect(panel("sidebar")).not.toContain("destination-search-input");
+  });
+});
+
+describe("an empty, focused box lists every destination (#1347)", () => {
+  const built = buildSearchDestinations(admin);
+
+  it("lists exactly the destinations the viewer may open, with no result limit", () => {
+    const all = allDestinations(built);
+    expect(all.map((destination) => destination.key).sort()).toEqual(built.map((destination) => destination.key).sort());
+    expect(all.length).toBeGreaterThan(8);
+    expect(listDestinations(built, "")).toEqual(all);
+    expect(listDestinations(built, "   ")).toEqual(all);
+  });
+
+  it("does not widen what a limited viewer sees", () => {
+    const limited = buildSearchDestinations(limitedStaff);
+    const listed = allDestinations(limited);
+    expect(listed).toHaveLength(limited.length);
+    expect(listed.some((destination) => destination.scope === "System")).toBe(false);
+    expect(listed.map((destination) => destination.href)).not.toContain("/admin/people");
+  });
+
+  it("groups by scope in menu order: System, Event, Profile, then Help", () => {
+    const groups = groupDestinationsByScope(allDestinations(built));
+    expect(groups.map((group) => group.scope)).toEqual(["System", "Event", "Profile", "Help"]);
+    expect(new Set(groups.map((group) => group.scope)).size).toBe(groups.length);
+    expect(groups[0].start).toBe(0);
+    expect(groups[1].start).toBe(groups[0].items.length);
+    expect(groups.reduce((sum, group) => sum + group.items.length, 0)).toBe(built.length);
+  });
+
+  it("puts the Clubs scope after System in the Clubs view", () => {
+    const clubs = allDestinations(buildSearchDestinations({ ...admin, clubsAdmin: { healthImport: true } }));
+    const order = groupDestinationsByScope(clubs).map((group) => group.scope);
+    expect(order.slice(0, 3)).toEqual(["System", "Clubs", "Event"]);
+  });
+
+  it("still ranks typed words, so typing narrows the list", () => {
+    const narrowed = listDestinations(built, "team");
+    expect(narrowed).toEqual(searchDestinations(built, "team"));
+    expect(narrowed.length).toBeLessThan(allDestinations(built).length);
+  });
+
+  it("opens an empty list with Enter on the first entry and the arrows", () => {
+    const empty = (key: string) => destinationKeyAction({ key, composing: false, open: true, query: "", count: built.length, active: -1 });
+    expect(empty("Enter")).toEqual({ type: "choose", index: 0 });
+    expect(empty("ArrowDown")).toEqual({ type: "move", index: 0 });
+    expect(empty("Escape")).toEqual({ type: "close" });
+  });
+
+  it("uses the shared search field wrapper for the box", () => {
+    const markup = renderToStaticMarkup(createElement(DestinationSearch, { destinations: built }));
+    expect(markup).toContain('class="search-field destination-search-field"');
   });
 });
