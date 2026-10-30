@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Search } from "lucide-react";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { filterTasks } from "@/components/event-modules-page-model";
 
 /**
@@ -66,9 +67,9 @@ export function MoreTaskSearch({ containerId }: { containerId: string }) {
 
   return (
     <div className="more-task-search" ref={watchRenderedTasks(containerId)} role="search">
-      <label className="search-field" htmlFor={inputId}>
+      <div className="search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={17} />
-        <span className="sr-only">Find a task or tool</span>
+        <label className="sr-only" htmlFor={inputId}>Find a task or tool</label>
         <input
           autoComplete="off"
           id={inputId}
@@ -77,7 +78,8 @@ export function MoreTaskSearch({ containerId }: { containerId: string }) {
           type="search"
           value={query}
         />
-      </label>
+        <SearchClearButton onClear={() => apply("")} visible={query !== ""} />
+      </div>
       <p aria-live="polite" className="more-task-search-status" role="status">
         {shown === null ? "" : shown === 0 ? "No task or tool matches. Clear the search to see them all." : `${shown} ${shown === 1 ? "match" : "matches"}`}
       </p>

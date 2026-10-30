@@ -17,6 +17,25 @@ export const HONOR_WATCH_MAX_RECIPIENTS = 10;
 /** A sanity limit on what one watch may list, honors and classes together. */
 export const HONOR_WATCH_MAX_TARGETS = 100;
 
+/** The most honors the setup panel lists for a typed search; an empty search lists the whole catalog. */
+export const HONOR_WATCH_SEARCH_RESULTS = 8;
+
+/**
+ * The honors the setup panel offers to add to a watch (#1347). An empty search lists the whole catalog (minus the honors
+ * already chosen); typed words narrow it by name or code, from the first character, and are capped.
+ */
+export function searchWatchCatalog<T extends { id: string; code: string; name: string }>(
+  catalog: readonly T[],
+  chosenIds: readonly string[],
+  search: string,
+  limit = HONOR_WATCH_SEARCH_RESULTS,
+): T[] {
+  const term = search.trim().toLowerCase();
+  const available = catalog.filter((honor) => !chosenIds.includes(honor.id));
+  if (term === "") return available;
+  return available.filter((honor) => honor.name.toLowerCase().includes(term) || honor.code.toLowerCase().includes(term)).slice(0, limit);
+}
+
 const idList = z.array(z.string().trim().min(1).max(64)).max(HONOR_WATCH_MAX_TARGETS);
 
 export const honorWatchInputSchema = z.object({

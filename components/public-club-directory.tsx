@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ComponentType } from "react";
-import { List, MapPin, Search, UsersRound, X } from "lucide-react";
+import { List, MapPin, Search, UsersRound } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 import type { PublicClubMapStatus } from "@/components/public-club-map";
 import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
@@ -107,7 +108,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     <div className={styles.layout}>
       <div className={styles.searchBlock}>
         <label className={styles.searchLabel} htmlFor={searchId}>Search town, ZIP, club or church</label>
-        <div className={styles.search}>
+        <div className={`search-field ${styles.search}`} onMouseDown={focusSearchInput}>
           <Search aria-hidden="true" size={17} />
           <input
             id={searchId}
@@ -117,11 +118,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
             type="search"
             value={query}
           />
-          {query && (
-            <button className={styles.clearButton} onClick={clearSearch} type="button">
-              <X aria-hidden="true" size={15} /> Clear search
-            </button>
-          )}
+          <SearchClearButton onClear={clearSearch} visible={query !== ""} />
         </div>
       </div>
 

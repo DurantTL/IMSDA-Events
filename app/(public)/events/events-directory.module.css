@@ -7,6 +7,9 @@
   background: #fff; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1rem;
 }
 .eventsDirectoryField input:focus-visible, .eventsDirectoryField select:focus-visible, .eventsDirectoryActions :is(button, a):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+/* The search box is the shared .search-field wrapper: it draws the border and the one ring, so the input inside draws none. */
+.eventsDirectoryField :global(.search-field) input { border: 0; border-radius: 0; background: transparent; padding: 0; }
+.eventsDirectoryField :global(.search-field) input:focus-visible { outline: 0; }
 .eventsDirectoryActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .eventsDirectoryActions :is(button, a) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; font-size: 1rem; text-decoration: none; }
 .eventsDirectoryCount { margin: 4px 0 0; color: var(--muted); font-size: 1rem; font-weight: 700; }

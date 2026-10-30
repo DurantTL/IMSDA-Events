@@ -24,6 +24,7 @@ import {
   type LauncherCloseReason,
 } from "@/components/more-launcher-model";
 import { DestinationSearch } from "@/components/destination-search";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { GuardedLink } from "@/components/guarded-link";
 import { moduleStateLabels, type ModuleDestinationEntry } from "@/components/module-destination-states";
 import type { SearchDestination } from "@/components/destination-search-model";
@@ -214,9 +215,9 @@ export function MoreLauncherPanel({
         </div>
       )}
       <div className="more-launcher-search" role="search" inert={confirming ? true : undefined}>
-        <label className="search-field" htmlFor={searchId}>
+        <div className="search-field" onMouseDown={focusSearchInput}>
           <Search aria-hidden="true" size={16} />
-          <span className="sr-only">Find a tool</span>
+          <label className="sr-only" htmlFor={searchId}>Find a tool</label>
           <input
             autoComplete="off"
             className="more-launcher-search-input"
@@ -228,7 +229,8 @@ export function MoreLauncherPanel({
             type="search"
             value={search}
           />
-        </label>
+          <SearchClearButton onClear={() => setSearch("")} visible={search !== ""} />
+        </div>
         <p aria-live="polite" className="more-launcher-search-status" id={statusId} role="status">{launcherSearchStatus(search, matchCount)}</p>
       </div>
       {listed.every((card) => !card.allowed) && <p className="more-launcher-empty">Everything you can open is in the sidebar.</p>}

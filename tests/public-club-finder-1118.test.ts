@@ -86,7 +86,7 @@ describe("find a club styles (#1118)", () => {
   const css = readFileSync(path.join(process.cwd(), "components/public-club-directory.module.css"), "utf8");
   it("gives phone controls 44px targets and hides one pane at a time", () => {
     expect(css).toMatch(/\.viewToggle button \{[^}]*min-height: 44px/);
-    expect(css).toMatch(/\.clearButton,\s*\.retryButton,\s*\.resetButton \{[^}]*min-height: 44px/);
+    expect(css).toMatch(/\.retryButton,\s*\.resetButton \{[^}]*min-height: 44px/);
     expect(css).toContain('.content[data-view="list"] .mapPane');
   });
 });

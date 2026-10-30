@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { Plus, Save, Trash2, X } from "lucide-react";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
-import { HONOR_WATCHES_MAX_PER_EVENT, HONOR_WATCH_MAX_RECIPIENTS } from "@/modules/honors/watch-domain";
+import { HONOR_WATCHES_MAX_PER_EVENT, HONOR_WATCH_MAX_RECIPIENTS, searchWatchCatalog } from "@/modules/honors/watch-domain";
 
 /**
  * The "Honor watches" panel on the honor classes page (#1099). Event administrators and system administrators only: the page does
@@ -43,10 +43,9 @@ function blankDraft(): Draft {
   return { localKey: nextKey(), name: "", recipientsText: "", savedRecipients: [], honorIds: [], offeringIds: [], warnings: [], honorSearch: "" };
 }
 
-const SEARCH_RESULTS = 8;
-
 export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string; catalog: CatalogHonor[]; initial: Panel }) {
   const headingId = useId();
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [classes, setClasses] = useState(initial.classes);
   const [drafts, setDrafts] = useState<Draft[]>(initial.watches.map(toDraft));
   const [error, setError] = useState("");
@@ -106,10 +105,8 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
         {drafts.length === 0 && <p className="quiet-copy">No honor watches yet.</p>}
         {drafts.map((draft, index) => {
           const prefix = `${headingId}-${draft.localKey}`;
-          const term = draft.honorSearch.trim().toLowerCase();
-          const matches = term.length < 2 ? [] : catalog
-            .filter((honor) => !draft.honorIds.includes(honor.id) && (honor.name.toLowerCase().includes(term) || honor.code.toLowerCase().includes(term)))
-            .slice(0, SEARCH_RESULTS);
+          // The whole catalog is listed only for the watch being searched (focused or holding words), so N watches do not each draw it.
+          const matches = draft.honorSearch.trim() === "" && focusedKey !== draft.localKey ? [] : searchWatchCatalog(catalog, draft.honorIds, draft.honorSearch);
           return (
             <fieldset className="panel form-stack" key={draft.localKey}>
               <legend>Watch {index + 1}</legend>
@@ -138,13 +135,14 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
                   <input
                     autoComplete="off"
                     onChange={(event) => update(draft.localKey, { honorSearch: event.target.value })}
+                    onFocus={() => setFocusedKey(draft.localKey)}
                     placeholder="Search the catalog by name or code"
                     type="search"
                     value={draft.honorSearch}
                   />
                 </label>
                 {matches.length > 0 && (
-                  <ul className="quiet-copy" style={{ listStyle: "none", padding: 0, margin: "8px 0" }}>
+                  <ul className="quiet-copy" style={{ listStyle: "none", padding: 0, margin: "8px 0", maxHeight: 264, overflowY: "auto" }}>
                     {matches.map((honor) => (
                       <li key={honor.id}>
                         <button className="text-button" onClick={() => update(draft.localKey, { honorIds: [...draft.honorIds, honor.id], honorSearch: "" })} style={{ minHeight: 44 }} type="button">

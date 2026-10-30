@@ -279,7 +279,7 @@ function directoryEntry(spec: typeof directorySpecs[number]): PaletteEntry {
     icon: spec.icon,
     keywords: spec.keywords,
     add(context) {
-      return { fields: [baseField(context, spec.fieldLabel, "SELECT", { required: true, optionSource: spec.source, helpText: `Start typing to search the ${spec.noun} directory.` })] };
+      return { fields: [baseField(context, spec.fieldLabel, "SELECT", { required: true, optionSource: spec.source, helpText: `Search the ${spec.noun} directory.` })] };
     },
   };
 }

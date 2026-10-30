@@ -153,9 +153,11 @@ describe("floating honor and class lists", () => {
     expect(read("app/globals.css")).toMatch(/\.club-roster-tools:has\(\.honor-combobox\) \{ align-items: flex-end;/);
   });
 
-  it("keeps the 44px honor combobox input and the #738 touch-target block", () => {
+  it("keeps the honor combobox on the shared 44px search field and the #738 touch-target block", () => {
     const css = read("app/globals.css");
-    expect(css).toMatch(/\.honor-combobox > input\[role="combobox"\] \{ width: 100%; min-height: 44px;/);
+    expect(css).toMatch(/\.honor-combobox \.search-field input \{ font-size:/);
+    expect(css).toMatch(/\.search-field \{[^}]*min-height: var\(--touch-target, 44px\)/);
+    expect(read("components/honor-combobox.tsx")).toContain('className="search-field"');
     expect(css).toContain("Touch and click targets (#738)");
   });
 });

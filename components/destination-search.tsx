@@ -11,12 +11,16 @@ import {
   destinationScopeLabels,
   actionForSurface,
   destinationSearchStatus,
+  groupDestinationsByScope,
+  hasSearchWords,
+  listDestinations,
   listExpanded,
-  searchDestinations,
   selectDestination,
   type SearchDestination,
 } from "@/components/destination-search-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
+import styles from "@/components/destination-search.module.css";
 
 /**
  * Find a page (#1177): a labelled combobox over a listbox of the destinations
@@ -52,10 +56,12 @@ export function DestinationSearch({
   // Where focus was before the field took it, so Escape can hand it back.
   const returnFocus = useRef<HTMLElement | null>(null);
 
-  const results = useMemo(() => searchDestinations(destinations, query), [destinations, query]);
+  const results = useMemo(() => listDestinations(destinations, query), [destinations, query]);
   const active = clampActiveIndex(activeRaw, results.length);
-  const expanded = listExpanded(open, query, results.length);
-  const hasQuery = query.trim() !== "";
+  const expanded = listExpanded(open, results.length);
+  const hasQuery = hasSearchWords(query);
+  // An empty box lists everything in the sidebar's groups; typed words are ranked, so they are not grouped.
+  const groups = hasQuery ? null : groupDestinationsByScope(results);
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
   function reset() {
@@ -121,9 +127,9 @@ export function DestinationSearch({
 
   return (
     <div className="destination-search" role="search">
-      <label className="destination-search-field" htmlFor={inputId}>
+      <div className="search-field destination-search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={16} />
-        <span className="sr-only">Find a page or task</span>
+        <label className="sr-only" htmlFor={inputId}>Find a page or task</label>
         <input
           aria-activedescendant={activeDescendantId(expanded, active, optionId)}
           aria-autocomplete="list"
@@ -144,8 +150,9 @@ export function DestinationSearch({
           onFocus={(event) => {
             const from = event.relatedTarget;
             returnFocus.current = from instanceof HTMLElement ? from : null;
-            if (hasQuery) setOpen(true);
+            setOpen(true);
           }}
+          onClick={() => setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder="Find a page or task"
           ref={inputRef}
@@ -154,7 +161,8 @@ export function DestinationSearch({
           type="text"
           value={query}
         />
-      </label>
+        <SearchClearButton onClear={() => { setQuery(""); setActive(-1); setOpen(true); }} visible={query !== ""} />
+      </div>
       <p aria-live="polite" className="sr-only" role="status">
         {destinationSearchStatus(query, results.length)}
       </p>
@@ -165,16 +173,34 @@ export function DestinationSearch({
         id={listId}
         role="listbox"
       >
-        {results.map((destination, index) => (
-          <DestinationOption
-            active={index === active}
-            destination={destination}
-            id={optionId(index)}
-            key={destination.key}
-            onChoose={() => choose(destination)}
-            onHover={() => setActive(index)}
-          />
-        ))}
+        {groups
+          ? (open ? groups : []).map((group) => (
+            <li aria-labelledby={`${baseId}-group-${group.scope}`} className={styles.group} key={group.scope} role="group">
+              <span className={styles.groupHeading} id={`${baseId}-group-${group.scope}`}>{destinationScopeDescription(group.scope)}</span>
+              <ul role="none">
+                {group.items.map((destination, offset) => (
+                  <DestinationOption
+                    active={group.start + offset === active}
+                    destination={destination}
+                    id={optionId(group.start + offset)}
+                    key={destination.key}
+                    onChoose={() => choose(destination)}
+                    onHover={() => setActive(group.start + offset)}
+                  />
+                ))}
+              </ul>
+            </li>
+          ))
+          : results.map((destination, index) => (
+            <DestinationOption
+              active={index === active}
+              destination={destination}
+              id={optionId(index)}
+              key={destination.key}
+              onChoose={() => choose(destination)}
+              onHover={() => setActive(index)}
+            />
+          ))}
       </ul>
       {open && hasQuery && results.length === 0 && (
         <p className="destination-search-empty">No pages match. Try a different word.</p>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Search } from "lucide-react";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { visibleBottomBarTop } from "@/components/fixed-bottom-bars";
 import { comboboxKeyResult, comboboxPopoverPlacement, filterHonorsByWordPrefix, type ComboboxPlacement } from "@/modules/honors/honor-search";
 
@@ -23,9 +25,9 @@ function visibleBounds(from: HTMLElement) {
 }
 
 /**
- * The type-to-search honor picker (#819), used wherever a honor is chosen (and, with `noun`, a class on the class tracking page, #827). An
+ * The search-as-you-type honor picker (#819), used wherever a honor is chosen (and, with `noun`, a class on the class tracking page, #827). An
  * ARIA 1.2 editable combobox with a listbox popup: typing filters by the start
- * of any word in the name; Arrow Up/Down move through the matches, Enter
+ * of any word in the name; the list opens when the field takes focus (click or Tab), so an empty field shows every choice; Arrow Up/Down move through the matches, Enter
  * chooses, Escape closes the list (and never closes a dialog around it).
  * `allLabel` adds an "All honors" choice with the empty value, for filters.
  * `name` posts the chosen id with a plain form; `onChange` reports it.
@@ -70,6 +72,7 @@ export function HonorCombobox({
   const [typed, setTyped] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   // `lift` is how far above the wrapper's bottom edge the list sits when it flips above the field.
   const [placement, setPlacement] = useState<ComboboxPlacement & { lift: number }>({ side: "below", maxHeight: 224, lift: 48 });
@@ -87,7 +90,8 @@ export function HonorCombobox({
   useLayoutEffect(() => {
     if (!open) return;
     function place() {
-      const input = inputRef.current;
+      // The wrapper is the field the person sees, so the list anchors to it.
+      const input = fieldRef.current;
       const list = listRef.current;
       if (!input || !list) return;
       const rect = input.getBoundingClientRect();
@@ -163,6 +167,8 @@ export function HonorCombobox({
   return (
     <div className="honor-combobox">
       <label htmlFor={`${baseId}-input`}>{label}</label>
+      <div className="search-field" onMouseDown={focusSearchInput} ref={fieldRef}>
+      <Search aria-hidden="true" size={16} />
       <input
         aria-activedescendant={open && choices.length > 0 ? optionId(safeActive) : undefined}
         aria-autocomplete="list"
@@ -175,14 +181,19 @@ export function HonorCombobox({
         onBlur={close}
         onChange={(event) => { setTyped(event.target.value); setOpen(true); setActive(0); }}
         onClick={() => setOpen(true)}
-        onFocus={(event) => event.currentTarget.select()}
+        onFocus={(event) => { event.currentTarget.select(); setOpen(true); }}
         onKeyDown={onKeyDown}
-        placeholder={placeholder ?? `Type to search ${nounPlural}`}
+        placeholder={placeholder ?? `Search ${nounPlural}`}
         required={required && !value}
         role="combobox"
         type="text"
         value={typed ?? selectedName}
       />
+      <SearchClearButton
+        onClear={() => { if (value) onChange(""); setTyped(""); setOpen(true); setActive(0); }}
+        visible={(typed ?? selectedName) !== ""}
+      />
+      </div>
       {name && <input name={name} type="hidden" value={value} />}
       <ul
         aria-label={`${label} matches`}

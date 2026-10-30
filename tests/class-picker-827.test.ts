@@ -40,10 +40,10 @@ describe("class tracking class picker (#827)", () => {
 
   it("uses class wording, and keeps honor wording by default", () => {
     const classes = renderToStaticMarkup(createElement(HonorCombobox, { label: "Class", noun: "class", nounPlural: "classes", onChange: () => {}, options: levels, value: "GUIDE" }));
-    expect(classes).toContain("Type to search classes");
+    expect(classes).toContain("Search classes");
     expect(classes).toContain('value="Guide"');
     const honors = renderToStaticMarkup(createElement(HonorCombobox, { label: "Honor", onChange: () => {}, options: [], value: "" }));
-    expect(honors).toContain("Type to search honors");
+    expect(honors).toContain("Search honors");
     expect(honors).toContain("No honor matches");
     expect(classes).not.toContain("No honor matches");
   });

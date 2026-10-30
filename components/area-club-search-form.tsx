@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/organization-search-controls";
 
 /**
@@ -53,11 +54,13 @@ export function AreaClubSearchForm({
   const formRef = useRef<HTMLFormElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pending, startTransition] = useTransition();
+  const [hasText, setHasText] = useState(query !== "");
 
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
     syncFieldValue(form.elements.namedItem("q") as HTMLInputElement | null, query, document.activeElement);
+    setHasText((form.elements.namedItem("q") as HTMLInputElement | null)?.value !== "");
   }, [query]);
 
   useEffect(() => () => {
@@ -88,23 +91,33 @@ export function AreaClubSearchForm({
       {clubYear && <input name="year" type="hidden" value={clubYear} />}
       {sort && <input name="sort" type="hidden" value={sort} />}
       {month && <input name="month" type="hidden" value={month} />}
-      <label className="search-field" htmlFor="area-club-search">
+      <div className="search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={15} />
-        <span className="sr-only">{label}</span>
+        <label className="sr-only" htmlFor="area-club-search">{label}</label>
         <input
           autoComplete="off"
           defaultValue={query}
           id="area-club-search"
           maxLength={80}
           name="q"
-          onChange={() => {
+          onChange={(event) => {
+            setHasText(event.target.value !== "");
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(apply, SEARCH_DEBOUNCE_MS);
           }}
           placeholder={label}
           type="search"
         />
-      </label>
+        <SearchClearButton
+          onClear={() => {
+            const input = formRef.current?.elements.namedItem("q") as HTMLInputElement | null;
+            if (input) input.value = "";
+            setHasText(false);
+            apply();
+          }}
+          visible={hasText}
+        />
+      </div>
       <button className="secondary-button" type="submit">Search</button>
       {/* Clearing cancels a search still waiting on its pause, so it cannot put the old filter back. */}
       {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={() => { if (timer.current) clearTimeout(timer.current); }}>Clear</Link>}

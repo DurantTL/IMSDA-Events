@@ -246,7 +246,7 @@ describe("what a row says (#1167)", () => {
 describe("search panel (#1167)", () => {
   it("labels the search, describes Details needed and reports the count in a polite status", () => {
     const out = html();
-    expect(out).toMatch(new RegExp(`<label class="${rosterStyles.rosterSearchField}" for="roster-search">Search roster`));
+    expect(out).toMatch(new RegExp(`<div class="${rosterStyles.rosterSearchField}"><label for="roster-search">Search roster</label>`));
     expect(out).toContain('id="roster-search"');
     expect(out).toContain('type="search"');
     expect(out).toMatch(/autocomplete="off"/i);
