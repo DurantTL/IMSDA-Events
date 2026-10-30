@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { personColumnSelect } from "@/modules/people/disclosure-matrix";
+import { auditCrossEventIdentityRead } from "@/modules/people/identity-read-audit";
 import {
   MAX_MERGE_CHAIN_DEPTH,
   PERSON_MERGE_REASON_MIN_LENGTH,
@@ -378,7 +380,7 @@ export type MergedPersonView = {
  * every person merged beneath it, and gathers their registrations with the
  * ORIGINAL attribution. It only reads; nothing is repointed.
  */
-export async function getMergedPersonView(personId: string): Promise<MergedPersonView> {
+export async function getMergedPersonView(personId: string, actorUserId: string): Promise<MergedPersonView> {
   const prisma = getPrisma();
   const canonicalPersonId = await resolveCanonicalPersonId(personId, prisma);
   let collected;
@@ -420,6 +422,20 @@ export async function getMergedPersonView(personId: string): Promise<MergedPerso
     })),
   ];
 
+  // It gathers registrations across events, so the read is audited (ids only) before it is returned.
+  await auditCrossEventIdentityRead({
+    actorUserId,
+    surface: "MERGED_PERSON_VIEW",
+    entityId: canonicalPersonId,
+    resultIds: registrations.map((registration) => registration.registrationId),
+    extra: {
+      requestedPersonId: personId,
+      canonicalPersonId,
+      memberPersonIds,
+      eventIds: [...new Set(registrations.map((registration) => registration.eventId))],
+    },
+  });
+
   return {
     requestedPersonId: personId,
     canonicalPersonId,
@@ -437,10 +453,10 @@ export type PersonMergeRecord = {
   mergedAt: string;
 };
 
-const mergePersonSelect = { id: true, firstName: true, lastName: true } as const;
+const mergePersonSelect = personColumnSelect("SYSTEM_ADMIN", ["firstName", "lastName"]) as { id: true; firstName: true; lastName: true };
 
 /** ACTIVE merges for the "Merged people" list: names only, like the review queue. */
-export async function listActivePersonMerges(): Promise<PersonMergeRecord[]> {
+export async function listActivePersonMerges(actorUserId: string): Promise<PersonMergeRecord[]> {
   const rows = await getPrisma().personMerge.findMany({
     where: { state: "ACTIVE" },
     orderBy: { mergedAt: "desc" },
@@ -452,6 +468,7 @@ export async function listActivePersonMerges(): Promise<PersonMergeRecord[]> {
       secondaryPerson: { select: mergePersonSelect },
     },
   });
+  await auditCrossEventIdentityRead({ actorUserId, surface: "ACTIVE_MERGES_LIST", resultIds: rows.map((row) => row.id) });
   return rows.map((row) => ({
     id: row.id,
     primaryPerson: row.primaryPerson,

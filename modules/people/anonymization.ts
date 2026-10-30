@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
 
 /**
  * Anonymization, not erasure (#127): an approved deletion request replaces a
@@ -65,7 +66,7 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
     // anonymization cannot commit between a merge's anonymized check and the merge's own commit.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('person-merge', 0))`;
     const approver = await tx.user.findUnique({ where: { id: input.approvedByUserId }, select: { globalRole: true } });
-    if (approver?.globalRole !== "SYSTEM_ADMIN") {
+    if (!isDisclosureAllowed("ANONYMIZATION_RECORD", staffIdentityAudience(approver ?? {}), "EDIT", { reach: "GLOBAL" })) {
       throw new PersonAnonymizationError("APPROVER_NOT_ALLOWED", "Only a system administrator can approve an anonymization.");
     }
     const person = await tx.person.findUnique({ where: { id: input.personId }, select: { id: true, anonymizedAt: true } });

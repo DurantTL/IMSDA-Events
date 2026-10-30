@@ -5,6 +5,7 @@ import {
   requireAuthenticatedUser,
 } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
 
 /**
  * `Person` is a global, cross-event entity, and the match review queue is
@@ -13,11 +14,13 @@ import { getCurrentSession } from "@/modules/access/current-session";
  * per-event permission that fits (no single `EventPermission` governs a
  * cross-event comparison of two people), so this mirrors
  * `modules/organizations/access.ts` and gates on the same cross-event
- * `globalRole` used by `modules/system-admin`.
+ * `globalRole` used by `modules/system-admin`. The decision is the
+ * disclosure matrix's (`disclosure-matrix.ts`): a global read of match
+ * candidate evidence, which only the system administrator audience holds.
  */
 export async function requireSystemAdministrator() {
   const user = requireAuthenticatedUser(await getCurrentSession());
-  if (user.globalRole !== "SYSTEM_ADMIN") {
+  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ", { reach: "GLOBAL" })) {
     throw new AccessDeniedError(
       "System administrator access is required to review possible duplicate people.",
       403,

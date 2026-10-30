@@ -128,6 +128,32 @@ not import and nothing merge-related can call. There is no route or screen for
 it yet. Not covered: personal data copied into registration contact and
 attendee profile snapshots, which belongs to a retention decision.
 
+## Disclosure matrix, invariants and read audit (`disclosure-matrix.ts`, `identity-read-audit.ts`)
+
+Identity slice 4 (#128). `DISCLOSURE_MATRIX` declares, per identity field
+(name, email, phone, household membership, account links, merge history,
+match-candidate evidence, external identities, anonymization record), which
+audience (system administrator, event staff, attendee for self, household
+member, anonymous) may read, edit, export and view the audit of it, plus a
+classification. It is configuration the code consults, not prose: the queue
+gate, the merge/unmerge/merges-list gate, the anonymization approver check and
+the person-column projections of the queue and merges list all decide through
+`isDisclosureAllowed` / `personColumnSelect`. Only the system administrator
+audience has global reach; event staff reach people through their own event's
+registrations, whatever event permissions they hold. `tests/identity-disclosure-matrix.test.ts`
+has a test per row.
+
+`tests/identity-authorization-invariants.test.ts` proves a link, a merge, a
+household or a shared identity grants no staff permission and no access to
+another event's records (attendees reach registrations by verified email only).
+
+Every identity read that crosses an event boundary (`getMergedPersonView`,
+`listActivePersonMerges`, `listOpenMatchCandidates`, so also
+`GET /api/people/merges` and the review queue) takes the acting user and
+writes a `PERSON_CROSS_EVENT_READ` audit entry before returning: actor,
+surface and ids only, never names, contact details or reasons. A failed audit
+write fails the read.
+
 ## Time-bounded household membership (`household-domain.ts`, `household-repository.ts`)
 
 `HouseholdMember` carries `effectiveFrom` / `effectiveTo` so a past

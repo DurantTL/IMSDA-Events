@@ -10,8 +10,8 @@ import { withRequestContext } from "@/lib/request-context";
 /** Lists open match candidates for the review queue. */
 async function getHandler() {
   try {
-    await requireSystemAdministrator();
-    return Response.json({ candidates: await listOpenMatchCandidates() });
+    const actor = await requireSystemAdministrator();
+    return Response.json({ candidates: await listOpenMatchCandidates(actor.id) });
   } catch (error) {
     return duplicateMatchApiError(error, "Loading match candidates");
   }
@@ -26,9 +26,9 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    await requireSystemAdministrator();
+    const actor = await requireSystemAdministrator();
     const result = await generateMatchCandidates();
-    return Response.json({ result, candidates: await listOpenMatchCandidates() });
+    return Response.json({ result, candidates: await listOpenMatchCandidates(actor.id) });
   } catch (error) {
     return duplicateMatchApiError(error, "Generating match candidates");
   }
