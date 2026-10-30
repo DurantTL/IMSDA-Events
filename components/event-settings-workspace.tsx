@@ -93,6 +93,7 @@ import {
   type SettingsBlockId,
   type SettingsFieldIssue,
 } from "@/modules/events/settings-layout";
+import styles from "@/components/public-page-overview.module.css";
 
 type EventSettingsWorkspaceProps = {
   mode: "create" | "edit";
@@ -1059,7 +1060,7 @@ export function EventSettingsWorkspace({
           >
             <p className="settings-block-intro">This event&rsquo;s public information lives on IMSDA Events. Link an IMSDA.org page too only if one still exists for this event.</p>
             {publicPageOverview && (
-              <dl className="public-page-overview">
+              <dl className={styles.publicPageOverview}>
                 <div>
                   <dt>{publicPageOverview.status.label}</dt>
                   <dd>{publicPageOverview.status.text}</dd>

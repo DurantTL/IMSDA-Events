@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import type { ActiveStationRow } from "@/modules/checkin-stations/repository";
 import { STATION_LABEL_MAX_LENGTH } from "@/modules/checkin-stations/domain";
+import styles from "@/components/check-in-stations-panel.module.css";
 
 function formatWhen(value: string, timeZone: string) {
   try {
@@ -78,13 +79,13 @@ export function CheckInStationsPanel({
   }
 
   return (
-    <section className="panel cis-panel" aria-labelledby="cis-panel-title">
+    <section className={`panel ${styles.cisPanel}`} aria-labelledby="cis-panel-title">
       <h2 id="cis-panel-title">Check-in stations</h2>
-      <p className="cis-panel-help">
+      <p className={styles.cisPanelHelp}>
         A station is a staff-run tablet that checks in a whole registration from one code. It works until the event
         ends, and you can revoke it here at any time.
       </p>
-      <form className="cis-panel-start" onSubmit={start}>
+      <form className={styles.cisPanelStart} onSubmit={start}>
         <label>
           Station name (optional)
           <input
@@ -101,9 +102,9 @@ export function CheckInStationsPanel({
       </form>
       <div role="status" aria-live="polite">{error && <p className="form-error">{error}</p>}</div>
       {stations.length === 0 ? (
-        <p className="cis-panel-help">No stations are active for this event.</p>
+        <p className={styles.cisPanelHelp}>No stations are active for this event.</p>
       ) : (
-        <ul className="cis-panel-list">
+        <ul className={styles.cisPanelList}>
           {stations.map((station) => (
             <li key={station.id}>
               <div>

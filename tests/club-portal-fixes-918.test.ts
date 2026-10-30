@@ -36,6 +36,7 @@ import { ClubEarnedAwardsWorkspace, emptyEarnedAwardsData } from "@/components/c
 import { ClubOrderWorkspace, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
+import rosterStyles from "@/components/club-roster-sections.module.css";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import { searchResultSummary } from "@/lib/search-match";
 import { isAdultRosterPerson } from "@/modules/club-rosters/domain";
@@ -46,6 +47,7 @@ import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
 const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
+const rosterCss = readFileSync(path.join(process.cwd(), "components/club-roster-sections.module.css"), "utf8");
 
 type Props = Record<string, unknown> & { children?: ReactNode };
 function walk(node: ReactNode, out: ReactElement<Props>[] = []) {
@@ -71,7 +73,7 @@ describe("1. roster: the name is the most prominent thing in the row", () => {
     const html = renderToStaticMarkup(createElement(ClubRosterWorkspace, {
       clubYear: "2026-27", initialMembers: [member], organizationId: "club-1", canSeeBirthDates: false, classHistoryBase: "/account/clubs/club-1/class-tracking",
     } as never));
-    const name = html.indexOf('class="roster-member-name"');
+    const name = html.indexOf(`class="${rosterStyles.rosterMemberName}"`);
     const link = html.indexOf("roster-class-history-link");
     expect(name).toBeGreaterThan(-1);
     expect(link).toBeGreaterThan(name);
@@ -85,7 +87,12 @@ describe("1. roster: the name is the most prominent thing in the row", () => {
     };
     const size = (body: string) => Number(/font-size:\s*max\(var\([^)]*\),\s*([\d.]+)rem\)/.exec(body)![1]);
     const weight = (body: string) => Number(/font-weight:\s*(\d+)/.exec(body)![1]);
-    const name = rule(".roster-card-name .roster-member-name");
+    const ruleIn = (source: string, selector: string) => {
+      const match = source.match(new RegExp(`${selector.replace(/[.\\[\]()]/g, "\\$&")}\\s*\\{([^}]*)\\}`));
+      expect(match, selector).not.toBeNull();
+      return match![1]!;
+    };
+    const name = ruleIn(rosterCss, ":global(.roster-card-name) .rosterMemberName");
     const link = rule(".roster-card-name .roster-class-history-link");
     expect(size(name)).toBeGreaterThan(size(link) + 0.15);
     expect(weight(name)).toBeGreaterThan(weight(link));

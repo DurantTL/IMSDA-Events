@@ -1,0 +1,16 @@
+/* Events list search and filters (#106): a plain GET form, one column on phones. */
+.eventsDirectoryForm { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 14px 0 6px; min-width: 0; }
+.eventsDirectoryField { display: grid; gap: 4px; min-width: 0; }
+.eventsDirectoryField label { color: var(--ink); font-size: 1rem; font-weight: 700; }
+.eventsDirectoryField input, .eventsDirectoryField select {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: 12px;
+  background: #fff; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1rem;
+}
+.eventsDirectoryField input:focus-visible, .eventsDirectoryField select:focus-visible, .eventsDirectoryActions :is(button, a):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+.eventsDirectoryActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.eventsDirectoryActions :is(button, a) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; font-size: 1rem; text-decoration: none; }
+.eventsDirectoryCount { margin: 4px 0 0; color: var(--muted); font-size: 1rem; font-weight: 700; }
+@media (min-width: 761px) {
+  .eventsDirectoryForm { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
+  .eventsDirectorySearch { grid-column: 1 / -1; }
+}

@@ -1,0 +1,6 @@
+/* Typed-name signature records on a staff registration (#1265). */
+.registrationSignatureRecord { display: grid; gap: 4px; border-top: 1px solid var(--line, #d2dfe4); padding-top: 10px; }
+.registrationSignatureRecord:first-child { border-top: 0; padding-top: 0; }
+.registrationSignatureRecord p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.registrationSignatureRecord summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.registrationSignatureRecord .registrationSignatureText { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }

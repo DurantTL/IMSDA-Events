@@ -10974,7 +10974,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* Class history link under a roster name (#791). */
 .roster-class-history-link { display: block; margin-top: 2px; padding: 0; font-size: max(var(--type-staff-floor, 0px), 0.8rem); }
 /* #918: the member's name is the most prominent thing in its row; "Class history" is a quiet secondary link under it. */
-.roster-card-name .roster-member-name { display: block; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 1.0625rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
 .roster-card-name .roster-class-history-link { margin-top: 4px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8125rem); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .roster-card-name .roster-class-history-link:hover, .roster-card-name .roster-class-history-link:focus-visible { color: var(--imsda-purple); }
 @media (max-width: 720px) {
@@ -13401,12 +13400,8 @@ a.season-item-body:focus-visible { outline: 3px solid var(--focus-ring); outline
 .home-footer-help a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
 .home-footer-help a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 
-/* Platform settings: homepage ministries and help contact (#1251). Staff labels at least 14px; the help text overrides .field-help's negative margin. */
+/* Platform settings: help text for the homepage ministries and help contact (#1251), shared by two components; the ministry tile fields moved to components/homepage-ministries-editor.module.css. Staff labels at least 14px; the help text overrides .field-help's negative margin. */
 .platform-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.ministry-tile-fields { display: grid; gap: 12px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; }
-.ministry-tile-fields > legend { padding: 0 6px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
-.ministry-tile-fields label { min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.ministry-tile-fields label > small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 /* Calendar month page, compact (#1249): a one-line header with the subscribe button, a sticky bar (view tabs, month navigation and
    filter chips), 88px week rows, and the month list beside the grid (below it on a phone). Flat fills only; 16px body text, 14px
    labels, 44px taps; no new motion. */
@@ -13573,9 +13568,9 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .email-health-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .message-file-storage-note { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
 .event-savebar-status { font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; min-width: 0; }
-/* Club roster and Honors name search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. */
-.roster-search-panel, .roster-search-field, .honor-name-search { grid-template-columns: minmax(0, 1fr); }
-.roster-search-row, .roster-search-input, .honor-name-search-field { min-width: 0; }
+/* Honors name search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. The club roster's search rules moved to components/club-roster-workspace.module.css. */
+.honor-name-search { grid-template-columns: minmax(0, 1fr); }
+.honor-name-search-field { min-width: 0; }
 /* Coordinator pages at 200% text on a phone (#1113): an Open club button sits under its card label, as other
    controls do, instead of beside a gutter that grows with the text; a long leader email wraps in the club's list (only the unclassed text span, so badges and buttons keep their width). */
 @media screen and (max-width: 600px) {
@@ -13591,139 +13586,11 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .public-manage-club-list { grid-template-columns: minmax(0, 1fr); }
 .public-manage-club-list li > span:not([class]) { min-width: 0; overflow-wrap: anywhere; }
 
-/* Check-in station (#892): a staff-run tablet screen outside the workspace shell. Large tap targets, one column. */
-@media screen {
-  .cis-shell { --type-floor: 0.875rem; --type-body-floor: 0.875rem; }
-}
-.cis-shell {
-  display: grid;
-  gap: 16px;
-  width: min(100%, 760px);
-  margin: 0 auto;
-  padding: 16px;
-}
-.cis-card { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: white; padding: 18px; }
-.cis-card h1, .cis-header h1 { margin: 0; font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
-.cis-card h2 { margin: 0 0 8px; font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
-.cis-payment h3 { margin: 0 0 6px; font-size: 1.05rem; }
-.cis-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.cis-header > div { min-width: 0; flex: 1 1 14rem; }
-.cis-eyebrow { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
-.cis-sub { margin: 2px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
-.cis-help { margin: 4px 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
-.cis-lookup label { font-size: 1rem; }
-.cis-lookup-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-.cis-shell input[type="text"], .cis-shell input:not([type]) {
-  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: white; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1.05rem;
-}
-.cis-lookup-row input { flex: 1 1 14rem; }
-.cis-form input[inputmode] { width: 100%; }
-.cis-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); cursor: pointer; padding: 8px 16px; font: inherit; font-size: 1rem; font-weight: 700;
-}
-.cis-button-primary { border-color: var(--imsda-navy); background: var(--imsda-navy); color: white; }
-.cis-button-quiet { background: white; }
-.cis-button:disabled { cursor: not-allowed; opacity: 0.58; }
-.cis-people { display: grid; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
-.cis-person { border: 1px solid var(--line); border-radius: 12px; }
-.cis-person-body { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 56px; padding: 8px 12px; }
-.cis-person-body > span:not(.cis-type):not(.cis-status) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-.cis-person-pick { cursor: pointer; }
-.cis-person-pick input[type="checkbox"], .cis-choice input[type="radio"] { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
-.cis-person strong { overflow-wrap: anywhere; }
-.cis-type { color: var(--muted); font-size: 0.95rem; }
-.cis-status { border-radius: 999px; padding: 2px 10px; font-size: 0.875rem; font-weight: 700; }
-.cis-status-ok { background: #eef8f2; color: #1c6b4a; }
-.cis-status-hold { background: var(--imsda-gold-soft); color: #6f5316; }
-.cis-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-.cis-payment { display: grid; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
-.cis-payment .checkin-payment-due { margin-top: 0; }
-.cis-form fieldset { display: grid; gap: 8px; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-.cis-form legend { padding: 0 6px; font-weight: 700; }
-.cis-form label { font-size: 1rem; }
-.cis-choice { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.cis-choice label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
-.cis-due, .cis-ok, .cis-error, .cis-desk-notice { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 0; font-size: 1rem; }
-.cis-ok { color: #1c6b4a; font-weight: 700; }
-.cis-error { border-radius: 9px; background: #fff1ef; color: var(--coral); padding: 9px 11px; }
-.cis-desk-notice { border-radius: 9px; background: var(--imsda-gold-soft); color: #6f5316; padding: 9px 11px; font-weight: 700; }
-
-/* Check-in stations panel on the check-in desk (#892). */
-.cis-panel { display: grid; gap: 12px; margin-top: 16px; }
-.cis-panel h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.cis-panel-start { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
-.cis-panel-start label { display: grid; flex: 1 1 14rem; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
-.cis-panel-start input { min-height: 44px; }
-.cis-panel-start .primary-button, .cis-panel-list .secondary-button { min-height: 44px; }
-.cis-panel-help { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.cis-panel-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.cis-panel-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.cis-panel-list li > div { min-width: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
-
-/* Typed-name signature records on a staff registration (#1265). */
-.registration-signature-record { display: grid; gap: 4px; border-top: 1px solid var(--line, #d2dfe4); padding-top: 10px; }
-.registration-signature-record:first-child { border-top: 0; padding-top: 0; }
-.registration-signature-record p { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
-.registration-signature-record summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.registration-signature-record .registration-signature-text { white-space: pre-wrap; max-height: 240px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; padding: 10px 12px; }
-/* Events list search and filters (#106): a plain GET form, one column on phones. */
-.events-directory-form { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 14px 0 6px; min-width: 0; }
-.events-directory-field { display: grid; gap: 4px; min-width: 0; }
-.events-directory-field label { color: var(--ink); font-size: 1rem; font-weight: 700; }
-.events-directory-field input, .events-directory-field select {
-  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: 12px;
-  background: #fff; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1rem;
-}
-.events-directory-field input:focus-visible, .events-directory-field select:focus-visible, .events-directory-actions :is(button, a):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
-.events-directory-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.events-directory-actions :is(button, a) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; font-size: 1rem; text-decoration: none; }
-.events-directory-count { margin: 4px 0 0; color: var(--muted); font-size: 1rem; font-weight: 700; }
-@media (min-width: 761px) {
-  .events-directory-form { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
-  .events-directory-search { grid-column: 1 / -1; }
-}
-
-/* Curated hub content (#111): site notices, announcements, extra header links and footer details. */
-.site-notices { margin: 0; padding: 0; }
-.site-notices ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.site-notice { display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--line); padding: 12px max(16px, calc((100% - 1180px) / 2)); font-size: 1rem; line-height: 1.45; }
-.site-notice svg { flex: 0 0 auto; margin-top: 2px; }
-.site-notice p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.site-notice-info { background: var(--imsda-navy-soft); color: var(--imsda-navy-deep); }
-.site-notice-urgent { background: var(--imsda-gold-soft); color: #5b3b00; border-left: 6px solid #b45309; }
-.site-notice-emergency { background: #fdeceb; color: #7a1712; border-left: 6px solid #b3261e; font-weight: 600; }
-.site-notice-link { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font-weight: 700; text-decoration: underline; }
-.site-notice-link:focus-visible, .home-announcement-link:focus-visible, .home-footer-links a:focus-visible, .public-header-nav a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+/* Curated hub content (#111): the extra header links are shared by two components, so they stay here; the notices and the home announcements and footer moved to site-notices-view.module.css and public-home-page.module.css. */
+.public-header-nav a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .public-header-nav { min-width: 0; }
 .public-header-nav ul { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
 .public-header-nav .text-button { white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
-.home-announcements { display: grid; gap: 12px; min-width: 0; }
-.home-announcements > h2 { margin: 0; color: var(--ink); font-size: 1.25rem; }
-.home-announcements-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-@media (min-width: 761px) { .home-announcements-list { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
-.home-announcements-list li { display: grid; gap: 6px; align-content: start; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px 16px; min-width: 0; }
-.home-announcements-list h3 { margin: 0; color: var(--imsda-navy); font-size: 1.1rem; overflow-wrap: anywhere; }
-.home-announcements-list p { margin: 0; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
-.home-announcement-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
-.home-footer-contact { overflow-wrap: anywhere; }
-.home-footer-links ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
-.home-footer-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
-
-/* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
-.role-details { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.role-details > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: underline; cursor: pointer; }
-.role-details > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
-.role-details .role-details-body { display: grid; gap: 8px; min-width: 0; padding: 0 0 6px; }
-.role-details .role-details-body .role-details-label { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.role-details .role-details-body ul { display: block; margin: 2px 0 0; padding-left: 20px; list-style: disc; }
-.role-details .role-details-body li { display: list-item; color: inherit; text-transform: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
-/* Public page and links overview (#448): the short read-only summary at the top of Step 3. */
-.public-page-overview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
-.public-page-overview > div { display: grid; gap: 2px; }
-.public-page-overview dt { font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.public-page-overview dd { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
-.public-page-overview dd small { display: block; margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
-.public-page-overview a { display: flex; width: fit-content; align-items: center; min-height: 44px; color: var(--imsda-purple); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
@@ -14120,59 +13987,19 @@ html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2
   .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }
 
-/* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
-.roster-search-panel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
-.roster-search-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
-.roster-search-field { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
-.roster-search-input { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
-.roster-search-input:focus-within { outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
-.roster-search-input svg { flex: 0 0 auto; }
-.roster-search-input input { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent; padding: 0; box-shadow: none; outline: 0; font-weight: 500; }
-.roster-filter-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.roster-filter-button { min-height: 44px; }
-.roster-filter-button[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }
-.roster-search-panel .field-help { margin: 0; }
-.roster-result-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
-.roster-result-line p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
-.roster-result-line .text-button { min-height: 44px; }
-.roster-member-name { overflow-wrap: anywhere; }
-.roster-member-role { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
-.roster-needs-details { white-space: normal; }
+/* Roster cards (#1167): the table-cell rules stay global (the roster-card-table classes are shared with the honors table); the search, Edit and Actions rules moved to components/club-roster-workspace.module.css. */
 .roster-card-table td.roster-card-flags { min-width: 10rem; }
-.roster-row-action-set { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.roster-row-action-set .actions-menu { display: inline-block; width: auto; }
-.roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: auto; min-height: 44px; min-width: 44px; white-space: nowrap; }
-/* An open menu opens in the flow, under Edit, at the width of its own cell: it can't be clipped by the table's scroll region, cover the next column or push the page sideways. */
-.roster-row-action-set .actions-menu[open] { flex-basis: 100%; }
-.roster-row-action-set .actions-menu-list { position: static; width: 100%; min-width: 0; margin-top: 6px; box-shadow: none; }
-.roster-row-action-set .actions-menu-list :is(a, button) { white-space: normal; }
 .roster-card-table td.roster-row-actions { min-width: 9.5rem; }
 /* The shared rule that lets an open menu out of a table wrap would push this page sideways; the roster's menu is in the flow, so the wrap keeps scrolling. */
 @media screen { .report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { overflow-x: auto; } }
-.actions-menu-list .actions-menu-note { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
-.roster-edit-button { min-height: 44px; min-width: 44px; white-space: nowrap; }
-.roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
-/* Phone and narrow cards: the name takes the full card width and the labelled actions sit on the card's last row, at 44px. */
 @media (max-width: 720px) {
   .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1 / -1; }
   .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions.roster-row-actions { grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; margin-top: 8px; }
-  .roster-card-table .roster-row-action-set > .secondary-button,
-  .roster-card-table .roster-row-action-set .actions-menu { flex: 1 1 8rem; }
-  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { width: 100%; justify-content: center; }
-  .roster-card-table .roster-row-action-set > .secondary-button { justify-content: center; }
   .roster-card-table td.roster-card-actions.roster-row-actions { justify-content: flex-start; }
-  .roster-card-table .roster-row-action-set { width: 100%; }
-  .roster-card-table .roster-row-action-set > .secondary-button,
-  .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
-  .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
 }
 @media (min-width: 721px) {
   @container (max-width: 640px) {
     .roster-card-table td.roster-card-name[data-label] { padding-right: 0; }
     .roster-card-table td.roster-card-actions.roster-row-actions { position: static; grid-column: 1 / -1; justify-content: flex-start; }
-    .roster-card-table .roster-row-action-set > .secondary-button,
-    .roster-card-table .roster-row-action-set .actions-menu > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
-    .roster-row-action-set .actions-menu-list :is(a, button) { min-height: 44px; }
-    }
+  }
 }
-.roster-card-table .roster-row-action-set .actions-menu[open] { flex: 1 1 100%; }

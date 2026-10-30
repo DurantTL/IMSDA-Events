@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PenLine } from "lucide-react";
 import type { RegistrationSignatures, SignatureRecordView, SignatureSummary } from "@/modules/signatures/domain";
+import styles from "@/components/registration-signatures-panel.module.css";
 
 function formatSignedAt(value: string, timeZone: string) {
   const date = new Date(value);
@@ -56,7 +57,7 @@ export function RegistrationSignaturesPanel({
       </header>
       <div className="registration-related-list">
         {state.data.signatures.map((signature) => (
-          <article key={signature.id} className="registration-signature-record">
+          <article key={signature.id} className={styles.registrationSignatureRecord}>
             <p>
               <strong>{signature.fieldLabel}</strong>
               {signature.registrationAttendeeId && attendeeNames[signature.registrationAttendeeId] ? ` · ${attendeeNames[signature.registrationAttendeeId]}` : ""}
@@ -67,7 +68,7 @@ export function RegistrationSignaturesPanel({
                 <p className="quiet-copy">IP address: {signature.ipAddress ?? "not recorded"}</p>
                 <details>
                   <summary>Text that was signed</summary>
-                  <p className="registration-signature-text">{signature.signedText}</p>
+                  <p className={styles.registrationSignatureText}>{signature.signedText}</p>
                 </details>
               </>
             ) : null}

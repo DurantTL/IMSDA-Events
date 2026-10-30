@@ -13,3 +13,56 @@
 .section[open] > .summary { margin-bottom: 8px; }
 .empty { margin: 0 0 4px; padding: 0 13px; color: var(--muted); font-style: italic; font-size: max(var(--type-body-floor, 0px), 0.875rem); }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
+
+/* Club roster search at 200% text on a phone (#1112): the grid tracks never grow to the input's natural width. */
+.rosterSearchPanel, .rosterSearchField { grid-template-columns: minmax(0, 1fr); }
+.rosterSearchRow, .rosterSearchInput { min-width: 0; }
+/* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
+.rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.rosterSearchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.rosterSearchField { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
+.rosterSearchInput { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--muted); }
+.rosterSearchInput:focus-within { outline: 3px solid var(--imsda-navy); outline-offset: 1px; }
+.rosterSearchInput svg { flex: 0 0 auto; }
+.rosterSearchInput input { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent; padding: 0; box-shadow: none; outline: 0; font-weight: 500; }
+.rosterFilterButtons { display: flex; flex-wrap: wrap; gap: 8px; }
+.rosterFilterButton { min-height: 44px; }
+.rosterFilterButton[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }
+.rosterSearchPanel :global(.field-help) { margin: 0; }
+.rosterResultLine { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.rosterResultLine p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.rosterResultLine :global(.text-button) { min-height: 44px; }
+.rosterMemberName { overflow-wrap: anywhere; }
+/* #918: the member's name is the most prominent thing in its row. */
+:global(.roster-card-name) .rosterMemberName { display: block; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 1.0625rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.rosterMemberRole { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
+.rosterNeedsDetails { white-space: normal; }
+.rosterRowActionSet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rosterRowActionSet :global(.actions-menu) { display: inline-block; width: auto; }
+.rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { width: auto; min-height: 44px; min-width: 44px; white-space: nowrap; }
+/* An open menu opens in the flow, under Edit, at the width of its own cell: it can't be clipped by the table's scroll region, cover the next column or push the page sideways. */
+.rosterRowActionSet :global(.actions-menu)[open] { flex-basis: 100%; }
+.rosterRowActionSet :global(.actions-menu-list) { position: static; width: 100%; min-width: 0; margin-top: 6px; box-shadow: none; }
+.rosterRowActionSet :global(.actions-menu-list) :is(a, button) { white-space: normal; }
+:global(.actions-menu-list) .actionsMenuNote { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
+.rosterEditButton { min-height: 44px; min-width: 44px; white-space: nowrap; }
+.rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
+/* Phone and narrow cards: the name takes the full card width and the labelled actions sit on the card's last row, at 44px. */
+@media (max-width: 720px) {
+  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
+  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) { flex: 1 1 8rem; }
+  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { width: 100%; justify-content: center; }
+  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button) { justify-content: center; }
+  :global(.roster-card-table) .rosterRowActionSet { width: 100%; }
+  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
+  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+  .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
+}
+@media (min-width: 721px) {
+  @container (max-width: 640px) {
+    :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
+    :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+    .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
+    }
+}
+:global(.roster-card-table) .rosterRowActionSet :global(.actions-menu)[open] { flex: 1 1 100%; }

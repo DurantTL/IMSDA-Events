@@ -35,6 +35,8 @@ vi.mock("@/modules/events/featured", async (importOriginal) => {
 import { PublicHomePage } from "@/components/public-home-page";
 import { PublicHeaderNavLinks } from "@/components/public-header-nav-links";
 import { SiteNoticesView } from "@/components/site-notices-view";
+import homeStyles from "@/components/public-home-page.module.css";
+import noticeStyles from "@/components/site-notices-view.module.css";
 const realFeatured = () => vi.importActual<typeof import("@/modules/events/featured")>("@/modules/events/featured");
 import { fallbackHomepageMinistries } from "@/modules/system-admin/homepage-ministries-domain";
 import { defaultHubContent, type HubContent } from "@/modules/site-content/hub-content-domain";
@@ -63,10 +65,10 @@ describe("the homepage with nothing curated", () => {
     expect(html).toContain("<h2 id=\"home-season-heading\">Next six months</h2>");
     expect(html).toContain("<h2 id=\"home-places-heading\">Find your place</h2>");
     expect(html).toContain('<p class="home-footer-verse">Not forsaking the assembling of ourselves together. <cite>Hebrews 10:25</cite></p>');
-    expect(html).not.toContain("site-notices");
-    expect(html).not.toContain("home-announcements");
-    expect(html).not.toContain("home-footer-links");
-    expect(html).not.toContain("home-footer-contact");
+    expect(html).not.toContain(noticeStyles["site-notices"]);
+    expect(html).not.toContain(homeStyles.homeAnnouncements);
+    expect(html).not.toContain(homeStyles.homeFooterLinks);
+    expect(html).not.toContain(homeStyles.homeFooterContact);
   });
 
   it("asks for no chosen events, which keeps today's Event.featured behaviour", async () => {
@@ -90,7 +92,7 @@ describe("the homepage with curated content", () => {
     expect(html).toContain('href="/events"');
     expect(html).not.toContain("Fictitious past news");
     expect(html).not.toContain("Fictitious coming news");
-    expect(await render(withContent({ announcements: [announcements[1]] }))).not.toContain("home-announcements");
+    expect(await render(withContent({ announcements: [announcements[1]] }))).not.toContain(homeStyles.homeAnnouncements);
   });
 
   it("follows the order, visibility and headings staff set", async () => {
@@ -117,19 +119,19 @@ describe("the homepage with curated content", () => {
         { id: "b", level: "EMERGENCY", message: "Fictitious: camp is closed today.", linkHref: "https://imsda.example/closed", linkLabel: "Read more" },
       ],
     }));
-    expect(html).toContain('<section aria-label="Site notices" class="site-notices">');
+    expect(html).toContain(`<section aria-label="Site notices" class="${noticeStyles["site-notices"]}">`);
     expect(position(html, "Emergency: </strong>Fictitious: camp is closed today.")).toBeGreaterThan(-1);
     expect(position(html, "Emergency: ")).toBeLessThan(position(html, "Notice: "));
-    expect(html).toContain('<a class="site-notice-link" href="https://imsda.example/closed">Read more</a>');
-    expect(html).toContain("site-notice-emergency");
+    expect(html).toContain(`<a class="${noticeStyles["site-notice-link"]}" href="https://imsda.example/closed">Read more</a>`);
+    expect(html).toContain(noticeStyles["site-notice-emergency"]);
   });
 
   it("draws the footer verse, contact lines and links, and lets staff clear the verse", async () => {
     const footer = { verse: "Be kind. Ephesians 4:32", contactLines: ["Fictitious Conference Office", "(515) 555-0100"], links: [{ label: "Privacy", href: "/privacy" }] };
     const html = await render(withContent({ footer }));
     expect(html).toContain('<cite>Ephesians 4:32</cite>');
-    expect(html).toContain('<p class="home-footer-contact">(515) 555-0100</p>');
-    expect(html).toContain('<nav aria-label="Footer links" class="home-footer-links">');
+    expect(html).toContain(`<p class="${homeStyles.homeFooterContact}">(515) 555-0100</p>`);
+    expect(html).toContain(`<nav aria-label="Footer links" class="${homeStyles.homeFooterLinks}">`);
     expect(html).toContain('href="/privacy"');
     expect(await render(withContent({ footer: { ...footer, verse: undefined } }))).not.toContain("home-footer-verse");
   });

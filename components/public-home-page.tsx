@@ -17,6 +17,7 @@ import { listCuratedFeaturedRows, listEventCardImages, listFeaturedEventRows } f
 import { activeAnnouncements, activeNotices, linkText, orderedSections, splitVerse, type HubContent, type SectionKey } from "@/modules/site-content/hub-content-domain";
 import { listHomepageMinistries } from "@/modules/system-admin/homepage-ministries";
 import { getPublicHelpContact } from "@/modules/system-admin/platform-settings";
+import styles from "@/components/public-home-page.module.css";
 
 const fullCalendarHref = "/calendar?view=list";
 const fullYearHref = "/calendar?view=year";
@@ -74,14 +75,14 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       </section>
     ),
     announcements: (heading) => announcements.length > 0 && (
-      <section aria-labelledby="home-announcements-heading" className="home-announcements" key="announcements">
+      <section aria-labelledby="home-announcements-heading" className={styles.homeAnnouncements} key="announcements">
         <h2 id="home-announcements-heading">{heading}</h2>
-        <ul className="home-announcements-list">
+        <ul className={styles.homeAnnouncementsList}>
           {announcements.map((announcement) => (
             <li key={announcement.id}>
               <h3>{announcement.title}</h3>
               <p>{announcement.body}</p>
-              {announcement.linkHref && <p><HubLink className="home-announcement-link" href={announcement.linkHref}>{linkText(announcement)}<span className="sr-only"> about {announcement.title}</span></HubLink></p>}
+              {announcement.linkHref && <p><HubLink className={styles.homeAnnouncementLink} href={announcement.linkHref}>{linkText(announcement)}<span className="sr-only"> about {announcement.title}</span></HubLink></p>}
             </li>
           ))}
         </ul>
@@ -262,9 +263,9 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
 
         <footer className="home-footer">
           {verse && <p className="home-footer-verse">{verse.text}{verse.cite && <> <cite>{verse.cite}</cite></>}</p>}
-          {content.footer.contactLines.map((line, index) => <p className="home-footer-contact" key={`${index}-${line}`}>{line}</p>)}
+          {content.footer.contactLines.map((line, index) => <p className={styles.homeFooterContact} key={`${index}-${line}`}>{line}</p>)}
           {content.footer.links.length > 0 && (
-            <nav aria-label="Footer links" className="home-footer-links">
+            <nav aria-label="Footer links" className={styles.homeFooterLinks}>
               <ul>
                 {content.footer.links.map((link, index) => <li key={`${link.href}-${index}`}><HubLink href={link.href}>{link.label}</HubLink></li>)}
               </ul>

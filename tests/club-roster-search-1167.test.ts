@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ClubRosterWorkspace, type RosterComplianceInfo } from "@/components/club-roster-workspace";
+import rosterStyles from "@/components/club-roster-sections.module.css";
 import {
   applyRosterFilters,
   clearedRosterFilters,
@@ -219,7 +220,7 @@ describe("what a row says (#1167)", () => {
 
   it("keeps a person's role under their name, so a phone card shows name, role, age and Edit", () => {
     const out = html();
-    expect(out).toContain('<span class="roster-member-role" translate="no">Role: Pathfinder</span>');
+    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}" translate="no">Role: Pathfinder</span>`);
     expect(out).toContain('data-label="Age"');
     expect(out).toContain('aria-label="Edit Sam Fixture-a"');
   });
@@ -245,7 +246,7 @@ describe("what a row says (#1167)", () => {
 describe("search panel (#1167)", () => {
   it("labels the search, describes Details needed and reports the count in a polite status", () => {
     const out = html();
-    expect(out).toMatch(/<label class="roster-search-field" for="roster-search">Search roster/);
+    expect(out).toMatch(new RegExp(`<label class="${rosterStyles.rosterSearchField}" for="roster-search">Search roster`));
     expect(out).toContain('id="roster-search"');
     expect(out).toContain('type="search"');
     expect(out).toMatch(/autocomplete="off"/i);
@@ -328,7 +329,8 @@ describe("long and duplicate names (#1167)", () => {
 
   it("lets a very long name wrap inside its card instead of widening the page", () => {
     const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
-    expect(css).toMatch(/\.roster-member-name \{ overflow-wrap: anywhere; \}/);
+    const moduleCss = readFileSync(path.join(process.cwd(), "components/club-roster-sections.module.css"), "utf8");
+    expect(moduleCss).toMatch(/\.rosterMemberName \{ overflow-wrap: anywhere; \}/);
     // The Details column keeps room for a whole word, so the summary wraps between words, never inside one.
     expect(css).toMatch(/\.roster-card-table td\.roster-card-flags \{ min-width: 10rem; \}/);
     const long = "Maximilian-Alexander-Bartholomew-Fitzgerald-Montgomery-Wellington";
@@ -436,7 +438,8 @@ describe("filters combine and reset together (#1167 review)", () => {
 
 describe("focus, announcements and labels after the review (#1167)", () => {
   const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
-  const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
+  const css = readFileSync(path.join(process.cwd(), "components/club-roster-sections.module.css"), "utf8");
+  const globalCss = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
 
   it("moves focus to the next row's Edit, else the result line, when a saved or removed row leaves the list", () => {
     expect(source).toContain("id={`roster-edit-${member.id}`}");
@@ -475,12 +478,14 @@ describe("focus, announcements and labels after the review (#1167)", () => {
   });
 
   it("keeps Edit and the Actions trigger at 44px at every width and opens the menu in the flow", () => {
-    expect(css).toMatch(/\.roster-edit-button \{ min-height: 44px; min-width: 44px;/);
-    expect(css).toMatch(/\.roster-row-action-set \.actions-menu > summary\.actions-menu-trigger \{ width: auto; min-height: 44px;/);
+    expect(css).toMatch(/\.rosterEditButton \{ min-height: 44px; min-width: 44px;/);
+    expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu\) > summary\.actions-menu-trigger \{ width: auto; min-height: 44px;/);
     // An open menu is in the flow under Edit, so it cannot be clipped, cover a column or widen the page.
-    expect(css).toMatch(/\.roster-row-action-set \.actions-menu-list \{ position: static; width: 100%; min-width: 0;/);
-    expect(css).toContain(".roster-row-action-set .actions-menu[open] { flex-basis: 100%; }");
+    expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu-list\) \{ position: static; width: 100%; min-width: 0;/);
+    expect(css).toContain(".rosterRowActionSet :global(.actions-menu)[open] { flex-basis: 100%; }");
     expect(css).not.toContain("padding-bottom: 12rem");
+    // The table-wrap rule is shared with other tables, so it stays global, hooked on the stable class.
+    expect(globalCss).toContain(".report-table-wrap:has(.roster-row-action-set .actions-menu[open])");
   });
 
   it("explains in the page what the Home link and count mean", () => {

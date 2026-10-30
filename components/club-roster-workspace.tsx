@@ -690,11 +690,11 @@ export function ClubRosterWorkspace({
             <button className="text-button" onClick={() => { setComplianceFilter(null); dropFilterParams("compliance"); }} type="button">Clear filter</button>
           </p>
         )}
-        <div className="roster-search-panel">
-          <div className="roster-search-row">
-            <label className="roster-search-field" htmlFor="roster-search">
+        <div className={styles.rosterSearchPanel}>
+          <div className={styles.rosterSearchRow}>
+            <label className={styles.rosterSearchField} htmlFor="roster-search">
               Search roster
-              <span className="roster-search-input">
+              <span className={styles.rosterSearchInput}>
                 <Search aria-hidden="true" size={16} />
                 <input
                   autoComplete="off"
@@ -706,11 +706,11 @@ export function ClubRosterWorkspace({
                 />
               </span>
             </label>
-            <div className="roster-filter-buttons">
+            <div className={styles.rosterFilterButtons}>
               <button
                 aria-describedby="roster-details-help"
                 aria-pressed={detailsOnly}
-                className="secondary-button roster-filter-button"
+                className={`secondary-button ${styles.rosterFilterButton}`}
                 onClick={() => {
                   if (detailsOnly) dropFilterParams("filter");
                   setDetailsOnly((current) => !current);
@@ -721,7 +721,7 @@ export function ClubRosterWorkspace({
               </button>
               <button
                 aria-pressed={showGender}
-                className="secondary-button roster-filter-button"
+                className={`secondary-button ${styles.rosterFilterButton}`}
                 onClick={() => setShowGender((current) => !current)}
                 type="button"
               >
@@ -732,7 +732,7 @@ export function ClubRosterWorkspace({
           <p className="field-help" id="roster-details-help">
             Details needed lists people missing a gender, current class, role or type. Each row says what to add.
           </p>
-          <div className="roster-result-line">
+          <div className={styles.rosterResultLine}>
             <p id="roster-result-text" tabIndex={-1}>
               <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
@@ -886,8 +886,8 @@ export function ClubRosterWorkspace({
                               switch (column) {
                                 case "name": return (
                                   <td className="roster-card-name" data-label="Name" key={column}>
-                                    <strong className="roster-member-name" translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className="roster-member-role" translate="no">{`Role: ${member.role}`}</span>}
+                                    <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
+                                    {member.role && <span className={styles.rosterMemberRole} translate="no">{`Role: ${member.role}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                         Class history<span className="sr-only"> for {label}</span>
@@ -911,7 +911,7 @@ export function ClubRosterWorkspace({
                                         <span className="status-chip gold">{clubRosterStatusLabels.INACTIVE}</span>
                                       )}
                                       {needs.length > 0 && (
-                                        <span className="status-chip gold roster-needs-details">{rosterDetailsSummary(needs)}</span>
+                                        <span className={`status-chip gold ${styles.rosterNeedsDetails}`}>{rosterDetailsSummary(needs)}</span>
                                       )}
                                       {healthRecordFlags?.[member.id] && (
                                         <span className="status-chip">Has a health record</span>
@@ -947,14 +947,14 @@ export function ClubRosterWorkspace({
                                 );
                                 case "actions": return (
                                   <td className="roster-card-actions roster-row-actions" data-label="Actions" key={column}>
-                                    <div className="roster-row-action-set">
+                                    <div className={`${styles.rosterRowActionSet} roster-row-action-set`}>
                                       {tools.primary === "edit" && (
-                                        <button aria-label={`Edit ${label}`} className="secondary-button roster-edit-button" disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
+                                        <button aria-label={`Edit ${label}`} className={`secondary-button ${styles.rosterEditButton}`} disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
                                           <Pencil aria-hidden="true" size={14} /> Edit
                                         </button>
                                       )}
                                       {tools.primary === "contacts" && (
-                                        <button aria-label={`Emergency contacts for ${label}`} className="secondary-button roster-edit-button" disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
+                                        <button aria-label={`Emergency contacts for ${label}`} className={`secondary-button ${styles.rosterEditButton}`} disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">
                                           <Pencil aria-hidden="true" size={14} /> Emergency contacts
                                         </button>
                                       )}
@@ -973,7 +973,7 @@ export function ClubRosterWorkspace({
                                             </li>
                                           )}
                                           {tools.menu.includes("healthOnFile") && (
-                                            <li className="actions-menu-note">A health record is on file; the director or a deputy can update it.</li>
+                                            <li className={styles.actionsMenuNote}>A health record is on file; the director or a deputy can update it.</li>
                                           )}
                                           {tools.menu.includes("remove") && (
                                             <li className="actions-menu-divider">
