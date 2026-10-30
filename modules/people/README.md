@@ -18,18 +18,18 @@ cross-event visibility follows from a link existing — `User`,
 concepts, and `modules/access/authorization.ts` never reads these tables.
 See `tests/account-links-invariant.test.ts`.
 
-Merge/unmerge itself is still out of scope here (slice 3, #127 — not yet
-built). Match suggestions and the review queue are now in this module; see
-below.
+Merge and unmerge are the reversible soft-merge below (slice 3, #127).
+Match suggestions and the review queue are in this module too.
 
 ## Duplicate match candidates and the review queue (`duplicate-match-domain.ts`, `duplicate-match-repository.ts`, `duplicate-match-access.ts`)
 
 Identity slice 2 (#126). `PersonMatchCandidate` records that two `Person`
 rows may be the same person, with the evidence for and against, a
 deterministic and versioned confidence tier, and a state
-(`OPEN` → `DISMISSED` / `SUPERSEDED`; `MERGED` is reserved for slice 3 and
-nothing here ever sets it). **Candidates are generated; they are never
-applied.** No code path in this module merges anything.
+(`OPEN` → `DISMISSED` / `SUPERSEDED` / `MERGED`; only a staff-reviewed
+merge sets `MERGED`, and unmerge puts the saved state back). **Candidates are
+generated; they are never applied.** Generation and the queue never merge
+anything.
 
 Matching is pure and rule-based (`duplicate-match-domain.ts`, no Prisma
 calls) so it is testable and so re-running it over unchanged data always
@@ -66,7 +66,62 @@ and contradicting signals) — never registrations, payments, medical, or
 consent records. It offers three outcomes: **Dismiss** (state change,
 requires a reason, audited), **Defer** (no state change — the candidate
 stays `OPEN`; only an audit entry records the touch), and **Merge**
-(disabled — a "coming soon" affordance, since slice 3 does not exist yet).
+(see the next section). A "Merged people" list under the candidates offers
+**Unmerge**.
+
+## Reversible soft-merge (`person-merge-domain.ts`, `person-merge-repository.ts`, `person-merge-access.ts`)
+
+Identity slice 3 (#127), following the owner's decision that merges are
+reversible. A merge is one `PersonMerge` row linking a secondary person to a
+primary, with the actor, a required reason, evidence (the people the reviewer
+selected and the roots they resolved to, ids only), the source candidate, and
+what unmerge needs (`priorState`). **A merge never rewrites a foreign key and
+never edits a `Person`, household membership, account link, registration,
+payment, consent record or audit actor.** Its only effects are that row, the
+source candidate becoming `MERGED` (prior state saved), and an `AuditLog`
+entry (`PERSON_MERGED`, ids only: no names, contact details or reason text).
+
+- **Resolution:** `resolveCanonicalPersonId` (and the batch
+  `resolveCanonicalPersonIds`) follow ACTIVE links to the ultimate primary.
+  A cycle or a chain longer than `MAX_MERGE_CHAIN_DEPTH` throws instead of
+  looping. Merging resolves both selected people to their roots first: equal
+  roots are refused (already the same person, or it would cycle); otherwise
+  secondaryRoot links to primaryRoot, so merging an already-merged person
+  lands on the ultimate primary.
+- **Reads aggregate, never rewrite:** `getMergedPersonView` resolves to the
+  canonical person, lists every person merged beneath it, and returns their
+  registrations with the original person id (a registration still points at
+  the secondary).
+- **Unmerge** (`unmergePeople`) sets the row `REVERSED` with who, when and why
+  (the row is never deleted), restores the source candidate, and writes
+  `PERSON_MERGE_REVERSED`. Everything underneath the secondary resolves to the
+  secondary again, which is the state before the merge. A non-active merge is
+  refused.
+- **Concurrency:** merge and unmerge take one `pg_advisory_xact_lock` in an
+  interactive transaction and re-resolve roots inside it, so overlapping
+  merges cannot make a cycle, lose a merge, or give a person two primaries. A
+  partial unique index (one ACTIVE merge per secondary) and
+  `primary <> secondary` are the database backstop. The person foreign keys
+  are `Restrict`, so history is never cascaded away.
+- **Permission:** `requirePersonMergePermission` (system administrator today,
+  deliberately separate from the queue's gate so #128 can tighten it). There
+  is no automatic merge path anywhere; an anonymized person is refused.
+- **Routes:** `POST /api/people/matches/[candidateId]/merge`,
+  `POST /api/people/merges/[mergeId]/unmerge`, `GET /api/people/merges`.
+- `npm run test:person-soft-merge` proves all of this against a real database.
+
+### Anonymization (`anonymization.ts`)
+
+The recorded deletion decision is anonymize, not erase. `anonymizePerson`
+replaces the declared `PERSON_ANONYMIZED_FIELDS` (first and last name, email,
+phone) and sets `Person.anonymizedAt`, records a `PersonAnonymization` row
+(approver, approval reference, fields) and writes one ids-only audit entry. It
+is idempotent, needs a system administrator approver, and never reads or
+changes payments, the ledger, consent or acknowledgment evidence,
+registrations or audit rows. It is a separate file that the merge code does
+not import and nothing merge-related can call. There is no route or screen for
+it yet. Not covered: personal data copied into registration contact and
+attendee profile snapshots, which belongs to a retention decision.
 
 ## Time-bounded household membership (`household-domain.ts`, `household-repository.ts`)
 

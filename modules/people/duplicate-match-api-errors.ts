@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { PersonMatchCandidateError } from "@/modules/people/duplicate-match-repository";
+import { PersonMergeError } from "@/modules/people/person-merge-repository";
 import { logError } from "@/lib/logger";
 
 export function duplicateMatchApiError(error: unknown, action: string) {
@@ -18,6 +19,10 @@ export function duplicateMatchApiError(error: unknown, action: string) {
     );
   }
   if (error instanceof PersonMatchCandidateError) {
+    const status = error.code === "NOT_FOUND" ? 404 : error.code === "INVALID_REASON" ? 400 : 409;
+    return Response.json({ error: error.code, message: error.message }, { status });
+  }
+  if (error instanceof PersonMergeError) {
     const status = error.code === "NOT_FOUND" ? 404 : error.code === "INVALID_REASON" ? 400 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
   }

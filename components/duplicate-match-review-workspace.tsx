@@ -3,15 +3,19 @@
 import { useState } from "react";
 import {
   Clock,
+  GitMerge,
   Mail,
   Phone,
   RefreshCw,
   ShieldCheck,
+  Undo2,
   UsersRound,
   X,
 } from "lucide-react";
+import styles from "./duplicate-match-review-workspace.module.css";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { PersonMatchCandidateRecord } from "@/modules/people/duplicate-match-repository";
+import type { PersonMergeRecord } from "@/modules/people/person-merge-repository";
 
 const signalLabels: Record<string, string> = {
   PHONE_MATCH: "Same phone number",
@@ -26,7 +30,7 @@ function signalLabel(signal: string) {
   return signalLabels[signal] ?? signal;
 }
 
-function personLine(person: PersonMatchCandidateRecord["personA"]) {
+function personLine(person: { firstName: string; lastName: string }) {
   return `${person.firstName} ${person.lastName}`;
 }
 
@@ -38,6 +42,7 @@ function ConfidenceChip({ confidence }: { confidence: string }) {
 type CandidatesResponse = {
   candidates?: PersonMatchCandidateRecord[];
   candidate?: PersonMatchCandidateRecord;
+  merge?: { id: string; state: string };
   result?: { created: number; superseded: number; unchanged: number; evaluated: number };
   message?: string;
   issues?: Array<{ message?: string }>;
@@ -45,10 +50,13 @@ type CandidatesResponse = {
 
 export function DuplicateMatchReviewWorkspace({
   initialCandidates,
+  initialMerges = [],
 }: {
   initialCandidates: PersonMatchCandidateRecord[];
+  initialMerges?: PersonMergeRecord[];
 }) {
   const [candidates, setCandidates] = useState(initialCandidates);
+  const [merges, setMerges] = useState(initialMerges);
   const [busyId, setBusyId] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -56,11 +64,31 @@ export function DuplicateMatchReviewWorkspace({
   const [dismissing, setDismissing] = useState<PersonMatchCandidateRecord | null>(null);
   const [reason, setReason] = useState("");
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(dismissing), closeDismiss);
+  const [merging, setMerging] = useState<PersonMatchCandidateRecord | null>(null);
+  const [primaryPersonId, setPrimaryPersonId] = useState("");
+  const [mergeReason, setMergeReason] = useState("");
+  const mergeDialogRef = useAccessibleDialog<HTMLElement>(Boolean(merging), closeMerge);
+  const [unmerging, setUnmerging] = useState<PersonMergeRecord | null>(null);
+  const [unmergeReason, setUnmergeReason] = useState("");
+  const unmergeDialogRef = useAccessibleDialog<HTMLElement>(Boolean(unmerging), closeUnmerge);
 
   function closeDismiss() {
     if (busyId) return;
     setDismissing(null);
     setReason("");
+  }
+
+  function closeMerge() {
+    if (busyId) return;
+    setMerging(null);
+    setPrimaryPersonId("");
+    setMergeReason("");
+  }
+
+  function closeUnmerge() {
+    if (busyId) return;
+    setUnmerging(null);
+    setUnmergeReason("");
   }
 
   async function readResponse(response: Response) {
@@ -128,6 +156,62 @@ export function DuplicateMatchReviewWorkspace({
     }
   }
 
+  async function submitMerge(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!merging || !primaryPersonId) return;
+    setBusyId(merging.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/people/matches/${merging.id}/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ primaryPersonId, reason: mergeReason }),
+      });
+      const result = await readResponse(response);
+      const primary = merging.personA.id === primaryPersonId ? merging.personA : merging.personB;
+      const secondary = merging.personA.id === primaryPersonId ? merging.personB : merging.personA;
+      setCandidates((current) => current.filter((candidate) => candidate.id !== merging.id));
+      if (result.merge) {
+        const mergeId = result.merge.id;
+        setMerges((current) => [
+          { id: mergeId, primaryPerson: primary, secondaryPerson: secondary, reason: mergeReason.trim(), mergedAt: new Date().toISOString() },
+          ...current,
+        ]);
+      }
+      setNotice(`Merged ${personLine(secondary)} under ${personLine(primary)}. Both records are kept, and you can unmerge below.`);
+      setMerging(null);
+      setPrimaryPersonId("");
+      setMergeReason("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Those people could not be merged.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function submitUnmerge(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!unmerging) return;
+    setBusyId(unmerging.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/people/merges/${unmerging.id}/unmerge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: unmergeReason }),
+      });
+      await readResponse(response);
+      setMerges((current) => current.filter((merge) => merge.id !== unmerging.id));
+      setNotice(`Unmerged ${personLine(unmerging.secondaryPerson)} from ${personLine(unmerging.primaryPerson)}. They are separate people again; run a scan to see the pair in the queue.`);
+      setUnmerging(null);
+      setUnmergeReason("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "That merge could not be reversed.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   return (
     <section className="page-stack">
       <div className="page-intro">
@@ -137,7 +221,8 @@ export function DuplicateMatchReviewWorkspace({
           <p>
             People who may be the same person, based on rule-based evidence — never applied
             automatically. Review the evidence for each pair, then dismiss it, defer it for later,
-            or (once merging ships) merge the records.
+            or merge the records. A merge links the two records and keeps both with their full
+            history, and it can be undone.
           </p>
         </div>
         <div className="intro-actions">
@@ -216,10 +301,147 @@ export function DuplicateMatchReviewWorkspace({
                 >
                   <Clock aria-hidden="true" size={15} /> Defer
                 </button>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={busyId === candidate.id}
+                  onClick={() => { setMerging(candidate); setPrimaryPersonId(candidate.personA.id); setMergeReason(""); }}
+                >
+                  <GitMerge aria-hidden="true" size={15} /> Merge
+                </button>
               </div>
             </article>
           ))}
         </section>
+      )}
+
+      {merges.length > 0 && (
+        <section className="panel duplicate-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Merged people</p>
+              <h2>{merges.length} active merge{merges.length === 1 ? "" : "s"}</h2>
+            </div>
+          </div>
+          {merges.map((merge) => (
+            <article className="duplicate-group" key={merge.id}>
+              <header>
+                <strong>{personLine(merge.secondaryPerson)} merged under {personLine(merge.primaryPerson)}</strong>
+                <small>Merged {new Date(merge.mergedAt).toLocaleString()} · {merge.reason}</small>
+              </header>
+              <div className="form-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={busyId === merge.id}
+                  onClick={() => { setUnmerging(merge); setUnmergeReason(""); }}
+                >
+                  <Undo2 aria-hidden="true" size={15} /> Unmerge
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {merging && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busyId) closeMerge(); }}>
+          <section className="modal-card" ref={mergeDialogRef} role="dialog" aria-modal="true" aria-labelledby="merge-match-title" tabIndex={-1}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Same person</p>
+                <h2 id="merge-match-title">Merge these people</h2>
+              </div>
+              <button className="icon-button modal-close-button" type="button" aria-label="Close dialog" onClick={closeMerge}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <p className="confirm-copy">
+              {personLine(merging.personA)} and {personLine(merging.personB)} will be linked as one person.
+              Both records and everything that points at them stay exactly as they are, and you can
+              unmerge later.
+            </p>
+            <form className="form-stack" onSubmit={submitMerge}>
+              <fieldset className={styles.primaryChoice}>
+                <legend>Keep as the primary person</legend>
+                {[merging.personA, merging.personB].map((person) => (
+                  <label className={styles.radioRow} key={person.id}>
+                    <input
+                      type="radio"
+                      name="primaryPersonId"
+                      value={person.id}
+                      checked={primaryPersonId === person.id}
+                      onChange={() => setPrimaryPersonId(person.id)}
+                    />
+                    {personLine(person)}
+                  </label>
+                ))}
+              </fieldset>
+              <label>
+                Reason <small>Required, at least five characters</small>
+                <textarea
+                  name="reason"
+                  rows={3}
+                  required
+                  minLength={5}
+                  maxLength={500}
+                  value={mergeReason}
+                  onChange={(event) => setMergeReason(event.target.value)}
+                />
+              </label>
+              <div className="form-actions">
+                <button className="secondary-button" type="button" onClick={closeMerge} disabled={Boolean(busyId)}>
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={Boolean(busyId) || !primaryPersonId || mergeReason.trim().length < 5}>
+                  {busyId ? "Merging…" : "Merge people"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {unmerging && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busyId) closeUnmerge(); }}>
+          <section className="modal-card" ref={unmergeDialogRef} role="dialog" aria-modal="true" aria-labelledby="unmerge-title" tabIndex={-1}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Undo a merge</p>
+                <h2 id="unmerge-title">Unmerge these people</h2>
+              </div>
+              <button className="icon-button modal-close-button" type="button" aria-label="Close dialog" onClick={closeUnmerge}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <p className="confirm-copy">
+              {personLine(unmerging.secondaryPerson)} will be a separate person again, apart from {personLine(unmerging.primaryPerson)}.
+              The merge is kept in the history as reversed.
+            </p>
+            <form className="form-stack" onSubmit={submitUnmerge}>
+              <label>
+                Reason <small>Required, at least five characters</small>
+                <textarea
+                  name="reason"
+                  rows={3}
+                  required
+                  minLength={5}
+                  maxLength={500}
+                  value={unmergeReason}
+                  onChange={(event) => setUnmergeReason(event.target.value)}
+                />
+              </label>
+              <div className="form-actions">
+                <button className="secondary-button" type="button" onClick={closeUnmerge} disabled={Boolean(busyId)}>
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={Boolean(busyId) || unmergeReason.trim().length < 5}>
+                  {busyId ? "Unmerging…" : "Unmerge people"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
       )}
 
       {dismissing && (
@@ -270,8 +492,8 @@ export function DuplicateMatchReviewWorkspace({
         <span>
           <strong>Evidence, not action</strong>
           <small>
-            Nothing here merges records at any confidence. This queue shows only the names,
-            contact fields, and matched signals needed to decide whether two people are the same
+            Nothing here merges records on its own at any confidence; a merge always needs a choice
+            and a reason from staff. This queue shows only the names, contact fields, and matched signals needed to decide whether two people are the same
             — not registrations, payments, medical, or consent records.
           </small>
         </span>
