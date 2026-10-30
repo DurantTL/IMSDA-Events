@@ -42,10 +42,8 @@ async function getHandler(_request: Request, context: RouteContext) {
     const { eventId } = await context.params;
     const actor = await actorFor(eventId);
     const lifecycle = await getEventLifecycle({ eventId, permissions: actor.permissions });
-    // The history carries actor ids and free-text reasons: only those who can change the state may read it.
-    const mayReadHistory = actor.permissions.includes("CONFIGURE_EVENT") || actor.permissions.includes("MANAGE_FINANCE");
     return lifecycle
-      ? Response.json({ lifecycle: mayReadHistory ? lifecycle : { ...lifecycle, history: [] } })
+      ? Response.json({ lifecycle })
       : Response.json({ error: "EVENT_NOT_FOUND", message: "That event no longer exists." }, { status: 404 });
   } catch (error) { return apiError(error); }
 }

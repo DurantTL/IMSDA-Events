@@ -5,6 +5,7 @@ import { calendarDateInEventTimeZone, hasEventEnded } from "@/modules/events/lif
 import {
   allowedNextStates,
   decideLifecycleTransition,
+  eventLifecycleTransitions,
   effectiveLifecycleState,
   eventLifecycleStateLabel,
   isPublicState,
@@ -171,6 +172,11 @@ export async function transitionEventLifecycle(input: TransitionEventLifecycleIn
     });
     const alreadyDone = input.legacy ? input.legacy.alreadyDone(effective) : effective === input.toState;
     if (alreadyDone) {
+      // Even a no-op needs the permission that moving into this state needs, so a member without it learns nothing.
+      const entering = eventLifecycleTransitions.filter((rule) => rule.to === input.toState);
+      if (entering.length > 0 && !entering.some((rule) => input.actor.permissions.includes(rule.permission))) {
+        throw new EventLifecycleError("PERMISSION_DENIED", `The ${entering[0]!.permission} permission is required for this change.`, effective);
+      }
       return { changed: false, fromState: effective, toState: effective, lifecycleVersion: current.lifecycleVersion };
     }
     if (effective === "ARCHIVED") {
@@ -284,7 +290,8 @@ export async function getEventLifecycle(input: { eventId: string; permissions: r
         ended: hasEventEnded({ timezone: event.timezone, endsAt: event.endsAt, lastDay: null }, now),
       },
     }).map((to) => ({ state: to, label: eventLifecycleStateLabel(to) })),
-    history: history.map((row) => ({
+    // The history carries actor ids and free-text reasons: only those who can change the state may read it.
+    history: !(input.permissions.includes("CONFIGURE_EVENT") || input.permissions.includes("MANAGE_FINANCE")) ? [] : history.map((row) => ({
       id: row.id,
       fromState: row.fromState,
       toState: row.toState,

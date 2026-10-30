@@ -128,15 +128,21 @@ describe("GET /api/events/[eventId]/lifecycle", () => {
     expect(dependencies.getEventLifecycle).toHaveBeenCalledWith(expect.objectContaining({ eventId: "evt_1", permissions: expect.arrayContaining(["VIEW_EVENT"]) }));
   });
 
-  it("shows the history only to those with CONFIGURE_EVENT or MANAGE_FINANCE; any member sees the current state", async () => {
-    const full = { state: "PUBLISHED", history: [{ id: "h1", actorUserId: "usr_9", reason: "private" }] };
+  it("hands the lifecycle read the caller's real permissions, which decide who sees the history", async () => {
     for (const [role, sees] of [["READ_ONLY_STAFF", false], ["EVENT_ADMIN", true], ["FINANCE_MANAGER", true]] as const) {
       asStaff(role);
-      dependencies.getEventLifecycle.mockResolvedValueOnce(full);
-      const body = await (await GET(new Request("https://events.imsda.test/x"), context)).json();
-      expect(body.lifecycle.state, role).toBe("PUBLISHED");
-      expect(body.lifecycle.history, role).toEqual(sees ? full.history : []);
+      await GET(new Request("https://events.imsda.test/x"), context);
+      const permissions: string[] = dependencies.getEventLifecycle.mock.calls.at(-1)![0].permissions;
+      expect(permissions.includes("CONFIGURE_EVENT") || permissions.includes("MANAGE_FINANCE"), role).toBe(sees);
     }
+  });
+
+  it("answers a no-op POST by a member without the permission with the service's 403, not a 200", async () => {
+    asStaff("READ_ONLY_STAFF");
+    dependencies.transitionEventLifecycle.mockRejectedValueOnce(new dependencies.EventLifecycleError("PERMISSION_DENIED", "no"));
+    const response = await POST(request({ toState: "PUBLISHED", expectedFromState: "PUBLISHED" }), context);
+    expect(response.status).toBe(403);
+    expect(dependencies.getEventLifecycle).not.toHaveBeenCalled();
   });
 
   it("is 404 for a missing event and refuses a non-member", async () => {

@@ -115,6 +115,13 @@ describe("transitionEventLifecycle (#156)", () => {
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
+  it("refuses even a no-op without the permission that moving into the state needs, and still allows it with it", async () => {
+    const { tx } = mockPrisma(row({ lifecycleState: "PUBLISHED", isPublished: true }));
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "PUBLISHED", actor: { userId: "usr_1", permissions: ["VIEW_EVENT"] }, now })).rejects.toMatchObject({ code: "PERMISSION_DENIED" });
+    await expect(transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "PUBLISHED", actor: configure, now })).resolves.toMatchObject({ changed: false });
+    expect(tx.eventLifecycleTransition.create).not.toHaveBeenCalled();
+  });
+
   it("refuses a stale expected state with a conflict and changes nothing", async () => {
     const { tx } = mockPrisma(row({ lifecycleState: "TEST" }));
     const error = await transitionEventLifecycle({ eventId: "event-1", toState: "PUBLISHED", expectedFromState: "DRAFT", actor: configure, now }).catch((caught: unknown) => caught);
@@ -219,6 +226,16 @@ describe("getEventLifecycle", () => {
     expect(result).toMatchObject({ state: "PUBLISHED", stateLabel: "Published", isPublic: true });
     expect(result?.allowedNext.map((next) => next.state)).toEqual(["DRAFT", "REGISTRATION_CLOSED"]);
     expect(result?.history).toEqual([]);
+  });
+
+  it("returns no history to a member who cannot change the state", async () => {
+    const mocked = mockPrisma(row({ lifecycleState: "PUBLISHED", isPublished: true }));
+    void mocked;
+    const prisma = dependencies.getPrisma();
+    prisma.eventLifecycleTransition.findMany.mockResolvedValue([{ id: "h1", fromState: "DRAFT", toState: "PUBLISHED", actorUserId: "usr_9", reason: "private", createdAt: new Date("2027-01-01T00:00:00.000Z") }]);
+    expect((await getEventLifecycle({ eventId: "event-1", permissions: ["VIEW_EVENT"], now }))?.history).toEqual([]);
+    expect((await getEventLifecycle({ eventId: "event-1", permissions: ["CONFIGURE_EVENT"], now }))?.history).toHaveLength(1);
+    expect((await getEventLifecycle({ eventId: "event-1", permissions: ["MANAGE_FINANCE"], now }))?.history).toHaveLength(1);
   });
 
   it("offers nothing on an archived event", async () => {
