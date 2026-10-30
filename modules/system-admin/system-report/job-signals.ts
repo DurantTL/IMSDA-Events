@@ -68,8 +68,10 @@ export const DISK_WATCH_PERCENT = 20;
 export function diskFields(key: string, disk: DiskSpace, readAt: Date): Fields {
   const percent = Math.round(disk.percentFree * 10) / 10;
   const gb = Math.round((disk.freeBytes / 1024 ** 3) * 10) / 10;
-  const text = `${percent}% free (${gb} GB).`;
-  const state = disk.percentFree < DISK_ATTENTION_PERCENT ? "attention" : disk.percentFree < DISK_WATCH_PERCENT ? "watch" : "ok";
+  const text = `${percent}% free (${gb} GB).${disk.fellBack ? " Uploads folder not found; measured the app disk." : ""}`;
+  const measured = disk.percentFree < DISK_ATTENTION_PERCENT ? "attention" : disk.percentFree < DISK_WATCH_PERCENT ? "watch" : "ok";
+  // Measuring a different disk than uploads use is never shown as plain OK.
+  const state = disk.fellBack && measured === "ok" ? "watch" : measured;
   return { key, state, checkedAt: iso(readAt), whenLabel: "Checked", resultText: text };
 }
 
@@ -106,5 +108,5 @@ export function reachabilityFields(kind: keyof typeof REACHABLE_WORDS, key: stri
   if (outcome === "refused") {
     return { ...common, state: "attention", resultText: `${words.refused}${old ? " That was over 24 hours ago. Test again." : ""}` };
   }
-  return { ...common, state: old ? "watch" : "unavailable", whenLabel: "Tried", resultText: `${words.name} did not answer in time or could not be reached.${old ? " That was over 24 hours ago. Test again." : ""}` };
+  return { ...common, state: "unavailable", whenLabel: "Tried", resultText: `${words.name} did not answer in time or could not be reached.${old ? " That was over 24 hours ago. Test again." : ""}` };
 }

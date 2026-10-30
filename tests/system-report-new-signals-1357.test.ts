@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   getPrisma: vi.fn(),
   logError: vi.fn(),
+  rejectCrossOriginRequest: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -21,7 +22,7 @@ vi.mock("@/lib/logger", async () => {
 });
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
-vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
+vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/system-admin/system-report/connection-tests", () => ({ runConnectionTests: mocks.runConnectionTests }));
 vi.mock("@/integrations/email/provider", () => ({
   getEmailAvailability: mocks.getEmailAvailability,
@@ -90,7 +91,7 @@ describe("calendar feed refresh and message file cleanup", () => {
 
 describe("server disk space", () => {
   const gb = 1024 ** 3;
-  const disk = (percentFree: number) => ({ percentFree, freeBytes: (percentFree / 100) * 100 * gb, totalBytes: 100 * gb });
+  const disk = (percentFree: number) => ({ percentFree, freeBytes: (percentFree / 100) * 100 * gb, totalBytes: 100 * gb, fellBack: false });
 
   it("is attention under 10% free, watch under 20% and OK otherwise", () => {
     expect(diskFields("d", disk(9.9), now).state).toBe("attention");
@@ -98,19 +99,29 @@ describe("server disk space", () => {
     expect(diskFields("d", disk(19.9), now).state).toBe("watch");
     expect(diskFields("d", disk(20), now).state).toBe("ok");
     expect(diskFields("d", disk(35), now).resultText).toBe("35% free (35 GB).");
+    // A different disk than uploads use is never plain OK, and the note names no path.
+    const fallback = diskFields("d", { ...disk(35), fellBack: true }, now);
+    expect(fallback.state).toBe("watch");
+    expect(fallback.resultText).toBe("35% free (35 GB). Uploads folder not found; measured the app disk.");
+    expect(diskFields("d", { ...disk(5), fellBack: true }, now).state).toBe("attention");
   });
 
   it("reads free space from statfs and never returns a path", async () => {
     const statfs = vi.fn().mockResolvedValue({ bavail: BigInt(25), blocks: BigInt(100), bsize: BigInt(4096) });
     const result = await readDiskSpace(statfs, "/synthetic/uploads");
     expect(result.percentFree).toBe(25);
+    expect(result.fellBack).toBe(false);
     expect(JSON.stringify(result)).not.toContain("/synthetic");
     expect(statfs).toHaveBeenCalledWith("/synthetic/uploads");
   });
 
-  it("falls back to the working directory when the uploads directory is missing, and throws when nothing reads", async () => {
-    const statfs = vi.fn().mockRejectedValueOnce(new Error("ENOENT")).mockResolvedValueOnce({ bavail: 1, blocks: 10, bsize: 1 });
-    expect((await readDiskSpace(statfs, "/synthetic/uploads")).percentFree).toBe(10);
+  it("falls back to the working directory only when the uploads directory is missing (ENOENT), and says so", async () => {
+    const statfs = vi.fn().mockRejectedValueOnce(Object.assign(new Error("missing"), { code: "ENOENT" })).mockResolvedValueOnce({ bavail: 1, blocks: 10, bsize: 1 });
+    expect(await readDiskSpace(statfs, "/synthetic/uploads")).toMatchObject({ percentFree: 10, fellBack: true });
+    // Any other error is a failed reading, not a reason to measure another disk.
+    const denied = vi.fn().mockRejectedValue(Object.assign(new Error("denied"), { code: "EACCES" }));
+    await expect(readDiskSpace(denied, "/synthetic/uploads")).rejects.toThrow();
+    expect(denied).toHaveBeenCalledTimes(1);
     await expect(readDiskSpace(vi.fn().mockRejectedValue(new Error("down")), "/synthetic/uploads")).rejects.toThrow();
     await expect(readDiskSpace(vi.fn().mockResolvedValue({ bavail: 0, blocks: 0, bsize: 0 }), "/synthetic/uploads")).rejects.toThrow();
   });
@@ -142,6 +153,14 @@ describe("stored connection test results", () => {
     const reachable = fields({ configured: true, run: stored("reachable", old) });
     expect(reachable.state).toBe("watch");
     expect(reachable.resultText).toContain("Test again");
+  });
+
+  it("keeps an old unavailable result unavailable, with Test again, and only an old reachable becomes watch", () => {
+    const old = minutesAgo(25 * 60);
+    const row = fields({ configured: true, run: stored("unavailable", old) });
+    expect(row.state).toBe("unavailable");
+    expect(row.resultText).toContain("Test again");
+    expect(fields({ configured: true, run: stored("refused", old) }).state).toBe("attention");
   });
 
   it("reads an unreadable stored result as unavailable", () => {
@@ -252,7 +271,17 @@ describe("Test connections", () => {
     expect(record).toHaveBeenCalledWith("square-reachability", "FAILED", { outcome: "unavailable", ms: 0 });
   });
 
+  it("refuses a cross-origin request first: no session lookup and no tests run", async () => {
+    mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({ error: "INVALID_REQUEST_ORIGIN" }, { status: 403 }));
+    const response = await POST(new Request("https://events.imsda.test/api/admin/system-report/test-connections", { method: "POST", headers: { origin: "https://evil.test" } }));
+    expect(response.status).toBe(403);
+    expect(mocks.rejectCrossOriginRequest).toHaveBeenCalledTimes(1);
+    expect(mocks.getCurrentSession).not.toHaveBeenCalled();
+    expect(mocks.runConnectionTests).not.toHaveBeenCalled();
+  });
+
   it("is refused for a signed-out visitor and for everyone but a system administrator", async () => {
+    mocks.rejectCrossOriginRequest.mockReturnValue(null);
     const request = () => new Request("https://events.imsda.test/api/admin/system-report/test-connections", { method: "POST", headers: { origin: "https://events.imsda.test" } });
     mocks.getCurrentSession.mockResolvedValue({ user: null });
     expect((await POST(request())).status).toBe(403);

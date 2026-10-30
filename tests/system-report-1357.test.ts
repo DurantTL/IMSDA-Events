@@ -258,7 +258,8 @@ describe("providers", () => {
       const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(2); // only the release identity and start time, read from the process
+      expect(report.overall.tally.ok).toBe(0); // the release identity and start time are information, never counted as OK
+      expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");
     });
@@ -322,6 +323,29 @@ describe("providers", () => {
       expect(byKey.get("import-review")?.state).toBe("ok");
       expect(byKey.get("ledger-check")).toMatchObject({ state: "ok", resultText: "0 of 20 registrations differ." });
       expect(byKey.get("balances-due")).toMatchObject({ state: "info" });
+    });
+
+    it("reads at most four events at a time", async () => {
+      everySourceDown();
+      mocks.getPrisma.mockReturnValue({
+        alertNotification: { count: vi.fn().mockResolvedValue(0) },
+        event: { findMany: vi.fn().mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({ id: `e${index}`, name: `Event ${index}` }))) },
+      });
+      const empty = { paymentAttempts: [], messages: [], imports: [], balances: [], capacity: [] };
+      let inFlight = 0;
+      let peak = 0;
+      mocks.getOperationalHealth.mockImplementation(async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight -= 1;
+        return empty;
+      });
+      mocks.reconcileRegistrationLedger.mockResolvedValue({ checked: 1, failing: [] });
+      await loadSystemReport(now);
+      expect(mocks.getOperationalHealth).toHaveBeenCalledTimes(10);
+      expect(peak).toBeLessThanOrEqual(4);
+      expect(peak).toBeGreaterThan(1);
     });
 
     it("does not show a clean result when part of the events could not be read", async () => {

@@ -145,11 +145,32 @@ function reportEvents(ctx: ReportContext) {
 type Settled<T> = { readAt: Date; events: Array<{ id: string; name: string }>; results: Array<{ id: string; name: string; value: T }>; failed: number };
 
 /** One computation per event, kept as a count of the events that could not be read. */
+/** At most this many events are read at once, so a long event list never opens a burst of database work. */
+const EVENT_READ_CONCURRENCY = 4;
+
+/** Runs the tasks with at most `limit` in flight, keeping order and never rejecting (like `Promise.allSettled`). */
+async function settleLimited<T>(tasks: Array<() => Promise<T>>, limit: number): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const index = next++;
+      try {
+        results[index] = { status: "fulfilled", value: await tasks[index]() };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
 function perEvent<T>(ctx: ReportContext, key: string, run: (eventId: string) => Promise<T>) {
   return ctx.once<Settled<T>>(key, async () => {
     const eventsRead = await reportEvents(ctx);
     if (!eventsRead.ok) throw new Error("events could not be read");
-    const settled = await Promise.allSettled(eventsRead.value.map((event) => run(event.id)));
+    const settled = await settleLimited(eventsRead.value.map((event) => () => run(event.id)), EVENT_READ_CONCURRENCY);
     const results: Settled<T>["results"] = [];
     let failed = 0;
     settled.forEach((outcome, index) => {
@@ -311,11 +332,11 @@ export const systemReportProviders: readonly SignalProvider[] = [
     const checkedAt = iso(new Date());
     const version = !release.sha
       ? { key: "release-version", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The release code is not recorded on this server, so the version is not known." }
-      : { key: "release-version", state: "ok" as const, checkedAt, whenLabel: "Read", resultText: `Release ${release.sha.slice(0, 7)}${release.buildId ? `, build ${release.buildId}` : ""}.` };
+      : { key: "release-version", state: "info" as const, checkedAt, whenLabel: "Read", resultText: `Release ${release.sha.slice(0, 7)}${release.buildId ? `, build ${release.buildId}` : ""}.` };
     const { startedAt, builtAt } = getReleaseTimes(ctx.now);
-    const built = builtAt ? ` Built ${builtAt.toISOString().slice(0, 16).replace("T", " ")} UTC.` : " The build time is not recorded.";
+    const stamp = (date: Date) => `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
     const deployed = startedAt
-      ? { key: "release-deployed", state: "ok" as const, checkedAt: iso(startedAt), whenLabel: "Server started", resultText: `The server process has been running since it started.${built}` }
+      ? { key: "release-deployed", state: "info" as const, checkedAt: iso(startedAt), whenLabel: "Server started", resultText: `Started ${stamp(startedAt)}.${builtAt ? ` Built ${stamp(builtAt)}.` : ""}` }
       : { key: "release-deployed", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The server's start time could not be read, so the deploy time is not known." };
     return [version, deployed];
   }),
