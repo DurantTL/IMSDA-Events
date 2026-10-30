@@ -48,7 +48,7 @@ const byId = (rows: FeatureRow[], id: string) => rows.find((row) => row.id === i
 describe("every feature is listed (#965)", () => {
   it("lists the catalog modules, the event columns, the club rows, publish, calendar, lodging and meals, in that order", () => {
     expect(buildFeatureRows(input()).map((row) => row.id)).toEqual([
-      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content",
+      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content", "module:emergency-plans",
       "column:waitlistEnabled", "column:autoPromoteWaitlist", "column:collectsShirtSizes", "column:hostedPaymentLinkEnabled", "column:checksAdultBackgrounds",
       "general-link", "teams", "publish", "calendar", "lodging", "meals",
     ]);

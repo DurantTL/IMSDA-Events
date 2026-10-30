@@ -1,0 +1,15 @@
+/* Emergency plan editor (#114). 44px targets, 16px inputs, one column on a phone. */
+.block { display: grid; gap: 12px; }
+.block h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; color: var(--imsda-navy); }
+.help:global(.field-help) { margin: 4px 0 0; }
+.item { display: grid; gap: 10px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.item label, .step label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.item input, .item select, .item textarea { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+.legend { padding: 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
+.step { display: grid; gap: 8px; border-left: 3px solid var(--line); padding-left: 10px; }
+.item :global(.secondary-button), .block > :global(.secondary-button), .actions :global(.secondary-button), .actions :global(.primary-button) { min-height: 44px; min-width: 44px; }
+.fieldError { color: #9b1c1c; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hint { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.versions { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

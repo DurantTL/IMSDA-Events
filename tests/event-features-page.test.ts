@@ -102,7 +102,7 @@ describe("/more/features", () => {
     expect(markup).toContain("Turn features on or off for Synthetic Camporee.");
     expect(markup).toContain('class="report-table table-cards event-features-table"');
     for (const id of [
-      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content",
+      "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content", "module:emergency-plans",
       "column:waitlistEnabled", "column:autoPromoteWaitlist", "column:collectsShirtSizes", "column:hostedPaymentLinkEnabled", "column:checksAdultBackgrounds",
       "general-link", "teams", "publish", "calendar", "lodging", "meals",
     ]) expect(markup).toContain(`data-feature="${id}"`);

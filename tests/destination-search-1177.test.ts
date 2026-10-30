@@ -85,6 +85,13 @@ describe("destination registry per role", () => {
     expect(destinations.some((destination) => destination.scope === "System")).toBe(false);
   });
 
+  it("lists the emergency plan for read-only event staff only while its module is on (#114)", () => {
+    const viewer = { ...base, permissions: ["VIEW_EVENT"] as EventPermission[] };
+    expect(labels(buildSearchDestinations({ ...viewer, hiddenCardKeys: new Set() }))).toContain("Event:Emergency plan");
+    expect(labels(buildSearchDestinations({ ...viewer, hiddenCardKeys: new Set(["emergency-plans"]) }))).not.toContain("Event:Emergency plan");
+    expect(labels(buildSearchDestinations(viewer))).not.toContain("Event:Emergency plan");
+  });
+
   it("gives staff with no access and no event only their profile", () => {
     expect(labels(buildSearchDestinations({ ...base, selectedEventId: "" }))).toEqual(["Profile:Your account"]);
     expect(labels(buildSearchDestinations(base))).toEqual(["Profile:Your account"]);

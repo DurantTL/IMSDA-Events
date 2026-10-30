@@ -15,6 +15,7 @@ export const eventModuleKeys = [
   "merchandise",
   "attendee-community",
   "public-content",
+  "emergency-plans",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -122,6 +123,17 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     alwaysOn: true,
     routes: ["/more/event-content"],
     features: ["public-event-page"],
+  },
+  {
+    key: "emergency-plans",
+    cardKey: "emergency-plans",
+    title: "Emergency plan",
+    description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.",
+    appliesTo: "any",
+    launcherGroup: "setup",
+    alwaysOn: false,
+    routes: ["/more/emergency-plan"],
+    features: ["emergency-reference-sheet"],
   },
 ];
 

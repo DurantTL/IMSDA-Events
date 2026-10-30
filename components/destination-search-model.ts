@@ -12,6 +12,7 @@ import {
 } from "@/components/staff-navigation";
 import { systemNavGroups } from "@/components/system-navigation";
 import type { EventPermission } from "@/modules/access/permissions";
+import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { visibleGuides } from "@/modules/help/visibility";
 
 /**
@@ -246,7 +247,8 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       isSystemAdmin: context.isSystemAdmin,
       clubFormsAccess: context.clubFormsAccess,
       eventQuery,
-      hiddenCardKeys: context.hiddenCardKeys,
+      // A missing module state is fail-closed: only the always-on modules count as on.
+      hiddenCardKeys: context.hiddenCardKeys ?? disabledModuleCardKeys(new Set(alwaysOnModuleKeys)),
     }).filter((card) => card.allowed);
     const cardByPath = new Map(cards.map((card) => [pathOf(card.href), card]));
 
