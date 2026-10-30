@@ -25,8 +25,8 @@ describe("field focus ring (#1349)", () => {
   it("sets the field border colour on focus only in the shared rule, so a per-form rule cannot beat the red invalid border", () => {
     const rules = css.match(/[^{}]*:focus(?:-within)?[^{}]*\{[^}]*\}/g) ?? [];
     const offenders = rules.filter((rule) => /border-color:\s*var\(--(field-focus|imsda-purple)\)/.test(rule) && /\b(input|select|textarea)\b|-input|-field|searchable-select/.test(rule.split("{")[0]) && !rule.trimStart().startsWith(":root:root:root"));
-    // .field-select is a single attendee select with its own test (#1176).
-    expect(offenders.map((r) => r.split("{")[0].trim()).filter((sel) => sel !== ".field-select:focus-visible")).toEqual([]);
+    // A rule may set the border only if it skips invalid fields (as .field-select, #1176, does).
+    expect(offenders.map((r) => r.split("{")[0].trim()).filter((sel) => !sel.includes(':not([aria-invalid="true"])'))).toEqual([]);
   });
 
   it("draws one 2px field-focus ring on bare fields and wrapper boxes", () => {

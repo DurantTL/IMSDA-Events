@@ -29,7 +29,7 @@ describe("attendee choice selects look tappable (#711)", () => {
     expect(block).toContain("background-image: url(");
     expect(block).toContain("width: 100%");
     expect(block).toMatch(/\.field-select\.is-empty \{ color: var\(--muted\)/);
-    expect(block).toContain(".field-select:focus-visible { border-color: var(--imsda-purple); }");
+    expect(block).toContain(".field-select:focus-visible:not([aria-invalid=\"true\"]) { border-color: var(--imsda-purple); }");
     expect(block).not.toMatch(/focus-visible \{[^}]*outline/);
   });
 
