@@ -74,10 +74,10 @@ offset, gold outline on navy surfaces. This is what `.search-field` already does
 and what `app/globals.css:9560` applies to wrappers. `SearchableSelect`,
 `DestinationSearch`, the honor combobox and the module copies adopt it.
 
-**Decision for Caleb:** the design system README says fields show "purple with a
-soft halo". The halo (`rgba(88, 44, 131, 0.1)`) is too faint to be the visible
-focus indicator alone, and adding it on top of the outline is what makes three
-rings. The mockup drops the halo for search fields.
+**Decided (Caleb, October 30):** no focus glow. The design system README says
+fields show "purple with a soft halo"; the halo (`rgba(88, 44, 131, 0.1)`) is too
+faint to be the visible focus indicator alone, and adding it on top of the
+outline is what makes three rings. Fields get one ring only, as in the mockup.
 
 **Risk:** low for behavior, medium for visual regressions. The global field rule
 at `app/globals.css:9559-9563` is a `:root:root:root` override with a long
@@ -112,7 +112,7 @@ second ring. The mobile layout audit covers these pages.
 | 20 | `components/club-order-workspace.tsx:664` | Order item picker | module class | client |
 | 21 | `components/honor-catalog-workspace.tsx:148` | Catalog filter | bare input | client |
 | 22 | `components/calendar-admin-workspace.tsx:950-958` | Calendar entry search | `.calendar-search` | client |
-| 23 | `components/background-check-review-panel.tsx:388-399` | Background check name lookup | bare input | server |
+| 23 | `components/background-check-review-panel.tsx:388-399` | Sterling Volunteers name lookup | bare input | server |
 | 24 | `components/registration-form-notifications-panel.tsx:236-246` | Club filter | bare input | client |
 | 25 | `components/lodging-assignments-workspace.tsx:375` | Lodging search | bare input | client |
 | 26 | `components/staff-invitation-list.tsx:189` | Invitation search | bare input | client |
@@ -155,11 +155,11 @@ No minimum length and no "type to search" state.
   and a capped list with "Type more to narrow the list." (`:92`).
 - Club order picker: list capped at 100 with a "type more" note
   (`components/club-order-workspace.tsx:105`, `:236`).
-- Background check name lookup: empty submit is disabled
+- Sterling Volunteers name lookup: empty submit is disabled
   (`components/background-check-review-panel.tsx:399`) and the lookup returns an
   empty result for an empty query (`modules/background-checks/repository.ts:1646-1649`).
-  This is a sensitive-data screen; whether an empty lookup should list every
-  person is Caleb's call, not a default fix.
+  Caleb decided (October 30) that it follows the empty-search rule too, keeping its
+  permission checks and audit logging (follow-up 2, #1348).
 - Builder palette help text for directory fields: "Start typing to search the …
   directory." (`components/registration-builder/palette-registry.ts:282`).
 
@@ -211,14 +211,22 @@ the change is visible and needs a mockup.
 | CSV escaping | `modules/reporting/csv.ts:6` `csvCell`, `:16` `toCsv` (formula guard) | `modules/forms/attendee-roster-csv.ts:32` `escapeCsvCell` (no formula guard). All other CSV builders checked already call `toCsv`. | `modules/reporting/csv.ts` |
 | Inline role checks | guards in `modules/access/authorization.ts:37`, `:49`, `:90` | `globalRole === "SYSTEM_ADMIN"` written inline 85 times in 67 files | reported only; not proposed for change here |
 
-## 6. Proposed follow-up issues (drafts, not created)
+## 6. Follow-up issues (#1347 to #1356)
 
-Priority order. Each one that changes how something looks links an approved
-mockup before it is built.
+Caleb approved this audit on October 30 and these ten follow-ups were opened
+as issues #1347 to #1356, in this priority order. Each one that changes how
+something looks links an approved mockup before it is built.
 
-### Follow-up 1: One search field look and the empty-search rule (client side)
+Decisions recorded with the approval:
 
-Mockup: `docs/mockups/search-field.html` (needs Caleb's approval).
+- **No focus glow:** remove the halo everywhere; every field and search box
+  shows one ring only.
+- **Sterling Volunteers name lookup:** follows the empty-search rule like every
+  other search, keeping its permission checks and audit logging.
+
+### Follow-up 1 (#1347): One search field look and the empty-search rule (client side)
+
+Mockup: `docs/mockups/search-field.html` (approved by Caleb, October 30).
 
 1. Make `.search-field` the one wrapper: border, 10px radius, one purple ring at
    2px offset, gold on navy; inner input draws nothing.
@@ -238,26 +246,27 @@ Mockup: `docs/mockups/search-field.html` (needs Caleb's approval).
 Tests: focused unit tests for the search models; mobile layout audit on the
 affected pages. Shared CSS change, so the `mobile-check` label applies.
 
-### Follow-up 2: Empty search on server lookups
+### Follow-up 2 (#1348): Empty search on server lookups
 
 1. Billing organization search: empty lists organizations, paged
    (`billing-responsibility-controls.tsx:147-150`, `billing-responsibility/repository.ts:776`).
 2. Asset desk lookup: empty lists people, paged (`asset-issue-desk.tsx:195`, `issued-assets/view.ts:290`).
 3. Community post search: allow empty, which shows all posts (`community/domain.ts:35-38`, `attendee-community-board.tsx:246-247`, `:366`).
 4. Replace "type more to narrow" caps with paging (`honor-multi-select.tsx:92`, `club-order-workspace.tsx:236`).
-5. Update the `scripts/` checks that assert the old minimums.
+5. Sterling Volunteers name lookup: empty lists people, paged, with its existing
+   permission checks and audit logging unchanged
+   (`background-check-review-panel.tsx:399`, `background-checks/repository.ts:1646-1649`).
+6. Update the `scripts/` checks that assert the old minimums.
 
-Background check lookup is left out: label `needs-decision` if Caleb wants it.
+### Follow-up 3 (#1349): One focus ring for every field (mockup needed)
 
-### Follow-up 3: One focus ring for every field (mockup needed)
-
-1. Decide halo or no halo (design system README versus app); one recipe.
+1. One ring, no halo (decided October 30); one recipe for every field.
 2. Remove the halo stacks at `app/globals.css:3727-3729` and `:9777`.
 3. Align `:focus-within` and `:focus-visible` use.
 4. Replace module focus recipes (`coordinator-monthly-records.module.css:22`, `:54`; `club-report-charts.module.css:29`).
-5. Add `--shadow-focus-halo` or remove it from the design system, to match.
+5. Remove `shadow-focus-halo` and the "soft halo" wording from the design system to match.
 
-### Follow-up 4: Radius and color tokens in CSS (no visual change)
+### Follow-up 4 (#1350): Radius and color tokens in CSS (no visual change)
 
 1. Add `--radius-sm/-card/-info/-panel/-modal/-pill` and `--touch-target` at `:root` in `app/globals.css`.
 2. Swap identical radius literals in modules for tokens.
@@ -267,34 +276,34 @@ Background check lookup is left out: label `needs-decision` if Caleb wants it.
 
 Values that differ (12px boxes, near-miss shadows) go to a later mockup issue.
 
-### Follow-up 5: Status chips and badges (mockup needed)
+### Follow-up 5 (#1351): Status chips and badges (mockup needed)
 
 Move the one-off chips and badges listed in section 3 onto `.status-chip` and
 `.count-badge`; `.status-chip` uses tokens for its hex values.
 
-### Follow-up 6: Buttons (mockup needed)
+### Follow-up 6 (#1352): Buttons (mockup needed)
 
 Move `.cisButton`, `.clubButton`, `.go`, `.linkButton` and `.tickButton` onto the
 shared button classes; `.tickButton` reaches 44px.
 
-### Follow-up 7: Tabs
+### Follow-up 7 (#1353): Tabs
 
 One tabs component (from `dashboard-tabs.tsx`) with keyboard support, used by the
 calendar admin, communications workspace and builder sidebar. Mockup only if the
 look changes.
 
-### Follow-up 8: Dialogs on the shared hook
+### Follow-up 8 (#1354): Dialogs on the shared hook
 
 Move the five dialogs in section 3 onto `useAccessibleDialog` (focus trap, Escape,
 return focus). No visual change.
 
-### Follow-up 9: Shared formatters
+### Follow-up 9 (#1355): Shared formatters
 
 1. One `formatCents` in `modules/payments/`; replace the named copies.
 2. One Chicago-time date formatter; replace the copies, starting with modules.
 3. `attendee-roster-csv.ts` uses `csvCell` (adds the formula guard).
 
-### Follow-up 10: Shared request helpers
+### Follow-up 10 (#1356): Shared request helpers
 
 1. `searchParams` first-value helper in `lib/`.
 2. `people-directory-model.ts` and `organizations/search.ts` use `lib/pagination.ts`.

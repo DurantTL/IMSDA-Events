@@ -190,7 +190,7 @@ p { margin: 0; }
 <body>
 <main class="page">
   <header>
-    <p class="eyebrow">Issue #1342 · proposed follow-up 1 · mockup for approval</p>
+    <p class="eyebrow">Issue #1342 · follow-up 1 (#1347) · approved October 30</p>
     <h1>One search field, one focus ring, full list when empty</h1>
     <p class="lede">Every search box and picker would use this one field. The box itself draws the border; the text inside never draws its own. Focus shows one purple ring around the box. Clicking into an empty box shows the whole list, and typing only narrows it. Club names below are fictional.</p>
   </header>
@@ -331,7 +331,7 @@ p { margin: 0; }
     </div>
     <ul class="rules">
       <li>Every search box and picker uses the shared <code>.search-field</code> wrapper (or <code>SearchableSelect</code>, which gets the same rules). One-off module copies are removed.</li>
-      <li>The design-system README's "soft halo" is dropped for search fields because one 2px outline is the visible ring the app already uses on <code>.search-field</code>; Caleb to confirm.</li>
+      <li>The design-system README's "soft halo" is dropped: one 2px outline is the visible ring the app already uses on <code>.search-field</code>. Caleb decided on October 30: no glow, one ring only, on every field.</li>
       <li>Empty or focused box opens the full list; typing narrows; no minimum length; no "type to search" text. The status line says how many are shown.</li>
     </ul>
   </section>
