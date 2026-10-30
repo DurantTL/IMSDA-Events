@@ -23,8 +23,9 @@ to approve before any building starts.
    where purple is the rule, and radii of 8, 9, 10, 11 and 12px.
 2. **Five search boxes break the empty-search rule** (they need typing or a
    minimum length), and four more partly break it. See "Search behavior".
-3. **CSS modules hard-code tokens.** 104 border-radius literals in 33 module
-   files, no `var(--radius-*)` use anywhere (the app has no radius tokens except
+3. **CSS modules hard-code tokens.** 152 px border-radius literals in 36 module
+   files (104 of them in 33 files are exactly 8, 10, 12 or 999px), no
+   `var(--radius-*)` use anywhere (the app has no radius tokens except
    `--field-radius`), and hex colors equal to existing tokens.
 4. **The design system names components the code does not have.** `StatusChip`,
    `Field`, `MetricCard`, `EmptyState` and `ReportTable` are global classes, not
@@ -44,7 +45,7 @@ to approve before any building starts.
 | Sidebar page search (`DestinationSearch`) | Purple outline on the wrapper **and** a gold outline on the inner input (two rings, the inner one clipped to the text box). | `app/globals.css:13776` (wrapper ring); the input is not in the exclusion list of `app/globals.css:9559`, and on the navy sidebar `:9566` adds the gold outline. Screenshot: `consistency-audit-2026-10/destination-search.png` |
 | Public club finder | Wrapper has 12px radius and no focus state; the inner input gets the global square purple ring. | `components/public-club-directory.module.css:6-13`, `:18-20`; ring from `app/globals.css:9559`. Screenshot: `consistency-audit-2026-10/public-club-directory.png` |
 | Club roster search | Navy 3px ring on the wrapper plus the global purple ring on the inner input. | `components/club-roster-sections.module.css:25` (navy), `:27` (`outline: 0` loses to `app/globals.css:9559`) |
-| Sign-in, public registration and other plain fields | Purple border, 3-4px halo **and** a 2px outline: three rings; 11px corners. | `app/globals.css:3727-3729` (halo), `:9559` (outline). Screenshot: `consistency-audit-2026-10/sign-in-field.png` |
+| Sign-in, public registration and other plain fields | Purple border, 3-4px halo **and** a 2px outline: three rings; 11px corners. | `app/globals.css:3727-3729` (halo), `:9559` (2px purple outline, which beats the 3px navy rule at `:438-444` on specificity). Screenshot: `consistency-audit-2026-10/sign-in-field.png` |
 | `SearchableSelect` control and phone picker | 4px halo plus the 2px wrapper outline; 11px radius. | `app/globals.css:3742`, `:3747-3749`, `:3887-3899`, `:9560` |
 | Public events directory | Module sets a navy 3px ring and 12px radius; the global purple ring wins. | `app/(public)/events/events-directory.module.css:5-9` |
 | Organization directory filters | 3px halo on `select:focus`, a different recipe again. | `app/globals.css:9774-9777` |
@@ -162,7 +163,7 @@ No minimum length and no "type to search" state.
 - Builder palette help text for directory fields: "Start typing to search the …
   directory." (`components/registration-builder/palette-registry.ts:282`).
 
-All other boxes in the inventory show the full list when empty.
+All other boxes in the inventory show the full list when empty. This was checked by reading each filter function, not by using each screen.
 
 ## 3. Other shared controls
 
@@ -183,8 +184,8 @@ dialogs carry keyboard and focus behavior, so consolidation needs focused tests.
 
 | Group | Size | Examples | Use instead |
 | --- | --- | --- | --- |
-| Radius literals | 104 lines in 33 module files; no radius tokens in the app except `--field-radius` | `components/public-club-directory.module.css:11`, `:177`; `components/club-orders.module.css:21` | Add `--radius-sm`, `--radius-card`, `--radius-pill` etc. to `app/globals.css` from `docs/design-system/tokens.css`, then use them |
-| Hex colors equal to tokens | `#003b5c` 18 module lines; `#fff1ef` 5; `#805807` 3; `#f9fbfb` 2 | `components/coordinator-monthly-records.module.css:20`; `components/check-in-station.module.css:29`; `.status-chip` in `app/globals.css:1193`, `:1195` | `var(--imsda-navy)`, `--coral-soft`, `--gold-text`, `--secondary-bg` |
+| Radius literals | 152 px lines in 36 module files (`grep -E 'border-radius:\s*[0-9.]+(px\|rem)'`); 104 lines in 33 files are exactly 8, 10, 12 or 999px; no radius tokens in the app except `--field-radius` | `components/public-club-directory.module.css:11`, `:177`; `components/club-orders.module.css:21` | Add `--radius-sm`, `--radius-card`, `--radius-pill` etc. to `app/globals.css` from `docs/design-system/tokens.css`, then use them |
+| Hex colors equal to tokens | `#003b5c` 18 module lines; `#fff1ef` 5; `#805807` 3; `#f9fbfb` 2 | `components/coordinator-monthly-records.module.css:20`; `components/check-in-station.module.css:29`; `.status-chip` in `app/globals.css:1193`, `:1195` | `var(--imsda-navy)`, `--gold-text`, `--secondary-bg`; `--coral-soft` exists only in `docs/design-system/tokens.css` and must be added to the app first |
 | Focus rings | 19 `focus-visible` lines in modules with their own recipes | `components/coordinator-monthly-records.module.css:22`, `:54`; `components/club-report-charts.module.css:29` (hex fallback) | The global rule at `app/globals.css:438-450` |
 | Tap targets | 136 module lines with `min-height: 44px` | `components/club-roster-sections.module.css:29`, `:48` | `var(--touch-target)` (defined only inside a media block at `app/globals.css:9489`; promote it to `:root`) |
 | Shadows | 7 module literals near `--shadow-metric` but not equal | `app/(workspace)/more/health/operational-health.module.css:63`, `:109` | `var(--shadow-metric)` |
@@ -260,7 +261,7 @@ Background check lookup is left out: label `needs-decision` if Caleb wants it.
 
 1. Add `--radius-sm/-card/-info/-panel/-modal/-pill` and `--touch-target` at `:root` in `app/globals.css`.
 2. Swap identical radius literals in modules for tokens.
-3. Swap identical hex colors (`#003b5c`, `#fff1ef`, `#805807`, `#f9fbfb`, `#f6f9fa`, `#e5f3ed`, `#dce6ea`, `#e6f0f4`).
+3. Add `--coral-soft` to the app, then swap identical hex colors (`#003b5c`, `#fff1ef`, `#805807`, `#f9fbfb`, `#f6f9fa`, `#e5f3ed`, `#dce6ea`, `#e6f0f4`).
 4. Merge the two `spin` keyframes.
 5. Replace the `club-supplies.module.css:4` hidden-input copy with `.sr-only`.
 

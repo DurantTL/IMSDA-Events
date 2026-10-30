@@ -11,7 +11,9 @@
 /* Mockup for the first follow-up of #1342 (consistency audit).
    Light only on purpose: the app's core palette has no dark values (docs/design-system/README.md).
    Layout: one column of labelled specimen boards, each a row of states that wraps to one column on phones.
-   Token values are copied from app/globals.css :root. */
+   Field tokens (--field-*, --imsda-*, --ink, --muted, --line, --paper, --danger, --danger-soft) are copied from app/globals.css :root.
+   Page-chrome tokens --radius-card, --radius-pill and --coral-soft come from docs/design-system/tokens.css;
+   --touch-target is defined in the app only inside a media block (app/globals.css:9489). */
 :root {
   color-scheme: light;
   --imsda-navy: #003b5c;
