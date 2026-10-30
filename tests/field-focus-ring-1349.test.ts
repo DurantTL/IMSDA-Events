@@ -38,6 +38,7 @@ describe("field focus ring (#1349)", () => {
   it("keeps the red border on an invalid field that has focus", () => {
     const borderRule = css.match(/:root:root:root :is\([^{]*\):focus-within,\s*:root:root:root :is\(input, select, textarea\)[^{]*\{[^}]*\}/)?.[0] ?? "";
     expect(borderRule).toContain(':not([aria-invalid="true"], .public-registration-field-invalid *)');
+    expect(borderRule).toContain(':not(.public-registration-field-invalid *, :has([aria-invalid="true"])):focus-within');
     expect(css).toMatch(/:is\(input, select, textarea\)\[aria-invalid="true"\] \{ border-color: var\(--danger, #8f3a30\); box-shadow: 0 0 0 1px var\(--danger, #8f3a30\); \}/);
     expect(css).toMatch(/\.public-registration-field-invalid select,[^}]*border-color: var\(--coral\);/);
   });

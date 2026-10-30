@@ -9535,7 +9535,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   outline: 2px solid var(--field-focus);
   outline-offset: 2px;
 }
-:root:root:root :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within,
+:root:root:root :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):not(.public-registration-field-invalid *, :has([aria-invalid="true"])):focus-within,
 :root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):not([aria-invalid="true"], .public-registration-field-invalid *):focus {
   border-color: var(--field-focus);
 }
