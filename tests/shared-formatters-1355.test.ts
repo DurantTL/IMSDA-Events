@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { createAttendeeRosterCsvTemplate } from "@/modules/forms/attendee-roster-csv";
@@ -136,5 +137,12 @@ describe("attendee roster CSV template (#1355)", () => {
     expect(csvCell("plain", { minimalQuoting: true })).toBe("plain");
     expect(csvCell("a,b", { minimalQuoting: true })).toBe('"a,b"');
     expect(template(["=sum", "@x", "a_b"])).toBe("'=sum,'@x,a_b\n");
+  });
+});
+
+describe("shared formatter files stay import-free (#1355)", () => {
+  // The cancellation guards (#170, #171) let format-cents past their payments/ ban only because it imports nothing and moves no money.
+  it.each(["modules/payments/format-cents.ts", "modules/calendar/conference-format.ts"])("%s has no imports", (file) => {
+    expect(readFileSync(file, "utf8")).not.toMatch(/^\s*import\b|\bfrom\s+["']|\brequire\(|\bimport\(/m);
   });
 });
