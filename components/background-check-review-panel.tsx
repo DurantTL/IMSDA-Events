@@ -229,7 +229,7 @@ export function BackgroundCheckReviewPanel() {
     const ticket = lookupTicket.current;
     try {
       const next = await fetchLookup(open.query, open.row, open.people);
-      if (ticket === lookupTicket.current) setLookup(next);
+      if (ticket === lookupTicket.current && lookupOpen.current === open) setLookup(next);
     } catch {
       // The change itself is saved; the list simply stays as it was.
     }
