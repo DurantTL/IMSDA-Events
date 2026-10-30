@@ -617,8 +617,8 @@ export async function publishEvent(eventId: string, actorUserId: string) {
  * Unpublish is its own action (#471), confirmed in-page rather than folded
  * into a settings save: it names the event and warns that every public
  * registration form closes immediately, since that's the whole effect.
- * Idempotent under concurrency the same way as `publishEvent`. An event past
- * registration (complete, in financial reconciliation or closed) is refused
+ * Idempotent under concurrency the same way as `publishEvent`. An event that is in
+ * progress, complete, in financial reconciliation or closed is refused
  * with a 409 instead of being taken off the public site.
  */
 export async function unpublishEvent(eventId: string, actorUserId: string) {

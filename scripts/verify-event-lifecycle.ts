@@ -248,15 +248,15 @@ async function main() {
   const stamp = async (eventId: string) => (await row(eventId)).updatedAt.getTime();
   const stamps = [await stamp(legacyNull), await stamp(legacyPublished), await stamp(legacyArchived)];
   const historyBefore = await prisma.eventLifecycleTransition.count();
-  const dry = await backfillEventLifecycle(false);
+  const dry = await backfillEventLifecycle(false, { idPrefix: `${P}_` });
   assert(dry.dryRun && dry.updatedCount === 0 && (await row(legacyNull)).lifecycleState === null, "the dry run writes nothing");
   assert(dry.rows.some((candidate) => candidate.id === legacyNull && candidate.to === "DRAFT" && candidate.needsWrite), "the dry run maps an unpublished event to DRAFT");
-  const applied = await backfillEventLifecycle(true);
-  assert(applied.updatedCount === applied.needsWrite && applied.updatedCount >= 3, "apply writes every null state");
+  const applied = await backfillEventLifecycle(true, { idPrefix: `${P}_` });
+  assert(applied.updatedCount === applied.needsWrite && applied.updatedCount >= 3 && applied.rows.every((candidate) => candidate.id.startsWith(`${P}_`)), "apply writes every null state");
   assert((await row(legacyNull)).lifecycleState === "DRAFT" && (await row(legacyPublished)).lifecycleState === "PUBLISHED" && (await row(legacyArchived)).lifecycleState === "PUBLISHED", "events map from isPublished; an archived event keeps its archive overlay");
   assert(JSON.stringify(stamps) === JSON.stringify([await stamp(legacyNull), await stamp(legacyPublished), await stamp(legacyArchived)]), "the backfill leaves updatedAt alone");
   assert((await prisma.eventLifecycleTransition.count()) === historyBefore, "the backfill writes no history rows");
-  const again = await backfillEventLifecycle(true);
+  const again = await backfillEventLifecycle(true, { idPrefix: `${P}_` });
   assert(again.updatedCount === 0 && again.needsWrite === 0, "a second apply changes nothing");
   assert(!JSON.stringify(applied.rows).includes("Evlife"), "the report carries no event names");
 

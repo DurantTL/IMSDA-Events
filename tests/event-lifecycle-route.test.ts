@@ -128,6 +128,17 @@ describe("GET /api/events/[eventId]/lifecycle", () => {
     expect(dependencies.getEventLifecycle).toHaveBeenCalledWith(expect.objectContaining({ eventId: "evt_1", permissions: expect.arrayContaining(["VIEW_EVENT"]) }));
   });
 
+  it("shows the history only to those with CONFIGURE_EVENT or MANAGE_FINANCE; any member sees the current state", async () => {
+    const full = { state: "PUBLISHED", history: [{ id: "h1", actorUserId: "usr_9", reason: "private" }] };
+    for (const [role, sees] of [["READ_ONLY_STAFF", false], ["EVENT_ADMIN", true], ["FINANCE_MANAGER", true]] as const) {
+      asStaff(role);
+      dependencies.getEventLifecycle.mockResolvedValueOnce(full);
+      const body = await (await GET(new Request("https://events.imsda.test/x"), context)).json();
+      expect(body.lifecycle.state, role).toBe("PUBLISHED");
+      expect(body.lifecycle.history, role).toEqual(sees ? full.history : []);
+    }
+  });
+
   it("is 404 for a missing event and refuses a non-member", async () => {
     asStaff("READ_ONLY_STAFF");
     dependencies.getEventLifecycle.mockResolvedValueOnce(null);

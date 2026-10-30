@@ -36,6 +36,8 @@ Anything not listed is refused (409). Archive and unarchive stay their own actio
 | Complete | Financial reconciliation | MANAGE_FINANCE | |
 | Financial reconciliation | Closed | MANAGE_FINANCE | |
 
+Unpublishing (to Draft) is refused with a 409 from In progress, Complete, Financial reconciliation and Closed.
+
 The rules live in `modules/events/lifecycle-state.ts` (pure). `modules/events/lifecycle-repository.ts` runs one
 transition in a single transaction: lock the event row, work out the effective state, treat "already there" as a
 no-op (no second history row), refuse a stale `expectedFromState` (409), decide, run the publish checklist for
@@ -43,7 +45,7 @@ Published, then a conditional update on `lifecycleVersion` that sets `lifecycleS
 It then writes one `EventLifecycleTransition` row and one audit entry. A reason is optional, trimmed, at most 500
 characters. `publishEvent` and `unpublishEvent` go through it and keep their audit actions and messages.
 
-API: `GET /api/events/[eventId]/lifecycle` (state, history, the moves this actor may make) and
+API: `GET /api/events/[eventId]/lifecycle` (state and the moves this actor may make for any member; the history, with actor ids and reasons, only with CONFIGURE_EVENT or MANAGE_FINANCE) and
 `POST` (`toState`, `expectedFromState`, optional `reason`). 403 permission, 404 missing, 409 conflict or refusal.
 
 ## Compatibility with the old fields

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
+import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
@@ -206,6 +207,15 @@ export function clubPhase(
   return phases.includes("OPEN") ? "OPEN" as const : phases.includes("UPCOMING") ? "UPCOMING" as const : "CLOSED" as const;
 }
 
+/**
+ * The closing date a director's messages may quote. A lifecycle state that closes registration (#156) closes it
+ * whatever the date says, and the date may still be ahead, so none is quoted. Legacy (null state) is unchanged.
+ */
+export function quotedClosingDate(event: ClubEvent, location: LocationDateSource | null) {
+  if (closesRegistration(effectiveLifecycleState(event))) return null;
+  return effectiveLocationDates(event, location).registrationClosesOn;
+}
+
 /** What a director sees for one location: its own dates (the event's when unset), seats, and whether it can be picked. */
 export function clubLocationView(event: ClubEvent, location: ClubLocation, occupied: number, now: Date) {
   const dates = effectiveLocationDates(event, location);
@@ -217,7 +227,7 @@ export function clubLocationView(event: ClubEvent, location: ClubLocation, occup
     address: location.address,
     firstDay: dates.firstDay,
     lastDay: dates.lastDay,
-    registrationClosesOn: dates.registrationClosesOn,
+    registrationClosesOn: quotedClosingDate(event, location),
     // Only when this location closes on its own date, so the picker doesn't repeat the event's (#413).
     ownClosingDate: location.registrationClosesOn !== null && location.registrationClosesOn !== event.registrationClosesOn
       ? location.registrationClosesOn
@@ -310,7 +320,7 @@ export async function listClubEvents(organizationId: string, now = new Date()) {
       /** Who pays: church-billed events never show a personal payment on the club's pages (#1166). */
       billingMode: event.billingMode,
       phase: clubPhase(event, event.locations, registeredLocation, now),
-      registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
+      registrationClosesOn: quotedClosingDate(event, registeredLocation),
       // The location this club registered at (#413), with its own dates.
       registeredLocation: registeredLocation
         ? { id: registeredLocation.id, name: registeredLocation.name, address: registeredLocation.address, ...pickDays(event, registeredLocation) }
@@ -637,7 +647,7 @@ export function clubEditWindow(event: ClubEvent, location: (LocationDateSource &
   const dates = effectiveLocationDates(event, location);
   return clubRegistrationEditWindow({
     phase: evaluateLocationPhase(event, location, now),
-    registrationClosesOn: dates.registrationClosesOn,
+    registrationClosesOn: quotedClosingDate(event, location),
     today: calendarDateInEventTimeZone(now, event.timezone),
     eventDate: dates.firstDay,
     ended: hasLocationEnded(event, location, now),
@@ -844,7 +854,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
       noCost,
       phase: clubPhase(event, eventLocations, registeredLocation, now),
       ended: hasLocationEnded(event, registeredLocation, now),
-      registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
+      registrationClosesOn: quotedClosingDate(event, registeredLocation),
       // Whether a submitted registration may still be reopened (H3b, #366),
       // on its location's dates when it has one (#413).
       edit: editWindow,
