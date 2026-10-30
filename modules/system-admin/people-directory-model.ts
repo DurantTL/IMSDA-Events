@@ -6,6 +6,8 @@
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { clubRoleText, eventRoleText, systemRoleText } from "@/modules/access/role-descriptions";
+import { firstParam } from "@/lib/search-params";
+import { clampPage, pageCountFor } from "@/lib/pagination";
 
 export const PEOPLE_PAGE_SIZE = 25;
 
@@ -90,22 +92,21 @@ export type PeoplePage<T> = {
 
 /** A 1-based page, clamped into range, so `?page=999` shows the last page rather than nothing. */
 export function pagePeople<T>(items: readonly T[], requestedPage: number, pageSize = PEOPLE_PAGE_SIZE): PeoplePage<T> {
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
-  const wanted = Number.isFinite(requestedPage) ? Math.trunc(requestedPage) : 1;
-  const page = Math.min(pageCount, Math.max(1, wanted));
+  const pageCount = pageCountFor(items.length, pageSize);
+  const page = clampPage(requestedPage, items.length, pageSize);
   return { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageCount, total: items.length, pageSize };
 }
 
 /** Reads `?page=` as a positive integer; anything else is page 1. */
 export function parsePeoplePage(value: unknown): number {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   if (typeof text !== "string" || !/^\d{1,6}$/.test(text)) return 1;
   return Math.max(1, Number(text));
 }
 
 /** Reads `?q=` trimmed and capped. */
 export function parsePeopleQuery(value: unknown): string {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   return typeof text === "string" ? text.trim().slice(0, 120) : "";
 }
 
@@ -267,7 +268,7 @@ export function parsePeopleRole(value: unknown, scope: PeopleScope): PeopleRoleF
 
 /** Reads `?event=` / `?club=`: an id (letters, digits, `_`, `-`), or nothing. */
 export function parsePeopleId(value: unknown): string | null {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   return typeof text === "string" && /^[\w-]{1,64}$/.test(text.trim()) ? text.trim() : null;
 }
 
@@ -511,7 +512,7 @@ export function formatGrantParam(items: readonly GrantItem[]): string {
  * kept, so a hand-edited link can only ever ask for a short list of known kinds of access.
  */
 export function parseGrantParam(value: unknown): GrantItem[] {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   if (typeof text !== "string") return [];
   const items: GrantItem[] = [];
   const seen = new Set<string>();

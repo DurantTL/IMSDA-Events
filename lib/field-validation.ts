@@ -72,6 +72,20 @@ export function validateEmail(raw: string): FieldCheck {
   return ok(text);
 }
 
+/** True when `raw` passes {@link validateEmail}. */
+export function isEmail(raw: string): boolean {
+  return validateEmail(raw).ok;
+}
+
+/**
+ * The older, looser address check some server paths use: something, "@", something, ".", something, no
+ * whitespace. It accepts strings {@link validateEmail} rejects (and the reverse), so it is kept only where a
+ * stored value or startup setting already depends on it. `maxLength` is checked first when given.
+ */
+export function isLooseEmail(raw: string, maxLength = Number.POSITIVE_INFINITY): boolean {
+  return raw.length <= maxLength && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+}
+
 export type NumberRules = { min?: number; max?: number; integer?: boolean };
 
 /** Plain decimal numbers only: no exponents, hex, thousands separators or text. */

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { everyTermMatches, insensitiveContains, searchTerms as splitSearchTerms } from "@/lib/server-search";
 
 /**
  * Server-side organization search (#723), shared by the Clubs and churches
@@ -21,11 +22,11 @@ export function cleanSearchQuery(value: string | null | undefined) {
 }
 
 export function searchTerms(query: string) {
-  return cleanSearchQuery(query).normalize("NFKC").trim().split(/\s+/).filter(Boolean).slice(0, MAX_TERMS);
+  return splitSearchTerms(query, { maxTerms: MAX_TERMS, maxQueryLength: ORGANIZATION_SEARCH_MAX_LENGTH });
 }
 
 function termMatches(term: string): Prisma.OrganizationWhereInput {
-  const contains = { contains: term, mode: "insensitive" as const };
+  const contains = insensitiveContains(term);
   return {
     OR: [
       { name: contains },
@@ -47,13 +48,7 @@ function termMatches(term: string): Prisma.OrganizationWhereInput {
 export function organizationSearchWhere(query: string): Prisma.OrganizationWhereInput | null {
   const terms = searchTerms(query);
   if (terms.length === 0) return null;
-  return { AND: terms.map(termMatches) };
-}
-
-/** A positive page number from a URL parameter; anything else is page 1. */
-export function parsePageParam(value: string | undefined) {
-  const page = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(page) && page > 0 ? Math.min(page, 10_000) : 1;
+  return everyTermMatches(terms, termMatches);
 }
 
 /** The query string for a list URL; blank and default values are left out. */

@@ -12,6 +12,7 @@ import {
 } from "@/modules/club-reports/area-summary-domain";
 import { chooseReportMonth, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { recordState, recordsToReviewHref } from "@/modules/club-reports/review-domain";
+import { firstParam } from "@/lib/search-params";
 
 export const STAFF_RECORDS_ROW_LIMIT = 10;
 
@@ -44,7 +45,7 @@ export type StaffRecordRow = {
 
 /** `?month=YYYY-MM` when it is a month of the club year, otherwise the month the directory opens on. */
 export function parseRecordsMonth(value: string | string[] | undefined, clubYear: string, now: Date) {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   return text && clubYearMonths(clubYear).includes(text) ? text : chooseReportMonth(clubYear, now);
 }
 
@@ -117,13 +118,11 @@ export type StaffRecordsOptions = {
   all?: string | string[];
 };
 
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
 export function buildStaffMonthlyRecords(input: StaffRecordsOptions) {
   const month = parseRecordsMonth(input.month, input.clubYear, input.now);
   const query = parseClubQuery(input.q);
-  const showAllClubs = first(input.show) === "all";
-  const expanded = first(input.all) === "1";
+  const showAllClubs = firstParam(input.show) === "all";
+  const expanded = firstParam(input.all) === "1";
   const totals = monthlyStatusTotals(input.clubs, input.clubYear);
   const monthTotals = totals.find((entry) => entry.month === month)!;
   const rows = buildStaffRecordRows(input.clubs, month);

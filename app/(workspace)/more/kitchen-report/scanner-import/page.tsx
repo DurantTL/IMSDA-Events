@@ -6,6 +6,7 @@ import { ScannerImportWorkspace } from "@/components/scanner-import-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadServedDrillDown, loadServedReport } from "@/modules/meals/scanner-import-repository";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
 
@@ -17,13 +18,12 @@ const serviceKeyPattern = /^(\d{4}-\d{2}-\d{2}|any):(BREAKFAST|LUNCH|SUPPER)$/;
  */
 export default async function ScannerImportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-  const { event, permissions } = await resolveEventContext(first(params.event), { allowWithoutEventView: true });
+  const { event, permissions } = await resolveEventContext(firstParam(params.event), { allowWithoutEventView: true });
   if (!permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." />;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
-  const service = first(params.service);
+  const service = firstParam(params.service);
   const serviceKey = service && serviceKeyPattern.test(service) ? service : null;
   const [report, drill] = await Promise.all([
     loadServedReport(event.id),

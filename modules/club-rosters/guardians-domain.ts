@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer, PHONE_FIELD_MESSAGE, validateEmail, validatePhone } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, isUnchangedEmail, isUnchangedPhone, normalizePhoneAnswer, PHONE_FIELD_MESSAGE, isEmail, validatePhone } from "@/lib/field-validation";
 
 
 /**
@@ -48,7 +48,7 @@ export function guardianEmailProblem(value: string, stored?: string): string | n
   const email = value.trim();
   if (!email) return null;
   if (isUnchangedEmail(email, stored)) return null;
-  return validateEmail(email).ok ? null : EMAIL_FIELD_MESSAGE;
+  return isEmail(email) ? null : EMAIL_FIELD_MESSAGE;
 }
 
 /** The shared phone check (#855): a US number or an international one starting with +, optional extension. */

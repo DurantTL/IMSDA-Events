@@ -139,6 +139,7 @@ import {
 } from "@/modules/communications/message-blocks";
 import { getAttendeeRosterConfig, resolveBillingContactName, resolveResponsibleOrganization } from "@/modules/forms/definition";
 import type { FormCalculation, RegistrationFormDefinition } from "@/modules/forms/definition";
+import { isLooseEmail } from "@/lib/field-validation";
 
 const fallbackSettings = {
   deliveryMode: "LOCAL_CAPTURE" as const,
@@ -231,7 +232,7 @@ function stringArrayFromJson(value: Prisma.JsonValue | null | undefined) {
 }
 
 function zodlessEmailCheck(value: string) {
-  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return isLooseEmail(value, 254);
 }
 
 function recordFromJson(value: Prisma.JsonValue | null | undefined) {

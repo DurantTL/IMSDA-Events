@@ -16,16 +16,21 @@ export type PageSlice<T> = {
   to: number;
 };
 
+/** How many pages a list of `total` rows has at `pageSize` per page; an empty list still has one. */
+export function pageCountFor(total: number, pageSize: number): number {
+  return Math.max(1, Math.ceil(total / pageSize));
+}
+
 /** Clamp a requested 1-based page into the valid range for the list size. */
 export function clampPage(page: number, total: number, pageSize: number): number {
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = pageCountFor(total, pageSize);
   if (!Number.isFinite(page)) return 1;
   return Math.min(Math.max(1, Math.floor(page)), pageCount);
 }
 
 export function paginate<T>(items: readonly T[], page: number, pageSize: number): PageSlice<T> {
   const total = items.length;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = pageCountFor(total, pageSize);
   const current = clampPage(page, total, pageSize);
   const start = (current - 1) * pageSize;
   const slice = items.slice(start, start + pageSize);
@@ -63,11 +68,21 @@ export function parsePageParam(raw: string | null | undefined): number {
 }
 
 /**
+ * Lenient `page` reader for the organization lists: reads the leading whole number the way `parseInt` does
+ * ("12abc" is 12, " 7" is 7), caps it at `max`, and anything that is not a positive number is page 1.
+ * Use {@link parsePageParam} for request parameters; this one keeps the older organization-list behaviour.
+ */
+export function parseLeadingPageParam(raw: string | null | undefined, max = 10_000): number {
+  const page = Number.parseInt(raw ?? "", 10);
+  return Number.isFinite(page) && page > 0 ? Math.min(page, max) : 1;
+}
+
+/**
  * Build the slice for a list that was paged on the server: `items` is the page that was fetched,
  * `page` is the already-clamped page and `total` the full count.
  */
 export function sliceFromCount<T>(items: T[], page: number, total: number, pageSize: number): PageSlice<T> {
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = pageCountFor(total, pageSize);
   const start = (page - 1) * pageSize;
   return {
     items,

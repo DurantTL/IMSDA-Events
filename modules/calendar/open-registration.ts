@@ -1,4 +1,5 @@
 import type { CalendarItem } from "@/modules/calendar/domain";
+import { firstParam } from "@/lib/search-params";
 
 /**
  * The "Open for registration" list (#1217): the public calendar's own items, narrowed to events people can still
@@ -17,7 +18,7 @@ const listedStatuses = new Set(["OPEN", "WAITLIST", "FULL", "OPENING_SOON", "UPC
 
 /** An unknown or missing `?for=` value is All. */
 export function parseOpenRegistrationFilter(value: string | string[] | undefined): OpenRegistrationFilter {
-  const first = Array.isArray(value) ? value[0] : value;
+  const first = firstParam(value);
   return first === "clubs" || first === "everyone" ? first : "all";
 }
 

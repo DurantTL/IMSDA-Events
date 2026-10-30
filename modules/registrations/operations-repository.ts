@@ -24,6 +24,7 @@ import type {
   AttendeeSubstitutionInput,
   RegistrationTransferInput,
 } from "@/modules/registrations/schemas";
+import { isLooseEmail } from "@/lib/field-validation";
 
 type RegistrationOperationKind = "TRANSFER" | "ATTENDEE_SUBSTITUTION";
 
@@ -200,7 +201,7 @@ function snapshotString(
 }
 
 function validNoticeEmail(value: string) {
-  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return isLooseEmail(value, 254);
 }
 
 function contactIdentity(registration: OperationRegistration) {

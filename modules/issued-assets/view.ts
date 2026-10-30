@@ -14,6 +14,7 @@ import {
 } from "@/modules/issued-assets/domain";
 import { resolveAssetByCode } from "@/modules/issued-assets/service";
 import { clampPage, sliceFromCount } from "@/lib/pagination";
+import { insensitiveContains } from "@/lib/server-search";
 
 /**
  * What the issued-asset screens read (#213). Everything is a plain, serializable shape. Names are read for display
@@ -299,8 +300,8 @@ export async function searchDeskPeople(eventId: string, query: string, client: C
     ...(q
       ? {
           OR: [
-            { person: { firstName: { contains: q, mode: "insensitive" as const } } },
-            { person: { lastName: { contains: q, mode: "insensitive" as const } } },
+            { person: { firstName: insensitiveContains(q) } },
+            { person: { lastName: insensitiveContains(q) } },
             { registration: { confirmationCode: { startsWith: q.toUpperCase() } } },
           ],
         }

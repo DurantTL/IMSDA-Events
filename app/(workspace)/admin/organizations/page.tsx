@@ -5,8 +5,9 @@ import { OrganizationDirectoryWorkspace } from "@/components/organization-direct
 import { getCurrentSession } from "@/modules/access/current-session";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { getOrganizationSummary, listSponsorOptions, listOrganizationsPage } from "@/modules/organizations/repository";
-import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
+import { cleanSearchQuery } from "@/modules/organizations/search";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { parseLeadingPageParam } from "@/lib/pagination";
 
 export const metadata: Metadata = { title: "Clubs and churches" };
 
@@ -37,7 +38,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   const status = statuses.find((candidate) => candidate === params.status) ?? "ALL";
   const query = cleanSearchQuery(params.q);
   const [list, summary, sponsorOptions] = await Promise.all([
-    listOrganizationsPage({ query, kind, status, page: parsePageParam(params.page) }),
+    listOrganizationsPage({ query, kind, status, page: parseLeadingPageParam(params.page) }),
     getOrganizationSummary(),
     listSponsorOptions(),
   ]);

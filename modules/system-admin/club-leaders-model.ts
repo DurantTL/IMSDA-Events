@@ -1,4 +1,5 @@
 import { CLUB_ROLE_LABELS, CLUB_ROLE_VALUES, parsePeopleId, type ClubRoleValue } from "@/modules/system-admin/people-directory-model";
+import { firstParam } from "@/lib/search-params";
 
 /** The pure half of the Club leaders list (#1277): reading the URL, the where-clause and the sort order. */
 
@@ -8,7 +9,7 @@ export type ClubLeaderFilters = { clubId: string | null; role: ClubRoleValue | n
 
 /** Reads `?role=` as a club role (`director`, `deputy`, `registrar`, `reporter`); anything else is every role. */
 export function parseLeaderRole(value: unknown): ClubRoleValue | null {
-  const text = Array.isArray(value) ? value[0] : value;
+  const text = firstParam(value);
   if (typeof text !== "string") return null;
   const upper = text.trim().toUpperCase();
   return (CLUB_ROLE_VALUES as readonly string[]).includes(upper) ? (upper as ClubRoleValue) : null;

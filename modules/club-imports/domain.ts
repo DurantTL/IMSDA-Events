@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { clubYearChoices, clubYearFor, rosterSectionOf, type ClubClassLevel } from "@/modules/club-rosters/domain";
+import { isLooseEmail } from "@/lib/field-validation";
 
 export { clubYearChoices };
 
@@ -146,11 +147,9 @@ export function ageFrom(value: string) {
   return match ? Number(match[1]) : null;
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function cleanEmail(value: unknown) {
   const email = text(value, 254).toLowerCase();
-  return emailPattern.test(email) ? email : "";
+  return isLooseEmail(email) ? email : "";
 }
 
 /** "Albany SDA Church" → "Albany". Used to match churches and name the club. */

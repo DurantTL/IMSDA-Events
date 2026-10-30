@@ -1,5 +1,6 @@
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 import { upcomingRegistrations } from "@/modules/attendee-accounts/account-overview";
+import { firstParam } from "@/lib/search-params";
 
 type HistoryRegistration = Pick<AttendeeRegistrationSummary, "id" | "lifecycle" | "balanceCents" | "payment"> & {
   event: Pick<AttendeeRegistrationSummary["event"], "name" | "startsAt" | "endsAt">;
@@ -10,7 +11,7 @@ export type HistoryFilter = (typeof historyFilters)[number];
 
 /** The `?show=` value of My registrations; anything unknown is the full list, never an error. */
 export function parseHistoryFilter(value: string | string[] | undefined): HistoryFilter {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw = firstParam(value);
   return historyFilters.find((filter) => filter === raw) ?? "all";
 }
 

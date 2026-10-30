@@ -6,6 +6,7 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
 import { clubInviteSignUpUrl } from "@/modules/club-imports/invites";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import type { PeopleScope } from "@/modules/system-admin/people-directory-model";
+import { containsAnyOf } from "@/lib/server-search";
 
 /**
  * Invites still waiting on the person (#1276), for the People & access list and the person page: club role invites made
@@ -39,13 +40,13 @@ export async function listPendingInvites(
   const text = options.query?.trim().slice(0, 120) ?? "";
   const prisma = getPrisma();
 
-  const match = (): { email?: { in: string[] }; OR?: Array<{ email: { contains: string; mode: "insensitive" } } | { name: { contains: string; mode: "insensitive" } }> } => ({
+  const match = () => ({
     ...(emails ? { email: { in: emails } } : {}),
-    ...(text ? { OR: [{ email: { contains: text, mode: "insensitive" as const } }, { name: { contains: text, mode: "insensitive" as const } }] } : {}),
+    ...(text ? containsAnyOf(["email", "name"], text) : {}),
   });
   const userMatch: Prisma.UserWhereInput = {
     ...(emails ? { email: { in: emails } } : {}),
-    ...(text ? { OR: [{ email: { contains: text, mode: "insensitive" } }, { displayName: { contains: text, mode: "insensitive" } }] } : {}),
+    ...(text ? containsAnyOf(["email", "displayName"], text) : {}),
   };
   const open = { status: { in: ["PENDING", "SENT"] as Array<"PENDING" | "SENT"> } };
 

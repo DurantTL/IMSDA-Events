@@ -25,6 +25,7 @@ import {
   visibleListingColumns,
   type AttendeeListingQuery,
 } from "@/modules/registrations/attendee-listing";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: staffPageTitles.attendeeList };
 
@@ -32,7 +33,7 @@ const STATUS_LABELS: Record<string, string> = { CONFIRMED: "Confirmed", SUBMITTE
 
 export default async function AttendeeListingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const requestedEvent = Array.isArray(params.event) ? params.event[0] : params.event;
+  const requestedEvent = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requestedEvent);
   // Same gate as the registrations list.
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {

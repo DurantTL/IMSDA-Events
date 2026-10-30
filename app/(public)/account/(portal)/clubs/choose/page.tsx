@@ -9,6 +9,7 @@ import { clubChooseDestination, isClubChooseKey } from "@/modules/club-forms/pub
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
+import { firstParam } from "@/lib/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
  */
 export default async function ChooseClubPage({ searchParams }: { searchParams: Promise<{ to?: string | string[] }> }) {
   const rawTo = (await searchParams).to;
-  const to = Array.isArray(rawTo) ? rawTo[0] : rawTo;
+  const to = firstParam(rawTo);
   if (!isClubChooseKey(to)) notFound();
 
   const { account } = await getCurrentAttendee();

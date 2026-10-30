@@ -1,4 +1,4 @@
-import { normalizePhoneAnswer, validateEmail, validateZip } from "@/lib/field-validation";
+import { isEmail, normalizePhoneAnswer, validateEmail, validateZip } from "@/lib/field-validation";
 import { parseCalendarDate } from "@/modules/club-rosters/domain";
 import { MAX_EMERGENCY_CONTACTS, healthFieldsNeedingCorrection, hasHealthNoteFor } from "@/modules/health-records/domain";
 import type { SheetRows } from "@/modules/health-records/import-files";
@@ -311,7 +311,7 @@ function entryFrom(
     lastName: clean(row.Name_Last, 80),
     birthDate: importDate(row.DateOfBirth),
     clubText: join([row.ChurchAndClubName_First, row.ChurchAndClubName_Last]),
-    guardianEmail: validateEmail(guardianEmail).ok ? guardianEmail : "",
+    guardianEmail: isEmail(guardianEmail) ? guardianEmail : "",
     submittedAt,
     incomplete: status === "incomplete",
     values,

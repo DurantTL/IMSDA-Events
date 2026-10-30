@@ -8,12 +8,13 @@ import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { clubHonorCounts, memberCompletedHonors } from "@/modules/reporting/director-exports";
 import { listExportMemberOptions, loadHonorsExport } from "@/modules/reporting/director-exports-repository";
+import { firstParam } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Honors report" };
 export const dynamic = "force-dynamic";
 
 type SearchParams = Record<string, string | string[] | undefined>;
-const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
+const one = (value: string | string[] | undefined) => firstParam(value) ?? "";
 
 /**
  * The printable honors report (#819): either one person's completed honors, or
