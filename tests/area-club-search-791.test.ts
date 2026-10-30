@@ -133,7 +133,9 @@ describe.each([
   it("filters to matching clubs and says how many match", async () => {
     const out = await html(Page, { q: "alpine" });
     expect(out).toContain("Alpine Eagles");
-    expect(out).not.toContain("Bay Trailblazers");
+    // On Points the summary band still names the leader of every club; the bars and rows are only the matches.
+    if (name === "points") expect(out).not.toContain('translate="no">Bay Trailblazers');
+    else expect(out).not.toContain("Bay Trailblazers");
     expect(out).toContain("1 of ");
     expect(out).toContain("clubs match");
   });
@@ -148,8 +150,8 @@ describe("rank and event totals under a search (#791)", () => {
   it("keeps a club's overall rank and the bar scale when searched", async () => {
     const out = await html(PointsPage, { q: "alpine" });
     expect(out).toContain('data-label="Rank">4<');
-    expect(out).toContain('width="37.5"'); // 900 of the unfiltered maximum 2,400
-    expect(out).not.toContain("Bay Trailblazers");
+    expect(out).toContain("width:37.5%"); // 900 of the unfiltered maximum 2,400
+    expect(out).not.toContain('translate="no">Bay Trailblazers');
   });
 
   it("keeps an event's registered clubs and people whole while a search narrows the rows", async () => {

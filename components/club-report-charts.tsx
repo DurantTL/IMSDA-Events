@@ -220,10 +220,14 @@ function CoordinatorTable({ totals, title, clubYear }: { totals: readonly Coordi
 
 export type PointsBarsClub = { id: string; name: string; reportPoints: number; totalPoints: number };
 
-export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "Total points by club", ranks, compact }: {
+export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, scaleMax, showAllHref, title = "Total points by club", ranks, compact }: {
   clubs: readonly PointsBarsClub[];
   clubYear: string;
+  /** The caller renders its own ranking table (#1316), so this one is left out. */
+  hideTable?: boolean;
   limit?: number;
+  /** Bar scale when `clubs` is only part of the field (a search), so a bar keeps its length. */
+  scaleMax?: number;
   showAllHref?: string;
   title?: string;
   /** Rank by club id when `clubs` is a filtered subset, so the table keeps each club's rank in the whole year. */
@@ -234,7 +238,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
   const base = safe(useId());
   const ranked = sortLeaderboard(clubs, "points");
   const shown = ranked.slice(0, limit);
-  const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
+  const max = Math.max(1, scaleMax ?? 0, ...ranked.map((club) => club.totalPoints));
   const description = `${pointsChartDescription(ranked, clubYear)} Each bar is split into report points and yearly registration points.`
     + (ranked.length > shown.length ? ` The chart shows the top ${shown.length}; the table lists all ${ranked.length}.` : "");
   // With ranks (a search), list positions would contradict the whole-year rank each row announces.
@@ -272,7 +276,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
       {showAllHref && ranked.length > shown.length && (
         <p className={styles.more}><Link className={styles.moreLink} href={showAllHref}>Show all {number(ranked.length)} clubs</Link></p>
       )}
-      <details className={styles.details}>
+      {!hideTable && <details className={styles.details}>
         <summary className={styles.summary}>Show as a table</summary>
         <div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}>
           <table className={`report-table report-table-auto ${styles.table}`}>
@@ -293,7 +297,7 @@ export function PointsBars({ clubs, clubYear, limit = 10, showAllHref, title = "
             </tbody>
           </table>
         </div>
-      </details>
+      </details>}
       </div>
     </figure>
   );
