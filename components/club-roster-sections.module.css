@@ -39,7 +39,7 @@
 .rosterNeedsDetails { white-space: normal; }
 .rosterRowActionSet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rosterRowActionSet :global(.actions-menu) { display: inline-block; width: auto; }
-.rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { width: auto; min-height: 44px; min-width: 44px; white-space: nowrap; }
+.rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: auto; min-height: 44px; min-width: 44px; white-space: nowrap; }
 /* An open menu opens in the flow, under Edit, at the width of its own cell: it can't be clipped by the table's scroll region, cover the next column or push the page sideways. */
 .rosterRowActionSet :global(.actions-menu)[open] { flex-basis: 100%; }
 .rosterRowActionSet :global(.actions-menu-list) { position: static; width: 100%; min-width: 0; margin-top: 6px; box-shadow: none; }
@@ -51,17 +51,17 @@
 @media (max-width: 720px) {
   :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
   :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) { flex: 1 1 8rem; }
-  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { width: 100%; justify-content: center; }
+  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; justify-content: center; }
   :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button) { justify-content: center; }
   :global(.roster-card-table) .rosterRowActionSet { width: 100%; }
   :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
-  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { min-height: 44px; min-width: 44px; }
   .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
 }
 @media (min-width: 721px) {
   @container (max-width: 640px) {
     :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
-    :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary.actions-menu-trigger { min-height: 44px; min-width: 44px; }
+    :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { min-height: 44px; min-width: 44px; }
     .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
     }
 }

@@ -479,7 +479,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
 
   it("keeps Edit and the Actions trigger at 44px at every width and opens the menu in the flow", () => {
     expect(css).toMatch(/\.rosterEditButton \{ min-height: 44px; min-width: 44px;/);
-    expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu\) > summary\.actions-menu-trigger \{ width: auto; min-height: 44px;/);
+    expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu\) > summary:global\(\.actions-menu-trigger\) \{ width: auto; min-height: 44px;/);
     // An open menu is in the flow under Edit, so it cannot be clipped, cover a column or widen the page.
     expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu-list\) \{ position: static; width: 100%; min-width: 0;/);
     expect(css).toContain(".rosterRowActionSet :global(.actions-menu)[open] { flex-basis: 100%; }");
