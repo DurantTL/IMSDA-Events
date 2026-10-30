@@ -46,7 +46,8 @@ describe("only a named staff member's button press carries a cancellation out", 
     ]);
     // The page only reads (getCarryOutPanel).
     expect(read("app/(workspace)/finance/cancellation-requests/page.tsx")).not.toContain("carryOutCancellation");
-    expect(read("modules/cancellation-requests/repository.ts")).not.toMatch(/cancellation-execution|lifecycle|payments\//);
+    // The shared money formatter (#1355) is the one payments/ file it may use: it only turns cents into text.
+    expect(read("modules/cancellation-requests/repository.ts").replaceAll('"@/modules/payments/format-cents"', "")).not.toMatch(/cancellation-execution|lifecycle|payments\//);
   });
 
   it("records a failed refund as resolved only from its own staff route, which moves no money", () => {

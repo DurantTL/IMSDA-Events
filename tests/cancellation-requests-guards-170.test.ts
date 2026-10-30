@@ -93,6 +93,8 @@ describe("the request workflow never reaches money, registrations or capacity (#
       const source = read(file);
       const imports = [...source.matchAll(/from "(@\/[^"]+)"/g)].map((match) => match[1]);
       for (const specifier of imports) {
+        // The shared money formatter (#1355) only turns cents into text; it moves nothing.
+        if (specifier === "@/modules/payments/format-cents") continue;
         expect(specifier, `${file} imports ${specifier}`).not.toMatch(/payments|refund|credit|capacity|waitlist|lifecycle|registrations\/(?!$)|invoices|square/);
       }
     }

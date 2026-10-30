@@ -1,4 +1,8 @@
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
+/** Kept here, with no imports, so client components that only format a date stay light; `calendar/domain` re-exports it. */
+export const CONFERENCE_TIME_ZONE = "America/Chicago";
+
+/** The zone is fixed, so a caller cannot pass one and have it silently ignored. */
+type ConferenceDateFormatOptions = Omit<Intl.DateTimeFormatOptions, "timeZone">;
 
 /**
  * Display formatting in the conference's time zone (America/Chicago), never the
@@ -14,7 +18,7 @@ import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 /** The cached formatter itself, for callers that need `formatToParts`. */
-export function conferenceDateFormat(options: Intl.DateTimeFormatOptions = {}, locale = "en-US") {
+export function conferenceDateFormat(options: ConferenceDateFormatOptions = {}, locale = "en-US") {
   const key = JSON.stringify([locale, options]);
   let formatter = formatters.get(key);
   if (!formatter) {
@@ -25,7 +29,7 @@ export function conferenceDateFormat(options: Intl.DateTimeFormatOptions = {}, l
 }
 
 /** An invalid date prints "Invalid Date", like `toLocale*String`, instead of throwing. */
-export function formatInConferenceTime(value: Date | string | number, options: Intl.DateTimeFormatOptions = {}, locale = "en-US") {
+export function formatInConferenceTime(value: Date | string | number, options: ConferenceDateFormatOptions = {}, locale = "en-US") {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Invalid Date";
   return conferenceDateFormat(options, locale).format(date);

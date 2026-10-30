@@ -9,9 +9,9 @@
  * immediate.
  */
 
-import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { CONFERENCE_TIME_ZONE, formatInConferenceTime } from "@/modules/calendar/conference-format";
 
-export const digestTimeZone = "America/Chicago";
+export const digestTimeZone = CONFERENCE_TIME_ZONE;
 /** Local hour (Central) from which the day's digest may be sent. */
 export const digestSendHour = 7;
 

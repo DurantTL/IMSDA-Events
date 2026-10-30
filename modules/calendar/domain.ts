@@ -5,8 +5,9 @@
  */
 
 import { publicStatusLine, type PublicCapacityStatus } from "@/modules/events/public-registration-status";
+import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
 
-export const CONFERENCE_TIME_ZONE = "America/Chicago";
+export { CONFERENCE_TIME_ZONE };
 
 export type CalendarItemStatus = "SCHEDULED" | "POSTPONED" | "CANCELLED";
 
