@@ -29,15 +29,44 @@ export type PrivateLinkContext = {
   appOrigins: readonly string[];
 };
 
-export type PrivateLinkReason = "manageLink" | "sourceAdminApi" | "sourceAsset" | "tokenParameter" | "sourceReference";
+export type PrivateLinkReason = "manageLink" | "tokenRoute" | "sourceAdminApi" | "sourceAsset" | "tokenParameter" | "sourceReference";
 
 export const privateLinkReasonLabels: Record<PrivateLinkReason, string> = {
   manageLink: "a registrant's private manage link",
+  tokenRoute: "a private link that carries a token in its path",
   sourceAdminApi: "the source event's staff API",
   sourceAsset: "an uploaded file of the source event",
   tokenParameter: "a token or signature in the address",
   sourceReference: "the source event's own address or id",
 };
+
+/**
+ * Routes whose last path segment is a secret token (a `[token]` folder under `app/`), as the segments before the
+ * token. A link on the app's own origin, or a relative one, that has a segment after one of these is private.
+ * `tests/private-link-token-routes.test.ts` fails when a new `[token]` route exists that this list does not cover.
+ */
+export const tokenRoutePrefixes: readonly (readonly string[])[] = [
+  ["manage"],
+  ["club-forms"],
+  ["health-records"],
+  ["staff-invite"],
+  ["unsubscribe"],
+  ["clubs", "register"],
+  ["api", "public", "manage"],
+  ["api", "public", "club-forms"],
+  ["api", "public", "health-records"],
+  ["api", "public", "staff-invitations"],
+  ["api", "public", "unsubscribe"],
+];
+
+function hasTokenRoute(segments: readonly string[]) {
+  return tokenRoutePrefixes.some((prefix) => {
+    for (let start = 0; start + prefix.length < segments.length; start += 1) {
+      if (prefix.every((part, offset) => segments[start + offset] === part)) return true;
+    }
+    return false;
+  });
+}
 
 const urlChars = "[^\\s<>\"'`()\\[\\]]";
 /** Absolute http(s) URLs, and relative paths that start a word with `/`. */
@@ -95,6 +124,7 @@ export function privateLinkReasons(url: string, context: PrivateLinkContext): Pr
   if (lower.includes(`/api/public/events/${slug}/assets/`)) reasons.push("sourceAsset");
   if (parsed && (parsed.relative || normalizedOrigins(context.appOrigins).includes(parsed.origin))) {
     if (parsed.segments.includes("manage")) reasons.push("manageLink");
+    else if (hasTokenRoute(parsed.segments)) reasons.push("tokenRoute");
     const names = [...parsed.segments, ...parsed.queryValues];
     if (reasons.length === 0 && (names.includes(slug) || names.includes(id))) reasons.push("sourceReference");
   }
@@ -106,7 +136,11 @@ export function privateLinkReasons(url: string, context: PrivateLinkContext): Pr
  * segment after `/manage/` are masked, so the plan never repeats a secret.
  */
 export function redactPrivateLink(url: string) {
-  return url
+  let masked = url;
+  for (const prefix of tokenRoutePrefixes) {
+    masked = masked.replace(new RegExp(`(\\/${prefix.join("\\/")}\\/)[^/?#\\s]+`, "gi"), "$1…");
+  }
+  return masked
     .replace(/(\/manage\/)[^/?#\s]+/gi, "$1…")
     .replace(/([?&#](?:[a-z0-9_-]*token|sig|signature)=)[^&#\s]*/gi, "$1…");
 }

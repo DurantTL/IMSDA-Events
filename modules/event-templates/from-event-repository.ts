@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { appOrigins, fingerprintOf, loadSourceConfiguration } from "@/modules/event-clones/repository";
 import { canonicalJson } from "@/modules/event-clones/domain";
-import { eventTemplatePayloadSchema } from "@/modules/event-templates/domain";
+import { eventTemplatePayloadSchema, type EventTemplatePayload } from "@/modules/event-templates/domain";
 import {
   buildTemplateFromEvent,
   previewTemplateFromEventInputSchema,
@@ -24,6 +24,16 @@ import {
 
 type Db = Prisma.TransactionClient;
 
+/** The template's own settings an event cannot supply, read from its current version (published, else the latest). */
+function settingsToKeep(payload: EventTemplatePayload) {
+  return {
+    reportSelections: payload.reportSelections,
+    formTemplateKeys: payload.formTemplateKeys,
+    registrationClosesOn: payload.registrationClosesOn,
+    starterKey: payload.starterKey,
+  };
+}
+
 /** Bounded wait for the source row lock; past it the save reports a busy template, never a hang. */
 const sourceLockTimeout = "5s";
 
@@ -41,7 +51,9 @@ async function loadTemplateSource(db: Db | ReturnType<typeof getPrisma>, eventId
 
 /** Hash of what a save would copy, so a save after the event changed is refused. */
 function templateFingerprintOf(source: TemplateSourceConfiguration) {
-  return createHash("sha256").update(`${fingerprintOf(source.config)}:${source.generalRegistrationLink ? "link" : "nolink"}`).digest("hex");
+  // The event's dates are in it because the saved day offsets depend on the start date.
+  const dates = `${source.config.event.startsOn}:${source.config.event.endsOn}`;
+  return createHash("sha256").update(`${fingerprintOf(source.config)}:${dates}:${source.generalRegistrationLink ? "link" : "nolink"}`).digest("hex");
 }
 
 export type TemplateFromEventPreviewResult = TemplateFromEventPreview & { fingerprint: string };
@@ -74,6 +86,7 @@ async function resolveExistingSave(actorUserId: string, input: SaveTemplateFromE
     versionId: existing.templateVersion.id,
     versionNumber: existing.templateVersion.versionNumber,
     alreadySaved: true,
+    kept: [] as Array<{ key: string; label: string; count: number }>,
   };
 }
 
@@ -103,17 +116,19 @@ export async function saveTemplateFromEvent(actorUserId: string, rawInput: unkno
       let templateId: string | null = null;
       let versionNumber = 1;
       let existingAudience: "GENERAL" | "CLUB" | null = null;
+      let existingSettings: ReturnType<typeof settingsToKeep> | null = null;
       if (input.target.mode === "NEW_VERSION") {
         templateId = input.target.templateId;
         refuseArchived(await lockTemplate(tx, templateId, "UPDATE"), "saved to");
         const versions = await tx.eventTemplateVersion.findMany({ where: { templateId }, orderBy: { versionNumber: "desc" } });
         if (versions.some((version) => version.status === "DRAFT")) {
-          throw new EventTemplateOperationError("DRAFT_EXISTS", "This template already has a draft. Publish or discard the current draft first.");
+          throw new EventTemplateOperationError("DRAFT_EXISTS", "This template already has a draft. Publish it or edit it in the template editor first, or save as a new template.");
         }
         versionNumber = (versions[0]?.versionNumber ?? 0) + 1;
         const current = versions.find((version) => version.status === "PUBLISHED") ?? versions[0];
         const parsed = current ? eventTemplatePayloadSchema.safeParse(current.payload) : null;
         existingAudience = parsed?.success ? parsed.data.audience : null;
+        existingSettings = parsed?.success ? settingsToKeep(parsed.data) : null;
       }
 
       // Share-lock the source row so its own settings cannot change mid-save; child configuration is guarded by the fingerprint.
@@ -127,7 +142,7 @@ export async function saveTemplateFromEvent(actorUserId: string, rawInput: unkno
       if (fingerprint !== input.fingerprint) {
         throw new EventTemplateOperationError("SOURCE_CHANGED", "The event changed after you previewed it. Preview it again and review what will be copied.");
       }
-      const build = buildTemplateFromEvent(source, appOrigins());
+      const build = buildTemplateFromEvent(source, appOrigins(), existingSettings);
       if (existingAudience !== null && existingAudience !== build.payload.audience) {
         throw new EventTemplateOperationError("AUDIENCE_MISMATCH", "This event's audience differs from the template's. Save it as a new template instead.");
       }
@@ -167,7 +182,8 @@ export async function saveTemplateFromEvent(actorUserId: string, rawInput: unkno
           requestKey: input.requestKey,
           requestInput: saveTemplateRequestInputOf(input) as unknown as Prisma.InputJsonValue,
           provenance: { ...build.provenance, fingerprint } as unknown as Prisma.InputJsonValue,
-          exclusions: build.preview.exclusions as unknown as Prisma.InputJsonValue,
+          // Keys, counts and reduced link origins only: never copied text.
+          exclusions: build.storedExclusions as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -187,9 +203,9 @@ export async function saveTemplateFromEvent(actorUserId: string, rawInput: unkno
         },
       } });
 
-      return { templateId: templateId!, versionId: version.id, versionNumber };
+      return { templateId: templateId!, versionId: version.id, versionNumber, kept: build.kept };
     });
-    return { template: await getEventTemplate(saved.templateId), versionId: saved.versionId, versionNumber: saved.versionNumber, alreadySaved: false };
+    return { template: await getEventTemplate(saved.templateId), versionId: saved.versionId, versionNumber: saved.versionNumber, alreadySaved: false, kept: saved.kept };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       // A concurrent request with this actor's key may have committed first.

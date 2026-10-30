@@ -13,7 +13,7 @@ async function postHandler(request: Request) {
     const user = requireEventTemplateManagementPermission(await getCurrentSession());
     const result = await saveTemplateFromEvent(user.id, await request.json());
     return Response.json(
-      { template: result.template, versionId: result.versionId, versionNumber: result.versionNumber, alreadySaved: result.alreadySaved },
+      { template: result.template, versionId: result.versionId, versionNumber: result.versionNumber, alreadySaved: result.alreadySaved, kept: result.kept },
       { status: result.alreadySaved ? 200 : 201 },
     );
   } catch (error) {

@@ -8,6 +8,7 @@ import {
   saveTemplateRequestInputOf,
 } from "@/modules/event-templates/from-event-domain";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { operationalReportKinds } from "@/modules/reporting/operational-reports";
 import { templateMealsFromDefinitions } from "@/modules/meals/clone-domain";
 
 const origins = ["https://events.imsda.test"];
@@ -197,6 +198,82 @@ describe("buildTemplateFromEvent (#154)", () => {
     expect(built.payload.registrationForms).toBeUndefined();
     expect(built.payload.locations).toBeUndefined();
     expect(built.payload.meals).toBeUndefined();
+  });
+});
+
+describe("private links in every copied string (#154)", () => {
+  const link = (route: string) => `https://events.imsda.test/${route}/${SECRET}`;
+
+  it("strips token links on other private routes and reports them masked", () => {
+    const config = source({
+      attendeeTypes: [{ code: "ADULT", label: "Adult", description: `Details ${link("club-forms")}`, sortOrder: 0, isActive: true, minimumAge: 18, maximumAge: null }],
+      attendeeClassifications: [{ kind: "CATEGORY", code: "GUEST", label: "Guest", description: `See ${link("health-records")}`, sortOrder: 0, isActive: true }],
+      locations: [{ name: "North Site", address: `1 Road ${link("staff-invite")}`, capacity: 40, sortOrder: 0, firstDay: null, lastDay: null, registrationClosesOn: null }],
+      meals: {
+        services: [{ name: "Friday supper", mealType: "SUPPER", serviceDate: "2027-05-07", startTime: "18:00", endTime: null, location: `Hall ${link("unsubscribe")}`, ticketing: "TICKETED", capacity: null, position: 1 }],
+        plans: [{ code: "FULL", name: "Full plan", description: `Plan ${link("clubs/register")}`, payer: "ATTENDEE", isDefaultTicketPlan: true, includesAllServices: true, defaultEntitlement: "PAID", position: 1, services: [], prices: [] }],
+      },
+    });
+    const built = build(config);
+    expect(JSON.stringify(built.payload)).not.toContain(SECRET);
+    expect(JSON.stringify(built.preview)).not.toContain(SECRET);
+    expect(built.preview.exclusions.find((entry) => entry.key === "privateLinks")!.count).toBeGreaterThanOrEqual(5);
+  });
+
+  it("scans form labels, titles, acknowledgment and signature text, roster labels and the required-one message", () => {
+    const base = formDefinition();
+    const definition = registrationFormDefinitionSchema.parse({
+      title: `Form ${link("manage")}`,
+      confirmationMessage: "Received.",
+      attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 5, attendeeLabel: "Person /manage/SHORTTOK1", addButtonLabel: "Add one /manage/SHORTTOK1" },
+      requireAtLeastOne: { fieldKeys: ["first_name", "last_name"], message: `Pick one ${link("club-forms")}` },
+      sections: [{
+        id: "sec_one", title: `Section ${link("health-records")}`, description: "", fields: [
+          { id: "f_first", key: "first_name", label: `First ${link("staff-invite")}`, type: "TEXT", scope: "ATTENDEE", required: true, options: [] },
+          { id: "f_last", key: "last_name", label: "Last name", type: "TEXT", scope: "ATTENDEE", required: true, options: [] },
+          { id: "f_ack", key: "typed_ack", label: "Typed", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [], acknowledgment: { source: "TEXT", text: `I agree ${link("unsubscribe")} to this.` } },
+          { id: "f_sig", key: "signed", label: "Signed", type: "SIGNATURE", scope: "REGISTRATION", required: true, options: [], signature: { text: `I sign ${link("unsubscribe")} here.` } },
+        ],
+      }],
+    });
+    void base;
+    const built = build(source({ registrationForms: [{ formId: "form-2", name: "Other", slug: "other", versionId: "v", versionNumber: 1, definition }] }));
+    expect(built.payload.registrationForms).toHaveLength(1);
+    expect(JSON.stringify(built.payload)).not.toContain(SECRET);
+    expect(JSON.stringify(built.payload)).not.toContain("/manage/");
+    expect(JSON.stringify(built.payload)).not.toContain("SHORTTOK1");
+  });
+
+  it("stores exclusions as keys and counts, with link origins and first segments only", () => {
+    const built = build();
+    const stored = JSON.stringify(built.storedExclusions);
+    for (const forbidden of [SECRET, "token=", "Retreat form", "Synthetic Inn", "Camp policy", "North Site", "Extra meal"]) expect(stored).not.toContain(forbidden);
+    const links = built.storedExclusions.find((entry) => entry.key === "privateLinks")!.links!;
+    expect(links.length).toBeGreaterThan(0);
+    for (const entry of links) expect(entry.link).toMatch(/^(https:\/\/events\.imsda\.test)?\/[a-z-]*$/);
+    expect(built.storedExclusions.every((entry) => Object.keys(entry).every((key) => ["key", "count", "links"].includes(key)))).toBe(true);
+  });
+});
+
+describe("a new version keeps the template's own settings (#154)", () => {
+  it("carries reportSelections, formTemplateKeys, registrationClosesOn and starterKey forward and says so", () => {
+    const built = buildTemplateFromEvent({ config: source(), generalRegistrationLink: false }, origins, {
+      reportSelections: operationalReportKinds.slice(0, 2),
+      formTemplateKeys: ["simple_rsvp"], registrationClosesOn: "2027-04-01", starterKey: "fall_camporee",
+    });
+    expect(built.payload.reportSelections).toEqual(operationalReportKinds.slice(0, 2));
+    expect(built.payload.formTemplateKeys).toEqual(["simple_rsvp"]);
+    expect(built.payload.registrationClosesOn).toBe("2027-04-01");
+    expect(built.payload.starterKey).toBe("fall_camporee");
+    expect(built.payload.registrationForms).toHaveLength(1);
+    expect(built.kept.map((entry) => entry.key).sort()).toEqual(["formTemplateKeys", "registrationClosesOn", "reportSelections", "starterKey"]);
+    expect(built.preview.domains.some((domain) => domain.key === "keptFromTemplate")).toBe(true);
+  });
+
+  it("keeps nothing for a new template", () => {
+    const built = build();
+    expect(built.kept).toEqual([]);
+    expect(built.payload.starterKey).toBeUndefined();
   });
 });
 

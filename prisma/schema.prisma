@@ -4702,8 +4702,8 @@ model EventTemplateVersion {
 /// name it had. `requestKey` is the caller's idempotency key, unique per actor:
 /// a retry with the same key and `requestInput` returns the version already
 /// saved, and the same key with different input is refused. `provenance` and
-/// `exclusions` hold ids, version numbers, fingerprint and counts only, never
-/// copied text.
+/// `exclusions` hold ids, version numbers, fingerprint, keys and counts only,
+/// never copied text.
 model EventTemplateVersionSource {
   id                String   @id @default(cuid())
   templateVersionId String   @unique
@@ -4718,7 +4718,9 @@ model EventTemplateVersionSource {
   /// Source form ids and published version ids and numbers, message template
   /// version ids and numbers, and the configuration fingerprint reviewed.
   provenance        Json
-  /// What the preview showed as not copied, with counts.
+  /// What was left out, as exclusion keys and counts only, plus the origin and
+  /// first path segment of each private link removed (no query, deeper path,
+  /// token or copied text).
   exclusions        Json
   createdAt         DateTime @default(now())
 

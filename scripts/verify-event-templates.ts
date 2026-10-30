@@ -64,6 +64,9 @@ function isOperationError(error: unknown, code: EventTemplateOperationError["cod
 async function cleanup() {
   await prisma.auditLog.deleteMany({ where: { actorUserId: { in: actors } } });
   await prisma.eventTemplateApplication.deleteMany({ where: { actorUserId: { in: actors } } });
+  // Payments and registrations first, so the Person row can go afterwards without hiding a real failure (#154).
+  await prisma.payment.deleteMany({ where: { event: { slug: { startsWith: `${P}-` } } } });
+  await prisma.registration.deleteMany({ where: { event: { slug: { startsWith: `${P}-` } } } });
   await prisma.$transaction(async (tx) => {
     // Event deletion is the one way lifecycle history may be deleted (#156).
     await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
@@ -645,6 +648,8 @@ async function verifyFromEvent() {
   const provenance = savedVersion.source!.provenance as { forms: Array<{ formId: string }>; fingerprint: string };
   assert(provenance.forms[0]?.formId === sourceForm.id && provenance.fingerprint === preview.fingerprint, "provenance records the source form and fingerprint");
   leakCheck(JSON.stringify(savedVersion.payload), "the saved payload");
+  leakCheck(JSON.stringify(savedVersion.source!.exclusions), "the stored exclusions", true);
+  assert(!JSON.stringify(savedVersion.source!.exclusions).includes("Evttpl"), "the stored exclusions hold no copied names");
   assert(JSON.stringify(Object.keys(savedVersion.payload as object).sort()) === JSON.stringify(["attendeeClassifications", "attendeeTypes", "audience", "billingMode", "brandingDefaults", "formTemplateKeys", "messageTemplateDefaults", "moduleEnablement", "registrationForms", "reportSelections"]), "the payload has exactly the allow-listed keys");
   assert(!JSON.stringify(savedVersion.payload).includes("/manage/"), "the private link was removed from the copied message");
   const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: "EVENT_TEMPLATE_SAVED_FROM_EVENT", entityId: first.template.id } });

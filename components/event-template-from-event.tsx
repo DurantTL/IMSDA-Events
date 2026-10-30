@@ -16,7 +16,7 @@ type Props = {
 
 type Preview = TemplateFromEventPreview & { fingerprint: string };
 type Failure = { message: string; stale: boolean };
-type Saved = { templateId: string; versionNumber: number; alreadySaved: boolean };
+type Saved = { templateId: string; versionNumber: number; alreadySaved: boolean; kept: Array<{ key: string; label: string; count: number }> };
 
 export function EventTemplateFromEvent({ events, templates }: Props) {
   const [sourceEventId, setSourceEventId] = useState(events[0]?.id ?? "");
@@ -78,7 +78,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
         });
       } else {
         const template = body.template as { id: string };
-        setSaved({ templateId: template.id, versionNumber: Number(body.versionNumber), alreadySaved: body.alreadySaved === true });
+        setSaved({ templateId: template.id, versionNumber: Number(body.versionNumber), alreadySaved: body.alreadySaved === true, kept: Array.isArray(body.kept) ? (body.kept as Saved["kept"]) : [] });
       }
     } catch (error) {
       setFailure({ message: error instanceof Error ? error.message : "The event could not be saved as a template.", stale: false });
@@ -96,6 +96,7 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
           Version {saved.versionNumber} was saved as a draft{saved.alreadySaved ? " earlier (this request had already been saved)" : ""}.
           Open the template to review it, then publish it when it is ready. Nothing is applied to any event until then.
         </p>
+        {saved.kept.length > 0 ? <p>Kept from the current template version: {saved.kept.map((entry) => entry.label).join(", ")}.</p> : null}
         <Link className={`primary-button ${styles.resultLink}`} href={`/admin/event-templates/${saved.templateId}`}>Open the template</Link>
       </section>
     );
@@ -184,11 +185,14 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
                     <option key={template.id} value={template.id}>{template.name}{template.hasDraft ? " (has a draft)" : ""}</option>
                   ))}
                 </select>
-                <span className={`field-help ${styles.hint}`}>Only templates for {preview.source.audience === "CLUB" ? "club" : "general"} events are listed. A template that already has a draft cannot take another: publish or discard its draft first.</span>
+                <span className={`field-help ${styles.hint}`}>Only templates for {preview.source.audience === "CLUB" ? "club" : "general"} events are listed. A template that already has a draft cannot take another: publish it or edit it in the template editor first, or save as a new template.</span>
               </label>
             )}
+            {mode === "NEW_VERSION" ? (
+              <p className={`field-help ${styles.hint}`}>A new version keeps the template&apos;s own report selections, form templates, registration deadline and starter identity from its current version. The event adds its forms alongside.</p>
+            ) : null}
             {mode === "NEW_VERSION" && targetTemplate?.hasDraft ? (
-              <p className="inline-notice error" role="alert">This template already has a draft. Publish or discard the current draft first.</p>
+              <p className="inline-notice error" role="alert">This template already has a draft. Publish it or edit it in the template editor first, or save as a new template.</p>
             ) : null}
             <label className={styles.label}>Release note (required)
               <textarea value={releaseNote} maxLength={2000} rows={3} onChange={(event) => setReleaseNote(event.target.value)} />

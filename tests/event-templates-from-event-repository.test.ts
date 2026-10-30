@@ -15,6 +15,7 @@ import { previewTemplateFromEvent, saveTemplateFromEvent } from "@/modules/event
 import { EventTemplateOperationError } from "@/modules/event-templates/repository";
 import { saveTemplateRequestInputOf, saveTemplateFromEventInputSchema } from "@/modules/event-templates/from-event-domain";
 import { eventTemplatePayloadSchema } from "@/modules/event-templates/domain";
+import { operationalReportKinds } from "@/modules/reporting/operational-reports";
 
 const SECRET = "SYNTHETICTOKEN0123456789";
 
@@ -107,6 +108,32 @@ describe("previewTemplateFromEvent (#154)", () => {
     const first = await freshFingerprint();
     mocks.loadSourceConfiguration.mockImplementation(async () => config({ attendeeTypes: [] }));
     expect(await freshFingerprint()).not.toBe(first);
+  });
+});
+
+describe("fingerprint and kept settings (#154)", () => {
+  it("changes when the event's dates change, because the day offsets depend on them", async () => {
+    const first = await freshFingerprint();
+    mocks.loadSourceConfiguration.mockImplementation(async () => config({ event: { ...config().event, startsOn: "2027-05-06" } }));
+    expect(await freshFingerprint()).not.toBe(first);
+    mocks.loadSourceConfiguration.mockImplementation(async () => config({ event: { ...config().event, endsOn: "2027-05-09" } }));
+    expect(await freshFingerprint()).not.toBe(first);
+  });
+
+  it("keeps reportSelections, formTemplateKeys, registrationClosesOn and starterKey in a new version", async () => {
+    const fingerprint = await freshFingerprint();
+    const existing = eventTemplatePayloadSchema.parse({
+      starterKey: "fall_camporee", audience: "GENERAL", formTemplateKeys: ["simple_rsvp"], reportSelections: [operationalReportKinds[0]], registrationClosesOn: "2027-04-01",
+    });
+    const { prisma, tx } = mockSave({ versions: [versionRow({ payload: existing })] });
+    mocks.getPrisma.mockReturnValue(prisma);
+    const result = await saveTemplateFromEvent("usr_actor", { ...newVersionInput, fingerprint });
+    const saved = eventTemplatePayloadSchema.parse(tx.eventTemplateVersion.create.mock.calls[0]![0].data.payload);
+    expect(saved).toMatchObject({ starterKey: "fall_camporee", formTemplateKeys: ["simple_rsvp"], reportSelections: [operationalReportKinds[0]], registrationClosesOn: "2027-04-01" });
+    expect(result.kept.map((entry) => entry.key).sort()).toEqual(["formTemplateKeys", "registrationClosesOn", "reportSelections", "starterKey"]);
+    const stored = JSON.stringify(tx.eventTemplateVersionSource.create.mock.calls[0]![0].data.exclusions);
+    expect(stored).not.toContain(SECRET);
+    expect(JSON.parse(stored).every((entry: object) => Object.keys(entry).every((key) => ["key", "count", "links"].includes(key)))).toBe(true);
   });
 });
 
@@ -209,7 +236,7 @@ describe("saveTemplateFromEvent (#154)", () => {
     mocks.getPrisma.mockReturnValue(drafted.prisma);
     const error = await saveTemplateFromEvent("usr_actor", { ...newVersionInput, fingerprint }).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(EventTemplateOperationError);
-    expect(error).toMatchObject({ code: "DRAFT_EXISTS", message: expect.stringContaining("Publish or discard the current draft first") });
+    expect(error).toMatchObject({ code: "DRAFT_EXISTS", message: expect.stringContaining("edit it in the template editor first") });
     expect(drafted.tx.eventTemplateVersion.create).not.toHaveBeenCalled();
     expect(drafted.tx.eventTemplateVersion.update).not.toHaveBeenCalled();
   });
