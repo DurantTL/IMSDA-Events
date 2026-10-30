@@ -118,6 +118,7 @@ const menuRoutes: readonly Menu[] = [
   ["/more/clubs", "Event", "More directory", "People & clubs", "This event's clubs"],
   ["/more/club-assignments", "Event", "More directory", "People & clubs", "Club assignments"],
   ["/more/event-patches", "Event", "More directory", "Event tools", "Event patches"],
+  ["/more/emergency-plan", "Event", "More directory", "Event tools", "Emergency plan"],
   ["/more/club-forms", "Event", "More directory", "People & clubs", "Club forms"],
   ["/more/event-health", "Event", "More directory", "People & clubs", "Event health information"],
   ["/more/lodging/assignments", "Event", "More directory", "People & clubs", "Lodging assignments"],
@@ -160,6 +161,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/finance/square-payments", "/finance", "components/finance-workspace.tsx"],
   ["/information-forms/responses", "/information-forms", "modules/information-forms/hub.ts"],
   ["/more/clubs/reports", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
+  ["/more/emergency-plan/print", "/more/emergency-plan", "components/emergency-plan-workspace.tsx"],
   ["/more/ledger-health", "/finance", "components/finance-workspace.tsx"],
   ["/more/honors/instructors", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/honors/rosters", "/more/honors", "components/honors-setup-workspace.tsx"],
@@ -274,7 +276,7 @@ export function missingFromRegistries(rows: readonly RouteMappingRow[], registri
 
 /** Viewers whose menus together must reach every mapped route: an administrator with every permission, and kitchen staff, who hold the counts page instead of the dashboard (#1029). */
 export const reachabilityContexts: readonly DestinationSearchContext[] = [
-  { isSystemAdmin: true, selectedEventId: "event_synthetic", permissions: eventPermissions, clubOversight: true, clubEvent: true, clubFormsAccess: true },
+  { isSystemAdmin: true, selectedEventId: "event_synthetic", permissions: eventPermissions, clubOversight: true, clubEvent: true, clubFormsAccess: true, hiddenCardKeys: new Set() },
   { isSystemAdmin: false, selectedEventId: "event_synthetic", permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubEvent: false, clubFormsAccess: false },
 ];
 

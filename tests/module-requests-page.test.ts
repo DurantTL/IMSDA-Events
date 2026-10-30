@@ -136,7 +136,7 @@ describe("Request a feature on /more", () => {
 
   it("builds the panel from pure inputs: nothing for a viewer who cannot request", () => {
     const entries = buildRequestPanel({ effective: new Set<EventModuleKey>(["public-content"]), dataPresent: new Set(), audience: "CLUB", requests: [], canRequest: true });
-    expect(entries.map((entry) => entry.definition.key)).toEqual(["honors", "event-patches", "club-assignments", "seminar-assignments", "merchandise", "attendee-community"]);
+    expect(entries.map((entry) => entry.definition.key)).toEqual(["honors", "event-patches", "club-assignments", "seminar-assignments", "merchandise", "attendee-community", "emergency-plans"]);
     expect(buildRequestPanel({ effective: new Set(), dataPresent: new Set(), audience: "CLUB", requests: [], canRequest: false })).toEqual([]);
   });
 });

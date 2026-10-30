@@ -263,6 +263,16 @@ describe("page view rules", () => {
   const only = new Set<EventModuleKey>(["public-content"]);
   const none = new Set<EventModuleKey>();
 
+  it("lists the emergency plan as enabled when it is effective, and as disabled when it is not (#114)", () => {
+    const on = new Set<EventModuleKey>(["public-content", "emergency-plans"]);
+    const view = buildEventModulesView({ cards, stored: on, effective: on, dataPresent: none, dataForced: none, isSystemAdmin: true, audience: "GENERAL" });
+    expect(view.enabled.map((entry) => entry.definition.key)).toContain("emergency-plans");
+    expect(view.enabled.find((entry) => entry.definition.key === "emergency-plans")?.card.href).toBe("/more/emergency-plan?event=event_1");
+    expect(view.disabled.map((entry) => entry.definition.key)).not.toContain("emergency-plans");
+    const off = buildEventModulesView({ cards, stored: only, effective: only, dataPresent: none, dataForced: none, isSystemAdmin: true, audience: "GENERAL" });
+    expect(off.enabled.map((entry) => entry.definition.key)).not.toContain("emergency-plans");
+  });
+
   it("gives only a system administrator the disabled modules and the right to toggle", () => {
     const admin = buildEventModulesView({ cards, stored: only, effective: only, dataPresent: none, dataForced: none, isSystemAdmin: true, audience: "GENERAL" });
     const other = buildEventModulesView({ cards, stored: only, effective: only, dataPresent: none, dataForced: none, isSystemAdmin: false, audience: "GENERAL" });

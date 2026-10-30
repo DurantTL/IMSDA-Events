@@ -135,7 +135,7 @@ describe("defaults come from the audience and the template", () => {
 describe("the switches the step offers", () => {
   it("offers club modules only to a club event, and always lists public content as locked on", () => {
     const general = creationFeatureItems("GENERAL", defaultCreationFeatures("GENERAL"));
-    expect(general.filter((item) => item.kind === "module").map((item) => item.key)).toEqual(["seminar-assignments", "merchandise", "attendee-community", "public-content"]);
+    expect(general.filter((item) => item.kind === "module").map((item) => item.key)).toEqual(["seminar-assignments", "merchandise", "attendee-community", "public-content", "emergency-plans"]);
     expect(general.find((item) => item.key === "public-content")).toMatchObject({ on: true, locked: true });
     const club = creationFeatureItems("CLUB", defaultCreationFeatures("CLUB"));
     expect(club.filter((item) => item.kind === "module").map((item) => item.key)).toEqual(expect.arrayContaining(["honors", "event-patches", "club-assignments"]));

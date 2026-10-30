@@ -185,6 +185,8 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/program-assignments": (scenario) => canManageProgramAssignments(scenario.permissions),
   // app/(workspace)/more/event-patches/page.tsx: CONFIGURE_EVENT, then a CLUB-audience event (#532)
   "/more/event-patches": (scenario) => has(scenario, "CONFIGURE_EVENT") && scenario.clubEvent,
+  // app/(workspace)/more/emergency-plan/page.tsx: VIEW_EVENT (read and print), then the module (#114)
+  "/more/emergency-plan": (scenario) => has(scenario, "VIEW_EVENT"),
   // app/(workspace)/more/club-assignments/page.tsx: permission, then a CLUB-audience event
   "/more/club-assignments": (scenario) => canManageClubAssignments(scenario.permissions) && scenario.clubEvent,
   // app/(workspace)/community/page.tsx

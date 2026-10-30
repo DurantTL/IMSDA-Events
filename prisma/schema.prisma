@@ -821,6 +821,7 @@ model User {
   startedCheckInStations    CheckInStation[]      @relation("CheckInStationStartedBy")
   revokedCheckInStations    CheckInStation[]      @relation("CheckInStationRevokedBy")
   archivedEvents            Event[]               @relation("EventArchivedBy")
+  emergencyPlanVersions     EmergencyPlanVersion[] @relation("EmergencyPlanVersionPublisher")
   moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
   moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
   importRuns                ImportRun[]
@@ -1758,6 +1759,7 @@ model Event {
   badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
   memberships                         EventMembership[]
   contentSections                     EventContentSection[]
+  emergencyPlan                       EmergencyPlan?
   assets                              EventAsset[]
   messageFiles                        MessageFile[]
   registrations                       Registration[]
@@ -10671,4 +10673,98 @@ model CheckInStation {
   @@index([eventId, revokedAt])
   @@index([startedByUserId])
   @@index([revokedByUserId])
+}
+
+/// Event emergency plan (#114): the procedural reference staff carry before
+/// anything happens. The draft is these rows; a published version is an
+/// immutable `EmergencyPlanVersion` snapshot. Staff-entered operational data
+/// only: no relation to Person, Registration, health, custody or incident
+/// models (tests/emergency-plan-schema.test.ts enforces it).
+model EmergencyPlan {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event      Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  locations  EmergencyPlanLocation[]
+  procedures EmergencyPlanProcedure[]
+  contacts   EmergencyPlanContact[]
+  versions   EmergencyPlanVersion[]
+}
+
+enum EmergencyLocationKind {
+  ASSEMBLY
+  SHELTER
+}
+
+enum EmergencyProcedureKind {
+  EVACUATION
+  SEVERE_WEATHER
+  OTHER
+}
+
+/// An assembly point or shelter. Informational: it allocates nothing and is
+/// not linked to lodging or groups.
+model EmergencyPlanLocation {
+  id           String                @id @default(cuid())
+  planId       String
+  kind         EmergencyLocationKind
+  name         String
+  description  String                @default("")
+  capacityNote String                @default("")
+  directions   String                @default("")
+  /// A web address or a grid reference, as staff typed it.
+  mapReference String?
+  sortOrder    Int
+
+  plan EmergencyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, sortOrder])
+}
+
+/// A procedure: plain-text body plus steps (`[{ "title", "text" }]`, the
+/// EventContentSection item shape, validated by parseEventContentItems).
+model EmergencyPlanProcedure {
+  id        String                 @id @default(cuid())
+  planId    String
+  kind      EmergencyProcedureKind
+  title     String
+  body      String                 @default("")
+  items     Json                   @default("[]")
+  sortOrder Int
+
+  plan EmergencyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, sortOrder])
+}
+
+/// An authorized operational contact, entered by staff. Not a person record.
+model EmergencyPlanContact {
+  id              String @id @default(cuid())
+  planId          String
+  role            String
+  name            String
+  phone           String
+  escalationOrder Int
+
+  plan EmergencyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, escalationOrder])
+}
+
+/// A published, immutable snapshot of the plan. Never updated after insert.
+model EmergencyPlanVersion {
+  id                String   @id @default(cuid())
+  planId            String
+  versionNumber     Int
+  snapshot          Json
+  publishedAt       DateTime @default(now())
+  publishedByUserId String?
+
+  plan        EmergencyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  publishedBy User?         @relation("EmergencyPlanVersionPublisher", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, versionNumber])
+  @@index([publishedByUserId])
 }

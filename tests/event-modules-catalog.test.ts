@@ -24,6 +24,7 @@ const cardKeys: Record<EventModuleKey, string> = {
   merchandise: "merchandise",
   "attendee-community": "community",
   "public-content": "event-content",
+  "emergency-plans": "emergency-plans",
 };
 
 describe("event module catalog (#741)", () => {
