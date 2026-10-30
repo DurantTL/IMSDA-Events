@@ -1686,7 +1686,7 @@ export async function lookupBackgroundCheckName(
     // An empty lookup lists the latest upload's rows and the people on file, by last then first name. Each list is
     // paged on the server (a count, then one page); only the items on those pages are looked into further.
     const rowTotal = latest ? await prisma.backgroundCheckEntry.count({ where: { uploadId: latest.id } }) : 0;
-    const peopleTotal = await prisma.person.count();
+    const peopleTotal = await prisma.person.count({ where: { anonymizedAt: null } });
     const rowPageNumber = clampPage(paging.rowPage ?? 1, rowTotal, LOOKUP_PAGE_SIZE);
     const peoplePageNumber = clampPage(paging.peoplePage ?? 1, peopleTotal, LOOKUP_PAGE_SIZE);
     [rows, people] = await Promise.all([
@@ -1700,6 +1700,7 @@ export async function lookupBackgroundCheckName(
         })
         : Promise.resolve([]),
       prisma.person.findMany({
+        where: { anonymizedAt: null },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
         skip: (peoplePageNumber - 1) * LOOKUP_PAGE_SIZE,
         take: LOOKUP_PAGE_SIZE,
@@ -1747,8 +1748,33 @@ export async function lookupBackgroundCheckName(
   }
   if (rows.length === 0 && people.length === 0) return { ...empty, hasList: Boolean(latest), rowsPage, peoplePage };
 
-  const personIds = people.map((person) => person.id);
-  const entryIds = rows.map((row) => row.id);
+  // The rows and people pairs are worked out over. A named lookup pairs what it lists. An empty lookup pages the two
+  // lists independently, so each listed row is also paired with everyone who shares its last name, and each listed
+  // person with the list rows that share theirs, wherever those sit in the paging.
+  let pairRows: LookupEntry[] = rows;
+  let pairPeople: LookupPerson[] = people;
+  if (query === "") {
+    const rowLastKeys = [...new Set(rows.map((row) => matchableName(row.lastName)).filter(Boolean))];
+    const personLastKeys = [...new Set(people.map((person) => matchableName(person.lastName)).filter(Boolean))];
+    const [peopleSharingRowNames, rowsSharingPersonNames] = await Promise.all([
+      Promise.all([...new Set(rows.map((row) => row.lastName))].map((lastName) => personsWithLastName(prisma, lastName))),
+      latest
+        ? Promise.all(personLastKeys.map((lastKey) => prisma.backgroundCheckEntry.findMany({
+          where: { uploadId: latest.id, normalizedName: { endsWith: lastKey } },
+          select: LOOKUP_ENTRY_SELECT,
+        })))
+        : Promise.resolve([]),
+    ]);
+    const personKeys = new Set(personLastKeys);
+    pairPeople = [...new Map([...people, ...peopleSharingRowNames.flat()].map((person) => [person.id, person])).values()]
+      .filter((person) => rowLastKeys.includes(matchableName(person.lastName)) || people.some((listed) => listed.id === person.id));
+    pairRows = [...new Map([...rows, ...rowsSharingPersonNames.flat().filter((row) => personKeys.has(matchableName(row.lastName)))].map((row) => [row.id, row])).values()];
+  }
+  const listedRowIds = new Set(rows.map((row) => row.id));
+  const listedPersonIds = new Set(people.map((person) => person.id));
+
+  const personIds = pairPeople.map((person) => person.id);
+  const entryIds = pairRows.map((row) => row.id);
   const [index, rosterMemberships, matches, reviews, rejected, rememberedMatches] = await Promise.all([
     buildCandidateIndex(prisma, now, { personIds }),
     personIds.length > 0
@@ -1767,8 +1793,8 @@ export async function lookupBackgroundCheckName(
         select: { entryId: true, reason: true, candidatePersonIds: true, dismissedAt: true },
       })
       : Promise.resolve([]),
-    rejectedPairingsFor(prisma, rows.map((row) => row.identityKey)),
-    rememberedMatchesFor(prisma, rows.map((row) => row.identityKey)),
+    rejectedPairingsFor(prisma, pairRows.map((row) => row.identityKey)),
+    rememberedMatchesFor(prisma, pairRows.map((row) => row.identityKey)),
   ]);
   const matchByEntry = new Map(matches.map((match) => [match.entryId, match]));
   const matchByPerson = new Map(matches.map((match) => [match.personId, match]));
@@ -1781,8 +1807,17 @@ export async function lookupBackgroundCheckName(
     rosterByPerson.set(member.personId, list);
   }
   const fullName = (person: { firstName: string; lastName: string }) => `${person.firstName} ${person.lastName}`.trim();
-  const entryById = new Map(rows.map((row) => [row.id, row]));
-  const personById = new Map(people.map((person) => [person.id, person]));
+  const entryById = new Map(pairRows.map((row) => [row.id, row]));
+  const personById = new Map(pairPeople.map((person) => [person.id, person]));
+  // Names (only) of the other side of a match that is on neither list nor shares a last name with the listed ones.
+  const missingPersonIds = [...new Set(matches.map((match) => match.personId).filter((id) => !personById.has(id)))];
+  const missingEntryIds = [...new Set(matches.map((match) => match.entryId).filter((id) => !entryById.has(id)))];
+  const [counterpartPeople, counterpartRows] = await Promise.all([
+    missingPersonIds.length > 0 ? prisma.person.findMany({ where: { id: { in: missingPersonIds } }, select: { id: true, firstName: true, lastName: true } }) : Promise.resolve([]),
+    missingEntryIds.length > 0 ? prisma.backgroundCheckEntry.findMany({ where: { id: { in: missingEntryIds } }, select: LOOKUP_ENTRY_SELECT }) : Promise.resolve([]),
+  ]);
+  for (const person of counterpartPeople) personById.set(person.id, person);
+  for (const row of counterpartRows) entryById.set(row.id, row);
   const sitesOf = (personId: string) => [...(index.byPerson.get(personId)?.siteNames ?? [])].sort();
   const matchLabel = (source: string) => MATCH_SOURCE_LABEL[source] ?? source.toLowerCase();
 
@@ -1818,8 +1853,9 @@ export async function lookupBackgroundCheckName(
   });
 
   const pairs: BackgroundCheckLookupPair[] = [];
-  for (const row of rows) {
-    for (const person of people) {
+  for (const row of pairRows) {
+    for (const person of pairPeople) {
+      if (!listedRowIds.has(row.id) && !listedPersonIds.has(person.id)) continue;
       if (matchableName(row.lastName) !== matchableName(person.lastName)) continue;
       const sameFirst = matchableName(row.firstName) === matchableName(person.firstName);
       if (!sameFirst && !firstNameVariant(row.firstName, person.firstName)) continue;
@@ -1869,8 +1905,8 @@ export async function lookupBackgroundCheckName(
       pairs.push({ entryId: row.id, personId: person.id, rowName: fullName(row), personName: fullName(person), reason: reasons.join(" "), rejectMatchId });
     }
   }
-  const rejectedOut = rows.flatMap((row) => people
-    .filter((person) => rejected.get(row.identityKey)?.has(person.id))
+  const rejectedOut = pairRows.flatMap((row) => pairPeople
+    .filter((person) => (listedRowIds.has(row.id) || listedPersonIds.has(person.id)) && rejected.get(row.identityKey)?.has(person.id))
     .map((person) => ({ entryId: row.id, personId: person.id, rowName: fullName(row), personName: fullName(person) })));
   return { query, hasList: true, rows: rowsOut, people: peopleOut, pairs, rejected: rejectedOut, rowsPage, peoplePage };
 }

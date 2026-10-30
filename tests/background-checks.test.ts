@@ -2655,13 +2655,48 @@ describe("name-only matches, variants, adults by age, and the lookup (#598)", ()
       expect(second.people).toHaveLength(10);
       expect(second.people[0]!.name).toBe("Pat Row051");
       expect(second.peoplePage).toEqual({ page: 3, pageCount: 3, total: 60, from: 51, to: 60 });
-      // Pairs and reasons only cover the people and rows on the returned pages.
-      expect(second.pairs.every((pair) => Number(pair.rowName.slice(-3)) > 25 && Number(pair.rowName.slice(-3)) <= 50)).toBe(true);
       const huge = await lookupBackgroundCheckName("", now, { rowPage: 9999, peoplePage: -4 });
       expect(huge.rowsPage.page).toBe(3);
       expect(huge.rows).toHaveLength(10);
       expect(huge.peoplePage.page).toBe(1);
       expect(huge.people).toHaveLength(25);
+    });
+
+    it("an empty lookup pairs a listed row with its person even when that person is on a later people page", async () => {
+      const { client, seed } = makeFakeDb();
+      currentClient = client;
+      seed.uploads.set("u-1", { id: "u-1", createdAt: new Date("2026-09-01") });
+      // One row on rows page 1 ("Adams"), whose person sorts onto people page 3 behind 60 other people.
+      seedEntry(seed, "e-adams", { identityKey: "userId:1", firstName: "Ann", lastName: "Adams", normalizedName: "ann adams", site: mapleGrove.parentName });
+      for (let index = 1; index <= 60; index += 1) {
+        seed.persons.set(`p-${index}`, { id: `p-${index}`, firstName: "Pat", lastName: `Baker${String(index).padStart(3, "0")}`, normalizedEmail: null });
+      }
+      rosterAdult(seed, "p-ann", "Ann", "Zimmer", mapleGrove);
+      seed.persons.set("p-ann", { id: "p-ann", firstName: "Ann", lastName: "Adams", normalizedEmail: null });
+      seed.persons.set("p-zed", { id: "p-zed", firstName: "Zed", lastName: "Zzz", normalizedEmail: null });
+      seed.persons.set("p-ann-zzz", { id: "p-ann-zzz", firstName: "Ann", lastName: "Zzz", normalizedEmail: null });
+      const lookup = await lookupBackgroundCheckName("", now, { rowPage: 1, peoplePage: 3 });
+      expect(lookup.rows.map((row) => row.name)).toEqual(["Ann Adams"]);
+      expect(lookup.people.map((person) => person.name)).not.toContain("Ann Adams");
+      expect(lookup.pairs.filter((pair) => pair.rowName === "Ann Adams").map((pair) => pair.personName)).toEqual(["Ann Adams"]);
+      // The other way round: a listed person pairs with a list row that is on another rows page.
+      const back = await lookupBackgroundCheckName("", now, { rowPage: 1, peoplePage: 1 });
+      expect(back.people.map((person) => person.name)).toContain("Ann Adams");
+      expect(back.pairs.some((pair) => pair.rowName === "Ann Adams" && pair.personName === "Ann Adams")).toBe(true);
+    });
+
+    it("an empty lookup names the counterpart of a match that is on another page", async () => {
+      const { client, seed } = makeFakeDb();
+      currentClient = client;
+      seed.uploads.set("u-1", { id: "u-1", createdAt: new Date("2026-09-01") });
+      seed.persons.set("p-zoe", { id: "p-zoe", firstName: "Zoe", lastName: "Zane", normalizedEmail: null });
+      seedEntry(seed, "e-ann", { identityKey: "userId:1", firstName: "Ann", lastName: "Adams", normalizedName: "ann adams" });
+      seed.matches.set("m-1", { id: "m-1", personId: "p-zoe", entryId: "e-ann", matchedBy: "MANUAL", updatedAt: new Date() });
+      for (let index = 1; index <= 30; index += 1) seed.persons.set(`p-${index}`, { id: `p-${index}`, firstName: "Pat", lastName: `Baker${String(index).padStart(3, "0")}`, normalizedEmail: null });
+      const lookup = await lookupBackgroundCheckName("", now, { rowPage: 1, peoplePage: 1 });
+      expect(lookup.rows[0]!.status).toBe("Matched by hand to Zoe Zane");
+      const later = await lookupBackgroundCheckName("", now, { rowPage: 1, peoplePage: 2 });
+      expect(later.people.find((person) => person.name === "Zoe Zane")!.status).toBe("Matched by hand to Ann Adams");
     });
 
     it("pages a named lookup with the same totals instead of cutting it off", async () => {

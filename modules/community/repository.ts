@@ -297,11 +297,10 @@ export async function searchAttendeeCommunityPosts(
   eventId: string,
   query: string,
 ) {
-  // An empty search is the paged board list, never an unpaged dump of every post.
-  if (query === "") return [];
   const event = await attendeeEventAccess(account, { id: eventId });
   const settings = settingsRecord(event.communitySettings);
-  if (!settings.isEnabled) return [];
+  // An empty search is the paged board list, never an unpaged dump of every post.
+  if (query === "" || !settings.isEnabled) return [];
   const participation = await getPrisma().communityParticipation.findUnique({
     where: { eventId_accountId: { eventId: event.id, accountId: account.id } },
     select: { acceptedConductVersion: true },

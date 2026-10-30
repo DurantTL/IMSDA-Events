@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ListPager } from "@/components/list-pager";
 import type { PageSlice } from "@/lib/pagination";
 
@@ -140,6 +140,7 @@ export function LinkOrganizationForm({
   const [selected, setSelected] = useState<OrganizationOption | null>(null);
   const [reason, setReason] = useState("");
   const [searchError, setSearchError] = useState("");
+  const searchTicket = useRef(0);
   const searchId = useId();
   const reasonId = useId();
 
@@ -147,13 +148,16 @@ export function LinkOrganizationForm({
     setQuery(value);
     setSelected(null);
     setSearchError("");
+    const ticket = (searchTicket.current += 1);
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/billing-responsibility/organizations?q=${encodeURIComponent(value)}&page=${page}`);
       if (!response.ok) throw new Error();
       const result = await response.json();
+      if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer
       setOptions(Array.isArray(result.organizations) ? result.organizations : []);
       setPager(typeof result.total === "number" ? result : null);
     } catch {
+      if (ticket !== searchTicket.current) return;
       setSearchError("The search failed. Try again.");
     }
   }

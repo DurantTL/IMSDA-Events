@@ -91,6 +91,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
   const [lookupCode, setLookupCode] = useState("");
   const [lookup, setLookup] = useState<AssetLookup | null | "none">(null);
   const codeInput = useRef<HTMLInputElement>(null);
+  const searchTicket = useRef(0);
 
   // Saved requests from an earlier visit (read after mount, so the server and first client render agree).
   useEffect(() => {
@@ -195,12 +196,17 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
   async function runSearch(value: string, page = 1) {
     setSearch(value);
+    const ticket = (searchTicket.current += 1);
     try {
       const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}&page=${page}`);
       const json = await response.json();
+      if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer
       setFound(response.ok ? json.people : []);
       setFoundPager(response.ok && typeof json.total === "number" ? json : null);
-    } catch { setFound([]); setFoundPager(null); }
+    } catch {
+      if (ticket !== searchTicket.current) return;
+      setFound([]); setFoundPager(null);
+    }
   }
 
   async function runLookup() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { RefreshCcw, Search, Undo2, UserCheck, UserX } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListPager } from "@/components/list-pager";
@@ -77,6 +77,8 @@ export function BackgroundCheckReviewPanel() {
   // Dismissals made in this visit, so each can be undone until the page is left (#702).
   const [dismissals, setDismissals] = useState<Array<{ reviewId: string; name: string }>>([]);
   const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const lookupTicket = useRef(0);
+  const lookupPages = useRef({ row: 1, people: 1 });
 
   const load = useCallback(async () => {
     setError("");
@@ -220,22 +222,29 @@ export function BackgroundCheckReviewPanel() {
   /** Re-run the lookup on show, at the pages already open, after a match changes. */
   async function reloadLookup() {
     if (!lookup) return;
+    const ticket = (lookupTicket.current += 1);
     try {
-      setLookup(await fetchLookup(lookup.query, lookup.rowsPage.page, lookup.peoplePage.page));
+      const next = await fetchLookup(lookup.query, lookupPages.current.row, lookupPages.current.people);
+      if (ticket === lookupTicket.current) setLookup(next);
     } catch {
       // The change itself is saved; the list simply stays as it was.
     }
   }
 
   async function showLookup(name: string, rowPage: number, peoplePage: number) {
+    // Both pages are kept here, so a click on one pager never loses the other list's page, and an older answer
+    // can never replace a newer one.
+    lookupPages.current = { row: rowPage, people: peoplePage };
+    const ticket = (lookupTicket.current += 1);
     setLookingUp(true);
     setError("");
     try {
-      setLookup(await fetchLookup(name.trim(), rowPage, peoplePage));
+      const next = await fetchLookup(name.trim(), rowPage, peoplePage);
+      if (ticket === lookupTicket.current) setLookup(next);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That name couldn't be looked up.");
+      if (ticket === lookupTicket.current) setError(caught instanceof Error ? caught.message : "That name couldn't be looked up.");
     } finally {
-      setLookingUp(false);
+      if (ticket === lookupTicket.current) setLookingUp(false);
     }
   }
 
@@ -411,7 +420,7 @@ export function BackgroundCheckReviewPanel() {
         <button className="secondary-button" disabled={lookingUp} type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
       </form>
       {lookup && !lookup.hasList && <p className="report-empty">No list has been uploaded yet.</p>}
-      {lookup && lookup.hasList && lookup.rows.length === 0 && lookup.people.length === 0 && <p className="report-empty">No list row or roster or registration person has that name or a similar one.</p>}
+      {lookup && lookup.hasList && lookup.rows.length === 0 && lookup.people.length === 0 && <p className="report-empty">{lookup.query === "" ? "No list row or roster or registration person yet." : "No list row or roster or registration person has that name or a similar one."}</p>}
       {lookup && (lookup.rows.length > 0 || lookup.people.length > 0) && (
         <div className="background-check-lookup">
           <h4>List rows ({lookup.rowsPage.total})</h4>
@@ -428,7 +437,7 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
-          <ListPager label="List rows pages" onPage={(page) => void showLookup(lookup.query, page, lookup.peoplePage.page)} slice={lookup.rowsPage} />
+          <ListPager label="List rows pages" onPage={(page) => void showLookup(lookup.query, page, lookupPages.current.people)} slice={lookup.rowsPage} />
           <h4>Roster and registration people ({lookup.peoplePage.total})</h4>
           {lookup.people.length === 0 ? <p className="report-empty">No one on file has that name or a similar one.</p> : (
             <div className="report-table-wrap">
@@ -447,7 +456,7 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
-          <ListPager label="People pages" onPage={(page) => void showLookup(lookup.query, lookup.rowsPage.page, page)} slice={lookup.peoplePage} />
+          <ListPager label="People pages" onPage={(page) => void showLookup(lookup.query, lookupPages.current.row, page)} slice={lookup.peoplePage} />
           <h4>Row and person pairs ({lookup.pairs.length})</h4>
           {lookup.pairs.length === 0 ? <p className="report-empty">No row and person share a last name and a similar first name.</p> : (
             <div className="report-table-wrap">
