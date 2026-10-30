@@ -41,12 +41,13 @@ export async function auditCrossEventIdentityRead(input: {
     entityType: "PersonIdentityRead",
     entityId: input.entityId,
     summary: `Read ${input.resultIds.length} identity record(s) across events (${input.surface}).`,
+    // `extra` goes first so it can never overwrite the audited count, ids or flag.
     metadata: {
+      ...extra,
       surface: input.surface,
       resultCount: input.resultIds.length,
       resultIds,
       truncated: input.resultIds.length > resultIds.length || extraTruncated,
-      ...extra,
     },
   });
 }
