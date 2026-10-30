@@ -579,6 +579,12 @@ async function main() {
   const lookupChild = await repository.lookupBackgroundCheckName("Cy Lindqvist");
   assert(/not an adult/i.test(lookupChild.pairs[0]?.reason ?? ""), "the lookup explains a roster child is not an adult");
   const lookupJson = JSON.stringify([lookup, lookupChild, await repository.lookupBackgroundCheckName("Lindqvist")]);
+  const lookupAll = await repository.lookupBackgroundCheckName("");
+  assert(lookupAll.hasList && lookupAll.rows.length > 0 && lookupAll.rows.length <= 25, "an empty lookup lists the latest upload's rows, one page of at most 25");
+  assert(lookupAll.people.length <= 25 && lookupAll.peoplePage.total >= lookupAll.people.length, "an empty lookup lists people one page at a time, with a total");
+  assert(lookupAll.rowsPage.page === 1 && (await repository.lookupBackgroundCheckName("", new Date(), { rowPage: 99999, peoplePage: -3 })).rowsPage.page === lookupAll.rowsPage.pageCount, "the lookup clamps a bad page");
+  const lookupAllJson = JSON.stringify(lookupAll);
+  assert(!/"(sealedBirthDate|birthDate|email)"/.test(lookupAllJson) && !/"1988-|@|\d{4}-\d{2}-\d{2}/.test(lookupAllJson), "the empty lookup shows no birth date or email");
   assert(!/1988|sealed|birth/i.test(lookupJson), "the lookup never shows a birth date");
   console.log("ok  Refresh re-matches stored entries; the lookup explains non-matches without birth dates");
 

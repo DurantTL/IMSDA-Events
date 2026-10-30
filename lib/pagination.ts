@@ -51,3 +51,30 @@ export function newestFirst<T>(items: readonly T[], timestamp: (item: T) => stri
 export function cappedNotice(shown: number, total: number): string {
   return shown < total ? `Showing ${shown} of ${total} — refine the search` : "";
 }
+
+/** Largest page number a request may ask for; anything beyond is clamped against the real total anyway. */
+const MAX_REQUESTED_PAGE = 100_000;
+
+/** Parse a `page` query value from a request: anything that is not a positive whole number becomes page 1. */
+export function parsePageParam(raw: string | null | undefined): number {
+  if (!raw || !/^\d{1,9}$/.test(raw.trim())) return 1;
+  const value = Number(raw.trim());
+  return value >= 1 ? Math.min(value, MAX_REQUESTED_PAGE) : 1;
+}
+
+/**
+ * Build the slice for a list that was paged on the server: `items` is the page that was fetched,
+ * `page` is the already-clamped page and `total` the full count.
+ */
+export function sliceFromCount<T>(items: T[], page: number, total: number, pageSize: number): PageSlice<T> {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const start = (page - 1) * pageSize;
+  return {
+    items,
+    page,
+    pageCount,
+    total,
+    from: items.length ? start + 1 : 0,
+    to: items.length ? start + items.length : 0,
+  };
+}

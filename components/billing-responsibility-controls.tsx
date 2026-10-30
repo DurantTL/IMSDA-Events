@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { ListPager } from "@/components/list-pager";
+import type { PageSlice } from "@/lib/pagination";
 
 /**
  * Staff controls for the Billing responsibility screen (#165). Every action posts to one
@@ -134,26 +136,28 @@ export function LinkOrganizationForm({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<OrganizationOption[]>([]);
+  const [pager, setPager] = useState<Pick<PageSlice<unknown>, "from" | "page" | "pageCount" | "to" | "total"> | null>(null);
   const [selected, setSelected] = useState<OrganizationOption | null>(null);
   const [reason, setReason] = useState("");
   const [searchError, setSearchError] = useState("");
+  const searchTicket = useRef(0);
   const searchId = useId();
   const reasonId = useId();
 
-  async function search(value: string) {
+  async function search(value: string, page = 1) {
     setQuery(value);
     setSelected(null);
     setSearchError("");
-    if (value.trim().length < 2) {
-      setOptions([]);
-      return;
-    }
+    const ticket = (searchTicket.current += 1);
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/billing-responsibility/organizations?q=${encodeURIComponent(value)}`);
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/billing-responsibility/organizations?q=${encodeURIComponent(value)}&page=${page}`);
       if (!response.ok) throw new Error();
       const result = await response.json();
+      if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer
       setOptions(Array.isArray(result.organizations) ? result.organizations : []);
+      setPager(typeof result.total === "number" ? result : null);
     } catch {
+      if (ticket !== searchTicket.current) return;
       setSearchError("The search failed. Try again.");
     }
   }
@@ -174,19 +178,20 @@ export function LinkOrganizationForm({
     >
       {hint && <small>Registrant typed: “{hint}” (a hint only; choose the organization yourself)</small>}
       <label htmlFor={searchId}>Find a church, school, club or ministry</label>
-      <input autoComplete="off" id={searchId} maxLength={80} onChange={(event) => void search(event.target.value)} value={query} />
+      <input autoComplete="off" id={searchId} maxLength={80} onChange={(event) => void search(event.target.value)} onFocus={() => { if (!selected && options.length === 0) void search(query); }} value={query} />
       {searchError && <small className="form-error" role="alert">{searchError}</small>}
       {options.length > 0 && !selected && (
         <ul className="billing-options" role="listbox" aria-label="Matching organizations">
           {options.map((option) => (
             <li key={option.id}>
-              <button onClick={() => { setSelected(option); setQuery(option.name); setOptions([]); }} role="option" aria-selected="false" type="button">
+              <button onClick={() => { setSelected(option); setQuery(option.name); setOptions([]); setPager(null); }} role="option" aria-selected="false" type="button">
                 {option.name} <small>{option.type.replaceAll("_", " ").toLowerCase()}{option.city ? ` · ${option.city}` : ""}</small>
               </button>
             </li>
           ))}
         </ul>
       )}
+      {options.length > 0 && !selected && pager && <ListPager label="Matching organizations pages" onPage={(page) => void search(query, page)} slice={pager} />}
       {selected && <small role="status">Selected: <strong>{selected.name}</strong></small>}
       {needsReason && (
         <>

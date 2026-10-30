@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { assigneeKindLabels, type AssigneeKind } from "@/modules/issued-assets/domain";
 import { AssetReturnPanel } from "@/components/asset-return-panel";
+import { ListPager } from "@/components/list-pager";
+import type { PageSlice } from "@/lib/pagination";
 import { cardCell } from "@/components/table-card-labels";
 import type { DeskMoney } from "@/modules/issued-assets/returns-view";
 import type { AssetLookup, AssigneeOptions, DeskLot, DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
@@ -85,9 +87,11 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
   const keyTimes = useRef<number[]>([]);
   const [search, setSearch] = useState("");
   const [found, setFound] = useState<Array<{ attendeeId: string; name: string; confirmationCode: string }>>([]);
+  const [foundPager, setFoundPager] = useState<Pick<PageSlice<unknown>, "from" | "page" | "pageCount" | "to" | "total"> | null>(null);
   const [lookupCode, setLookupCode] = useState("");
   const [lookup, setLookup] = useState<AssetLookup | null | "none">(null);
   const codeInput = useRef<HTMLInputElement>(null);
+  const searchTicket = useRef(0);
 
   // Saved requests from an earlier visit (read after mount, so the server and first client render agree).
   useEffect(() => {
@@ -190,14 +194,19 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
     } finally { setBusy(false); }
   }
 
-  async function runSearch(value: string) {
+  async function runSearch(value: string, page = 1) {
     setSearch(value);
-    if (value.trim().length < 2) { setFound([]); return; }
+    const ticket = (searchTicket.current += 1);
     try {
-      const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}`);
+      const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}&page=${page}`);
       const json = await response.json();
+      if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer
       setFound(response.ok ? json.people : []);
-    } catch { setFound([]); }
+      setFoundPager(response.ok && typeof json.total === "number" ? json : null);
+    } catch {
+      if (ticket !== searchTicket.current) return;
+      setFound([]); setFoundPager(null);
+    }
   }
 
   async function runLookup() {
@@ -249,8 +258,9 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       {person ? <p><strong>{person.name}</strong>, registration {person.confirmationCode}.{" "}
         {person.rooms.length === 0 ? "Not placed in a room." : `Room: ${person.rooms.map((room) => room.roomName).join("; ")}.`}
         {person.registrationActive ? "" : " This registration is not active."}</p> : <p>Find an attendee, or choose a room, staff member, vehicle or team below.</p>}
-      <label>Find an attendee (name or confirmation code) <input value={search} onChange={(event) => void runSearch(event.target.value)} /></label>
+      <label>Find an attendee (name or confirmation code) <input value={search} onChange={(event) => void runSearch(event.target.value)} onFocus={() => { if (found.length === 0) void runSearch(search); }} /></label>
       {found.length > 0 ? <ul>{found.map((row) => <li key={row.attendeeId}><a href={`/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(row.attendeeId)}`}>{row.name} ({row.confirmationCode})</a></li>)}</ul> : null}
+      {found.length > 0 && foundPager ? <ListPager label="Attendee lookup pages" onPage={(page) => void runSearch(search, page)} slice={foundPager} /> : null}
       <label>Issue to <select value={kind} onChange={(event) => { setKind(event.target.value as AssigneeKind); setOther(""); }}>
         {(["ATTENDEE", "REGISTRATION", "ROOM", "STAFF", "VEHICLE", "TEAM"] as const).filter((value) => kinds.includes(value) || kinds.length === 0).map((value) => <option key={value} value={value}>{assigneeKindLabels[value]}</option>)}
       </select></label>

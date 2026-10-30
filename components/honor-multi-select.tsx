@@ -2,12 +2,14 @@
 
 import { useId, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { ListPager } from "@/components/list-pager";
+import { paginate } from "@/lib/pagination";
 import { filterHonorsByWordPrefix } from "@/modules/honors/honor-search";
 
 export type HonorMultiSelectOption = { id: string; name: string; code: string };
 
-/** The most matches drawn at once; the catalog can hold hundreds, and typing narrows it. */
-const MAX_LISTED = 80;
+/** Matches drawn per page; the catalog can hold hundreds, so the list is paged and typing narrows it. */
+const PAGE_SIZE = 80;
 
 /**
  * Choose one or more honors from the catalog for one class (#812): a
@@ -36,7 +38,9 @@ export function HonorMultiSelect({
   const byId = useMemo(() => new Map(options.map((option) => [option.id, option])), [options]);
   const chosen = new Set(value);
   const matches = useMemo(() => filterHonorsByWordPrefix(options, query), [options, query]);
-  const listed = matches.slice(0, MAX_LISTED);
+  const [page, setPage] = useState(1);
+  const slice = useMemo(() => paginate(matches, page, PAGE_SIZE), [matches, page]);
+  const listed = slice.items;
 
   function toggle(id: string) {
     onChange(chosen.has(id) ? value.filter((existing) => existing !== id) : [...value, id]);
@@ -66,7 +70,7 @@ export function HonorMultiSelect({
               <input
                 autoComplete="off"
                 id={`${baseId}-search`}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => { setQuery(event.target.value); setPage(1); }}
                 // Enter in the search box must not submit the class form.
                 onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
                 placeholder={prerequisite ? "Type to search prerequisite honors" : "Type to search honors"}
@@ -89,8 +93,8 @@ export function HonorMultiSelect({
             </li>
           ))}
           {matches.length === 0 && <li className="field-help">No honor matches that search.</li>}
-          {matches.length > listed.length && <li className="field-help">Showing the first {listed.length} of {matches.length}. Type more to narrow the list.</li>}
         </ul>
+        <ListPager label={prerequisite ? "Prerequisite honor pages" : "Honor pages"} onPage={setPage} slice={slice} />
     </fieldset>
   );
 }

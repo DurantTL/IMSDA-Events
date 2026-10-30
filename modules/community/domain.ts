@@ -32,9 +32,9 @@ export const attendeeCommunityActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("MARK_NOTIFICATIONS_READ") }).strict(),
 ]);
 
+/** An empty search is allowed and means "show the board as usual"; typing only narrows. */
 export const attendeeCommunitySearchSchema = z.string()
   .trim()
-  .min(2, "Enter at least two characters to search posts.")
   .max(80, "Keep the search to 80 characters or fewer.");
 
 export const staffCommunityActionSchema = z.discriminatedUnion("action", [

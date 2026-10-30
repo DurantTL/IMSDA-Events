@@ -79,7 +79,7 @@ beforeEach(() => {
   mocks.listManualBackgroundCheckMatches.mockResolvedValue([]);
   mocks.listUnmatchedBackgroundCheckEntries.mockResolvedValue([]);
   mocks.listNameOnlyBackgroundCheckMatches.mockResolvedValue([]);
-  mocks.lookupBackgroundCheckName.mockResolvedValue({ query: "", hasList: true, rows: [], people: [], pairs: [], truncated: false });
+  mocks.lookupBackgroundCheckName.mockResolvedValue({ query: "", hasList: true, rows: [], people: [], pairs: [], rejected: [] });
 });
 
 describe("name-only matches, lookup, and Refresh routes (#598)", () => {
@@ -105,11 +105,26 @@ describe("name-only matches, lookup, and Refresh routes (#598)", () => {
   it("looks a name up and re-matches on Refresh, and Refresh is a 409 during an upload", async () => {
     const lookup = await lookupGet(new Request(url("lookup?name=Mina%20Osei")));
     expect(lookup.status).toBe(200);
-    expect(mocks.lookupBackgroundCheckName).toHaveBeenCalledWith("Mina Osei");
+    expect(mocks.lookupBackgroundCheckName).toHaveBeenCalledWith("Mina Osei", expect.any(Date), { rowPage: 1, peoplePage: 1 });
     expect((await rematchPost(post("/api/admin/background-checks/rematch", undefined))).status).toBe(200);
     expect(mocks.rematchBackgroundCheckList).toHaveBeenCalledTimes(1);
     mocks.rematchBackgroundCheckList.mockRejectedValueOnce(new BackgroundCheckOperationError("UPLOAD_IN_PROGRESS", "busy"));
     expect((await rematchPost(post("/api/admin/background-checks/rematch", undefined))).status).toBe(409);
+  });
+
+  it("lets an empty name through, with page numbers clamped to whole pages", async () => {
+    await lookupGet(new Request(url("lookup?name=&rowPage=3&peoplePage=2")));
+    expect(mocks.lookupBackgroundCheckName).toHaveBeenLastCalledWith("", expect.any(Date), { rowPage: 3, peoplePage: 2 });
+    await lookupGet(new Request(url("lookup?rowPage=-5&peoplePage=abc")));
+    expect(mocks.lookupBackgroundCheckName).toHaveBeenLastCalledWith("", expect.any(Date), { rowPage: 1, peoplePage: 1 });
+    await lookupGet(new Request(url("lookup?name=&rowPage=99999999999999999999")));
+    expect(mocks.lookupBackgroundCheckName).toHaveBeenLastCalledWith("", expect.any(Date), { rowPage: 1, peoplePage: 1 });
+  });
+
+  it("refuses an empty lookup to anyone who is not allowed to use the screen", async () => {
+    mocks.requireSystemAdministrator.mockRejectedValueOnce(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));
+    expect((await lookupGet(new Request(url("lookup?name=")))).status).toBe(403);
+    expect(mocks.lookupBackgroundCheckName).not.toHaveBeenCalled();
   });
 
   it("matches a rejected pair anyway, staff-only, with clear errors", async () => {

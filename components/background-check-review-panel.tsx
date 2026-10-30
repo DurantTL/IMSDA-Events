@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { RefreshCcw, Search, Undo2, UserCheck, UserX } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListPager } from "@/components/list-pager";
@@ -22,8 +22,10 @@ type LookupResult = {
   people: Array<{ personId: string; name: string; sites: string[]; status: string }>;
   pairs: Array<{ entryId: string; personId: string; rowName: string; personName: string; reason: string; rejectMatchId: string | null }>;
   rejected: Array<{ entryId: string; personId: string; rowName: string; personName: string }>;
-  truncated: boolean;
+  rowsPage: LookupPaging;
+  peoplePage: LookupPaging;
 };
+type LookupPaging = { page: number; pageCount: number; total: number; from: number; to: number };
 type UnmatchedEntry = { id: string; name: string; site: string | null; complianceStatus: string | null; checkedOn: string | null; expiresOn: string | null };
 
 /** Confirm step for "Match them anyway": it overrides an earlier staff "not the same person" decision. */
@@ -75,6 +77,8 @@ export function BackgroundCheckReviewPanel() {
   // Dismissals made in this visit, so each can be undone until the page is left (#702).
   const [dismissals, setDismissals] = useState<Array<{ reviewId: string; name: string }>>([]);
   const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const lookupTicket = useRef(0);
+  const lookupOpen = useRef<{ query: string; row: number; people: number } | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -177,11 +181,7 @@ export function BackgroundCheckReviewPanel() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "That match couldn't be undone.");
       await load();
-      if (lookupName.trim()) {
-        const again = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(lookupName.trim())}`);
-        const next = await again.json().catch(() => ({}));
-        if (again.ok) setLookup(next.lookup ?? null);
-      }
+      await reloadLookup();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That match couldn't be undone.");
     } finally {
@@ -203,11 +203,7 @@ export function BackgroundCheckReviewPanel() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "That match couldn't be saved.");
       await load();
-      if (lookupName.trim()) {
-        const again = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(lookupName.trim())}`);
-        const next = await again.json().catch(() => ({}));
-        if (again.ok) setLookup(next.lookup ?? null);
-      }
+      await reloadLookup();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That match couldn't be saved.");
     } finally {
@@ -215,21 +211,52 @@ export function BackgroundCheckReviewPanel() {
     }
   }
 
-  async function runLookup(event: FormEvent) {
-    event.preventDefault();
-    if (!lookupName.trim()) return;
+  /** One request to the lookup: an empty name lists everyone, a page of rows and a page of people. */
+  async function fetchLookup(name: string, rowPage: number, peoplePage: number) {
+    const response = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(name)}&rowPage=${rowPage}&peoplePage=${peoplePage}`);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message ?? "That name couldn't be looked up.");
+    return (result.lookup ?? null) as LookupResult | null;
+  }
+
+  /**
+   * Re-run the lookup on show, at the pages and name now open, after a match changes. It never takes a new ticket:
+   * a lookup staff start themselves always wins, and this answer is dropped if one began meanwhile.
+   */
+  async function reloadLookup() {
+    const open = lookupOpen.current;
+    if (!open) return;
+    const ticket = lookupTicket.current;
+    try {
+      const next = await fetchLookup(open.query, open.row, open.people);
+      if (ticket === lookupTicket.current && lookupOpen.current === open) setLookup(next);
+    } catch {
+      // The change itself is saved; the list simply stays as it was.
+    }
+  }
+
+  async function showLookup(name: string, rowPage: number, peoplePage: number) {
+    // The open name and both pages are kept in a ref, set only when an answer is applied, so a click on one pager
+    // never loses the other list's page, a failed fetch changes nothing, and an older answer never replaces a newer one.
+    const ticket = (lookupTicket.current += 1);
     setLookingUp(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(lookupName.trim())}`);
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message ?? "That name couldn't be looked up.");
-      setLookup(result.lookup ?? null);
+      const next = await fetchLookup(name.trim(), rowPage, peoplePage);
+      if (ticket === lookupTicket.current) {
+        lookupOpen.current = { query: name.trim(), row: rowPage, people: peoplePage };
+        setLookup(next);
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That name couldn't be looked up.");
+      if (ticket === lookupTicket.current) setError(caught instanceof Error ? caught.message : "That name couldn't be looked up.");
     } finally {
-      setLookingUp(false);
+      if (ticket === lookupTicket.current) setLookingUp(false);
     }
+  }
+
+  function runLookup(event: FormEvent) {
+    event.preventDefault();
+    void showLookup(lookupName, 1, 1);
   }
 
   async function undo(matchId: string) {
@@ -396,13 +423,13 @@ export function BackgroundCheckReviewPanel() {
             value={lookupName}
           />
         </label>{" "}
-        <button className="secondary-button" disabled={lookingUp || !lookupName.trim()} type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
+        <button className="secondary-button" disabled={lookingUp} type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
       </form>
       {lookup && !lookup.hasList && <p className="report-empty">No list has been uploaded yet.</p>}
-      {lookup && lookup.hasList && lookup.rows.length === 0 && lookup.people.length === 0 && <p className="report-empty">No list row or roster or registration person has that name or a similar one.</p>}
+      {lookup && lookup.hasList && lookup.rows.length === 0 && lookup.people.length === 0 && <p className="report-empty">{lookup.query === "" ? "No list row or roster or registration person yet." : "No list row or roster or registration person has that name or a similar one."}</p>}
       {lookup && (lookup.rows.length > 0 || lookup.people.length > 0) && (
         <div className="background-check-lookup">
-          <h4>List rows ({lookup.rows.length})</h4>
+          <h4>List rows ({lookup.rowsPage.total})</h4>
           {lookup.rows.length === 0 ? <p className="report-empty">No row on the list has that name or a similar one.</p> : (
             <div className="report-table-wrap">
               <table className="report-table">
@@ -416,7 +443,8 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
-          <h4>Roster and registration people ({lookup.people.length})</h4>
+          <ListPager label="List rows pages" onPage={(page) => void showLookup(lookup.query, page, lookupOpen.current?.people ?? 1)} slice={lookup.rowsPage} />
+          <h4>Roster and registration people ({lookup.peoplePage.total})</h4>
           {lookup.people.length === 0 ? <p className="report-empty">No one on file has that name or a similar one.</p> : (
             <div className="report-table-wrap">
               <table className="report-table">
@@ -434,6 +462,7 @@ export function BackgroundCheckReviewPanel() {
               </table>
             </div>
           )}
+          <ListPager label="People pages" onPage={(page) => void showLookup(lookup.query, lookupOpen.current?.row ?? 1, page)} slice={lookup.peoplePage} />
           <h4>Row and person pairs ({lookup.pairs.length})</h4>
           {lookup.pairs.length === 0 ? <p className="report-empty">No row and person share a last name and a similar first name.</p> : (
             <div className="report-table-wrap">
@@ -474,7 +503,6 @@ export function BackgroundCheckReviewPanel() {
               </ul>
             </>
           )}
-          {lookup.truncated && <p className="quiet-copy">Only the first {lookup.rows.length} rows and {lookup.people.length} people are shown. Type a first name to narrow it down.</p>}
         </div>
       )}
 

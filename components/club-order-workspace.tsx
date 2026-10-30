@@ -9,7 +9,9 @@ import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatched
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import type { AwardableNeed, OrderBatchSummary, OrderableHonor, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
-import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
+import { ListPager } from "@/components/list-pager";
+import { paginate } from "@/lib/pagination";
+import { effectiveChoice, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 export type ClubOrderWorkspaceData = {
@@ -102,7 +104,7 @@ export function filterPickerHonors(honors: readonly OrderableHonor[], listed: Re
 }
 
 /** Most items the "add an item" picker lists at once. */
-const PICKER_LIMIT = 100;
+const PICKER_PAGE_SIZE = 100;
 
 const HONOR_PICK_PREFIX = "honor:";
 
@@ -195,6 +197,7 @@ export function ClubOrderWorkspace({
   // Remembered per club on this device. The server snapshot is "not dismissed", so the first render matches the server.
   const promptDismissed = useSyncExternalStore(subscribeDismissed, () => readDismissed(organizationId), () => false);
   const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerPage, setPickerPage] = useState(1);
   const [pickerItem, setPickerItem] = useState("");
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
@@ -230,12 +233,9 @@ export function ClubOrderWorkspace({
       .map((honor) => ({ itemId: `${HONOR_PICK_PREFIX}${honor.honorId}`, label: `${honor.name} · ${NO_CATALOG_ITEM_LABEL}` }));
     return [...items, ...honors];
   }, [stock, orderableHonors, listedHonorIds, pickerQuery, onList]);
-  const shownPickerItems = useMemo(() => pickerItems.slice(0, PICKER_LIMIT), [pickerItems]);
-  const pickerSummary = pickerItems.length > PICKER_LIMIT
-    ? hasSearchText(pickerQuery)
-      ? `Showing the first ${PICKER_LIMIT} of ${pickerItems.length} matches for \u201c${pickerQuery.trim()}\u201d. Type more to narrow them.`
-      : `Showing the first ${PICKER_LIMIT} of ${pickerItems.length} items. Search to narrow the list.`
-    : searchResultSummary(pickerItems.length, pickerQuery, "item");
+  const pickerSlice = useMemo(() => paginate(pickerItems, pickerPage, PICKER_PAGE_SIZE), [pickerItems, pickerPage]);
+  const shownPickerItems = pickerSlice.items;
+  const pickerSummary = searchResultSummary(pickerItems.length, pickerQuery, "item");
   // One match needs no second click, and a search can never leave a hidden item chosen (#799).
   const chosenItem = effectiveChoice(pickerItem, shownPickerItems.map((row) => ({ id: row.itemId })), pickerQuery);
   // Honors that may have been handed out long ago: the club marks them so they aren't counted as needed.
@@ -345,7 +345,7 @@ export function ClubOrderWorkspace({
     }
     if (await setQuantity(chosenItem, quantity, "Added to the list.")) {
       setPickerItem("");
-      setPickerQuery("");
+      setPickerQuery(""); setPickerPage(1);
       setPickerQuantity("1");
     }
   }
@@ -661,7 +661,7 @@ export function ClubOrderWorkspace({
             <div className={styles.pickerRow}>
               <label className={styles.pickerField} htmlFor="club-order-picker-search">
                 Search honors and items
-                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerItem(""); }} placeholder="Honor or item name, or item number" type="search" value={pickerQuery} />
+                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerPage(1); setPickerItem(""); }} placeholder="Honor or item name, or item number" type="search" value={pickerQuery} />
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item
@@ -680,6 +680,7 @@ export function ClubOrderWorkspace({
                 <Plus aria-hidden="true" size={14} /> Add to list
               </button>
             </div>
+            <ListPager label="Honor and item pages" onPage={(page) => { setPickerPage(page); setPickerItem(""); }} slice={pickerSlice} />
             <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{pickerSummary}</p>
             <p className={`field-help ${styles.helpText}`}>Honors with no catalog item can be added too; they are marked as ordered from AdventSource separately and have no item number. If an honor is missing, conference staff can link it in the supply catalog.</p>
           </div>

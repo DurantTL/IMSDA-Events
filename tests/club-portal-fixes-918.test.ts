@@ -269,13 +269,19 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     tree = orders();
     expect(text(byId(tree, "club-order-picker-results"))).toContain("No items match");
   });
-  it("Orders: when the match list is capped, says how many are shown of how many match", () => {
+  it("Orders: a long match list is paged (no \"type more\" cap), with the shared pager and the match count", () => {
     const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({ itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0 }));
     const capped = () => { runtime.index = 0; return ClubOrderWorkspace({ organizationId: "club-1", initial, stock: many }) as ReactElement<Props>; };
     type(byId(capped(), "club-order-picker-search"), "patch");
     const tree = capped();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(101);
-    expect(text(byId(tree, "club-order-picker-results"))).toContain("Showing the first 100 of 250 matches");
+    expect(text(byId(tree, "club-order-picker-results"))).toContain("250 items match");
+    expect(text(byId(tree, "club-order-picker-results"))).not.toMatch(/type more|narrow/i);
+    const pager = walk(tree).find((el) => el.props.label === "Honor and item pages")!;
+    expect(pager.props.slice).toMatchObject({ page: 1, pageCount: 3, total: 250, from: 1, to: 100 });
+    (pager.props.onPage as (page: number) => void)(3);
+    const last = capped();
+    expect(optionLabels(byId(last, "club-order-picker-item"))).toHaveLength(51);
   });
 });
 
