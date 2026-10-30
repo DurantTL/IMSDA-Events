@@ -261,6 +261,42 @@ describe("mergePeople", () => {
   });
 });
 
+describe("retries and repeats do not collapse distinct people (#128 invariant 6)", () => {
+  it("repeating the same merge is refused and leaves one link, with a bystander untouched", async () => {
+    const fake = buildFake({ people: ["a", "b", "bystander"] });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    await mergePeople({ primaryPersonId: "a", secondaryPersonId: "b", actorUserId: "u1", reason: "same person" });
+    // A retry (double submit) of the identical request, and of the reversed one.
+    expect(await codeOf(mergePeople({ primaryPersonId: "a", secondaryPersonId: "b", actorUserId: "u1", reason: "same person" }))).toBe("SAME_PERSON");
+    expect(await codeOf(mergePeople({ primaryPersonId: "b", secondaryPersonId: "a", actorUserId: "u1", reason: "same person" }))).toBe("SAME_PERSON");
+    expect(fake.merges).toHaveLength(1);
+    expect(await resolveCanonicalPersonId("bystander", fake.prisma as never)).toBe("bystander");
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("retrying a candidate merge is refused (the pair already shares a root) and never links anyone else", async () => {
+    const candidates: CandidateRow[] = [{ id: "c1", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: ["PHONE_MATCH"], ruleVersion: 1 }];
+    const fake = buildFake({ people: ["a", "b", "c"], candidates });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    await mergeMatchCandidate("c1", "a", "u1", "same person");
+    expect(await codeOf(mergeMatchCandidate("c1", "a", "u1", "same person"))).toBe("SAME_PERSON");
+    expect(await codeOf(mergeMatchCandidate("c1", "b", "u1", "same person"))).toBe("SAME_PERSON");
+    expect(fake.merges).toHaveLength(1);
+    expect(await resolveCanonicalPersonId("c", fake.prisma as never)).toBe("c");
+  });
+
+  it("retrying an unmerge is refused and does not touch other merges", async () => {
+    const fake = buildFake({ people: ["a", "b", "c", "d"], merges: [link("d", "c", "m_other")] });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    const merge = await mergePeople({ primaryPersonId: "a", secondaryPersonId: "b", actorUserId: "u1", reason: "same person" });
+    await unmergePeople(merge.id, "u1", "valid reason");
+    expect(await codeOf(unmergePeople(merge.id, "u1", "valid reason"))).toBe("NOT_ACTIVE");
+    expect(fake.merges.find((row) => row.id === "m_other")!.state).toBe("ACTIVE");
+    expect(await resolveCanonicalPersonId("d", fake.prisma as never)).toBe("c");
+    expect(await resolveCanonicalPersonId("b", fake.prisma as never)).toBe("b");
+  });
+});
+
 describe("unmergePeople", () => {
   it("reverses the merge, keeps the row, restores the candidate, and audits", async () => {
     const candidates: CandidateRow[] = [{ id: "c1", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: [], ruleVersion: 1 }];

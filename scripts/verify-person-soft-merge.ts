@@ -8,7 +8,10 @@
  * - merging an already-merged person lands on the ultimate primary; people who share a root are refused;
  * - concurrent overlapping merges (A->B with B->A, and A->B / B->C / C->A) never produce a cycle, a lost merge
  *   or two ACTIVE merges for one secondary, and the database index refuses a second one on its own;
- * - a merged person's past registrations read back with their original attribution;
+ * - a merged person's past registrations read back with their original attribution, and that cross-event read is
+ *   audited with ids only (#128);
+ * - a merge or shared household gives the primary's verified address no claim on the secondary's registration (#128);
+ * - an identical double-submitted merge makes one link and leaves a bystander alone (#128);
  * - anonymization of a person with payments and consent evidence keeps those rows, is idempotent and audited,
  *   and an anonymized person cannot be merged.
  *
@@ -22,6 +25,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { generateMatchCandidates, listOpenMatchCandidates } from "../modules/people/duplicate-match-repository";
+import { authorizeAttendeeRegistration, matchingRegistrationIdsForVerifiedEmail } from "../modules/attendee-accounts/registrations-repository";
 import { anonymizePerson, PERSON_ANONYMIZED_FIELDS } from "../modules/people/anonymization";
 import {
   getMergedPersonView,
@@ -161,7 +165,7 @@ async function main() {
   assert(!JSON.stringify(mergeAudit).includes(REASON) && !JSON.stringify(mergeAudit).includes("First"), "the audit row holds ids only (no reason, no name)");
 
   // ---- A merged person's past registration reads with its original attribution ----
-  const view = await getMergedPersonView(secondary.id);
+  const view = await getMergedPersonView(secondary.id, ids.staff);
   assert(view.canonicalPersonId === primary.id && view.requestedPersonId === secondary.id, "the view resolves to the canonical person");
   assert([...view.memberPersonIds].sort().join() === [primary.id, secondary.id].sort().join(), "the view lists both people");
   const secondaryRead = view.registrations.find((row) => row.registrationId === secondaryRegistration.id && row.role === "ACCOUNT_HOLDER");
@@ -170,6 +174,16 @@ async function main() {
   assert(view.registrations.some((row) => row.registrationId === primaryRegistration.id && row.originalPersonId === primary.id), "the primary's own registration is in the same view");
   assert((await prisma.registration.findUniqueOrThrow({ where: { id: secondaryRegistration.id } })).accountHolderPersonId === secondary.id, "the registration row itself still points at the secondary");
   assert(await prisma.person.count({ where: { id: { in: [primary.id, secondary.id] } } }) === 2, "both people remain queryable");
+
+  const readAudit = await prisma.auditLog.findMany({ where: { action: "PERSON_CROSS_EVENT_READ", entityId: primary.id } });
+  assert(readAudit.length === 1 && readAudit[0]!.actorUserId === ids.staff && readAudit[0]!.eventId === null, "the cross-event read is audited once, with the actor and no event");
+  assert(!JSON.stringify(readAudit).includes("First") && !JSON.stringify(readAudit).includes(P + "-primary@") && !JSON.stringify(readAudit).includes(REASON), "the read audit holds ids only");
+
+  // ---- #128: a merge (or a shared household) gives the primary's address no claim on the secondary's registration ----
+  const primaryEmail = `${P}-primary@example.test`;
+  assert([...await matchingRegistrationIdsForVerifiedEmail(primaryEmail)].sort().join() === [primaryRegistration.id].join(), "while merged, the primary's verified address still claims only its own registration");
+  assert(await authorizeAttendeeRegistration(primaryEmail, secondaryRegistration.id) === null, "the primary's account cannot authorize the secondary's registration, merged or in one household");
+  assert(await authorizeAttendeeRegistration(`${P}-secondary@example.test`, secondaryRegistration.id) !== null, "the secondary's own address still reaches it");
 
   // ---- Refusals ----
   assert(await code(mergePeople({ primaryPersonId: secondary.id, secondaryPersonId: primary.id, actorUserId: ids.staff, reason: REASON })) === "SAME_PERSON", "merging the reverse of an active merge is refused (would cycle)");
@@ -253,6 +267,18 @@ async function main() {
   await assertForest([hub!.id, ...spokes.map((spoke) => spoke!.id)], "crowd");
   assert(crowd.some((result) => result.status === "fulfilled"), "at least one merge in the crowd succeeded");
 
+  // ---- #128 invariant 6: an identical double submit makes one merge and never touches a bystander ----
+  for (let round = 0; round < 5; round += 1) {
+    const [m, n, bystander] = await Promise.all([newPerson(`dm${round}`), newPerson(`dn${round}`), newPerson(`db${round}`)]);
+    const settled = await Promise.allSettled([
+      mergePeople({ primaryPersonId: n!.id, secondaryPersonId: m!.id, actorUserId: ids.staff, reason: REASON }),
+      mergePeople({ primaryPersonId: n!.id, secondaryPersonId: m!.id, actorUserId: ids.staff, reason: REASON }),
+    ]);
+    const { links, resolved } = await assertForest([m!.id, n!.id, bystander!.id], `double submit round ${round}`);
+    assert(settled.filter((result) => result.status === "fulfilled").length === 1 && links.length === 1, `double submit round ${round}: exactly one merge stands`);
+    assert(resolved.get(bystander!.id) === bystander!.id && resolved.get(m!.id) === n!.id, `double submit round ${round}: the bystander is still its own person`);
+  }
+
   // ---- The database refuses a second ACTIVE merge for one secondary, and a self-merge, on its own ----
   const [e, f, g] = await Promise.all(["e", "f", "g"].map((label) => newPerson(label)));
   const row = (primaryPersonId: string, secondaryPersonId: string) => ({ primaryPersonId, secondaryPersonId, actorUserId: ids.staff, reason: "synthetic", evidence: {}, priorState: {} });
@@ -300,7 +326,7 @@ async function main() {
   await generateMatchCandidates();
   assert(await pairOpen() === 0, "a rescan skips an anonymized person even when a signal still matches");
   await prisma.personMatchCandidate.create({ data: { personAId: [qa!.id, qb!.id].sort()[0]!, personBId: [qa!.id, qb!.id].sort()[1]!, confidence: "MEDIUM", ruleVersion: 0, fingerprint: `synthetic-${randomUUID()}`, matchedSignals: ["PHONE_MATCH"] } });
-  assert(!(await listOpenMatchCandidates()).some((candidate) => [candidate.personA.id, candidate.personB.id].includes(qa!.id)), "the review queue drops an OPEN pair with an anonymized person");
+  assert(!(await listOpenMatchCandidates(ids.staff)).some((candidate) => [candidate.personA.id, candidate.personB.id].includes(qa!.id)), "the review queue drops an OPEN pair with an anonymized person");
 
   console.log("verify-person-soft-merge: all checks passed");
 }

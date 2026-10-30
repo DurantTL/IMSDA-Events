@@ -128,6 +128,46 @@ not import and nothing merge-related can call. There is no route or screen for
 it yet. Not covered: personal data copied into registration contact and
 attendee profile snapshots, which belongs to a retention decision.
 
+## Disclosure matrix, invariants and read audit (`disclosure-matrix.ts`, `identity-read-audit.ts`)
+
+Identity slice 4 (#128). `DISCLOSURE_MATRIX` declares, per identity field
+(name, email, phone, household membership, account links, merge history,
+match-candidate evidence, external identities, anonymization record), which
+audience (system administrator, event staff, attendee for self, household
+member, anonymous) may read, edit, export and view the audit of it, plus a
+classification. It is configuration the code consults, not prose: the queue
+gate, the merge/unmerge/merges-list gate, the anonymization approver check and
+the person-column projections of the queue and merges list all decide through
+`isDisclosureAllowed` / `personColumnSelect`. Only the system administrator
+audience has global reach, and `isDisclosureAllowed` is deny-by-default: it is
+true only for an `ALLOWED` cell. Event-staff cells are `EVENT_SCOPED` markers
+that never grant by themselves (`isEventScopedDisclosureAllowed` needs an
+explicit event, membership and footprint proof); every attendee cell is denied. `tests/identity-disclosure-matrix.test.ts`
+has a test per row.
+
+`tests/identity-authorization-invariants.test.ts` proves a link, a merge, a
+household or a shared identity grants no staff permission and no access to
+another event's records (attendees reach registrations by verified email only).
+
+Every identity read that crosses an event boundary (`getMergedPersonView`,
+`listActivePersonMerges`, `listOpenMatchCandidates`, so also
+`GET /api/people/merges` and the review queue) takes the acting user and
+writes a `PERSON_CROSS_EVENT_READ` audit entry before returning: actor,
+surface and ids only, never names, contact details or reasons. A failed audit
+write fails the read.
+
+## Migration dry run (`identity-migration-dry-run-domain.ts`, `identity-migration-dry-run.ts`)
+
+`npm run people:identity-dry-run` classifies existing rows without changing any
+(read-only transaction, ids only, deterministic): accounts that would receive a
+link (`VERIFIED_EMAIL_EXACT`), households needing an effective-date backfill,
+likely duplicate pairs (the slice 2 matcher, routed to the review queue), and
+exceptions: account-link ambiguity goes to its own manual review list
+(`ACCOUNT_LINK_REVIEW`, because the queue compares people not accounts), other
+problems to a data fix, with per-table reconciliation totals. It applies
+nothing; running it on production is human-only. See
+`docs/PEOPLE-IDENTITY-MIGRATION-DRY-RUN.md`.
+
 ## Time-bounded household membership (`household-domain.ts`, `household-repository.ts`)
 
 `HouseholdMember` carries `effectiveFrom` / `effectiveTo` so a past

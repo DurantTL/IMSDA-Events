@@ -354,7 +354,7 @@ describe("anonymized people and merged pairs stay out of the queue", () => {
       candidates: [candidate("c1", "per_a", "per_b"), candidate("c2", "per_c", "per_d")],
     });
     mocks.getPrisma.mockReturnValue(prisma);
-    expect((await listOpenMatchCandidates()).map((row) => row.id)).toEqual(["c2"]);
+    expect((await listOpenMatchCandidates("u1")).map((row) => row.id)).toEqual(["c2"]);
   });
 
   it("generation and the listing skip a pair that already shares a canonical person", async () => {
@@ -366,10 +366,10 @@ describe("anonymized people and merged pairs stay out of the queue", () => {
 
     const listing = buildFakePrisma({ people: sharedPhone, candidates: [candidate("c1", "per_a", "per_b")], merges: [merged] });
     mocks.getPrisma.mockReturnValue(listing);
-    expect(await listOpenMatchCandidates()).toEqual([]);
+    expect(await listOpenMatchCandidates("u1")).toEqual([]);
     const unmerged = buildFakePrisma({ people: sharedPhone, candidates: [candidate("c1", "per_a", "per_b")] });
     mocks.getPrisma.mockReturnValue(unmerged);
-    expect(await listOpenMatchCandidates()).toHaveLength(1);
+    expect(await listOpenMatchCandidates("u1")).toHaveLength(1);
   });
 });
 

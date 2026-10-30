@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DuplicateMatchReviewWorkspace } from "@/components/duplicate-match-review-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
 import { listActivePersonMerges } from "@/modules/people/person-merge-repository";
 import { listOpenMatchCandidates } from "@/modules/people/duplicate-match-repository";
 
@@ -18,8 +19,8 @@ export const metadata: Metadata = { title: "Possible duplicate people" };
 export default async function DuplicateMatchQueuePage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");
 
-  const [candidates, merges] = await Promise.all([listOpenMatchCandidates(), listActivePersonMerges()]);
+  const [candidates, merges] = await Promise.all([listOpenMatchCandidates(user.id), listActivePersonMerges(user.id)]);
   return <DuplicateMatchReviewWorkspace initialCandidates={candidates} initialMerges={merges} />;
 }

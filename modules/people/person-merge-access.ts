@@ -5,6 +5,7 @@ import {
   requireAuthenticatedUser,
 } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { isDisclosureAllowed, staffIdentityAudience, type DisclosureAction } from "@/modules/people/disclosure-matrix";
 
 /**
  * Who may merge and unmerge people (#127). Today that is a system
@@ -14,11 +15,15 @@ import { getCurrentSession } from "@/modules/access/current-session";
  * narrower permission (#128) can replace it without touching the review
  * queue's own gate.
  */
-export async function requirePersonMergePermission() {
+export async function requirePersonMergePermission(action: DisclosureAction = "EDIT") {
   const user = requireAuthenticatedUser(await getCurrentSession());
-  if (user.globalRole !== "SYSTEM_ADMIN") {
+  // The matrix decides (`disclosure-matrix.ts`): merging and unmerging are EDIT
+  // of merge history, listing merges is READ; both are global-reach.
+  if (!isDisclosureAllowed("MERGE_HISTORY", staffIdentityAudience(user), action)) {
     throw new AccessDeniedError(
-      "System administrator access is required to merge or unmerge people.",
+      action === "READ"
+        ? "System administrator access is required to see merged people."
+        : "System administrator access is required to merge or unmerge people.",
       403,
       "PERMISSION_DENIED",
     );
