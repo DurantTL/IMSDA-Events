@@ -411,7 +411,7 @@ export default async function SystemAdminPage({
             <h2 id="system-health-heading">System health</h2>
             <p>Only what was measured: each signal says what was checked, when, and what it found. A reading that could not be made is shown as unavailable, never as healthy or zero.</p>
           </div>
-          <Link className={styles.fullReport} href="/admin/email">Full health report <ArrowRight aria-hidden="true" size={14} /></Link>
+          <Link className={styles.fullReport} href="/admin/system-report">Full health report <ArrowRight aria-hidden="true" size={14} /></Link>
         </div>
         {!health && <Unavailable what="System health" />}
         {healthNote && <p className={styles.healthNote} role="status" data-testid="health-note">{healthNote}</p>}

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { getCurrentSession } from "@/modules/access/current-session";
 import { resolveEventContext } from "@/modules/events/selection";
 import {
   canAccessOperationalHealth,
@@ -136,6 +137,8 @@ export default async function OperationalHealthPage({
   }
 
   const access = operationalHealthAccessFor(permissions);
+  // The System report is for system administrators only, so the link is only shown to them.
+  const showSystemReportLink = (await getCurrentSession()).user?.globalRole === "SYSTEM_ADMIN";
   const health = await getOperationalHealth(event.id, access);
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const refreshHref = `/more/health?${eventQuery}`;
@@ -164,6 +167,12 @@ export default async function OperationalHealthPage({
             <RefreshCw aria-hidden="true" size={15} />
             Refresh status
           </Link>
+          {showSystemReportLink && (
+            <Link className="secondary-button" href="/admin/system-report">
+              Full system report
+              <ArrowRight aria-hidden="true" size={15} />
+            </Link>
+          )}
         </div>
       </div>
 

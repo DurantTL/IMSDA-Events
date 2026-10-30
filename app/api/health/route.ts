@@ -1,5 +1,5 @@
 import { getEncryptionKeyStatus } from "@/lib/env";
-import { getPrisma } from "@/lib/prisma";
+import { checkDatabaseLiveness } from "@/modules/operations/database-liveness";
 import { getOutboxQueueHealth } from "@/modules/communications/outbox-sweep";
 import { logError } from "@/lib/logger";
 import { dispatchUnsuppressedAlert } from "@/modules/operations/alerting";
@@ -23,10 +23,9 @@ async function getHandler() {
   // Whether a key is configured and how it was loaded. Never the key itself.
   const encryptionKey = getEncryptionKeyStatus();
 
-  try {
-    await getPrisma().$queryRaw`SELECT 1`;
-  } catch (error) {
-    logError("Health check failed", error);
+  const database = await checkDatabaseLiveness();
+  if (!database.ok) {
+    logError("Health check failed", database.error);
     // There is nowhere to record suppression when the database is the thing
     // that is down, so this always attempts delivery. An orchestrator polling
     // this endpoint will repeat it, which is the correct amount of noise for a

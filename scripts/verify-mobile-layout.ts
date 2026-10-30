@@ -437,6 +437,7 @@ const pages: PageSpec[] = [
   staff("analytics", "/admin/analytics", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),
+  staff("system-report", "/admin/system-report", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
   // The club form settings page, with the "Email these addresses when this form is submitted" box (#1017).

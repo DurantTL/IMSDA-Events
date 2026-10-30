@@ -225,7 +225,7 @@ describe("the refreshed page", () => {
     const health = html.slice(html.indexOf('id="system-health"'));
     expect(health).toContain("Open alerts");
     expect(health).toContain("Scan reports");
-    expect(health).toMatch(/href="\/admin\/email">Full health report/);
+    expect(health).toMatch(/href="\/admin\/system-report">Full health report/);
     for (const signal of ["email-sweep", "email-queue", "open-alerts", "email-delivery"]) expect(health).toContain(`data-signal="${signal}"`);
   });
 

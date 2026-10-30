@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarPlus,
   CheckCircle2,
+  HeartPulse,
   Church,
   ClipboardList,
   ClipboardPen,
@@ -121,6 +122,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/analytics", label: "Public analytics", description: "Anonymous 30-day counts: event views, registration funnel, sign-in rates, broken links and page speed.", icon: LineChart },
       { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
+      { href: "/admin/system-report", label: "System report", description: "Every health reading in one place: what was checked, when and what it found.", icon: HeartPulse },
     ],
   },
 ];
@@ -221,6 +223,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/event-templates(\/|$)/, "Event templates"],
   [/^\/admin\/(email|notifications)(\/|$)/, "Email"],
   [/^\/admin\/readiness(\/|$)/, "System readiness"],
+  [/^\/admin\/system-report(\/|$)/, "System report"],
   [/^\/admin\/site-content(\/|$)/, "Homepage & site content"],
   [/^\/admin\/analytics(\/|$)/, "Public analytics"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
