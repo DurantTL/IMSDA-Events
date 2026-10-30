@@ -1,0 +1,159 @@
+/* IMSDA Events — generated from tokens.json */
+:root, [data-theme="light"] {
+  --imsda-navy: #003b5c;
+  --imsda-navy-deep: #002c45;
+  --imsda-navy-soft: #e6f0f4;
+  --imsda-purple: #582c83;
+  --imsda-purple-soft: #f1eaf7;
+  --imsda-gold: #f0b323;
+  --imsda-gold-soft: #fff5d7;
+  --focus-ring: var(--imsda-navy);
+  --focus-ring-on-dark: var(--imsda-gold);
+  --ink: #243640;
+  --muted: #536872;
+  --line: #dce6ea;
+  --paper: #f4f7f8;
+  --card: #ffffff;
+  --field-border: #6f8591;
+  --field-border-hover: #4a6270;
+  --field-bg: #ffffff;
+  --field-focus: var(--imsda-purple);
+  --green: #267357;
+  --green-soft: #e5f3ed;
+  --coral: #a95549;
+  --coral-soft: #fff1ef;
+  --danger: #8f3a30;
+  --danger-soft: #fdf4f2;
+  --danger-line: #e3b8b1;
+  --gold-text: #805807;
+  --warning-text: #6f5316;
+  --warning-line: #ddcd9e;
+  --notice-line: #b8d7ca;
+  --error-line: #e9c7c2;
+  --secondary-bg: #f9fbfb;
+  --table-head: #f6f9fa;
+  --table-row-line: #eaf0f2;
+  --hero-mid: #07577d;
+  --hero-text-soft: #d5e5ed;
+  --tabbar-text: #566a75;
+  --report-light: #7fa6bd;
+  --info-card-info-bg: #e6f0f9;
+  --info-card-info-edge: #1d5f9c;
+  --info-card-deadline-bg: #fdeceb;
+  --info-card-deadline-edge: #b3261e;
+  --info-card-requirement-bg: #fff1e0;
+  --info-card-requirement-edge: #b45309;
+  --info-card-success-bg: #e5f3ed;
+  --info-card-success-edge: #267357;
+  --info-card-help-bg: #f1eaf7;
+  --info-card-help-edge: #582c83;
+  --info-card-neutral-bg: #ffffff;
+  --info-card-neutral-edge: #003b5c;
+  --info-card-ink: #1f3039;
+  --block-bg: #ffffff;
+  --block-ink: #1f3039;
+  --block-muted: #4a5f69;
+  --block-edge: #dce6ea;
+  --block-accent: #003b5c;
+  --block-soft: #e6f0f4;
+  --cal-tone-1-fill: #f3edfa;
+  --cal-tone-1-edge: #582c83;
+  --cal-tone-1-ink: #3b1a5e;
+  --cal-tone-2-fill: #d4eac0;
+  --cal-tone-2-edge: #3f7d1f;
+  --cal-tone-2-ink: #1f3f0d;
+  --cal-tone-3-fill: #bcdaf3;
+  --cal-tone-3-edge: #2a7fb8;
+  --cal-tone-3-ink: #0d3b5c;
+  --cal-tone-4-fill: #ecc660;
+  --cal-tone-4-edge: #8f6200;
+  --cal-tone-4-ink: #3d2a00;
+  --cal-tone-5-fill: #7fc7bf;
+  --cal-tone-5-edge: #0a6f69;
+  --cal-tone-5-ink: #032f2c;
+  --cal-tone-6-fill: #e29aae;
+  --cal-tone-6-edge: #a8264a;
+  --cal-tone-6-ink: #44091c;
+  --cal-closure-fill: #fde4cc;
+  --cal-closure-edge: #8a4b1f;
+  --cal-closure-ink: #6b3410;
+  --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
+  --shadow-metric: 0 8px 28px rgba(0, 59, 92, 0.045);
+  --shadow-chip: 0 2px 8px rgba(0, 59, 92, 0.09);
+  --shadow-modal: 0 28px 80px rgba(0, 25, 40, 0.3);
+  --shadow-focus-halo: 0 0 0 3px rgba(88, 44, 131, 0.1);
+  --shadow-tabbar: 0 -8px 24px rgba(0, 59, 92, 0.07);
+}
+[data-theme="dark"] {
+  --info-card-info-bg: #12283a;
+  --info-card-info-edge: #8ec1f0;
+  --info-card-deadline-bg: #3a1917;
+  --info-card-deadline-edge: #ff9f98;
+  --info-card-requirement-bg: #36230d;
+  --info-card-requirement-edge: #f2b36b;
+  --info-card-success-bg: #12301f;
+  --info-card-success-edge: #86d4ad;
+  --info-card-help-bg: #261a38;
+  --info-card-help-edge: #cdb0ef;
+  --info-card-neutral-bg: #17232b;
+  --info-card-neutral-edge: #9cc7de;
+  --info-card-ink: #edf3f6;
+  --block-bg: #17232b;
+  --block-ink: #edf3f6;
+  --block-muted: #b4c6cf;
+  --block-edge: #34505e;
+  --block-accent: #9cc7de;
+  --block-soft: #1d3340;
+}
+:root {
+  --gap-xs: 6px;
+  --gap-sm: 9px;
+  --gap-form-grid: 12px;
+  --gap-form-stack: 15px;
+  --gap-page: 18px;
+  --pad-panel: 21px;
+  --pad-modal: 22px;
+  --content-width: 1180px;
+  --workspace-width: 1420px;
+  --sidebar-width: 260px;
+  --touch-target: 44px;
+  --target-desktop: 36px;
+  --target-cta: 48px;
+  --radius-sm: 8px;
+  --radius-field: 10px;
+  --radius-card: 12px;
+  --radius-info: 14px;
+  --radius-pass: 16px;
+  --radius-calendar: 18px;
+  --radius-panel: 19px;
+  --radius-modal: 20px;
+  --radius-hero: 24px;
+  --radius-pill: 999px;
+  --bp-phone: 600px;
+  --bp-club-nav: 640px;
+  --bp-tablet: 768px;
+  --bp-sidebar: 800px;
+  --z-sidebar: 30;
+  --z-tabbar: 40;
+  --z-modal: 100;
+  --font-sans: "Noto Sans", Arial, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.public-title { font-family: var(--font-sans); font-size: 1.5rem; line-height: 1.25; font-weight: 800; }
+.public-body { font-family: var(--font-sans); font-size: 1rem; line-height: 1.5; font-weight: 400; }
+.public-label { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.4; font-weight: 700; }
+.workspace-title { font-family: var(--font-sans); font-size: 1.7rem; line-height: 1.2; font-weight: 800; }
+.heading-section { font-family: var(--font-sans); font-size: 1.3rem; line-height: 1.3; font-weight: 800; }
+.heading-sub { font-family: var(--font-sans); font-size: 1.075rem; line-height: 1.3; font-weight: 700; }
+.heading-group { font-family: var(--font-sans); font-size: 1rem; line-height: 1.35; font-weight: 700; }
+.base-body { font-family: var(--font-sans); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.admin-body { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.5; font-weight: 400; }
+.label-upper { font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.3; font-weight: 800; letter-spacing: 0.08em; }
+.button { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.25; font-weight: 700; }
+.button-cta { font-family: var(--font-sans); font-size: 1rem; line-height: 1.25; font-weight: 700; }
+.badge { font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.2; font-weight: 700; }
+.metric { font-family: var(--font-sans); font-size: 1.75rem; line-height: 1; font-weight: 800; }
+.brand-flame { font-family: var(--font-serif); font-size: 1.35rem; line-height: 1; font-weight: 700; font-style: italic; }
+@font-face { font-family: "Noto Sans"; src: url("fonts/NotoSans-Regular.ttf"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Noto Sans"; src: url("fonts/NotoSans-Bold.ttf"); font-weight: 700; font-style: normal; font-display: swap; }
