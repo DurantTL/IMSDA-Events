@@ -154,6 +154,16 @@ writes a `PERSON_CROSS_EVENT_READ` audit entry before returning: actor,
 surface and ids only, never names, contact details or reasons. A failed audit
 write fails the read.
 
+## Migration dry run (`identity-migration-dry-run-domain.ts`, `identity-migration-dry-run.ts`)
+
+`npm run people:identity-dry-run` classifies existing rows without changing any
+(read-only transaction, ids only, deterministic): accounts that would receive a
+link (`VERIFIED_EMAIL_EXACT`), households needing an effective-date backfill,
+likely duplicate pairs (the slice 2 matcher), and exceptions, each routed to the
+review queue or a data fix, with per-table reconciliation totals. It applies
+nothing; running it on production is human-only. See
+`docs/PEOPLE-IDENTITY-MIGRATION-DRY-RUN.md`.
+
 ## Time-bounded household membership (`household-domain.ts`, `household-repository.ts`)
 
 `HouseholdMember` carries `effectiveFrom` / `effectiveTo` so a past
