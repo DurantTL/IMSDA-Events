@@ -216,6 +216,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
   [/^\/admin\/(people|team|accounts)(\/|$)/, "People & access"],
   [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
+  [/^\/admin\/event-templates\/from-event(\/|$)/, "Save an event as a template"],
   [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],
   [/^\/admin\/event-templates(\/|$)/, "Event templates"],
   [/^\/admin\/(email|notifications)(\/|$)/, "Email"],

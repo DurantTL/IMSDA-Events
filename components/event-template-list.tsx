@@ -107,6 +107,12 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
       {error ? <div className="inline-notice error" role="alert">{error}</div> : null}
 
       <section className="panel form-stack event-settings-panel">
+        <div className="section-heading"><div><h2>Save an event as a template</h2></div></div>
+        <p>Turn a reviewed event&apos;s settings and forms into a new template, or the next draft version of one you have. You see exactly what is copied and what is not before anything is saved.</p>
+        <Link className="secondary-button" href="/admin/event-templates/from-event">Save an event as a template</Link>
+      </section>
+
+      <section className="panel form-stack event-settings-panel">
         <div className="section-heading"><div><h2>Starter templates</h2></div></div>
         <p>
           Adds a published template for each real event that has a built-in form, ready to start an event from. Starter

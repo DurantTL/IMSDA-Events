@@ -1,4 +1,9 @@
 /**
+ * Also proves saving an event as a template (#154): a source event with a registration, payment, access token and a
+ * private link in its text saves as a draft version that carries none of it; a duplicate request returns the earlier
+ * version and a reused key is refused; a stale preview is refused; a revision after prior use leaves the published
+ * version, its payload and its applications untouched, and publishing the new version archives only the old one.
+ *
  * Proves the event template guarantees (#152) against a real PostgreSQL
  * database: applying creates a draft event with its own rows; revising and
  * republishing the template leaves an event already created from it
@@ -36,6 +41,7 @@ import {
   saveEventTemplateDraft,
 } from "../modules/event-templates/repository";
 import { eventTemplateApiError } from "../modules/event-templates/api-errors";
+import { previewTemplateFromEvent, saveTemplateFromEvent } from "../modules/event-templates/from-event-repository";
 import { eventSettingsInputSchema } from "../modules/events/schemas";
 import { getEventSettings } from "../modules/events/repository";
 
@@ -64,6 +70,7 @@ async function cleanup() {
     await tx.event.deleteMany({ where: { slug: { startsWith: `${P}-` } } });
   });
   await prisma.eventTemplate.deleteMany({ where: { createdByUserId: { in: actors } } });
+  await prisma.person.deleteMany({ where: { firstName: "Evttpl" } });
   await prisma.organization.deleteMany({ where: { name: { startsWith: "Evttpl " } } });
   await prisma.user.deleteMany({ where: { id: { in: actors } } });
 }
@@ -97,6 +104,7 @@ async function main() {
   await cleanup();
   try {
     await run();
+    await verifyFromEvent();
   } finally {
     await cleanup();
     await restoreSeededStarters();
@@ -584,6 +592,130 @@ async function verifyStarters() {
   assert(afterArchive.status === "ARCHIVED" && !afterArchive.canApply, "the archived starter stays archived");
   assert((await starterTemplates()).length === starterEventTemplates.length, "no duplicates after edits and archive");
   console.log("ok  an edited starter and an archived starter are left alone; the starterKey is server-owned; no duplicates");
+}
+
+const fromEventSecret = "SYNTHETICTOKEN0123456789";
+
+async function verifyFromEvent() {
+  // A source event, made the ordinary way, then given what a real event holds that a template must never copy.
+  const sourceTemplate = await createEventTemplate(adminId, { name: "Evttpl Source Blueprint", description: "", audience: "GENERAL" });
+  await save(sourceTemplate.id, goodPayload({ audience: "GENERAL" }));
+  await publishEventTemplateVersion(sourceTemplate.id, adminId);
+  const sourceSlug = `${P}-source-2027`;
+  const source = await applyEventTemplate(sourceTemplate.id, adminId, {
+    name: "Evttpl Source 2027", slug: sourceSlug, startsOn: "2027-05-05", endsOn: "2027-05-07", requestKey: `${P}-key-source`,
+  });
+  const sourceEventId = source.event.id;
+  const sourceForm = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: sourceEventId }, include: { versions: true } });
+  await prisma.registrationFormVersion.update({ where: { id: sourceForm.versions[0]!.id }, data: { status: "PUBLISHED", publishedAt: new Date() } });
+  await prisma.messageTemplateVersion.updateMany({
+    where: { template: { eventId: sourceEventId } },
+    data: { bodyTemplate: `Hello {{recipient_name}}. Your private page: /manage/${fromEventSecret}` },
+  });
+  const person = await prisma.person.create({ data: { firstName: "Evttpl", lastName: "Zzsynthetic", normalizedEmail: `${P}-attendee@example.test`, phone: "(515) 555-0100" } });
+  const registration = await prisma.registration.create({
+    data: { eventId: sourceEventId, accountHolderPersonId: person.id, confirmationCode: "EVTTPL-CONF-1", status: "CONFIRMED", totalAmount: "50.00", submittedAt: new Date() },
+  });
+  await prisma.payment.create({ data: { eventId: sourceEventId, registrationId: registration.id, amount: "50.00", status: "SUCCEEDED", method: "CASH", receivedAt: new Date() } });
+  await prisma.registrationAccessToken.create({ data: { registrationId: registration.id, tokenHash: `${P}-token-hash`, expiresAt: new Date("2030-01-01T00:00:00.000Z") } });
+
+  // 1. Preview shows the copied configuration and the exclusions, and none of the private data.
+  const preview = await previewTemplateFromEvent({ sourceEventId });
+  assert(preview.domains.find((domain) => domain.key === "registrationForms")?.count === 1, "the preview lists the published form");
+  assert(preview.exclusions.some((entry) => entry.key === "unsupported.merchandise") && preview.exclusions.some((entry) => entry.key === "registrationThemes"), "the preview lists unsupported modules as exclusions");
+  const privateLinks = preview.exclusions.find((entry) => entry.key === "privateLinks");
+  assert(privateLinks && privateLinks.count !== null && privateLinks.count >= 1, "the private link in the message is reported");
+  const leakCheck = (text: string, where: string, allowSourceId = false) => {
+    for (const forbidden of [fromEventSecret, ...(allowSourceId ? [] : [sourceEventId]), sourceSlug, registration.id, person.id, "EVTTPL-CONF-1", `${P}-attendee`, `${P}-token-hash`, "Zzsynthetic"]) {
+      assert(!text.includes(forbidden), `${where} must not contain ${forbidden}`);
+    }
+  };
+  leakCheck(JSON.stringify(preview), "the preview", true);
+
+  // 2. Save as a new template: a draft version 1 with provenance, actor and note; nothing private copied.
+  const saveInput = {
+    sourceEventId, fingerprint: preview.fingerprint, releaseNote: "Reviewed after the 2027 retreat.", requestKey: `${P}-key-save-1`,
+    target: { mode: "NEW" as const, name: "Evttpl From Event", description: "" },
+  };
+  const first = await saveTemplateFromEvent(adminId, saveInput);
+  assert(!first.alreadySaved && first.versionNumber === 1, "the first save creates version 1");
+  const savedVersion = await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: first.versionId }, include: { source: true } });
+  assert(savedVersion.status === "DRAFT" && savedVersion.createdByUserId === adminId, "the saved version is a draft by the actor");
+  assert(savedVersion.source?.sourceEventId === sourceEventId && savedVersion.source.actorUserId === adminId && savedVersion.source.releaseNote === saveInput.releaseNote, "provenance names the event, actor and note");
+  const provenance = savedVersion.source!.provenance as { forms: Array<{ formId: string }>; fingerprint: string };
+  assert(provenance.forms[0]?.formId === sourceForm.id && provenance.fingerprint === preview.fingerprint, "provenance records the source form and fingerprint");
+  leakCheck(JSON.stringify(savedVersion.payload), "the saved payload");
+  assert(JSON.stringify(Object.keys(savedVersion.payload as object).sort()) === JSON.stringify(["attendeeClassifications", "attendeeTypes", "audience", "billingMode", "brandingDefaults", "formTemplateKeys", "messageTemplateDefaults", "moduleEnablement", "registrationForms", "reportSelections"]), "the payload has exactly the allow-listed keys");
+  assert(!JSON.stringify(savedVersion.payload).includes("/manage/"), "the private link was removed from the copied message");
+  const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: "EVENT_TEMPLATE_SAVED_FROM_EVENT", entityId: first.template.id } });
+  leakCheck(JSON.stringify(audit), "the audit entry", true);
+  console.log("ok  saving an event with a registration, payment, token and private link copies configuration only, with provenance");
+
+  // 3. Duplicate requests: same key and input returns the same version; same key with other input is refused.
+  const retry = await saveTemplateFromEvent(adminId, saveInput);
+  assert(retry.alreadySaved && retry.versionId === first.versionId, "a retry returns the earlier version");
+  assert(await prisma.eventTemplateVersion.count({ where: { templateId: first.template.id } }) === 1, "a retry creates no second version");
+  const reusedKey = await saveTemplateFromEvent(adminId, { ...saveInput, releaseNote: "Something else entirely." }).then(() => null, (error: unknown) => error);
+  assert(isOperationError(reusedKey, "REQUEST_KEY_REUSED"), `the same key with a different note is refused, got ${String(reusedKey)}`);
+  const parallelInput = { ...saveInput, requestKey: `${P}-key-save-parallel`, target: { mode: "NEW" as const, name: "Evttpl Parallel Save", description: "" } };
+  const parallel = await Promise.allSettled([1, 2, 3].map(() => saveTemplateFromEvent(adminId, parallelInput)));
+  assert(parallel.every((result) => result.status === "fulfilled"), `every parallel save settles on the one result: ${parallel.filter((result) => result.status === "rejected").map((result) => String((result as PromiseRejectedResult).reason)).join("; ")}`);
+  assert(await prisma.eventTemplate.count({ where: { name: "Evttpl Parallel Save" } }) === 1, "three parallel saves create one template");
+  console.log("ok  a duplicate save returns the earlier version; a reused key is refused; parallel saves create one template");
+
+  // 4. A stale preview is refused and writes nothing (version 1 is published first, so no draft is in the way).
+  await publishEventTemplateVersion(first.template.id, adminId);
+  await prisma.eventAttendeeType.create({ data: { eventId: sourceEventId, code: "ELDER", label: "Elder", sortOrder: 5 } });
+  const staleSave = await saveTemplateFromEvent(adminId, { ...saveInput, requestKey: `${P}-key-save-stale`, target: { mode: "NEW_VERSION" as const, templateId: first.template.id } })
+    .then(() => null, (error: unknown) => error);
+  assert(isOperationError(staleSave, "SOURCE_CHANGED"), `a stale fingerprint is refused, got ${String(staleSave)}`);
+  assert(await prisma.eventTemplateVersion.count({ where: { templateId: first.template.id } }) === 1, "the stale save wrote nothing");
+
+  // 5. Revision after prior use: v1 is published and applied; v2 is saved from the changed event.
+  const applied = await applyEventTemplate(first.template.id, adminId, { name: "Evttpl Applied 2028", slug: `${P}-applied-2028`, startsOn: "2028-05-03", endsOn: "2028-05-05", requestKey: `${P}-key-apply-saved` });
+  assert(await prisma.registrationForm.count({ where: { eventId: applied.event.id } }) === 1, "applying the saved version creates its form as a draft from registrationForms");
+  const appliedForm = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: applied.event.id }, include: { versions: true } });
+  assert(appliedForm.versions.length === 1 && appliedForm.versions[0]!.status === "DRAFT", "the applied form is a draft");
+  const v1Before = await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: first.versionId } });
+  const applicationBefore = await prisma.eventTemplateApplication.findFirstOrThrow({ where: { eventId: applied.event.id } });
+  const preview2 = await previewTemplateFromEvent({ sourceEventId });
+  assert(preview2.fingerprint !== preview.fingerprint, "the preview reflects the change");
+  const second = await saveTemplateFromEvent(adminId, {
+    sourceEventId, fingerprint: preview2.fingerprint, releaseNote: "Added the elder attendee type.", requestKey: `${P}-key-save-2`,
+    target: { mode: "NEW_VERSION", templateId: first.template.id },
+  });
+  assert(second.versionNumber === 2 && !second.alreadySaved, "the revision is version 2");
+  const v1After = await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: first.versionId } });
+  assert(v1After.status === "PUBLISHED" && JSON.stringify(v1After.payload) === JSON.stringify(v1Before.payload) && v1After.updatedAt.getTime() === v1Before.updatedAt.getTime(), "version 1 is untouched by the revision");
+  const v2 = await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: second.versionId } });
+  assert(v2.status === "DRAFT" && (v2.payload as { attendeeTypes: unknown[] }).attendeeTypes.length === 3, "version 2 is a new draft with the changed configuration");
+  const applicationAfter = await prisma.eventTemplateApplication.findUniqueOrThrow({ where: { id: applicationBefore.id } });
+  assert(applicationAfter.templateVersionId === first.versionId && JSON.stringify(applicationAfter.payloadSnapshot) === JSON.stringify(applicationBefore.payloadSnapshot), "the application still points at version 1 with its snapshot");
+  const blocked = await saveTemplateFromEvent(adminId, {
+    sourceEventId, fingerprint: preview2.fingerprint, releaseNote: "A third attempt.", requestKey: `${P}-key-save-3`, target: { mode: "NEW_VERSION", templateId: first.template.id },
+  }).then(() => null, (error: unknown) => error);
+  assert(isOperationError(blocked, "DRAFT_EXISTS"), `a template with a draft refuses another, got ${String(blocked)}`);
+  assert((await prisma.eventTemplateVersion.findUniqueOrThrow({ where: { id: second.versionId } })).updatedAt.getTime() === v2.updatedAt.getTime(), "the existing draft was not overwritten");
+  await publishEventTemplateVersion(first.template.id, adminId);
+  const statuses = Object.fromEntries((await prisma.eventTemplateVersion.findMany({ where: { templateId: first.template.id } })).map((version) => [version.versionNumber, version.status]));
+  assert(statuses[1] === "ARCHIVED" && statuses[2] === "PUBLISHED", `publishing version 2 archives only version 1, got ${JSON.stringify(statuses)}`);
+  console.log("ok  a revision after prior use is a new draft; version 1, its applications and its payload are untouched; publishing archives only version 1");
+
+  // 6. An archived template refuses a new version.
+  await archiveEventTemplate(first.template.id, adminId);
+  const archivedSave = await saveTemplateFromEvent(adminId, {
+    sourceEventId, fingerprint: preview2.fingerprint, releaseNote: "Into an archived template.", requestKey: `${P}-key-save-4`, target: { mode: "NEW_VERSION", templateId: first.template.id },
+  }).then(() => null, (error: unknown) => error);
+  assert(isOperationError(archivedSave, "TEMPLATE_ARCHIVED"), `an archived template refuses a save, got ${String(archivedSave)}`);
+
+  // 7. Deleting the source event keeps the provenance name and clears the link.
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await tx.event.delete({ where: { id: sourceEventId } });
+  });
+  const orphan = await prisma.eventTemplateVersionSource.findUniqueOrThrow({ where: { templateVersionId: first.versionId } });
+  assert(orphan.sourceEventId === null && orphan.sourceEventName === "Evttpl Source 2027", "a deleted source event leaves its name and no link");
+  console.log("ok  an archived template refuses a save; a deleted source event keeps its name in the provenance");
 }
 
 main()

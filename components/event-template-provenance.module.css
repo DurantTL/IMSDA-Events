@@ -1,0 +1,27 @@
+/* Where a template version came from (#154). */
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.15));
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.line {
+  margin: 0;
+}

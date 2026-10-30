@@ -206,6 +206,32 @@ describe("applyEventTemplate (#152)", () => {
     }));
   });
 
+  it("creates the registration forms a template saved from an event carries, as drafts, after the meals (#154)", async () => {
+    const payload = eventTemplatePayloadSchema.parse({
+      audience: "GENERAL",
+      registrationForms: [{
+        name: "Retreat form", slug: "retreat-form",
+        definition: {
+          title: "Retreat form", confirmationMessage: "Received.",
+          sections: [{ id: "sec_one", title: "Everything", description: "", fields: [{ id: "f_name", key: "full_name", label: "Name", type: "TEXT", scope: "REGISTRATION", required: true, options: [] }] }],
+        },
+      }],
+    });
+    const { prisma, registrationFormCreate, auditLogCreate } = mockApply({ publishedVersion: versionRow({ payload }) });
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await applyEventTemplate("template-1", "usr_actor", applyInput);
+
+    expect(registrationFormCreate).toHaveBeenCalledTimes(1);
+    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ eventId: "event-1", slug: "retreat-form", name: "Retreat form" });
+    expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "REGISTRATION_FORM_CREATED", metadata: expect.objectContaining({ templateVersionId: "version-1" }) }),
+    }));
+    expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "EVENT_TEMPLATE_APPLIED", metadata: expect.objectContaining({ registrationFormCount: 1 }) }),
+    }));
+  });
+
   it("creates forms through the forms module: directory options stripped and REGISTRATION_FORM_CREATED audited (N3)", async () => {
     const { prisma, registrationFormCreate, auditLogCreate } = mockApply();
     dependencies.getPrisma.mockReturnValue(prisma);

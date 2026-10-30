@@ -149,6 +149,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/check-in/badges", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/passes", "/check-in", "components/check-in-workspace.tsx"],
   ["/communications/scheduled", "/communications", "components/communications-workspace.tsx"],
+  ["/admin/event-templates/from-event", "/admin/event-templates", "components/event-template-list.tsx"],
   ["/event-setup/from-template", "/event-setup", "app/(workspace)/event-setup/page.tsx"],
   ["/finance/attendance-reconciliation", "/finance", "components/finance-workspace.tsx"],
   ["/finance/billing-responsibility", "/finance", "components/finance-workspace.tsx"],

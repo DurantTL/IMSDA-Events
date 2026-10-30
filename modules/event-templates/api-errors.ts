@@ -17,6 +17,10 @@ const operationStatus: Record<EventTemplateOperationError["code"], number> = {
   EDIT_CONFLICT: 409,
   EVENT_SLUG_TAKEN: 409,
   REQUEST_KEY_REUSED: 409,
+  DRAFT_EXISTS: 409,
+  AUDIENCE_MISMATCH: 409,
+  SOURCE_NOT_FOUND: 404,
+  SOURCE_CHANGED: 409,
 };
 
 /**
