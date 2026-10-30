@@ -211,12 +211,12 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
         </div>
         <p className={styles.stateBar}>
           {published
-            ? <span className={"status-chip green"}>Published{published.publishedByName ? ` by ${published.publishedByName}` : ""} {when(published.publishedAt)}</span>
+            ? <span className="status-chip green">Published{published.publishedByName ? ` by ${published.publishedByName}` : ""} {when(published.publishedAt)}</span>
             : <span className="status-chip neutral">Nothing published yet: visitors see the standard homepage</span>}
           {dirty
-            ? <span className={"status-chip gold"}>Unsaved changes</span>
+            ? <span className="status-chip gold">Unsaved changes</span>
             : hasDraft && draftDiffers
-              ? <span className={"status-chip gold"}>Draft not published</span>
+              ? <span className="status-chip gold">Draft not published</span>
               : <span className="status-chip neutral">No unpublished changes</span>}
         </p>
         <p className={styles.note}>
