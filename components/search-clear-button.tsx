@@ -22,7 +22,6 @@ export function SearchClearButton({ visible, onClear, label = "Clear search" }: 
       type="button"
     >
       <X aria-hidden="true" size={16} />
-      <span className="sr-only">{label}</span>
     </button>
   );
 }

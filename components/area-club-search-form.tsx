@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { SearchClearButton } from "@/components/search-clear-button";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/organization-search-controls";
 
 /**
@@ -91,9 +91,9 @@ export function AreaClubSearchForm({
       {clubYear && <input name="year" type="hidden" value={clubYear} />}
       {sort && <input name="sort" type="hidden" value={sort} />}
       {month && <input name="month" type="hidden" value={month} />}
-      <label className="search-field" htmlFor="area-club-search">
+      <div className="search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={15} />
-        <span className="sr-only">{label}</span>
+        <label className="sr-only" htmlFor="area-club-search">{label}</label>
         <input
           autoComplete="off"
           defaultValue={query}
@@ -117,7 +117,7 @@ export function AreaClubSearchForm({
           }}
           visible={hasText}
         />
-      </label>
+      </div>
       <button className="secondary-button" type="submit">Search</button>
       {/* Clearing cancels a search still waiting on its pause, so it cannot put the old filter back. */}
       {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={() => { if (timer.current) clearTimeout(timer.current); }}>Clear</Link>}

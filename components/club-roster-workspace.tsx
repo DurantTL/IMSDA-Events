@@ -3,7 +3,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { SearchClearButton } from "@/components/search-clear-button";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -693,9 +693,9 @@ export function ClubRosterWorkspace({
         )}
         <div className={styles.rosterSearchPanel}>
           <div className={styles.rosterSearchRow}>
-            <label className={styles.rosterSearchField} htmlFor="roster-search">
-              Search roster
-              <span className={`search-field ${styles.rosterSearchInput}`}>
+            <div className={styles.rosterSearchField}>
+              <label htmlFor="roster-search">Search roster</label>
+              <span className={`search-field ${styles.rosterSearchInput}`} onMouseDown={focusSearchInput}>
                 <Search aria-hidden="true" size={16} />
                 <input
                   autoComplete="off"
@@ -707,7 +707,7 @@ export function ClubRosterWorkspace({
                 />
                 <SearchClearButton onClear={() => setQuery("")} visible={query !== ""} />
               </span>
-            </label>
+            </div>
             <div className={styles.rosterFilterButtons}>
               <button
                 aria-describedby="roster-details-help"

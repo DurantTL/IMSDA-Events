@@ -19,7 +19,7 @@ import {
   type SearchDestination,
 } from "@/components/destination-search-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
-import { SearchClearButton } from "@/components/search-clear-button";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import styles from "@/components/destination-search.module.css";
 
 /**
@@ -127,9 +127,9 @@ export function DestinationSearch({
 
   return (
     <div className="destination-search" role="search">
-      <label className="search-field destination-search-field" htmlFor={inputId}>
+      <div className="search-field destination-search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={16} />
-        <span className="sr-only">Find a page or task</span>
+        <label className="sr-only" htmlFor={inputId}>Find a page or task</label>
         <input
           aria-activedescendant={activeDescendantId(expanded, active, optionId)}
           aria-autocomplete="list"
@@ -162,7 +162,7 @@ export function DestinationSearch({
           value={query}
         />
         <SearchClearButton onClear={() => { setQuery(""); setActive(-1); setOpen(true); }} visible={query !== ""} />
-      </label>
+      </div>
       <p aria-live="polite" className="sr-only" role="status">
         {destinationSearchStatus(query, results.length)}
       </p>

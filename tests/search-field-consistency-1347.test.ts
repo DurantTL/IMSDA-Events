@@ -4,9 +4,10 @@ import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/admin", useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/admin", useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 import { HonorCombobox } from "@/components/honor-combobox";
 import { searchWatchCatalog } from "@/modules/honors/watch-domain";
+import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import { SearchClearButton } from "@/components/search-clear-button";
 import { EventsSearchField } from "@/app/(public)/events/events-search-field";
 import { DestinationSearch } from "@/components/destination-search";
@@ -177,5 +178,45 @@ describe("clear button (#1347)", () => {
   it("treats accented letters as search words", () => {
     expect(hasSearchWords("é")).toBe(true);
     expect(hasSearchWords(" - ")).toBe(false);
+  });
+});
+
+describe("search box accessibility (#1347)", () => {
+  const typeInto = (input: HTMLInputElement, value: string) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const nameOf = (input: HTMLInputElement) => [...(input.labels ?? [])].map((label) => label.textContent).join(" ");
+
+  it("names the input without the clear button once text is typed", () => {
+    act(() => root.render(createElement(DestinationSearch, { destinations: buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }) })));
+    let input = container.querySelector("input[role=combobox]") as HTMLInputElement;
+    typeInto(input, "account");
+    expect(container.querySelector('button[aria-label="Clear search"]')).not.toBeNull();
+    expect(nameOf(input)).toBe("Find a page or task");
+
+    act(() => root.render(createElement(AreaClubSearchForm, { basePath: "/clubs", label: "Search clubs", query: "", shown: 1, total: 1 })));
+    input = container.querySelector("input[type=search]") as HTMLInputElement;
+    typeInto(input, "river");
+    expect(container.querySelector('button[aria-label="Clear search"]')).not.toBeNull();
+    expect(nameOf(input)).toBe("Search clubs");
+    expect(nameOf(input)).not.toContain("Clear search");
+  });
+
+  it("focuses the input on a mousedown in the wrapper's padding, but never prevents a mousedown on the input", () => {
+    act(() => root.render(createElement(EventsSearchField, { defaultValue: "" })));
+    const input = container.querySelector("input") as HTMLInputElement;
+    const wrapper = container.querySelector(".search-field") as HTMLElement;
+    const onPadding = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    act(() => { wrapper.dispatchEvent(onPadding); });
+    expect(onPadding.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(input);
+    input.blur();
+    const onInput = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    act(() => { input.dispatchEvent(onInput); });
+    expect(onInput.defaultPrevented).toBe(false);
   });
 });

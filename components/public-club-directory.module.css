@@ -147,7 +147,6 @@
   color: var(--ink);
 }
 
-.clearButton,
 .retryButton,
 .resetButton {
   display: inline-flex;
@@ -167,7 +166,6 @@
   margin-top: 10px;
 }
 
-.clearButton:focus-visible,
 .retryButton:focus-visible,
 .resetButton:focus-visible,
 .viewToggle button:focus-visible,

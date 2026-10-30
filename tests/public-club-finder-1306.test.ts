@@ -47,7 +47,7 @@ function type(input: HTMLInputElement, value: string) {
   });
 }
 
-const clearButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Clear search"));
+const clearButton = () => [...container.querySelectorAll("button")].find((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").includes("Clear search"));
 
 describe("find a club search flow (#1306)", () => {
   it("filters, offers Clear search, and restores the full list and count", () => {
