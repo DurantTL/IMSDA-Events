@@ -3,6 +3,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { SearchClearButton } from "@/components/search-clear-button";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -704,6 +705,7 @@ export function ClubRosterWorkspace({
                   type="search"
                   value={query}
                 />
+                <SearchClearButton onClear={() => setQuery("")} visible={query !== ""} />
               </span>
             </label>
             <div className={styles.rosterFilterButtons}>

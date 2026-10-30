@@ -2,9 +2,16 @@
 import { readFileSync } from "node:fs";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/admin", useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 import { HonorCombobox } from "@/components/honor-combobox";
 import { searchWatchCatalog } from "@/modules/honors/watch-domain";
+import { SearchClearButton } from "@/components/search-clear-button";
+import { EventsSearchField } from "@/app/(public)/events/events-search-field";
+import { DestinationSearch } from "@/components/destination-search";
+import { buildSearchDestinations } from "@/components/destination-search-model";
+import { hasSearchWords } from "@/components/destination-search-model";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -90,7 +97,7 @@ describe("one search field in the CSS (#1347)", () => {
   });
 
   it("hides the native clear x on every search input and gives the clear button a 44px target", () => {
-    expect(css).toContain('input[type="search"]::-webkit-search-cancel-button');
+    expect(css).toContain('.search-field input[type="search"]::-webkit-search-cancel-button');
     expect(rule(".search-field-clear")).toContain("width: var(--touch-target, 44px)");
     expect(css).toMatch(/\.searchable-select-control > button \{[^}]*width: var\(--touch-target, 44px\)/);
   });
@@ -115,8 +122,60 @@ describe("one search field in the CSS (#1347)", () => {
     expect(finder).not.toMatch(/\.search \{[^}]*border/);
     expect(finder).not.toMatch(/\.search \{[^}]*border-radius: 12px/);
     expect(roster).not.toMatch(/\.rosterSearchInput[^{]*\{[^}]*(border|outline)/);
-    expect(events).toContain(".eventsDirectoryField .search-field input { min-height: 42px; border: 0;");
+    expect(events).toContain(".eventsDirectoryField :global(.search-field) input { min-height: 42px; border: 0;");
     expect(readFileSync("components/public-club-directory.tsx", "utf8")).toContain("search-field ${styles.search}");
     expect(readFileSync("components/club-roster-workspace.tsx", "utf8")).toContain("search-field ${styles.rosterSearchInput}");
+  });
+});
+
+describe("clear button (#1347)", () => {
+  const typeInto = (input: HTMLInputElement, value: string) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const clear = () => container.querySelector<HTMLButtonElement>('button[aria-label="Clear search"]');
+
+  it("is a 44px class button, hidden without text", () => {
+    act(() => root.render(createElement(SearchClearButton, { onClear: () => {}, visible: false })));
+    expect(clear()).toBeNull();
+    act(() => root.render(createElement(SearchClearButton, { onClear: () => {}, visible: true })));
+    expect(clear()?.className).toBe("search-field-clear");
+  });
+
+  it("shows on the events search only with text, empties the field and refocuses it", () => {
+    act(() => root.render(createElement(EventsSearchField, { defaultValue: "" })));
+    const input = container.querySelector("input") as HTMLInputElement;
+    expect(clear()).toBeNull();
+    typeInto(input, "camp");
+    expect(clear()).not.toBeNull();
+    act(() => clear()!.click());
+    expect(input.value).toBe("");
+    expect(document.activeElement).toBe(input);
+    expect(clear()).toBeNull();
+  });
+
+  it("works in the destination search and honor combobox", () => {
+    act(() => root.render(createElement(DestinationSearch, { destinations: buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }) })));
+    const dest = container.querySelector("input[role=combobox]") as HTMLInputElement;
+    expect(clear()).toBeNull();
+    typeInto(dest, "account");
+    expect(clear()).not.toBeNull();
+    act(() => clear()!.click());
+    expect(dest.value).toBe("");
+    act(() => root.render(createElement(HonorCombobox, { label: "Honor", onChange: () => {}, options, value: "" })));
+    const honor = container.querySelector("input[role=combobox]") as HTMLInputElement;
+    expect(clear()).toBeNull();
+    typeInto(honor, "fire");
+    expect(clear()).not.toBeNull();
+    act(() => clear()!.click());
+    expect(honor.value).toBe("");
+  });
+
+  it("treats accented letters as search words", () => {
+    expect(hasSearchWords("é")).toBe(true);
+    expect(hasSearchWords(" - ")).toBe(false);
   });
 });

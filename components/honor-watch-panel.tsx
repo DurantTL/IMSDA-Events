@@ -45,6 +45,7 @@ function blankDraft(): Draft {
 
 export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string; catalog: CatalogHonor[]; initial: Panel }) {
   const headingId = useId();
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [classes, setClasses] = useState(initial.classes);
   const [drafts, setDrafts] = useState<Draft[]>(initial.watches.map(toDraft));
   const [error, setError] = useState("");
@@ -104,7 +105,8 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
         {drafts.length === 0 && <p className="quiet-copy">No honor watches yet.</p>}
         {drafts.map((draft, index) => {
           const prefix = `${headingId}-${draft.localKey}`;
-          const matches = searchWatchCatalog(catalog, draft.honorIds, draft.honorSearch);
+          // The whole catalog is listed only for the watch being searched (focused or holding words), so N watches do not each draw it.
+          const matches = draft.honorSearch.trim() === "" && focusedKey !== draft.localKey ? [] : searchWatchCatalog(catalog, draft.honorIds, draft.honorSearch);
           return (
             <fieldset className="panel form-stack" key={draft.localKey}>
               <legend>Watch {index + 1}</legend>
@@ -133,6 +135,7 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
                   <input
                     autoComplete="off"
                     onChange={(event) => update(draft.localKey, { honorSearch: event.target.value })}
+                    onFocus={() => setFocusedKey(draft.localKey)}
                     placeholder="Search the catalog by name or code"
                     type="search"
                     value={draft.honorSearch}

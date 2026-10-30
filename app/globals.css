@@ -1248,8 +1248,8 @@ select:focus-visible {
 .search-field-clear { display: inline-grid; flex: none; place-items: center; width: var(--touch-target, 44px); height: 42px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
 .search-field-clear:hover { background: var(--paper); color: var(--ink); }
 .search-field-clear:focus-visible { outline: 2px solid var(--field-focus); outline-offset: -4px; }
-/* The native clear "x" is hidden on every search input; each field has its own 44px clear button. */
-input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+/* The native clear "x" is hidden inside a .search-field (it has its own 44px clear button); other search inputs keep it. */
+.search-field input[type="search"]::-webkit-search-cancel-button, .search-field input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .secondary-button,
 .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
 .secondary-button { border: 1px solid var(--line); background: #f9fbfb; color: var(--imsda-navy); text-decoration: none; }
@@ -1508,7 +1508,7 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-webki
 .scan-card small { display: block; }
 .scan-card strong { font-size: max(var(--type-staff-floor, 0px), 0.78rem); }
 .scan-card small { margin-top: 3px; color: #dfd2eb; font-size: max(var(--type-floor, 0px), 0.63rem); }
-.checkin-tools .search-field { padding: 9px 18px; }
+.checkin-tools .search-field { padding: 0 4px 0 12px; }
 .arrival-row { grid-template-columns: auto 1fr auto auto; }
 .arrival-time { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.67rem); }
 .arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
@@ -9557,7 +9557,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   :root .record-select input { width: 22px; height: 22px; }
 
   /* Search and filter controls: the input itself is 44px tall. */
-  :root :is(.search-field input, .filter-field select) { min-height: var(--touch-target); }
+  :root :is(.filter-field select) { min-height: var(--touch-target); }
+  /* Inside the 44px .search-field box the input is 42px, so the box stays 44px. */
+  :root .search-field input { min-height: 42px; }
 }
 
 /* Every input, select and textarea gets one clear keyboard/typing focus ring

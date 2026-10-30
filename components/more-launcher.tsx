@@ -24,6 +24,7 @@ import {
   type LauncherCloseReason,
 } from "@/components/more-launcher-model";
 import { DestinationSearch } from "@/components/destination-search";
+import { SearchClearButton } from "@/components/search-clear-button";
 import { GuardedLink } from "@/components/guarded-link";
 import { moduleStateLabels, type ModuleDestinationEntry } from "@/components/module-destination-states";
 import type { SearchDestination } from "@/components/destination-search-model";
@@ -228,6 +229,7 @@ export function MoreLauncherPanel({
             type="search"
             value={search}
           />
+          <SearchClearButton onClear={() => setSearch("")} visible={search !== ""} />
         </label>
         <p aria-live="polite" className="more-launcher-search-status" id={statusId} role="status">{launcherSearchStatus(search, matchCount)}</p>
       </div>

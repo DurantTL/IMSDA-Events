@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { visibleBottomBarTop } from "@/components/fixed-bottom-bars";
 import { comboboxKeyResult, comboboxPopoverPlacement, filterHonorsByWordPrefix, type ComboboxPlacement } from "@/modules/honors/honor-search";
 
@@ -166,7 +167,7 @@ export function HonorCombobox({
   return (
     <div className="honor-combobox">
       <label htmlFor={`${baseId}-input`}>{label}</label>
-      <div className="search-field" ref={fieldRef}>
+      <div className="search-field" onMouseDown={focusSearchInput} ref={fieldRef}>
       <Search aria-hidden="true" size={16} />
       <input
         aria-activedescendant={open && choices.length > 0 ? optionId(safeActive) : undefined}
@@ -187,6 +188,10 @@ export function HonorCombobox({
         role="combobox"
         type="text"
         value={typed ?? selectedName}
+      />
+      <SearchClearButton
+        onClear={() => { if (value) onChange(""); setTyped(""); setOpen(true); setActive(0); }}
+        visible={(typed ?? selectedName) !== ""}
       />
       </div>
       {name && <input name={name} type="hidden" value={value} />}

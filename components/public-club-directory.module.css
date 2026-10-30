@@ -147,12 +147,6 @@
   color: var(--ink);
 }
 
-/* Inside the box the clear button draws no border of its own. */
-.search .clearButton {
-  border: 0;
-  background: transparent;
-}
-
 .clearButton,
 .retryButton,
 .resetButton {

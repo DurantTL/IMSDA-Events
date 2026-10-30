@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Search } from "lucide-react";
+import { SearchClearButton } from "@/components/search-clear-button";
 import { filterTasks } from "@/components/event-modules-page-model";
 
 /**
@@ -77,6 +78,7 @@ export function MoreTaskSearch({ containerId }: { containerId: string }) {
           type="search"
           value={query}
         />
+        <SearchClearButton onClear={() => apply("")} visible={query !== ""} />
       </label>
       <p aria-live="polite" className="more-task-search-status" role="status">
         {shown === null ? "" : shown === 0 ? "No task or tool matches. Clear the search to see them all." : `${shown} ${shown === 1 ? "match" : "matches"}`}

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { SearchClearButton } from "@/components/search-clear-button";
 import { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/organization-search-controls";
 
 /**
@@ -53,11 +54,13 @@ export function AreaClubSearchForm({
   const formRef = useRef<HTMLFormElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pending, startTransition] = useTransition();
+  const [hasText, setHasText] = useState(query !== "");
 
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
     syncFieldValue(form.elements.namedItem("q") as HTMLInputElement | null, query, document.activeElement);
+    setHasText((form.elements.namedItem("q") as HTMLInputElement | null)?.value !== "");
   }, [query]);
 
   useEffect(() => () => {
@@ -97,12 +100,22 @@ export function AreaClubSearchForm({
           id="area-club-search"
           maxLength={80}
           name="q"
-          onChange={() => {
+          onChange={(event) => {
+            setHasText(event.target.value !== "");
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(apply, SEARCH_DEBOUNCE_MS);
           }}
           placeholder={label}
           type="search"
+        />
+        <SearchClearButton
+          onClear={() => {
+            const input = formRef.current?.elements.namedItem("q") as HTMLInputElement | null;
+            if (input) input.value = "";
+            setHasText(false);
+            apply();
+          }}
+          visible={hasText}
         />
       </label>
       <button className="secondary-button" type="submit">Search</button>

@@ -398,7 +398,7 @@ export function listDestinations(destinations: readonly SearchDestination[], que
 
 /** Whether a query holds any word to search for (letters or digits). */
 export function hasSearchWords(query: string): boolean {
-  return /[A-Za-z0-9]/.test(query);
+  return /[\p{L}\p{N}]/u.test(query);
 }
 
 /** The scope groups of a list that is already in `allDestinations` order, each with its starting index in the list. */
@@ -476,8 +476,12 @@ export function destinationKeyAction(input: {
       const next = nextDestinationIndex(expanded ? active : -1, input.count, input.key);
       return next === null ? { type: "none" } : { type: "move", index: next };
     }
-    case "Enter":
-      return expanded ? { type: "choose", index: active >= 0 ? active : 0 } : { type: "none" };
+    case "Enter": {
+      if (!expanded) return { type: "none" };
+      // With nothing typed the list is only a menu: Enter opens a page only once an entry is active.
+      if (!hasSearchWords(input.query)) return active >= 0 ? { type: "choose", index: active } : { type: "none" };
+      return { type: "choose", index: active >= 0 ? active : 0 };
+    }
     case "Escape":
       if (expanded) return { type: "close" };
       return input.query !== "" ? { type: "clear" } : { type: "restore-focus" };

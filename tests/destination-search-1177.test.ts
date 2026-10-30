@@ -420,9 +420,10 @@ describe("an empty, focused box lists every destination (#1347)", () => {
     expect(narrowed.length).toBeLessThan(allDestinations(built).length);
   });
 
-  it("opens an empty list with Enter on the first entry and the arrows", () => {
+  it("never opens a page on Enter from an empty box until an entry is active", () => {
     const empty = (key: string) => destinationKeyAction({ key, composing: false, open: true, query: "", count: built.length, active: -1 });
-    expect(empty("Enter")).toEqual({ type: "choose", index: 0 });
+    expect(empty("Enter")).toEqual({ type: "none" });
+    expect(destinationKeyAction({ key: "Enter", composing: false, open: true, query: "", count: built.length, active: 2 })).toEqual({ type: "choose", index: 2 });
     expect(empty("ArrowDown")).toEqual({ type: "move", index: 0 });
     expect(empty("Escape")).toEqual({ type: "close" });
   });

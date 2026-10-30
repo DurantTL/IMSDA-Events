@@ -19,6 +19,7 @@ import {
   type SearchDestination,
 } from "@/components/destination-search-model";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
+import { SearchClearButton } from "@/components/search-clear-button";
 import styles from "@/components/destination-search.module.css";
 
 /**
@@ -160,6 +161,7 @@ export function DestinationSearch({
           type="text"
           value={query}
         />
+        <SearchClearButton onClear={() => { setQuery(""); setActive(-1); setOpen(true); }} visible={query !== ""} />
       </label>
       <p aria-live="polite" className="sr-only" role="status">
         {destinationSearchStatus(query, results.length)}
