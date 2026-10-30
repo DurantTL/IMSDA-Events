@@ -784,6 +784,9 @@ enum ProgramUnassignedReason {
 
 model User {
   id            String            @id @default(cuid())
+  personMergesActed            PersonMerge[]                 @relation("PersonMergeActor")
+  personMergesReversed         PersonMerge[]                 @relation("PersonMergeReversedBy")
+  personAnonymizationsApproved PersonAnonymization[]         @relation("PersonAnonymizationApprovedBy")
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
   healthSnapshotHolds          HealthSnapshotHold[]        @relation("HealthSnapshotHoldPlacedBy")
   healthSnapshotHoldsLifted    HealthSnapshotHold[]        @relation("HealthSnapshotHoldLiftedBy")
@@ -2375,6 +2378,10 @@ model Person {
   lastName        String
   normalizedEmail String?  @unique
   phone           String?
+  /// Set once an approved deletion request anonymized this person's personal
+  /// fields (#127, `modules/people/anonymization.ts`). The row, its id and
+  /// every record that references it are kept.
+  anonymizedAt    DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -2390,6 +2397,9 @@ model Person {
   userLinks            UserPersonLink[]
   matchCandidatesAsA   PersonMatchCandidate[] @relation("PersonMatchCandidateAsA")
   matchCandidatesAsB   PersonMatchCandidate[] @relation("PersonMatchCandidateAsB")
+  mergesAsPrimary           PersonMerge[]                       @relation("PersonMergePrimary")
+  mergesAsSecondary         PersonMerge[]                       @relation("PersonMergeSecondary")
+  anonymization             PersonAnonymization?
   clubRosterMemberships ClubRosterMember[]
   healthSnapshots       HealthRecordSnapshot[]
   healthSnapshotHolds   HealthSnapshotHold[]
@@ -2483,9 +2493,9 @@ enum PersonMatchState {
   /// or the underlying data changed while this one was still open). Kept
   /// for history rather than deleted.
   SUPERSEDED
-  /// Reserved for slice 3 (#127, merge/unmerge — not yet built). Nothing in
-  /// this codebase ever sets this value; it exists so the enum does not
-  /// need a breaking migration when merge ships.
+  /// A staff-reviewed soft-merge (#127) used this candidate. Set only by
+  /// `mergePeople`; `unmergePeople` restores the state saved in
+  /// `PersonMerge.priorState`.
   MERGED
 }
 
@@ -3187,11 +3197,73 @@ model PersonMatchCandidate {
   personA        Person @relation("PersonMatchCandidateAsA", fields: [personAId], references: [id], onDelete: Cascade)
   personB        Person @relation("PersonMatchCandidateAsB", fields: [personBId], references: [id], onDelete: Cascade)
   dismissedByUser User? @relation("PersonMatchCandidateDismissedBy", fields: [dismissedByUserId], references: [id], onDelete: SetNull)
+  merges          PersonMerge[]
 
   @@unique([personAId, personBId, fingerprint])
   @@index([personAId])
   @@index([personBId])
   @@index([state])
+}
+
+enum PersonMergeState {
+  ACTIVE
+  REVERSED
+}
+
+/// A reversible soft-merge of two `Person` rows (#127). It is a link, not a
+/// rewrite: no foreign key, household membership, account link, registration,
+/// payment, consent record or audit actor is touched, so unmerging (state
+/// REVERSED) leaves everything exactly as it was. Reads resolve a person to
+/// its canonical primary by following ACTIVE links (`resolveCanonicalPersonId`).
+///
+/// `primaryPersonId` / `secondaryPersonId` are the resolved roots at merge
+/// time (the link is secondaryRoot -> primaryRoot); the people the reviewer
+/// actually selected are kept in `evidence`. Migration-level guards: at most
+/// one ACTIVE merge per secondary, primary <> secondary, and reversal fields
+/// present exactly when REVERSED. Rows are never deleted; the person foreign
+/// keys are Restrict so history cannot be cascaded away.
+model PersonMerge {
+  id                String           @id @default(cuid())
+  primaryPersonId   String
+  secondaryPersonId String
+  state             PersonMergeState @default(ACTIVE)
+  actorUserId       String
+  reason            String
+  /// Ids only: the people originally requested and the roots they resolved to.
+  evidence          Json
+  sourceCandidateId String?
+  /// What unmerge needs to restore exactly (the source candidate's prior state).
+  priorState        Json
+  mergedAt          DateTime         @default(now())
+  reversedAt        DateTime?
+  reversedByUserId  String?
+  reversalReason    String?
+
+  primaryPerson   Person                @relation("PersonMergePrimary", fields: [primaryPersonId], references: [id], onDelete: Restrict)
+  secondaryPerson Person                @relation("PersonMergeSecondary", fields: [secondaryPersonId], references: [id], onDelete: Restrict)
+  actor           User                  @relation("PersonMergeActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  reversedBy      User?                 @relation("PersonMergeReversedBy", fields: [reversedByUserId], references: [id], onDelete: Restrict)
+  sourceCandidate PersonMatchCandidate? @relation(fields: [sourceCandidateId], references: [id], onDelete: SetNull)
+
+  /// Partial unique index (migration): one ACTIVE merge per secondaryPersonId.
+  @@index([primaryPersonId, state])
+  @@index([secondaryPersonId, state])
+  @@index([sourceCandidateId])
+}
+
+/// The record that an approved deletion request anonymized a person (#127).
+/// One row per person; the fields list is `PERSON_ANONYMIZED_FIELDS`. Never
+/// deleted, and the person row it points at is never deleted either.
+model PersonAnonymization {
+  id                String   @id @default(cuid())
+  personId          String   @unique
+  approvedByUserId  String
+  approvalReference String
+  fields            String[]
+  anonymizedAt      DateTime @default(now())
+
+  person     Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  approvedBy User   @relation("PersonAnonymizationApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
 }
 
 model Registration {

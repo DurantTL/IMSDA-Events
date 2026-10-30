@@ -53,6 +53,7 @@
     "test:attendance-reconciliation": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-attendance-reconciliation.ts",
     "test:consent-policies": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-consent-policies.ts",
     "test:guardian-authority": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-guardian-authority.ts",
+    "test:person-soft-merge": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-person-soft-merge.ts",
     "test:acknowledgments": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-acknowledgments.ts",
     "test:signatures": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-signatures.ts",
     "test:square-hosted-link": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-square-hosted-link.ts",

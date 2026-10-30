@@ -1,0 +1,29 @@
+.primaryChoice {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.primaryChoice legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.radioRow input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}

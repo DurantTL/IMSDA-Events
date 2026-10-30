@@ -153,12 +153,13 @@ const ids = {
 async function seedBefore527(clubYear: string) {
   // Before the later migrations are deployed, select only the id: the default
   // RETURNING lists every column of the current client, including ones these
-  // older migrations have not added yet (#649, and User.attendeeAccountId, #554).
+  // older migrations have not added yet (#649, User.attendeeAccountId #554, and
+  // Person.anonymizedAt #127).
   await db.user.create({ data: { id: ids.user, email: `${P}.admin@example.test`, displayName: "Verify Admin", globalRole: "SYSTEM_ADMIN" }, select: { id: true } });
   await db.organization.create({ data: { id: ids.church, type: "CHURCH", name: "Verify Church", normalizedName: "verify church" }, select: { id: true } });
   await db.organization.create({ data: { id: ids.club, type: "CLUB", name: "Verify Pathfinders", normalizedName: "verify pathfinders", parentOrganizationId: ids.church }, select: { id: true } });
   for (const person of people) {
-    await db.person.create({ data: { id: ids.person(person.key), firstName: person.firstName, lastName: person.lastName, normalizedEmail: person.email ?? null } });
+    await db.person.create({ data: { id: ids.person(person.key), firstName: person.firstName, lastName: person.lastName, normalizedEmail: person.email ?? null }, select: { id: true } });
     await db.clubRosterMember.create({
       data: { id: ids.member(person.key), organizationId: ids.club, clubYear, personId: ids.person(person.key), attendeeType: "ADULT", source: "DIRECTOR" },
     });
