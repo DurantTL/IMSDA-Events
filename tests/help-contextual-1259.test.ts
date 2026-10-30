@@ -77,7 +77,7 @@ describe("the dialog", () => {
     expect(source).toContain(".close()");
     // Focus return moved to the shared dialog hook (#1354).
     expect(source).toContain("returnFocus: () => triggerRef.current");
-    expect(source).toContain("onClose={close}");
+    expect(source).toMatch(/onClose=\{\(event\) => \{ if \(!event.currentTarget.open\) close\(\); \}\}/);
     const css = readFileSync(join(root, "components/contextual-help.module.css"), "utf8");
     expect(css).toMatch(/\.trigger,\s*\.action\s*\{[^}]*min-height: 44px/);
   });
