@@ -79,6 +79,12 @@ function buildFakePrisma(fixture: {
       candidates.push(row);
       return { ...row };
     }),
+    updateMany: vi.fn(async ({ where, data }: { where: { id: string; state: string }; data: Partial<CandidateRow> }) => {
+      const hit = candidates.filter((row) => row.id === where.id && row.state === where.state);
+      for (const row of hit) Object.assign(row, data);
+      return { count: hit.length };
+    }),
+    findUniqueOrThrow: vi.fn(async ({ where }: { where: { id: string } }) => ({ ...candidates.find((row) => row.id === where.id)! })),
     update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<CandidateRow> }) => {
       const row = candidates.find((candidate) => candidate.id === where.id);
       if (!row) throw new Error("not found");
@@ -112,6 +118,7 @@ function buildFakePrisma(fixture: {
       findMany: vi.fn(async () => externalIdentities.filter((row) => row.personId !== null)),
     },
     personMatchCandidate,
+    personMerge: { findMany: vi.fn(async () => [] as unknown[]) },
     $transaction: vi.fn(async (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma)),
   };
   return prisma;

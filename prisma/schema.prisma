@@ -2003,11 +2003,11 @@ model EventLocation {
   honorSessions   HonorSession[]
   honorOfferings  HonorOffering[]
   honorRooms      HonorRoom[]
-  generalLinkSubmissions GeneralLinkSubmission[]
 
   @@unique([eventId, normalizedName])
   @@index([eventId, isActive, sortOrder])
   @@index([coordinatorAccountId])
+  generalLinkSubmissions GeneralLinkSubmission[]
 }
 
 enum LocationWaitlistChangeKind {

@@ -33,7 +33,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[] };
+  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -64,8 +64,12 @@ function fakeDatabase() {
           ["guardianAuthoritiesAsMinor", "guardianAuthoritiesAsAdult", "guardianAuthoritiesDeclared", "guardianConflictsAsMinor", "guardianConflictsAsAdult"]
             .filter((key) => requested[key]).map((key) => [key, guardian]),
         );
+        const mergeCounts = Object.fromEntries(
+          ["mergesAsPrimary", "mergesAsSecondary"].filter((key) => requested[key]).map((key) => [key, db.mergeReferences.has(person.id) ? 1 : 0]),
+        );
         return {
           _count: {
+            ...mergeCounts,
             householdMembers: 0, heldRegistrations: 0, registrationEvents: referenced, externalIdentities: 0,
             notes: 0, attendeeAccountLinks: 0, userLinks: 0, healthSnapshots: db.snapshotReferences.has(person.id) ? 1 : 0,
             memberClassCompletions: db.classCompletions.filter((row) => row.personId === person.id).length,
@@ -75,6 +79,7 @@ function fakeDatabase() {
         };
       },
     },
+    personAnonymization: { count: async ({ where }: { where: { personId: string } }) => (db.anonymizedReferences.has(where.personId) ? 1 : 0) },
     // Transfer records (#489) are blanked, never counted, when a person is erased.
     memberTransfer: {
       findMany: async ({ where }: { where: { status?: unknown } }) => { if (where.status) db.blankedTransferWhere.push({ status: where.status }); return [{ id: "transfer-1" }]; },
@@ -535,6 +540,29 @@ describe("club roster storage", () => {
     expect(db.people.some((person) => person.id === personId)).toBe(true);
     const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
     expect(removal.metadata).toMatchObject({ personDeleted: false });
+  });
+
+  it("keeps the person when merge history or an anonymization record refers to them (#127)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.mergeReferences.add(personId);
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    // Those foreign keys are `onDelete: Restrict`, so deleting the person would fail the removal with a 500.
+    expect(db.people.some((person) => person.id === personId)).toBe(true);
+    const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+    expect(removal.metadata).toMatchObject({ personDeleted: false });
+  });
+
+  it("keeps the person when an anonymization record refers to them (#127)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.anonymizedReferences.add(personId);
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.people.some((person) => person.id === personId)).toBe(true);
   });
 
   it("keeps the person while a sealed health copy refers to them, and tells the director nothing new (#924)", async () => {

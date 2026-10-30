@@ -200,9 +200,26 @@ async function main() {
   const dd = await mergePeople({ primaryPersonId: a!.id, secondaryPersonId: d!.id, actorUserId: ids.staff, reason: REASON }); // d joins c, the ultimate primary
   assert(dd.primaryPersonId === c!.id, "a person merged under a merged person joins the ultimate primary");
   assert(await code(mergePeople({ primaryPersonId: d!.id, secondaryPersonId: c!.id, actorUserId: ids.staff, reason: REASON })) === "SAME_PERSON", "a cycle is refused");
+  assert(await code(unmergePeople(bc.id, ids.staff, REASON)) === "DEPENDENT_MERGE", "the middle link cannot be undone while d's merge (made through a) relies on it");
+  await unmergePeople(dd.id, ids.staff, REASON);
+  assert(await resolveCanonicalPersonId(d!.id) === d!.id && await resolveCanonicalPersonId(a!.id) === c!.id, "undoing the later merge leaves the rest as it was");
   await unmergePeople(bc.id, ids.staff, REASON);
-  assert(await resolveCanonicalPersonId(a!.id) === b!.id && await resolveCanonicalPersonId(b!.id) === b!.id && await resolveCanonicalPersonId(d!.id) === c!.id, "unmerging the middle link restores exactly what was under it");
+  assert(await resolveCanonicalPersonId(a!.id) === b!.id && await resolveCanonicalPersonId(b!.id) === b!.id && await resolveCanonicalPersonId(d!.id) === d!.id, "unmerging the middle link restores exactly what was under it");
   void ab;
+
+  // ---- An inner link that a later reviewed merge relies on cannot be unmerged first ----
+  const [da, db, dc] = await Promise.all(["dpa", "dpb", "dpc"].map((label) => newPerson(label)));
+  const inner = await mergePeople({ primaryPersonId: da!.id, secondaryPersonId: db!.id, actorUserId: ids.staff, reason: REASON }); // b -> a
+  const [lo, hi] = [db!.id, dc!.id].sort();
+  const laterCandidate = await prisma.personMatchCandidate.create({ data: { personAId: lo!, personBId: hi!, matchedSignals: ["PHONE_MATCH"], confidence: "HIGH", ruleVersion: 1, fingerprint: `${P}-fp-dep` } });
+  const outer = await mergeMatchCandidate(laterCandidate.id, dc!.id, ids.staff, REASON); // b resolves to a, so a -> c
+  assert(outer.secondaryPersonId === da!.id && outer.primaryPersonId === dc!.id, "the later merge stores the roots (a under c)");
+  assert(await code(unmergePeople(inner.id, ids.staff, REASON)) === "DEPENDENT_MERGE", "unmerging the inner link is refused while the later merge depends on it");
+  assert((await prisma.personMerge.findUniqueOrThrow({ where: { id: inner.id } })).state === "ACTIVE" && await resolveCanonicalPersonId(db!.id) === dc!.id, "the refusal changed nothing");
+  await unmergePeople(outer.id, ids.staff, REASON);
+  assert((await prisma.personMatchCandidate.findUniqueOrThrow({ where: { id: laterCandidate.id } })).state === "OPEN", "the later merge's candidate is OPEN again");
+  await unmergePeople(inner.id, ids.staff, REASON);
+  assert(await resolveCanonicalPersonId(db!.id) === db!.id, "with the later merge undone first, the inner one can be undone");
 
   // ---- Concurrency: overlapping merges never cycle, lose a merge, or give a person two primaries ----
   for (let round = 0; round < 5; round += 1) {

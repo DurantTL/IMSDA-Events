@@ -41,6 +41,7 @@ function ConfidenceChip({ confidence }: { confidence: string }) {
 
 type CandidatesResponse = {
   candidates?: PersonMatchCandidateRecord[];
+  merges?: PersonMergeRecord[];
   candidate?: PersonMatchCandidateRecord;
   merge?: { id: string; state: string };
   result?: { created: number; superseded: number; unchanged: number; evaluated: number };
@@ -97,6 +98,16 @@ export function DuplicateMatchReviewWorkspace({
       throw new Error(result.message ?? result.issues?.[0]?.message ?? "That request could not be completed.");
     }
     return result;
+  }
+
+  /** Reloads both lists so the screen shows what is actually stored. */
+  async function refreshLists() {
+    const [candidateResult, mergeResult] = await Promise.all([
+      fetch("/api/people/matches").then(readResponse),
+      fetch("/api/people/merges").then(readResponse),
+    ]);
+    setCandidates(candidateResult.candidates ?? []);
+    setMerges(mergeResult.merges ?? []);
   }
 
   async function runGeneration() {
@@ -167,18 +178,13 @@ export function DuplicateMatchReviewWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primaryPersonId, reason: mergeReason }),
       });
-      const result = await readResponse(response);
+      await readResponse(response);
       const primary = merging.personA.id === primaryPersonId ? merging.personA : merging.personB;
       const secondary = merging.personA.id === primaryPersonId ? merging.personB : merging.personA;
       setCandidates((current) => current.filter((candidate) => candidate.id !== merging.id));
-      if (result.merge) {
-        const mergeId = result.merge.id;
-        setMerges((current) => [
-          { id: mergeId, primaryPerson: primary, secondaryPerson: secondary, reason: mergeReason.trim(), mergedAt: new Date().toISOString() },
-          ...current,
-        ]);
-      }
-      setNotice(`Merged ${personLine(secondary)} under ${personLine(primary)}. Both records are kept, and you can unmerge below.`);
+      // The stored link can differ from the pair picked (a person who was already merged resolves to its primary).
+      await refreshLists().catch(() => undefined);
+      setNotice(`Merged ${personLine(secondary)} with ${personLine(primary)}. Both records are kept, and you can unmerge below.`);
       setMerging(null);
       setPrimaryPersonId("");
       setMergeReason("");
@@ -202,7 +208,8 @@ export function DuplicateMatchReviewWorkspace({
       });
       await readResponse(response);
       setMerges((current) => current.filter((merge) => merge.id !== unmerging.id));
-      setNotice(`Unmerged ${personLine(unmerging.secondaryPerson)} from ${personLine(unmerging.primaryPerson)}. They are separate people again; run a scan to see the pair in the queue.`);
+      await refreshLists().catch(() => undefined);
+      setNotice(`Unmerged ${personLine(unmerging.secondaryPerson)} from ${personLine(unmerging.primaryPerson)}. They are separate people again, and the pair is back in the queue if it is still a candidate.`);
       setUnmerging(null);
       setUnmergeReason("");
     } catch (caught) {

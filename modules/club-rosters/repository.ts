@@ -536,6 +536,9 @@ export async function removeRosterMember(organizationId: string, memberId: strin
               // and both references are `onDelete: Restrict`, so the Person stays rather than failing the removal.
               acknowledgmentEvidenceAsSubject: true,
               acknowledgmentEvidenceActed: true,
+              // Merge history (#127) and the anonymization record both point at the Person with `onDelete: Restrict`.
+              mergesAsPrimary: true,
+              mergesAsSecondary: true,
             },
           },
         },
@@ -544,9 +547,11 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       // block deleting the Person (`onDelete: Restrict`).
       const orderedNeeds = await tx.clubOrderNeed.count({ where: { personId: member.personId, status: { not: "NEEDED" } } });
       const openElsewhere = await tx.clubOrderNeed.count({ where: { personId: member.personId, status: "NEEDED" } });
+      // One-to-one, so it cannot be part of `_count`.
+      const anonymizationRecords = await tx.personAnonymization.count({ where: { personId: member.personId } });
       if (person) {
         const { heldRegistrations, registrationEvents, healthSnapshots, ...others } = person._count;
-        const otherUses = Object.values(others).reduce((sum, count) => sum + count, 0) + openElsewhere;
+        const otherUses = Object.values(others).reduce((sum, count) => sum + count, 0) + openElsewhere + anonymizationRecords;
         const sealedCopies = healthSnapshots ?? 0;
         if (otherUses === 0 && heldRegistrations === 0 && registrationEvents === 0 && orderedNeeds === 0 && sealedCopies === 0) {
           await blankTransferText(tx, member.personId);

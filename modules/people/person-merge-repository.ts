@@ -36,6 +36,7 @@ export type PersonMergeErrorCode =
   | "CANDIDATE_NOT_OPEN"
   | "ANONYMIZED_PERSON"
   | "NOT_ACTIVE"
+  | "DEPENDENT_MERGE"
   | "RESOLUTION_FAILED"
   | "CONFLICT";
 
@@ -203,7 +204,9 @@ export async function mergePeople(input: MergePeopleInput) {
     }
 
     if (sourceCandidate) {
-      await tx.personMatchCandidate.update({ where: { id: sourceCandidate.id }, data: { state: "MERGED" } });
+      // Guarded on OPEN so a dismissal that landed since the read above is never overwritten.
+      const marked = await tx.personMatchCandidate.updateMany({ where: { id: sourceCandidate.id, state: "OPEN" }, data: { state: "MERGED" } });
+      if (marked.count === 0) throw new PersonMergeError("CANDIDATE_NOT_OPEN", "Only an open match candidate can be merged.");
     }
 
     await writeAuditLog({
@@ -262,6 +265,30 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
       throw new PersonMergeError("NOT_ACTIVE", "Only an active merge can be unmerged.");
     }
 
+    // A later reviewed merge may rely on this link: its stored link sits outside the people about to be
+    // detached while one of the people its reviewer picked sits inside. Undoing this one would silently
+    // undo that merge too, so the later one has to be undone first.
+    let detached: Set<string>;
+    try {
+      const { members } = await collectMergedMembers(existing.secondaryPersonId, childLoader(tx));
+      detached = new Set([existing.secondaryPersonId, ...members.map((member) => member.personId)]);
+    } catch (error) {
+      if (error instanceof PersonMergeResolutionError) throw new PersonMergeError("RESOLUTION_FAILED", error.message);
+      throw error;
+    }
+    const others = await tx.personMerge.findMany({
+      where: { state: "ACTIVE", id: { not: mergeId } },
+      select: { id: true, secondaryPersonId: true, evidence: true },
+    });
+    const dependent = others.find((other) => {
+      if (detached.has(other.secondaryPersonId)) return false;
+      const evidence = (other.evidence ?? {}) as { requestedPrimaryPersonId?: string; requestedSecondaryPersonId?: string };
+      return [evidence.requestedPrimaryPersonId, evidence.requestedSecondaryPersonId].some((id) => id !== undefined && detached.has(id));
+    });
+    if (dependent) {
+      throw new PersonMergeError("DEPENDENT_MERGE", "Undo the later merge first: it was made through one of these people and relies on this merge.");
+    }
+
     const reversed = await tx.personMerge.update({
       where: { id: mergeId },
       data: { state: "REVERSED", reversedAt: new Date(), reversedByUserId: actorUserId, reversalReason: trimmedReason },
@@ -270,13 +297,21 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
     const prior = (existing.priorState as { sourceCandidate?: { id: string; state: string } | null } | null)?.sourceCandidate ?? null;
     let restoredCandidateState: string | null = null;
     if (prior && existing.sourceCandidateId) {
-      const candidate = await tx.personMatchCandidate.findUnique({ where: { id: existing.sourceCandidateId }, select: { state: true } });
+      const candidate = await tx.personMatchCandidate.findUnique({ where: { id: existing.sourceCandidateId }, select: { state: true, personAId: true, personBId: true } });
       if (candidate?.state === "MERGED") {
-        await tx.personMatchCandidate.update({
-          where: { id: existing.sourceCandidateId },
-          data: { state: prior.state as Prisma.PersonMatchCandidateUpdateInput["state"] },
+        // If a newer open candidate now exists for this pair, the restored one is superseded rather than a duplicate.
+        const newer = prior.state === "OPEN"
+          ? await tx.personMatchCandidate.findFirst({
+            where: { personAId: candidate.personAId, personBId: candidate.personBId, state: "OPEN", id: { not: existing.sourceCandidateId } },
+            select: { id: true },
+          })
+          : null;
+        const restoreTo = newer ? "SUPERSEDED" : prior.state;
+        const restored = await tx.personMatchCandidate.updateMany({
+          where: { id: existing.sourceCandidateId, state: "MERGED" },
+          data: { state: restoreTo as Prisma.PersonMatchCandidateUpdateInput["state"] },
         });
-        restoredCandidateState = prior.state;
+        if (restored.count > 0) restoredCandidateState = restoreTo;
       }
     }
 

@@ -81,9 +81,9 @@ function buildFake(fixture: { people?: string[]; merges?: MergeRow[]; candidates
     user: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (fixture.users ?? []).find((u) => u.id === where.id) ?? null) },
     personAnonymization: { create: vi.fn(async ({ data }: { data: unknown }) => { anonymizations.push(data); return data; }) },
     personMerge: {
-      findMany: vi.fn(async ({ where }: { where: { secondaryPersonId?: { in: string[] }; primaryPersonId?: { in: string[] }; state: string } }) =>
+      findMany: vi.fn(async ({ where }: { where: { secondaryPersonId?: { in: string[] }; primaryPersonId?: { in: string[] }; id?: { not: string }; state: string } }) =>
         merges.filter((m) =>
-          m.state === where.state &&
+          m.state === where.state && (!where.id || m.id !== where.id.not) &&
           (!where.secondaryPersonId || where.secondaryPersonId.in.includes(m.secondaryPersonId)) &&
           (!where.primaryPersonId || where.primaryPersonId.in.includes(m.primaryPersonId))).map((m) => ({ ...m }))),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => { const m = merges.find((row) => row.id === where.id); return m ? { ...m } : null; }),
@@ -99,6 +99,16 @@ function buildFake(fixture: { people?: string[]; merges?: MergeRow[]; candidates
       }),
     },
     personMatchCandidate: {
+      findFirst: vi.fn(async ({ where }: { where: { personAId: string; personBId: string; state: string; id: { not: string } } }) => {
+        const c = candidates.find((row) => row.personAId === where.personAId && row.personBId === where.personBId && row.state === where.state && row.id !== where.id.not);
+        return c ? { ...c } : null;
+      }),
+      updateMany: vi.fn(async ({ where, data }: { where: { id?: string; state: string; OR?: Array<{ personAId?: string; personBId?: string }> }; data: Partial<CandidateRow> }) => {
+        const hit = candidates.filter((c) => c.state === where.state && (where.id ? c.id === where.id : true)
+          && (!where.OR || where.OR.some((clause) => c.personAId === clause.personAId || c.personBId === clause.personBId)));
+        for (const row of hit) Object.assign(row, data);
+        return { count: hit.length };
+      }),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => { const c = candidates.find((row) => row.id === where.id); return c ? { ...c } : null; }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<CandidateRow> }) => {
         const row = candidates.find((c) => c.id === where.id)!;
@@ -269,6 +279,38 @@ describe("unmergePeople", () => {
     expect((await mergePeople({ primaryPersonId: "a", secondaryPersonId: "b", actorUserId: "u1", reason: "same person" })).state).toBe("ACTIVE");
   });
 
+  it("refuses to unmerge a link that a later reviewed merge relies on, but allows the later one first", async () => {
+    const candidates: CandidateRow[] = [{ id: "c2", personAId: "b", personBId: "c", state: "OPEN", matchedSignals: [], ruleVersion: 1 }];
+    const fake = buildFake({ people: ["a", "b", "c"], merges: [link("b", "a", "m1")], candidates });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    // (b, c) merged with c primary: b resolves to a, so the stored link is a -> c.
+    const later = await mergeMatchCandidate("c2", "c", "u1", "same person");
+    expect(later).toMatchObject({ primaryPersonId: "c", secondaryPersonId: "a" });
+    expect(await codeOf(unmergePeople("m1", "u1", "valid reason"))).toBe("DEPENDENT_MERGE");
+    expect(fake.merges.find((m) => m.id === "m1")!.state).toBe("ACTIVE");
+    await unmergePeople(later.id, "u1", "valid reason");
+    expect((await unmergePeople("m1", "u1", "valid reason")).state).toBe("REVERSED");
+  });
+
+  it("supersedes the restored candidate when a newer open one exists for the pair", async () => {
+    const candidates: CandidateRow[] = [{ id: "c1", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: [], ruleVersion: 1 }];
+    const fake = buildFake({ people: ["a", "b"], candidates });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    const merge = await mergeMatchCandidate("c1", "a", "u1", "same person");
+    candidates.push({ id: "c9", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: [], ruleVersion: 2 });
+    await unmergePeople(merge.id, "u1", "valid reason");
+    expect(candidates.find((c) => c.id === "c1")!.state).toBe("SUPERSEDED");
+    expect(candidates.find((c) => c.id === "c9")!.state).toBe("OPEN");
+  });
+
+  it("does not overwrite a candidate that is no longer open when merging", async () => {
+    const candidates: CandidateRow[] = [{ id: "c1", personAId: "a", personBId: "b", state: "OPEN", matchedSignals: [], ruleVersion: 1 }];
+    const fake = buildFake({ people: ["a", "b"], candidates });
+    fake.tx.personMatchCandidate.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    expect(await codeOf(mergeMatchCandidate("c1", "a", "u1", "same person"))).toBe("CANDIDATE_NOT_OPEN");
+  });
+
   it("refuses a non-active merge, a missing merge, and a short reason", async () => {
     const reversed = { ...link("a", "b", "m1"), state: "REVERSED" as const };
     const fake = buildFake({ merges: [reversed, link("c", "d", "m2")] });
@@ -302,6 +344,18 @@ describe("anonymization", () => {
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
   });
 
+  it("takes the merge lock and supersedes the person's open candidates", async () => {
+    const candidates: CandidateRow[] = [
+      { id: "c1", personAId: "p1", personBId: "p2", state: "OPEN", matchedSignals: [], ruleVersion: 1 },
+      { id: "c2", personAId: "p2", personBId: "p3", state: "OPEN", matchedSignals: [], ruleVersion: 1 },
+    ];
+    const fake = buildFake({ people: ["p1", "p2", "p3"], candidates, users: [{ id: "admin", globalRole: "SYSTEM_ADMIN" }] });
+    mocks.getPrisma.mockReturnValue(fake.prisma);
+    await anonymizePerson({ personId: "p1", approvedByUserId: "admin", approvalReference: "Request 2026-14" });
+    expect(fake.tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(candidates.map((c) => c.state)).toEqual(["SUPERSEDED", "OPEN"]);
+  });
+
   it("refuses a short reference, a non-administrator approver, and a missing person", async () => {
     const fake = buildFake({ people: ["p1"], users: [{ id: "admin", globalRole: "SYSTEM_ADMIN" }, { id: "staff", globalRole: null }] });
     mocks.getPrisma.mockReturnValue(fake.prisma);
@@ -321,7 +375,7 @@ describe("anonymization", () => {
       "app/api/people/merges/route.ts",
     ];
     for (const file of files) expect(readFileSync(file, "utf8")).not.toMatch(/people\/anonymization|anonymizePerson/);
-    expect(readFileSync("modules/people/anonymization.ts", "utf8")).not.toMatch(/person-merge/);
+    expect(readFileSync("modules/people/anonymization.ts", "utf8")).not.toMatch(/from\s+"[^"]*person-merge/);
   });
 });
 
@@ -350,6 +404,14 @@ describe("merge routes", () => {
     expect((await merge(post({ primaryPersonId: "a", reason: "same person" }), mergeContext)).status).toBe(401);
     expect(mocks.mergeMatchCandidate).not.toHaveBeenCalled();
     expect(mocks.unmergePeople).not.toHaveBeenCalled();
+  });
+
+  it("refuses a non-administrator and an anonymous caller on GET /api/people/merges", async () => {
+    const { GET } = await import("@/app/api/people/merges/route");
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: null } });
+    expect((await GET(new Request("https://events.imsda.test/api/people/merges"))).status).toBe(403);
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    expect((await GET(new Request("https://events.imsda.test/api/people/merges"))).status).toBe(401);
   });
 
   it("lets a system administrator merge and unmerge, and rejects a missing reason", async () => {

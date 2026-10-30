@@ -96,8 +96,13 @@ entry (`PERSON_MERGED`, ids only: no names, contact details or reason text).
   (the row is never deleted), restores the source candidate, and writes
   `PERSON_MERGE_REVERSED`. Everything underneath the secondary resolves to the
   secondary again, which is the state before the merge. A non-active merge is
-  refused.
-- **Concurrency:** merge and unmerge take one `pg_advisory_xact_lock` in an
+  refused. So is unmerging a link that a later ACTIVE merge relies on (one of
+  the people its reviewer picked sits under this link while its stored link is
+  elsewhere): undo the later merge first (`DEPENDENT_MERGE`). A restored
+  candidate becomes `SUPERSEDED` if a newer open one exists for the pair.
+  Candidate generation and the queue skip pairs that already share a
+  canonical person, and anonymizing a person supersedes their open candidates.
+- **Concurrency:** merge, unmerge and anonymization take one `pg_advisory_xact_lock` in an
   interactive transaction and re-resolve roots inside it, so overlapping
   merges cannot make a cycle, lose a merge, or give a person two primaries. A
   partial unique index (one ACTIVE merge per secondary) and

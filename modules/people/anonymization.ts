@@ -61,6 +61,9 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
   }
 
   return getPrisma().$transaction(async (tx) => {
+    // The same lock merge and unmerge take (kept as a literal so this file stays free of merge imports), so an
+    // anonymization cannot commit between a merge's anonymized check and the merge's own commit.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('person-merge', 0))`;
     const approver = await tx.user.findUnique({ where: { id: input.approvedByUserId }, select: { globalRole: true } });
     if (approver?.globalRole !== "SYSTEM_ADMIN") {
       throw new PersonAnonymizationError("APPROVER_NOT_ALLOWED", "Only a system administrator can approve an anonymization.");
@@ -77,6 +80,11 @@ export async function anonymizePerson(input: AnonymizePersonInput) {
     });
     if (changed.count === 0) return { personId: person.id, alreadyAnonymized: true as const };
 
+    // An anonymous person is not a duplicate to review: close any open candidate that involves them.
+    await tx.personMatchCandidate.updateMany({
+      where: { state: "OPEN", OR: [{ personAId: person.id }, { personBId: person.id }] },
+      data: { state: "SUPERSEDED" },
+    });
     await tx.personAnonymization.create({
       data: {
         personId: person.id,
