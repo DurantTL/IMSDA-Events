@@ -437,15 +437,17 @@ a { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible,
 a:focus-visible,
+summary:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 /* On the dark navy surfaces (sidebar, heroes, the registration submit card) the ring is gold. */
 :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
-  :is(button, a, input, select, summary, [tabindex]):focus-visible {
+  :is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline-color: var(--focus-ring-on-dark);
 }
 
@@ -1679,8 +1681,7 @@ select:focus-visible {
   outline: 0;
 }
 .check-in-manual-form input:focus {
-  border-color: var(--imsda-purple);
-  box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1);
+  border-color: var(--field-focus);
 }
 .check-in-manual-form .secondary-button { min-height: 42px; }
 .check-in-scanner-error {
@@ -1896,7 +1897,7 @@ select:focus-visible {
 .form-stack textarea { resize: vertical; line-height: 1.55; }
 .form-stack input:focus,
 .form-stack select:focus,
-.form-stack textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.form-stack textarea:focus { border-color: var(--field-focus); }
 /* #918: a field label is a small grid (caption, control, help). In a grid row that is taller than the label (its
    neighbour has helper text) the label's own rows used to stretch, so the control grew into an empty tall box;
    keep the rows at their natural size and let the free space fall below. */
@@ -1997,7 +1998,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .auth-form + .auth-form { margin-top: 20px; }
 .auth-form > label { display: grid; gap: 6px; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
 .auth-form input:not([type="checkbox"]) { width: 100%; border: 1px solid var(--field-border); border-radius: 11px; background: #fbfcfd; color: var(--ink); padding: 11px 12px; outline: 0; }
-.auth-form input:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.auth-form input:focus { border-color: var(--field-focus); }
 .password-field { position: relative; display: block; }
 .password-field input { padding-right: 44px !important; }
 .password-field button { position: absolute; inset: 50% 7px auto auto; display: grid; border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 7px; transform: translateY(-50%); }
@@ -2313,7 +2314,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .builder-section input:focus,
 .builder-section select:focus,
 .builder-section textarea:focus,
-.confirmation-editor textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.09); }
+.confirmation-editor textarea:focus { border-color: var(--field-focus); }
 .builder-editor-head :disabled,
 .builder-section :disabled,
 .confirmation-editor :disabled { cursor: not-allowed; opacity: 0.72; }
@@ -3733,7 +3734,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-registration-field textarea { min-height: 115px; resize: vertical; line-height: 1.55; }
 .public-registration-field input:focus,
 .public-registration-field select:focus,
-.public-registration-field textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1); }
+.public-registration-field textarea:focus { border-color: var(--field-focus); }
 .public-registration-field-invalid input:not([type="checkbox"]):not([type="radio"]),
 .public-registration-field-invalid select,
 .public-registration-field-invalid textarea { border-color: var(--coral); box-shadow: 0 0 0 1px var(--coral); background: #fffdfc; } /* 2px in all: the box-shadow keeps the invalid state distinct from the grey field border */
@@ -5976,7 +5977,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .message-test-form input:focus,
 .message-settings-form input:focus,
 .message-settings-form select:focus,
-.message-settings-form textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.09); }
+.message-settings-form textarea:focus { border-color: var(--field-focus); }
 .message-body-field { display: grid; gap: 6px; }
 .message-body-field > strong { color: var(--ink); font-size: max(var(--type-floor, 0px), 0.62rem); }
 .message-body-editor { overflow: hidden; border: 1px solid #cbdbe2; border-radius: 14px; background: #eef2f4; }
@@ -6168,7 +6169,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .confirmation-resend-form > div > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.56rem); line-height: 1.55; }
 .confirmation-resend-form > label:not(.message-enabled-toggle) { display: grid; gap: 5px; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.59rem); font-weight: 800; }
 .confirmation-resend-form input[type="email"] { width: 100%; border: 1px solid var(--field-border); border-radius: 9px; background: white; color: var(--ink); padding: 9px 10px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.65rem); outline: 0; }
-.confirmation-resend-form input[type="email"]:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.09); }
+.confirmation-resend-form input[type="email"]:focus { border-color: var(--field-focus); }
 .confirmation-resend-form label > small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.5rem); font-weight: 500; }
 .confirmation-resend-form .secondary-button { justify-content: center; width: 100%; }
 
@@ -6321,8 +6322,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 
 .event-slug-input:focus-within,
 .input-with-icon:focus-within {
-  border-color: var(--imsda-purple);
-  box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1);
+  border-color: var(--field-focus);
 }
 
 .event-slug-input b {
@@ -8134,7 +8134,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   color: var(--ink); padding: 10px 11px; font-size: var(--text-helper-min); font-family: inherit; outline: 0;
 }
 @media (pointer: coarse) { .club-guest-form input { font-size: 1rem; } }
-.club-guest-form input:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.club-guest-form input:focus { border-color: var(--field-focus); }
 .club-sticky-bar {
   /* #996: in the page flow until the reader has scrolled past the intro (is-pinned), so it never covers it. */
   position: static; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
@@ -8828,7 +8828,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
 .assignment-edit-form textarea { width: 100%; border: 1px solid var(--field-border); border-radius: 9px; background: #fbfcfd; color: var(--ink); padding: 8px 9px; font-size: max(var(--type-body-floor, 0px), 0.72rem); outline: 0; }
 .assignment-edit-form textarea { min-height: 64px; resize: vertical; line-height: 1.5; }
 .assignment-edit-form input:focus,
-.assignment-edit-form textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.assignment-edit-form textarea:focus { border-color: var(--field-focus); }
 .club-assignment-preview { display: grid; gap: 12px; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .club-assignment-preview > p { margin: 0; }
 .club-assignment-preview .primary-button { justify-self: start; }
@@ -9561,17 +9561,22 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   :root .search-field-clear { height: var(--touch-target); }
 }
 
-/* Every input, select and textarea gets one clear keyboard/typing focus ring
-   (several form styles set outline: 0 and relied on a 10%-alpha shadow). */
-:root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+/* One focus ring for every field (#1349): a field-focus purple border plus one 2px ring with a 2px offset, no halo.
+   Bare fields draw it on :focus (so a mouse click on a select shows it too); wrapper boxes draw it on :focus-within and
+   their inner input draws none. An invalid field keeps its red border (the border rule below skips it) and gets the ring. */
+:root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus,
 :root:root:root :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
-  outline: 2px solid var(--imsda-purple);
+  outline: 2px solid var(--field-focus);
   outline-offset: 2px;
+}
+:root:root:root :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within,
+:root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):not([aria-invalid="true"], .public-registration-field-invalid *):focus {
+  border-color: var(--field-focus);
 }
 /* The same fields on the dark navy surfaces (the sidebar's event picker) get the gold ring (#1003); this has to match the
    strength of the purple rule above and come after it. */
 :root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
-  :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+  :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus,
 :root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
   :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
   outline-color: var(--focus-ring-on-dark);
@@ -9781,7 +9786,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .org-filter-field input,
 .org-filter-field select { box-sizing: border-box; width: 100%; min-height: 42px; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--ink); padding: 10px 11px; font-size: max(var(--type-body-floor, 0px), 0.78rem); font-weight: 400; outline: 0; }
 .org-filter-field input:focus,
-.org-filter-field select:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.org-filter-field select:focus { border-color: var(--field-focus); }
 .org-filter-submit { min-height: 42px; }
 .org-filter-bar[aria-busy="true"] { opacity: 0.75; }
 .org-result-summary { margin: 0 0 12px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.7rem); }

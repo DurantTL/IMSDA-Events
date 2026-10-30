@@ -19,7 +19,6 @@
 .monthName { font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .monthSelected { background: #003b5c; border-color: #003b5c; color: #fff; }
 .monthSelected small { color: #fff; }
-.monthLink:focus-visible, .step:focus-visible, .open:focus-visible { outline: 3px solid var(--focus-ring, #003b5c); outline-offset: 2px; }
 @media (min-width: 900px) { .months { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
 
 .tableBlock { display: grid; gap: 8px; min-width: 0; }
@@ -51,4 +50,3 @@
   display: flex; align-items: center; min-height: 44px; cursor: pointer; font-weight: 600; color: #003b5c;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
-.fullYear > summary:focus-visible { outline: 3px solid var(--focus-ring, #003b5c); outline-offset: 2px; }

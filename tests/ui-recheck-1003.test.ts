@@ -21,7 +21,7 @@ const token = (name: string) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F
 
 describe("site-wide focus ring (#1003)", () => {
   it("draws a solid navy 3px ring from the token, matching the modal close button", () => {
-    expect(css).toMatch(/button:focus-visible,\s*a:focus-visible,\s*input:focus-visible,\s*select:focus-visible \{\s*outline: 3px solid var\(--focus-ring\);\s*outline-offset: 2px;/);
+    expect(css).toMatch(/button:focus-visible,\s*a:focus-visible,\s*summary:focus-visible,\s*input:focus-visible,\s*select:focus-visible,\s*textarea:focus-visible \{\s*outline: 3px solid var\(--focus-ring\);\s*outline-offset: 2px;/);
     expect(css).toMatch(/--focus-ring: var\(--imsda-navy\);/);
     expect(css).toMatch(/--focus-ring-on-dark: var\(--imsda-gold\);/);
     expect(css).not.toContain("rgba(240, 179, 35, 0.55)");
@@ -43,7 +43,7 @@ describe("site-wide focus ring (#1003)", () => {
   });
 
   it("turns gold on the dark navy surfaces", () => {
-    expect(css).toMatch(/:is\(\.sidebar, [^)]*\.on-dark\)\s*:is\(button, a, input, select, summary, \[tabindex\]\):focus-visible \{\s*outline-color: var\(--focus-ring-on-dark\);/);
+    expect(css).toMatch(/:is\(\.sidebar, [^)]*\.on-dark\)\s*:is\(button, a, input, select, textarea, summary, \[tabindex\]\):focus-visible \{\s*outline-color: var\(--focus-ring-on-dark\);/);
   });
 
   it("rings the label of a visually hidden file input", () => {

@@ -31,7 +31,7 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 
 ## Focus and motion
 
-- Every interactive element shows a 3px `focus-ring` outline (navy) with 2px offset; on navy surfaces it switches to `focus-ring-on-dark` (gold). Fields show `field-focus` purple with a soft halo.
+- Every interactive element shows a 3px `focus-ring` outline (navy) with 2px offset; on navy surfaces it switches to `focus-ring-on-dark` (gold). Fields show a `field-focus` purple border and one 2px purple ring with a 2px offset, no halo; error fields keep the red border and also get the ring; on navy the ring is gold.
 - Motion is short (150–300ms ease) and limited to color, border and small position changes; honor `prefers-reduced-motion`.
 
 ## Iconography
