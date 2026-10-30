@@ -159,3 +159,62 @@ export function mealDefinitionsFromTemplate(meals: TemplateMeals, firstDay: stri
     })),
   };
 }
+
+/** Whole days from one calendar date to another. */
+function daysBetween(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000);
+}
+
+/**
+ * The inverse of `mealDefinitionsFromTemplate` (#154): a source event's meal definitions as template meals, each date
+ * a day offset from the event's first day. Built field by field, never by spreading a row. A service dated before the
+ * first day or more than a year after it has no valid offset, so it is left out, together with every plan row that
+ * names it; the counts say what was left out. The result is checked against `templateMealsSchema`, and `null` (with the
+ * first problem) is returned when the definitions cannot be a template.
+ */
+export function templateMealsFromDefinitions(definitions: MealDefinitions, firstDay: string): {
+  meals: TemplateMeals | null;
+  issue: string | null;
+  skippedServices: number;
+  skippedPlanServices: number;
+} {
+  const offsetOf = (date: string) => {
+    const offset = daysBetween(firstDay, date);
+    return offset >= 0 && offset <= 365 ? offset : null;
+  };
+  const services: TemplateMeals["services"] = [];
+  let skippedServices = 0;
+  for (const service of definitions.services) {
+    const dayOffset = offsetOf(service.serviceDate);
+    if (dayOffset === null) {
+      skippedServices += 1;
+      continue;
+    }
+    services.push({
+      name: service.name, mealType: service.mealType, dayOffset, startTime: service.startTime, endTime: service.endTime,
+      location: service.location, ticketing: service.ticketing, capacity: service.capacity,
+    });
+  }
+  let skippedPlanServices = 0;
+  const plans: TemplateMeals["plans"] = definitions.plans.map((plan) => ({
+    code: plan.code, name: plan.name, description: plan.description, payer: plan.payer, isDefaultTicketPlan: plan.isDefaultTicketPlan,
+    includesAllServices: plan.includesAllServices, defaultEntitlement: plan.defaultEntitlement,
+    services: plan.services.flatMap((row) => {
+      const dayOffset = offsetOf(row.serviceDate);
+      if (dayOffset === null || !services.some((service) => service.name === row.serviceName && service.dayOffset === dayOffset)) {
+        skippedPlanServices += 1;
+        return [];
+      }
+      return [{ serviceName: row.serviceName, dayOffset, entitlement: row.entitlement }];
+    }),
+    prices: plan.prices.map((price) => ({
+      mealType: price.mealType, ageGroup: price.ageGroup, attendeeTypeCode: price.attendeeTypeCode, amountCents: price.amountCents,
+    })),
+  }));
+  if (services.length === 0 && plans.length === 0) return { meals: null, issue: null, skippedServices, skippedPlanServices };
+  const parsed = templateMealsSchema.safeParse({ services, plans });
+  if (!parsed.success) {
+    return { meals: null, issue: parsed.error.issues[0]?.message ?? "The meal definitions cannot be saved in a template.", skippedServices, skippedPlanServices };
+  }
+  return { meals: parsed.data, issue: null, skippedServices, skippedPlanServices };
+}

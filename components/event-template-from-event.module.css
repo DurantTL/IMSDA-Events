@@ -1,0 +1,106 @@
+/* Save an event as a template (#154): the preview lists, the target choice and the result. */
+.root {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  min-width: 0;
+}
+
+.label select,
+.label input,
+.label textarea {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.choice input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.domainList,
+.exclusionList,
+.plainList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.domain,
+.exclusion {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.15));
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.count {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.names,
+.details {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.actions > * {
+  min-height: 44px;
+}
+
+.resultLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .actions > * {
+    flex: 1 1 100%;
+  }
+}

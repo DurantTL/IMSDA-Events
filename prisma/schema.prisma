@@ -905,6 +905,7 @@ model User {
   createdEventTemplateVersions       EventTemplateVersion[]       @relation("EventTemplateVersionCreatedBy")
   eventTemplateApplications          EventTemplateApplication[]   @relation("EventTemplateApplicationActor")
   eventCloneRecords                  EventCloneRecord[]           @relation("EventCloneRecordActor")
+  eventTemplateVersionSources        EventTemplateVersionSource[] @relation("EventTemplateVersionSourceActor")
   enabledClubFormTemplates           ClubFormTemplate[]           @relation("ClubFormTemplateEnabledBy")
   createdClubFormLinks               ClubFormLink[]               @relation("ClubFormLinkCreatedByUser")
   enteredClubFormSubmissions         ClubFormSubmission[]         @relation("ClubFormSubmissionEnteredByUser")
@@ -1901,6 +1902,7 @@ model Event {
   templateApplication                 EventTemplateApplication?
   cloneRecord                         EventCloneRecord?            @relation("EventCloneResult")
   clonedInto                          EventCloneRecord[]           @relation("EventCloneSource")
+  savedAsTemplateVersions             EventTemplateVersionSource[] @relation("EventTemplateVersionSourceEvent")
   locations                           EventLocation[]
   locationWaitlistChanges             LocationWaitlistChange[]
   modules                             EventModule[]
@@ -4685,9 +4687,49 @@ model EventTemplateVersion {
   template     EventTemplate              @relation(fields: [templateId], references: [id], onDelete: Cascade)
   createdBy    User                       @relation("EventTemplateVersionCreatedBy", fields: [createdByUserId], references: [id])
   applications EventTemplateApplication[]
+  source       EventTemplateVersionSource?
 
   @@unique([templateId, versionNumber])
   @@index([templateId, status, versionNumber])
+}
+
+/// Provenance of a template version made by "Save an event as a template"
+/// (#154): which event it was saved from, who saved it and why, and exactly
+/// which source form and message template versions it was built from. The
+/// version row itself stays a plain `EventTemplateVersion`, so a stored payload
+/// never changes shape and publishing needs no special case. `sourceEventId`
+/// goes null if the event is later deleted, while `sourceEventName` keeps the
+/// name it had. `requestKey` is the caller's idempotency key, unique per actor:
+/// a retry with the same key and `requestInput` returns the version already
+/// saved, and the same key with different input is refused. `provenance` and
+/// `exclusions` hold ids, version numbers, fingerprint, keys and counts only,
+/// never copied text.
+model EventTemplateVersionSource {
+  id                String   @id @default(cuid())
+  templateVersionId String   @unique
+  sourceEventId     String?
+  sourceEventName   String
+  actorUserId       String
+  /// The required release note (3 to 2000 characters): why this version was saved.
+  releaseNote       String
+  requestKey        String
+  /// The save request as sent (minus the key): what a retry is compared against.
+  requestInput      Json
+  /// Source form ids and published version ids and numbers, message template
+  /// version ids and numbers, and the configuration fingerprint reviewed.
+  provenance        Json
+  /// What was left out, as exclusion keys and counts only, plus the origin and
+  /// first path segment of each private link removed (no query, deeper path,
+  /// token or copied text).
+  exclusions        Json
+  createdAt         DateTime @default(now())
+
+  templateVersion EventTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  sourceEvent     Event?               @relation("EventTemplateVersionSourceEvent", fields: [sourceEventId], references: [id], onDelete: SetNull)
+  actor           User                 @relation("EventTemplateVersionSourceActor", fields: [actorUserId], references: [id])
+
+  @@unique([actorUserId, requestKey])
+  @@index([sourceEventId])
 }
 
 /// Records the one-time, non-live copy an "apply" makes (#152): the new event

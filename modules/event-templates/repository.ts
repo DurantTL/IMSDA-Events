@@ -17,7 +17,7 @@ import { createMealDefinitions } from "@/modules/meals/clone-repository";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { activeCoordinatorAccountIds } from "@/modules/event-locations/coordinators";
 import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locations/domain";
-import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
+import { createRegistrationFormFromDefinitionInTransaction, createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCreationModules } from "@/modules/event-modules/defaults";
 import { creationModuleKeys } from "@/modules/event-modules/catalog";
@@ -34,7 +34,11 @@ export class EventTemplateOperationError extends Error {
       | "VERSION_NOT_FOUND"
       | "EDIT_CONFLICT"
       | "EVENT_SLUG_TAKEN"
-      | "REQUEST_KEY_REUSED",
+      | "REQUEST_KEY_REUSED"
+      | "DRAFT_EXISTS"
+      | "AUDIENCE_MISMATCH"
+      | "SOURCE_NOT_FOUND"
+      | "SOURCE_CHANGED",
     message: string,
   ) {
     super(message);
@@ -50,7 +54,11 @@ const templateInclude = {
   createdBy: { select: { displayName: true } },
   versions: {
     orderBy: { versionNumber: "desc" as const },
-    include: { createdBy: { select: { displayName: true } } },
+    include: {
+      createdBy: { select: { displayName: true } },
+      // Set only on a version saved from an event (#154).
+      source: { include: { actor: { select: { displayName: true } } } },
+    },
   },
 } satisfies Prisma.EventTemplateInclude;
 
@@ -84,6 +92,17 @@ function serializeTemplate(template: TemplateWithVersions) {
     createdAt: version.createdAt.toISOString(),
     updatedAt: version.updatedAt.toISOString(),
     createdBy: version.createdBy.displayName,
+    /** Where a version saved from an event came from (#154); null for any other version. */
+    source: version.source
+      ? {
+          sourceEventId: version.source.sourceEventId,
+          sourceEventName: version.source.sourceEventName,
+          releaseNote: version.source.releaseNote,
+          savedBy: version.source.actor.displayName,
+          savedAt: version.source.createdAt.toISOString(),
+          provenance: version.source.provenance,
+        }
+      : null,
   }));
   const published = versions.find((version) => version.status === "PUBLISHED") ?? null;
   const draft = versions.find((version) => version.status === "DRAFT") ?? null;
@@ -117,7 +136,7 @@ async function loadTemplate(templateId: string) {
  * a concurrent archive or publish cannot land between its checks and its
  * writes.
  */
-async function lockTemplate(tx: Prisma.TransactionClient, templateId: string, mode: "UPDATE" | "SHARE") {
+export async function lockTemplate(tx: Prisma.TransactionClient, templateId: string, mode: "UPDATE" | "SHARE") {
   // Bounded wait: past it the lock is SQLSTATE 55P03, reported as TEMPLATE_BUSY.
   await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '5s'");
   const rows = mode === "UPDATE"
@@ -130,7 +149,7 @@ async function lockTemplate(tx: Prisma.TransactionClient, templateId: string, mo
   return row.status;
 }
 
-function refuseArchived(status: EventTemplateStatus, action: string) {
+export function refuseArchived(status: EventTemplateStatus, action: string) {
   if (status === "ARCHIVED") {
     throw new EventTemplateOperationError("TEMPLATE_ARCHIVED", `This event template is archived and cannot be ${action}.`);
   }
@@ -497,6 +516,16 @@ export async function applyEventTemplate(
         await createRegistrationFormFromTemplateInTransaction(tx, event.id, actorUserId, templateKey);
       }
 
+      // Forms saved from an event (#154): each is a new draft built from the template's own copy of the definition.
+      for (const templateForm of payload.registrationForms ?? []) {
+        await createRegistrationFormFromDefinitionInTransaction(tx, event.id, actorUserId, {
+          definition: templateForm.definition,
+          preferredSlug: templateForm.slug,
+          summary: (formName) => `Created ${formName} from the ${template.name} template, version ${version.versionNumber}.`,
+          metadata: { templateId: template.id, templateVersionId: version.id },
+        });
+      }
+
       for (const messageDefault of payload.messageTemplateDefaults) {
         const key = asEventMessageTemplateKey(messageDefault.key);
         await tx.eventMessageTemplate.create({
@@ -551,6 +580,7 @@ export async function applyEventTemplate(
             modules: creationModuleKeys(payload.audience, input.features?.modules),
             showOnCalendar: event.showOnCalendar,
             formTemplateCount: payload.formTemplateKeys.length,
+            registrationFormCount: (payload.registrationForms ?? []).length,
             attendeeTypeCount: payload.attendeeTypes.length,
             locationCount: templateLocations.length,
           },

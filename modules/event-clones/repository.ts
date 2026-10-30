@@ -52,7 +52,7 @@ export class EventCloneOperationError extends Error {
 type Db = Prisma.TransactionClient;
 
 /** The app's own origin, the way it builds absolute links: `/manage/` and slug links there are private. */
-function appOrigins() {
+export function appOrigins() {
   return [new URL(getServerEnv().APP_BASE_URL).origin];
 }
 
@@ -68,7 +68,7 @@ function eventDate(value: string) {
  * The plan, the fingerprint, and the copy all come from this one object, so
  * what the reviewer saw is exactly what is copied.
  */
-async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceConfiguration | null> {
+export async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceConfiguration | null> {
   const event = await db.event.findUnique({
     where: { id: eventId },
     select: {
@@ -228,7 +228,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
 /** Hash of the copyable configuration (never the event's own identity or the
  * unsupported-domain counts), so any edit to what a clone would copy changes
  * it and a stale confirm is refused (#157). */
-function fingerprintOf(config: SourceConfiguration) {
+export function fingerprintOf(config: SourceConfiguration) {
   const hashed = { ...config, event: { id: config.event.id }, unsupported: null };
   return createHash("sha256").update(canonicalJson(hashed)).digest("hex");
 }

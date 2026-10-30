@@ -8,6 +8,8 @@ import { attendeeClassificationInputSchema, attendeeTypeInputSchema } from "@/mo
 import { teamSettingsInputSchema } from "@/modules/club-teams/domain";
 import { templateFeatureOverridesSchema } from "@/modules/event-features/creation";
 import { templateMealsSchema } from "@/modules/meals/clone-domain";
+import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { replacePolicyVersionAcknowledgments } from "@/modules/forms/form-template-library-domain";
 
 /**
  * The fixed set of optional feature toggles a template may set on the new
@@ -100,6 +102,19 @@ export const templateLocationSchema = z.object({
 export type TemplateLocation = z.infer<typeof templateLocationSchema>;
 
 /**
+ * A registration form's structure a template creates on the new event (#154), saved from an event's current
+ * published form. The definition is the form as a template carries it: policy-version acknowledgments are typed
+ * wording with a placeholder (a policy version belongs to one event) and no late-pricing dates (they are for one year).
+ */
+export const templateRegistrationFormSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers and hyphens."),
+  definition: registrationFormDefinitionSchema,
+}).strict();
+
+export type TemplateRegistrationForm = z.infer<typeof templateRegistrationFormSchema>;
+
+/**
  * The immutable payload a published `EventTemplateVersion` carries (#152).
  * Everything here can be validated on its own shape at draft/publish time;
  * `validateEventTemplatePayloadReferences` below does the second check that
@@ -154,7 +169,16 @@ export const eventTemplatePayloadSchema = z.object({
   teamSettings: teamSettingsInputSchema.optional(),
   /** Turns on the event's general registration link (#931): directors with no account register a team through one public link. Club events only. */
   generalRegistrationLink: z.boolean().optional(),
+  /** Registration forms created on the new event as drafts, from an event's published forms (#154). Optional, so no stored payload changes shape. */
+  registrationForms: z.array(templateRegistrationFormSchema).max(20).optional(),
 }).superRefine((payload, ctx) => {
+  const formSlugs = new Set<string>();
+  (payload.registrationForms ?? []).forEach((form, index) => {
+    if (formSlugs.has(form.slug)) {
+      ctx.addIssue({ code: "custom", path: ["registrationForms", index, "slug"], message: `Form address ${form.slug} is repeated.` });
+    }
+    formSlugs.add(form.slug);
+  });
   if (payload.teamSettings && payload.audience !== "CLUB") {
     ctx.addIssue({ code: "custom", path: ["teamSettings"], message: "Team rules are for club events." });
   }
@@ -239,6 +263,13 @@ export function validateEventTemplatePayloadReferences(payload: EventTemplatePay
   for (const key of payload.formTemplateKeys) {
     if (!getFormTemplate(key)) {
       issues.push(`Registration form template "${key}" is not available.`);
+    }
+  }
+
+  // A policy version belongs to one event, so a template's form can only carry typed acknowledgment wording (#154).
+  for (const form of payload.registrationForms ?? []) {
+    for (const label of replacePolicyVersionAcknowledgments(form.definition).replacedLabels) {
+      issues.push(`Form "${form.name}": the acknowledgment "${label}" points at a policy version, which belongs to one event. Type the wording instead.`);
     }
   }
 

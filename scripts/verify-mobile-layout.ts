@@ -1139,7 +1139,20 @@ async function seedInformationForm(prisma: PrismaClient): Promise<PageSpec[]> {
 async function seedEventTemplatePages(prisma: PrismaClient): Promise<PageSpec[]> {
   const template = await prisma.eventTemplate.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } });
   if (!template) return [];
-  return [{ name: "staff-event-template-editor-back-link", path: `/admin/event-templates/${template.id}`, role: "system-admin", expectText: /Back to Event templates/ }];
+  return [
+    { name: "staff-event-template-editor-back-link", path: `/admin/event-templates/${template.id}`, role: "system-admin", expectText: /Back to Event templates/ },
+    // Save an event as a template (#154), with the first event's preview open. A preview reads only; nothing is saved.
+    {
+      name: "staff-event-template-from-event",
+      path: "/admin/event-templates/from-event",
+      role: "system-admin",
+      expectText: /Choose an event/,
+      prepare: async (page) => {
+        await page.getByRole("button", { name: /Preview what will be copied/i }).click();
+        await page.getByRole("heading", { name: /What will not be copied/i }).waitFor();
+      },
+    },
+  ];
 }
 
 async function cleanupInformationForm(prisma: PrismaClient) {

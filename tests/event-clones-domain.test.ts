@@ -649,3 +649,15 @@ describe("info cards in a clone (#652)", () => {
     expect(isEmptyAfterClone({ kind: "RESOURCE_LINKS", body: "", links: [] })).toBe(false);
   });
 });
+
+describe("token routes in copied text (#154)", () => {
+  it("removes links on every private token route, on the app origin or relative, and keeps outside links", () => {
+    const context = { sourceEventId: "event-src", sourceSlug: "annual-2027", appOrigins: ["https://events.imsda.test"] };
+    const text = "See /club-forms/TOK1 and https://events.imsda.test/health-records/TOK2 and https://events.imsda.test/unsubscribe/TOK3 and https://example.test/club-forms/TOK4.";
+    const result = stripPrivateLinks(text, context);
+    expect(result.matches).toHaveLength(3);
+    expect(result.text).not.toMatch(/TOK[123]/);
+    expect(result.text).toContain("https://example.test/club-forms/TOK4");
+    expect(JSON.stringify(result.matches)).not.toMatch(/TOK[123]/);
+  });
+});
