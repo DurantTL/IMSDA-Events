@@ -1,0 +1,56 @@
+/* Check-in station (#892): a staff-run tablet screen outside the workspace shell. Large tap targets, one column. */
+@media screen {
+  .cisShell { --type-floor: 0.875rem; --type-body-floor: 0.875rem; }
+}
+.cisShell {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 16px;
+}
+.cisCard { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: white; padding: 18px; }
+.cisCard h1, .cisHeader h1 { margin: 0; font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
+.cisCard h2 { margin: 0 0 8px; font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
+.cisPayment h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.cisHeader { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cisHeader > div { min-width: 0; flex: 1 1 14rem; }
+.cisEyebrow { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+.cisSub { margin: 2px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
+.cisHelp { margin: 4px 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
+.cisLookup label { font-size: 1rem; }
+.cisLookupRow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.cisShell input[type="text"], .cisShell input:not([type]) {
+  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: white; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1.05rem;
+}
+.cisLookupRow input { flex: 1 1 14rem; }
+.cisForm input[inputmode] { width: 100%; }
+.cisButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); cursor: pointer; padding: 8px 16px; font: inherit; font-size: 1rem; font-weight: 700;
+}
+.cisButtonPrimary { border-color: var(--imsda-navy); background: var(--imsda-navy); color: white; }
+.cisButtonQuiet { background: white; }
+.cisButton:disabled { cursor: not-allowed; opacity: 0.58; }
+.cisPeople { display: grid; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
+.cisPerson { border: 1px solid var(--line); border-radius: 12px; }
+.cisPersonBody { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 56px; padding: 8px 12px; }
+.cisPersonBody > span:not(.cisType):not(.cisStatus) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.cisPersonPick { cursor: pointer; }
+.cisPersonPick input[type="checkbox"], .cisChoice input[type="radio"] { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
+.cisPerson strong { overflow-wrap: anywhere; }
+.cisType { color: var(--muted); font-size: 0.95rem; }
+.cisStatus { border-radius: 999px; padding: 2px 10px; font-size: 0.875rem; font-weight: 700; }
+.cisStatusOk { background: #eef8f2; color: #1c6b4a; }
+.cisStatusHold { background: var(--imsda-gold-soft); color: #6f5316; }
+.cisActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.cisPayment { display: grid; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.cisPayment :global(.checkin-payment-due) { margin-top: 0; }
+.cisForm fieldset { display: grid; gap: 8px; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.cisForm legend { padding: 0 6px; font-weight: 700; }
+.cisForm label { font-size: 1rem; }
+.cisChoice { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.cisChoice label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.cisDue, .cisOk, .cisError, .cisDeskNotice { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 0; font-size: 1rem; }
+.cisOk { color: #1c6b4a; font-weight: 700; }
+.cisError { border-radius: 9px; background: #fff1ef; color: var(--coral); padding: 9px 11px; }
+.cisDeskNotice { border-radius: 9px; background: var(--imsda-gold-soft); color: #6f5316; padding: 9px 11px; font-weight: 700; }

@@ -16,6 +16,7 @@ import { PublishEventDialog } from "@/components/publish-event-dialog";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { getEventPublishReadiness } from "@/modules/events/readiness";
 import type { EventSettingsRecord } from "@/modules/events/repository";
+import overviewStyles from "@/components/public-page-overview.module.css";
 
 const root = process.cwd();
 const workspaceSource = readFileSync(path.join(root, "components/event-settings-workspace.tsx"), "utf8");
@@ -133,7 +134,7 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
   describe("Public page and links overview (#448)", () => {
     const overview = (event: EventSettingsRecord) => {
       const markup = renderToStaticMarkup(createElement(EventSettingsWorkspace, { mode: "edit", initialEvent: event }));
-      const start = markup.indexOf('class="public-page-overview"');
+      const start = markup.indexOf(`class="${overviewStyles.publicPageOverview}"`);
       return markup.slice(start, markup.indexOf("</dl>", start));
     };
 

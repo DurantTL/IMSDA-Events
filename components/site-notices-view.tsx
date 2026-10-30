@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, Info, Siren } from "lucide-react";
 import { linkText, noticeLevelLabels, type HubNotice } from "@/modules/site-content/hub-content-domain";
+import styles from "@/components/site-notices-view.module.css";
 
 const icons = { INFO: Info, URGENT: AlertTriangle, EMERGENCY: Siren } as const;
 
@@ -13,17 +14,17 @@ export function HubLink({ href, className, children }: { href: string; className
 export function SiteNoticesView({ notices }: { notices: readonly HubNotice[] }) {
   if (notices.length === 0) return null;
   return (
-    <section aria-label="Site notices" className="site-notices">
+    <section aria-label="Site notices" className={styles["site-notices"]}>
       <ul>
         {notices.map((notice) => {
           const Icon = icons[notice.level];
           return (
-            <li className={`site-notice site-notice-${notice.level.toLowerCase()}`} key={notice.id}>
+            <li className={`${styles["site-notice"]} ${styles[`site-notice-${notice.level.toLowerCase()}`]}`} key={notice.id}>
               <Icon size={20} aria-hidden="true" />
               <p>
                 <strong>{noticeLevelLabels[notice.level]}: </strong>
                 {notice.message}
-                {notice.linkHref ? <> <HubLink className="site-notice-link" href={notice.linkHref}>{linkText(notice)}</HubLink></> : null}
+                {notice.linkHref ? <> <HubLink className={styles["site-notice-link"]} href={notice.linkHref}>{linkText(notice)}</HubLink></> : null}
               </p>
             </li>
           );

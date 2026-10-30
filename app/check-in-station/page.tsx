@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CheckInStationScreen } from "@/components/check-in-station";
 import { STATION_INACTIVE_MESSAGE } from "@/modules/checkin-stations/domain";
 import { resolveStation } from "@/modules/checkin-stations/repository";
+import styles from "@/components/check-in-station.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,8 @@ export default async function CheckInStationPage() {
   const station = await resolveStation();
   if (!station) {
     return (
-      <main className="cis-shell">
-        <section className="cis-card">
+      <main className={styles.cisShell}>
+        <section className={styles.cisCard}>
           <h1>Check-in station</h1>
           <p>{STATION_INACTIVE_MESSAGE}</p>
         </section>

@@ -7,6 +7,7 @@ import {
   homepageMinistryIcons,
   type HomepageMinistry,
 } from "@/modules/system-admin/homepage-ministries-domain";
+import styles from "@/components/homepage-ministries-editor.module.css";
 
 type TileDraft = Omit<HomepageMinistry, "description" | "linkHref" | "categories"> & { description: string; linkHref: string; categories: string };
 
@@ -92,7 +93,7 @@ export function HomepageMinistriesEditor({
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="inline-notice" role="status">{notice}</p>}
         {tiles.map((tile) => (
-          <fieldset className="ministry-tile-fields" key={tile.position}>
+          <fieldset className={styles.ministryTileFields} key={tile.position}>
             <legend>Tile {tile.position}</legend>
             <label>Name<input maxLength={60} required value={tile.name} onChange={(event) => change(tile.position, { name: event.target.value })} /></label>
             <label>

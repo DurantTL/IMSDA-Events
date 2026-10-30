@@ -1,0 +1,13 @@
+/* Curated hub content (#111): home announcements and footer details. */
+.homeAnnouncements { display: grid; gap: 12px; min-width: 0; }
+.homeAnnouncements > h2 { margin: 0; color: var(--ink); font-size: 1.25rem; }
+.homeAnnouncementsList { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 761px) { .homeAnnouncementsList { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
+.homeAnnouncementsList li { display: grid; gap: 6px; align-content: start; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 14px 16px; min-width: 0; }
+.homeAnnouncementsList h3 { margin: 0; color: var(--imsda-navy); font-size: 1.1rem; overflow-wrap: anywhere; }
+.homeAnnouncementsList p { margin: 0; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+.homeAnnouncementLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
+.homeFooterContact { overflow-wrap: anywhere; }
+.homeFooterLinks ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
+.homeFooterLinks a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
+.homeAnnouncementLink:focus-visible, .homeFooterLinks a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

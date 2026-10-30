@@ -1,0 +1,11 @@
+/* Check-in stations panel on the check-in desk (#892). */
+.cisPanel { display: grid; gap: 12px; margin-top: 16px; }
+.cisPanel h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.cisPanelStart { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.cisPanelStart label { display: grid; flex: 1 1 14rem; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.cisPanelStart input { min-height: 44px; }
+.cisPanelStart :global(.primary-button), .cisPanelList :global(.secondary-button) { min-height: 44px; }
+.cisPanelHelp { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.cisPanelList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cisPanelList li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.cisPanelList li > div { min-width: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }

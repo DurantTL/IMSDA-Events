@@ -1,0 +1,8 @@
+/* Role details disclosure (#1278): one "Details" toggle with the can / can't lists, shared by every role. */
+.roleDetails { min-width: 0; margin: 2px 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.roleDetails > summary { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.roleDetails > summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.roleDetails .roleDetailsBody { display: grid; gap: 8px; min-width: 0; padding: 0 0 6px; }
+.roleDetails .roleDetailsBody .roleDetailsLabel { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.roleDetails .roleDetailsBody ul { display: block; margin: 2px 0 0; padding-left: 20px; list-style: disc; }
+.roleDetails .roleDetailsBody li { display: list-item; color: inherit; text-transform: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }

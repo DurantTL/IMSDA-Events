@@ -1,0 +1,11 @@
+/* Curated hub content (#111): site notices, announcements, extra header links and footer details. */
+.site-notices { margin: 0; padding: 0; }
+.site-notices ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.site-notice { display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--line); padding: 12px max(16px, calc((100% - 1180px) / 2)); font-size: 1rem; line-height: 1.45; }
+.site-notice svg { flex: 0 0 auto; margin-top: 2px; }
+.site-notice p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.site-notice-info { background: var(--imsda-navy-soft); color: var(--imsda-navy-deep); }
+.site-notice-urgent { background: var(--imsda-gold-soft); color: #5b3b00; border-left: 6px solid #b45309; }
+.site-notice-emergency { background: #fdeceb; color: #7a1712; border-left: 6px solid #b3261e; font-weight: 600; }
+.site-notice-link { display: inline-flex; align-items: center; min-height: 44px; color: inherit; font-weight: 700; text-decoration: underline; }
+.site-notice-link:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }

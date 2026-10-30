@@ -22,6 +22,7 @@ vi.mock("@/modules/site-content/hub-content", () => ({ getPublishedHubContent: m
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 
 import OpenForRegistrationPage from "@/app/(public)/events/page";
+import styles from "@/app/(public)/events/events-directory.module.css";
 import type { CalendarItem } from "@/modules/calendar/domain";
 import { defaultHubContent } from "@/modules/site-content/hub-content-domain";
 import {
@@ -170,7 +171,7 @@ describe("the page (#106)", () => {
     expect(html).toContain("Show events");
     expect(html).not.toContain("Clear filters");
     expect(html).toContain("2 events");
-    expect(html).toMatch(/class="events-directory-count" role="status"/);
+    expect(html).toContain(`class="${styles.eventsDirectoryCount}" role="status"`);
     expect(html).toMatch(/id="events-from" max="\d{4}-\d{2}-\d{2}" min="2026-10-27"/);
   });
 
@@ -244,11 +245,10 @@ describe("the page (#106)", () => {
     expect(html).not.toContain("Gamma Day");
   });
 
-  it("styles the form for phones with large targets and no overflow, before the editor-shell marker", () => {
-    const css = readFileSync("app/globals.css", "utf8");
-    const at = css.indexOf(".events-directory-form {");
-    expect(at).toBeGreaterThan(-1);
-    expect(at).toBeLessThan(css.indexOf("/* Registration form builder editor shell (#1132)"));
-    expect(css).toMatch(/\.events-directory-field input, \.events-directory-field select \{[^}]*min-height: 44px[^}]*font-size: 1rem/);
+  it("styles the form for phones with large targets and no overflow, in the page's CSS module", () => {
+    const css = readFileSync("app/(public)/events/events-directory.module.css", "utf8");
+    expect(css).toContain(".eventsDirectoryForm {");
+    expect(readFileSync("app/globals.css", "utf8")).not.toContain("events-directory");
+    expect(css).toMatch(/\.eventsDirectoryField input, \.eventsDirectoryField select \{[^}]*min-height: 44px[^}]*font-size: 1rem/);
   });
 });

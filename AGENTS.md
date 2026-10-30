@@ -66,6 +66,9 @@ Then `npm run dev`.
 - **CSS placement:** new CSS in `app/globals.css` goes before the
   `/* Registration form builder editor shell (#1132)` marker. Never add a
   `:hover` rule after the `/* Form settings tab` (#1139) marker.
+- **Where styles go:** new feature styles go in a CSS module (`*.module.css`)
+  next to the component, not `app/globals.css`, which is for tokens, base
+  element styles, layout primitives and shared utilities.
 - **Text size:** staff headings and labels are at least 14px; use
   `max(var(--type-staff-floor, 0px), 0.875rem)`. An unstyled or undersized
   h1 or h2 is flagged.

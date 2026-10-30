@@ -30,6 +30,7 @@ import { activeNotices, applyCategoryPreferences } from "@/modules/site-content/
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
+import styles from "./events-directory.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -133,40 +134,40 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
           ))}
         </nav>
 
-        <form action="/events" className="events-directory-form" method="get" role="search" aria-label="Search and filter events">
+        <form action="/events" className={styles.eventsDirectoryForm} method="get" role="search" aria-label="Search and filter events">
           {filter !== "all" && <input name="for" type="hidden" value={filter} />}
-          <div className="events-directory-field events-directory-search">
+          <div className={`${styles.eventsDirectoryField} ${styles.eventsDirectorySearch}`}>
             <label htmlFor="events-q">Search events</label>
             <input defaultValue={filters.q} id="events-q" maxLength={100} name="q" type="search" />
           </div>
-          <div className="events-directory-field">
+          <div className={styles.eventsDirectoryField}>
             <label htmlFor="events-from">From</label>
             <input defaultValue={filters.from} id="events-from" max={windowEnd} min={today} name="from" type="date" />
           </div>
-          <div className="events-directory-field">
+          <div className={styles.eventsDirectoryField}>
             <label htmlFor="events-to">To</label>
             <input defaultValue={filters.to} id="events-to" max={windowEnd} min={today} name="to" type="date" />
           </div>
-          <div className="events-directory-field">
+          <div className={styles.eventsDirectoryField}>
             <label htmlFor="events-category">Category</label>
             <select defaultValue={filters.category} id="events-category" name="category">
               <option value="">Any</option>
               {categories.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </div>
-          <div className="events-directory-field">
+          <div className={styles.eventsDirectoryField}>
             <label htmlFor="events-location">Location</label>
             <select defaultValue={filters.location} id="events-location" name="location">
               <option value="">Any</option>
               {locations.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </div>
-          <div className="events-directory-actions">
+          <div className={styles.eventsDirectoryActions}>
             <button className="primary-button" type="submit">Show events</button>
             {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
           </div>
         </form>
-        <p className="events-directory-count" role="status">{calendarCountLabel(items.length)}</p>
+        <p className={styles.eventsDirectoryCount} role="status">{calendarCountLabel(items.length)}</p>
 
         <section aria-labelledby="open-events-heading" className="calendar-agenda">
           <h2 className="sr-only" id="open-events-heading">Events open for registration</h2>
