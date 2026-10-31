@@ -26,7 +26,8 @@ export type SectionKey =
   | "alerts"
   | "setup"
   | "public-site"
-  | "checklist";
+  | "checklist"
+  | "notices";
 
 export type Signal = {
   key: string;
@@ -77,6 +78,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "setup", title: "Security and setup", fixHref: "/admin/settings", fixLabel: "Platform settings" },
   { key: "public-site", title: "Public site", fixHref: "/admin/analytics", fixLabel: "Open analytics" },
   { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
+  { key: "notices", title: "Payment and email notices", fixHref: null, fixLabel: null },
 ];
 
 export type SignalMeta = Pick<Signal, "key" | "name" | "description" | "fixHref" | "fixLabel">;

@@ -4275,6 +4275,7 @@ model SquareWebhookEvent {
   @@index([eventType, objectId, occurredAt])
   @@index([paymentAttemptId, occurredAt])
   @@index([eventId, occurredAt])
+  @@index([receivedAt])
 }
 
 model CheckIn {
@@ -5323,6 +5324,7 @@ model MessageProviderEvent {
   @@unique([provider, providerEventId])
   @@index([provider, providerMessageId, occurredAt])
   @@index([messageOutboxId, occurredAt])
+  @@index([provider, receivedAt])
 }
 
 /// Why an address is not being sent to (#863).

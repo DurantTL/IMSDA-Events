@@ -26,6 +26,7 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
+import { buildNoticeProviders } from "./notice-providers";
 import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
@@ -541,6 +542,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       };
     });
   }),
+  ...buildNoticeProviders(defineProvider),
 ];
 
 /* ---------- Environment status rows ---------- */
