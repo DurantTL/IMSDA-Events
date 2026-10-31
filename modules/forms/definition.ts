@@ -1002,6 +1002,7 @@ export const formTemplates: FormTemplate[] = [
           templateField("mc_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),
           templateField("mc_last", "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
           templateField("mc_age", "attendee_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE" }),
+          templateField("mc_age_group", "age_group", "Age group", "RADIO", true, [], { scope: "ATTENDEE", optionSource: "ATTENDEE_TYPES" }),
           templateField("mc_program", "program_selection", "Program", "SELECT", true, ["Adult program", "Young Men’s Program (ages 10–14)", "Child / family attendee", "Volunteer / event worker"], { scope: "ATTENDEE" }),
           templateField("mc_package", "registration_package", "Registration / lodging category", "RADIO", true, manCampRegistrationPackages, {
             scope: "ATTENDEE",

@@ -186,6 +186,29 @@ async function main() {
     }),
   ]);
 
+  // Attendee types with age ranges (#1403): age class comes only from these, so without them scheduled email treats every
+  // attendee as an unknown age. Women's Retreat asks Adult, Teen or Child; the others ask an "Age group".
+  const retreatTypes = [
+    { code: "ADULT", label: "Adult", sortOrder: 0, minimumAge: 18, maximumAge: null },
+    { code: "TEEN", label: "Teen", sortOrder: 1, minimumAge: 13, maximumAge: 17 },
+    { code: "CHILD", label: "Child", sortOrder: 2, minimumAge: null, maximumAge: 12 },
+  ];
+  const ageGroupTypes = [
+    { code: "ADULT", label: "Adult", sortOrder: 0, minimumAge: 18, maximumAge: null },
+    { code: "YOUTH", label: "Youth", sortOrder: 1, minimumAge: 13, maximumAge: 17 },
+    { code: "CHILD", label: "Child", sortOrder: 2, minimumAge: null, maximumAge: 12 },
+  ];
+  const seededTypes: Record<string, typeof retreatTypes> = { evt_wr26: retreatTypes, evt_cm27: ageGroupTypes, evt_mc27: ageGroupTypes };
+  for (const event of events) {
+    for (const type of seededTypes[event.id] ?? []) {
+      await prisma.eventAttendeeType.upsert({
+        where: { eventId_code: { eventId: event.id, code: type.code } },
+        update: { label: type.label, sortOrder: type.sortOrder, minimumAge: type.minimumAge, maximumAge: type.maximumAge, isActive: true },
+        create: { eventId: event.id, ...type },
+      });
+    }
+  }
+
   for (const event of events) {
     await prisma.eventMembership.upsert({
       where: { eventId_userId: { eventId: event.id, userId: admin.id } },
@@ -304,16 +327,19 @@ async function main() {
   ]);
 
   const attendeeTypes = ["ATTENDEE", "ATTENDEE", "WORKER"];
+  // The seeded attendees are synthetic adults, so they carry the Adult type (#1403).
+  const adultType = await prisma.eventAttendeeType.findUniqueOrThrow({ where: { eventId_code: { eventId: wr26.id, code: "ADULT" } }, select: { id: true } });
   for (let index = 0; index < registrations.length; index += 1) {
     await prisma.registrationAttendee.upsert({
       where: { registrationId_personId: { registrationId: registrations[index].id, personId: people[index].id } },
-      update: {},
+      update: { attendeeTypeDefinitionId: adultType.id },
       create: {
         id: `attendee_test_${index + 1}`,
         eventId: wr26.id,
         registrationId: registrations[index].id,
         personId: people[index].id,
         attendeeType: attendeeTypes[index],
+        attendeeTypeDefinitionId: adultType.id,
         profileSnapshot: { firstName: people[index].firstName, lastName: people[index].lastName, email: people[index].normalizedEmail },
       },
     });

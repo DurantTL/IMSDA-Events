@@ -134,7 +134,7 @@ async function run() {
     assert(await storedDefinition(afterSync[key]!) === beforeDefinitions[key], `${key}: a form created after the sync stores the same definition as one created before it`);
   }
   const createdAudit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: afterSync.camp_meeting_export!, action: "REGISTRATION_FORM_CREATED" } });
-  assert((createdAudit.metadata as { templateKey?: string; templateVersion?: number }).templateVersion === 1, "the creation audit records the seeded template version");
+  assert((createdAudit.metadata as { templateKey?: string; templateVersion?: number }).templateVersion === bundledSeededFormTemplates.find((seed) => seed.key === "camp_meeting_export")!.version, "the creation audit records the seeded template version");
   const listed = await listFormTemplates();
   for (const seed of bundledSeededFormTemplates) {
     const entry = listed.find((item) => item.key === seed.key)!;

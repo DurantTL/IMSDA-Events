@@ -616,7 +616,7 @@ describe("template version ids and the used-by count filter (#1065)", () => {
     await save("simple_rsvp", titled(rsvp().definition, "Synthetic edit"), 1);
     const second = await loadFormTemplate(db.tx as never, "simple_rsvp");
     expect(second!.versionId).not.toBe(first!.versionId);
-    expect(second!.versionId).toBe(db.versions.find((row) => row.version === 2)!.id);
+    expect(second!.versionId).toBe(db.versions.find((row) => row.version === 2 && row.templateId === db.templates.find((entry) => entry.key === "simple_rsvp")!.id)!.id);
     const all = await loadAllFormTemplates(db.tx as never);
     expect(all.find((template) => template.key === "simple_rsvp")!.versionId).toBe(second!.versionId);
   });

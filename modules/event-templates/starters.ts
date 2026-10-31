@@ -1,6 +1,7 @@
 import { getFormTemplate, isBlankFormTemplateKey } from "@/modules/forms/definition";
 import { unpricedFeeFieldLabels } from "@/modules/events/readiness";
 import { eventTemplatePayloadSchema, type EventTemplatePayload, type TemplateLocation } from "@/modules/event-templates/domain";
+import type { TemplateAttendeeType } from "@/modules/event-templates/domain";
 import type { TeamSettingsInputValues } from "@/modules/club-teams/domain";
 
 /**
@@ -36,10 +37,30 @@ export type StarterEventTemplate = {
   registrationClosesOn?: string;
   /** Turns on the general registration link (#931): directors with no account register a team through one public link. */
   generalRegistrationLink?: boolean;
+  /** Attendee types created on the new event, with the age ranges messaging needs (#1403). GENERAL starters only. */
+  attendeeTypes?: readonly TemplateAttendeeType[];
   /** Replaces the generated description, for a starter whose form carries no prices and whose set-up the generic text does not describe. */
   description?: string;
 };
 
+
+/**
+ * Attendee types for the general events (#1403). Age class comes only from a type's age range (ADR 0005 Addendum A), so a
+ * type with no range leaves every attendee's age unknown and scheduled email refuses them. Labels match the Women's Retreat
+ * form's own Adult, Teen and Child answers exactly, which is how a registration's answer is linked to its type.
+ */
+const womensRetreatAttendeeTypes: readonly TemplateAttendeeType[] = [
+  { code: "ADULT", label: "Adult", description: "", sortOrder: 0, isActive: true, minimumAge: 18, maximumAge: null },
+  { code: "TEEN", label: "Teen", description: "", sortOrder: 1, isActive: true, minimumAge: 13, maximumAge: 17 },
+  { code: "CHILD", label: "Child", description: "", sortOrder: 2, isActive: true, minimumAge: null, maximumAge: 12 },
+];
+
+/** Camp Meeting and Man Camp ask an "Age group" question that selects one of these. */
+const ageGroupAttendeeTypes: readonly TemplateAttendeeType[] = [
+  { code: "ADULT", label: "Adult", description: "", sortOrder: 0, isActive: true, minimumAge: 18, maximumAge: null },
+  { code: "YOUTH", label: "Youth", description: "", sortOrder: 1, isActive: true, minimumAge: 13, maximumAge: 17 },
+  { code: "CHILD", label: "Child", description: "", sortOrder: 2, isActive: true, minimumAge: null, maximumAge: 12 },
+];
 
 /**
  * Fall Camporee always runs at two sites with different dates (#593). Staff
@@ -79,11 +100,11 @@ const pbeTeamSettings: TeamSettingsInputValues = {
 export const starterEventTemplates: readonly StarterEventTemplate[] = [
   { starterKey: "blank_event", name: "Blank event", formTemplateKey: "blank_form", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: false, checksAdultBackgrounds: false },
   { starterKey: "blank_club_event", name: "Blank club event", formTemplateKey: "blank_club_form", audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true },
-  { starterKey: "womens_retreat", name: "Women's Retreat", formTemplateKey: "womens_retreat_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: true, checksAdultBackgrounds: false, hostedPaymentLink: true },
-  { starterKey: "man_camp", name: "Man Camp", formTemplateKey: "man_camp_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: true, checksAdultBackgrounds: false, hostedPaymentLink: true },
+  { starterKey: "womens_retreat", name: "Women's Retreat", formTemplateKey: "womens_retreat_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: true, checksAdultBackgrounds: false, hostedPaymentLink: true, attendeeTypes: womensRetreatAttendeeTypes },
+  { starterKey: "man_camp", name: "Man Camp", formTemplateKey: "man_camp_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: true, checksAdultBackgrounds: false, hostedPaymentLink: true, attendeeTypes: ageGroupAttendeeTypes },
   { starterKey: "spring_camporee", name: "Spring Camporee", formTemplateKey: "spring_camporee_export", audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true },
   { starterKey: "fall_camporee", name: "Fall Camporee", formTemplateKey: "fall_camporee", audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true, locations: fallCamporeeLocations },
-  { starterKey: "camp_meeting", name: "Camp Meeting", formTemplateKey: "camp_meeting_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLink: true },
+  { starterKey: "camp_meeting", name: "Camp Meeting", formTemplateKey: "camp_meeting_export", audience: "GENERAL", billingMode: "ATTENDEE_PAY", collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLink: true, attendeeTypes: ageGroupAttendeeTypes },
   {
     starterKey: "pathfinder_bible_experience", name: "Pathfinder Bible Experience", formTemplateKey: "pbe_registration", audience: "CLUB",
     billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true,
@@ -161,6 +182,7 @@ export function starterPayload(starter: StarterEventTemplate): EventTemplatePayl
     audience: starter.audience,
     billingMode: starter.billingMode,
     formTemplateKeys: [starter.formTemplateKey],
+    ...(starter.attendeeTypes ? { attendeeTypes: starter.attendeeTypes.map((type) => ({ ...type })) } : {}),
     moduleEnablement: {
       collectsShirtSizes: starter.collectsShirtSizes,
       checksAdultBackgrounds: starter.checksAdultBackgrounds,

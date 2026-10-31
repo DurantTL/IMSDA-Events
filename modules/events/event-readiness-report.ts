@@ -53,7 +53,8 @@ export async function collectEventReadinessReport(
 ): Promise<EventReadinessReport | null> {
   const event = await prisma.event.findUnique({
     where: { slug },
-    select: { id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, location: true, publicInfoUrl: true, supportContact: true, isPublished: true, billingMode: true, audience: true },
+    select: { id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, location: true, publicInfoUrl: true, supportContact: true, isPublished: true, billingMode: true, audience: true,
+      _count: { select: { attendeeTypes: { where: { isActive: true, minimumAge: { gte: 18 } } } } } },
   });
   if (!event) return null;
   const isDeferredOrganizationBilling = event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
@@ -96,6 +97,7 @@ export async function collectEventReadinessReport(
     ...event,
     startsOn: event.startsAt.toISOString(),
     endsOn: event.endsAt.toISOString(),
+    attendeeTypesWithAgeRangeCount: event._count?.attendeeTypes,
   }, publishedFormCount);
   const publishChecks: OperationalReadinessCheck[] = [
     ...publishReadiness.items.map((item) => ({

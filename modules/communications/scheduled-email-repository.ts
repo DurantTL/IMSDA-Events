@@ -37,7 +37,8 @@ import {
   eventTimingChanged,
   formatInstantInZone,
   projectSchedule,
-  refusedYouthTargets,
+  refusedYouthTargetReasons,
+  type YouthRefusalReason,
   ruleFromColumns,
   ruleToColumns,
   scheduleReviewFingerprint,
@@ -193,7 +194,16 @@ export async function findMinorTargets(
   eventId: string,
   targets: ReadonlyArray<{ email: string; registrationId: string; roles: readonly string[] }>,
 ): Promise<Set<string>> {
-  if (targets.length === 0) return new Set();
+  return new Set((await findYouthRefusals(client, eventId, targets)).keys());
+}
+
+/** `findMinorTargets` with the reason for each refusal: a known minor, or only an unknown age. */
+export async function findYouthRefusals(
+  client: Client,
+  eventId: string,
+  targets: ReadonlyArray<{ email: string; registrationId: string; roles: readonly string[] }>,
+): Promise<Map<string, YouthRefusalReason>> {
+  if (targets.length === 0) return new Map();
   const [types, registrations] = await Promise.all([
     client.eventAttendeeType.findMany({ where: { eventId }, select: { code: true, minimumAge: true, maximumAge: true } }),
     client.registration.findMany({
@@ -215,11 +225,17 @@ export async function findMinorTargets(
   const adultCodes = types.filter((type) => ageClass.get(type.code) === "ADULT").map((type) => type.code);
   const eventMinorRows = await client.registrationAttendee.findMany({
     where: { eventId, OR: [{ attendeeTypeDefinitionId: null }, { attendeeTypeDefinition: { code: { notIn: adultCodes } } }] },
-    select: { personId: true, person: { select: { normalizedEmail: true } } },
+    select: { personId: true, attendeeTypeDefinition: { select: { code: true } }, person: { select: { normalizedEmail: true } } },
   });
+  const untypedRows = eventMinorRows.filter((row) => !row.attendeeTypeDefinition);
+  const knownMinorRows = eventMinorRows.filter((row) => row.attendeeTypeDefinition && ageClass.get(row.attendeeTypeDefinition.code) === "MINOR");
   const eventMinors: EventMinors = {
     personIds: new Set(eventMinorRows.map((row) => row.personId)),
     emails: new Set(eventMinorRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
+    knownMinorPersonIds: new Set(knownMinorRows.map((row) => row.personId)),
+    knownMinorEmails: new Set(knownMinorRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
+    untypedPersonIds: new Set(untypedRows.map((row) => row.personId)),
+    untypedEmails: new Set(untypedRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
   };
   const byRegistration = new Map<string, YouthCheckRegistration>();
   for (const registration of registrations) {
@@ -238,11 +254,12 @@ export async function findMinorTargets(
           email: normalizeAudienceEmail(attendee.person.normalizedEmail),
           // No type definition at all is unknown, which is never an adult.
           age: (code ? ageClass.get(code) : undefined) ?? "UNKNOWN",
+          typed: Boolean(code),
         };
       }),
     });
   }
-  return refusedYouthTargets(targets, byRegistration, eventMinors);
+  return refusedYouthTargetReasons(targets, byRegistration, eventMinors);
 }
 
 function builderExclusionCode(code: string): ScheduleExclusionCode | null {
@@ -259,6 +276,14 @@ function builderExclusionCode(code: string): ScheduleExclusionCode | null {
     default:
       return null;
   }
+}
+
+/** The review's code for a builder exclusion: a known minor stays "Youth"; an unknown age says why the age is unknown. */
+function builderExclusionCodeFor(exclusion: { code: string; blockedAge?: "MINOR" | "UNKNOWN"; unknownCauses?: { noType: number; noRange: number } }): ScheduleExclusionCode | null {
+  if (exclusion.code === "MINOR_ATTENDEE" && exclusion.blockedAge === "UNKNOWN") {
+    return exclusion.unknownCauses && exclusion.unknownCauses.noType === 0 ? "AGE_UNKNOWN_NO_RANGE" : "AGE_UNKNOWN_RECIPIENT";
+  }
+  return builderExclusionCode(exclusion.code);
 }
 
 /**
@@ -314,7 +339,15 @@ export async function buildScheduledEmailReview(
 
   const exclusionCounts = new Map<string, number>();
   const addExclusion = (code: string, count = 1) => exclusionCounts.set(code, (exclusionCounts.get(code) ?? 0) + count);
-  for (const exclusion of evaluated.result.exclusions) addExclusion(builderExclusionCode(exclusion.code) ?? exclusion.code, exclusion.contactCount);
+  for (const exclusion of evaluated.result.exclusions) {
+    const causes = exclusion.unknownCauses;
+    if (exclusion.code === "MINOR_ATTENDEE" && exclusion.blockedAge === "UNKNOWN" && causes) {
+      if (causes.noType > 0) addExclusion("AGE_UNKNOWN_RECIPIENT", causes.noType);
+      if (causes.noRange > 0) addExclusion("AGE_UNKNOWN_NO_RANGE", causes.noRange);
+      continue;
+    }
+    addExclusion(builderExclusionCodeFor(exclusion) ?? exclusion.code, exclusion.contactCount);
+  }
 
   let candidates: ScheduleTarget[] = evaluated.result.recipients.flatMap((recipient) => recipient.registrations.map((entry) => ({
     email: recipient.email,
@@ -336,10 +369,11 @@ export async function buildScheduledEmailReview(
     }
     candidates = kept;
   }
-  const minors = await findMinorTargets(prisma, eventId, candidates);
+  const minors = await findYouthRefusals(prisma, eventId, candidates);
   const targets = candidates.filter((target) => {
-    if (!minors.has(targetKey(target.email, target.registrationId))) return true;
-    addExclusion("MINOR_RECIPIENT");
+    const refusal = minors.get(targetKey(target.email, target.registrationId));
+    if (!refusal) return true;
+    addExclusion(refusal === "UNKNOWN" ? "AGE_UNKNOWN_RECIPIENT" : refusal === "UNKNOWN_NO_RANGE" ? "AGE_UNKNOWN_NO_RANGE" : "MINOR_RECIPIENT");
     return false;
   });
 
@@ -987,9 +1021,13 @@ async function buildCurrentView(
   }
   const exclusionByEmail = new Map<string, ScheduleExclusionCode>();
   for (const exclusion of evaluated.result.exclusions) {
-    const code = builderExclusionCode(exclusion.code);
+    const code = builderExclusionCodeFor(exclusion);
     if (code && exclusion.email) exclusionByEmail.set(exclusion.email, code);
   }
+  const youthRefusals = await findYouthRefusals(client, eventId, reviewed.map((recipient) => ({
+    ...recipient,
+    roles: targets.get(targetKey(recipient.email, recipient.registrationId))?.roles ?? [],
+  })));
   return {
     targets,
     registrations: new Map(registrations.map((registration) => [registration.id, { active: registration.status === "SUBMITTED" || registration.status === "CONFIRMED" }] as const)),
@@ -998,10 +1036,9 @@ async function buildCurrentView(
     // The reviewed recipients are what is being decided, so the youth check runs over them, not over what the audience lists.
     // Judged on the roles each recipient holds NOW (from the current audience), not those stored at approval, so a role that
     // lapsed (a group leader or organization contact who is no longer one) cannot vouch for a youth address.
-    minorTargets: await findMinorTargets(client, eventId, reviewed.map((recipient) => ({
-      ...recipient,
-      roles: targets.get(targetKey(recipient.email, recipient.registrationId))?.roles ?? [],
-    }))),
+    minorTargets: new Set(youthRefusals.keys()),
+    unknownAgeTargets: new Set([...youthRefusals].filter(([, reason]) => reason !== "MINOR").map(([key]) => key)),
+    unknownNoRangeTargets: new Set([...youthRefusals].filter(([, reason]) => reason === "UNKNOWN_NO_RANGE").map(([key]) => key)),
     isOrganizationBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
   };
 }
