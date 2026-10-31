@@ -227,12 +227,15 @@ export async function findYouthRefusals(
     where: { eventId, OR: [{ attendeeTypeDefinitionId: null }, { attendeeTypeDefinition: { code: { notIn: adultCodes } } }] },
     select: { personId: true, attendeeTypeDefinition: { select: { code: true } }, person: { select: { normalizedEmail: true } } },
   });
+  const untypedRows = eventMinorRows.filter((row) => !row.attendeeTypeDefinition);
   const knownMinorRows = eventMinorRows.filter((row) => row.attendeeTypeDefinition && ageClass.get(row.attendeeTypeDefinition.code) === "MINOR");
   const eventMinors: EventMinors = {
     personIds: new Set(eventMinorRows.map((row) => row.personId)),
     emails: new Set(eventMinorRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
     knownMinorPersonIds: new Set(knownMinorRows.map((row) => row.personId)),
     knownMinorEmails: new Set(knownMinorRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
+    untypedPersonIds: new Set(untypedRows.map((row) => row.personId)),
+    untypedEmails: new Set(untypedRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
   };
   const byRegistration = new Map<string, YouthCheckRegistration>();
   for (const registration of registrations) {
@@ -251,6 +254,7 @@ export async function findYouthRefusals(
           email: normalizeAudienceEmail(attendee.person.normalizedEmail),
           // No type definition at all is unknown, which is never an adult.
           age: (code ? ageClass.get(code) : undefined) ?? "UNKNOWN",
+          typed: Boolean(code),
         };
       }),
     });
@@ -369,7 +373,7 @@ export async function buildScheduledEmailReview(
   const targets = candidates.filter((target) => {
     const refusal = minors.get(targetKey(target.email, target.registrationId));
     if (!refusal) return true;
-    addExclusion(refusal === "UNKNOWN" ? "AGE_UNKNOWN_RECIPIENT" : "MINOR_RECIPIENT");
+    addExclusion(refusal === "UNKNOWN" ? "AGE_UNKNOWN_RECIPIENT" : refusal === "UNKNOWN_NO_RANGE" ? "AGE_UNKNOWN_NO_RANGE" : "MINOR_RECIPIENT");
     return false;
   });
 
@@ -1033,7 +1037,8 @@ async function buildCurrentView(
     // Judged on the roles each recipient holds NOW (from the current audience), not those stored at approval, so a role that
     // lapsed (a group leader or organization contact who is no longer one) cannot vouch for a youth address.
     minorTargets: new Set(youthRefusals.keys()),
-    unknownAgeTargets: new Set([...youthRefusals].filter(([, reason]) => reason === "UNKNOWN").map(([key]) => key)),
+    unknownAgeTargets: new Set([...youthRefusals].filter(([, reason]) => reason !== "MINOR").map(([key]) => key)),
+    unknownNoRangeTargets: new Set([...youthRefusals].filter(([, reason]) => reason === "UNKNOWN_NO_RANGE").map(([key]) => key)),
     isOrganizationBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
   };
 }

@@ -14,7 +14,7 @@ export type EventReadinessSource = {
   /** The event's id, for the link on the attendee-types item. */
   id?: string | null;
   /**
-   * Active attendee types that have an age range (#1403). Omitted by a caller that has not loaded them, which leaves the
+   * Active attendee types with a minimum age of 18 or more (#1403), the rule that makes an attendee an adult. Omitted by a caller that has not loaded them, which leaves the
    * "Attendee types set" item out rather than reporting it undone.
    */
   attendeeTypesWithAgeRangeCount?: number | null;
@@ -96,8 +96,8 @@ export function getAttendeeTypesReadinessItem(
     id: "attendee-types",
     label: "Attendee types set",
     detail: done
-      ? "Attendee types with age ranges tell scheduled email who is an adult."
-      : "Add at least one attendee type with an age range. Without one, scheduled email cannot tell who is an adult and sends to nobody.",
+      ? "An adult attendee type tells scheduled email who is an adult."
+      : "Add an adult attendee type (minimum age 18 or more). Without one, scheduled email cannot reach attendees because their age is unknown.",
     complete: done,
     ...(event.id ? { href: `/more/attendee-configuration?event=${encodeURIComponent(event.id)}` } : {}),
   };

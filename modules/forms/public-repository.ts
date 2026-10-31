@@ -1274,7 +1274,7 @@ async function createPublicRegistrationTransaction(
     // the answer matches one of the event's types exactly; club registrations are never typed this way.
     const selectedType = selectedTypeCode
       ? form.event.attendeeTypes.find((candidate) => candidate.code === selectedTypeCode)
-      : !configuredTypeSelector && !clubAttendees
+      : !configuredTypeSelector && !clubAttendees && form.event.audience === "GENERAL"
         ? matchLegacyAttendeeTypeAnswer(mergedResponses, form.event.attendeeTypes)
         : null;
     if (configuredTypeSelector && !selectedType) {

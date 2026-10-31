@@ -157,6 +157,14 @@ describe("why a youth target is refused (#1403)", () => {
     expect([...reasons.values()]).toEqual(["MINOR"]);
   });
 
+  it("an attendee whose type has no adult range is named for that, and an untyped one is not", () => {
+    const typed: YouthCheckRegistration = { ...registration("UNKNOWN"), attendees: [{ personId: "p1", email: "p1@example.test", age: "UNKNOWN", typed: true }] };
+    const evidence = { personIds: new Set(["p1"]), emails: new Set(["p1@example.test"]), untypedPersonIds: new Set<string>(), untypedEmails: new Set<string>() };
+    expect([...refusedYouthTargetReasons([target], new Map([["reg-1", typed]]), evidence).values()]).toEqual(["UNKNOWN_NO_RANGE"]);
+    const untyped = { ...evidence, untypedPersonIds: new Set(["p1"]), untypedEmails: new Set(["p1@example.test"]) };
+    expect([...refusedYouthTargetReasons([target], new Map([["reg-1", { ...typed, attendees: [{ ...typed.attendees[0]!, typed: false }] }]]), untyped).values()]).toEqual(["UNKNOWN"]);
+  });
+
   it("refuses exactly the same targets as before", () => {
     for (const age of ["MINOR", "UNKNOWN"] as const) {
       const registrations = new Map([["reg-1", registration(age)]]);
@@ -174,6 +182,7 @@ describe("why a youth target is refused (#1403)", () => {
     const decide = (current: CurrentAudienceView) => decideRecipientEligibility(reviewed, "EVENT_ANNOUNCEMENT", current, "BEFORE_EVENT_START");
     expect(decide(view(new Set([key])))).toBe("AGE_UNKNOWN_RECIPIENT");
     expect(decide(view())).toBe("MINOR_RECIPIENT");
+    expect(decide({ ...view(new Set([key])), unknownNoRangeTargets: new Set([key]) })).toBe("AGE_UNKNOWN_NO_RANGE");
     expect(SCHEDULE_EXCLUSION_LABELS.AGE_UNKNOWN_RECIPIENT).toBe("Age unknown (no attendee type)");
     expect(SCHEDULE_EXCLUSION_LABELS.MINOR_RECIPIENT).toMatch(/^Youth/);
   });

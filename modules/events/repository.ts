@@ -187,7 +187,7 @@ export async function getEventSettings(eventId: string) {
         featureUntil: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { attendeeTypes: { where: { isActive: true, OR: [{ minimumAge: { not: null } }, { maximumAge: { not: null } }] } } } },
+        _count: { select: { attendeeTypes: { where: { isActive: true, minimumAge: { gte: 18 } } } } },
       },
     }),
     prisma.registrationForm.findMany({

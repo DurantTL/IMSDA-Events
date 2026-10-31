@@ -403,6 +403,8 @@ export type CurrentAudienceView = {
   minorTargets: ReadonlySet<string>;
   /** The subset of `minorTargets` refused only because the age is unknown, not because a known minor is behind it. */
   unknownAgeTargets?: ReadonlySet<string>;
+  /** The subset of `unknownAgeTargets` where every attendee behind it has a type, but one with no adult age range. */
+  unknownNoRangeTargets?: ReadonlySet<string>;
   /** The event bills the organization, so a balance reminder is never sent to an attendee. */
   isOrganizationBilled: boolean;
 };
@@ -429,7 +431,10 @@ export function decideRecipientEligibility(
   // Youth never receive these. Checked before the audience's own answer, so an attendee who is now a minor is named as one
   // rather than as "no longer matches", and so the rule holds even if the audience were ever to list the address.
   const youthKey = targetKey(email, recipient.registrationId);
-  if (view.minorTargets.has(youthKey)) return view.unknownAgeTargets?.has(youthKey) ? "AGE_UNKNOWN_RECIPIENT" : "MINOR_RECIPIENT";
+  if (view.minorTargets.has(youthKey)) {
+    if (view.unknownNoRangeTargets?.has(youthKey)) return "AGE_UNKNOWN_NO_RANGE";
+    return view.unknownAgeTargets?.has(youthKey) ? "AGE_UNKNOWN_RECIPIENT" : "MINOR_RECIPIENT";
+  }
   const target = view.targets.get(targetKey(email, recipient.registrationId));
   if (!target) {
     const fromBuilder = view.exclusionByEmail.get(email);
@@ -530,7 +535,7 @@ export type YouthCheckRegistration = {
   /** Normalized; the address typed as the registration contact, or "" when the contact falls back to the account holder. */
   snapshotEmail: string;
   /** This registration's attendees. Age class comes from the attendee type only, never a birth date (ADR 0005 Addendum A). */
-  attendees: ReadonlyArray<{ personId: string; email: string; age: "ADULT" | "MINOR" | "UNKNOWN" }>;
+  attendees: ReadonlyArray<{ personId: string; email: string; age: "ADULT" | "MINOR" | "UNKNOWN"; /** True when the attendee has an attendee type (so an UNKNOWN age means the type has no adult range). Omitted reads as untyped. */ typed?: boolean }>;
 };
 
 /** Everyone in the WHOLE event who is a non-adult attendee (minor or age unknown) on any registration, built once per evaluation. */
@@ -540,10 +545,13 @@ export type EventMinors = {
   /** The subset whose attendee type says they are a minor (not merely unknown). Omitted means none is known. */
   knownMinorPersonIds?: ReadonlySet<string>;
   knownMinorEmails?: ReadonlySet<string>;
+  /** The subset with no attendee type at all. Omitted means the caller cannot tell, so an unknown age reads as untyped. */
+  untypedPersonIds?: ReadonlySet<string>;
+  untypedEmails?: ReadonlySet<string>;
 };
 
 /** Why a youth target is refused: a known minor is behind it, or only an unknown age. */
-export type YouthRefusalReason = "MINOR" | "UNKNOWN";
+export type YouthRefusalReason = "MINOR" | "UNKNOWN" | "UNKNOWN_NO_RANGE";
 
 /**
  * Owner decision (#177, Oct 17, 2026): a youth's own address may receive a scheduled email only when an ADULT is genuinely
@@ -602,7 +610,13 @@ export function refusedYouthTargetReasons(
     const knownMinorBehindIt = Boolean(eventMinors.knownMinorEmails?.has(email))
       || registration.attendees.some((attendee) => attendee.age === "MINOR" && attendee.email === email)
       || Boolean(holderKnownMinor && holderIsMinor && email === contactEmail);
-    const reason: YouthRefusalReason = knownMinorBehindIt ? "MINOR" : "UNKNOWN";
+    // An unknown age is "no range" only with positive evidence that every attendee behind the address has a type.
+    const untypedBehindIt = !eventMinors.untypedEmails
+      || eventMinors.untypedEmails.has(email)
+      || registration.attendees.some((attendee) => attendee.age === "UNKNOWN" && attendee.typed !== true && attendee.email === email)
+      || Boolean(holderIsMinor && email === contactEmail && (eventMinors.untypedPersonIds?.has(registration.accountHolderPersonId)
+        || registration.attendees.some((attendee) => attendee.personId === registration.accountHolderPersonId && attendee.age === "UNKNOWN" && attendee.typed !== true)));
+    const reason: YouthRefusalReason = knownMinorBehindIt ? "MINOR" : untypedBehindIt ? "UNKNOWN" : "UNKNOWN_NO_RANGE";
     if (youthAddresses.has(email)) {
       if (!adultBehindIt) refused.set(key, reason);
       continue;

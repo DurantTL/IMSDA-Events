@@ -222,6 +222,36 @@ describe("publishing a form with a partner club question (#963)", () => {
   });
 });
 
+describe("publishing a form whose question uses the event's attendee types (#1403)", () => {
+  const withTypeSelector = () => registrationFormDefinitionSchema.parse({
+    ...structuredClone(individualDefinition),
+    sections: [{ id: "sec_age", title: "Age", description: "", fields: [
+      { id: "fld_age_group", key: "age_group", label: "Age group", helpText: "", type: "RADIO", scope: "ATTENDEE", required: true, options: [], optionSource: "ATTENDEE_TYPES" },
+    ] }, ...individualDefinition.sections],
+  });
+  const draftTx = (activeTypes: number) => {
+    const draft = version({ id: "version-2", versionNumber: 2, status: "DRAFT", publishedAt: null, definition: withTypeSelector() });
+    const tx = { ...txFor([draft]), eventAttendeeType: { count: vi.fn().mockResolvedValue(activeTypes) } };
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx as never, [draft]));
+    return tx;
+  };
+
+  it("refuses, with where to set them, when the event has no active attendee types", async () => {
+    const tx = draftTx(0);
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.toMatchObject({
+      code: "ATTENDEE_TYPES_REQUIRED",
+      message: expect.stringContaining("Set attendee types for this event before publishing this form: its Age group question has no choices."),
+    });
+    expect(tx.eventAttendeeType.count).toHaveBeenCalledWith({ where: { eventId: "event-1", isActive: true } });
+    expect(tx.registrationFormVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("goes on to the next gate once the event has an active type", async () => {
+    draftTx(2);
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.not.toMatchObject({ code: "ATTENDEE_TYPES_REQUIRED" });
+  });
+});
+
 describe("withdrawing a published registration form (#564)", () => {
   it("archives the published version so the public page closes, and reports the withdrawn state", async () => {
     const published = version();

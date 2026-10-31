@@ -40,6 +40,7 @@ function transactionClient(previouslyPublishedCount: number, validTests: number)
   return {
     $executeRaw: vi.fn().mockResolvedValue(0),
     eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
+    eventAttendeeType: { count: vi.fn().mockResolvedValue(1) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     registrationForm: {
       findFirst: vi.fn().mockResolvedValue({

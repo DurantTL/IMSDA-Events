@@ -19,7 +19,7 @@ import { loadTicketPrices } from "@/modules/meals/config-repository";
 import { applyMealPricesToDefinition, mealPriceDrift } from "@/modules/meals/domain";
 import { slugCandidate, slugify, slugMatchesTitle } from "@/modules/forms/slug";
 import { listActiveAttendeeTypes } from "@/modules/attendee-types/repository";
-import { stripAttendeeTypeOptions, withAttendeeTypeOptions } from "@/modules/attendee-types/form-options";
+import { attendeeTypeSelector, stripAttendeeTypeOptions, withAttendeeTypeOptions } from "@/modules/attendee-types/form-options";
 import type { AttendeeTypeOption } from "@/modules/attendee-types/domain";
 import { hasDirectoryOptionSource, stripDirectoryOptions, withDirectoryOptions } from "@/modules/organizations/directory-form-options";
 import type { OrganizationDirectory } from "@/modules/organizations/directory-options";
@@ -80,7 +80,7 @@ async function assertAcknowledgmentPolicies(eventId: string, definition: Registr
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED" | "ACKNOWLEDGMENT_PLACEHOLDER" | "SIGNATURE_PLACEHOLDER",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED" | "ACKNOWLEDGMENT_PLACEHOLDER" | "SIGNATURE_PLACEHOLDER" | "ATTENDEE_TYPES_REQUIRED",
     message: string,
   ) {
     super(message);
@@ -607,6 +607,12 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     if (placeholders.length > 0) throw new FormOperationError("ACKNOWLEDGMENT_PLACEHOLDER", `Write the acknowledgment statement for: ${placeholders.join(", ")}.`);
     const signaturePlaceholders = placeholderSignatureLabels(definition);
     if (signaturePlaceholders.length > 0) throw new FormOperationError("SIGNATURE_PLACEHOLDER", `Write the statement to be signed for: ${signaturePlaceholders.join(", ")}.`);
+    // A question whose choices are the event's attendee types has none to offer until the event has an active one, and every
+    // public submission would then fail ("Select an active attendee type.") (#1403).
+    const typeSelector = attendeeTypeSelector(definition);
+    if (typeSelector && await tx.eventAttendeeType.count({ where: { eventId, isActive: true } }) === 0) {
+      throw new FormOperationError("ATTENDEE_TYPES_REQUIRED", `Set attendee types for this event before publishing this form: its ${typeSelector.label} question has no choices. Add them under Attendee setup (/more/attendee-configuration?event=${encodeURIComponent(eventId)}).`);
+    }
     // A test is required only before a form's first publish (#564, #1061).
     // The first publish proves the form can be filled in and priced. Once a
     // version has been published or archived, later drafts are mostly wording

@@ -53,7 +53,7 @@ import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
 import { getRegistrationByIdWithClient } from "@/modules/registrations/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
-import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-answer";
+import { LEGACY_ATTENDEE_TYPE_ANSWER_KEY, matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-answer";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
@@ -267,6 +267,7 @@ const amendmentRegistrationInclude = {
       name: true,
       timezone: true,
       capacity: true,
+      audience: true,
     },
   },
   accountHolderPerson: {
@@ -533,6 +534,7 @@ export function resolveAmendmentAttendeeType(
   responses: Record<string, unknown>,
   configuredTypes: Array<{ id: string; code: string; label: string }>,
   current: { attendeeType: string; attendeeTypeDefinitionId?: string | null; attendeeTypeDefinition?: { id: string; code: string; label: string } | null } | null,
+  audience: "GENERAL" | "CLUB" | null = null,
 ) {
   const selector = attendeeTypeSelector(definition);
   const selectedCode = selector && typeof responses[selector.key] === "string" ? responses[selector.key] : null;
@@ -547,9 +549,20 @@ export function resolveAmendmentAttendeeType(
     );
   }
   if (selector && selected) return { attendeeType: selected.label, attendeeTypeDefinitionId: selected.id };
-  // No selector: an attendee without a type yet is linked from the legacy `attendee_type` answer when it matches exactly.
-  const legacy = !selector && !current?.attendeeTypeDefinitionId ? matchLegacyAttendeeTypeAnswer(responses, configuredTypes) : null;
-  if (legacy) return { attendeeType: legacy.label, attendeeTypeDefinitionId: legacy.id };
+  // No selector on a general event: the legacy `attendee_type` answer decides the type every time it is present, so an
+  // amendment from "Adult" to "Teen" re-types the attendee. Exact match only; a blank, unknown or ambiguous answer clears the
+  // type (fail closed). An attendee whose answer is absent keeps whatever type they have, wherever it came from.
+  if (!selector && audience === "GENERAL" && LEGACY_ATTENDEE_TYPE_ANSWER_KEY in responses) {
+    const legacy = matchLegacyAttendeeTypeAnswer(responses, configuredTypes);
+    if (legacy) return { attendeeType: legacy.label, attendeeTypeDefinitionId: legacy.id };
+    const answer = typeof responses[LEGACY_ATTENDEE_TYPE_ANSWER_KEY] === "string" ? responses[LEGACY_ATTENDEE_TYPE_ANSWER_KEY].trim().toLowerCase() : "";
+    const held = current?.attendeeTypeDefinition;
+    // An unchanged answer for a type that has since been deactivated keeps that type.
+    if (held && answer && (held.label.trim().toLowerCase() === answer || held.code.trim().toLowerCase() === answer)) {
+      return { attendeeType: current!.attendeeType, attendeeTypeDefinitionId: current!.attendeeTypeDefinitionId };
+    }
+    return { attendeeType: current ? current.attendeeType : attendeeType(responses), attendeeTypeDefinitionId: null };
+  }
   return current
     ? { attendeeType: current.attendeeType, attendeeTypeDefinitionId: current.attendeeTypeDefinitionId }
     : { attendeeType: attendeeType(responses), attendeeTypeDefinitionId: null };
@@ -1448,6 +1461,7 @@ async function prepareAmendment(
     addedAttendeeCount: input.attendees.filter((attendee) => !attendee.attendeeId).length,
     seminarPreferencesChanged,
     configuredTypes,
+    eventAudience: registration.event.audience ?? null,
     rosterRenamedCount,
     serverOwnedChangedKeys: serverOwnedChangedKeys.sort(),
     locationChange: locationChanged
@@ -1707,6 +1721,7 @@ async function amendRegistrationInner(
                   { ...prepared.prepared.registrationResponses, ...attendee.responses },
                   prepared.configuredTypes.filter((type) => type.isActive),
                   current,
+                  prepared.eventAudience,
                 ),
                 profileSnapshot: {
                   ...recordFromJson(current.profileSnapshot),
@@ -1746,6 +1761,7 @@ async function amendRegistrationInner(
                   { ...prepared.prepared.registrationResponses, ...attendee.responses },
                   prepared.configuredTypes.filter((type) => type.isActive),
                   null,
+                  prepared.eventAudience,
                 ),
                 position,
                 profileSnapshot: {

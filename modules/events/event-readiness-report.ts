@@ -54,7 +54,7 @@ export async function collectEventReadinessReport(
   const event = await prisma.event.findUnique({
     where: { slug },
     select: { id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, location: true, publicInfoUrl: true, supportContact: true, isPublished: true, billingMode: true, audience: true,
-      _count: { select: { attendeeTypes: { where: { isActive: true, OR: [{ minimumAge: { not: null } }, { maximumAge: { not: null } }] } } } } },
+      _count: { select: { attendeeTypes: { where: { isActive: true, minimumAge: { gte: 18 } } } } } },
   });
   if (!event) return null;
   const isDeferredOrganizationBilling = event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
