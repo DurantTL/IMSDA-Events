@@ -55,8 +55,14 @@ export async function readUnreleasedHoldCounts(eventIds: string[]): Promise<Arra
   return eventIds.filter((id) => (counts.get(id) ?? 0) > 0).map((id) => ({ eventId: id, count: counts.get(id)! }));
 }
 
-/** Public form submissions (one `PublicRegistrationSubmission` per registration made through the public form) since a time. */
+/**
+ * Public form submissions (one `PublicRegistrationSubmission` per registration made through the public form) since a
+ * time. WR26 imports also write these rows, stamped with the import time, so they are left out.
+ */
+export const IMPORTED_SUBMISSION_PREFIX = "wr26-import:";
 export async function countPublicSubmissionsSince(eventIds: string[], since: Date): Promise<number> {
   if (eventIds.length === 0) return 0;
-  return getPrisma().publicRegistrationSubmission.count({ where: { eventId: { in: eventIds }, createdAt: { gte: since } } });
+  return getPrisma().publicRegistrationSubmission.count({
+    where: { eventId: { in: eventIds }, createdAt: { gte: since }, NOT: { idempotencyKey: { startsWith: IMPORTED_SUBMISSION_PREFIX } } },
+  });
 }

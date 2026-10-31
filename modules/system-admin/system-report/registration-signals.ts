@@ -44,7 +44,10 @@ export function unreleasedHoldsFields(
   };
 }
 
-/** Open registration with no published form: a visitor sees no way to register, so it is attention. */
+/**
+ * Open registration dates with no published form. The public page shows these as "opening soon" (#1201), which staff
+ * may mean while a form is finished, so it is watch, not attention.
+ */
 export function openWithoutFormFields(
   key: string,
   input: { openCount: number; withoutForm: Array<{ id: string; name: string }>; namesOf: (events: Array<{ name: string }>) => string; href: (eventId: string) => string; readAt: string },
@@ -56,7 +59,7 @@ export function openWithoutFormFields(
   const count = input.withoutForm.length;
   return {
     ...common,
-    state: "attention",
+    state: "watch",
     resultText: `${count} open ${plural(count, "event has", "events have")} no published registration form: ${input.namesOf(input.withoutForm)}.`,
     fixHref: input.href(input.withoutForm[0].id),
   };

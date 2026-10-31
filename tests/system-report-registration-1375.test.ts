@@ -73,11 +73,11 @@ describe("pure mappers", () => {
     expect(row.resultText).toContain("2 capacity holds are");
   });
 
-  it("open without a form: none is OK, some is attention naming the events", () => {
+  it("open without a form: none is OK, some is watch naming the events", () => {
     const common = { namesOf: (events: Array<{ name: string }>) => events.map((event) => event.name).join(", "), href: (id: string) => `/registration-builder?event=${id}`, readAt: at };
     expect(openWithoutFormFields("k", { ...common, openCount: 2, withoutForm: [] }).state).toBe("ok");
     const row = openWithoutFormFields("k", { ...common, openCount: 2, withoutForm: [{ id: "e2", name: "Synthetic Camp" }] });
-    expect(row).toMatchObject({ state: "attention", fixHref: "/registration-builder?event=e2" });
+    expect(row).toMatchObject({ state: "watch", fixHref: "/registration-builder?event=e2" });
     expect(row.resultText).toContain("Synthetic Camp");
   });
 
@@ -150,13 +150,13 @@ describe("the registration provider", () => {
     const rows = await provider.load(now, createReportContext(now));
     const byKey = new Map(rows.map((row) => [row.key, row]));
     expect(byKey.get("capacity-holds-released")).toMatchObject({ state: "watch", fixHref: "/people?event=e1" });
-    expect(byKey.get("open-without-form")).toMatchObject({ state: "attention", fixHref: "/registration-builder?event=e2" });
+    expect(byKey.get("open-without-form")).toMatchObject({ state: "watch", fixHref: "/registration-builder?event=e2" });
     expect(byKey.get("open-without-form")?.resultText).toContain("Synthetic No Form");
     expect(byKey.get("registrations-received")).toMatchObject({ state: "info" });
     expect(byKey.get("registrations-received")?.resultText).toContain("7 public submissions");
     expect(byKey.get("general-link-expiry")?.state).toBe("ok");
     // Only the two open events are counted, and only the last 24 hours.
-    expect(count).toHaveBeenCalledWith({ where: { eventId: { in: ["e1", "e2"] }, createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } } });
+    expect(count).toHaveBeenCalledWith({ where: { eventId: { in: ["e1", "e2"] }, createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }, NOT: { idempotencyKey: { startsWith: "wr26-import:" } } } });
   });
 
   it("keeps attendee data out of the rows", async () => {
