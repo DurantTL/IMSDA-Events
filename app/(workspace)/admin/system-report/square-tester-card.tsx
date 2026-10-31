@@ -91,6 +91,18 @@ export function SquareTesterCard() {
 
   const rowOf = (key: SquareCheckKey) => result?.rows.find((row) => row.key === key) ?? null;
   const head: SquareCheckState | "running" = running ? "running" : result ? (result.overall === "ok" ? "ok" : result.overall === "watch" ? "watch" : result.overall === "attention" ? "attention" : "unavailable") : "idle";
+  const counts = result ? {
+    attention: result.rows.filter((row) => row.state === "attention").length,
+    watch: result.rows.filter((row) => row.state === "watch").length,
+    unavailable: result.rows.filter((row) => row.state === "unavailable" || row.state === "skipped").length,
+  } : null;
+  const summary = !result || !counts ? "" : result.overall === "ok"
+    ? "Square checks finished: all OK"
+    : `Square checks finished: ${[
+      counts.attention ? `${counts.attention} need attention` : "",
+      counts.watch ? `${counts.watch} to check soon` : "",
+      counts.unavailable ? `${counts.unavailable} unavailable or skipped` : "",
+    ].filter(Boolean).join(", ")}`;
   const headingId = "square-tester-heading";
   return (
     <section className={styles.card} aria-labelledby={headingId} data-testid="square-tester">
@@ -101,6 +113,7 @@ export function SquareTesterCard() {
       </div>
       <div className={styles.body}>
         <p className={styles.safety}><ShieldCheck aria-hidden="true" size={16} /><span>Never charges a card and never refunds. Shows no customer or card details. Each test is logged.</span></p>
+        <p className="sr-only" role="status" aria-live="polite">{running ? "" : summary}</p>
         <div aria-live="polite">
           {message && (
             <div className={`${styles.result} ${message.tone === "bad" ? styles.resultBad : styles.resultWarn}`} role="status">

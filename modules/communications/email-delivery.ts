@@ -643,6 +643,12 @@ async function cancelIfInvoiceReplaced(
   return true;
 }
 
+/**
+ * The System report's test email (#1383) is one-shot: only a run that names its id may claim or recover it, so the
+ * scheduled sweep never sends it, retries it or re-sends it after a stale lock.
+ */
+const SWEEP_SKIPS_SYSTEM_TEST = { templateKey: { not: "SYSTEM_TEST_EMAIL" } } as const;
+
 async function recoverStaleClaims(
   prisma: DeliveryPrisma,
   scope: OutboxScope,
@@ -656,7 +662,7 @@ async function recoverStaleClaims(
       ...scope,
       status: "PROCESSING",
       lockedAt: { lte: staleBefore },
-      ...(messageIds ? { id: { in: messageIds } } : {}),
+      ...(messageIds ? { id: { in: messageIds } } : SWEEP_SKIPS_SYSTEM_TEST),
     },
     orderBy: { lockedAt: "asc" },
     take: EMAIL_DELIVERY_BATCH_SIZE,
@@ -748,7 +754,7 @@ async function claimNextMessage(
           status: "PENDING",
           availableAt: { lte: now },
           attemptCount: { lt: MAX_EMAIL_DELIVERY_ATTEMPTS },
-          ...(messageIds ? { id: { in: messageIds } } : {}),
+          ...(messageIds ? { id: { in: messageIds } } : SWEEP_SKIPS_SYSTEM_TEST),
         },
         orderBy: [{ availableAt: "asc" }, { createdAt: "asc" }],
         select: {

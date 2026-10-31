@@ -185,14 +185,23 @@ describe("email tester: sending", () => {
     expect(mocks.outbox.create).not.toHaveBeenCalled();
   });
 
-  it("closes a test the loop left pending, so it never sends later, and reports a fixed failure", async () => {
+  it("closes a test the loop left pending, so it never sends later, and reports it as unavailable", async () => {
     mocks.processAccountEmailQueue.mockRejectedValue(new Error("secret provider text re_live_key"));
     mocks.outbox.updateMany.mockResolvedValue({ count: 1 });
     mocks.outbox.findFirst.mockResolvedValue(row({ status: "CANCELLED", sentAt: null, provider: null, providerDeliveryStatus: null, failedAt: now }));
     const result = await runEmailTest({ user: admin, body: { to: "me@example.org" }, now });
-    expect(mocks.outbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "msg_test_1", status: { in: ["PENDING", "PROCESSING"] } }, data: expect.objectContaining({ status: "CANCELLED" }) }));
-    expect(result).toMatchObject({ kind: "started", status: { state: "failed", reason: EMAIL_TEST_REASONS.failed, final: true } });
+    expect(mocks.outbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "msg_test_1", status: "PENDING" }, data: expect.objectContaining({ status: "CANCELLED" }) }));
+    expect(result).toMatchObject({ kind: "started", status: { state: "unavailable", reason: EMAIL_TEST_REASONS.unavailable, final: true } });
     expect(JSON.stringify(result)).not.toMatch(/secret provider|re_live_key/);
+  });
+});
+
+describe("email tester: a worker still holding the row", () => {
+  it("never cancels a PROCESSING row and keeps the card polling", async () => {
+    mocks.outbox.findFirst.mockResolvedValue(row({ status: "PROCESSING", sentAt: null, provider: null, providerDeliveryStatus: null }));
+    const result = await runEmailTest({ user: admin, body: { to: "me@example.org" }, now });
+    for (const call of mocks.outbox.updateMany.mock.calls) expect(call[0].where.status).toBe("PENDING");
+    expect(result).toMatchObject({ kind: "started", status: { state: "queued", final: false } });
   });
 });
 
@@ -213,6 +222,9 @@ describe("email tester: status mapping", () => {
     expect(map({ providerDeliveryStatus: "FAILED" })).toMatchObject({ state: "failed", reason: EMAIL_TEST_REASONS.failed });
     expect(map({ status: "SUPPRESSED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "suppressed", reason: EMAIL_TEST_REASONS.suppressed });
     expect(map({ status: "FAILED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "failed", reason: EMAIL_TEST_REASONS.failed });
+    expect(map({ status: "CANCELLED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "unavailable", reason: EMAIL_TEST_REASONS.unavailable, final: true });
+    const stuck = row({ status: "PROCESSING", sentAt: null, provider: null, providerDeliveryStatus: null, createdAt: new Date(now.getTime() - EMAIL_NOTICE_WAIT_MS) });
+    expect(mapEmailTestStatus(stuck, [], now)).toMatchObject({ state: "unavailable", final: true });
   });
 
   it("uses a provider notice that the outbox row has not caught up with, and the worst one wins", () => {

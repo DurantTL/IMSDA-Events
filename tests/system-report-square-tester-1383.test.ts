@@ -68,7 +68,7 @@ type Script = Partial<Record<string, Reply>>;
 
 /** A recording stand-in for Square, keyed "METHOD /path". Anything unlisted is a test failure. */
 function fakeSquare(script: Script = {}) {
-  const calls: Array<{ method: string; path: string; body: unknown }> = [];
+  const calls: Array<{ method: string; path: string; query: string; body: unknown }> = [];
   const defaults: Script = {
     "GET /v2/locations": { body: { locations: [{ id: "LOC_SYNTH_1" }] } },
     "GET /v2/locations/LOC_SYNTH_1": { body: { location: { id: "LOC_SYNTH_1", name: "Conference Office", status: "ACTIVE", capabilities: ["CREDIT_CARD_PROCESSING"] } } },
@@ -82,12 +82,17 @@ function fakeSquare(script: Script = {}) {
     const url = new URL(String(input));
     const method = (init?.method ?? "GET").toUpperCase();
     const key = `${method} ${url.pathname}`;
-    calls.push({ method, path: url.pathname, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    calls.push({ method, path: url.pathname, query: url.search, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     const reply = replies[key];
     if (!reply) throw new Error(`unexpected request ${key}`);
     if (reply === "throw") throw new TypeError("network down");
     if (reply === "timeout") throw new DOMException("The operation timed out.", "TimeoutError");
-    return new Response(JSON.stringify(reply.body ?? {}), { status: reply.status ?? 200, headers: { "content-type": "application/json" } });
+    let body = reply.body as { subscriptions?: Array<{ enabled?: boolean }> } | undefined;
+    // Like Square: disabled subscriptions come back only when asked for.
+    if (key === "GET /v2/webhooks/subscriptions" && body?.subscriptions && url.searchParams.get("include_disabled") !== "true") {
+      body = { ...body, subscriptions: body.subscriptions.filter((subscription) => subscription.enabled !== false) };
+    }
+    return new Response(JSON.stringify(body ?? {}), { status: reply.status ?? 200, headers: { "content-type": "application/json" } });
   }) as unknown as typeof fetch;
   return { fetcher, calls };
 }
@@ -176,6 +181,24 @@ describe("square tester: checks", () => {
     expect(elsewhere.calls.some((call) => call.path.endsWith("/test"))).toBe(false);
   });
 
+  it("asks Square for disabled subscriptions too, so a turned-off one is reported as off, not missing", async () => {
+    const { result, calls } = await run({ "GET /v2/webhooks/subscriptions": { body: { subscriptions: [{ id: "wbhk_1", enabled: false, notification_url: noticeUrl, event_types: [...SQUARE_REQUIRED_NOTICE_EVENTS] }] } } });
+    expect(calls.find((call) => call.path === "/v2/webhooks/subscriptions")?.query).toBe("?include_disabled=true");
+    expect(rowOf(result, "notices").text).toMatch(/turned off/);
+  });
+
+  it("maps our endpoint's other answers: 503 key not set, 400 unreadable sample", async () => {
+    const testPath = "POST /v2/webhooks/subscriptions/wbhk_1/test";
+    const key = await run({ [testPath]: { body: { subscription_test_result: { status_code: 503 } } } });
+    expect(stateOf(key.result, "test")).toBe("attention");
+    expect(rowOf(key.result, "test").text).toBe("The test notice arrived, but this server's notice signature key is not set.");
+    expect(rowOf(key.result, "test").next).toMatch(/Save the subscription's signature key in the server settings/);
+    const sample = await run({ [testPath]: { body: { subscription_test_result: { status_code: 400 } } } });
+    expect(stateOf(sample.result, "test")).toBe("watch");
+    expect(rowOf(sample.result, "test").text).toBe("Arrived and the signature is ours, but the app could not read Square's sample notice.");
+    expect(sample.result.overall).toBe("watch");
+  });
+
   it("reads a 403 from our own endpoint as arrived-but-signature-mismatch, and anything else as not arrived", async () => {
     const testPath = "POST /v2/webhooks/subscriptions/wbhk_1/test";
     const bad = await run({ [testPath]: { body: { subscription_test_result: { status_code: 403 } } } });
@@ -244,6 +267,19 @@ describe("square tester: the test link is always deleted", () => {
   it("treats a link Square no longer has as deleted", async () => {
     const { result } = await run({ "DELETE /v2/online-checkout/payment-links/LINK_1": { status: 404, body: {} } }, true);
     expect(stateOf(result, "link")).toBe("ok");
+  });
+
+  it("records the link outcome durably and, when create is uncertain, names the order reference to look for", async () => {
+    const ok = await run({}, true);
+    expect(ok.result).toMatchObject({ linkId: "LINK_1", linkOutcome: "deleted" });
+    const failed = await run({ "DELETE /v2/online-checkout/payment-links/LINK_1": { status: 400 } }, true);
+    expect(failed.result).toMatchObject({ linkId: "LINK_1", linkOutcome: "delete-failed" });
+    const uncertain = await run({ "POST /v2/online-checkout/payment-links": "timeout" }, true);
+    expect(uncertain.result).toMatchObject({ linkId: null, linkOutcome: "create-uncertain" });
+    expect(rowOf(uncertain.result, "link").next).toBe("Look for order reference system-test-T-3M9P in Square → Online checkout and delete it if it is there.");
+    expect(uncertain.calls.some((call) => call.method === "DELETE")).toBe(false);
+    const off = await run({}, false);
+    expect(off.result).toMatchObject({ linkId: null, linkOutcome: "not-run" });
   });
 
   it("makes no delete call when no link was made, and reports the refusal", async () => {
@@ -369,7 +405,7 @@ describe("square tester: route", () => {
       expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
       const audit = mocks.writeAuditLog.mock.calls[0][0];
       expect(audit).toMatchObject({ action: "SYSTEM_REPORT_SQUARE_TEST", actorUserId: "user_admin_1", entityType: "SquareTest" });
-      expect(audit.metadata).toMatchObject({ linkTested: true, overall: "attention", outcomes: { account: "attention", location: "skipped", notices: "skipped", test: "skipped", link: "skipped" } });
+      expect(audit.metadata).toMatchObject({ linkId: null, linkOutcome: "not-run", linkTested: true, overall: "attention", outcomes: { account: "attention", location: "skipped", notices: "skipped", test: "skipped", link: "skipped" } });
     } finally {
       Object.assign(configuration, { paymentConfigured: true, issue: null });
     }

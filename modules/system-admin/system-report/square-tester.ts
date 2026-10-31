@@ -85,8 +85,13 @@ export type SquareCheckRow = {
   fixLabel?: string;
 };
 
+export type SquareLinkOutcome = "deleted" | "delete-failed" | "create-uncertain" | "not-run";
+
 export type SquareTestResult = {
   ref: string;
+  /** The test link's Square id when one was made (an id, never a secret), else null. */
+  linkId: string | null;
+  linkOutcome: SquareLinkOutcome;
   ranAt: string;
   linkTested: boolean;
   overall: "ok" | "attention" | "watch" | "unavailable";
@@ -207,7 +212,7 @@ async function checkLocation(fetcher: Fetcher, configuration: SquareRuntimeConfi
 type NoticeCheck = { row: SquareCheckRow; subscriptionId: string | null; eventType: string | null };
 
 async function checkNotices(fetcher: Fetcher, configuration: SquareRuntimeConfiguration, now: () => Date): Promise<NoticeCheck> {
-  const result = await call(fetcher, configuration, "GET", "/v2/webhooks/subscriptions");
+  const result = await call(fetcher, configuration, "GET", "/v2/webhooks/subscriptions?include_disabled=true");
   const at = now().toISOString();
   const none = { subscriptionId: null, eventType: null };
   if (result.kind === "unavailable") return { ...none, row: { key: "notices", state: "unavailable", text: ROW_COPY.unavailable, next: null, at } };
@@ -252,16 +257,25 @@ async function checkTestNotice(fetcher: Fetcher, configuration: SquareRuntimeCon
   if (status !== null && status >= 200 && status < 300) {
     return { key: "test", state: "ok", at, text: `Arrived ${seconds === 0 ? "at once" : `${seconds} ${seconds === 1 ? "second" : "seconds"} after asking`}. Signature OK.`, next: null };
   }
+  if (status === 503) {
+    return { key: "test", state: "attention", at, text: "The test notice arrived, but this server's notice signature key is not set.", next: "Save the subscription's signature key in the server settings, then run this again.", fixHref: "/admin/settings", fixLabel: "Open payment settings" };
+  }
+  if (status === 400) {
+    return { key: "test", state: "watch", at, text: "Arrived and the signature is ours, but the app could not read Square's sample notice.", next: null };
+  }
   if (status === 403) {
     return { key: "test", state: "attention", at, text: "The test notice arrived, but the signature did not match.", next: "Copy the subscription's signature key from Square into the server settings. Until then, payment notices are being ignored." };
   }
   return { key: "test", state: "attention", at, text: "The test notice did not arrive.", next: "Check that this site is reachable from the internet at the notice address, then run this again." };
 }
 
-async function checkLink(fetcher: Fetcher, configuration: SquareRuntimeConfiguration, ref: string, now: () => Date): Promise<SquareCheckRow> {
+type LinkCheck = { row: SquareCheckRow; linkId: string | null; outcome: SquareLinkOutcome };
+
+async function checkLink(fetcher: Fetcher, configuration: SquareRuntimeConfiguration, ref: string, now: () => Date): Promise<LinkCheck> {
   let created: SquarePaymentLinkResult | null = null;
   let madeAt: string | null = null;
   let failure: SquareCheckRow | null = null;
+  let outcome: SquareLinkOutcome = "not-run";
   try {
     created = await createSquarePaymentLink(configuration, {
       idempotencyKey: randomUUID(),
@@ -276,21 +290,32 @@ async function checkLink(fetcher: Fetcher, configuration: SquareRuntimeConfigura
     madeAt = now().toISOString();
   } catch (error) {
     if (error instanceof SquareRequestNotAllowedError) throw error;
-    const unavailable = error instanceof SquareAdapterError ? error.code === "SQUARE_REQUEST_UNCERTAIN" : false;
-    failure = created
-      ? { key: "link", state: "attention", text: "The test link was made, but the check stopped early. It is being deleted.", next: null, at: madeAt }
-      : unavailable
-      ? { key: "link", state: "unavailable", text: ROW_COPY.unavailable, next: null, at: null }
-      : { key: "link", state: "attention", text: "Square would not make a test payment link.", next: "Check that the location takes card payments and the access token may create payment links.", at: null };
+    const uncertain = error instanceof SquareAdapterError
+      && (error.code === "SQUARE_REQUEST_UNCERTAIN" || error.code === "SQUARE_INVALID_RESPONSE");
+    if (created) {
+      failure = { key: "link", state: "attention", text: "The test link was made, but the check stopped early. It is being deleted.", next: null, at: madeAt };
+    } else if (uncertain) {
+      // Square may have made the link even though no answer came back: the admin must look for it.
+      outcome = "create-uncertain";
+      failure = {
+        key: "link", state: "unavailable", at: null,
+        text: "Square did not confirm whether the test link was made.",
+        next: `Look for order reference system-test-${ref} in Square → Online checkout and delete it if it is there.`,
+      };
+    } else {
+      failure = { key: "link", state: "attention", text: "Square would not make a test payment link.", next: "Check that the location takes card payments and the access token may create payment links.", at: null };
+    }
   } finally {
     // Always runs once a link exists, even if the lines above threw after creating it.
     if (created) {
       const linkId = created.id;
       try {
         await deleteSquarePaymentLink(configuration, linkId, fetcher);
+        outcome = "deleted";
         failure = failure ?? { key: "link", state: "ok", at: now().toISOString(), text: "Made and deleted at once. Never paid.", next: null };
       } catch (error) {
         if (error instanceof SquareRequestNotAllowedError) throw error;
+        outcome = "delete-failed";
         failure = {
           key: "link", state: "attention", at: madeAt,
           text: "Made, but could not be deleted.",
@@ -299,7 +324,8 @@ async function checkLink(fetcher: Fetcher, configuration: SquareRuntimeConfigura
       }
     }
   }
-  return failure ?? { key: "link", state: "attention", text: "The test link did not complete.", next: null, at: null };
+  const row = failure ?? { key: "link" as const, state: "attention" as const, text: "The test link did not complete.", next: null, at: null };
+  return { row, linkId: created?.id ?? null, outcome };
 }
 
 function overallOf(rows: SquareCheckRow[]): SquareTestResult["overall"] {
@@ -317,6 +343,8 @@ export async function runSquareChecks(input: { includeLink: boolean }, deps: Squ
   const ref = deps.ref ?? newSystemTestRef();
   const ranAt = now().toISOString();
 
+  let linkId: string | null = null;
+  let linkOutcome: SquareLinkOutcome = "not-run";
   const account = await checkAccount(fetcher, configuration, now);
   const rows: SquareCheckRow[] = [account];
   const needsAccount = "Needs a working account first.";
@@ -328,9 +356,14 @@ export async function runSquareChecks(input: { includeLink: boolean }, deps: Squ
     const notices = await checkNotices(fetcher, configuration, now);
     rows.push(notices.row);
     rows.push(await checkTestNotice(fetcher, configuration, notices, now));
-    if (input.includeLink) rows.push(await checkLink(fetcher, configuration, ref, now));
+    if (input.includeLink) {
+      const link = await checkLink(fetcher, configuration, ref, now);
+      rows.push(link.row);
+      linkId = link.linkId;
+      linkOutcome = link.outcome;
+    }
   }
-  return { ref, ranAt, linkTested: input.includeLink, overall: overallOf(rows), rows };
+  return { ref, linkId, linkOutcome, ranAt, linkTested: input.includeLink, overall: overallOf(rows), rows };
 }
 
 export type SquareTestRun =
@@ -352,6 +385,8 @@ export async function runSquareTest(input: { user: { id: string }; includeLink: 
       metadata: {
         testRef: result.ref,
         linkTested: result.linkTested,
+        linkId: result.linkId,
+        linkOutcome: result.linkOutcome,
         overall: result.overall,
         outcomes: Object.fromEntries(result.rows.map((row) => [row.key, row.state])),
       },

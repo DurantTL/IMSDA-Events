@@ -34,6 +34,7 @@ function headChip(status: EmailTestStatus | null, phase: Phase) {
     case "delivered": return { color: "green", label: "OK" };
     case "bounced": case "complained": case "failed": case "suppressed": return { color: "coral", label: "Needs attention" };
     case "no-notice": return { color: "gold", label: "Check soon" };
+    case "unavailable": return { color: "neutral", label: "Unavailable", quiet: true };
     default: return { color: "gold", label: "Waiting for notice" };
   }
 }
@@ -50,6 +51,8 @@ function Timeline({ status }: { status: EmailTestStatus }) {
   ];
   if (status.state === "queued") {
     steps.push(<Step key="s" kind="wait" title="Sent to the email provider" sub="Waiting to be picked up." time="—" />);
+  } else if (!status.sentAt && status.state === "unavailable") {
+    steps.push(<Step key="u" kind="warn" title="Not sent" sub={status.reason ?? undefined} time={clockTime(status.outcomeAt)} />);
   } else if (!status.sentAt) {
     steps.push(<Step key="f" kind="fail" title="Could not be sent" sub={status.reason ?? undefined} time={clockTime(status.outcomeAt)} />);
   } else {
@@ -113,6 +116,18 @@ function Result({ status }: { status: EmailTestStatus }) {
           <ol>
             <li>Check the email provider key and the sender address in Email settings.</li>
             <li>Run Test connections, then send again.</li>
+          </ol>
+          {ref}
+        </div>
+      );
+    case "unavailable":
+      return (
+        <div className={`${styles.result} ${styles.resultWarn}`}>
+          <strong>The test email was not sent.</strong>
+          <p>{status.reason}</p>
+          <ol>
+            <li>Try again in a minute.</li>
+            <li>If it keeps happening, run Test connections and check Email settings.</li>
           </ol>
           {ref}
         </div>

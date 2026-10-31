@@ -27,7 +27,7 @@ export const emailTestInputSchema = z.object({
   to: z.string().trim().max(254).pipe(z.email()),
 }).strict();
 
-export type EmailTestState = "queued" | "waiting" | "delivered" | "bounced" | "complained" | "failed" | "suppressed" | "no-notice";
+export type EmailTestState = "queued" | "waiting" | "delivered" | "bounced" | "complained" | "failed" | "suppressed" | "no-notice" | "unavailable";
 
 export type EmailTestStatus = {
   testId: string;
@@ -48,6 +48,7 @@ export const EMAIL_TEST_REASONS = {
   bounced: "The receiving server refused it.",
   complained: "The recipient marked it as spam.",
   failed: "The email provider could not send it.",
+  unavailable: "The email provider could not be reached, so nothing was sent.",
   suppressed: "This address is on the do-not-send list after an earlier bounce or spam report.",
   "no-notice": "The provider has not reported delivered or bounced yet.",
 } as const;
@@ -112,8 +113,12 @@ export function mapEmailTestStatus(
   });
 
   if (row.status === "SUPPRESSED") return done("suppressed", row.failedAt ?? row.createdAt);
-  if (row.status === "FAILED" || row.status === "CANCELLED") return done("failed", row.failedAt ?? null);
+  // A test is closed as CANCELLED only when the provider could not be reached or nothing was claimed.
+  if (row.status === "CANCELLED") return done("unavailable", row.failedAt ?? null);
+  if (row.status === "FAILED") return done("failed", row.failedAt ?? null);
   if (row.status !== "SENT") {
+    // Still held by a worker after the notice wait: stop promising a result.
+    if (now.getTime() - row.createdAt.getTime() >= EMAIL_NOTICE_WAIT_MS) return done("unavailable", new Date(row.createdAt.getTime() + EMAIL_NOTICE_WAIT_MS));
     return { ...base, state: "queued", outcomeAt: null, reason: null, final: false };
   }
   const notice = classifyNotice(row, events);
@@ -197,9 +202,10 @@ export async function runEmailTest(input: { user: { id: string }; body: unknown;
     // Not configured at the provider, or the loop failed outright. The row is closed below; nothing is retried later.
     logError("The System report test email could not be delivered", error, { testRef: queued.ref });
   }
-  // A test is one shot. A row the loop rescheduled for a retry is closed, so it never sends a surprise email later.
+  // A test is one shot. A row still PENDING (nothing claimed, or rescheduled for a retry) is closed, so it never sends a
+  // surprise email later. A PROCESSING row belongs to another worker, which will finish it; the card keeps polling.
   await getPrisma().messageOutbox.updateMany({
-    where: { id: queued.messageId, status: { in: ["PENDING", "PROCESSING"] } },
+    where: { id: queued.messageId, status: "PENDING" },
     data: { status: "CANCELLED", failedAt: now, lockedAt: null, lockToken: null },
   }).catch((error) => logError("Could not close an unsent System report test email", error, { testRef: queued.ref }));
 

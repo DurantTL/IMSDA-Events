@@ -831,6 +831,22 @@ describe("account email queue", () => {
     );
   });
 
+  it("keeps the System report test email out of every sweep, claim and stale recovery (#1383)", async () => {
+    configureAccountEmail("no-reply@imsda.org");
+    const sweep = accountStore();
+    await processAccountEmailQueue({ dependencies: { ...dependencies, prisma: sweep.prisma as never, sendEmail: vi.fn(), prepareBodyText: vi.fn() } });
+    const claims = claimQueries(sweep);
+    expect(claims.length).toBeGreaterThan(0);
+    for (const call of claims) expect(call.where).toMatchObject({ templateKey: { not: "SYSTEM_TEST_EMAIL" } });
+
+    const named = accountStore();
+    await processAccountEmailQueue({ messageIds: ["message-1"], dependencies: { ...dependencies, prisma: named.prisma as never, sendEmail: vi.fn(), prepareBodyText: vi.fn() } });
+    for (const call of claimQueries(named)) {
+      expect(call.where).toMatchObject({ id: { in: ["message-1"] } });
+      expect(call.where).not.toHaveProperty("templateKey");
+    }
+  });
+
   it("refuses to run, rather than send from nowhere, with no sender configured", async () => {
     configureAccountEmail(undefined);
     const store = accountStore();
