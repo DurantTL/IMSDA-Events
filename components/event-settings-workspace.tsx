@@ -965,7 +965,9 @@ export function EventSettingsWorkspace({
             {fieldNote("slug")}</label>
             <div className="form-grid two-column">
               <label>Starts on<input {...fieldAria("startsOn")} id="event-field-starts-on" type="date" required value={draft.startsOn} onChange={(event) => update("startsOn", event.target.value)} />{fieldNote("startsOn")}</label>
+              {mode === "create" && <label>Start time<input {...fieldAria("startTime")} id="event-field-start-time" type="time" required value={draft.startTime ?? ""} onChange={(event) => update("startTime", event.target.value)} />{fieldNote("startTime")}</label>}
               <label>Ends on<input {...fieldAria("endsOn")} id="event-field-ends-on" type="date" required min={draft.startsOn || undefined} value={draft.endsOn} onChange={(event) => update("endsOn", event.target.value)} />{fieldNote("endsOn")}</label>
+              {mode === "create" && <label>End time<input {...fieldAria("endTime")} id="event-field-end-time" type="time" required value={draft.endTime ?? ""} onChange={(event) => update("endTime", event.target.value)} />{fieldNote("endTime")}</label>}
             </div>
             <label>
               Event timezone

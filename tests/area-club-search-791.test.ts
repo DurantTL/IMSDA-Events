@@ -108,7 +108,7 @@ beforeEach(() => {
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.getAreaClubsSummary.mockResolvedValue(clubs);
   mocks.listAreaClubEvents.mockResolvedValue([
-    { id: "e1", name: "Test Camporee", startsAt: "2026-10-10T00:00:00.000Z", clubs: [
+    { id: "e1", name: "Test Camporee", startsAt: "2026-10-10T00:00:00.000Z", timezone: "UTC", clubs: [
       { organizationId: "a", name: "Alpine Eagles", status: "REGISTERED", headcount: 12 },
       { organizationId: "b", name: "Bay Trailblazers", status: "REGISTERED", headcount: 20 },
     ] },

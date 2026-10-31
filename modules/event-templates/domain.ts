@@ -2,7 +2,8 @@ import { z } from "zod";
 import { getFormTemplate } from "@/modules/forms/definition";
 import { isEventMessageTemplateKey, validateMessageTemplate, type MessageTemplateKey } from "@/modules/communications/templates";
 import { runSendCheck } from "@/modules/communications/send-check";
-import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/events/schemas";
+import { calendarDateSchema, eventNameSchema, eventSlugSchema, timeOfDaySchema } from "@/modules/events/schemas";
+import { eventTimeProblems } from "@/modules/events/event-times";
 import { operationalReportKinds } from "@/modules/reporting/operational-reports";
 import { attendeeClassificationInputSchema, attendeeTypeInputSchema } from "@/modules/attendee-types/domain";
 import { teamSettingsInputSchema } from "@/modules/club-teams/domain";
@@ -326,6 +327,9 @@ export const applyEventTemplateInputSchema = z.object({
   slug: eventSlugSchema,
   startsOn: calendarDateSchema,
   endsOn: calendarDateSchema,
+  /** Wall-clock times in the event's time zone (#1406); absent keeps today's noon UTC. */
+  startTime: timeOfDaySchema.optional(),
+  endTime: timeOfDaySchema.optional(),
   /** The caller's idempotency key, scoped to the signed-in actor: retrying an
    * apply with the same key and the same details returns the event the first
    * attempt created instead of creating a second one, and reusing a key with
@@ -343,6 +347,8 @@ export const applyEventTemplateInputSchema = z.object({
   if (value.endsOn < value.startsOn) {
     context.addIssue({ code: "custom", path: ["endsOn"], message: "The event cannot end before it starts." });
   }
+  const timeProblem = eventTimeProblems(value).endTime;
+  if (timeProblem && value.startTime && value.endTime) context.addIssue({ code: "custom", path: ["endTime"], message: timeProblem });
 });
 
 export type ApplyEventTemplateInput = z.infer<typeof applyEventTemplateInputSchema>;

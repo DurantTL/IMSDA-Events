@@ -18,14 +18,12 @@ import { isPublicState, type EventLifecycleStateName } from "@/modules/events/li
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
+import { eventInstant, keepClockTime } from "@/modules/events/event-times";
 import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export { EventOperationError } from "@/modules/events/operation-error";
 
-function eventDate(value: string) {
-  return new Date(`${value}T12:00:00.000Z`);
-}
 
 export async function findActiveMembership(
   userId: string,
@@ -300,8 +298,8 @@ export async function createEvent(
       data: {
         name: input.name,
         slug: input.slug,
-        startsAt: eventDate(input.startsOn),
-        endsAt: eventDate(input.endsOn),
+        startsAt: eventInstant(input.startsOn, input.startTime, input.timezone),
+        endsAt: eventInstant(input.endsOn, input.endTime, input.timezone),
         timezone: input.timezone,
         location: input.location,
         capacity: input.capacity,
@@ -512,8 +510,9 @@ export async function updateEventSettings(
       data: {
         name: input.name,
         slug: input.slug,
-        startsAt: eventDate(input.startsOn),
-        endsAt: eventDate(input.endsOn),
+        // Dates move, the clock time stays (#1406).
+        startsAt: keepClockTime(current.startsAt, current.timezone, input.startsOn, input.timezone),
+        endsAt: keepClockTime(current.endsAt, current.timezone, input.endsOn, input.timezone),
         timezone: input.timezone,
         location: input.location,
         capacity: input.capacity,

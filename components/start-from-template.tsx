@@ -42,6 +42,8 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
   const [slugEdited, setSlugEdited] = useState(false);
   const [startsOn, setStartsOn] = useState(calendarPrefill?.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(calendarPrefill?.endsOn ?? "");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [requestKey] = useState(() => crypto.randomUUID());
   // The features step (#965): the template's own settings until staff change one. Changes belong to the template they were
   // made for, so picking another template shows that template's settings again.
@@ -87,7 +89,7 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
   }
 
   async function apply() {
-    const errors = validateFromTemplateForm({ templateId, name, slug, startsOn, endsOn });
+    const errors = validateFromTemplateForm({ templateId, name, slug, startsOn, endsOn, startTime, endTime });
     setFieldErrors(errors);
     const invalid = orderedFromTemplateErrors(errors);
     if (invalid.length > 0) {
@@ -103,7 +105,7 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
       const response = await fetch(`/api/event-templates/${templateId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug, startsOn, endsOn, requestKey, ...(calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}), ...(chosenFeatures ? { features: chosenFeatures } : {}) }),
+        body: JSON.stringify({ name, slug, startsOn, endsOn, startTime, endTime, requestKey, ...(calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}), ...(chosenFeatures ? { features: chosenFeatures } : {}) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "The event could not be created from this template.");
@@ -183,10 +185,22 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
           {fieldError("startsOn")}
           </div>
           <div>
+          <label>Start time
+            <input {...fieldProps("startTime")} type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); clearFieldError("startTime"); clearFieldError("endTime"); }} />
+          </label>
+          {fieldError("startTime")}
+          </div>
+          <div>
           <label>Ends on
             <input {...fieldProps("endsOn")} type="date" value={endsOn} onChange={(event) => { setEndsOn(event.target.value); clearFieldError("endsOn"); }} />
           </label>
           {fieldError("endsOn")}
+          </div>
+          <div>
+          <label>End time
+            <input {...fieldProps("endTime")} type="time" value={endTime} onChange={(event) => { setEndTime(event.target.value); clearFieldError("endTime"); }} />
+          </label>
+          {fieldError("endTime")}
           </div>
         </div>
 

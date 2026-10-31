@@ -1,11 +1,12 @@
-import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/events/schemas";
+import { calendarDateSchema, eventNameSchema, eventSlugSchema, timeOfDaySchema } from "@/modules/events/schemas";
+import { eventTimeProblems } from "@/modules/events/event-times";
 
-export type FromTemplateField = "templateId" | "name" | "slug" | "startsOn" | "endsOn";
+export type FromTemplateField = "templateId" | "name" | "slug" | "startsOn" | "endsOn" | "startTime" | "endTime";
 
 export type FromTemplateErrors = Partial<Record<FromTemplateField, string>>;
 
 /** Field order on the page, so focus goes to the first invalid field a person sees. */
-export const fromTemplateFieldOrder: FromTemplateField[] = ["templateId", "name", "slug", "startsOn", "endsOn"];
+export const fromTemplateFieldOrder: FromTemplateField[] = ["templateId", "name", "slug", "startsOn", "startTime", "endsOn", "endTime"];
 
 export const fromTemplateFieldLabels: Record<FromTemplateField, string> = {
   templateId: "Template",
@@ -13,6 +14,8 @@ export const fromTemplateFieldLabels: Record<FromTemplateField, string> = {
   slug: "Web address",
   startsOn: "Starts on",
   endsOn: "Ends on",
+  startTime: "Start time",
+  endTime: "End time",
 };
 
 /**
@@ -26,6 +29,9 @@ export function validateFromTemplateForm(input: {
   slug: string;
   startsOn: string;
   endsOn: string;
+  /** The page always passes both (they are required there); left out, the times are not checked. */
+  startTime?: string;
+  endTime?: string;
 }): FromTemplateErrors {
   const errors: FromTemplateErrors = {};
   if (!input.templateId) errors.templateId = "Choose a published template.";
@@ -42,6 +48,19 @@ export function validateFromTemplateForm(input: {
   const ends = calendarDateSchema.safeParse(input.endsOn);
   if (!ends.success) errors.endsOn = input.endsOn === "" ? "Choose the end date." : (ends.error.issues[0]?.message ?? "Choose the end date.");
   else if (starts.success && input.endsOn < input.startsOn) errors.endsOn = "The event cannot end before it starts.";
+
+  if (input.startTime !== undefined) {
+    const startTime = timeOfDaySchema.safeParse(input.startTime);
+    if (!startTime.success) errors.startTime = input.startTime === "" ? "Choose the start time." : (startTime.error.issues[0]?.message ?? "Choose the start time.");
+  }
+  if (input.endTime !== undefined) {
+    const endTime = timeOfDaySchema.safeParse(input.endTime);
+    if (!endTime.success) errors.endTime = input.endTime === "" ? "Choose the end time." : (endTime.error.issues[0]?.message ?? "Choose the end time.");
+    else if (!errors.startTime && !errors.endsOn && input.startTime) {
+      const problem = eventTimeProblems({ startsOn: input.startsOn, endsOn: input.endsOn, startTime: input.startTime, endTime: input.endTime }).endTime;
+      if (problem) errors.endTime = problem;
+    }
+  }
 
   return errors;
 }

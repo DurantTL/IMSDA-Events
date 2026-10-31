@@ -85,6 +85,8 @@ export type AreaClubEvent = {
   id: string;
   name: string;
   startsAt: string;
+  /** The event's own time zone, so its date shows as that day there (#1406: start times are no longer noon UTC). */
+  timezone: string;
   clubs: AreaEventClubRow[];
 };
 
@@ -102,6 +104,7 @@ export async function listAreaClubEvents(clubYear: string): Promise<AreaClubEven
         id: true,
         name: true,
         startsAt: true,
+        timezone: true,
         clubRegistrations: {
           select: { organizationId: true, registration: { select: { status: true, _count: { select: { attendees: true } } } } },
         },
@@ -127,6 +130,7 @@ export async function listAreaClubEvents(clubYear: string): Promise<AreaClubEven
       id: event.id,
       name: event.name,
       startsAt: event.startsAt.toISOString(),
+      timezone: event.timezone,
       clubs: clubs.map((club) => {
         const registration = registrations.get(club.id);
         const status = registration ? registrationStatusFor(registration.status) : drafts.has(club.id) ? "DRAFT" : "NOT_REGISTERED";

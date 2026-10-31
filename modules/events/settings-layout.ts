@@ -40,6 +40,8 @@ export const settingsFieldBlock: Record<string, SettingsBlockId> = {
   slug: "basics",
   startsOn: "basics",
   endsOn: "basics",
+  startTime: "basics",
+  endTime: "basics",
   timezone: "basics",
   location: "basics",
   capacity: "basics",
