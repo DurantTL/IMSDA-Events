@@ -70,9 +70,18 @@ Optional:
 
 ```
 BACKUP_R2_READ_PREFIX=<folder in the bucket, e.g. events.imsda.org/>
-BACKUP_R2_READ_DATABASE_PATTERNS=   # default: *.sql,*.sql.gz,*.sql.zst,*.dump,*.dump.gz
-BACKUP_R2_READ_FILES_PATTERNS=      # default: *.tar,*.tar.gz,*.tgz,*.zip,*.tar.zst
+BACKUP_R2_READ_DATABASE_PATTERNS=
+BACKUP_R2_READ_FILES_PATTERNS=
 ```
+
+Leave the two pattern lines blank to use the defaults. The database default is
+`*.sql,*.sql.gz,*.sql.zst,*.dump,*.dump.gz` and the files default is
+`*.tar,*.tar.gz,*.tgz,*.zip,*.tar.zst`.
+
+If the bucket holds more than about 10,000 files, the app reads only the first
+10 pages and the System report says the listing was cut short (state "watch",
+not a warning to health). Set `BACKUP_R2_READ_PREFIX` to the folder with the
+database dumps to fix that.
 
 The patterns are matched against each file's name (the last part of its path),
 ignoring capital letters, and `*` is the only wildcard. If xCloud names its
@@ -92,7 +101,7 @@ plain restart of the old container does not re-read it).
    if you just changed something.
 2. A fresh database backup shows its date and size with a green "OK".
 3. The detailed `/api/health` answer (token or administrator sign-in) shows the
-   same under `offsiteBackups`, and `services.backups`. A stale or missing
+   same under `offsiteBackups` and `services.offsiteBackups` (`services.backups` is the app's own helper). A stale or missing
    database backup makes it `degraded` (still HTTP 200). A failed R2 read is
    shown as `error` but does not make it `degraded`.
 4. If a row says "R2 refused the read-only key", the key or Account ID is wrong,

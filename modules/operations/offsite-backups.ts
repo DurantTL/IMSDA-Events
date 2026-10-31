@@ -32,10 +32,13 @@ export type OffsiteBackupResult =
       files: OffsiteBackupEntry | null;
       /** The listing was cut short, so a newer object may exist. */
       partial: boolean;
+      /** How many objects were read (for the "cut short" message). */
+      scanned: number;
       checkedAt: string;
     };
 
-export type OffsiteDatabaseStatus = "ok" | "stale" | "missing";
+/** `partial`: the listing was cut short and no fresh dump was seen, so staleness cannot be judged. */
+export type OffsiteDatabaseStatus = "ok" | "stale" | "missing" | "partial";
 
 type CompiledPattern = { regex: RegExp; extension: string | null };
 
@@ -108,6 +111,7 @@ export function assessOffsiteBackups(input: AssessmentInput): Extract<OffsiteBac
     database: entry(database, "Database dump"),
     files: entry(files, "Files archive"),
     partial: input.partial,
+    scanned: input.objects.length,
     checkedAt: input.now.toISOString(),
   };
 }
@@ -115,9 +119,10 @@ export function assessOffsiteBackups(input: AssessmentInput): Extract<OffsiteBac
 /** `null` unless the answer is a completed listing. */
 export function offsiteDatabaseStatus(result: OffsiteBackupResult, now: Date): OffsiteDatabaseStatus | null {
   if (result.state !== "checked") return null;
-  if (!result.database) return "missing";
-  const age = now.getTime() - Date.parse(result.database.at);
-  return age > DATABASE_BACKUP_STALE_AFTER_MS ? "stale" : "ok";
+  if (result.database && now.getTime() - Date.parse(result.database.at) <= DATABASE_BACKUP_STALE_AFTER_MS) return "ok";
+  // A fresh dump in a cut-short listing is ok; nothing fresh in one is unknown, not stale or missing.
+  if (result.partial) return "partial";
+  return result.database ? "stale" : "missing";
 }
 
 /** B, KB, MB or GB, one decimal from MB up. */

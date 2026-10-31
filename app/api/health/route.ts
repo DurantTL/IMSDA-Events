@@ -28,7 +28,7 @@ import { offsiteDatabaseStatus, type OffsiteBackupResult } from "@/modules/opera
  */
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
-type OffsiteHealthStatus = "ok" | "stale" | "missing" | "not_connected" | "misconfigured" | "error";
+type OffsiteHealthStatus = "ok" | "stale" | "missing" | "partial" | "not_connected" | "misconfigured" | "error";
 
 function offsiteHealthStatus(result: OffsiteBackupResult): OffsiteHealthStatus {
   if (result.state !== "checked") return result.state;
@@ -43,6 +43,7 @@ function offsiteSummary(result: OffsiteBackupResult, status: OffsiteHealthStatus
     newestDatabase: result.state === "checked" ? entry(result.database) : null,
     newestFiles: result.state === "checked" ? entry(result.files) : null,
     partial: result.state === "checked" ? result.partial : false,
+    ...(result.state === "checked" && result.partial ? { scanned: result.scanned } : {}),
     checkedAt: result.state === "checked" || result.state === "error" ? result.checkedAt : null,
     ...(result.state === "error" ? { reason: result.reason } : {}),
   };
@@ -138,9 +139,9 @@ async function getHandler(request: Request) {
   }
   const offsiteStatus = offsiteHealthStatus(offsite);
   const offsiteDegraded = offsiteStatus === "stale" || offsiteStatus === "missing";
-  const backupsService =
-    offsite.state !== "not_connected" ? offsiteStatus
-    : backupHelperHasReported(backups) ? (backups?.status ?? "unknown")
+  // The app's own helper keeps its own entry, so a failing helper is never hidden behind an R2 "ok".
+  const backupsService = backupHelperHasReported(backups)
+    ? (backups?.status ?? "unknown")
     : backups ? "not_connected" : "unknown";
 
   return Response.json(
@@ -157,6 +158,7 @@ async function getHandler(request: Request) {
       messageOutbox: outbox?.status ?? "unknown",
       outboxSweep: outboxSweep?.status ?? "unknown",
       backups: backupsService,
+      offsiteBackups: offsiteStatus,
     },
     offsiteBackups: offsiteSummary(offsite, offsiteStatus),
     outboxSweep,

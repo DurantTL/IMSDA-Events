@@ -73,12 +73,14 @@ export type ListBackupObjectsOptions = {
 };
 
 function listUrl(config: R2ReadConfig, continuationToken: string | null): string {
-  const params = new URLSearchParams();
-  params.set("list-type", "2");
-  if (config.prefix) params.set("prefix", config.prefix);
-  params.set("max-keys", MAX_KEYS);
-  if (continuationToken) params.set("continuation-token", continuationToken);
-  return `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}?${params.toString()}`;
+  // RFC 3986 encoding (space is %20, never `+`), which is what SigV4 signs.
+  const encode = (value: string) => encodeURIComponent(value).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const pairs: Array<[string, string]> = [["list-type", "2"]];
+  if (config.prefix) pairs.push(["prefix", config.prefix]);
+  pairs.push(["max-keys", MAX_KEYS]);
+  if (continuationToken) pairs.push(["continuation-token", continuationToken]);
+  const query = pairs.map(([name, value]) => `${name}=${encode(value)}`).join("&");
+  return `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}?${query}`;
 }
 
 /** Lists the objects under the configured prefix. Throws `R2ListError` with a generic failure kind. */

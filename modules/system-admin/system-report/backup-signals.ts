@@ -65,6 +65,20 @@ export function offsiteBackupFields(result: OffsiteBackupResult | null, now: Dat
 
   const cut = result.partial ? CUT_SHORT : "";
   const status = offsiteDatabaseStatus(result, now);
+  if (status === "partial") {
+    const seen = result.database ? `The newest one seen is ${describe(result.database)}. ` : "";
+    const database: Fields = {
+      key: databaseKey,
+      state: "watch",
+      resultText: `${seen}The listing was cut short after ${result.scanned} objects, so the newest dump may be on a page not read. Set BACKUP_R2_READ_PREFIX to the database folder.`,
+      checkedAt: result.database?.at ?? result.checkedAt,
+      whenLabel: result.database ? "Backup made" : "Checked",
+    };
+    const files: Fields = result.files
+      ? { key: filesKey, state: "info", resultText: `${describe(result.files)}. ${result.files.label}.${CUT_SHORT}`, checkedAt: result.files.at, whenLabel: "Backup made" }
+      : { key: filesKey, state: "info", resultText: `None found.${CUT_SHORT}`, checkedAt: result.checkedAt, whenLabel: "Checked" };
+    return [database, files];
+  }
   const database: Fields = result.database
     ? {
         key: databaseKey,

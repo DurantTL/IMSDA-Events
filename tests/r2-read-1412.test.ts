@@ -53,6 +53,19 @@ describe("R2 read-only adapter (#1412)", () => {
     expect(request.headers.get("authorization")).not.toContain(config.secretAccessKey);
   });
 
+  it("encodes the query as RFC 3986 (space is %20, + is %2B) before signing", async () => {
+    const seen: Request[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      seen.push(input as Request);
+      return ok(page([]));
+    });
+    await r2.listBackupObjects({ ...config, prefix: "my site/a+b (1)!'*/" }, { fetch: fetchMock as unknown as typeof fetch });
+    const query = seen[0].url.split("?")[1];
+    expect(query).toContain("prefix=my%20site%2Fa%2Bb%20%281%29%21%27%2A%2F");
+    expect(query).not.toContain("+");
+    expect(new URL(seen[0].url).searchParams.get("prefix")).toBe("my site/a+b (1)!'*/");
+  });
+
   it("follows continuation tokens and stops at the page cap as partial", async () => {
     const urls: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

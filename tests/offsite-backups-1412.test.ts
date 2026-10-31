@@ -64,6 +64,16 @@ describe("offsite backup assessment (#1412)", () => {
     expect(noFiles.database?.label).toBe("Database dump (.dump)");
   });
 
+  it("judges partial listings: fresh is ok, nothing fresh is partial, complete listings stay stale or missing", () => {
+    const run = (objects: BackupObject[], partial: boolean) => offsiteDatabaseStatus(assessOffsiteBackups({ objects, partial, now: NOW }), NOW);
+    expect(run([obj("a.sql", 1)], true)).toBe("ok");
+    expect(run([obj("a.sql", 40)], true)).toBe("partial");
+    expect(run([], true)).toBe("partial");
+    expect(run([obj("a.sql", 40)], false)).toBe("stale");
+    expect(run([], false)).toBe("missing");
+    expect(assessOffsiteBackups({ objects: [obj("a.sql", 1), obj("b.txt", 1)], partial: false, now: NOW }).scanned).toBe(2);
+  });
+
   it("carries partial through", () => {
     expect(assessOffsiteBackups({ objects: [], partial: true, now: NOW }).partial).toBe(true);
   });

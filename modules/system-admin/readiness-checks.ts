@@ -69,7 +69,7 @@ export function pendingMigrationNames(shipped: readonly string[], rows: readonly
 
 /**
  * The two backup rows, from the same assessment `/api/health` uses (`assessBackupStatus`), so the two never
- * disagree. Dates and yes/no only. A backup that has never run is attention, not ok. When the backup log could not
+ * disagree. Dates and yes/no only. A helper that never reported is `info` ("not in use", #1412); one that has reported keeps the stale and failing rules. When the backup log could not
  * be read the rows say so ("unknown") and the manual ticks stay visible (unreadable is not evidence).
  */
 export function evaluateBackupItems(backup: BackupEvidence, now: Date): AutomaticReadinessRow[] {
