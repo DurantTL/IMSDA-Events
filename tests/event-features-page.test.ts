@@ -47,7 +47,7 @@ function settingsRecord(overrides: Record<string, unknown> = {}) {
     hotelInstructions: null, approvedPaymentInstructions: null, isPublished: true, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null,
     waitlistEnabled: true, collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLinkEnabled: false, attendeeEditPolicy: "VERIFY_EVERY_EDIT",
     billingMode: "ATTENDEE_PAY", audience: "GENERAL", seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: false,
-    publishedFormCount: 1, publishedForms: [], warnings: [], readiness: { ready: true, items: [], optionalItems: [], completedCount: 0 },
+    publishedFormCount: 1, publishedForms: [], warnings: [], readiness: { ready: true, items: [], recommendedItems: [], recommendedOpenCount: 0, completedCount: 0 },
     createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z",
     ...overrides,
   };

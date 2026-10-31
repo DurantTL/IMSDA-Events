@@ -362,6 +362,10 @@ describe("submitting a request (#170)", () => {
     const view = await getRegistrantRequestView(target, world.now);
     expect(view.available).toBe(false);
     expect(view.unavailableReason).toMatch(/not available/);
+    // The My registrations note keys off this flag (#1408); an ineligible registration never carries it.
+    expect(view.noPolicy).toBe(true);
+    world.status = "CANCELLED";
+    expect((await getRegistrantRequestView(target, world.now)).noPolicy).toBe(false);
   });
 });
 

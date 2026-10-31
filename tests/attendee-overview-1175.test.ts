@@ -107,6 +107,7 @@ function registration(
       endsAt: endsAt ?? "2027-04-25T15:00:00.000Z",
       timezone: "America/Chicago",
       location: "Synthetic Campground",
+      supportContact: "help@example.test",
       attendeeEditPolicy: "TIERED",
       isDeferredOrganizationBilling: false,
     },

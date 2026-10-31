@@ -14,7 +14,8 @@ import {
   type EventLifecycleStateName,
 } from "@/modules/events/lifecycle-state";
 import { EventOperationError } from "@/modules/events/operation-error";
-import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/events/readiness";
+import { CENTRAL_SENDER_MESSAGE, CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/events/readiness";
+import { loadRequiredReadinessInputs } from "@/modules/events/readiness-inputs";
 
 /**
  * The typed refusals of a lifecycle transition (#156). A missing event and an incomplete publish
@@ -85,8 +86,12 @@ export async function assertEventReadyToPublish(tx: Tx, eventId: string, event: 
   const publishedFormCount = await tx.registrationFormVersion.count({
     where: { status: "PUBLISHED", form: { eventId } },
   });
+  // Always loaded here, never skipped: a required item whose data was not read would otherwise pass silently (#1408).
+  const required = await loadRequiredReadinessInputs(tx, eventId);
   const readiness = getEventPublishReadiness(
     {
+      ...required,
+      id: eventId,
       name: event.name,
       slug: event.slug,
       startsOn: event.startsAt.toISOString().slice(0, 10),
@@ -105,8 +110,12 @@ export async function assertEventReadyToPublish(tx: Tx, eventId: string, event: 
     if (incomplete.length === 1 && incomplete[0]!.id === "club-billing") {
       throw new EventOperationError("EVENT_NOT_READY", CLUB_EVENT_BILLING_MESSAGE);
     }
-    const missing = incomplete.map((item) => item.label.toLowerCase());
-    throw new EventOperationError("EVENT_NOT_READY", `Finish the publish checklist first: ${missing.join(", ")}.`);
+    // Event staff cannot save the sender, so it gets its own sentence saying who can.
+    const senderMissing = incomplete.some((item) => item.id === "central-sender");
+    const others = incomplete.filter((item) => item.id !== "central-sender").map((item) => item.label.toLowerCase());
+    if (senderMissing && others.length === 0) throw new EventOperationError("EVENT_NOT_READY", CENTRAL_SENDER_MESSAGE);
+    const checklist = `Finish the publish checklist first: ${others.join(", ")}.`;
+    throw new EventOperationError("EVENT_NOT_READY", senderMissing ? `${checklist} ${CENTRAL_SENDER_MESSAGE}` : checklist);
   }
   return readiness.items.map((item) => ({ id: item.id, complete: item.complete }));
 }

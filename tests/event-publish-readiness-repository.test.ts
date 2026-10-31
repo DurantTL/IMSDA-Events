@@ -119,6 +119,9 @@ function mockPrisma(
     registrationFormVersion: {
       count: vi.fn().mockResolvedValue(publishedFormCount),
     },
+    // The required publish items (#1408): a saved central sender and an adult attendee type.
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@example.test", defaultReplyToEmail: null }) },
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue([{ label: "Adult", minimumAge: 18 }]) },
     eventPaymentInstructionVersion: {
       findFirst: vi.fn().mockResolvedValue(null),
     },
@@ -139,6 +142,9 @@ function mockPrisma(
     },
     registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+    platformSettings: tx.platformSettings,
+    eventAttendeeType: tx.eventAttendeeType,
+    eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue([]) },
     eventPaymentInstructionVersion: { findFirst: vi.fn().mockResolvedValue(null) },
   };
   return { prisma, tx, eventUpdate, eventUpdateMany, auditLogCreate };

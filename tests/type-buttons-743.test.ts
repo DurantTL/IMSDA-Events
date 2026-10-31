@@ -303,7 +303,7 @@ const baseEventFields = {
   hotelRate: null, hotelInstructions: null, approvedPaymentInstructions: null, isPublished: false, archivedAt: null, showOnCalendar: true, registrationOpensOn: "2027-05-01",
   registrationClosesOn: "2027-10-01", paymentDueOn: null, waitlistEnabled: false, collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLinkEnabled: false,
   attendeeEditPolicy: "VERIFY_EVERY_EDIT" as const, billingMode: "ATTENDEE_PAY" as const, audience: "GENERAL" as const,
-  seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: false, featured: false, featuredOrder: null, featureUntil: null, publishedFormCount: 1,
+  seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: false, featured: false, featuredOrder: null, featureUntil: null, publishedFormCount: 1, attendeeTypesWithAgeRangeCount: 1, attendeeTypeNames: ["Adult"], centralSenderEmail: "events@example.test", hasCancellationPolicy: true,
   publishedForms: [], createdAt: "2027-01-01T00:00:00.000Z", updatedAt: "2027-01-01T00:00:00.000Z",
 };
 const settingsEvent = (over: Partial<typeof baseEventFields> = {}): EventSettingsRecord => {

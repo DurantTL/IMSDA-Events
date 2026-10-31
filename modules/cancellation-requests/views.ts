@@ -35,6 +35,11 @@ export type RegistrantRequestView = {
   requests: RegistrantRequestSummary[];
   /** True when any request is open, so the screen warns before another overlapping one replaces it. */
   hasOpenRequest: boolean;
+  /**
+   * True when the registration is otherwise eligible but the event has no cancellation policy in effect (#1408), so
+   * My registrations tells the attendee to contact the event team. The same rule as the event's readiness item.
+   */
+  noPolicy?: boolean;
 };
 
 export const noRequestsView: RegistrantRequestView = {

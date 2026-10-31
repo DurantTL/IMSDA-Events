@@ -6394,7 +6394,6 @@ body:has(.auth-page) { padding-bottom: 0; }
 .event-readiness-list strong { font-size: max(var(--type-floor, 0px), 0.64rem); }
 .event-readiness-list small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.54rem); line-height: 1.4; }
 .event-readiness-list li.complete { background: var(--green-soft); }
-.event-readiness-optional-heading { margin: 10px 0 4px; color: var(--muted); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.6rem); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 
 .event-publish-toggle {
   cursor: pointer;

@@ -1,3 +1,4 @@
+import { onlineCancellationApplies } from "@/modules/cancellation-policy/online-cancellation";
 import { DUPLICATE_PUBLIC_FORMS_MESSAGE, duplicatePublicFormGroups, publicFormLookKey } from "@/modules/forms/duplicate-public-forms";
 
 export type EventReadinessSource = {
@@ -14,35 +15,55 @@ export type EventReadinessSource = {
   /** The event's id, for the link on the attendee-types item. */
   id?: string | null;
   /**
-   * Active attendee types with a minimum age of 18 or more (#1403), the rule that makes an attendee an adult. Omitted by a caller that has not loaded them, which leaves the
-   * "Attendee types set" item out rather than reporting it undone.
+   * Active attendee types with a minimum age of 18 or more (#1403), the rule that makes an attendee an adult. Every
+   * production caller loads it; a pure caller that omits it leaves the "Attendee types set" item out, never reports it
+   * done. The server gate (`assertEventReadyToPublish`) always loads it.
    */
   attendeeTypesWithAgeRangeCount?: number | null;
+  /** Labels of the event's active attendee types, for the done line of the attendee-types item. */
+  attendeeTypeNames?: readonly string[] | null;
+  /**
+   * The platform's central email sender address as saved (`loadCentralSender`). `undefined` means "not loaded": the item
+   * is left out. `null` or blank is loaded and not saved, so the item is undone and publishing is blocked (#1408).
+   */
+  centralSenderEmail?: string | null;
+  /** Whether a cancellation policy is in effect (`eventHasCancellationPolicy`); `undefined` leaves the recommendation out, as does an event with no online cancellation. */
+  hasCancellationPolicy?: boolean;
 };
 
 /** Shown as the publish blocker and the settings/readiness flag (#565). */
 export const CLUB_EVENT_BILLING_MESSAGE = "Club registration uses church billing — choose it before publishing.";
 
-export type EventReadinessItem = {
-  id: "basics" | "location" | "support" | "registration-form" | "club-billing";
-  label: string;
-  detail: string;
-  complete: boolean;
-};
-
 /**
- * Event information no longer lives on a required IMSDA.org page (#467):
- * it is an optional setting, never counted toward "ready" and never a
- * publish blocker. It is reported separately so a caller that wants to show
- * it can, without folding it back into readiness math.
+ * Shown as the publish blocker when the central email sender address is not saved (#1408). Event staff cannot fix it:
+ * only a system administrator saves the sender, so the message says who to ask.
  */
-export type EventReadinessOptionalItem = {
-  id: "public-info" | "attendee-types";
+export const CENTRAL_SENDER_MESSAGE = "The central email sender address is not saved, so confirmation and reminder emails could not be sent. Ask a system administrator to set this up.";
+
+export type EventReadinessItem = {
+  id: "basics" | "location" | "support" | "registration-form" | "central-sender" | "attendee-types" | "club-billing";
   label: string;
   detail: string;
   complete: boolean;
   /** Where to fix it, when the item points at one page. */
   href?: string;
+  /** The link text for `href` while the item is not done. */
+  actionLabel?: string;
+};
+
+/**
+ * Recommended items (#1408, #467): never counted toward "ready" and never a publish blocker. Event information no longer
+ * lives on a required IMSDA.org page, and a cancellation policy only decides whether attendees can ask to cancel online.
+ * They are reported separately so a caller that wants to show them can, without folding them into readiness math.
+ */
+export type EventReadinessRecommendedItem = {
+  id: "cancellation-policy" | "public-info";
+  label: string;
+  detail: string;
+  complete: boolean;
+  /** Where to fix it, when the item points at one page. */
+  href?: string;
+  actionLabel?: string;
 };
 
 export const pastEventPublishWarning =
@@ -82,24 +103,50 @@ function isPublicWebUrl(value: string | null | undefined) {
   }
 }
 
+/** The attendee-types link: the event's attendee configuration page. */
+function attendeeTypesHref(id: string | null | undefined) {
+  return id ? `/more/attendee-configuration?event=${encodeURIComponent(id)}` : undefined;
+}
+
+function listNames(names: readonly string[]) {
+  return `${names.join(", ")}.`;
+}
+
 /**
- * "Attendee types set" (#1403): attendee types matter for events (GENERAL), never club events. Age class comes only from a
- * type's age range, so without one every attendee's age is unknown and scheduled email reaches nobody. Recommended, never a
- * publish blocker. Null for a club event, and for a caller that has not loaded the count.
+ * "Attendee types set" (#1403, required by #1408): attendee types matter for general events, never club events. Age class
+ * comes only from a type's age range, so without an adult type every attendee's age is unknown and scheduled email reaches
+ * nobody. Required before publishing a GENERAL event. Null for a club event, and for a caller that has not loaded the count.
  */
 export function getAttendeeTypesReadinessItem(
-  event: Pick<EventReadinessSource, "audience" | "id" | "attendeeTypesWithAgeRangeCount">,
-): EventReadinessOptionalItem | null {
+  event: Pick<EventReadinessSource, "audience" | "id" | "attendeeTypesWithAgeRangeCount" | "attendeeTypeNames">,
+): EventReadinessItem | null {
   if (event.audience === "CLUB" || typeof event.attendeeTypesWithAgeRangeCount !== "number") return null;
   const done = event.attendeeTypesWithAgeRangeCount > 0;
+  const names = (event.attendeeTypeNames ?? []).filter(hasText);
+  const href = attendeeTypesHref(event.id);
   return {
     id: "attendee-types",
     label: "Attendee types set",
     detail: done
-      ? "An adult attendee type tells scheduled email who is an adult."
-      : "Add an adult attendee type (minimum age 18 or more). Without one, scheduled email cannot reach attendees because their age is unknown.",
+      ? names.length > 0 ? listNames(names) : "An adult attendee type tells scheduled email who is an adult."
+      : "Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.",
     complete: done,
-    ...(event.id ? { href: `/more/attendee-configuration?event=${encodeURIComponent(event.id)}` } : {}),
+    ...(href ? { href, actionLabel: "Set attendee types" } : {}),
+  };
+}
+
+/** "Central email sender saved" (#1408): the address is set, not the email environment. Null when the caller has not loaded it. */
+export function getCentralSenderReadinessItem(event: Pick<EventReadinessSource, "centralSenderEmail">): EventReadinessItem | null {
+  if (event.centralSenderEmail === undefined) return null;
+  const address = event.centralSenderEmail?.trim() ?? "";
+  const done = address.length > 0;
+  return {
+    id: "central-sender",
+    label: "Central email sender saved",
+    detail: done
+      ? `Emails go out from ${address}.`
+      : "Confirmation and reminder emails wait until a system administrator saves the sender address.",
+    complete: done,
   };
 }
 
@@ -140,6 +187,12 @@ export function getEventPublishReadiness(
     },
   ];
 
+  const centralSenderItem = getCentralSenderReadinessItem(event);
+  if (centralSenderItem) items.push(centralSenderItem);
+  // GENERAL events only (#1408): a club event has no attendee types of its own to set.
+  const attendeeTypesItem = getAttendeeTypesReadinessItem(event);
+  if (attendeeTypesItem) items.push(attendeeTypesItem);
+
   // Directors only see CLUB events billed to the church (#565), so a CLUB
   // event set to attendee-pay would 404 for them. Listed only for CLUB
   // events, and never auto-corrected: a billing change is a human decision.
@@ -152,28 +205,38 @@ export function getEventPublishReadiness(
     });
   }
 
+  const recommendedItems: EventReadinessRecommendedItem[] = [];
+  // Only where attendees could cancel online: club and church-billed events are handled by the event team.
+  if (typeof event.hasCancellationPolicy === "boolean" && onlineCancellationApplies(event)) {
+    const policyHref = event.id ? `/finance/cancellation-policy?event=${encodeURIComponent(event.id)}` : undefined;
+    recommendedItems.push({
+      id: "cancellation-policy",
+      label: "Cancellation policy set",
+      detail: event.hasCancellationPolicy
+        ? "Attendees can ask to cancel online under this policy."
+        : "Without one, attendees can't ask to cancel online. They see a line telling them to contact the support contact.",
+      complete: event.hasCancellationPolicy,
+      ...(!event.hasCancellationPolicy && policyHref ? { href: policyHref, actionLabel: "Set a cancellation policy" } : {}),
+    });
+  }
   // Complete when nothing is set (there is nothing to fix) or when the
   // configured value is a valid web address. Never a blocker either way.
   const publicInfoComplete = !hasText(event.publicInfoUrl) || isPublicWebUrl(event.publicInfoUrl);
-  const optionalItems: EventReadinessOptionalItem[] = [
-    {
-      id: "public-info",
-      label: "IMSDA.org information page (optional)",
-      detail: publicInfoComplete
-        ? "Event information now lives on IMSDA Events. Set this only if a separate IMSDA.org page also describes the event."
-        : "The saved address isn't a complete http:// or https:// web address. Fix it or clear it.",
-      complete: publicInfoComplete,
-    },
-  ];
-
-  const attendeeTypesItem = getAttendeeTypesReadinessItem(event);
-  if (attendeeTypesItem) optionalItems.push(attendeeTypesItem);
+  recommendedItems.push({
+    id: "public-info",
+    label: "IMSDA.org information page",
+    detail: publicInfoComplete
+      ? "Only if a separate IMSDA.org page also describes the event."
+      : "The saved address isn't a complete http:// or https:// web address. Fix it or clear it.",
+    complete: publicInfoComplete,
+  });
 
   return {
     ready: items.every((item) => item.complete),
     completedCount: items.filter((item) => item.complete).length,
     items,
-    optionalItems,
+    recommendedItems,
+    recommendedOpenCount: recommendedItems.filter((item) => !item.complete).length,
   };
 }
 

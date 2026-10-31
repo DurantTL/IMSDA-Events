@@ -43,7 +43,7 @@ const row = (overrides: Partial<Row> = {}): Row => ({
   ...overrides,
 });
 
-function mockPrisma(current: Row | null, options: { forms?: number; changedRows?: number } = {}) {
+function mockPrisma(current: Row | null, options: { forms?: number; changedRows?: number; sender?: string | null; types?: Array<{ label: string; minimumAge: number | null }> } = {}) {
   const order: string[] = [];
   const tx = {
     $queryRaw: vi.fn(async () => { order.push("lock"); return [{ id: "event-1" }]; }),
@@ -52,6 +52,9 @@ function mockPrisma(current: Row | null, options: { forms?: number; changedRows?
       updateMany: vi.fn(async () => { order.push("update"); return { count: options.changedRows ?? 1 }; }),
     },
     registrationFormVersion: { count: vi.fn().mockResolvedValue(options.forms ?? 1) },
+    // The required publish items (#1408): a saved central sender and an adult attendee type, by default present.
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMSDA Events", defaultSenderEmail: options.sender === undefined ? "events@example.test" : options.sender, defaultReplyToEmail: null }) },
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue(options.types ?? [{ label: "Adult", minimumAge: 18 }]) },
     eventLifecycleTransition: { create: vi.fn(async () => { order.push("history"); return {}; }) },
     auditLog: { create: vi.fn(async (_args: { data: { action: string; metadata: unknown } }) => { void _args; order.push("audit"); return {}; }) },
   };

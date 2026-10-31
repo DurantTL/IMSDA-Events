@@ -283,6 +283,8 @@ export type AttendeeRegistrationSummary = {
     endsAt: string;
     timezone: string;
     location: string | null;
+    /** The event's support contact as plain text, shown where an attendee has to ask the event team (#1408). */
+    supportContact: string | null;
     attendeeEditPolicy: "TIERED" | "VERIFY_EVERY_EDIT";
     // A deferred-organization event bills the responsible church directly
     // (#409): the recorded amount is what the church owes, never an
@@ -372,6 +374,7 @@ export async function listRegistrationsForVerifiedEmail(
           endsAt: true,
           timezone: true,
           location: true,
+          supportContact: true,
           attendeeEditPolicy: true,
           billingMode: true,
           seminarPreferenceClosesOn: true,
@@ -526,6 +529,7 @@ export async function listRegistrationsForVerifiedEmail(
         endsAt: registration.event.endsAt.toISOString(),
         timezone: registration.event.timezone,
         location: registration.event.location,
+        supportContact: registration.event.supportContact,
         attendeeEditPolicy: registration.event.attendeeEditPolicy,
         isDeferredOrganizationBilling,
       },

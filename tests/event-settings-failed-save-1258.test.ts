@@ -23,7 +23,7 @@ const fields = {
   collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLinkEnabled: false,
   attendeeEditPolicy: "VERIFY_EVERY_EDIT" as const, billingMode: "ATTENDEE_PAY" as const, audience: "GENERAL" as const,
   seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: false,
-  featured: false, featuredOrder: null, featureUntil: null, publishedFormCount: 0, publishedForms: [],
+  featured: false, featuredOrder: null, featureUntil: null, publishedFormCount: 0, publishedForms: [], attendeeTypesWithAgeRangeCount: 1, attendeeTypeNames: ["Adult"], centralSenderEmail: "events@example.test", hasCancellationPolicy: true,
   createdAt: "2027-01-01T00:00:00.000Z", updatedAt: "2027-01-01T00:00:00.000Z",
 };
 const event: EventSettingsRecord = { ...fields, readiness: getEventPublishReadiness(fields, 0), warnings: [] };

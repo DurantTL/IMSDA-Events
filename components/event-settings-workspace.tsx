@@ -29,7 +29,7 @@ import {
   sectionsWithNonDefaultValues,
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
-import { getAttendeeTypesReadinessItem, getEventPublishReadiness, getEventPublishWarnings } from "@/modules/events/readiness";
+import { getEventPublishReadiness, getEventPublishWarnings, type EventReadinessItem, type EventReadinessRecommendedItem, type EventReadinessSource } from "@/modules/events/readiness";
 import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
@@ -94,6 +94,7 @@ import {
   type SettingsFieldIssue,
 } from "@/modules/events/settings-layout";
 import styles from "@/components/public-page-overview.module.css";
+import readinessStyles from "@/components/event-settings-readiness.module.css";
 
 type EventSettingsWorkspaceProps = {
   mode: "create" | "edit";
@@ -128,6 +129,39 @@ function OwnershipNote({ ownership, id }: { ownership: SettingOwnership; id?: st
 }
 
 export type CalendarPrefill = { entryId: string; title: string; startsOn: string; endsOn: string; location: string };
+
+/** The readiness inputs that live outside the settings draft: the event's id, saved types, central sender and policy. */
+function readinessInputsFrom(event: EventSettingsRecord | null | undefined): Pick<EventReadinessSource, "id" | "attendeeTypesWithAgeRangeCount" | "attendeeTypeNames" | "centralSenderEmail" | "hasCancellationPolicy"> {
+  return {
+    id: event?.id,
+    attendeeTypesWithAgeRangeCount: event?.attendeeTypesWithAgeRangeCount,
+    attendeeTypeNames: event?.attendeeTypeNames,
+    centralSenderEmail: event?.centralSenderEmail,
+    hasCancellationPolicy: event?.hasCancellationPolicy,
+  };
+}
+
+/** The platform email settings (System management > Email), where the central sender is saved. */
+const CENTRAL_SENDER_SETTINGS_HREF = "/admin/email";
+
+/** One group of the readiness panel. Each row keeps its status as text for screen readers (the icon is decorative). */
+function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: ReadonlyArray<EventReadinessItem | EventReadinessRecommendedItem>; canOpenPlatformSettings: boolean; "aria-labelledby": string }) {
+  return (
+    <ul className="event-readiness-list" {...rest}>
+      {items.map((item) => (
+        <li className={item.complete ? "complete" : ""} key={item.id}>
+          {item.complete ? <CheckCircle2 size={18} aria-hidden="true" /> : <span aria-hidden="true" />}
+          <span>
+            <strong><span className="sr-only">{item.complete ? "Done: " : "Not done: "}</span>{item.label}</strong>
+            <small>{item.detail}</small>
+            {!item.complete && item.href && item.actionLabel && <small><Link className={readinessStyles.action} href={item.href}>{item.actionLabel}</Link></small>}
+            {!item.complete && item.id === "central-sender" && canOpenPlatformSettings && <small><Link className={readinessStyles.action} href={CENTRAL_SENDER_SETTINGS_HREF}>Open email settings</Link></small>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 type PublishBlocker = { text: string; actionLabel?: string; targetId?: string; href?: string };
 
@@ -246,19 +280,12 @@ export function EventSettingsWorkspace({
   // Readiness reflects the saved event (#471), not unsaved edits: that is
   // what the server checks when Publish is clicked, so the checklist and the
   // button never promise something a save hasn't made true yet.
-  const baseReadiness = useMemo(
-    () => getEventPublishReadiness(savedDraft, publishedFormCount),
-    [savedDraft, publishedFormCount],
+  // The sender, attendee types and cancellation policy are saved elsewhere, so the settings draft does not carry them (#1403, #1408).
+  const [readinessInputs, setReadinessInputs] = useState(() => readinessInputsFrom(initialEvent));
+  const readiness = useMemo(
+    () => getEventPublishReadiness({ ...savedDraft, ...readinessInputs }, publishedFormCount),
+    [savedDraft, readinessInputs, publishedFormCount],
   );
-  // The attendee-types item reads the event's saved types, which the settings draft does not carry (#1403).
-  const readiness = useMemo(() => {
-    const item = getAttendeeTypesReadinessItem({
-      audience: savedDraft.audience,
-      id: initialEvent?.id,
-      attendeeTypesWithAgeRangeCount: initialEvent?.attendeeTypesWithAgeRangeCount,
-    });
-    return item ? { ...baseReadiness, optionalItems: [...baseReadiness.optionalItems, item] } : baseReadiness;
-  }, [baseReadiness, savedDraft.audience, initialEvent?.id, initialEvent?.attendeeTypesWithAgeRangeCount]);
   const publishWarnings = useMemo(
     () => getEventPublishWarnings(savedDraft),
     [savedDraft],
@@ -423,7 +450,9 @@ export function EventSettingsWorkspace({
       setPublished(result.event.isPublished);
       setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
       setSetupWarnings(result.event.warnings ?? []);
-      const nextReadiness = getEventPublishReadiness(nextDraft, result.event.publishedFormCount);
+      const nextInputs = readinessInputsFrom(result.event);
+      setReadinessInputs(nextInputs);
+      const nextReadiness = getEventPublishReadiness({ ...nextDraft, ...nextInputs }, result.event.publishedFormCount);
       const nextStep = result.event.isPublished
         ? "Public registration stays on."
         : nextReadiness.items.find((item) => !item.complete)
@@ -460,7 +489,7 @@ export function EventSettingsWorkspace({
     const missing = readiness.items.find((item) => !item.complete);
     if (!missing) return null;
     if (missing.id === "registration-form") {
-      return { text: "Can't publish yet: a published registration form is missing.", actionLabel: "Open registration form", href: `/registration-builder?event=${initialEvent?.id ?? ""}` };
+      return { text: "Next: publish a registration form.", actionLabel: "Open registration form", href: `/registration-builder?event=${initialEvent?.id ?? ""}` };
     }
     if (missing.id === "basics") {
       const first = ([
@@ -471,12 +500,21 @@ export function EventSettingsWorkspace({
         ["timezone", "event-field-timezone", "Event timezone"],
       ] as const).find(([key]) => !String(savedDraft[key] ?? "").trim());
       const [, targetId, controlLabel] = first ?? ["name", "event-field-name", "Event name"];
-      return { text: `Can't publish yet: ${controlLabel} is missing.`, actionLabel: `Go to ${controlLabel}`, targetId };
+      return { text: `Next: fill in ${controlLabel.toLowerCase()}.`, actionLabel: `Go to ${controlLabel}`, targetId };
     }
-    if (missing.id === "location") return { text: "Can't publish yet: the event location is missing.", actionLabel: "Go to Location", targetId: "event-field-location" };
-    if (missing.id === "support") return { text: "Can't publish yet: the registration support contact is missing.", actionLabel: "Go to Registration support contact", targetId: "event-field-support-contact" };
-    return { text: "Can't publish yet: club registration needs church billing.", actionLabel: "Go to Billing mode", targetId: "event-field-billing-mode" };
-  }, [publishBlockedBySave, saving, readiness, savedDraft, initialEvent?.id]);
+    if (missing.id === "location") return { text: "Next: add the event location.", actionLabel: "Go to Location", targetId: "event-field-location" };
+    if (missing.id === "support") return { text: "Next: add the registration support contact.", actionLabel: "Go to Registration support contact", targetId: "event-field-support-contact" };
+    if (missing.id === "central-sender") {
+      // Only a system administrator can save the sender, so everyone else gets the instruction with no dead-end link.
+      return canOpenPlatformSettings
+        ? { text: "Next: save the central email sender.", actionLabel: "Open email settings", href: CENTRAL_SENDER_SETTINGS_HREF }
+        : { text: "Next: ask a system administrator to save the central email sender." };
+    }
+    if (missing.id === "attendee-types") {
+      return { text: "Next: set attendee types.", actionLabel: "Go to attendee types", href: missing.href };
+    }
+    return { text: "Next: choose church billing.", actionLabel: "Go to Billing mode", targetId: "event-field-billing-mode" };
+  }, [publishBlockedBySave, saving, readiness, savedDraft, initialEvent?.id, canOpenPlatformSettings]);
 
   // Open the block that holds a control (a "Go to ..." link, an error, a jump
   // link), then scroll to it and focus it. The block is opened in the DOM at
@@ -1198,17 +1236,11 @@ export function EventSettingsWorkspace({
         <aside className="event-settings-side">
           <section className="panel event-readiness-panel" id="event-readiness-panel">
             <p className="eyebrow">Publish readiness</p>
-            <h2>{readiness.ready ? "Ready to publish" : `${readiness.completedCount} of ${readiness.items.length} ready`}</h2>
+            <h2>{readiness.ready ? "Ready to publish" : `${readiness.completedCount} of ${readiness.items.length} required ready`}</h2>
             <p>Publishing turns on the event’s public registration links. Form versions and registration dates still control what attendees can submit.</p>
             {mode === "edit" && dirty && <p className="field-help">This checklist reflects the saved settings. Save your changes to update it.</p>}
-            <ul className="event-readiness-list">
-              {readiness.items.map((item) => (
-                <li className={item.complete ? "complete" : ""} key={item.id}>
-                  {item.complete ? <CheckCircle2 size={18} aria-hidden="true" /> : <span aria-hidden="true" />}
-                  <span><strong>{item.label}</strong><small>{item.detail}</small></span>
-                </li>
-              ))}
-            </ul>
+            <p className={readinessStyles.groupHeading} id="event-readiness-required-heading">Required before publishing</p>
+            <ReadinessList canOpenPlatformSettings={canOpenPlatformSettings} aria-labelledby="event-readiness-required-heading" items={readiness.items} />
             {/* Never blocks publish (#575): a warning only. */}
             {!published && publishWarnings.map((warning) => (
               <div className="inline-notice clone-warning" key={warning} role="status"><AlertTriangle size={17} aria-hidden="true" /> {warning}</div>
@@ -1217,16 +1249,11 @@ export function EventSettingsWorkspace({
             {setupWarnings.map((warning) => (
               <div className="inline-notice clone-warning" key={warning.id} role="status"><AlertTriangle size={17} aria-hidden="true" /> <span><strong>{warning.label}.</strong> {warning.detail}{warning.href ? <>{" "}<Link href={warning.href}>{warning.href.includes("&field=") ? "Go to the fee field" : "Open the registration form"}</Link></> : null}</span></div>
             ))}
-            {/* Never blocks publish (#467): shown for visibility only. */}
-            <p className="event-readiness-optional-heading">Optional</p>
-            <ul className="event-readiness-list event-readiness-optional">
-              {readiness.optionalItems.map((item) => (
-                <li className={item.complete ? "complete" : ""} key={item.id}>
-                  {item.complete ? <CheckCircle2 size={18} aria-hidden="true" /> : <span aria-hidden="true" />}
-                  <span><strong>{item.label}</strong><small>{item.detail}</small>{item.href && !item.complete && <small><Link href={item.href}>Open attendee setup</Link></small>}</span>
-                </li>
-              ))}
-            </ul>
+            {/* Never blocks publish (#467, #1408): recommended only. */}
+            <p className={readinessStyles.groupHeading} id="event-readiness-recommended-heading">
+              Recommended <span className={readinessStyles.groupNote}>doesn’t block publishing</span>
+            </p>
+            <ReadinessList canOpenPlatformSettings={canOpenPlatformSettings} aria-labelledby="event-readiness-recommended-heading" items={readiness.recommendedItems} />
             {!readiness.items.find((item) => item.id === "registration-form")?.complete && (
               mode === "edit"
                 ? <a className="secondary-button full-button" href={`/registration-builder?event=${initialEvent?.id}`}>Open registration form</a>
@@ -1243,9 +1270,14 @@ export function EventSettingsWorkspace({
                   <small>
                     {published
                       ? "To close every public form immediately, use Unpublish in the Danger zone below."
-                      : publishBlocker
-                        ? "Publishing is separate from saving. It needs one thing first:"
-                        : "Every checklist item is complete. Publishing turns on public registration."}
+                      : !readiness.ready
+                        ? `Publishing needs ${readiness.items.length - readiness.completedCount} required ${readiness.items.length - readiness.completedCount === 1 ? "item" : "items"} first.`
+                        : publishBlocker
+                          ? "Publishing is separate from saving. It needs one thing first:"
+                          : "Every required item is done."}
+                    {!published && readiness.ready && !publishBlocker && readiness.recommendedOpenCount > 0
+                      ? ` ${readiness.recommendedOpenCount} recommended ${readiness.recommendedOpenCount === 1 ? "item is" : "items are"} still open; you can publish without ${readiness.recommendedOpenCount === 1 ? "it" : "them"}.`
+                      : ""}
                   </small>
                 </span>
                 {!published && publishBlocker && (

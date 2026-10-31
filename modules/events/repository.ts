@@ -11,6 +11,7 @@ import {
   remainingEventCapacity,
 } from "@/modules/events/lifecycle";
 import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/events/readiness";
+import { loadRecommendedReadinessInputs, loadRequiredReadinessInputs } from "@/modules/events/readiness-inputs";
 import { EventOperationError } from "@/modules/events/operation-error";
 import { EventLifecycleError, transitionEventLifecycle } from "@/modules/events/lifecycle-repository";
 import { isPublicState, type EventLifecycleStateName } from "@/modules/events/lifecycle-state";
@@ -187,7 +188,6 @@ export async function getEventSettings(eventId: string) {
         featureUntil: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { attendeeTypes: { where: { isActive: true, minimumAge: { gte: 18 } } } } },
       },
     }),
     prisma.registrationForm.findMany({
@@ -210,8 +210,12 @@ export async function getEventSettings(eventId: string) {
   ]);
   if (!event) return null;
   const publishedFormCount = publishedForms.length;
-  // Undefined (an event row without the count) leaves the attendee-types item out of readiness.
-  const attendeeTypesWithAgeRangeCount = event._count?.attendeeTypes;
+  // The required items' data (#1408): the saved central sender and the attendee types, loaded by the same code the
+  // publish gate uses, plus whether a cancellation policy is in effect (the rule attendees see).
+  const [requiredInputs, recommendedInputs] = await Promise.all([
+    loadRequiredReadinessInputs(prisma, eventId),
+    loadRecommendedReadinessInputs(prisma, eventId),
+  ]);
   const view = {
     id: event.id,
     name: event.name,
@@ -258,7 +262,8 @@ export async function getEventSettings(eventId: string) {
     featureUntil: event.featureUntil,
     publishedFormCount,
     publishedForms,
-    ...(attendeeTypesWithAgeRangeCount === undefined ? {} : { attendeeTypesWithAgeRangeCount }),
+    ...requiredInputs,
+    ...recommendedInputs,
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };

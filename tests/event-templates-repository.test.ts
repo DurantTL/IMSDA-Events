@@ -159,6 +159,10 @@ function mockApply(options: {
     registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
     eventPaymentInstructionVersion: { findFirst: vi.fn().mockResolvedValue(null) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+    // The settings view reads the required readiness inputs (#1408).
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderEmail: null }) },
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue([]) },
+    eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue([]) },
   };
 
   return { prisma, tx, eventCreate, auditLogCreate, applicationCreate, attendeeTypeCreateMany, registrationFormCreate, messageTemplateCreate, moduleCreateMany };

@@ -15,13 +15,13 @@ import {
   type PolicyVersionRecord,
 } from "@/modules/cancellation-policy/calculator";
 import {
-  cancellationRulesSchema,
   cancellationScopes,
   chargeCategories,
   parseCancellationRules,
   RULES_SCHEMA_VERSION,
   type CancellationRules,
 } from "@/modules/cancellation-policy/rules";
+import { toPolicyRecord, usablePolicyVersions, policyVersionInEffect } from "@/modules/cancellation-policy/policy-in-effect";
 import { isValidTimeZone } from "@/modules/cancellation-policy/event-time";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { depositConfigurationFromValue, netPaidCents } from "@/modules/payments/deposit-domain";
@@ -89,12 +89,6 @@ export type PolicyVersionView = {
   unreadable: boolean;
 };
 
-function toRecord(row: { id: string; version: number; effectiveFrom: Date; rules: unknown }): PolicyVersionRecord | null {
-  const parsed = cancellationRulesSchema.safeParse(row.rules);
-  if (!parsed.success) return null;
-  return { id: row.id, version: row.version, effectiveFrom: row.effectiveFrom, rules: parsed.data };
-}
-
 async function loadEvent(client: Pick<Client, "event">, eventId: string) {
   const event = await client.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, timezone: true, startsAt: true } });
   if (!event) throw new CancellationPolicyError("EVENT_NOT_FOUND", "That event could not be found.");
@@ -108,7 +102,7 @@ export async function listPolicyVersions(eventId: string, now = new Date()) {
     select: { id: true, version: true, effectiveFrom: true, rules: true, note: true, createdAt: true, createdByNameSnapshot: true },
   });
   const views: PolicyVersionView[] = rows.map((row) => {
-    const parsed = toRecord(row);
+    const parsed = toPolicyRecord(row);
     return {
       id: row.id,
       version: row.version,
@@ -120,17 +114,9 @@ export async function listPolicyVersions(eventId: string, now = new Date()) {
       unreadable: !parsed,
     };
   });
-  const usable = rows.flatMap((row) => { const parsed = toRecord(row); return parsed ? [parsed] : []; });
+  const usable = rows.flatMap((row) => { const parsed = toPolicyRecord(row); return parsed ? [parsed] : []; });
   const inEffect = selectPolicyVersion(usable, now);
   return { versions: views, inEffectVersionId: inEffect?.id ?? null };
-}
-
-async function usablePolicyVersions(client: Pick<Client, "eventCancellationPolicyVersion">, eventId: string) {
-  const rows = await client.eventCancellationPolicyVersion.findMany({
-    where: { eventId },
-    select: { id: true, version: true, effectiveFrom: true, rules: true },
-  });
-  return rows.flatMap((row) => { const parsed = toRecord(row); return parsed ? [parsed] : []; });
 }
 
 /**
@@ -578,7 +564,7 @@ export async function loadRegistrationFacts(eventId: string, registrationId: str
 
 /** The version in effect at `now`, or null, for deciding which scopes a registrant may request (#170). */
 export async function policyInEffect(eventId: string, now = new Date()) {
-  return selectPolicyVersion(await usablePolicyVersions(getPrisma(), eventId), now);
+  return policyVersionInEffect(getPrisma(), eventId, now);
 }
 
 export async function getRecordedCalculation(eventId: string, calculationId: string) {

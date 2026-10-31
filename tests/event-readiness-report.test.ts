@@ -14,12 +14,20 @@ const readyEnv = {
   SQUARE_WEBHOOK_NOTIFICATION_URL: "https://synthetic.invalid/api/webhooks/square",
 };
 
+import { campMeetingPreset } from "./support/camp-meeting-seeds";
+
+// A rules document that parses under the real schema, so the policy counts as in effect.
+const policyRules = campMeetingPreset("2026-05-25");
+
 function dataSource(overrides: {
   event?: Record<string, unknown> | null;
   publishedFormCount?: number;
   settings?: Record<string, unknown> | null;
   templates?: ReadonlyArray<Record<string, unknown>>;
   registrations?: ReadonlyArray<Record<string, unknown>>;
+  sender?: string | null;
+  attendeeTypes?: ReadonlyArray<{ label: string; minimumAge: number | null }>;
+  policyVersions?: ReadonlyArray<Record<string, unknown>>;
 } = {}) {
   const event = overrides.event === null ? null : {
     id: "event_synthetic",
@@ -32,6 +40,7 @@ function dataSource(overrides: {
     publicInfoUrl: "https://www.imsda.org/synthetic-retreat",
     supportContact: "Registration team",
     isPublished: true,
+    billingMode: "ATTENDEE_PAY",
     ...overrides.event,
   };
   const templates = overrides.templates ?? [
@@ -44,6 +53,10 @@ function dataSource(overrides: {
   const reads = {
     event: { findUnique: vi.fn().mockResolvedValue(event) },
     registrationFormVersion: { count: vi.fn().mockResolvedValue(overrides.publishedFormCount ?? 1) },
+    // The required publish items (#1408): a saved central sender and attendee types; a cancellation policy is recommended.
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderEmail: overrides.sender === undefined ? "events@imsda.org" : overrides.sender }) },
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue(overrides.attendeeTypes ?? [{ label: "Adult", minimumAge: 18 }]) },
+    eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue(overrides.policyVersions ?? [{ id: "pol_1", version: 1, effectiveFrom: new Date("2020-01-01T00:00:00Z"), rules: policyRules }]) },
     registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
     eventMessageSettings: { findFirst: vi.fn().mockResolvedValue(overrides.settings === null ? null : overrides.settings ?? { deliveryMode: "EXTERNAL_EMAIL", senderEmail: "notifications@imsda.org", replyToEmail: "registration@imsda.org" }) },
@@ -93,6 +106,32 @@ describe("collectEventReadinessReport", () => {
     expect(check(mismatched, "PUBLISH_CLUB_BILLING")).toMatchObject({ severity: "BLOCKER", label: "Church billing for club registration" });
     const general = await collectEventReadinessReport(dataSource({ event: { audience: "GENERAL", billingMode: "ATTENDEE_PAY" } }).prisma, "synthetic-retreat", readyEnv);
     expect(check(general, "PUBLISH_CLUB_BILLING")).toBeUndefined();
+  });
+
+  it("requires a saved central sender, and says it is not blocked by the email environment (#1408)", async () => {
+    const missing = await collectEventReadinessReport(dataSource({ sender: null }).prisma, "synthetic-retreat", readyEnv);
+    expect(check(missing, "PUBLISH_CENTRAL_SENDER")).toMatchObject({ severity: "BLOCKER", label: "Central email sender saved" });
+    expect(check(await collectEventReadinessReport(dataSource({ sender: "   " }).prisma, "synthetic-retreat", readyEnv), "PUBLISH_CENTRAL_SENDER")?.severity).toBe("BLOCKER");
+    const saved = await collectEventReadinessReport(dataSource().prisma, "synthetic-retreat", {});
+    expect(check(saved, "PUBLISH_CENTRAL_SENDER")?.severity).toBe("READY");
+  });
+
+  it("requires an adult attendee type for a general event only (#1408)", async () => {
+    const none = { attendeeTypes: [{ label: "Child", minimumAge: null }] };
+    expect(check(await collectEventReadinessReport(dataSource(none).prisma, "synthetic-retreat", readyEnv), "PUBLISH_ATTENDEE_TYPES")?.severity).toBe("BLOCKER");
+    const club = await collectEventReadinessReport(dataSource({ ...none, event: { audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" } }).prisma, "synthetic-retreat", readyEnv);
+    expect(check(club, "PUBLISH_ATTENDEE_TYPES")).toBeUndefined();
+    expect(check(club, "PUBLISH_CLUB_BILLING")?.severity).toBe("READY");
+  });
+
+  it("recommends a cancellation policy but never blocks on it (#1408)", async () => {
+    const report = await collectEventReadinessReport(dataSource({ policyVersions: [] }).prisma, "synthetic-retreat", readyEnv);
+    expect(check(report, "PUBLISH_CANCELLATION_POLICY")?.severity).toBe("WARNING");
+    expect(report?.summary.blockers).toBe(0);
+    expect(check(await collectEventReadinessReport(dataSource().prisma, "synthetic-retreat", readyEnv), "PUBLISH_CANCELLATION_POLICY")?.severity).toBe("READY");
+    // Not where online cancellation never applies (club or church-billed events).
+    const club = await collectEventReadinessReport(dataSource({ policyVersions: [], event: { audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" } }).prisma, "synthetic-retreat", readyEnv);
+    expect(check(club, "PUBLISH_CANCELLATION_POLICY")).toBeUndefined();
   });
 
   it("never blocks publish on the optional IMSDA.org information page (#467)", async () => {

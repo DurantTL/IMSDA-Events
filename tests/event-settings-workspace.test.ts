@@ -63,6 +63,7 @@ const baseEventFields = {
   featuredOrder: null,
   featureUntil: null,
   publishedFormCount: 1,
+  attendeeTypesWithAgeRangeCount: 1, attendeeTypeNames: ["Adult"], centralSenderEmail: "events@example.test", hasCancellationPolicy: true,
   publishedForms: [],
   createdAt: "2027-01-01T00:00:00.000Z",
   updatedAt: "2027-01-01T00:00:00.000Z",
@@ -97,7 +98,7 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
   });
 
   it("gates Publish on the saved settings, not unsaved edits or an in-flight save", () => {
-    expect(workspaceSource).toContain("getEventPublishReadiness(savedDraft, publishedFormCount)");
+    expect(workspaceSource).toContain("getEventPublishReadiness({ ...savedDraft, ...readinessInputs }, publishedFormCount)");
     expect(workspaceSource).toContain("const publishBlockedBySave = dirty || saving;");
     // Publish stays focusable and explains itself (#742); the request itself is still gated.
     expect(workspaceSource).toContain("aria-disabled={Boolean(publishBlocker) || publishing}");
@@ -128,7 +129,7 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
     }));
     expect(markup).toContain("Private draft");
     expect(markup).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Publish event<\/button>/);
-    expect(markup).toContain("the registration support contact is missing");
+    expect(markup).toContain("Next: add the registration support contact.");
   });
 
   describe("Public page and links overview (#448)", () => {

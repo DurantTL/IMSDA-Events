@@ -17,6 +17,7 @@
  *   npm run test:event-templates
  */
 import { loadEnvConfig } from "@next/env";
+import { clearSyntheticCentralSender, setSyntheticCentralSender } from "./support/central-email";
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
   draftEventTemplateInputSchema,
@@ -109,6 +110,7 @@ async function main() {
     await run();
     await verifyFromEvent();
   } finally {
+    await clearSyntheticCentralSender(prisma);
     await cleanup();
     await restoreSeededStarters();
   }
@@ -555,6 +557,8 @@ async function verifyStarters() {
   const oldForm = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: oldEvent.id }, include: { versions: true } });
   await prisma.registrationFormVersion.update({ where: { id: oldForm.versions[0]!.id }, data: { status: "PUBLISHED", publishedAt: new Date() } });
   await prisma.registrationForm.update({ where: { id: oldForm.id }, data: { status: "PUBLISHED" } });
+  // Publishing needs a saved central sender (#1408); the seed leaves it blank and main() clears it afterwards.
+  await setSyntheticCentralSender(prisma);
   await publishEvent(oldEvent.id, adminId);
   const directorOrg = await prisma.organization.create({ data: { type: "CLUB", name: "Evttpl Synthetic Club", normalizedName: "evttpl synthetic club" } });
   const listed = (await listClubEvents(directorOrg.id)).find((entry) => entry.id === oldEvent.id);

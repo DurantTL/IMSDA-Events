@@ -188,30 +188,40 @@ describe("why a youth target is refused (#1403)", () => {
   });
 });
 
-describe("publish readiness: attendee types (#1403)", () => {
+describe("publish readiness: attendee types (#1403, required by #1408)", () => {
   const base = {
     name: "Sample", slug: "sample", startsOn: "2027-06-01", endsOn: "2027-06-03", timezone: "America/Chicago",
     location: "Des Moines", supportContact: "help@example.test", id: "evt_1",
   };
-  const find = (readiness: ReturnType<typeof getEventPublishReadiness>) => readiness.optionalItems.find((item) => item.id === "attendee-types");
+  const find = (readiness: ReturnType<typeof getEventPublishReadiness>) => readiness.items.find((item) => item.id === "attendee-types");
 
-  it("a general event lists 'Attendee types set', undone without a ranged type, with a link to attendee setup", () => {
+  it("a general event requires 'Attendee types set', undone without a ranged type, with a link to attendee setup", () => {
     const readiness = getEventPublishReadiness({ ...base, audience: "GENERAL", billingMode: "ATTENDEE_PAY", attendeeTypesWithAgeRangeCount: 0 }, 1);
-    expect(find(readiness)).toMatchObject({ label: "Attendee types set", complete: false, href: "/more/attendee-configuration?event=evt_1" });
-    // Never blocks publishing.
+    expect(find(readiness)).toMatchObject({
+      label: "Attendee types set",
+      complete: false,
+      href: "/more/attendee-configuration?event=evt_1",
+      actionLabel: "Set attendee types",
+      detail: "Attendee types decide who is an adult, youth or child, which sets prices and who gets each email.",
+    });
+    // It blocks publishing, and is not among the recommended items.
+    expect(readiness.ready).toBe(false);
+    expect(readiness.recommendedItems.map((item) => item.id)).not.toContain("attendee-types");
+  });
+
+  it("is done once an active type has an age range, and lists the type names", () => {
+    const readiness = getEventPublishReadiness({ ...base, audience: "GENERAL", attendeeTypesWithAgeRangeCount: 2, attendeeTypeNames: ["Adult", "Youth", "Child"] }, 1);
+    expect(find(readiness)).toMatchObject({ complete: true, detail: "Adult, Youth, Child." });
     expect(readiness.ready).toBe(true);
-    expect(readiness.items.map((item) => item.id)).not.toContain("attendee-types");
   });
 
-  it("is done once an active type has an age range", () => {
-    expect(find(getEventPublishReadiness({ ...base, audience: "GENERAL", attendeeTypesWithAgeRangeCount: 2 }, 1))?.complete).toBe(true);
+  it("a club event never lists it and is never blocked by it", () => {
+    const readiness = getEventPublishReadiness({ ...base, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", attendeeTypesWithAgeRangeCount: 0 }, 1);
+    expect(find(readiness)).toBeUndefined();
+    expect(readiness.ready).toBe(true);
   });
 
-  it("a club event never lists it", () => {
-    expect(find(getEventPublishReadiness({ ...base, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", attendeeTypesWithAgeRangeCount: 0 }, 1))).toBeUndefined();
-  });
-
-  it("a caller that has not loaded the count leaves it out", () => {
+  it("a pure caller that has not loaded the count leaves it out", () => {
     expect(find(getEventPublishReadiness({ ...base, audience: "GENERAL" }, 1))).toBeUndefined();
   });
 });

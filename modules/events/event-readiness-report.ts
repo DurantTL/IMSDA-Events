@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { getEventPublishReadiness } from "@/modules/events/readiness";
+import { loadRecommendedReadinessInputs, loadRequiredReadinessInputs } from "@/modules/events/readiness-inputs";
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import {
   checkOperationalReadiness,
@@ -53,13 +54,12 @@ export async function collectEventReadinessReport(
 ): Promise<EventReadinessReport | null> {
   const event = await prisma.event.findUnique({
     where: { slug },
-    select: { id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, location: true, publicInfoUrl: true, supportContact: true, isPublished: true, billingMode: true, audience: true,
-      _count: { select: { attendeeTypes: { where: { isActive: true, minimumAge: { gte: 18 } } } } } },
+    select: { id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, location: true, publicInfoUrl: true, supportContact: true, isPublished: true, billingMode: true, audience: true },
   });
   if (!event) return null;
   const isDeferredOrganizationBilling = event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
 
-  const [publishedFormCount, settings, templates, registrations] = await Promise.all([
+  const [publishedFormCount, settings, templates, registrations, requiredInputs, recommendedInputs] = await Promise.all([
     prisma.registrationFormVersion.count({ where: { form: { eventId: event.id }, status: "PUBLISHED" } }),
     // The one effective-delivery decision (#1043): paused and unconfigured both read as capture-only here.
     loadEventEmailSettings(prisma, event.id, { fallback: false }),
@@ -75,6 +75,9 @@ export async function collectEventReadinessReport(
         payments: { where: { status: "SUCCEEDED" }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } } },
       },
     }),
+    // The same inputs the publish gate and the settings page read (#1408), so the three agree.
+    loadRequiredReadinessInputs(prisma, event.id),
+    loadRecommendedReadinessInputs(prisma, event.id),
   ]);
 
   let registrationsMissingShirtSize = 0;
@@ -97,7 +100,8 @@ export async function collectEventReadinessReport(
     ...event,
     startsOn: event.startsAt.toISOString(),
     endsOn: event.endsAt.toISOString(),
-    attendeeTypesWithAgeRangeCount: event._count?.attendeeTypes,
+    ...requiredInputs,
+    ...recommendedInputs,
   }, publishedFormCount);
   const publishChecks: OperationalReadinessCheck[] = [
     ...publishReadiness.items.map((item) => ({
@@ -106,9 +110,9 @@ export async function collectEventReadinessReport(
       severity: item.complete ? "READY" : "BLOCKER",
       detail: item.detail,
     } satisfies OperationalReadinessCheck)),
-    // Never a blocker (#467): a misconfigured optional info URL is worth
+    // Never a blocker (#467, #1408): a missing cancellation policy or a misconfigured info URL is worth
     // flagging, but it must never stop publish.
-    ...publishReadiness.optionalItems.map((item) => ({
+    ...publishReadiness.recommendedItems.map((item) => ({
       code: `PUBLISH_${item.id.replaceAll("-", "_").toUpperCase()}`,
       label: item.label,
       severity: item.complete ? "READY" : "WARNING",

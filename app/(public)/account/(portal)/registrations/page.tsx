@@ -6,6 +6,7 @@ import { ArrowRight, CircleAlert, CircleHelp, Inbox, ShieldCheck } from "lucide-
 import { AccountRegistrationCard } from "@/components/account-registration-card";
 import { AttendeeRegistrationContactForm } from "@/components/attendee-registration-contact-form";
 import { AttendeeRegistrationAnswersForm } from "@/components/attendee-registration-answers-form";
+import { CancellationUnavailableNote } from "@/components/cancellation-unavailable-note";
 import { CancellationRequestPanel } from "@/components/cancellation-request-panel";
 import { PublicSquarePayment } from "@/components/public-square-payment";
 import { RegistrationActionDisclosure } from "@/components/registration-action-disclosure";
@@ -41,7 +42,7 @@ export const metadata: Metadata = {
 async function cancellationFor(registration: AttendeeRegistrationSummary, editable: boolean): Promise<RegistrantRequestView | null> {
   if (!editable) return null;
   const view = await getRegistrantRequestViewById(registration.id).catch(() => null);
-  return view && (view.available || view.requests.length > 0) ? view : null;
+  return view && (view.available || view.requests.length > 0 || view.noPolicy) ? view : null;
 }
 
 /**
@@ -62,7 +63,9 @@ function CardActions({
   const actions = registrationActions(registration, { editable, cancellation });
   const requestCount = cancellation?.requests.length ?? 0;
   const hasAny = actions.continuePayment || actions.editContact || actions.cancellation || actions.details;
+  const noPolicyNote = actions.cancellationUnavailable ? <CancellationUnavailableNote supportContact={registration.event.supportContact} /> : null;
   if (!hasAny) {
+    if (noPolicyNote) return noPolicyNote;
     if (!actions.readOnlyHistory) return null;
     return (
       <p className="attendee-reg-readonly">
@@ -73,6 +76,7 @@ function CardActions({
     );
   }
   return (
+    <>
     <div className="attendee-reg-actions" role="group" aria-label={`More for ${registration.event.name}`}>
       {actions.continuePayment && (
         <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${formatCents(registration.balanceCents)} remaining`}>
@@ -110,6 +114,8 @@ function CardActions({
         </RegistrationActionDisclosure>
       )}
     </div>
+    {noPolicyNote}
+    </>
   );
 }
 

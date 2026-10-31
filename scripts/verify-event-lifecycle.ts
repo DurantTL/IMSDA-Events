@@ -11,12 +11,15 @@
  * - Archive and unarchive write history only when they changed the row.
  * - Old code that writes only `isPublished` is reconciled by `effectiveLifecycleState`.
  * - The backfill gives legacy events a state, writes no history, keeps `updatedAt`, and a second run changes nothing.
+ * - Publishing needs the required readiness items (#1408): a saved central sender address and, for a general event, an adult
+ *   attendee type (a club event needs neither type); an event that is already public is never touched by that gate.
  * Uses fictitious rows it creates and removes itself.
  *
  *   npm run test:event-lifecycle
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
+import { clearSyntheticCentralSender, setSyntheticCentralSender } from "./support/central-email";
 
 loadEnvConfig(process.cwd());
 process.env.SECRET_ENCRYPTION_KEY ||= "verify-event-lifecycle-synthetic-key-not-a-secret";
@@ -64,7 +67,7 @@ async function cleanup() {
 const future = { startsAt: new Date("2031-10-13T15:00:00Z"), endsAt: new Date("2031-10-15T18:00:00Z"), timezone: "America/Chicago" };
 const past = { startsAt: new Date("2024-10-13T15:00:00Z"), endsAt: new Date("2024-10-15T18:00:00Z"), timezone: "America/Chicago" };
 
-async function createEvent(name: string, extra: Record<string, unknown> = {}, withForm = true) {
+async function createEvent(name: string, extra: Record<string, unknown> = {}, withForm = true, withAdultType = true) {
   const eventId = id(name);
   await prisma.event.create({
     data: {
@@ -72,6 +75,10 @@ async function createEvent(name: string, extra: Record<string, unknown> = {}, wi
       ...future, ...extra,
     },
   });
+  // A general event needs an adult attendee type to publish (#1408).
+  if (withAdultType) {
+    await prisma.eventAttendeeType.create({ data: { eventId, code: "ADULT", label: "Adult", sortOrder: 0, minimumAge: 18 } });
+  }
   if (withForm) {
     const form = await prisma.registrationForm.create({ data: { eventId, createdByUserId: adminId, name: `Evlife form ${name}`, slug: `${P}-form-${name}`, status: "PUBLISHED" } });
     await prisma.registrationFormVersion.create({ data: { formId: form.id, createdByUserId: adminId, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: {} } });
@@ -88,6 +95,8 @@ async function main() {
   const { evaluateEventRegistrationPhase } = await import("../modules/events/lifecycle");
 
   await cleanup();
+  // The required publish items include a saved central sender (#1408); the seed leaves it blank.
+  await setSyntheticCentralSender(prisma);
   await prisma.user.createMany({
     data: [
       { id: adminId, email: `${P}-admin@example.test`, displayName: "Lifecycle Check Admin", globalRole: "SYSTEM_ADMIN" },
@@ -158,6 +167,41 @@ async function main() {
   const refused = await caught(transitionEventLifecycle({ eventId: notReady, toState: "PUBLISHED", expectedFromState: "DRAFT", actor: configure }));
   assert(hasCode(refused, "EVENT_NOT_READY"), "publishing without a published form is EVENT_NOT_READY");
   assert((await history(notReady)).length === 0 && (await row(notReady)).lifecycleState === null, "a refused publish changes nothing");
+
+  // ---- Required items (#1408): a missing central sender or adult attendee type blocks publishing. ----
+  const ready = await createEvent("readygate");
+  await clearSyntheticCentralSender(prisma);
+  const noSender = await caught(transitionEventLifecycle({ eventId: ready, toState: "PUBLISHED", expectedFromState: "DRAFT", actor: configure }));
+  assert(hasCode(noSender, "EVENT_NOT_READY") && String((noSender as Error).message).includes("Ask a system administrator to set this up"), "a missing central sender blocks publishing with the administrator message");
+  assert((await history(ready)).length === 0 && !(await row(ready)).isPublished, "a refused publish for a missing sender changes nothing");
+  const noSenderLegacy = await caught(publishEvent(ready, actorId));
+  assert(hasCode(noSenderLegacy, "EVENT_NOT_READY"), "publishEvent is blocked the same way");
+  // A blank (whitespace) address is not saved either.
+  await prisma.platformSettings.update({ where: { id: "platform" }, data: { defaultSenderEmail: "   " } });
+  assert(hasCode(await caught(publishEvent(ready, actorId)), "EVENT_NOT_READY"), "a blank sender address is not saved");
+  // An event that is already public is not affected when the sender is later cleared.
+  const alreadyPublic = await createEvent("alreadypublic");
+  await setSyntheticCentralSender(prisma);
+  await publishEvent(alreadyPublic, actorId);
+  await clearSyntheticCentralSender(prisma);
+  await publishEvent(alreadyPublic, actorId);
+  assert((await row(alreadyPublic)).isPublished, "publishing an already-public event is a no-op that never re-checks readiness");
+  await transitionEventLifecycle({ eventId: alreadyPublic, toState: "REGISTRATION_CLOSED", expectedFromState: "PUBLISHED", actor: configure });
+  await transitionEventLifecycle({ eventId: alreadyPublic, toState: "PUBLISHED", expectedFromState: "REGISTRATION_CLOSED", actor: configure });
+  assert((await row(alreadyPublic)).isPublished, "moves between public states are not gated by the required items");
+  await setSyntheticCentralSender(prisma);
+  // No adult attendee type: a general event is blocked, a club event is not.
+  const noTypes = await createEvent("notypes", {}, true, false);
+  const noTypesRefused = await caught(transitionEventLifecycle({ eventId: noTypes, toState: "PUBLISHED", expectedFromState: "DRAFT", actor: configure }));
+  assert(hasCode(noTypesRefused, "EVENT_NOT_READY") && String((noTypesRefused as Error).message).includes("attendee types set"), "a general event without an adult attendee type cannot publish");
+  await prisma.eventAttendeeType.create({ data: { eventId: noTypes, code: "CHILD", label: "Child", sortOrder: 1, maximumAge: 12 } });
+  assert(hasCode(await caught(publishEvent(noTypes, actorId)), "EVENT_NOT_READY"), "a type with no adult age range does not count");
+  await prisma.eventAttendeeType.create({ data: { eventId: noTypes, code: "ADULT", label: "Adult", sortOrder: 0, minimumAge: 18 } });
+  await publishEvent(noTypes, actorId);
+  assert((await row(noTypes)).isPublished, "an adult attendee type lets the event publish");
+  const club = await createEvent("clubnotypes", { audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" }, true, false);
+  await publishEvent(club, actorId);
+  assert((await row(club)).isPublished, "a club event publishes without attendee types");
 
   // ---- Concurrency: different targets, exactly one wins. ----
   const race = await createEvent("race");
@@ -267,6 +311,7 @@ async function main() {
   assert((await prisma.event.count({ where: { id: e1 } })) === 0 && (await prisma.eventLifecycleTransition.count({ where: { eventId: e1 } })) === 0, "deleting an event removes it and its history");
 
   await cleanup();
+  await clearSyntheticCentralSender(prisma);
   console.log("Event lifecycle checks passed.");
 }
 
@@ -274,6 +319,7 @@ main()
   .catch(async (error) => {
     console.error(error);
     await cleanup().catch(() => undefined);
+    await clearSyntheticCentralSender(prisma).catch(() => undefined);
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());

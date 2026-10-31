@@ -91,6 +91,7 @@ function registration(id: string, lifecycle: Lifecycle, overrides: Partial<Atten
       ...(dates ?? future),
       timezone: "America/Chicago",
       location: "Synthetic Campground",
+      supportContact: "help@example.test",
       attendeeEditPolicy: "TIERED",
       isDeferredOrganizationBilling: false,
     },
@@ -558,6 +559,54 @@ describe("wording and compatibility (#1176)", () => {
     const page = readFileSync(path.join(process.cwd(), files[0]), "utf8");
     expect(page).toContain("/api/attendee/registrations/${encodeURIComponent(registration.id)}/cancellation");
     expect(page).toContain("manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`}");
+  });
+});
+
+describe("an event with no cancellation policy (#1408)", () => {
+  const noPolicy = { ...openRequests, available: false, allowedScopes: [], noPolicy: true };
+
+  it("hides the request control and tells the attendee to contact the event team, with the support contact as plain text", async () => {
+    mocks.registrations = [registration("np", "CONFIRMED")];
+    mocks.cancellations = { np: noPolicy };
+    const markup = await render();
+    expect(markup).not.toContain("Request cancellation");
+    expect(markup).toContain("Cancellation isn");
+    expect(markup).toContain("online for this event.");
+    expect(markup).toContain("To cancel or change plans, contact the event team");
+    expect(markup).toContain("help@example.test");
+    expect(markup).not.toContain("mailto:help@example.test");
+  });
+
+  it("shows no note while the control is offered", async () => {
+    mocks.registrations = [registration("ok", "CONFIRMED")];
+    mocks.cancellations = { ok: openRequests };
+    const markup = await render();
+    expect(markup).toContain("Request cancellation");
+    expect(markup).not.toContain("online for this event.");
+  });
+
+  it("shows no note for a past event, a cancelled registration, or a staff viewer", async () => {
+    mocks.registrations = [registration("gone", "CONFIRMED", { dates: past, balanceCents: 0 }), registration("canc", "CANCELLED")];
+    mocks.cancellations = { gone: noPolicy, canc: noPolicy };
+    expect(await render()).not.toContain("online for this event.");
+    mocks.registrations = [registration("np", "CONFIRMED")];
+    mocks.cancellations = { np: noPolicy };
+    mocks.via = "staff";
+    expect(await render()).not.toContain("online for this event.");
+  });
+
+  it("leaves out the contact when the event has none, rather than printing a blank", async () => {
+    const base = registration("nc", "CONFIRMED");
+    mocks.registrations = [{ ...base, event: { ...base.event, supportContact: null } }];
+    mocks.cancellations = { nc: noPolicy };
+    const markup = await render();
+    expect(markup).toContain("contact the event team.");
+  });
+
+  it("registrationActions reports it only for the person's own live registration", () => {
+    expect(registrationActions(registration("a", "CONFIRMED"), { editable: true, cancellation: noPolicy }).cancellationUnavailable).toBe(true);
+    expect(registrationActions(registration("a", "CONFIRMED"), { editable: false, cancellation: noPolicy }).cancellationUnavailable).toBe(false);
+    expect(registrationActions(registration("a", "CONFIRMED"), { editable: true, cancellation: openRequests }).cancellationUnavailable).toBe(false);
   });
 });
 
