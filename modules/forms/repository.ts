@@ -611,7 +611,7 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     // public submission would then fail ("Select an active attendee type.") (#1403).
     const typeSelector = attendeeTypeSelector(definition);
     if (typeSelector && await tx.eventAttendeeType.count({ where: { eventId, isActive: true } }) === 0) {
-      throw new FormOperationError("ATTENDEE_TYPES_REQUIRED", `Set attendee types for this event before publishing this form: its ${typeSelector.label} question has no choices. Add them under Attendee setup (/more/attendee-configuration?event=${encodeURIComponent(eventId)}).`);
+      throw new FormOperationError("ATTENDEE_TYPES_REQUIRED", `Set attendee types for this event before publishing this form: its ${typeSelector.label} question has no choices. Add them under Attendee setup.`);
     }
     // A test is required only before a form's first publish (#564, #1061).
     // The first publish proves the form can be filled in and priced. Once a

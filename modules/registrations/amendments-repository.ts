@@ -561,7 +561,8 @@ export function resolveAmendmentAttendeeType(
     if (held && answer && (held.label.trim().toLowerCase() === answer || held.code.trim().toLowerCase() === answer)) {
       return { attendeeType: current!.attendeeType, attendeeTypeDefinitionId: current!.attendeeTypeDefinitionId };
     }
-    return { attendeeType: current ? current.attendeeType : attendeeType(responses), attendeeTypeDefinitionId: null };
+    // The stored label is recomputed too: a stale "Adult" label would let the attendee-type backfill re-link a minor as an adult.
+    return { attendeeType: attendeeType(responses), attendeeTypeDefinitionId: null };
   }
   return current
     ? { attendeeType: current.attendeeType, attendeeTypeDefinitionId: current.attendeeTypeDefinitionId }

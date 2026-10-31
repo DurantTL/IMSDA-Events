@@ -410,7 +410,10 @@ describe("registration amendments repository", () => {
       .toEqual({ attendeeType: "Teen", attendeeTypeDefinitionId: "type-teen" });
     // No match, or a blank answer, clears the type.
     expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Worker" }, configured, asAdult, "GENERAL"))
-      .toMatchObject({ attendeeTypeDefinitionId: null });
+      .toEqual({ attendeeType: "WORKER", attendeeTypeDefinitionId: null });
+    // The stale "Adult" label goes too, so the attendee-type backfill cannot re-link a minor as an adult.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Teen" }, [configured[0]!], asAdult, "GENERAL"))
+      .toEqual({ attendeeType: "CHILD", attendeeTypeDefinitionId: null });
     expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "" }, configured, asAdult, "GENERAL"))
       .toMatchObject({ attendeeTypeDefinitionId: null });
     // An unchanged answer for a since-deactivated type keeps it.
