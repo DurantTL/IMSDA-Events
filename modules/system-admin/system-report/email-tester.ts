@@ -48,7 +48,7 @@ export const EMAIL_TEST_REASONS = {
   bounced: "The receiving server refused it.",
   complained: "The recipient marked it as spam.",
   failed: "The email provider could not send it.",
-  unavailable: "The email provider could not be reached, so nothing was sent.",
+  unavailable: "The email provider did not confirm the send in time. It may still arrive.",
   suppressed: "This address is on the do-not-send list after an earlier bounce or spam report.",
   "no-notice": "The provider has not reported delivered or bounced yet.",
 } as const;
@@ -203,7 +203,8 @@ export async function runEmailTest(input: { user: { id: string }; body: unknown;
     logError("The System report test email could not be delivered", error, { testRef: queued.ref });
   }
   // A test is one shot. A row still PENDING (nothing claimed, or rescheduled for a retry) is closed, so it never sends a
-  // surprise email later. A PROCESSING row belongs to another worker, which will finish it; the card keeps polling.
+  // surprise email later. A PROCESSING row is left alone: its worker may still finish it, and the card keeps polling. If
+  // nobody finishes it, the sweep closes it unsent (`closeAbandonedSystemTests`).
   await getPrisma().messageOutbox.updateMany({
     where: { id: queued.messageId, status: "PENDING" },
     data: { status: "CANCELLED", failedAt: now, lockedAt: null, lockToken: null },

@@ -77,14 +77,16 @@ export function assessOutboxQueue(snapshot: OutboxQueueSnapshot): OutboxQueueHea
 
 export async function getOutboxQueueSnapshot(now = new Date()): Promise<OutboxQueueSnapshot> {
   const prisma = getPrisma();
-  const dueWhere = { status: "PENDING" as const, availableAt: { lte: now } };
+  // The System report test email (#1383) is one-shot and never swept, so it must not count as queue backlog.
+  const real = { templateKey: { not: "SYSTEM_TEST_EMAIL" as const } };
+  const dueWhere = { ...real, status: "PENDING" as const, availableAt: { lte: now } };
 
   const [pending, due, processing, failed, oldestDue, dueEvents, accountMessagesDue] =
     await Promise.all([
-      prisma.messageOutbox.count({ where: { status: "PENDING" } }),
+      prisma.messageOutbox.count({ where: { ...real, status: "PENDING" } }),
       prisma.messageOutbox.count({ where: dueWhere }),
-      prisma.messageOutbox.count({ where: { status: "PROCESSING" } }),
-      prisma.messageOutbox.count({ where: { status: "FAILED" } }),
+      prisma.messageOutbox.count({ where: { ...real, status: "PROCESSING" } }),
+      prisma.messageOutbox.count({ where: { ...real, status: "FAILED" } }),
       prisma.messageOutbox.findFirst({
         where: dueWhere,
         orderBy: { availableAt: "asc" },

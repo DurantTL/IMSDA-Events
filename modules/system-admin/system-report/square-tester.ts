@@ -258,10 +258,10 @@ async function checkTestNotice(fetcher: Fetcher, configuration: SquareRuntimeCon
     return { key: "test", state: "ok", at, text: `Arrived ${seconds === 0 ? "at once" : `${seconds} ${seconds === 1 ? "second" : "seconds"} after asking`}. Signature OK.`, next: null };
   }
   if (status === 503) {
-    return { key: "test", state: "attention", at, text: "The test notice arrived, but this server's notice signature key is not set.", next: "Save the subscription's signature key in the server settings, then run this again.", fixHref: "/admin/settings", fixLabel: "Open payment settings" };
+    return { key: "test", state: "attention", at, text: "Our server answered “temporarily unavailable”. The Square notice signature key may not be set on the server.", next: "Check that the server setting SQUARE_WEBHOOK_SIGNATURE_KEY holds the subscription's signature key and that the site is running normally, then run this again." };
   }
   if (status === 400) {
-    return { key: "test", state: "watch", at, text: "Arrived and the signature is ours, but the app could not read Square's sample notice.", next: null };
+    return { key: "test", state: "watch", at, text: "The test notice arrived, but the app could not read it.", next: null };
   }
   if (status === 403) {
     return { key: "test", state: "attention", at, text: "The test notice arrived, but the signature did not match.", next: "Copy the subscription's signature key from Square into the server settings. Until then, payment notices are being ignored." };

@@ -191,11 +191,12 @@ describe("square tester: checks", () => {
     const testPath = "POST /v2/webhooks/subscriptions/wbhk_1/test";
     const key = await run({ [testPath]: { body: { subscription_test_result: { status_code: 503 } } } });
     expect(stateOf(key.result, "test")).toBe("attention");
-    expect(rowOf(key.result, "test").text).toBe("The test notice arrived, but this server's notice signature key is not set.");
-    expect(rowOf(key.result, "test").next).toMatch(/Save the subscription's signature key in the server settings/);
+    expect(rowOf(key.result, "test").text).toBe("Our server answered “temporarily unavailable”. The Square notice signature key may not be set on the server.");
+    expect(rowOf(key.result, "test").next).toMatch(/SQUARE_WEBHOOK_SIGNATURE_KEY/);
+    expect(rowOf(key.result, "test").fixHref).toBeUndefined();
     const sample = await run({ [testPath]: { body: { subscription_test_result: { status_code: 400 } } } });
     expect(stateOf(sample.result, "test")).toBe("watch");
-    expect(rowOf(sample.result, "test").text).toBe("Arrived and the signature is ours, but the app could not read Square's sample notice.");
+    expect(rowOf(sample.result, "test").text).toBe("The test notice arrived, but the app could not read it.");
     expect(sample.result.overall).toBe("watch");
   });
 

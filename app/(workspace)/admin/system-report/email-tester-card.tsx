@@ -126,8 +126,8 @@ function Result({ status }: { status: EmailTestStatus }) {
           <strong>The test email was not sent.</strong>
           <p>{status.reason}</p>
           <ol>
-            <li>Try again in a minute.</li>
-            <li>If it keeps happening, run Test connections and check Email settings.</li>
+            <li>Check the inbox for “IMSDA Events test email”. It may still arrive.</li>
+            <li>If it does not, try again later. If it keeps happening, run Test connections and check Email settings.</li>
           </ol>
           {ref}
         </div>
