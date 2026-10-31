@@ -5,6 +5,7 @@ import { logError } from "@/lib/logger";
 import { isStuckFailure } from "@/modules/cancellation-execution/domain";
 import { reportChurchShareDrift } from "@/modules/lodging/church-share-drift";
 import { PAY_ON_SQUARE_LINK_SWEEP_JOB } from "@/modules/operations/sweep-heartbeat";
+import { getSquareConfiguration } from "@/modules/payments/square-config";
 import { payOnSquareLinkSweepFields } from "./job-signals";
 import { runRefundSelfTest } from "./refund-self-test";
 import type { SignalState } from "./model";
@@ -25,6 +26,7 @@ type EventReads<T> = { readAt: Date; events: Array<{ id: string; name: string }>
 
 export type MoneyKit = {
   defineProvider: typeof defineProvider;
+  reportEvents: (ctx: ReportContext) => Promise<Read<Array<{ id: string; name: string }>>>;
   perEvent: <T>(ctx: ReportContext, key: string, run: (eventId: string) => Promise<T>) => Promise<Read<EventReads<T>>>;
   tried: (read: Read<unknown>, reason?: string) => { checkedAt: string; whenLabel: string; state: "unavailable"; resultText: string };
   iso: (date: Date) => string;
@@ -40,7 +42,7 @@ const RANK: Record<SignalState, number> = { attention: 0, unavailable: 1, watch:
 const worse = (a: SignalState, b: SignalState): SignalState => (RANK[a] <= RANK[b] ? a : b);
 
 export function buildMoneyProviders(kit: MoneyKit): SignalProvider[] {
-  const { defineProvider: define, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref } = kit;
+  const { defineProvider: define, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref } = kit;
   return [
     define("money", [
       m("cancellations-stuck", "Cancellations stuck", "Cancellations whose refund is still with Square, or failed in a way that needs a person.", "/finance/cancellation-requests", "Open cancellation requests"),
@@ -52,29 +54,58 @@ export function buildMoneyProviders(kit: MoneyKit): SignalProvider[] {
     ], async (ctx) => {
       const rows: Awaited<ReturnType<Parameters<typeof defineProvider>[2]>> = [];
 
-      // 1. Cancellations stuck.
-      const executions = await ctx.once("money:cancellations", async () => getPrisma().cancellationExecution.groupBy({
-        by: ["eventId", "status", "lastFailureCode"],
-        where: { status: { in: ["PROCESSOR_PENDING", "FAILED"] } },
-        _count: { _all: true },
-        orderBy: { eventId: "asc" },
-      }));
-      if (!executions.ok) rows.push({ key: "cancellations-stuck", ...tried(executions) });
+      // The report's event window, in its own order (by start date), so a link goes to the first affected event in it.
+      const windowEvents = await reportEvents(ctx);
+      const firstInWindow = (eventIds: Iterable<string>) => {
+        if (!windowEvents.ok) return null;
+        const affected = new Set(eventIds);
+        return windowEvents.value.find((event) => affected.has(event.id))?.id ?? null;
+      };
+
+      // 1. Cancellations stuck. Legs are counted, not just executions: an execution keeps only its first failure code.
+      const cancellations = await ctx.once("money:cancellations", async () => {
+        const prisma = getPrisma();
+        const [pending, legs, cancelSteps] = await Promise.all([
+          prisma.cancellationExecution.groupBy({
+            by: ["eventId"],
+            where: { status: "PROCESSOR_PENDING", updatedAt: { lt: new Date(ctx.now.getTime() - REFUND_PENDING_STUCK_AFTER_MS) } },
+            _count: { _all: true },
+          }),
+          prisma.cancellationExecutionRefund.groupBy({
+            by: ["eventId", "failureCode"],
+            where: { status: "FAILED", resolvedAt: null },
+            _count: { _all: true },
+          }),
+          prisma.cancellationExecution.groupBy({
+            by: ["eventId", "cancelFailureCode"],
+            where: { status: "FAILED", cancelStatus: "FAILED" },
+            _count: { _all: true },
+          }),
+        ]);
+        return { pending, legs, cancelSteps };
+      });
+      if (!cancellations.ok) rows.push({ key: "cancellations-stuck", ...tried(cancellations) });
       else {
-        const pending = executions.value.filter((group) => group.status === "PROCESSOR_PENDING");
-        const failed = executions.value.filter((group) => group.status === "FAILED" && isStuckFailure(group.lastFailureCode));
-        const sum = (groups: typeof pending) => groups.reduce((total, group) => total + group._count._all, 0);
-        const pendingCount = sum(pending);
-        const failedCount = sum(failed);
-        const common = { key: "cancellations-stuck", checkedAt: iso(executions.readAt), whenLabel: "Checked" };
-        if (pendingCount + failedCount === 0) rows.push({ ...common, state: "ok", resultText: "No cancellation is waiting on Square or stuck after a failed refund." });
+        const { pending, legs, cancelSteps } = cancellations.value;
+        const total = (groups: Array<{ _count: { _all: number } }>) => groups.reduce((sum, group) => sum + group._count._all, 0);
+        const failures = [
+          ...legs.map((group) => ({ eventId: group.eventId, code: group.failureCode, count: group._count._all })),
+          ...cancelSteps.map((group) => ({ eventId: group.eventId, code: group.cancelFailureCode, count: group._count._all })),
+        ];
+        const settleGroups = failures.filter((entry) => isStuckFailure(entry.code));
+        const continueGroups = failures.filter((entry) => !isStuckFailure(entry.code));
+        const pendingCount = total(pending);
+        const settleCount = settleGroups.reduce((sum, entry) => sum + entry.count, 0);
+        const continueCount = continueGroups.reduce((sum, entry) => sum + entry.count, 0);
+        const common = { key: "cancellations-stuck", checkedAt: iso(cancellations.readAt), whenLabel: "Checked" };
+        if (pendingCount + settleCount + continueCount === 0) rows.push({ ...common, state: "ok", resultText: "No cancellation is waiting on Square or has a failed step." });
         else {
-          const first = [...pending, ...failed].map((group) => group.eventId).sort()[0];
+          const first = firstInWindow([...pending.map((group) => group.eventId), ...failures.map((entry) => entry.eventId)]);
           rows.push({
             ...common,
-            state: failedCount > 0 ? "attention" : "watch",
-            resultText: `${plural(pendingCount, "cancellation", "cancellations")} waiting on Square and ${plural(failedCount, "cancellation", "cancellations")} stuck after a failed refund.`,
-            fixHref: eventHref("/finance/cancellation-requests", first),
+            state: settleCount > 0 ? "attention" : "watch",
+            resultText: `${plural(settleCount, "failed step needs", "failed steps need")} settling by a person, ${plural(continueCount, "failed step needs", "failed steps need")} Continue pressed, and ${plural(pendingCount, "cancellation has", "cancellations have")} waited over an hour on Square.`,
+            ...(first ? { fixHref: eventHref("/finance/cancellation-requests", first) } : {}),
           });
         }
       }
@@ -110,9 +141,17 @@ export function buildMoneyProviders(kit: MoneyKit): SignalProvider[] {
 
       // 4. Pay on Square link sweep: its last run, plus withdrawn links Square has not confirmed deleted.
       const sweep = await jobRow(ctx, PAY_ON_SQUARE_LINK_SWEEP_JOB, "pay-on-square-sweep", payOnSquareLinkSweepFields);
-      const stuckLinks = await ctx.once("money:hosted-delete-errors", async () => getPrisma().squareHostedCheckout.count({ where: { providerDeleteError: { not: null }, providerDeletedAt: null } }));
-      if (!stuckLinks.ok) rows.push({ key: "pay-on-square-sweep", ...tried(stuckLinks, "The count of links Square has not deleted could not be read. It is not shown as healthy.") });
-      else {
+      // Only links in the current Square environment are retried by the sweep, so only those are counted.
+      const stuckLinks = await ctx.once("money:hosted-delete-errors", async () => getPrisma().squareHostedCheckout.count({
+        where: { providerDeleteError: { not: null }, providerDeletedAt: null, environment: getSquareConfiguration().environment },
+      }));
+      if (!stuckLinks.ok) {
+        const unread = "The count of links Square has not deleted could not be read.";
+        // A failing run is never hidden behind an unreadable count.
+        rows.push(sweep.state === "attention"
+          ? { ...sweep, resultText: `${sweep.resultText} ${unread}` }
+          : { key: "pay-on-square-sweep", ...tried(stuckLinks, `${unread} It is not shown as healthy.`) });
+      } else {
         const count = stuckLinks.value;
         const note = count === 0 ? "No withdrawn link is waiting on Square." : `${plural(count, "withdrawn link", "withdrawn links")} Square has not deleted after an error.`;
         rows.push({

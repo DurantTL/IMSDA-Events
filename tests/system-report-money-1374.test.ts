@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getJobRun: vi.fn(),
   reportChurchShareDrift: vi.fn(),
   groupBy: vi.fn(),
+  legGroupBy: vi.fn(),
+  getSquareConfiguration: vi.fn(),
   refundCount: vi.fn(),
   duplicateCount: vi.fn(),
   hostedCount: vi.fn(),
@@ -19,7 +21,7 @@ vi.mock("@/lib/release", () => ({ getReleaseIdentity: vi.fn(), getReleaseTimes: 
 vi.mock("@/modules/operations/disk-space", () => ({ readDiskSpace: vi.fn() }));
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ getJobRun: mocks.getJobRun }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: vi.fn() }));
-vi.mock("@/modules/payments/square-config", () => ({ getSquareConfiguration: vi.fn() }));
+vi.mock("@/modules/payments/square-config", () => ({ getSquareConfiguration: mocks.getSquareConfiguration }));
 vi.mock("@/modules/system-admin/repository", () => ({ getSystemHealth: vi.fn() }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: vi.fn() }));
 vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadiness: vi.fn() }));
@@ -52,12 +54,15 @@ beforeEach(() => {
   vi.setSystemTime(now);
   mocks.getPrisma.mockReturnValue({
     cancellationExecution: { groupBy: mocks.groupBy },
+    cancellationExecutionRefund: { groupBy: mocks.legGroupBy },
     refund: { count: mocks.refundCount },
     squareDuplicateCharge: { count: mocks.duplicateCount },
     squareHostedCheckout: { count: mocks.hostedCount },
     event: { findMany: mocks.eventFindMany },
   });
   mocks.groupBy.mockResolvedValue([]);
+  mocks.legGroupBy.mockResolvedValue([]);
+  mocks.getSquareConfiguration.mockReturnValue({ environment: "sandbox", paymentConfigured: true });
   mocks.refundCount.mockResolvedValue(0);
   mocks.duplicateCount.mockResolvedValue(0);
   mocks.hostedCount.mockResolvedValue(0);
@@ -89,6 +94,7 @@ describe("the money section", () => {
 
   it("makes every database-backed row unavailable, never OK, when its read fails; the self-test needs no database", async () => {
     mocks.groupBy.mockRejectedValue(new Error("down"));
+    mocks.legGroupBy.mockRejectedValue(new Error("down"));
     mocks.refundCount.mockRejectedValue(new Error("down"));
     mocks.duplicateCount.mockRejectedValue(new Error("down"));
     mocks.hostedCount.mockRejectedValue(new Error("down"));
@@ -102,26 +108,56 @@ describe("the money section", () => {
     expect(byKey.get("refund-self-test")?.state).toBe("ok");
   });
 
+  // The two execution queries are told apart by what they group by.
+  const executionGroups = (pending: unknown[], cancelSteps: unknown[]) =>
+    mocks.groupBy.mockImplementation(async ({ by }: { by: string[] }) => (by.includes("cancelFailureCode") ? cancelSteps : pending));
+
   describe("cancellations stuck", () => {
-    it("counts a refund with Square and only the failures a person must settle, and links the first event", async () => {
-      mocks.groupBy.mockResolvedValue([
-        { eventId: "evt_b", status: "PROCESSOR_PENDING", lastFailureCode: null, _count: { _all: 2 } },
-        { eventId: "evt_a", status: "FAILED", lastFailureCode: "PROVIDER_DECLINED", _count: { _all: 1 } },
-        { eventId: "evt_a", status: "FAILED", lastFailureCode: "SQUARE_REJECTED_AMOUNT", _count: { _all: 1 } },
-        { eventId: "evt_a", status: "FAILED", lastFailureCode: "NETWORK", _count: { _all: 5 } }, // uncertain: safe to resend, not stuck
+    it("counts every failed leg by its own code, so a retryable leg beside a declined one is not hidden", async () => {
+      executionGroups([{ eventId: "evt_b", _count: { _all: 2 } }], []);
+      mocks.legGroupBy.mockResolvedValue([
+        { eventId: "evt_b", failureCode: "PROVIDER_DECLINED", _count: { _all: 1 } },
+        { eventId: "evt_b", failureCode: "SQUARE_REJECTED_AMOUNT", _count: { _all: 1 } },
+        { eventId: "evt_b", failureCode: "NETWORK", _count: { _all: 5 } },
       ]);
       const row = (await rows()).get("cancellations-stuck");
-      expect(row).toMatchObject({ state: "attention", fixHref: "/finance/cancellation-requests?event=evt_a" });
-      expect(row?.resultText).toContain("2 cancellations waiting on Square and 2 cancellations stuck");
+      expect(row?.state).toBe("attention");
+      expect(row?.resultText).toBe("2 failed steps need settling by a person, 5 failed steps need Continue pressed, and 2 cancellations have waited over an hour on Square.");
+      expect(mocks.legGroupBy.mock.calls[0][0].where).toEqual({ status: "FAILED", resolvedAt: null });
     });
 
-    it("is only a watch when the refunds are just waiting on Square", async () => {
-      mocks.groupBy.mockResolvedValue([{ eventId: "evt_a", status: "PROCESSOR_PENDING", lastFailureCode: null, _count: { _all: 1 } }]);
+    it("counts a failed cancel step: retryable is a watch, a stuck code is attention", async () => {
+      executionGroups([], [{ eventId: "evt_a", cancelFailureCode: "TIMEOUT", _count: { _all: 1 } }]);
+      expect((await rows()).get("cancellations-stuck")).toMatchObject({ state: "watch" });
+      executionGroups([], [{ eventId: "evt_a", cancelFailureCode: "PROVIDER_FAILED", _count: { _all: 1 } }]);
+      expect((await rows()).get("cancellations-stuck")?.state).toBe("attention");
+    });
+
+    it("only counts a refund with Square after the one-hour grace, and a lone wait is a watch", async () => {
+      executionGroups([{ eventId: "evt_a", _count: { _all: 1 } }], []);
       expect((await rows()).get("cancellations-stuck")?.state).toBe("watch");
+      const pendingCall = mocks.groupBy.mock.calls.map(([args]) => args).find((args) => !args.by.includes("cancelFailureCode"));
+      expect(pendingCall.where).toEqual({ status: "PROCESSOR_PENDING", updatedAt: { lt: new Date("2026-10-31T11:00:00.000Z") } });
     });
 
-    it("is OK when the only failures are ones that can be resent", async () => {
-      mocks.groupBy.mockResolvedValue([{ eventId: "evt_a", status: "FAILED", lastFailureCode: "NETWORK", _count: { _all: 3 } }]);
+    it("links the first affected event in the report window order, not the lowest id", async () => {
+      // The window lists evt_a then evt_b (by start date); evt_b sorts first by id here.
+      mocks.eventFindMany.mockResolvedValue([{ id: "evt_z", name: "Z" }, { id: "evt_a", name: "A" }]);
+      executionGroups([], []);
+      mocks.legGroupBy.mockResolvedValue([
+        { eventId: "evt_a", failureCode: "PROVIDER_DECLINED", _count: { _all: 1 } },
+        { eventId: "evt_z", failureCode: "PROVIDER_DECLINED", _count: { _all: 1 } },
+      ]);
+      expect((await rows()).get("cancellations-stuck")?.fixHref).toBe("/finance/cancellation-requests?event=evt_z");
+    });
+
+    it("keeps the section's own link when no affected event is in the window", async () => {
+      executionGroups([], []);
+      mocks.legGroupBy.mockResolvedValue([{ eventId: "evt_old", failureCode: "PROVIDER_DECLINED", _count: { _all: 1 } }]);
+      expect((await rows()).get("cancellations-stuck")).toMatchObject({ state: "attention", fixHref: "/finance/cancellation-requests" });
+    });
+
+    it("is OK when nothing is pending or failed", async () => {
       expect((await rows()).get("cancellations-stuck")?.state).toBe("ok");
     });
   });
@@ -155,7 +191,7 @@ describe("the money section", () => {
       expect(row?.state).toBe("watch");
       expect(row?.resultText).toContain("2 withdrawn, 2 deleted at Square, 0 deletions failed.");
       expect(row?.resultText).toContain("2 withdrawn links Square has not deleted after an error.");
-      expect(mocks.hostedCount).toHaveBeenCalledWith({ where: { providerDeleteError: { not: null }, providerDeletedAt: null } });
+      expect(mocks.hostedCount).toHaveBeenCalledWith({ where: { providerDeleteError: { not: null }, providerDeletedAt: null, environment: "sandbox" } });
       expect(mocks.getJobRun.mock.calls[0][0]).toBe("pay-on-square-link-sweep");
     });
 
@@ -170,9 +206,24 @@ describe("the money section", () => {
       expect((await rows()).get("pay-on-square-sweep")?.state).toBe("attention");
     });
 
-    it("is unavailable when only the count cannot be read", async () => {
+    it("is unavailable when only the count cannot be read, and says so", async () => {
       mocks.hostedCount.mockRejectedValue(new Error("down"));
+      const row = (await rows()).get("pay-on-square-sweep");
+      expect(row?.state).toBe("unavailable");
+      expect(row?.resultText).toContain("could not be read");
+    });
+
+    it("is unavailable when the Square environment cannot be read", async () => {
+      mocks.getSquareConfiguration.mockImplementation(() => { throw new Error("no config"); });
       expect((await rows()).get("pay-on-square-sweep")?.state).toBe("unavailable");
+    });
+
+    it("keeps attention for a failing run even when the count cannot be read", async () => {
+      mocks.getJobRun.mockResolvedValue(jobRun({ status: "failing", lastFailedAt: minutesAgo(3) }));
+      mocks.hostedCount.mockRejectedValue(new Error("down"));
+      const row = (await rows()).get("pay-on-square-sweep");
+      expect(row?.state).toBe("attention");
+      expect(row?.resultText).toContain("could not be read");
     });
   });
 

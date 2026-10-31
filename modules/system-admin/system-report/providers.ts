@@ -542,7 +542,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       };
     });
   }),
-  ...buildMoneyProviders({ defineProvider, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
+  ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
 ];
 
 /* ---------- Environment status rows ---------- */
