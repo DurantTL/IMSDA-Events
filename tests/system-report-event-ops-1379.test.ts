@@ -64,12 +64,14 @@ async function load() {
 }
 
 describe("event operations pure helpers", () => {
-  it("imports: running over an hour is attention, waiting is watch, none is ok, and failed commits never change the state", () => {
-    expect(importsStuckResult({ running: 1, pending: 2, failed: 0, names: ["A"] }).state).toBe("attention");
-    expect(importsStuckResult({ running: 0, pending: 2, failed: 0, names: ["A"] }).state).toBe("watch");
-    const none = importsStuckResult({ running: 0, pending: 0, failed: 3, names: [] });
+  it("imports: previews waiting over an hour are watch, none is ok, and failed commits are text only, printed only when non-zero", () => {
+    const waiting = importsStuckResult({ waiting: 2, failed: 0, names: ["A"] });
+    expect(waiting.state).toBe("watch");
+    expect(waiting.resultText).toBe("2 import previews have waited over an hour without being committed at A.");
+    const none = importsStuckResult({ waiting: 0, failed: 3, names: [] });
     expect(none.state).toBe("ok");
     expect(none.resultText).toContain("3 failed commits are listed under Import review");
+    expect(importsStuckResult({ waiting: 0, failed: 0, names: [] }).resultText).not.toContain("failed");
   });
 
   it("info rows are always info", () => {
@@ -122,7 +124,7 @@ describe("event operations rows", () => {
     await load();
     const ids = { in: ["evt_a", "evt_b"] };
     expect(prisma.importRun.groupBy).toHaveBeenCalledTimes(1);
-    expect(prisma.importRun.groupBy.mock.calls[0][0].where).toEqual({ eventId: ids, status: { in: ["RUNNING", "PENDING"] }, startedAt: { lt: new Date("2026-10-30T09:42:00.000Z") } });
+    expect(prisma.importRun.groupBy.mock.calls[0][0].where).toEqual({ eventId: ids, status: { in: ["RUNNING", "PENDING"] }, errors: 0, startedAt: { lt: new Date("2026-10-30T09:42:00.000Z") } });
     expect(prisma.checkInStation.groupBy.mock.calls[0][0].where).toEqual({ eventId: ids, expiresAt: { lt: now }, stoppedAt: null, revokedAt: null });
     expect(prisma.honorClassWaitlistEntry.groupBy.mock.calls[0][0].where).toEqual({ eventId: ids, status: "OFFERED", offerExpiresAt: { lt: new Date("2026-10-30T10:12:00.000Z") } });
     expect(prisma.eventLodgingWaitlistEntry.groupBy.mock.calls[0][0].where).toEqual({ eventId: ids, status: "OFFERED", offerExpiresAt: { lte: now } });
@@ -134,7 +136,7 @@ describe("event operations rows", () => {
   it("maps findings to states with event names and links, and never a person", async () => {
     prismaWith({
       importRun: {
-        groupBy: vi.fn().mockResolvedValue([grouped("evt_b", 1, { status: "RUNNING" }), grouped("evt_a", 2, { status: "PENDING" })]),
+        groupBy: vi.fn().mockResolvedValue([grouped("evt_b", 1), grouped("evt_a", 2)]),
         count: vi.fn().mockResolvedValue(2),
       },
       checkInStation: { groupBy: vi.fn().mockResolvedValue([grouped("evt_a", 3)]) },
@@ -146,7 +148,7 @@ describe("event operations rows", () => {
     });
     mocks.selectionsMissingTickets.mockImplementation(async (_tx: unknown, eventId: string) => (eventId === "evt_b" ? ["sel_secret_1", "sel_secret_2"] : []));
     const rows = await load();
-    expect(rows.get("imports-stuck")).toMatchObject({ state: "attention", fixHref: "/imports?event=evt_a" });
+    expect(rows.get("imports-stuck")).toMatchObject({ state: "watch", fixHref: "/imports?event=evt_a" });
     expect(rows.get("imports-stuck")?.resultText).toContain("2 failed commits are listed under Import review");
     expect(rows.get("checkin-stations")).toMatchObject({ state: "info", fixHref: "/check-in?event=evt_a" });
     expect(rows.get("honors-offers-overdue")).toMatchObject({ state: "attention" });

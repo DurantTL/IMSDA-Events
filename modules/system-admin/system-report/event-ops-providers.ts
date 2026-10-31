@@ -82,7 +82,7 @@ export function buildEventOpsProviders(kit: EventOpsKit): SignalProvider[] {
 
   return [
     define("event-operations", [
-      m("imports-stuck", "Imports stuck", "Imports still running, or still waiting to be committed, after more than an hour.", "/imports", "Open imports"),
+      m("imports-stuck", "Imports stuck", "Import previews with no errors that have waited over an hour without being committed.", "/imports", "Open imports"),
       m("checkin-stations", "Check-in stations left open", "Check-in stations that expired without being stopped or revoked.", "/check-in", "Open check-in"),
       m("honors-offers-overdue", "Honors class offers overdue", "Honors class waitlist offers more than 30 minutes past their expiry.", "/more/honors", "Open honors"),
       m("lodging-offers-lapsed", "Lodging offers lapsed", "Lodging waitlist offers that have passed their expiry and are not yet handled.", "/more/lodging", "Open lodging"),
@@ -100,8 +100,8 @@ export function buildEventOpsProviders(kit: EventOpsKit): SignalProvider[] {
         const prisma = getPrisma();
         const [stuck, failed] = await Promise.all([
           prisma.importRun.groupBy({
-            by: ["eventId", "status"],
-            where: { eventId: { in: ids }, status: { in: ["RUNNING", "PENDING"] }, startedAt: { lt: ago(IMPORT_STUCK_AFTER_MS) } },
+            by: ["eventId"],
+            where: { eventId: { in: ids }, status: { in: ["RUNNING", "PENDING"] }, errors: 0, startedAt: { lt: ago(IMPORT_STUCK_AFTER_MS) } },
             _count: { _all: true },
           }),
           prisma.importRun.count({ where: { eventId: { in: ids }, status: "FAILED" } }),
@@ -109,10 +109,8 @@ export function buildEventOpsProviders(kit: EventOpsKit): SignalProvider[] {
         return { stuck, failed };
       });
       rows.push(windowedRow("imports-stuck", imports, ({ stuck, failed }, window) => {
-        const running = sum(stuck.filter((group) => group.status === "RUNNING"));
-        const pending = sum(stuck.filter((group) => group.status === "PENDING"));
         const where = affected(window, stuck);
-        return { ...importsStuckResult({ running, pending, failed, names: where.names }), link: where.first ? eventHref("/imports", where.first) : null };
+        return { ...importsStuckResult({ waiting: sum(stuck), failed, names: where.names }), link: where.first ? eventHref("/imports", where.first) : null };
       }));
 
       // 2. Check-in stations left open (a count only).

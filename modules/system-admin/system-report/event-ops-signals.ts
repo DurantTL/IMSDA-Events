@@ -21,13 +21,14 @@ export function eventNames(names: readonly string[], limit = 3) {
 
 const at = (names: readonly string[]) => (names.length > 0 ? ` at ${eventNames(names)}` : "");
 
-export function importsStuckResult(input: { running: number; pending: number; failed: number; names: readonly string[] }): EventOpsResult {
-  const { running, pending, failed, names } = input;
+/** A preview waiting to be committed. Previews with errors are left out: they can never be committed and are flagged under Import review. */
+export function importsStuckResult(input: { waiting: number; failed: number; names: readonly string[] }): EventOpsResult {
+  const { waiting, failed, names } = input;
   const failedNote = failed > 0 ? ` ${plural(failed, "failed commit is", "failed commits are")} listed under Import review.` : "";
-  if (running + pending === 0) return { state: "ok", resultText: `No import has been running or waiting over an hour.${failedNote}` };
+  if (waiting === 0) return { state: "ok", resultText: `No import preview has waited over an hour without being committed.${failedNote}` };
   return {
-    state: running > 0 ? "attention" : "watch",
-    resultText: `${plural(running, "import has", "imports have")} been running over an hour (a commit should finish in one transaction) and ${plural(pending, "import has", "imports have")} waited over an hour to be committed${at(names)}.${failedNote}`,
+    state: "watch",
+    resultText: `${plural(waiting, "import preview has", "import previews have")} waited over an hour without being committed${at(names)}.${failedNote}`,
   };
 }
 
