@@ -171,15 +171,19 @@ export function honorWatchSummaryFields(key: string, run: JobRun, readAt: Date):
 
 /**
  * Sealed health copies. With health records switched off nothing new is sealed, which is a choice and not a problem, so
- * the row reads "Off" as a count-only note (never OK, never a warning). That is judged from the live setting, not the last run.
+ * the row reads "Off" as a count-only note (never OK, never a warning). The sweep still deletes expired copies while off,
+ * so a stored failed or stale run still surfaces, and an unreadable run is unavailable rather than a reassuring Off.
  */
 export function healthSnapshotFields(key: string, run: JobRun | null, readAt: Date, enabled: boolean): Fields {
-  if (!enabled) {
-    return { key, state: "info", checkedAt: iso(readAt), whenLabel: "Checked", resultText: "Off. Health records are switched off, so no health copies are sealed." };
-  }
   if (!run) return { key, state: "unavailable", checkedAt: iso(readAt), whenLabel: "Tried", resultText: "The last run could not be read. It is not shown as healthy." };
+  const off = "Off. Health records are switched off, so no health copies are sealed.";
+  if (!enabled && run.status === "never") return { key, state: "info", checkedAt: iso(readAt), whenLabel: "Checked", resultText: off };
   const problem = runProblem(key, run, readAt, "the sealed health copy sweep");
   if (problem) return problem;
+  if (!enabled) {
+    const deleted = num(run.summary, "deleted");
+    return ranFields(key, run, "info", deleted === null ? off : `${off} ${deleted} expired copies deleted.`);
+  }
   const c = counts(run, ["taken", "sealFailed", "deleted", "heldSkipped"]);
   if (!c) return ranFields(key, run, "watch", COUNTS_MISSING);
   const text = `${c.taken} sealed, ${c.sealFailed} failed to seal, ${c.deleted} expired copies deleted, ${c.heldSkipped} kept for a legal hold.`;

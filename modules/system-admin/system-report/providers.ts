@@ -285,7 +285,8 @@ async function jobRow(ctx: ReportContext, job: string, key: string, fields: (key
   return fields(key, read.value, read.readAt);
 }
 
-/** The health records switch, read from the environment like the module does (exactly "true" is on; a failed read is off). */
+/** Same rule as `healthRecordsEnabled()` in modules/health-records/flag.ts, copied because tests/health-records-privacy-guards.test.ts forbids importing that module here.
+ * The health records switch, read from the environment like the module does (exactly "true" is on; a failed read is off). */
 function healthRecordsSwitchedOn() {
   try {
     return getServerEnv().HEALTH_RECORDS_ENABLED === true;
@@ -300,7 +301,7 @@ async function alertDeliveryRow(ctx: ReportContext, key: string) {
   try {
     configured = isAlertDeliveryConfigured();
   } catch {
-    return { key, checkedAt: iso(new Date()), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
   }
   if (!configured) return alertDeliveryFields(key, { configured: false, run: null }, ctx.now);
   const read = await ctx.once(`job:${ALERT_WEBHOOK_DELIVERY_JOB}`, () => getJobRun(ALERT_WEBHOOK_DELIVERY_JOB, ctx.now));
@@ -313,7 +314,7 @@ async function reachabilityRow(ctx: ReportContext, kind: "email" | "square", key
   try {
     configured = isConfigured();
   } catch {
-    return { key, checkedAt: iso(new Date()), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
   }
   if (!configured) return reachabilityFields(kind, key, { configured: false, run: null }, ctx.now);
   const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now));
@@ -429,10 +430,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     await jobRow(ctx, CLASS_WAITLIST_SWEEP_JOB, "class-waitlists", classWaitlistFields),
     await jobRow(ctx, INSTRUCTOR_CLASS_EMAILS_JOB, "instructor-class-emails", instructorClassEmailFields),
     await jobRow(ctx, HONOR_WATCH_SUMMARIES_JOB, "honor-watch-summaries", honorWatchSummaryFields),
-    // "Off" is read from the switch before any stored run, so it shows even when the run cannot be read.
-    healthRecordsSwitchedOn()
-      ? await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, true))
-      : healthSnapshotFields("health-snapshots", null, ctx.now, false),
+    await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, healthRecordsSwitchedOn())),
     await jobRow(ctx, RETENTION_CLEANUP_JOB, "retention-cleanups", retentionCleanupFields),
   ]),
 

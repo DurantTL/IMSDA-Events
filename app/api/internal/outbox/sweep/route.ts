@@ -106,11 +106,9 @@ async function postHandler(request: Request) {
       RETENTION_CLEANUP_JOB,
       "retention clean-up",
       communityRetention !== null && alertFeedRetention !== null && publicMetricsRetention !== null,
-      {
-        community: communityRetention?.removedPosts ?? null,
-        alertFeed: alertFeedRetention ?? null,
-        analytics: publicMetricsRetention ?? null,
-      },
+      communityRetention !== null && alertFeedRetention !== null && publicMetricsRetention !== null
+        ? { community: communityRetention.removedPosts, alertFeed: alertFeedRetention, analytics: publicMetricsRetention }
+        : undefined,
     );
     // The daily location waitlist digest to Area Coordinators and event staff
     // (#599). It waits for its morning send time (Central) and sends at most one
@@ -239,11 +237,12 @@ async function postHandler(request: Request) {
     });
     // With health records off `started` is null by design, so only a missing retention result (or a missing seal result while on) is a failure.
     const healthOn = sealedCopiesEnabled();
+    const healthSucceeded = healthSnapshots !== null && healthSnapshots.retention !== null && (!healthOn || healthSnapshots.started !== null);
     await recordStep(
       HEALTH_SNAPSHOT_SWEEP_JOB,
       "sealed health copy sweep",
-      healthSnapshots !== null && healthSnapshots.retention !== null && (!healthOn || healthSnapshots.started !== null),
-      healthSnapshots
+      healthSucceeded,
+      healthSnapshots && healthSucceeded
         ? {
             enabled: healthOn,
             taken: healthSnapshots.started?.taken ?? null,

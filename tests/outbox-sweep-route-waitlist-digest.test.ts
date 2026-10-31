@@ -279,7 +279,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
     expect(JSON.stringify(recorded())).not.toContain("secret-key-name");
   });
 
-  it("records every step that threw as FAILED, and the retention row holds null for the one that failed", async () => {
+  it("records every step that threw as FAILED, and a failed run sends no summary, so the last good one is kept", async () => {
     mocks.runAlertScan.mockRejectedValueOnce(new Error("synthetic"));
     mocks.reconcileDeadlineReminders.mockRejectedValueOnce(new Error("synthetic"));
     mocks.sendDueLocationWaitlistDigests.mockRejectedValueOnce(new Error("synthetic"));
@@ -297,7 +297,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
       expect(recorded()).toContainEqual([job, "FAILED", undefined]);
     }
     expect(recorded()).toContainEqual(["health-snapshot-sweep", "FAILED", undefined]);
-    expect(recorded()).toContainEqual(["retention-cleanup", "FAILED", { community: 5, alertFeed: null, analytics: 7 }]);
+    expect(recorded()).toContainEqual(["retention-cleanup", "FAILED", undefined]);
   });
 
   it("records the health sweep as a success with health records off, where no seal result is expected", async () => {

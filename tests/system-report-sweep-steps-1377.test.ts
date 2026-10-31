@@ -107,10 +107,22 @@ describe("a step switched off in the notification settings", () => {
 });
 
 describe("sealed health copies with health records off", () => {
-  it("reads Off as a count-only note from the live setting, whatever the last run says", () => {
-    for (const r of [never, failing, stale, run({ summary: { enabled: false, taken: null, sealFailed: null, deleted: 0, heldSkipped: 0 } })]) {
-      expect(healthSnapshotFields("k", r, now, false)).toMatchObject({ state: "info", resultText: "Off. Health records are switched off, so no health copies are sealed." });
-    }
+  const off = (r: JobRun | null) => healthSnapshotFields("k", r, now, false);
+  const OFF = "Off. Health records are switched off, so no health copies are sealed.";
+
+  it("reads Off as a count-only note when it never ran or its last run was fine", () => {
+    expect(off(never)).toMatchObject({ state: "info", resultText: OFF });
+    expect(off(run({ summary: { enabled: false, taken: null, sealFailed: null, deleted: 3, heldSkipped: 0 } }))).toMatchObject({ state: "info", resultText: `${OFF} 3 expired copies deleted.` });
+    expect(off(run({ summary: null })).state).toBe("info");
+  });
+
+  it("still surfaces a failed or stale deletion while off, because expired copies are deleted either way", () => {
+    expect(off(failing).state).toBe("attention");
+    expect(off(stale).state).toBe("watch");
+  });
+
+  it("is unavailable, not a reassuring Off, when the stored run cannot be read", () => {
+    expect(off(null).state).toBe("unavailable");
   });
 });
 
@@ -150,8 +162,8 @@ describe("alert delivery", () => {
 });
 
 describe("sealed health copies when the stored run cannot be read", () => {
-  it("is unavailable when on, and still Off when off", () => {
+  it("is unavailable whether on or off", () => {
     expect(healthSnapshotFields("k", null, now, true).state).toBe("unavailable");
-    expect(healthSnapshotFields("k", null, now, false).state).toBe("info");
+    expect(healthSnapshotFields("k", null, now, false).state).toBe("unavailable");
   });
 });
