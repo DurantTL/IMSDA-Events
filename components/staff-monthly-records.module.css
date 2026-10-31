@@ -30,12 +30,7 @@
 .club { font-weight: 400; overflow-wrap: anywhere; }
 .club small { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .name { font-weight: 700; color: var(--ink); }
-.badge { display: inline-flex; gap: 4px; padding: 4px 10px; border-radius: 8px; background: var(--imsda-navy-soft); color: var(--imsda-navy); font-weight: 700; white-space: nowrap; }
-.badge[data-kind="MISSING"] { background: #fde8ea; color: #8a1220; }
-.badge[data-kind="DRAFT"], .badge[data-kind="DUE"] { background: var(--imsda-gold-soft); color: #76520b; }
-.badge[data-kind="REVIEWED"] { background: #e5f3eb; color: #245c3b; }
-.badge[data-kind="NOT_YET_DUE"] { background: #eef2f4; color: #3f4b52; }
-.late { margin-left: 6px; color: #8a1220; font-weight: 700; }
+.chipRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .points { font-variant-numeric: tabular-nums; }
 .rowLink { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; font-weight: 700; }
 .showAll { justify-self: start; min-height: 44px; }

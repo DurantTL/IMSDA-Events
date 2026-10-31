@@ -52,6 +52,8 @@
   --green: #267357;
   --green-soft: #e5f3ed;
   --coral: #a95549;
+  --coral-soft: #fff1ef;
+  --gold-text: #805807;
   --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
   --sidebar-width: 260px;
 }
@@ -1187,16 +1189,16 @@ textarea:focus-visible {
 .person-row small,
 .arrival-row small { margin-top: 3px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.66rem); }
 
-.status-chip { padding: 5px 8px; font-size: max(var(--type-floor, 0px), 0.61rem); }
+.status-chip { padding: 5px 10px; font-size: max(var(--type-floor, 0px), 0.61rem); }
 .tag-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .tag-chip { color: #fff; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); gap: 8px; }
 .tag-chip .text-button { color: inherit; }
 .status-chip.green { background: var(--green-soft); color: var(--green); }
-.status-chip.gold { background: var(--imsda-gold-soft); color: #805807; }
+.status-chip.gold { background: var(--imsda-gold-soft); color: var(--gold-text); }
 .status-chip.purple { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
-.status-chip.coral { background: #fff1ef; color: var(--coral); }
+.status-chip.coral { background: var(--coral-soft); color: var(--coral); }
 /* Informational, not a status. */
-.status-chip.neutral { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.status-chip.neutral { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 4px 9px; }
 
 .attention-row {
   display: grid;

@@ -1,9 +1,6 @@
 /* Homepage & site content editor (#111). Text is 0.875rem or larger; every control is at least 44px tall. */
 .workspace { display: grid; gap: 16px; padding-bottom: 32px; }
 .stateBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.9rem); }
-.chip { display: inline-flex; align-items: center; min-height: 28px; border-radius: 999px; background: var(--imsda-navy-soft); color: var(--imsda-navy-deep); padding: 2px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.chipWarn { background: var(--imsda-gold-soft); color: #5b3b00; }
-.chipGood { background: #e5f3ed; color: #1b5a43; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .actions button, .actions a { min-height: 44px; }
 .stack { display: grid; gap: 12px; }

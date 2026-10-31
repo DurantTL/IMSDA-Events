@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReportSummaryBand, RecordsByMonthChart, YearStrip } from "@/components/club-report-charts";
 import {
   staffRecordKindDisplay,
+  staffRecordKindTone,
   staffRecordStatusLabel,
   staffRecordsHref,
   type StaffRecordsView,
@@ -91,8 +92,10 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
                     <th className={styles.club} role="rowheader" scope="row" translate="no"><span className={styles.name}>{row.name}</span>{row.church && <small>{row.church}</small>}</th>
                     <td className={styles.status} role="cell">
                       <span className="sr-only">{view.monthLabel} record: </span>
-                      <span className={styles.badge} data-kind={row.kind}><span aria-hidden="true">{display.icon}</span> {display.word}</span>
-                      {row.late && <span className={styles.late}>late</span>}
+                      <span className={styles.chipRow}>
+                        <span className={`status-chip ${staffRecordKindTone[row.kind]}`} data-kind={row.kind}><span aria-hidden="true">{display.icon}</span> {display.word}</span>
+                        {row.late && <span className="status-chip coral">Late</span>}
+                      </span>
                     </td>
                     <td className={styles.points} role="cell"><span className="sr-only">Points: </span>{row.points === null ? "—" : row.points.toLocaleString("en-US")}</td>
                     <td className={styles.stripCell} role="cell"><YearStrip cells={row.cells} clubName={row.name} selectedMonth={view.month} variant="staff" /></td>

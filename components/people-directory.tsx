@@ -34,7 +34,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
   return (
     <details className={styles.panel}>
       <summary className={styles.panelSummary}>
-        Filters{count > 0 ? <span className={styles.badge}>{count} active</span> : null}
+        Filters{count > 0 ? <span className="count-badge">{count} active</span> : null}
       </summary>
       <form action="/admin/people" className={styles.panelForm} method="get">
         {query ? <input name="q" type="hidden" value={query} /> : null}
@@ -158,9 +158,9 @@ export function PeopleDirectory({
                 <small translate="no">{row.email}</small>
               </Link>
               <ul aria-label={scope === "full" ? "Account kinds and sign-in" : "Account kinds"} className={styles.chips}>
-                {row.kinds.map((kind) => <li className={`${styles.chip} ${styles.kind}`} key={kind}>{kind}</li>)}
+                {row.kinds.map((kind) => <li className="status-chip neutral" key={kind}>{kind}</li>)}
                 {row.signIn.map((chip) => (
-                  <li className={`${styles.chip} ${styles[chip.tone]}`} key={chip.side}>
+                  <li className={`status-chip ${chip.tone}`} key={chip.side}>
                     {row.signIn.length > 1 ? `${chip.side}: ` : ""}{chip.label}
                   </li>
                 ))}
