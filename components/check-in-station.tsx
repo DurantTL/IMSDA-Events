@@ -198,7 +198,7 @@ export function CheckInStationScreen({
           <h1>{eventName}</h1>
           <p className={styles.cisSub}>{stationLabel ? `Station: ${stationLabel}` : "Staff-run station"}</p>
         </div>
-        <button type="button" className={`${styles.cisButton} ${styles.cisButtonQuiet}`} onClick={() => { setStopError(""); setStopping(true); }}>
+        <button type="button" className={`secondary-button ${styles.large}`} onClick={() => { setStopError(""); setStopping(true); }}>
           Stop station
         </button>
       </header>
@@ -219,7 +219,7 @@ export function CheckInStationScreen({
             enterKeyHint="search"
             aria-describedby="cis-code-help"
           />
-          <button type="submit" className={`${styles.cisButton} ${styles.cisButtonPrimary}`} disabled={busy !== "" || !entry.trim()}>
+          <button type="submit" className={`primary-button ${styles.large}`} disabled={busy !== "" || !entry.trim()}>
             {busy === "lookup" ? "Looking up..." : "Find family"}
           </button>
         </div>
@@ -267,13 +267,13 @@ export function CheckInStationScreen({
           <div className={styles.cisActions}>
             <button
               type="button"
-              className={`${styles.cisButton} ${styles.cisButtonPrimary}`}
+              className={`primary-button ${styles.large}`}
               disabled={busy !== "" || selected.size === 0}
               onClick={confirmCheckIn}
             >
               {busy === "confirm" ? "Checking in..." : `Confirm check-in${selected.size ? ` (${selected.size})` : ""}`}
             </button>
-            <button type="button" className={styles.cisButton} onClick={reset} disabled={busy !== ""}>Next person</button>
+            <button type="button" className={`secondary-button ${styles.large}`} onClick={reset} disabled={busy !== ""}>Next person</button>
           </div>
 
           <PaymentPanel
@@ -443,7 +443,7 @@ function PaymentPanel({
                     />
                   </>
                 )}
-                <button type="submit" className={`${styles.cisButton} ${styles.cisButtonPrimary}`} disabled={busy}>
+                <button type="submit" className={`primary-button ${styles.large}`} disabled={busy}>
                   {busy ? "Saving..." : method === "CASH" ? "Record cash received" : "Record check received"}
                 </button>
               </fieldset>
@@ -451,7 +451,7 @@ function PaymentPanel({
           )}
 
           {!squareOpen ? (
-            <button type="button" className={styles.cisButton} onClick={() => { setSquareOpen(true); setError(""); }}>
+            <button type="button" className={`secondary-button ${styles.large}`} onClick={() => { setSquareOpen(true); setError(""); }}>
               <Square aria-hidden="true" size={16} /> Paid by card in Square app
             </button>
           ) : (
@@ -464,8 +464,8 @@ function PaymentPanel({
                 <label htmlFor="cis-square-receipt">Receipt number (optional)</label>
                 <input id="cis-square-receipt" autoComplete="off" value={receipt} maxLength={60} onChange={(event) => setReceipt(event.target.value)} />
                 <div className={styles.cisActions}>
-                  <button type="submit" className={`${styles.cisButton} ${styles.cisButtonPrimary}`} disabled={busy}>Note card payment</button>
-                  <button type="button" className={styles.cisButton} onClick={() => setSquareOpen(false)} disabled={busy}>Cancel</button>
+                  <button type="submit" className={`primary-button ${styles.large}`} disabled={busy}>Note card payment</button>
+                  <button type="button" className={`secondary-button ${styles.large}`} onClick={() => setSquareOpen(false)} disabled={busy}>Cancel</button>
                 </div>
               </fieldset>
             </form>

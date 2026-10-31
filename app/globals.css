@@ -1133,6 +1133,8 @@ select:focus-visible {
   font-size: max(var(--type-body-floor, 0px), 0.66rem);
   font-weight: 700;
 }
+.text-button:not(:where(td, th, p, small, summary, label, li, dd, dt) *) { min-height: var(--target-touch, 44px); }
+.text-button:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
 
 .action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
 .action-grid .action-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
@@ -1249,11 +1251,14 @@ select:focus-visible {
 /* The native clear "x" is hidden inside a .search-field (it has its own 44px clear button); other search inputs keep it. */
 .search-field input[type="search"]::-webkit-search-cancel-button, .search-field input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .secondary-button,
-.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: var(--target-touch, 44px); border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; transition: background-color 120ms, border-color 120ms; }
 .secondary-button { border: 1px solid var(--line); background: #f9fbfb; color: var(--imsda-navy); text-decoration: none; }
 .primary-button { border: 1px solid var(--imsda-navy); background: var(--imsda-navy); color: white; }
+.primary-button:hover:not(:disabled) { background: var(--imsda-navy-deep); border-color: var(--imsda-navy-deep); }
+.secondary-button:hover:not(:disabled) { background: var(--imsda-navy-soft); border-color: #b9ccd4; }
 .primary-button:disabled,
-.secondary-button:disabled { cursor: wait; opacity: 0.58; }
+.secondary-button:disabled { cursor: not-allowed; opacity: 0.58; }
+@media (prefers-reduced-motion: reduce) { .primary-button, .secondary-button { transition: none; } }
 
 .filter-field {
   display: inline-flex;
@@ -10465,6 +10470,7 @@ button[aria-busy="true"] { cursor: progress; }
 .danger-zone-item > p { margin: 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.8rem); line-height: 1.55; }
 .danger-outline-button { border: 2px solid var(--danger, #8f3a30); background: #fff; color: var(--danger, #8f3a30); }
 .danger-outline-button:hover:not(:disabled) { background: #fbe9e5; }
+.danger-outline-button { min-height: var(--target-touch, 44px); }
 @media screen { .danger-zone .danger-outline-button { min-height: var(--target-desktop, 36px); } }
 @media only screen and (max-width: 768px) { .danger-zone .danger-outline-button { min-height: var(--target-touch, 44px); } }
 /* Bulk and scope previews inside a confirmation. */

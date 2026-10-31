@@ -44,17 +44,22 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 44px;
   text-align: left;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--field-radius, 10px);
   background: #fff;
   padding: 10px 12px;
   cursor: pointer;
 }
 
+.clubButton:hover {
+  border-color: var(--field-border);
+}
+
 .clubButton.selected {
-  border-color: var(--imsda-purple, #4a2e83);
-  background: #f6f1fb;
+  border-color: var(--imsda-purple);
+  background: var(--imsda-purple-soft);
 }
 
 .clubIcon {
@@ -168,9 +173,13 @@
 
 .retryButton:focus-visible,
 .resetButton:focus-visible,
-.viewToggle button:focus-visible,
-.clubButton:focus-visible {
+.viewToggle button:focus-visible {
   outline: 3px solid #f9a13a;
+  outline-offset: 2px;
+}
+
+.clubButton:focus-visible {
+  outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -241,10 +250,6 @@
     border-color: var(--imsda-purple, #4a2e83);
     background: #f6f1fb;
     font-weight: 600;
-  }
-
-  .clubButton {
-    min-height: 44px;
   }
 
   .content[data-view="list"] .mapPane,
