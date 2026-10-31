@@ -20,6 +20,8 @@ export async function checkApplePayFileReachable(
       method: "GET",
       signal: AbortSignal.timeout(options.timeoutMs ?? REACHABILITY_TIMEOUT_MS),
     });
+    // The body is never read; release it so the connection is freed straight away.
+    await response.body?.cancel().catch(() => {});
     if (response.ok) return done("reachable");
     return done(response.status === 401 || response.status === 403 ? "refused" : "unavailable");
   } catch {

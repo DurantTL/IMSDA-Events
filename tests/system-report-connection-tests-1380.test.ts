@@ -59,7 +59,7 @@ describe("Google sign-in keys", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("leaves the real sign-in key cache alone", async () => {
+  it("makes its own request and never the sign-in key fetch (the sign-in cache is private to google.ts)", async () => {
     // Sign-in's own fetch uses the global fetch; the test uses only the injected one, so the global is never called.
     const globalFetch = vi.fn();
     vi.stubGlobal("fetch", globalFetch);
