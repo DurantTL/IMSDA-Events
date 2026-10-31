@@ -66,10 +66,10 @@ describe("pricing self-test", () => {
 
 describe("pure mappers", () => {
   it("capacity holds: 0 is OK, any is watch with a link and counts only", () => {
-    const base = { firstEventHref: (id: string) => `/registrations?event=${id}`, readAt: at };
+    const base = { firstEventHref: (id: string) => `/people?event=${id}`, readAt: at };
     expect(unreleasedHoldsFields("k", { ...base, total: 0, firstEventId: null, eventNames: "" }).state).toBe("ok");
     const row = unreleasedHoldsFields("k", { ...base, total: 2, firstEventId: "e1", eventNames: "Synthetic Event" });
-    expect(row).toMatchObject({ state: "watch", fixHref: "/registrations?event=e1" });
+    expect(row).toMatchObject({ state: "watch", fixHref: "/people?event=e1" });
     expect(row.resultText).toContain("2 capacity holds are");
   });
 
@@ -149,7 +149,7 @@ describe("the registration provider", () => {
     mocks.getJobRun.mockResolvedValue({ status: "ok", lastSucceededAt: at, lastFailedAt: null, ageMs: 1000, summary: { expired: 0, events: 0 } });
     const rows = await provider.load(now, createReportContext(now));
     const byKey = new Map(rows.map((row) => [row.key, row]));
-    expect(byKey.get("capacity-holds-released")).toMatchObject({ state: "watch", fixHref: "/registrations?event=e1" });
+    expect(byKey.get("capacity-holds-released")).toMatchObject({ state: "watch", fixHref: "/people?event=e1" });
     expect(byKey.get("open-without-form")).toMatchObject({ state: "attention", fixHref: "/registration-builder?event=e2" });
     expect(byKey.get("open-without-form")?.resultText).toContain("Synthetic No Form");
     expect(byKey.get("registrations-received")).toMatchObject({ state: "info" });

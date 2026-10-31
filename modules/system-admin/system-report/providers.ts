@@ -481,7 +481,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       key: "capacity",
       issues: (health) => health.capacity,
       noun: (count) => (count === 1 ? "event or choice is near full" : "events or choices are near full"),
-      href: (eventId) => eventHref("/registrations", eventId),
+      href: (eventId) => eventHref("/people", eventId),
       none: "None near full.",
     }),
   ]),
@@ -548,9 +548,9 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
   defineProvider("registration", [
     m("pricing-self-test", "Pricing self-test", "The pricing arithmetic (form total, early-bird price, quantity, promo code, deposit, card fee) gives the known answers for one fixed example. It reads no registration.", "/registration-builder", "Open the form builder"),
-    m("capacity-holds-released", "Capacity holds released", "No capacity hold is still kept by a cancelled or waitlisted registration.", "/registrations", "Open registrations"),
+    m("capacity-holds-released", "Capacity holds released", "No capacity hold is still kept by a cancelled or waitlisted registration.", "/people", "Open registrations"),
     m("open-without-form", "Open events have a form", "Every event that is open for registration has a published registration form.", "/registration-builder", "Open the form builder"),
-    m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/registrations", "Open registrations"),
+    m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/people", "Open registrations"),
     m("general-link-expiry", "Pending-team expiry", "The last sweep's expiry of general-link teams still waiting 30 days after their event ended.", "/events-admin", "Open events"),
   ], async (ctx) => {
     let pricing: Awaited<ReturnType<Reader>>[number];
@@ -576,7 +576,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
         holds = unreleasedHoldsFields("capacity-holds-released", {
           total: read.value.reduce((sum, row) => sum + row.count, 0),
           firstEventId: read.value[0]?.eventId ?? null,
-          firstEventHref: (eventId) => eventHref("/registrations", eventId),
+          firstEventHref: (eventId) => eventHref("/people", eventId),
           eventNames: namesOf(named),
           readAt: iso(read.readAt),
         });
