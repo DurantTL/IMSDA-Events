@@ -101,7 +101,7 @@ export function rejectedNoticeFields(
       resultText: `No rejected Square or Resend notices stored in the last 7 days. An alert webhook is set up, and a rejection whose alert could not be delivered is not kept, so this cannot show that none happened.`,
     };
   }
-  return { ...base, state: "ok", resultText: `No rejected Square or Resend notices in the last 7 days. No alert webhook is set up, so every rejection is kept. ${KEPT_NOTE}` };
+  return { ...base, state: "ok", resultText: `No rejected Square or Resend notices in the last 7 days. No alert webhook is set up, so every rejection is kept.` };
 }
 
 export function suppressionFields(key: string, input: { bounces: number; complaints: number; now: Date }): NoticeFields {

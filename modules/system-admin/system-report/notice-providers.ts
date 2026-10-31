@@ -118,11 +118,14 @@ export function buildNoticeProviders(define: typeof defineProvider): SignalProvi
         return { squareRejectedAt: at(SQUARE_REJECTED_KEY), resendRejectedAt: at(EMAIL_REJECTED_KEY) };
       });
       const config = await activeEmail(ctx);
+      const alertDelivery = await ctx.once("notices:alert-delivery", async () => isAlertDeliveryConfigured());
       rows.push(!rejected.ok
         ? triedRow("rejected-notices", rejected.readAt)
         : !config.ok
           ? triedRow("rejected-notices", config.readAt)
-          : rejectedNoticeFields("rejected-notices", { ...rejected.value, active: config.value.active, alertDeliveryConfigured: isAlertDeliveryConfigured(), now: ctx.now }));
+          : !alertDelivery.ok
+            ? triedRow("rejected-notices", alertDelivery.readAt)
+            : rejectedNoticeFields("rejected-notices", { ...rejected.value, active: config.value.active, alertDeliveryConfigured: alertDelivery.value, now: ctx.now }));
 
       // 5. Bounces and complaints.
       const suppressed = await ctx.once("notices:suppressions", () =>
