@@ -33,6 +33,11 @@ export async function sealHealthSnapshotAfterCheckIn(eventId: string, attendeeId
   }
 }
 
+/** Whether the sealed-copy sweep will seal anything: the sweep route records this beside its counts (#1377). */
+export function sealedCopiesEnabled() {
+  return healthRecordsEnabled();
+}
+
 /**
  * Called by the scheduled sweep (the same authenticated outbox sweep that runs the
  * other periodic work). Takes the event-start copies that are due and runs the
