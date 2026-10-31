@@ -31,7 +31,8 @@ describe("markdownToPlainText (#1411 A6)", () => {
     expect(markdownToPlainText("Hello Mary-Ann.\nSee you soon.")).toBe("Hello Mary-Ann.\nSee you soon.");
   });
 
-  it("drops images instead of turning them into links", () => {
-    expect(markdownToPlainText("Scan:\n\n![Check-in QR](https://x.example.test/qr.png)\n\nThanks")).toBe("Scan:\n\n\n\nThanks");
+  it("keeps an image's address so a QR-only message still works", () => {
+    expect(markdownToPlainText("Scan:\n\n![Check-in QR](https://x.example.test/qr.png)\n\nThanks")).toBe("Scan:\n\nCheck-in QR: https://x.example.test/qr.png\n\nThanks");
+    expect(markdownToPlainText("![](https://x.example.test/qr.png)")).toBe("https://x.example.test/qr.png");
   });
 });

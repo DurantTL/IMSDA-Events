@@ -77,12 +77,15 @@ export function plainTextFromEscapedMarkdown(value: string) {
  * The text part of an email is read as plain text, so the Markdown the body is
  * authored in is flattened here, at send time (the stored snapshot is left as
  * written): heading marks and bold or italic wrappers are dropped and
- * `[label](url)` becomes `label: url`. Idempotent on text that has no Markdown.
+ * `[label](url)` and `![alt](url)` become `label: url`. Idempotent on text that has no Markdown.
  */
 export function markdownToPlainText(value: string) {
   return value
-    // An image has no use in plain text (a check-in QR is also shown as a link): drop it entirely.
-    .replace(/!\[[^\]\n]*\]\([^)\s]*\)/g, "")
+    // An image cannot show in plain text, so keep its address (a check-in QR is
+    // sometimes only an image): `![alt](url)` becomes `alt: url`, or just `url`.
+    .replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (_match, alt: string, url: string) =>
+      alt.trim() ? `${alt.trim()}: ${url}` : url,
+    )
     .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, label: string, url: string) =>
       label.trim() === url ? url : `${label}: ${url}`,
     )
