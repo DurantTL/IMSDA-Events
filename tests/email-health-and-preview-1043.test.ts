@@ -1,7 +1,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { EmailDeliverySection } from "@/components/email-delivery-section";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
+import { EmailDeliverySection, deliveryHeading } from "@/components/email-delivery-section";
 import { buildAttentionSummary, type AttentionSignals } from "@/modules/system-admin/attention-model";
 import { buildEmailHealth } from "@/modules/system-admin/email-health";
 import { buildCentralEmailPreview, formatCentralEmailPreview } from "@/modules/communications/central-email-preview";
@@ -112,5 +114,13 @@ describe("Delivery & sender states on the Email page (#1043)", () => {
     expect(render({ platformConfigured: false })).not.toContain("emails are waiting");
     expect(render({ platformConfigured: false })).toContain('data-email-environment="not-configured"');
     expect(render({ platformConfigured: true })).toContain('data-email-environment="configured"');
+  });
+
+  it("words the heading for the real state", () => {
+    expect(render({ platformConfigured: true })).toContain("<h2>Real email is on for every event</h2>");
+    expect(render({ platformConfigured: false, senderMissing: true })).toContain("<h2>Emails are waiting for a central sender</h2>");
+    expect(render({ platformConfigured: false, senderMissing: true })).not.toContain("Real email is on for every event");
+    expect(render({ platformConfigured: false })).toContain("<h2>Email is captured here, not sent</h2>");
+    expect(deliveryHeading(false, false)).toBe("Email is captured here, not sent");
   });
 });
