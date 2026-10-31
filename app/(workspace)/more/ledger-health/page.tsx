@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -11,10 +12,6 @@ import styles from "../health/operational-health.module.css";
 export const metadata: Metadata = { title: staffPageTitles.ledgerCheck };
 
 const visibleRowLimit = 50;
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 function words(value: string) {
   return value
@@ -111,7 +108,7 @@ export default async function LedgerCheckPage({
                     </span>
                   </div>
                   <p>
-                    Current total {money(row.expectedCents)} · Ledger {money(row.ledgerCents)} · Difference {money(row.differenceCents)}
+                    Current total {formatCents(row.expectedCents)} · Ledger {formatCents(row.ledgerCents)} · Difference {formatCents(row.differenceCents)}
                   </p>
                 </div>
                 <Link className={styles.resolveLink} href={`/finance?${eventQuery}&registration=${encodeURIComponent(row.registrationId)}`}>

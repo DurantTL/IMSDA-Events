@@ -16,6 +16,7 @@
  * code is ever printed.
  */
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { InvoiceSnapshot } from "@/modules/invoices/domain";
 import type { InvoiceHeader, InvoiceLayout } from "@/modules/invoices/invoice-layout";
@@ -49,7 +50,7 @@ export const MUTED = rgb(0.38, 0.42, 0.45);
 export const RULE = rgb(0.8, 0.84, 0.86);
 
 export function formatPdfMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+  return formatCents(cents);
 }
 
 function formatIssueDate(date: Date, timezone: string) {

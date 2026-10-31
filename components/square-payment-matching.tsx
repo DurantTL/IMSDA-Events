@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CreditCard, Link2, Search, X } from "lucide-react";
@@ -75,13 +76,6 @@ function trailingName(note: string | null) {
   const segments = note.split(/[\u2013\u2014|]/);
   const tail = segments[segments.length - 1]?.trim() ?? "";
   return segments.length > 1 && tail.length >= 3 && tail.length <= 60 ? tail : "";
-}
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
 }
 
 function when(value: string | null) {
@@ -190,9 +184,9 @@ export function SquarePaymentMatching({
       ));
       setAttached((current) => [
         ...current,
-        `${money(result.amountCents)} attached to ${result.confirmationCode}${
+        `${formatCents(result.amountCents)} attached to ${result.confirmationCode}${
           result.overpaidCents > 0
-            ? ` · ${money(result.overpaidCents)} more than the balance`
+            ? ` · ${formatCents(result.overpaidCents)} more than the balance`
             : ""
         }`,
       ]);
@@ -278,9 +272,9 @@ export function SquarePaymentMatching({
                 </small>
               )}
             </span>
-            <span>{money(finding.amountCents)}</span>
+            <span>{formatCents(finding.amountCents)}</span>
             <span>
-              {finding.balanceCents === null ? "—" : money(finding.balanceCents)}
+              {finding.balanceCents === null ? "—" : formatCents(finding.balanceCents)}
             </span>
             <span>{findingCopy[finding.code]?.label ?? finding.code}</span>
             <span>Match</span>
@@ -334,7 +328,7 @@ export function SquarePaymentMatching({
           >
             <div className="modal-head">
               <div>
-                <p className="eyebrow">{money(active.amountCents)} · {when(active.createdAt)}</p>
+                <p className="eyebrow">{formatCents(active.amountCents)} · {when(active.createdAt)}</p>
                 <h2 id="square-match-title">Attach this Square payment</h2>
               </div>
               <button
@@ -360,8 +354,8 @@ export function SquarePaymentMatching({
               {selected && gap !== null && gap > 0 && (
                 <div className="inline-notice" role="status">
                   <AlertTriangle aria-hidden="true" size={16} /> Square took{" "}
-                  {money(gap)} more than this registration&rsquo;s balance. The
-                  full {money(active.amountCents)} is recorded as received, so
+                  {formatCents(gap)} more than this registration&rsquo;s balance. The
+                  full {formatCents(active.amountCents)} is recorded as received, so
                   the registration will show an overpayment until someone
                   adjusts its total.
                 </div>
@@ -399,8 +393,8 @@ export function SquarePaymentMatching({
                           </strong>
                           <small>
                             {registration.confirmationCode} · balance{" "}
-                            {money(registration.balanceCents)} of{" "}
-                            {money(registration.totalAmountCents)}
+                            {formatCents(registration.balanceCents)} of{" "}
+                            {formatCents(registration.totalAmountCents)}
                           </small>
                         </span>
                       </label>
@@ -424,16 +418,16 @@ export function SquarePaymentMatching({
                   <ul>
                     {(duplicateWarning.details.existingPayments ?? []).map((existing) => (
                       <li key={existing.id}>
-                        {money(existing.amountCents)} · reference{" "}
+                        {formatCents(existing.amountCents)} · reference{" "}
                         {existing.externalReference ?? "none"}
                       </li>
                     ))}
                   </ul>
                   <p>
                     Attaching this would take the registration to{" "}
-                    {money(duplicateWarning.details.resultingPaidCents ?? 0)}{" "}
+                    {formatCents(duplicateWarning.details.resultingPaidCents ?? 0)}{" "}
                     received against a{" "}
-                    {money(duplicateWarning.details.totalCents ?? 0)} total.
+                    {formatCents(duplicateWarning.details.totalCents ?? 0)} total.
                   </p>
                   <p>
                     The spreadsheet import recorded whatever payment reference

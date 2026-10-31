@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { resolveFieldPrices, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
@@ -102,7 +103,7 @@ export function formatCardDateRange(firstDay: string | null, lastDay: string | n
 }
 
 export function formatCardMoney(cents: number) {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return formatCents(cents);
 }
 
 function dayBefore(calendarDate: string) {

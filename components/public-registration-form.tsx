@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
 import { useConfirm } from "@/components/use-confirm";
@@ -383,11 +384,6 @@ export type PublicRegistrationFormProps = {
   };
 };
 
-const moneyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
 /** What a promo quote depends on: the pre-discount lines and the processing fee. */
 function promoCalculationBasis(calculation: DisplayedCalculation) {
   return JSON.stringify([
@@ -395,10 +391,6 @@ function promoCalculationBasis(calculation: DisplayedCalculation) {
     calculation.processingFeeCents ?? null,
     calculation.lineItems.map((item) => [item.key, item.amountCents, item.attendeeIndex ?? null]),
   ]);
-}
-
-function money(cents: number) {
-  return moneyFormatter.format(cents / 100);
 }
 
 function formatEventDates(startValue: string, endValue: string, timeZone: string) {
@@ -1220,7 +1212,7 @@ export function PublicRegistrationForm({
       setPromoCodeQuote(quote);
       setPromoQuoteBasis(requestBasis);
       setPromoCodeNotice(
-        `${quote.promoCode} applied${quote.discountAmountCents === undefined ? "." : ` — ${money(quote.discountAmountCents)} off.`}${quote.sponsoredBy ? ` Sponsored by ${quote.sponsoredBy}.` : ""}`,
+        `${quote.promoCode} applied${quote.discountAmountCents === undefined ? "." : ` — ${formatCents(quote.discountAmountCents)} off.`}${quote.sponsoredBy ? ` Sponsored by ${quote.sponsoredBy}.` : ""}`,
       );
       setIdempotencyKey(null);
     } catch {
@@ -1290,7 +1282,7 @@ export function PublicRegistrationForm({
     if (issue) return { ok: false, text: issue.message };
     const applied = activeAttendeePromo.attendeeDiscounts.find((candidate) => candidate.attendeeIndex === attendeeIndex);
     const sponsor = applied ? activeAttendeePromo.sponsors?.[applied.code.normalize("NFKC").trim().toUpperCase()] : undefined;
-    return applied ? { ok: true, text: `${applied.code} applied — ${money(applied.discountAmountCents)} off for this person.${sponsor ? ` Sponsored by ${sponsor}.` : ""}` } : null;
+    return applied ? { ok: true, text: `${applied.code} applied — ${formatCents(applied.discountAmountCents)} off for this person.${sponsor ? ` Sponsored by ${sponsor}.` : ""}` } : null;
   }
 
   // Price changed under checked codes: check them again (debounced).
@@ -1715,7 +1707,7 @@ export function PublicRegistrationForm({
     const mode = getAvailabilityMode(field);
     const price = choicePrice(field, option);
     const details: string[] = [];
-    if (price !== undefined) details.push(money(price));
+    if (price !== undefined) details.push(formatCents(price));
     if (mode === "RANKED_INTEREST") {
       details.push(`${stats.first} first choice`, `${stats.second} second choice`);
       details.push(`${stats.total} total interest`);
@@ -1987,7 +1979,7 @@ export function PublicRegistrationForm({
       return (
         <div className={`${wrapperClass} public-registration-calculated`} key={field.id}>
           <span><strong>{field.label}</strong><small>Automatically included in your order.</small></span>
-          <strong>{lineItem ? <span translate="no">{money(lineItem.amountCents)}</span> : "Included"}</strong>
+          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
         </div>
       );
     }
@@ -2923,7 +2915,7 @@ export function PublicRegistrationForm({
               <p>
                 {lodgingOffer.categories.find((option) => option.category === lodgingChoice.category)?.label ?? "Lodging"}, {chosenNights(lodgingChoice).length} night{chosenNights(lodgingChoice).length === 1 ? "" : "s"}
                 {" "}({lodgingChoice.firstNight} to {lodgingChoice.lastNight}), {lodgingChoice.partySize} {lodgingChoice.partySize === 1 ? "person" : "people"}
-                {lodgingLine ? `. Lodging charge ${lodgingLine.amountCents < 0 ? "-" : ""}$${(Math.abs(lodgingLine.amountCents) / 100).toFixed(2)} is part of your total below.` : joiningWaitlist ? ". Saved with your waitlist request; nothing is charged for lodging now." : ". Included in your registration."}
+                {lodgingLine ? `. Lodging charge ${formatCents(lodgingLine.amountCents, { grouping: false })} is part of your total below.` : joiningWaitlist ? ". Saved with your waitlist request; nothing is charged for lodging now." : ". Included in your registration."}
               </p>
             )}
             {lodgingSubmission && ((lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)) > 0 && <p>Roommate requests: {(lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)}. Each stays private until the other person asks for you too, or the event team approves it.</p>}
@@ -2984,32 +2976,32 @@ export function PublicRegistrationForm({
                     {item.label}
                     {item.pricingLabel && <small>{item.pricingLabel}</small>}
                   </span>
-                  <strong translate="no">{money(item.amountCents)}</strong>
+                  <strong translate="no">{formatCents(item.amountCents)}</strong>
                 </div>
               ))}
-              <div><span>Subtotal</span><strong translate="no">{money(displayedPreDiscountSubtotalCents)}</strong></div>
+              <div><span>Subtotal</span><strong translate="no">{formatCents(displayedPreDiscountSubtotalCents)}</strong></div>
               {displayedDiscountCents > 0 && (
                 <>
                   <div className="is-discount">
                     <span>Promo code {displayedPromoCode}</span>
-                    <strong translate="no">−{money(displayedDiscountCents)}</strong>
+                    <strong translate="no">−{formatCents(displayedDiscountCents)}</strong>
                   </div>
                   <div>
                     <span>Discounted subtotal</span>
-                    <strong translate="no">{money(calculation.subtotalCents ?? 0)}</strong>
+                    <strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong>
                   </div>
                 </>
               )}
               {(calculation.processingFeeCents ?? 0) > 0 && (
                 <div>
                   <span>Card processing</span>
-                  <strong translate="no">{money(calculation.processingFeeCents ?? 0)}</strong>
+                  <strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong>
                 </div>
               )}
               <div className="is-total">
                 <span>{joiningWaitlist ? "Estimated if promoted" : "Total"}</span>
                 <strong translate="no">
-                  {money(
+                  {formatCents(
                     (joiningWaitlist
                       ? calculation.subtotalCents
                       : calculation.totalCents) ?? 0,
@@ -3394,7 +3386,7 @@ export function PublicRegistrationForm({
                 pricingDate: formatPricingDate(confirmation.pricingDate),
               }).map((row) => <div key={row.label}><dt>{row.label}</dt><dd translate={row.translate === false ? "no" : undefined}>{row.value}</dd></div>)}
               {confirmation.totalCents !== undefined && !deferredOrganizationBilling && (
-                <div><dt>{waitlisted ? "Estimated total if promoted" : "Total recorded"}</dt><dd translate="no">{money(confirmation.totalCents)}</dd></div>
+                <div><dt>{waitlisted ? "Estimated total if promoted" : "Total recorded"}</dt><dd translate="no">{formatCents(confirmation.totalCents)}</dd></div>
               )}
             </dl>
             {deferredOrganizationBilling && !teamConfirmation && (
@@ -3415,17 +3407,17 @@ export function PublicRegistrationForm({
               <section className="public-registration-confirmation-order" aria-label="Recorded order">
                 <h2>{waitlisted ? "Estimated order if promoted" : "Recorded order"}</h2>
                 {confirmation.lineItems.map((item) => (
-                  <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{money(item.amountCents)}</strong></div>
+                  <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{formatCents(item.amountCents)}</strong></div>
                 ))}
-                <div><span>Subtotal</span><strong translate="no">{money(confirmation.preDiscountSubtotalCents ?? 0)}</strong></div>
+                <div><span>Subtotal</span><strong translate="no">{formatCents(confirmation.preDiscountSubtotalCents ?? 0)}</strong></div>
                 {(confirmation.discountAmountCents ?? 0) > 0 && (
                   <>
-                    <div className="is-discount"><span>Promo code {confirmation.promoCode}</span><strong translate="no">−{money(confirmation.discountAmountCents ?? 0)}</strong></div>
-                    <div><span>Discounted subtotal</span><strong translate="no">{money(confirmation.subtotalCents ?? 0)}</strong></div>
+                    <div className="is-discount"><span>Promo code {confirmation.promoCode}</span><strong translate="no">−{formatCents(confirmation.discountAmountCents ?? 0)}</strong></div>
+                    <div><span>Discounted subtotal</span><strong translate="no">{formatCents(confirmation.subtotalCents ?? 0)}</strong></div>
                   </>
                 )}
-                {(confirmation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{money(confirmation.processingFeeCents ?? 0)}</strong></div>}
-                <div className="is-total"><span>Total</span><strong translate="no">{money(confirmation.totalCents ?? 0)}</strong></div>
+                {(confirmation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{formatCents(confirmation.processingFeeCents ?? 0)}</strong></div>}
+                <div className="is-total"><span>Total</span><strong translate="no">{formatCents(confirmation.totalCents ?? 0)}</strong></div>
               </section>
             )}
             {confirmation.managePath && (
@@ -3719,17 +3711,17 @@ export function PublicRegistrationForm({
           {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
             <div className="public-registration-summary-lines">
               {calculation.lineItems.map((item) => (
-                <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{money(item.amountCents)}</strong></div>
+                <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{formatCents(item.amountCents)}</strong></div>
               ))}
-              <div><span>Subtotal</span><strong translate="no">{money(displayedPreDiscountSubtotalCents)}</strong></div>
+              <div><span>Subtotal</span><strong translate="no">{formatCents(displayedPreDiscountSubtotalCents)}</strong></div>
               {displayedDiscountCents > 0 && (
                 <>
-                  <div className="is-discount"><span>Promo code {displayedPromoCode}</span><strong translate="no">−{money(displayedDiscountCents)}</strong></div>
-                  <div><span>Discounted subtotal</span><strong translate="no">{money(calculation.subtotalCents ?? 0)}</strong></div>
+                  <div className="is-discount"><span>Promo code {displayedPromoCode}</span><strong translate="no">−{formatCents(displayedDiscountCents)}</strong></div>
+                  <div><span>Discounted subtotal</span><strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong></div>
                 </>
               )}
-              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{money(calculation.processingFeeCents ?? 0)}</strong></div>}
-              <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{money((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
+              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong></div>}
+              <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{formatCents((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
             </div>
           )}
           <small className="public-registration-pricing-date">Pricing verified for {formatPricingDate(pricingDate)}</small>

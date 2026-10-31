@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, MailCheck, Send, TriangleAlert, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -22,11 +23,6 @@ type BatchOperation = {
   suppressedCount: number;
   replayed: boolean;
 };
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-    .format(cents / 100);
-}
 
 function deliveryNote(operation: BatchOperation) {
   if (operation.deliveryMode === "DISABLED") {
@@ -261,7 +257,7 @@ export function SelectedAudienceDialog({
                   <span><small>Will receive</small><strong>{preview.includedCount}</strong></span>
                   <span><small>Skipped</small><strong>{preview.skippedCount}</strong></span>
                   {templateKey === "BALANCE_REMINDER" && (
-                    <span><small>Balance covered</small><strong>{money(preview.totalBalanceCents)}</strong></span>
+                    <span><small>Balance covered</small><strong>{formatCents(preview.totalBalanceCents)}</strong></span>
                   )}
                 </div>
                 <div className="inline-notice">
@@ -309,7 +305,7 @@ export function SelectedAudienceDialog({
                           <small>{recipient.resolvedTemplateLabel}{recipient.templateVersionNumber ? ` · version ${recipient.templateVersionNumber}` : ""}</small>
                         )}
                         {(templateKey === "BALANCE_REMINDER" || recipient.resolvedTemplateKey === "REGISTRATION_CONFIRMATION_UNPAID") && (
-                          <small>Balance due: {money(recipient.balanceCents)}</small>
+                          <small>Balance due: {formatCents(recipient.balanceCents)}</small>
                         )}
                       </li>
                     ))}

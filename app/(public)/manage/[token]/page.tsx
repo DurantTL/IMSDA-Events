@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -56,15 +57,6 @@ type PublicManagePageProps = {
   params: Promise<{ token: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
-
-const moneyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function money(cents: number) {
-  return moneyFormatter.format(cents / 100);
-}
 
 function submittedLabel(
   submittedAt: string | null,
@@ -274,12 +266,12 @@ export default async function PublicManagePage({
                 )}
                 <div>
                   <dt><CircleDollarSign size={17} aria-hidden="true" /> Estimated total</dt>
-                  <dd translate="no">{money(group.billing.estimate.totalCents)}</dd>
+                  <dd translate="no">{formatCents(group.billing.estimate.totalCents)}</dd>
                 </div>
               </dl>
               <p>
                 <strong>{group.billing.notice}</strong> No payment is due online. The total is an estimate from
-                the price of each person{group.billing.estimate.perPersonCents !== null ? ` (${money(group.billing.estimate.perPersonCents)} each)` : ""}.
+                the price of each person{group.billing.estimate.perPersonCents !== null ? ` (${formatCents(group.billing.estimate.perPersonCents)} each)` : ""}.
               </p>
               {group.event.registrationClosesOn && group.event.edit.open && (
                 <p className="field-help">You can change people, locations, and classes until registration closes on {formatCalendarDate(group.event.registrationClosesOn)}.</p>
@@ -350,25 +342,25 @@ export default async function PublicManagePage({
                 {view.order.lineItems.map((item, index) => (
                   <div key={`${item.label}-${index}`}>
                     <span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span>
-                    <strong translate="no">{money(item.amountCents)}</strong>
+                    <strong translate="no">{formatCents(item.amountCents)}</strong>
                   </div>
                 ))}
                 <div>
                   <span>Subtotal</span>
-                  <strong translate="no">{money(view.order.preDiscountSubtotalCents)}</strong>
+                  <strong translate="no">{formatCents(view.order.preDiscountSubtotalCents)}</strong>
                 </div>
                 <div className="is-discount">
                   <span>Promo code <span translate="no">{view.order.promoCode}</span></span>
-                  <strong translate="no">−{money(view.order.discountAmountCents)}</strong>
+                  <strong translate="no">−{formatCents(view.order.discountAmountCents)}</strong>
                 </div>
                 <div>
                   <span>Discounted subtotal</span>
-                  <strong translate="no">{money(view.order.subtotalCents)}</strong>
+                  <strong translate="no">{formatCents(view.order.subtotalCents)}</strong>
                 </div>
                 {view.order.processingFeeCents > 0 && (
                   <div>
                     <span>Card processing</span>
-                    <strong translate="no">{money(view.order.processingFeeCents)}</strong>
+                    <strong translate="no">{formatCents(view.order.processingFeeCents)}</strong>
                   </div>
                 )}
               </div>
@@ -377,21 +369,21 @@ export default async function PublicManagePage({
             <dl className="public-manage-payment-grid">
               <div>
                 <dt>Registration total</dt>
-                <dd translate="no">{money(view.payment.totalCents)}</dd>
+                <dd translate="no">{formatCents(view.payment.totalCents)}</dd>
               </div>
               <div>
                 <dt>Successful payments, net of refunds</dt>
-                <dd translate="no">{money(view.payment.paidCents)}</dd>
+                <dd translate="no">{formatCents(view.payment.paidCents)}</dd>
               </div>
               {view.payment.refundedCents > 0 && (
                 <div>
                   <dt>Refunds recorded</dt>
-                  <dd translate="no">{money(view.payment.refundedCents)}</dd>
+                  <dd translate="no">{formatCents(view.payment.refundedCents)}</dd>
                 </div>
               )}
               <div className="is-due">
                 <dt>Amount due now</dt>
-                <dd translate="no">{money(view.payment.amountDueCents)}</dd>
+                <dd translate="no">{formatCents(view.payment.amountDueCents)}</dd>
               </div>
             </dl>
             )}

@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { ClipboardCheck, Download } from "lucide-react";
 import { AcknowledgeForm, ApproveControl, CorrectionForm, PrepareControl } from "@/components/attendance-reconciliation-controls";
 import {
@@ -11,10 +12,6 @@ import {
   type RegistrationResult,
 } from "@/modules/attendance-reconciliation/domain";
 import type { AttendanceReconciliationView, VersionSummary } from "@/modules/attendance-reconciliation/repository";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 function when(value: string) {
   return new Date(value).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }) + " UTC";
@@ -117,7 +114,7 @@ export function AttendanceReconciliation({
         <div className="section-heading"><h3>Reconciliation</h3></div>
         {approved ? (
           <p>
-            <strong>Approved: version {approved.versionNumber}</strong> · {approved.counts.billable} billable people · {money(approved.billableCents)}
+            <strong>Approved: version {approved.versionNumber}</strong> · {approved.counts.billable} billable people · {formatCents(approved.billableCents)}
             {" "}· approved {approved.approvedAt ? when(approved.approvedAt) : ""}{approved.approvedByName ? ` by ${approved.approvedByName}` : ""}
             {view.approvedFreshness === "FACTS_CHANGED" && (
               <>
@@ -132,7 +129,7 @@ export function AttendanceReconciliation({
         )}
         {draft && (
           <p>
-            <strong>Draft: version {draft.versionNumber}</strong> · {draft.counts.billable} billable people · {money(draft.billableCents)} · prepared {when(draft.preparedAt)}{draft.preparedByName ? ` by ${draft.preparedByName}` : ""}
+            <strong>Draft: version {draft.versionNumber}</strong> · {draft.counts.billable} billable people · {formatCents(draft.billableCents)} · prepared {when(draft.preparedAt)}{draft.preparedByName ? ` by ${draft.preparedByName}` : ""}
             {" "}· <a href={`/finance/attendance-reconciliation?event=${eventId}&version=${draft.id}`}>Review this draft</a>
             {!draftIsCurrent && <><br /><small>Facts have changed since this draft was prepared. Prepare again to review the new numbers; this draft can no longer be approved.</small></>}
           </p>
@@ -160,7 +157,7 @@ export function AttendanceReconciliation({
         <article className="finance-stat"><small>No-show</small><strong>{result.totals.noShow}</strong></article>
         <article className="finance-stat"><small>Adjusted by staff</small><strong>+{result.totals.addedByStaff} / −{result.totals.removedByStaff}</strong></article>
         <article className="finance-stat"><small>Billable</small><strong>{result.totals.billable}</strong></article>
-        <article className="finance-stat"><small>Estimated → billable</small><strong>{money(result.totals.estimatedCents)} → {money(result.totals.billableCents)}</strong></article>
+        <article className="finance-stat"><small>Estimated → billable</small><strong>{formatCents(result.totals.estimatedCents)} → {formatCents(result.totals.billableCents)}</strong></article>
       </section>
 
       {result.groups.length === 0 && (
@@ -193,7 +190,7 @@ function VersionRow({ eventId, version, shownId }: { eventId: string; version: V
         </small>
       </span>
       <span>{version.counts.registered} registered · {version.counts.checkedIn} checked in · {version.counts.noShow} no-show · {version.counts.billable} billable</span>
-      <span>{money(version.estimatedCents)} → {money(version.billableCents)}</span>
+      <span>{formatCents(version.estimatedCents)} → {formatCents(version.billableCents)}</span>
       <span>{shownId === version.id ? "Shown" : <a href={`/finance/attendance-reconciliation?event=${eventId}&version=${version.id}`}>View</a>}</span>
     </div>
   );
@@ -213,7 +210,7 @@ function GroupPanel({ eventId, group, isLive, correctionDetails, acknowledgement
       {HEAD}
       {group.registrations.map((registration) => <RegistrationRow acknowledgementDetails={acknowledgementDetails} correctionDetails={correctionDetails} eventId={eventId} isLive={isLive} key={registration.registrationId} registration={registration} />)}
       <div className="finance-row attendance-row">
-        <span><strong>Group total</strong></span><CountCells counts={group.counts} /><span>{money(group.estimatedCents)}</span><span><strong>{money(group.billableCents)}</strong></span>
+        <span><strong>Group total</strong></span><CountCells counts={group.counts} /><span>{formatCents(group.estimatedCents)}</span><span><strong>{formatCents(group.billableCents)}</strong></span>
       </div>
     </section>
   );
@@ -233,7 +230,7 @@ function RegistrationRow({ eventId, registration, isLive, correctionDetails, ack
             {" "}({review.reasons.map(rosterReviewReasonLabel).join("; ")}). Until staff choose a figure the prorated amount is used, and approval waits.
             {acknowledgement && ` Acknowledged${acknowledgement.actorName ? ` by ${acknowledgement.actorName}` : ""} on ${when(acknowledgement.createdAt)}. Reason: ${acknowledgement.reason}`}
             {registration.alternatives && (
-              <> Per-person (best match) {money(registration.alternatives.perPersonCents)}; prorated {money(registration.alternatives.proratedCents)}.</>
+              <> Per-person (best match) {formatCents(registration.alternatives.perPersonCents)}; prorated {formatCents(registration.alternatives.proratedCents)}.</>
             )}
             {review.acknowledged && review.choice && <> Billing the {review.choice === "PER_PERSON" ? "per-person figure" : "prorated figure"}.</>}
             {review.notes.length > 0 && <> {review.notes.join(" ")}</>}
@@ -247,7 +244,7 @@ function RegistrationRow({ eventId, registration, isLive, correctionDetails, ack
               <li key={person.attendeeId}>
                 <strong>{person.name}</strong> · {personStateLabel(person.state)}
                 {person.transferredFrom ? ` · Transferred from ${person.transferredFrom}` : ""}
-                {person.billable ? ` · ${money(person.chargeCents)}${person.lateRate ? " (late price)" : ""}` : " · not billed"}
+                {person.billable ? ` · ${formatCents(person.chargeCents)}${person.lateRate ? " (late price)" : ""}` : " · not billed"}
                 {person.addedAfterSubmission ? " · added after submission" : ""}
                 {person.substituted ? " · substituted" : ""}
                 {person.correction && (
@@ -263,11 +260,11 @@ function RegistrationRow({ eventId, registration, isLive, correctionDetails, ack
             ))}
           </ul>
           <small>
-            Charges for attended people {money(registration.components.personChargesCents)}
-            {registration.components.registrationChargeCents > 0 ? ` · registration-level charges ${money(registration.components.registrationChargeCents)}` : ""}
-            {registration.credits.map((credit) => ` · ${credit.label}${credit.units !== null ? ` (${credit.units} ${credit.units === 1 ? "person" : "people"})` : ""} ${money(credit.appliedCents)}`).join("")}
-            {registration.promo ? ` · promo code ${registration.promo.code} ${money(registration.promo.appliedCents)}` : ""}
-            {registration.components.adjustmentCents !== 0 ? ` · staff adjustments ${money(registration.components.adjustmentCents)}` : ""}
+            Charges for attended people {formatCents(registration.components.personChargesCents)}
+            {registration.components.registrationChargeCents > 0 ? ` · registration-level charges ${formatCents(registration.components.registrationChargeCents)}` : ""}
+            {registration.credits.map((credit) => ` · ${credit.label}${credit.units !== null ? ` (${credit.units} ${credit.units === 1 ? "person" : "people"})` : ""} ${formatCents(credit.appliedCents)}`).join("")}
+            {registration.promo ? ` · promo code ${registration.promo.code} ${formatCents(registration.promo.appliedCents)}` : ""}
+            {registration.components.adjustmentCents !== 0 ? ` · staff adjustments ${formatCents(registration.components.adjustmentCents)}` : ""}
           </small>
           {registration.unattached.length > 0 && (
             <>
@@ -275,7 +272,7 @@ function RegistrationRow({ eventId, registration, isLive, correctionDetails, ack
               <small>Kept whole, not reduced by who attended (the same as the estimate).</small>
               <ul>
                 {registration.unattached.map((entry, index) => (
-                  <li key={`${entry.label}-${index}`}>{entry.label}: {money(entry.amountCents)}{entry.kind === "CREDIT_AS_RECORDED" ? " (credit as recorded)" : ""}</li>
+                  <li key={`${entry.label}-${index}`}>{entry.label}: {formatCents(entry.amountCents)}{entry.kind === "CREDIT_AS_RECORDED" ? " (credit as recorded)" : ""}</li>
                 ))}
               </ul>
             </>
@@ -283,8 +280,8 @@ function RegistrationRow({ eventId, registration, isLive, correctionDetails, ack
         </details>
       </span>
       <CountCells counts={registration.counts} />
-      <span>{money(registration.estimatedCents)}</span>
-      <span><strong>{money(registration.billableCents)}</strong></span>
+      <span>{formatCents(registration.estimatedCents)}</span>
+      <span><strong>{formatCents(registration.billableCents)}</strong></span>
     </div>
   );
 }

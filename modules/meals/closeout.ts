@@ -1,3 +1,4 @@
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { z } from "zod";
 import type { MealPayerValue, MealTypeValue } from "@/modules/meals/domain";
 import { sha256Hex } from "@/modules/meals/scanner-import";
@@ -155,8 +156,7 @@ function makeException(
   };
 }
 
-const dollars = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
-export const formatCents = dollars;
+export const formatCents = formatCentsPlain;
 
 export function buildCloseout(input: CloseoutInput): CloseoutProjection {
   const rows = new Map<string, CloseoutRow>();

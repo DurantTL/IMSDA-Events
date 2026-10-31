@@ -2,6 +2,7 @@
  * Read-only Square reconciliation for human review. Takes no money, writes
  * nothing, and is safe to run against Production.
  */
+import { formatCents } from "@/modules/payments/format-cents";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
@@ -53,13 +54,6 @@ function window(argv: string[]) {
   };
 }
 
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
-
 async function main() {
   const argv = process.argv.slice(2);
   const { beginTime, endTime } = window(argv);
@@ -91,10 +85,10 @@ async function main() {
       console.log("  [.] Every completed Square payment is recorded in IMSDA Events.\n");
     } else {
       for (const finding of actionable) {
-        console.log(`  [!] [${finding.code}] ${money(finding.amountCents)} ${finding.providerPaymentId}`);
+        console.log(`  [!] [${finding.code}] ${formatCents(finding.amountCents)} ${finding.providerPaymentId}`);
         console.log(`        ${finding.createdAt ?? "unknown date"}${finding.confirmationCode ? ` · registration ${finding.confirmationCode}` : ""}`);
         if (finding.balanceCents !== null && finding.balanceCents !== finding.amountCents) {
-          console.log(`        Outstanding balance ${money(finding.balanceCents)}`);
+          console.log(`        Outstanding balance ${formatCents(finding.balanceCents)}`);
         }
         console.log(`        ${finding.detail}`);
       }

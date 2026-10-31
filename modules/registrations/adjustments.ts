@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import "server-only";
 
 import { Prisma, type RegistrationAdjustmentKind } from "@prisma/client";
@@ -115,10 +116,6 @@ function attendeeName(attendee: { profileSnapshot: unknown; person: { firstName:
   return `${first} ${last}`.trim();
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100);
-}
-
 /** The sum of every adjustment line on a registration, in cents. */
 export async function adjustmentTotalCents(client: Client, registrationId: string) {
   const result = await client.registrationAdjustment.aggregate({
@@ -185,13 +182,13 @@ function checkNewTotal(currentTotalCents: number, changeCents: number, paidCents
   if (next < 0) {
     throw new AdjustmentError(
       "TOTAL_BELOW_ZERO",
-      `That would make the total less than $0. The most it can come down is ${money(currentTotalCents)}.`,
+      `That would make the total less than $0. The most it can come down is ${formatCents(currentTotalCents)}.`,
     );
   }
   if (next < paidCents) {
     throw new AdjustmentError(
       "TOTAL_BELOW_PAID",
-      `That would bring the total (${money(next)}) below what has already been paid (${money(paidCents)}). Record a refund first, then adjust.`,
+      `That would bring the total (${formatCents(next)}) below what has already been paid (${formatCents(paidCents)}). Record a refund first, then adjust.`,
     );
   }
   return next;

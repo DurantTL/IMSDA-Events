@@ -1,12 +1,8 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { CheckSquare, QrCode } from "lucide-react";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { CHURCH_BILLED_NOTICE } from "@/modules/club-registrations/per-person-price";
 import type { ClubPacket } from "@/modules/reporting/club-packet";
-
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-function money(cents: number) {
-  return moneyFormatter.format(cents / 100);
-}
 
 function dateRange(startsOn: string, endsOn: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone }).formatRange(
@@ -166,7 +162,7 @@ export function ClubPacketSheet({ packet, qrSrc }: { packet: ClubPacket; qrSrc: 
               ? <PerPersonPriceNotice className="club-packet-owed" price={packet.perPersonPrice ?? { notice: CHURCH_BILLED_NOTICE, roster: true, attendeeLines: [], registrationLines: [], uniformAmountCents: null }} />
               : (
                 <p className="club-packet-owed">
-                  Estimated amount billed to the church: <strong translate="no">{money(packet.amountOwedCents)}</strong>
+                  Estimated amount billed to the church: <strong translate="no">{formatCents(packet.amountOwedCents)}</strong>
                 </p>
               )}
           </section>

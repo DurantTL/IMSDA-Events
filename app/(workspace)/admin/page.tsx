@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { systemRoleText } from "@/modules/access/role-descriptions";
@@ -50,14 +51,6 @@ export const metadata: Metadata = { title: staffPageTitles.systemManagement };
 
 /** Where the build plan lives. The command center shows live state, not the plan. */
 const ROADMAP_URL = "https://github.com/DurantTL/imsda-events/issues/98";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
 function dateRange(start: Date, end: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -331,7 +324,7 @@ export default async function SystemAdminPage({
                   <span><strong>{event.waitingCount}</strong><small>Waitlisted</small></span>
                   <span>
                     <Link href={`/finance?${query}`} title="Money still owed on active registrations">
-                      <strong>{money(event.ledgerBalanceCents)}</strong><small>Outstanding balance</small>
+                      <strong>{formatCents(event.ledgerBalanceCents, { wholeDollars: true })}</strong><small>Outstanding balance</small>
                     </Link>
                   </span>
                 </div>

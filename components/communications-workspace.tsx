@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
@@ -257,13 +258,6 @@ function friendlyStatus(status: string) {
 
 function localDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Not recorded";
-}
-
-function money(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value / 100);
 }
 
 const confirmationTemplateKeys = new Set([
@@ -1642,7 +1636,7 @@ export function CommunicationsWorkspace({
               <article>
                 <span className="message-stat-icon gold"><WalletCards size={18} aria-hidden="true" /></span>
                 <small>Total balance</small>
-                <strong>{money(messaging.reminderPreview.totalBalanceCents)}</strong>
+                <strong>{formatCents(messaging.reminderPreview.totalBalanceCents)}</strong>
               </article>
               <article>
                 <span className="message-stat-icon purple"><AlertTriangle size={18} aria-hidden="true" /></span>
@@ -1687,7 +1681,7 @@ export function CommunicationsWorkspace({
                       <td>{recipient.recipientName}</td>
                       <td>{recipient.confirmationCode}</td>
                       <td>{recipient.recipientEmail}</td>
-                      <td>{money(recipient.balanceCents)}</td>
+                      <td>{formatCents(recipient.balanceCents)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1734,7 +1728,7 @@ export function CommunicationsWorkspace({
                 onChange={(event) => setReminderConfirmed(event.target.checked)}
               />
               <span>
-                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of {money(messaging.reminderPreview.totalBalanceCents)}.</strong>
+                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of {formatCents(messaging.reminderPreview.totalBalanceCents)}.</strong>
                 <small>
                   I understand this action uses the exact preview above. If a registration, payment, refund, email, template, or sender setting changes, IMSDA Events will stop and require a new review.
                 </small>

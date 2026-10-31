@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { RegistrationFormField } from "@/modules/forms/definition";
 
 /**
@@ -20,8 +21,7 @@ export function creditSummary(
   field: Pick<RegistrationFormField, "creditCentsPerUnit" | "capUnitsAtAttendeeCount">,
 ) {
   if (field.creditCentsPerUnit === undefined) return null;
-  const amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-    .format(Math.abs(field.creditCentsPerUnit) / 100);
+  const amount = formatCents(Math.abs(field.creditCentsPerUnit));
   return `Credit: ${amount} per unit${field.capUnitsAtAttendeeCount ? ", capped at headcount" : ""}`;
 }
 

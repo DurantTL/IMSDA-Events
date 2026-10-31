@@ -1,3 +1,4 @@
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 import "server-only";
 
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -165,7 +166,6 @@ function writeRegistration(client: Client, entries: readonly LedgerEntryDraft[])
 }
 
 export function formatBackfillReport(report: BackfillReport) {
-  const money = (cents: number) => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
   const lines = [
     report.apply ? "Ledger backfill: APPLIED" : "Ledger backfill: DRY RUN (nothing written; pass --apply to write)",
     `Registrations scanned: ${report.registrationsScanned}`,
@@ -178,7 +178,7 @@ export function formatBackfillReport(report: BackfillReport) {
   ];
   for (const residual of report.residuals.slice(0, 50)) {
     lines.push(
-      `  ${residual.confirmationCode} (${residual.registrationId}): total ${money(residual.totalCents)}, ledger ${money(residual.reconstructedCents)}, residual ${money(residual.residualCents)}`,
+      `  ${residual.confirmationCode} (${residual.registrationId}): total ${formatCentsPlain(residual.totalCents)}, ledger ${formatCentsPlain(residual.reconstructedCents)}, residual ${formatCentsPlain(residual.residualCents)}`,
     );
   }
   if (report.residuals.length > 50) lines.push(`  ... and ${report.residuals.length - 50} more`);

@@ -1,12 +1,10 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 type CardRegistration = Pick<
   AttendeeRegistrationSummary,
   "lifecycle" | "status" | "balanceCents" | "totalCents" | "paidCents" | "grossPaidCents" | "refundedCents" | "payment" | "churchBilling" | "groupBilling"
 >;
-
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const formatMoney = (cents: number) => moneyFormatter.format(cents / 100);
 
 /**
  * The state wording on an Overview card (#1175). A submitted registration reads "Registration received": it arrived,
@@ -36,7 +34,7 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
   const total = registration.totalCents ?? 0;
   const gross = registration.grossPaidCents ?? 0;
   const refunded = registration.refundedCents ?? 0;
-  const history = gross > 0 ? `${formatMoney(gross)} paid${refunded > 0 ? ` · ${formatMoney(refunded)} refunded` : ""}.` : null;
+  const history = gross > 0 ? `${formatCents(gross)} paid${refunded > 0 ? ` · ${formatCents(refunded)} refunded` : ""}.` : null;
 
   if (registration.churchBilling) {
     return registration.churchBilling.billed
@@ -45,7 +43,7 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
   }
   if (registration.groupBilling) {
     return registration.groupBilling.billed
-      ? { headline: `Estimated total ${formatMoney(registration.groupBilling.estimateCents)}`, detail: registration.groupBilling.notice, tone: "calm" }
+      ? { headline: `Estimated total ${formatCents(registration.groupBilling.estimateCents)}`, detail: registration.groupBilling.notice, tone: "calm" }
       : { headline: sentence(registration.groupBilling.label), detail: null, tone: "calm" };
   }
   if (registration.lifecycle === "WAITLISTED") {
@@ -57,7 +55,7 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
     if (total === 0 && gross === 0 && refunded === 0) {
       return { headline: "Nothing due now", detail: "No payment is due on a cancelled registration.", tone: "calm" };
     }
-    const kept = [`Original total ${formatMoney(total)}`, gross > 0 ? `${formatMoney(gross)} paid` : "nothing paid", refunded > 0 ? `${formatMoney(refunded)} refunded` : null]
+    const kept = [`Original total ${formatCents(total)}`, gross > 0 ? `${formatCents(gross)} paid` : "nothing paid", refunded > 0 ? `${formatCents(refunded)} refunded` : null]
       .filter(Boolean)
       .join(" \u00b7 ");
     return { headline: "Nothing due now", detail: `${kept}. No payment is due on a cancelled registration.`, tone: "calm" };
@@ -65,13 +63,13 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
   if (registration.payment.paymentEligible && registration.balanceCents > 0) {
     const paid = registration.paidCents ?? 0;
     return {
-      headline: `${formatMoney(registration.balanceCents)} remaining`,
-      detail: paid > 0 ? `${formatMoney(paid)} paid toward your ${formatMoney(total)} registration.` : `Your registration total is ${formatMoney(total)}.`,
+      headline: `${formatCents(registration.balanceCents)} remaining`,
+      detail: paid > 0 ? `${formatCents(paid)} paid toward your ${formatCents(total)} registration.` : `Your registration total is ${formatCents(total)}.`,
       tone: "due",
     };
   }
   if (registration.payment.state === "PAID") {
-    return { headline: "Paid in full", detail: `${formatMoney(total)} registration.`, tone: "calm" };
+    return { headline: "Paid in full", detail: `${formatCents(total)} registration.`, tone: "calm" };
   }
   return { headline: registration.payment.label, detail: null, tone: "calm" };
 }
