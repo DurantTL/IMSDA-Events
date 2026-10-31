@@ -155,7 +155,7 @@ describe("the report model", () => {
     expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 1, info: 0 });
     expect(report.overall.state).toBe("ok");
     expect(report.overall.readingsTried).toBe(1);
-    const last = report.sections.at(-1)!;
+    const last = report.sections.filter((section) => section.signals.length > 0).at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
     expect(last.stateLabel).toBe("11 of 13 ticked");
@@ -253,12 +253,16 @@ describe("providers", () => {
     it("shows every reading as unavailable when every source fails, and never as OK", async () => {
       everySourceDown();
       const report = await loadSystemReport(now);
-      const rows = report.sections.flatMap((section) => section.signals);
+      // The built-in self-tests (#1381) read no source, so they still pass when every source is down.
+      const selfTests = report.sections.find((section) => section.key === "self-tests")!.signals;
+      expect(selfTests).toHaveLength(8);
+      for (const row of selfTests) expect(row.state, row.key).toBe("ok");
+      const rows = report.sections.filter((section) => section.key !== "self-tests").flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts are read from the process, not from a failing source.
       const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(0); // the release identity and start time are information, never counted as OK
+      expect(report.overall.tally.ok).toBe(8); // only the eight self-tests; the release identity and start time are information, never counted as OK
       expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");
