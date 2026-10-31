@@ -113,6 +113,10 @@ export const serverEnvSchema = z
     // sweep endpoint is never reachable without a credential.
     OUTBOX_SWEEP_TOKEN: optionalTrimmed,
 
+    // Lets the host's deploy and cleanup jobs report one heartbeat per run to the System report (#1382). Optional: unset
+    // means the endpoint is always 401 and the report reads "Not reporting yet".
+    HOST_JOB_HEARTBEAT_TOKEN: optionalTrimmed,
+
     // Message files (#845). The quota is the most one event may keep, in whole megabytes. The grace period is how old an
     // unreferenced upload must be before the sweep may remove it (never less than 24 hours: the reader clamps it). The
     // sweep only reports what it would remove unless MESSAGE_FILE_SWEEP_DELETE is exactly "true".
@@ -415,6 +419,7 @@ export const SERVER_ENV_KEYS = [
     "SQUARE_WEBHOOK_NOTIFICATION_URL",
     "SQUARE_ENABLE_PRODUCTION",
     "OUTBOX_SWEEP_TOKEN",
+    "HOST_JOB_HEARTBEAT_TOKEN",
     "MESSAGE_FILE_EVENT_QUOTA_MB",
     "MESSAGE_FILE_SWEEP_GRACE_HOURS",
     "MESSAGE_FILE_SWEEP_DELETE",
