@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getServerEnv } from "@/lib/env";
-import { getCurrentSession } from "@/modules/access/current-session";
+import { getCurrentSessionPassive } from "@/modules/access/current-session";
 import { isAuthorizedSweepRequest } from "@/modules/communications/outbox-sweep";
 import { isAuthorizedHostJobRequest } from "@/modules/operations/host-job-heartbeat";
 
@@ -25,10 +25,10 @@ export function hasHealthDetailToken(request: Request): boolean {
   }
 }
 
-/** A signed-in system administrator. Never throws: any failure reads as "not authorized". */
+/** A signed-in system administrator. Reads the session passively, so a polling monitor tab never keeps it alive. Never throws: any failure reads as "not authorized". */
 export async function isSystemAdministratorSession(): Promise<boolean> {
   try {
-    const session = await getCurrentSession();
+    const session = await getCurrentSessionPassive();
     return session.user?.globalRole === "SYSTEM_ADMIN";
   } catch {
     return false;

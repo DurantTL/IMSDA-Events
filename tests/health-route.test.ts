@@ -6,7 +6,7 @@ const dependencies = vi.hoisted(() => ({
   getReleaseIdentity: vi.fn(),
   getSweepHeartbeat: vi.fn(),
   getBackupStatus: vi.fn(),
-  getCurrentSession: vi.fn(),
+  getCurrentSessionPassive: vi.fn(),
   dispatchUnsuppressedAlert: vi.fn(),
 }));
 
@@ -17,7 +17,7 @@ vi.mock("@/modules/communications/outbox-sweep", async (importOriginal) => ({
   getOutboxQueueHealth: dependencies.getOutboxQueueHealth,
 }));
 vi.mock("@/modules/access/current-session", () => ({
-  getCurrentSession: dependencies.getCurrentSession,
+  getCurrentSessionPassive: dependencies.getCurrentSessionPassive,
 }));
 vi.mock("@/modules/operations/alerting", () => ({
   dispatchUnsuppressedAlert: dependencies.dispatchUnsuppressedAlert,
@@ -77,7 +77,7 @@ beforeEach(() => {
   dependencies.getOutboxQueueHealth.mockResolvedValue(healthyQueue);
   dependencies.getSweepHeartbeat.mockResolvedValue(recentSweep);
   dependencies.getBackupStatus.mockResolvedValue(healthyBackups);
-  dependencies.getCurrentSession.mockResolvedValue({ user: null });
+  dependencies.getCurrentSessionPassive.mockResolvedValue({ user: null });
   dependencies.dispatchUnsuppressedAlert.mockResolvedValue(undefined);
   resetServerEnvCache();
   vi.stubEnv("OUTBOX_SWEEP_TOKEN", sweepToken);
@@ -96,7 +96,7 @@ function healthRequest(token?: string) {
 }
 
 function adminSession(globalRole: string) {
-  dependencies.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole } });
+  dependencies.getCurrentSessionPassive.mockResolvedValue({ user: { id: "user-1", globalRole } });
 }
 
 function databaseDown() {
@@ -156,18 +156,21 @@ describe("health endpoint, public answer (#1400)", () => {
     expect(dependencies.dispatchUnsuppressedAlert).toHaveBeenCalledTimes(1);
   });
 
-  it("gives an authorized caller the same minimal 503 body when the database is down", async () => {
+  it("adds release and key source (not the outbox queries) to the 503 for a token holder", async () => {
     databaseDown();
     const response = await GET(healthRequest(sweepToken));
+    const body = await response.json();
     expect(response.status).toBe(503);
-    expect(Object.keys(await response.json()).sort()).toEqual(["checkedAt", "services", "status"]);
+    expect(Object.keys(body).sort()).toEqual(["checkedAt", "encryptionKey", "release", "services", "status"]);
+    expect(body.services).toEqual({ application: "ok", database: "unavailable" });
+    expect(dependencies.getOutboxQueueHealth).not.toHaveBeenCalled();
     expect(dependencies.dispatchUnsuppressedAlert).toHaveBeenCalledTimes(1);
   });
 
   it("does not look up a session when the database is down", async () => {
     databaseDown();
     await GET(healthRequest());
-    expect(dependencies.getCurrentSession).not.toHaveBeenCalled();
+    expect(dependencies.getCurrentSessionPassive).not.toHaveBeenCalled();
   });
 
   it("sends Cache-Control: no-store on every response", async () => {
@@ -230,7 +233,7 @@ describe("health endpoint, who sees the detail (#1400)", () => {
   });
 
   it("shows the public answer when the session lookup throws", async () => {
-    dependencies.getCurrentSession.mockRejectedValue(new Error("cookies unavailable"));
+    dependencies.getCurrentSessionPassive.mockRejectedValue(new Error("cookies unavailable"));
     const response = await GET(healthRequest());
     expect(response.status).toBe(200);
     expect(await isFull(response)).toBe(false);
@@ -238,7 +241,7 @@ describe("health endpoint, who sees the detail (#1400)", () => {
 
   it("does not look up a session for a token holder", async () => {
     await GET(healthRequest(monitorToken));
-    expect(dependencies.getCurrentSession).not.toHaveBeenCalled();
+    expect(dependencies.getCurrentSessionPassive).not.toHaveBeenCalled();
   });
 });
 

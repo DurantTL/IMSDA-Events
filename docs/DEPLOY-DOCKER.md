@@ -120,7 +120,15 @@ the immutable Next.js build ID so an operator can verify what is actually
 running. Only a caller with the `OUTBOX_SWEEP_TOKEN` or `HEALTH_MONITOR_TOKEN`
 bearer token, or a signed-in system administrator, sees it; the public answer is
 just `status`, `checkedAt` and the database check. The `curl` examples below that
-read the release send `-H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN"`. The xCloud repair script copies `XCLOUD_DEPLOYED_COMMIT` into
+read the release take the token from the running container and give it to curl on
+standard input, so it never appears on a command line:
+
+```bash
+T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health
+```
+
+A missing or wrong token is not an error: the answer is just the public one.
+The xCloud repair script copies `XCLOUD_DEPLOYED_COMMIT` into
 `APP_RELEASE_SHA` when xCloud exposes that value.
 
 **Optional / conditional:**
@@ -475,6 +483,28 @@ tables and columns until the night deploy. Watch it with
 `journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
 `imsda-deploy` as `root`.
 
+### Before merging #1400 (health answer trimmed)
+
+`/usr/local/bin/imsda-deploy` is a copy of `deploy/xcloud/deploy.sh`, not a link.
+The new app only shows the release SHA on `/api/health` to a caller with the
+sweep token, and the old copy of the script sends no token. If the merge deploys
+with the old script, it can never see the new SHA, the deploy fails, and the SHA
+is written to `/var/lib/imsda/failed-sha`, which blocks further deploys.
+
+**Before the merge reaches the server (as `root`, from a checkout that has the
+new script):**
+
+```bash
+install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+```
+
+The new script reads the token from the container it is checking and works with
+older images too (they ignore the header and still show the SHA publicly), so
+installing it early is safe.
+
+**If it was missed and a deploy failed:** install the new script (command above),
+then `rm -f /var/lib/imsda/failed-sha`, then run `imsda-deploy` by hand.
+
 ### Deploys without downtime (#1263)
 
 Before #1263 every deploy stopped the app, ran migrations and template syncs,
@@ -489,9 +519,8 @@ submitted in that window failed. Now:
    code that stops using it; split those over two releases.
 2. **The new version starts next to it** as the `standby` service on
    `127.0.0.1:8101` and must report the new SHA on `/api/health` (`deploy.sh`
-   reads `OUTBOX_SWEEP_TOKEN` from the production env file, `IMSDA_ENV_FILE`,
-   default `/home/u_events/239298/.env`, and stops before changing anything if it
-   is missing). If it never does, the deploy stops and the live app is not restarted (the database is
+   reads `OUTBOX_SWEEP_TOKEN` from the container it is checking, so it is exactly
+   what the app received; with no token the check never passes). If it never does, the deploy stops and the live app is not restarted (the database is
    already migrated, which is why migrations must be additive).
 3. **The live tag moves and `app` restarts on 8100** with the preparation
    skipped (`IMSDA_SKIP_DB_PREP=1`), so it answers within a few seconds. If it
@@ -546,7 +575,7 @@ is a separate PR for #1263.
    ```bash
    systemctl list-timers imsda-autodeploy.timer        # next run is listed
    journalctl -u imsda-autodeploy.service --since today | grep Deploying
-   curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
+   T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
    ```
 
    To use a different window, add `Environment=IMSDA_DEPLOY_WINDOW=01-04` under
@@ -660,7 +689,7 @@ By hand, as `root`:
 B=/home/u_events/239298/docker-compose.yml
 docker compose -f $B config --quiet && echo config-ok
 IMSDA_SKIP_DB_PREP=1 docker compose -f $B up -d app   # restart on the live image
-curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health
+T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health
 docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
 ```
@@ -887,8 +916,8 @@ What it does, in order:
 4. Keeps the running app as `<name>-old` (removing the previous `-old` first),
    starts the new container with the same port, networks, uploads volume and
    restart policy, and waits up to 15 minutes for `/api/health` to report the
-   new SHA (it sends `OUTBOX_SWEEP_TOKEN` from `.env`, and stops before changing
-   anything if that line is missing). If the container exits or never reports it, the script prints its
+   new SHA (it reads `OUTBOX_SWEEP_TOKEN` from the new container with `docker exec`; with no token the check never passes). If the container
+   exits or never reports it, the script prints its
    last log lines and puts the `-old` container back automatically.
 5. When `/home/u_events/.xcloud/.env.backup` exists, restarts `imsda-backup` on
    the matching backup image (docs/BACKUPS.md). Skip with `IMSDA_SKIP_BACKUP=1`.
@@ -985,7 +1014,7 @@ there is no database URL to give the new container.
 ```bash
    docker logs -f xcloud-site-<id>-app-1
    # once it looks up and serving, Ctrl-C, then:
-   curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health
+   T="$(docker exec xcloud-site-<id>-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health
 ```
 
    Confirm `status: ok`, the expected `release.sha`, `database`/
@@ -1125,7 +1154,8 @@ clean deployment is still being rebuilt.
    Record both values in the deployment log:
 
    ```bash
-   curl --fail --silent -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" https://your-final-domain/api/health | jq '.status, .release'
+   T="$(docker compose exec -T app printenv OUTBOX_SWEEP_TOKEN)"
+   printf 'Authorization: Bearer %s\n' "$T" | curl --fail --silent -H @- https://your-final-domain/api/health | jq '.status, .release'
    ```
 4. Create the first real administrator. The database starts empty and there is no
    first-run setup screen, so this is the supported way in:
@@ -1483,7 +1513,7 @@ systemctl start imsda-xcloud-runtime-guard.timer
 6. Confirm:
 
 ```bash
-curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health | grep -o '"encryptionKey":{[^}]*}'
+T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health | grep -o '"encryptionKey":{[^}]*}'
 # expect: "encryptionKey":{"configured":true,"source":"file"}
 docker inspect xcloud-site-<id>-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c '^SECRET_ENCRYPTION_KEY='
 # expect 0 (only SECRET_ENCRYPTION_KEY_FILE, a path, is listed)

@@ -18,17 +18,21 @@ echo "$* prep=\${IMSDA_PREP_ONLY:-} skip=\${IMSDA_SKIP_DB_PREP:-}" >> "$FAKE_LOG
 case "$1" in
   image) case "$*" in *--format*) echo "\${FAKE_PREVIOUS:-}" ;; esac; exit 0 ;;
   run) exit "\${FAKE_LEGACY_EXIT:-0}" ;;
-  compose) case "$*" in *" run "*) exit "\${FAKE_PREP_EXIT:-0}" ;; esac ;;
+  compose) case "$*" in
+    *printenv*) printf '%s' "$FAKE_TOKEN"; exit 0 ;;
+    *" run "*) exit "\${FAKE_PREP_EXIT:-0}" ;;
+  esac ;;
 esac
 exit 0
 `;
 // curl answers /api/health with FAKE_SHA_<port>, but only when stdin carries the
-// right bearer header (-H @-), like the real endpoint (#1400).
+// bearer header (-H @-) with the token the container reported (FAKE_TOKEN, what
+// \`printenv OUTBOX_SWEEP_TOKEN\` answers), like the real endpoint (#1400).
 const sweepToken = "synthetic-sweep-token-0123456789-abcdefghij";
 const fakeCurl = `#!/bin/sh
 echo "curl $*" >> "$FAKE_LOG"
 header="$(cat)"
-[ "$header" = "Authorization: Bearer ${sweepToken}" ] || exit 0
+[ "$header" = "Authorization: Bearer $FAKE_TOKEN" ] || exit 0
 for arg in "$@"; do
   case "$arg" in
     *:8101/*) printf '{"release":{"sha":"%s"}}' "$FAKE_SHA_8101" ;;
@@ -64,8 +68,6 @@ function setup(tools: Record<string, string>) {
 function runDeploy(env: Record<string, string>) {
   const ctx = setup({ docker: fakeDocker, curl: fakeCurl, git: fakeGit, sleep: fakeSleep });
   writeFileSync(ctx.log, "");
-  const envFile = path.join(ctx.dir, "site.env");
-  writeFileSync(envFile, env.FAKE_ENV_CONTENT ?? `DATABASE_URL=postgresql://u:p@db/app\nOUTBOX_SWEEP_TOKEN="${sweepToken}"\n`);
   const result = spawnSync("sh", [deployScript], {
     encoding: "utf8",
     env: {
@@ -74,7 +76,7 @@ function runDeploy(env: Record<string, string>) {
       IMSDA_LOCK_HELD: "1",
       XCLOUD_SITE_PATH: ctx.dir,
       XCLOUD_COMPOSE_FILE: ctx.compose,
-      IMSDA_ENV_FILE: envFile,
+      FAKE_TOKEN: sweepToken,
       IMSDA_HEALTH_WAIT_SECONDS: "6",
       IMSDA_CLEANUP: "/nonexistent",
       IMSDA_FAILED_SHA_FILE: path.join(ctx.dir, "failed-sha"),
@@ -140,27 +142,27 @@ describe("deploy.sh zero-downtime switch", () => {
     expect(calls.join("\n")).not.toContain(sweepToken);
   });
 
-  it("reads the token from an unquoted line too", () => {
-    const { status } = runDeploy({
-      FAKE_SHA_8101: sha,
-      FAKE_SHA_8100: sha,
-      FAKE_ENV_CONTENT: `OUTBOX_SWEEP_TOKEN=old\nOUTBOX_SWEEP_TOKEN=${sweepToken}\n`,
-    });
+  it("sends a token with literal quotes verbatim, as the app received it", () => {
+    const quoted = `"${sweepToken}"`;
+    const { status, calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha, FAKE_TOKEN: quoted });
     expect(status).toBe(0);
+    expect(calls.join("\n")).not.toContain(sweepToken);
   });
 
-  it("stops before pulling or changing anything when the token cannot be read", () => {
-    const { status, calls, stderr, failed } = runDeploy({
-      FAKE_SHA_8101: sha,
-      FAKE_SHA_8100: sha,
-      FAKE_ENV_CONTENT: "DATABASE_URL=postgresql://u:p@db/app\n",
-    });
+  it("asks the standby and the live app for their own token", () => {
+    const { calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(calls.some((c) => c.includes("--profile standby exec -T standby printenv OUTBOX_SWEEP_TOKEN"))).toBe(true);
+    expect(calls.some((c) => c.includes(" exec -T app printenv OUTBOX_SWEEP_TOKEN"))).toBe(true);
+  });
+
+  it("fails closed without calling the endpoint when the container has no token", () => {
+    const { status, calls, stderr, stdout, failed } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha, FAKE_TOKEN: "" });
     expect(status).toBe(1);
-    expect(stderr).toContain("OUTBOX_SWEEP_TOKEN");
-    expect(stderr).toContain("Nothing was changed");
-    expect(stderr).not.toContain(sweepToken);
-    expect(calls.filter((c) => c !== "")).toEqual([]);
-    expect(failed).toBeNull();
+    expect(stderr).toContain("did not become healthy on port 8101");
+    expect(failed).toBe(sha);
+    expect(calls.some((c) => c.startsWith("curl "))).toBe(false);
+    expect(calls.some((c) => c.startsWith("tag ") && c.includes("imsda-events:live"))).toBe(false);
+    expect(`${stdout}${stderr}`).not.toContain(sweepToken);
   });
 
   it("clears the failed marker after a successful deploy", () => {

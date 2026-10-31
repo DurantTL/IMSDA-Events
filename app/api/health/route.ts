@@ -43,8 +43,18 @@ async function getHandler(request: Request) {
       summary: "The database is unreachable",
       detail: "Registrations, check-in, and payment cannot be recorded until it returns.",
     }).catch(() => undefined);
+    // Neither of these needs the database, so a token holder still gets them;
+    // the public body stays minimal.
     return Response.json(
-      { status: "degraded", checkedAt, services: { database: "unavailable" } },
+      tokenAuthorized
+        ? {
+            status: "degraded",
+            checkedAt,
+            release: getReleaseIdentity(),
+            services: { application: "ok", database: "unavailable" },
+            encryptionKey: getEncryptionKeyStatus(),
+          }
+        : { status: "degraded", checkedAt, services: { database: "unavailable" } },
       { status: 503, headers: NO_STORE }
     );
   }
