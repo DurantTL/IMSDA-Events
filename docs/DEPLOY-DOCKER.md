@@ -60,6 +60,7 @@ ATTENDEE_PASS_SIGNING_SECRET=<openssl rand -base64 48>
 RATE_LIMIT_HASH_SECRET=<openssl rand -base64 48>
 OUTBOX_SWEEP_TOKEN=<openssl rand -base64 48>
 HOST_JOB_HEARTBEAT_TOKEN=<openssl rand -base64 48>   # optional, see "System report heartbeats"
+HEALTH_MONITOR_TOKEN=<openssl rand -base64 48>       # optional, see "Uptime monitor" under Alerting
 SECRET_ENCRYPTION_KEY=<openssl rand -base64 48>
 RESEND_API_KEY=<from the Resend dashboard>
 ACCOUNT_EMAIL_SENDER_ADDRESS=<a verified sender, e.g. no-reply@imsda.org>
@@ -116,7 +117,10 @@ provide `DATABASE_URL` here.
 `APP_RELEASE_SHA` is operational metadata, not a secret. When supplied, it must
 be a 7–64 character hexadecimal Git SHA. `/api/health` returns it together with
 the immutable Next.js build ID so an operator can verify what is actually
-running. The xCloud repair script copies `XCLOUD_DEPLOYED_COMMIT` into
+running. Only a caller with the `OUTBOX_SWEEP_TOKEN` or `HEALTH_MONITOR_TOKEN`
+bearer token, or a signed-in system administrator, sees it; the public answer is
+just `status`, `checkedAt` and the database check. The `curl` examples below that
+read the release send `-H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN"`. The xCloud repair script copies `XCLOUD_DEPLOYED_COMMIT` into
 `APP_RELEASE_SHA` when xCloud exposes that value.
 
 **Optional / conditional:**
@@ -484,8 +488,10 @@ submitted in that window failed. Now:
    column without a default, a rename or a drop in the same release as the
    code that stops using it; split those over two releases.
 2. **The new version starts next to it** as the `standby` service on
-   `127.0.0.1:8101` and must report the new SHA on `/api/health`. If it never
-   does, the deploy stops and the live app is not restarted (the database is
+   `127.0.0.1:8101` and must report the new SHA on `/api/health` (`deploy.sh`
+   reads `OUTBOX_SWEEP_TOKEN` from the production env file, `IMSDA_ENV_FILE`,
+   default `/home/u_events/239298/.env`, and stops before changing anything if it
+   is missing). If it never does, the deploy stops and the live app is not restarted (the database is
    already migrated, which is why migrations must be additive).
 3. **The live tag moves and `app` restarts on 8100** with the preparation
    skipped (`IMSDA_SKIP_DB_PREP=1`), so it answers within a few seconds. If it
@@ -540,7 +546,7 @@ is a separate PR for #1263.
    ```bash
    systemctl list-timers imsda-autodeploy.timer        # next run is listed
    journalctl -u imsda-autodeploy.service --since today | grep Deploying
-   curl -s http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
+   curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health | grep -o '"sha":"[^"]*"'
    ```
 
    To use a different window, add `Environment=IMSDA_DEPLOY_WINDOW=01-04` under
@@ -654,7 +660,7 @@ By hand, as `root`:
 B=/home/u_events/239298/docker-compose.yml
 docker compose -f $B config --quiet && echo config-ok
 IMSDA_SKIP_DB_PREP=1 docker compose -f $B up -d app   # restart on the live image
-curl -s http://127.0.0.1:8100/api/health
+curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health
 docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
 ```
@@ -881,7 +887,8 @@ What it does, in order:
 4. Keeps the running app as `<name>-old` (removing the previous `-old` first),
    starts the new container with the same port, networks, uploads volume and
    restart policy, and waits up to 15 minutes for `/api/health` to report the
-   new SHA. If the container exits or never reports it, the script prints its
+   new SHA (it sends `OUTBOX_SWEEP_TOKEN` from `.env`, and stops before changing
+   anything if that line is missing). If the container exits or never reports it, the script prints its
    last log lines and puts the `-old` container back automatically.
 5. When `/home/u_events/.xcloud/.env.backup` exists, restarts `imsda-backup` on
    the matching backup image (docs/BACKUPS.md). Skip with `IMSDA_SKIP_BACKUP=1`.
@@ -978,7 +985,7 @@ there is no database URL to give the new container.
 ```bash
    docker logs -f xcloud-site-<id>-app-1
    # once it looks up and serving, Ctrl-C, then:
-   curl -s http://127.0.0.1:8100/api/health
+   curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health
 ```
 
    Confirm `status: ok`, the expected `release.sha`, `database`/
@@ -1086,7 +1093,7 @@ database dump when the old data is intentionally being discarded:
    ```bash
    docker compose ps
    docker compose exec app npx prisma migrate status
-   curl --fail https://your-new-domain/api/health
+   curl --fail https://your-new-domain/api/health   # public answer: status and database
    ```
 
 7. Create the first administrator as described below. Create or configure the
@@ -1112,12 +1119,13 @@ clean deployment is still being rebuilt.
 1. Set the required env vars above.
 2. Deploy. Watch the logs for `Applying database migrations...` then `Starting`.
    A startup failure names the environment variable that caused it.
-3. `GET /api/health` should return `{"status":"ok"}` with `database` and
-   `messageOutbox` both `ok`, plus `release.buildId` and, when configured,
-   `release.sha`. Record both values in the deployment log:
+3. `GET /api/health` with no token should return `{"status":"ok"}` and
+   `services.database` `ok`. With the `OUTBOX_SWEEP_TOKEN` bearer token it also
+   shows `messageOutbox`, `release.buildId` and, when configured, `release.sha`.
+   Record both values in the deployment log:
 
    ```bash
-   curl --fail --silent https://your-final-domain/api/health | jq '.status, .release'
+   curl --fail --silent -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" https://your-final-domain/api/health | jq '.status, .release'
    ```
 4. Create the first real administrator. The database starts empty and there is no
    first-run setup screen, so this is the supported way in:
@@ -1220,13 +1228,31 @@ The scan runs at the end of the outbox sweep, so its frequency is
 
 Because the scan rides on the sweep, **a sweep that stops cannot alert about
 itself.** Each successful sweep therefore records when it finished, and
-`/api/health` reports it as `outboxSweep`: `ok`, `stale` (no successful sweep
-for 15 minutes — three missed five-minute runs), `failing` (the latest run
-failed), or `never` (nothing has reported since this was added). `stale` and
-`failing` turn the health `status` to `degraded` while still answering 200, so
-an external uptime monitor watching `/api/health` for anything other than
-`"status":"ok"` is what catches a stopped sweeper. The System command center
-shows the same signal. Whatever runs the sweep on the host — the Compose
+the detailed `/api/health` reports it as `outboxSweep`: `ok`, `stale` (no
+successful sweep for 15 minutes — three missed five-minute runs), `failing` (the
+latest run failed), or `never` (nothing has reported since this was added).
+`stale` and `failing` turn the detailed `status` to `degraded` while still
+answering 200. The System command center shows the same signal.
+
+#### Uptime monitor
+
+`/api/health` has two answers (#1400):
+
+- **Public (no token):** `{"status":"ok","checkedAt":...,"services":{"database":"ok"}}`
+  with HTTP 200 while the site is up and the database answers; HTTP 503 and
+  `"status":"degraded"` when the database is down. Point the ordinary uptime
+  monitor (and the Cloudflare skip rule) at this and alert on anything other than
+  HTTP 200 / `"status":"ok"`. Backups, the outbox and the sweep never change it.
+- **Detailed (token):** release, backups, outbox, sweep and encryption key source.
+  Send `Authorization: Bearer <token>` with `HEALTH_MONITOR_TOKEN` (at least 32
+  characters, `openssl rand -base64 48`). Use that separate token for a
+  third-party monitor so the sweep token is never shared with it, and alert on a
+  `"status"` other than `"ok"`: that is what catches a stopped sweeper, a stale
+  backup or a backed-up outbox. `OUTBOX_SWEEP_TOKEN` and a signed-in system
+  administrator also see the detail. A wrong or missing token gets the public
+  answer, not an error.
+
+Every health response sends `Cache-Control: no-store`. Whatever runs the sweep on the host — the Compose
 `outbox-sweeper` service or a cron entry — must `POST` to
 `/api/internal/outbox/sweep` with the `OUTBOX_SWEEP_TOKEN` bearer token for
 any of this to register. A condition that persists pages
@@ -1321,7 +1347,7 @@ How the app behaves (`lib/env.ts`):
   `OUTBOX_SWEEP_TOKEN` (`scripts/outbox-sweep.sh`), so it gets no key file. Giving
   it one only widens who can read the key. (The `docker-compose.yml` development
   stack still passes `SECRET_ENCRYPTION_KEY` as a plain variable.)
-- `/api/health` reports `"encryptionKey": {"configured": true, "source": "file"}`
+- `/api/health` (with a bearer token, see "Uptime monitor") reports `"encryptionKey": {"configured": true, "source": "file"}`
   (or `"env"`). `configured: false` with `source: "file"` means the file variable
   is set but the file could not be used. The value is never shown.
 
@@ -1457,7 +1483,7 @@ systemctl start imsda-xcloud-runtime-guard.timer
 6. Confirm:
 
 ```bash
-curl -s http://127.0.0.1:8100/api/health | grep -o '"encryptionKey":{[^}]*}'
+curl -s -H "Authorization: Bearer $OUTBOX_SWEEP_TOKEN" http://127.0.0.1:8100/api/health | grep -o '"encryptionKey":{[^}]*}'
 # expect: "encryptionKey":{"configured":true,"source":"file"}
 docker inspect xcloud-site-<id>-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c '^SECRET_ENCRYPTION_KEY='
 # expect 0 (only SECRET_ENCRYPTION_KEY_FILE, a path, is listed)

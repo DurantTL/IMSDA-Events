@@ -24,7 +24,12 @@ case "$1" in
 esac
 exit 0
 `;
+// Like the real endpoint (#1400): the detail answers only to the bearer header on stdin (-H @-).
+const sweepToken = "synthetic-sweep-token-0123456789-abcdefghij";
 const fakeCurl = `#!/bin/sh
+echo "curl $*" >> "$FAKE_DOCKER_LOG"
+header="$(cat)"
+[ "$header" = "Authorization: Bearer ${sweepToken}" ] || exit 0
 printf '%s' "$FAKE_HEALTH"
 `;
 
@@ -74,8 +79,9 @@ function setup(envFile: string, keyFile?: string) {
   return { run };
 }
 
-const envWithKey = "DATABASE_URL=postgresql://u:p@db/app\nSECRET_ENCRYPTION_KEY=x\n";
-const envWithoutKey = "DATABASE_URL=postgresql://u:p@db/app\n";
+const tokenLine = `OUTBOX_SWEEP_TOKEN=${sweepToken}\n`;
+const envWithKey = `DATABASE_URL=postgresql://u:p@db/app\nSECRET_ENCRYPTION_KEY=x\n${tokenLine}`;
+const envWithoutKey = `DATABASE_URL=postgresql://u:p@db/app\n${tokenLine}`;
 
 describe("manual-deploy.sh", () => {
   it("needs a full commit sha", () => {
@@ -118,6 +124,24 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toMatch(/run -d --name xcloud-site-1-app-1 .*SECRET_ENCRYPTION_KEY_FILE=\/run\/secrets\/encryption-key/);
     expect(result.calls).toMatch(/run -d .*imsda_events_assets:\/app\/storage\/event-assets/);
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
+  });
+
+  it("sends the sweep token to the health URL on stdin, never on the command line", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const result = run([sha]);
+    expect(result.status).toBe(0);
+    expect(result.calls).toMatch(/^curl .*-H @- /m);
+    expect(result.calls).not.toContain(sweepToken);
+    expect(result.stdout).not.toContain(sweepToken);
+  });
+
+  it("stops before changing anything when OUTBOX_SWEEP_TOKEN is missing from .env", () => {
+    const { run } = setup("DATABASE_URL=postgresql://u:p@db/app\nSECRET_ENCRYPTION_KEY=x\n");
+    const result = run([sha]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("OUTBOX_SWEEP_TOKEN");
+    expect(result.stderr).toContain("Nothing was changed");
+    expect(result.calls).toBe("");
   });
 
   it("rolls back to the old container when the new one never reports healthy", () => {

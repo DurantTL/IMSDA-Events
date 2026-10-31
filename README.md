@@ -233,7 +233,7 @@ Never place real attendee exports, medical details, production identifiers, or c
 - `POST /api/auth/password-reset/request` queues a single-use 30-minute reset credential for account email delivery; development can return a local link when delivery is unconfigured.
 - `POST /api/auth/password-reset/complete` updates the scrypt password hash and revokes all prior sessions.
 
-- `GET /api/health` checks the application, PostgreSQL connection, and message outbox, and identifies the running release SHA/build ID.
+- `GET /api/health` answers `status`, `checkedAt` and the database check to anyone. With the `OUTBOX_SWEEP_TOKEN` or `HEALTH_MONITOR_TOKEN` bearer token, or a system-admin session, it also shows the message outbox, sweep, backups, encryption key source and the running release SHA/build ID (see `docs/DEPLOY-DOCKER.md`, "Uptime monitor").
 - `GET /api/events` returns only events assigned to the development session user.
 - `GET /api/events/:eventId/overview` validates the event ID, verifies active event membership and `VIEW_EVENT`, then returns database-derived totals.
 - `GET|POST /api/events/:eventId/registrations` lists or creates registrations after event-scoped permission checks.

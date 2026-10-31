@@ -22,8 +22,13 @@ case "$1" in
 esac
 exit 0
 `;
-// curl answers /api/health with FAKE_SHA_<port>.
+// curl answers /api/health with FAKE_SHA_<port>, but only when stdin carries the
+// right bearer header (-H @-), like the real endpoint (#1400).
+const sweepToken = "synthetic-sweep-token-0123456789-abcdefghij";
 const fakeCurl = `#!/bin/sh
+echo "curl $*" >> "$FAKE_LOG"
+header="$(cat)"
+[ "$header" = "Authorization: Bearer ${sweepToken}" ] || exit 0
 for arg in "$@"; do
   case "$arg" in
     *:8101/*) printf '{"release":{"sha":"%s"}}' "$FAKE_SHA_8101" ;;
@@ -59,6 +64,8 @@ function setup(tools: Record<string, string>) {
 function runDeploy(env: Record<string, string>) {
   const ctx = setup({ docker: fakeDocker, curl: fakeCurl, git: fakeGit, sleep: fakeSleep });
   writeFileSync(ctx.log, "");
+  const envFile = path.join(ctx.dir, "site.env");
+  writeFileSync(envFile, env.FAKE_ENV_CONTENT ?? `DATABASE_URL=postgresql://u:p@db/app\nOUTBOX_SWEEP_TOKEN="${sweepToken}"\n`);
   const result = spawnSync("sh", [deployScript], {
     encoding: "utf8",
     env: {
@@ -67,6 +74,7 @@ function runDeploy(env: Record<string, string>) {
       IMSDA_LOCK_HELD: "1",
       XCLOUD_SITE_PATH: ctx.dir,
       XCLOUD_COMPOSE_FILE: ctx.compose,
+      IMSDA_ENV_FILE: envFile,
       IMSDA_HEALTH_WAIT_SECONDS: "6",
       IMSDA_CLEANUP: "/nonexistent",
       IMSDA_FAILED_SHA_FILE: path.join(ctx.dir, "failed-sha"),
@@ -121,6 +129,38 @@ describe("deploy.sh zero-downtime switch", () => {
     const rollback = calls.findIndex((c, index) => c.includes("up -d --no-deps app") && index > calls.indexOf("tag imsda-events:previous imsda-events:live prep= skip="));
     expect(calls[rollback]).toContain("skip=1");
     expect(calls.findIndex((c, index) => c.includes("rm -sf standby") && index > rollback)).toBeGreaterThan(rollback);
+  });
+
+  it("sends the sweep token on stdin, never on the command line", () => {
+    const { status, calls } = runDeploy({ FAKE_SHA_8101: sha, FAKE_SHA_8100: sha });
+    expect(status).toBe(0);
+    const curls = calls.filter((c) => c.startsWith("curl "));
+    expect(curls.length).toBeGreaterThan(0);
+    expect(curls.every((c) => c.includes("-H @-"))).toBe(true);
+    expect(calls.join("\n")).not.toContain(sweepToken);
+  });
+
+  it("reads the token from an unquoted line too", () => {
+    const { status } = runDeploy({
+      FAKE_SHA_8101: sha,
+      FAKE_SHA_8100: sha,
+      FAKE_ENV_CONTENT: `OUTBOX_SWEEP_TOKEN=old\nOUTBOX_SWEEP_TOKEN=${sweepToken}\n`,
+    });
+    expect(status).toBe(0);
+  });
+
+  it("stops before pulling or changing anything when the token cannot be read", () => {
+    const { status, calls, stderr, failed } = runDeploy({
+      FAKE_SHA_8101: sha,
+      FAKE_SHA_8100: sha,
+      FAKE_ENV_CONTENT: "DATABASE_URL=postgresql://u:p@db/app\n",
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain("OUTBOX_SWEEP_TOKEN");
+    expect(stderr).toContain("Nothing was changed");
+    expect(stderr).not.toContain(sweepToken);
+    expect(calls.filter((c) => c !== "")).toEqual([]);
+    expect(failed).toBeNull();
   });
 
   it("clears the failed marker after a successful deploy", () => {

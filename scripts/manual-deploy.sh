@@ -54,6 +54,12 @@ CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
 # --- 1. Server files ---------------------------------------------------------
 [ -r "$ENV_FILE" ] || fail "missing or unreadable $ENV_FILE"
 
+# /api/health shows the release SHA only to a caller with OUTBOX_SWEEP_TOKEN
+# (#1400). Read just that line (never `source` the file), strip optional quotes,
+# never print it, and give it to curl on stdin so it is not in `ps`.
+SWEEP_TOKEN="$(sed -n 's/^OUTBOX_SWEEP_TOKEN=//p' "$ENV_FILE" | tail -n 1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
+[ -n "$SWEEP_TOKEN" ] || fail "OUTBOX_SWEEP_TOKEN is not set in $ENV_FILE; the deploy needs it to confirm the new release on /api/health. Nothing was changed."
+
 has_var() { grep -Eq "^$1=[^[:space:]]" "$2" 2>/dev/null; }
 
 container_exists() { docker inspect "$1" >/dev/null 2>&1; }
@@ -183,7 +189,7 @@ log "Waiting up to ${HEALTH_TIMEOUT}s for $HEALTH_URL to report $SHORT_SHA"
 WAITED=0
 while :; do
   container_running "$APP" || rollback
-  BODY="$(curl -fsS --max-time 10 "$HEALTH_URL" 2>/dev/null || true)"
+  BODY="$(printf 'Authorization: Bearer %s\n' "$SWEEP_TOKEN" | curl -fsS --max-time 10 -H @- "$HEALTH_URL" 2>/dev/null || true)"
   if printf '%s' "$BODY" | grep -q "\"$SHA\""; then
     printf '%s' "$BODY" | grep -q '"status":"ok"' \
       || log "WARNING: health is not \"ok\"; check $HEALTH_URL (backups or outbox can degrade it without breaking the site)"

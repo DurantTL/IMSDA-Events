@@ -6,12 +6,21 @@ const dependencies = vi.hoisted(() => ({
   getReleaseIdentity: vi.fn(),
   getSweepHeartbeat: vi.fn(),
   getBackupStatus: vi.fn(),
+  getCurrentSession: vi.fn(),
+  dispatchUnsuppressedAlert: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
-vi.mock("@/modules/communications/outbox-sweep", () => ({
+vi.mock("@/modules/communications/outbox-sweep", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/communications/outbox-sweep")>()),
   getOutboxQueueHealth: dependencies.getOutboxQueueHealth,
+}));
+vi.mock("@/modules/access/current-session", () => ({
+  getCurrentSession: dependencies.getCurrentSession,
+}));
+vi.mock("@/modules/operations/alerting", () => ({
+  dispatchUnsuppressedAlert: dependencies.dispatchUnsuppressedAlert,
 }));
 vi.mock("@/lib/release", () => ({
   getReleaseIdentity: dependencies.getReleaseIdentity,
@@ -59,12 +68,20 @@ const healthyBackups = {
   needsAttention: false,
 };
 
+const sweepToken = "synthetic-sweep-token-0123456789-abcdefghij";
+const monitorToken = "synthetic-monitor-token-0123456789-abcdefgh";
+
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.getPrisma.mockReturnValue({ $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]) });
   dependencies.getOutboxQueueHealth.mockResolvedValue(healthyQueue);
   dependencies.getSweepHeartbeat.mockResolvedValue(recentSweep);
   dependencies.getBackupStatus.mockResolvedValue(healthyBackups);
+  dependencies.getCurrentSession.mockResolvedValue({ user: null });
+  dependencies.dispatchUnsuppressedAlert.mockResolvedValue(undefined);
+  resetServerEnvCache();
+  vi.stubEnv("OUTBOX_SWEEP_TOKEN", sweepToken);
+  vi.stubEnv("HEALTH_MONITOR_TOKEN", monitorToken);
   dependencies.getReleaseIdentity.mockReturnValue({
     sha: "d27839dcabf253111bf4a014cb526db3b1c57469",
     buildId: "next-build-id",
@@ -72,8 +89,20 @@ beforeEach(() => {
 });
 
 /** The wrapper needs a request: Next always supplies one. */
-function healthRequest() {
-  return new Request("https://events.imsda.test/api/health");
+function healthRequest(token?: string) {
+  return new Request("https://events.imsda.test/api/health", {
+    headers: token === undefined ? {} : { authorization: `Bearer ${token}` },
+  });
+}
+
+function adminSession(globalRole: string) {
+  dependencies.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole } });
+}
+
+function databaseDown() {
+  dependencies.getPrisma.mockReturnValue({
+    $queryRaw: vi.fn().mockRejectedValue(new Error("connection refused")),
+  });
 }
 
 afterEach(() => {
@@ -81,9 +110,143 @@ afterEach(() => {
   resetServerEnvCache();
 });
 
-describe("health endpoint", () => {
+describe("health endpoint, public answer (#1400)", () => {
+  it("returns only status, time and the database check", async () => {
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(["checkedAt", "services", "status"]);
+    expect(body.status).toBe("ok");
+    expect(body.services).toEqual({ database: "ok" });
+    expect(Number.isNaN(Date.parse(body.checkedAt))).toBe(false);
+    const text = JSON.stringify(body);
+    for (const key of ["release", "encryptionKey", "backups", "messageOutbox", "outboxSweep", "sha"]) {
+      expect(text).not.toContain(key);
+    }
+  });
+
+  it("does not run the outbox, sweep, backup or release lookups", async () => {
+    await GET(healthRequest());
+    expect(dependencies.getOutboxQueueHealth).not.toHaveBeenCalled();
+    expect(dependencies.getSweepHeartbeat).not.toHaveBeenCalled();
+    expect(dependencies.getBackupStatus).not.toHaveBeenCalled();
+    expect(dependencies.getReleaseIdentity).not.toHaveBeenCalled();
+  });
+
+  it("stays ok when backups are stale and the outbox is backed up", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({ ...healthyBackups, status: "stale", stale: true, needsAttention: true });
+    dependencies.getOutboxQueueHealth.mockResolvedValue({ ...healthyQueue, status: "degraded", due: 90 });
+    const response = await GET(healthRequest());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: "ok", services: { database: "ok" } });
+  });
+
+  it("returns 503 with a minimal body and still alerts when the database is down", async () => {
+    databaseDown();
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      status: "degraded",
+      checkedAt: expect.any(String),
+      services: { database: "unavailable" },
+    });
+    expect(dependencies.dispatchUnsuppressedAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives an authorized caller the same minimal 503 body when the database is down", async () => {
+    databaseDown();
+    const response = await GET(healthRequest(sweepToken));
+    expect(response.status).toBe(503);
+    expect(Object.keys(await response.json()).sort()).toEqual(["checkedAt", "services", "status"]);
+    expect(dependencies.dispatchUnsuppressedAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not look up a session when the database is down", async () => {
+    databaseDown();
+    await GET(healthRequest());
+    expect(dependencies.getCurrentSession).not.toHaveBeenCalled();
+  });
+
+  it("sends Cache-Control: no-store on every response", async () => {
+    expect((await GET(healthRequest())).headers.get("cache-control")).toBe("no-store");
+    expect((await GET(healthRequest(sweepToken))).headers.get("cache-control")).toBe("no-store");
+    databaseDown();
+    expect((await GET(healthRequest())).headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+describe("health endpoint, who sees the detail (#1400)", () => {
+  async function isFull(response: Response) {
+    const body = await response.json();
+    return "release" in body && "messageOutbox" in body && "backups" in body && "encryptionKey" in body;
+  }
+
+  it("shows the full response to the sweep token", async () => {
+    const response = await GET(healthRequest(sweepToken));
+    expect(await isFull(response)).toBe(true);
+    expect(dependencies.getOutboxQueueHealth).toHaveBeenCalled();
+  });
+
+  it("shows the full response to the monitor token", async () => {
+    expect(await isFull(await GET(healthRequest(monitorToken)))).toBe(true);
+  });
+
+  it("shows the public answer for a wrong token, a wrong length or no token", async () => {
+    expect(await isFull(await GET(healthRequest("synthetic-wrong-token-0123456789-abcdefghijk")))).toBe(false);
+    expect(await isFull(await GET(healthRequest(`${sweepToken}x`)))).toBe(false);
+    expect(await isFull(await GET(healthRequest(sweepToken.slice(0, -1))))).toBe(false);
+    expect(await isFull(await GET(healthRequest("")))).toBe(false);
+    expect(await isFull(await GET(healthRequest()))).toBe(false);
+  });
+
+  it("fails closed when the monitor token is unset or shorter than 32 characters", async () => {
+    resetServerEnvCache();
+    vi.stubEnv("HEALTH_MONITOR_TOKEN", "");
+    expect(await isFull(await GET(healthRequest("")))).toBe(false);
+    expect(await isFull(await GET(healthRequest(monitorToken)))).toBe(false);
+
+    resetServerEnvCache();
+    vi.stubEnv("HEALTH_MONITOR_TOKEN", "short-token");
+    expect(await isFull(await GET(healthRequest("short-token")))).toBe(false);
+  });
+
+  it("fails closed when no sweep token is configured", async () => {
+    resetServerEnvCache();
+    vi.stubEnv("OUTBOX_SWEEP_TOKEN", "");
+    expect(await isFull(await GET(healthRequest(sweepToken)))).toBe(false);
+  });
+
+  it("shows the full response to a system administrator session", async () => {
+    adminSession("SYSTEM_ADMIN");
+    expect(await isFull(await GET(healthRequest()))).toBe(true);
+  });
+
+  it("shows the public answer to a signed-in user who is not a system administrator", async () => {
+    adminSession("USER");
+    expect(await isFull(await GET(healthRequest()))).toBe(false);
+  });
+
+  it("shows the public answer when the session lookup throws", async () => {
+    dependencies.getCurrentSession.mockRejectedValue(new Error("cookies unavailable"));
+    const response = await GET(healthRequest());
+    expect(response.status).toBe(200);
+    expect(await isFull(response)).toBe(false);
+  });
+
+  it("does not look up a session for a token holder", async () => {
+    await GET(healthRequest(monitorToken));
+    expect(dependencies.getCurrentSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("health endpoint, full detail", () => {
   it("shows how the encryption key is loaded and never its value", async () => {
     const syntheticKey = "synthetic-health-key-0123456789-abcdefghijklmno";
+    // A session, not a token: an environment with a missing key file cannot be read for tokens.
+    adminSession("SYSTEM_ADMIN");
     resetServerEnvCache();
     vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "");
     vi.stubEnv("SECRET_ENCRYPTION_KEY", syntheticKey);
@@ -108,7 +271,7 @@ describe("health endpoint", () => {
   });
 
   it("reports ok when the database and the outbox are both healthy", async () => {
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -129,7 +292,7 @@ describe("health endpoint", () => {
       reasons: ["90 messages are due and undelivered"],
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
     const body = await response.json();
 
     // Still 200: a backed-up queue must not make the orchestrator restart a
@@ -144,7 +307,7 @@ describe("health endpoint", () => {
       $queryRaw: vi.fn().mockRejectedValue(new Error("connection refused")),
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
@@ -155,7 +318,7 @@ describe("health endpoint", () => {
   it("stays up and marks the outbox unknown when its own check fails", async () => {
     dependencies.getOutboxQueueHealth.mockRejectedValue(new Error("query failed"));
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -172,7 +335,7 @@ describe("health endpoint", () => {
       ageMs: 40 * 60_000,
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -190,7 +353,7 @@ describe("health endpoint", () => {
       ageMs: null,
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
@@ -201,7 +364,7 @@ describe("health endpoint", () => {
   it("marks the sweep unknown when its heartbeat cannot be read", async () => {
     dependencies.getSweepHeartbeat.mockRejectedValue(new Error("query failed"));
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
@@ -211,7 +374,7 @@ describe("health endpoint", () => {
   });
 
   it("shows the backup block without secrets and stays ok", async () => {
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -237,7 +400,7 @@ describe("health endpoint", () => {
       needsAttention: true,
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -254,7 +417,7 @@ describe("health endpoint", () => {
       needsAttention: true,
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     const body = await response.json();
     expect(body.status).toBe("degraded");
@@ -274,7 +437,7 @@ describe("health endpoint", () => {
       lastRehearsalOk: null,
     });
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
@@ -285,7 +448,7 @@ describe("health endpoint", () => {
   it("marks backups unknown when their status cannot be read", async () => {
     dependencies.getBackupStatus.mockRejectedValue(new Error("query failed"));
 
-    const response = await GET(healthRequest());
+    const response = await GET(healthRequest(sweepToken));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({

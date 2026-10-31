@@ -22,9 +22,20 @@ COMPOSE="${XCLOUD_COMPOSE_FILE:-/home/u_events/239298/docker-compose.yml}"
 SHA="$(git -c safe.directory="$SITE" -C "$SITE" rev-parse HEAD)"
 IMAGE="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}:$SHA"
 WAIT_SECONDS="${IMSDA_IMAGE_WAIT_SECONDS:-1200}"
+# /api/health shows the release SHA only to a caller with OUTBOX_SWEEP_TOKEN
+# (#1400). Same file deploy/xcloud/docker-compose.yml reads as env_file.
+ENV_FILE="${IMSDA_ENV_FILE:-/home/u_events/239298/.env}"
 
 grep -q 'imsda-events:live' "$COMPOSE" || {
   echo "[deploy] $COMPOSE is not the IMSDA version (xCloud regenerated it?). Copy deploy/xcloud/docker-compose.yml over it first." >&2
+  exit 1
+}
+
+# Read just the one line (never `source` the file); strip optional quotes. The
+# value is never printed and only reaches curl on stdin, so it is not in `ps`.
+SWEEP_TOKEN="$(sed -n 's/^OUTBOX_SWEEP_TOKEN=//p' "$ENV_FILE" 2>/dev/null | tail -n 1 | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
+[ -n "$SWEEP_TOKEN" ] || {
+  echo "[deploy] Could not read OUTBOX_SWEEP_TOKEN from $ENV_FILE; the deploy needs it to confirm the new release on /api/health. Nothing was changed." >&2
   exit 1
 }
 
@@ -45,7 +56,7 @@ done
 #     old code then runs on the new schema, so migrations must be additive
 #     (docs/DEPLOY-DOCKER.md, "Deploys without downtime");
 #  2. the new version starts as `standby` on port 8101 and must report this SHA
-#     on /api/health. If it never does, the live app is not restarted;
+#     on /api/health (detail, so it sends OUTBOX_SWEEP_TOKEN). If it never does, the live app is not restarted;
 #  3. the live tag moves and `app` restarts on 8100 with the preparation
 #     skipped, so it answers within seconds. nginx can fail over to 8101 for
 #     those seconds;
@@ -60,7 +71,8 @@ export IMSDA_STANDBY_TAG=next
 wait_for_release() { # port sha
   waited=0
   while [ "$waited" -lt "$HEALTH_SECONDS" ]; do
-    if curl -fsS --max-time 5 "http://127.0.0.1:$1/api/health" 2>/dev/null | grep -q "\"sha\":\"$2\""; then
+    if printf 'Authorization: Bearer %s\n' "$SWEEP_TOKEN" \
+      | curl -fsS --max-time 5 -H @- "http://127.0.0.1:$1/api/health" 2>/dev/null | grep -q "\"sha\":\"$2\""; then
       return 0
     fi
     sleep 3

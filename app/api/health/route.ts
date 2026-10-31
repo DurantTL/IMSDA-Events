@@ -7,6 +7,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { getReleaseIdentity } from "@/lib/release";
 import { getSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
 import { getBackupStatus } from "@/modules/operations/backup-status-repository";
+import { hasHealthDetailToken, isSystemAdministratorSession } from "@/modules/operations/health-access";
 import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/operations/backup-status";
 
 /**
@@ -16,12 +17,18 @@ import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/oper
  * broken, so the outbox is checked too. A backed-up queue is `degraded`, not
  * `unavailable`: the container should stay up and keep serving registrations
  * while somebody investigates, so only a database failure returns 503.
+ *
+ * The public answer (#1400) is only "the app is up and the database answers":
+ * status, time and the database check. The detail below (release, backups,
+ * outbox, sweep, key source) needs the sweep token, the monitor token or a
+ * system-administrator session. The public status is never degraded by backups,
+ * the outbox or the sweep, and those queries do not run for public callers.
  */
-async function getHandler() {
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+async function getHandler(request: Request) {
+  const tokenAuthorized = hasHealthDetailToken(request);
   const checkedAt = new Date().toISOString();
-  const release = getReleaseIdentity();
-  // Whether a key is configured and how it was loaded. Never the key itself.
-  const encryptionKey = getEncryptionKeyStatus();
 
   const database = await checkDatabaseLiveness();
   if (!database.ok) {
@@ -37,16 +44,24 @@ async function getHandler() {
       detail: "Registrations, check-in, and payment cannot be recorded until it returns.",
     }).catch(() => undefined);
     return Response.json(
-      {
-        status: "degraded",
-        checkedAt,
-        release,
-        services: { application: "ok", database: "unavailable" },
-        encryptionKey,
-      },
-      { status: 503 }
+      { status: "degraded", checkedAt, services: { database: "unavailable" } },
+      { status: 503, headers: NO_STORE }
     );
   }
+
+  // Only now, with the database answering, look up a session. A lookup error
+  // is an unauthorized caller, never a failed health check.
+  const authorized = tokenAuthorized || (await isSystemAdministratorSession());
+  if (!authorized) {
+    return Response.json(
+      { status: "ok", checkedAt, services: { database: "ok" } },
+      { headers: NO_STORE }
+    );
+  }
+
+  const release = getReleaseIdentity();
+  // Whether a key is configured and how it was loaded. Never the key itself.
+  const encryptionKey = getEncryptionKeyStatus();
 
   let outbox: Awaited<ReturnType<typeof getOutboxQueueHealth>> | null = null;
   try {
@@ -79,7 +94,8 @@ async function getHandler() {
   }
   const backupsDegraded = backupStatusDegradesHealth(backups);
 
-  return Response.json({
+  return Response.json(
+    {
     status:
       (outbox && outbox.status !== "ok") || sweepDegraded || backupsDegraded
         ? "degraded"
@@ -108,7 +124,9 @@ async function getHandler() {
           eventsWithDueMessages: outbox.eventsWithDueMessages,
         }
       : null,
-  });
+    },
+    { headers: NO_STORE }
+  );
 }
 
 export const GET = withRequestContext(getHandler);
