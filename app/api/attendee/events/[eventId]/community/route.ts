@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeCommunityActionSchema, attendeeCommunitySearchSchema } from "@/modules/community/domain";
 import {
   acceptCommunityConduct,
@@ -62,6 +63,8 @@ async function postHandler(
     if (current.via !== "attendee" || !current.account) {
       return json({ message: "Sign in as an attendee to use the community." }, { status: 401 });
     }
+    // A club role that still owes its emailed sign-in code (#1410) has not finished signing in.
+    if (await attendeeSignInStepPending()) return signInStepRequired();
     const input = attendeeCommunityActionSchema.parse(await request.json());
     if (input.action === "CREATE_POST") {
       rateLimit = await checkAttendeeCommunityPostRateLimit(
@@ -109,6 +112,13 @@ async function postHandler(
   }
 }
 
+function signInStepRequired() {
+  return json(
+    { code: "SECOND_STEP_REQUIRED", message: "Finish signing in to use the community." },
+    { status: 403 },
+  );
+}
+
 async function getHandler(
   request: Request,
   context: { params: Promise<{ eventId: string }> },
@@ -119,6 +129,8 @@ async function getHandler(
     if (current.via !== "attendee" || !current.account) {
       return json({ message: "Sign in as an attendee to search the community." }, { status: 401 });
     }
+    // A club role that still owes its emailed sign-in code (#1410) has not finished signing in.
+    if (await attendeeSignInStepPending()) return signInStepRequired();
     const params = new URL(request.url).searchParams;
     const cursor = params.get("cursor");
     if (cursor !== null) {

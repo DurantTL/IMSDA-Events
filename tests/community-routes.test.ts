@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const signInStep = vi.hoisted(() => ({ pending: vi.fn() }));
 const mocks = vi.hoisted(() => {
   class MockAccessDeniedError extends Error {
     constructor(
@@ -45,6 +46,9 @@ vi.mock("@/modules/access/authorization", () => ({
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
   getCurrentAttendee: mocks.getCurrentAttendee,
+}));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({
+  attendeeSignInStepPending: signInStep.pending,
 }));
 vi.mock("@/modules/events/repository", () => ({
   findActiveMembership: mocks.findActiveMembership,
@@ -92,6 +96,7 @@ function request(method: "POST" | "PATCH", body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
+  signInStep.pending.mockResolvedValue(false);
   mocks.getCurrentAttendee.mockResolvedValue({ account, via: "attendee", sessionId: "session-1" });
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.requirePermission.mockResolvedValue({ user: { id: "staff-1" } });
@@ -154,6 +159,20 @@ describe("attendee community route", () => {
 
     expect(response.status).toBe(401);
     expect(mocks.acceptCommunityConduct).not.toHaveBeenCalled();
+  });
+
+  it("refuses a club-role session that still owes its emailed sign-in code (#1410)", async () => {
+    signInStep.pending.mockResolvedValue(true);
+    const post = await attendeePost(request("POST", {
+      action: "CREATE_POST", body: "Posted before the sign-in code.", parentId: null,
+    }), context);
+    expect(post.status).toBe(403);
+    expect((await post.json()).code).toBe("SECOND_STEP_REQUIRED");
+    expect(mocks.createCommunityPost).not.toHaveBeenCalled();
+
+    const search = await attendeeGet(new Request("https://events.imsda.test/api/community?q=bags"), context);
+    expect(search.status).toBe(403);
+    expect(mocks.searchAttendeeCommunityPosts).not.toHaveBeenCalled();
   });
 
   it("searches only through the signed-in attendee boundary", async () => {
