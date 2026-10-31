@@ -255,10 +255,10 @@ describe("providers", () => {
       const report = await loadSystemReport(now);
       const rows = report.sections.flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(0); // the release identity and start time are information, never counted as OK
+      expect(report.overall.tally.ok).toBe(1); // only the pricing self-test, which reads no source; the release identity and start time are information
       expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");

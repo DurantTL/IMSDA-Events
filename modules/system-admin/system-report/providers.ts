@@ -12,6 +12,7 @@ import { readDiskSpace } from "@/modules/operations/disk-space";
 import {
   CALENDAR_FEED_REFRESH_JOB,
   EMAIL_REACHABILITY_JOB,
+  GENERAL_LINK_EXPIRY_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
@@ -26,7 +27,10 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
-import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
+import { calendarRefreshFields, diskFields, generalLinkExpiryFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
+import { runPricingSelfTest } from "./pricing-self-test";
+import { countPublicSubmissionsSince, readOpenRegistrationEvents, readUnreleasedHoldCounts } from "./registration-reads";
+import { openWithoutFormFields, pricingSelfTestFields, registrationsReceivedFields, unreleasedHoldsFields } from "./registration-signals";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -540,6 +544,66 @@ export const systemReportProviders: readonly SignalProvider[] = [
         sectionLabel,
       };
     });
+  }),
+
+  defineProvider("registration", [
+    m("pricing-self-test", "Pricing self-test", "The pricing arithmetic (form total, early-bird price, quantity, promo code, deposit, card fee) gives the known answers for one fixed example. It reads no registration.", "/registration-builder", "Open the form builder"),
+    m("capacity-holds-released", "Capacity holds released", "No capacity hold is still kept by a cancelled or waitlisted registration.", "/registrations", "Open registrations"),
+    m("open-without-form", "Open events have a form", "Every event that is open for registration has a published registration form.", "/registration-builder", "Open the form builder"),
+    m("registrations-received", "Registrations received", "Public registration submissions in the last 24 hours for open events. A count only.", "/registrations", "Open registrations"),
+    m("general-link-expiry", "Pending-team expiry", "The last sweep's expiry of general-link teams still waiting 30 days after their event ended.", "/events-admin", "Open events"),
+  ], async (ctx) => {
+    let pricing: Awaited<ReturnType<Reader>>[number];
+    try {
+      pricing = pricingSelfTestFields("pricing-self-test", runPricingSelfTest(), iso(new Date()));
+    } catch (error) {
+      logError("System report pricing self-test could not run", error);
+      pricing = { key: "pricing-self-test", ...tried({ ok: false, readAt: new Date() }, "The pricing self-test could not run. It is not shown as OK.") };
+    }
+
+    const windowStart = new Date(ctx.now.getTime() - EVENT_LOOKBACK_MS);
+    const opened = await ctx.once("registration-open-events", () => readOpenRegistrationEvents(ctx.now, windowStart));
+    const events = await reportEvents(ctx);
+
+    let holds: Awaited<ReturnType<Reader>>[number];
+    if (!events.ok) holds = { key: "capacity-holds-released", ...tried(events) };
+    else {
+      const ids = events.value.map((event) => event.id);
+      const read = await ctx.once("registration-unreleased-holds", () => readUnreleasedHoldCounts(ids));
+      if (!read.ok) holds = { key: "capacity-holds-released", ...tried(read) };
+      else {
+        const named = read.value.map((row) => events.value.find((event) => event.id === row.eventId)).filter((event): event is { id: string; name: string } => Boolean(event));
+        holds = unreleasedHoldsFields("capacity-holds-released", {
+          total: read.value.reduce((sum, row) => sum + row.count, 0),
+          firstEventId: read.value[0]?.eventId ?? null,
+          firstEventHref: (eventId) => eventHref("/registrations", eventId),
+          eventNames: namesOf(named),
+          readAt: iso(read.readAt),
+        });
+      }
+    }
+
+    let noForm: Awaited<ReturnType<Reader>>[number];
+    let received: Awaited<ReturnType<Reader>>[number];
+    if (!opened.ok) {
+      noForm = { key: "open-without-form", ...tried(opened) };
+      received = { key: "registrations-received", ...tried(opened) };
+    } else {
+      noForm = openWithoutFormFields("open-without-form", {
+        openCount: opened.value.length,
+        withoutForm: opened.value.filter((event) => !event.hasPublishedForm),
+        namesOf,
+        href: (eventId) => eventHref("/registration-builder", eventId),
+        readAt: iso(opened.readAt),
+      });
+      const since = new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000);
+      const count = await ctx.once("registration-public-submissions", () => countPublicSubmissionsSince(opened.value.map((event) => event.id), since));
+      received = !count.ok
+        ? { key: "registrations-received", ...tried(count) }
+        : registrationsReceivedFields("registrations-received", { count: count.value, openCount: opened.value.length, readAt: iso(count.readAt) });
+    }
+
+    return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields)];
   }),
 ];
 

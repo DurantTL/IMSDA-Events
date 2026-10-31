@@ -17,7 +17,7 @@ import { expireStalePendingTeams } from "@/modules/general-link-registrations/re
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordJobRun, recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
-import { CALENDAR_FEED_REFRESH_JOB, MESSAGE_FILE_CLEANUP_JOB } from "@/modules/operations/sweep-heartbeat";
+import { CALENDAR_FEED_REFRESH_JOB, GENERAL_LINK_EXPIRY_JOB, MESSAGE_FILE_CLEANUP_JOB } from "@/modules/operations/sweep-heartbeat";
 import { withRequestContext } from "@/lib/request-context";
 import { sweepMessageFiles } from "@/modules/communications/message-file-sweep";
 import { messageFileSweepDeletes } from "@/modules/communications/message-file-config";
@@ -138,6 +138,14 @@ async function postHandler(request: Request) {
     const generalLinkRetention = await expireStalePendingTeams().catch((error) => {
       logError("The general link retention sweep failed after a successful outbox sweep", error);
       return null;
+    });
+    // The System report (#1375) shows when this step last ran and its counts. Recording never fails the sweep.
+    await recordJobRun(
+      GENERAL_LINK_EXPIRY_JOB,
+      generalLinkRetention ? "SUCCEEDED" : "FAILED",
+      generalLinkRetention ? { expired: generalLinkRetention.expired, events: generalLinkRetention.events } : undefined,
+    ).catch((error) => {
+      logError("Could not record the pending-team expiry run", error);
     });
     // Message files (#845): uploads nothing refers to. It only REPORTS what it would delete unless a human set
     // MESSAGE_FILE_SWEEP_DELETE=true, never touches a file inside the grace period (24 hours at the least) or one
