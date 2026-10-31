@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confirmationMessageForEvent, eventRegistrationFormTitle, renameFormDefinitionForEvent } from "@/modules/forms/event-form-naming";
+import { formIndexToNameAfterEvent, confirmationMessageForEvent, eventRegistrationFormTitle, renameFormDefinitionForEvent } from "@/modules/forms/event-form-naming";
 import { slugify } from "@/modules/forms/slug";
 
 describe("event form naming (#1406)", () => {
@@ -34,5 +34,16 @@ describe("event form naming (#1406)", () => {
   it("renames a whole definition without touching other fields", () => {
     const renamed = renameFormDefinitionForEvent({ title: "Women’s Retreat 2026 registration", confirmationMessage: "Your Women’s Retreat registration has been received.", other: 1 }, "Mock Run Retreat 2027");
     expect(renamed).toEqual({ title: "Mock Run Retreat 2027 registration", confirmationMessage: "Your Mock Run Retreat 2027 registration has been received.", other: 1 });
+  });
+
+  it("picks the registration form only when exactly one title ends in registration", () => {
+    expect(formIndexToNameAfterEvent(["Volunteer sign-up", "Women’s Retreat 2026 registration"])).toBe(1);
+    expect(formIndexToNameAfterEvent(["A registration", "B Registration"])).toBeNull();
+    expect(formIndexToNameAfterEvent(["Volunteer sign-up"])).toBeNull();
+  });
+
+  it("rewrites the confirmation but keeps the title when the form is not renamed", () => {
+    expect(renameFormDefinitionForEvent({ title: "Volunteer sign-up", confirmationMessage: "Your Old registration has been received." }, "New 2027", false))
+      .toEqual({ title: "Volunteer sign-up", confirmationMessage: "Your New 2027 registration has been received." });
   });
 });

@@ -206,6 +206,27 @@ describe("applyEventTemplate (#152)", () => {
     }));
   });
 
+  it("names only the one registration form after the new event and keeps the other form's title (#1406)", async () => {
+    const sections = [{ id: "sec_one", title: "Everything", description: "", fields: [{ id: "f_name", key: "full_name", label: "Name", type: "TEXT", scope: "REGISTRATION", required: true, options: [] }] }];
+    const payload = eventTemplatePayloadSchema.parse({
+      audience: "GENERAL",
+      registrationForms: [
+        { name: "Old", slug: "old-registration", definition: { title: "Old Retreat 2026 registration", confirmationMessage: "Your Old Retreat registration has been received.", sections } },
+        { name: "Volunteers", slug: "volunteer-sign-up", definition: { title: "Volunteer sign-up", confirmationMessage: "Your Old Retreat registration has been received.", sections } },
+      ],
+    });
+    const { prisma, registrationFormCreate } = mockApply({ publishedVersion: versionRow({ payload }) });
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await applyEventTemplate("template-1", "usr_actor", applyInput);
+
+    expect(registrationFormCreate).toHaveBeenCalledTimes(2);
+    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ slug: "weekend-retreat-2027-registration", name: "Weekend Retreat 2027 registration" });
+    expect(registrationFormCreate.mock.calls[1]![0].data).toMatchObject({ slug: "volunteer-sign-up", name: "Volunteer sign-up" });
+    const confirmations = registrationFormCreate.mock.calls.map((call) => call[0].data.versions.create.definition.confirmationMessage);
+    expect(confirmations).toEqual(Array(2).fill("Your Weekend Retreat 2027 registration has been received."));
+  });
+
   it("creates the registration forms a template saved from an event carries, as drafts, after the meals (#154)", async () => {
     const payload = eventTemplatePayloadSchema.parse({
       audience: "GENERAL",
@@ -223,7 +244,7 @@ describe("applyEventTemplate (#152)", () => {
     await applyEventTemplate("template-1", "usr_actor", applyInput);
 
     expect(registrationFormCreate).toHaveBeenCalledTimes(1);
-    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ eventId: "event-1", slug: "weekend-retreat-2027-registration", name: "Weekend Retreat 2027 registration" }); // named after the new event (#1406)
+    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ eventId: "event-1", slug: "retreat-form", name: "Retreat form" }); // not a registration title: keeps its own name (#1406)
     expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: "REGISTRATION_FORM_CREATED", metadata: expect.objectContaining({ templateVersionId: "version-1" }) }),
     }));

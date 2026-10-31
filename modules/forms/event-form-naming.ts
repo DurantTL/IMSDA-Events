@@ -31,11 +31,29 @@ export function confirmationMessageForEvent(message: string, eventName: string):
   return next.length > CONFIRMATION_MAX_LENGTH ? message : next;
 }
 
-/** A copy of a form definition named after the new event: its title and event-specific confirmation text. */
-export function renameFormDefinitionForEvent<T extends { title: string; confirmationMessage: string }>(definition: T, eventName: string): T {
+/** A title that names a registration form ("Women’s Retreat 2026 registration"), as opposed to a sign-up or survey. */
+export function isRegistrationFormTitle(title: string): boolean {
+  return /registration\s*$/i.test(title.trim());
+}
+
+/**
+ * Which of the forms copied for a new event takes the event's name: the one whose template title ends in
+ * "registration", when exactly one does. With none or several, no form is renamed, so a "Volunteer sign-up" never
+ * becomes "<event> registration". Returns the index in `titles`, or null.
+ */
+export function formIndexToNameAfterEvent(titles: readonly string[]): number | null {
+  const matches = titles.flatMap((title, index) => (isRegistrationFormTitle(title) ? [index] : []));
+  return matches.length === 1 ? matches[0]! : null;
+}
+
+/**
+ * A copy of a form definition for a new event: the event-specific confirmation text always carries the event's name;
+ * the title only when `renameTitle` (the form chosen by `formIndexToNameAfterEvent`).
+ */
+export function renameFormDefinitionForEvent<T extends { title: string; confirmationMessage: string }>(definition: T, eventName: string, renameTitle = true): T {
   return {
     ...definition,
-    title: eventRegistrationFormTitle(eventName),
+    title: renameTitle ? eventRegistrationFormTitle(eventName) : definition.title,
     confirmationMessage: confirmationMessageForEvent(definition.confirmationMessage, eventName),
   };
 }

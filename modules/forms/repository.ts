@@ -302,8 +302,8 @@ export async function createRegistrationFormFromTemplateInTransaction(
   actorUserId: string,
   templateKey: string,
   expectedVersionId?: string,
-  /** Set only when a NEW event is created from an event template (#1406): the form is named after that event. */
-  eventName?: string,
+  /** Set only when a NEW event is created from an event template (#1406): its confirmation carries the event's name, and the form is named after it when `nameFormAfterEvent`. */
+  newEvent?: { eventName: string; nameFormAfterEvent: boolean },
 ) {
   // A template is read from its stored row (#153, #1064), at its latest version; the definition is copied into the
   // new form's own version, so nothing created here is linked to the template afterwards.
@@ -313,7 +313,7 @@ export async function createRegistrationFormFromTemplateInTransaction(
   return createRegistrationFormFromDefinitionInTransaction(tx, eventId, actorUserId, {
     definition: template.definition,
     sourceTemplateVersionId: template.versionId,
-    ...(eventName ? { eventName } : {}),
+    ...(newEvent ?? {}),
     summary: (formName) => `Created ${formName} from the ${template.name} template.`,
     metadata: { templateKey, ...(template.version !== undefined ? { templateVersion: template.version } : {}), ...(template.versionId ? { templateVersionId: template.versionId } : {}) },
   });
@@ -337,8 +337,9 @@ export async function createRegistrationFormFromDefinitionInTransaction(
   source: {
     definition: unknown;
     preferredSlug?: string;
-    /** A NEW event's name (#1406): the form's title, web address and confirmation take it instead of the definition's own. */
+    /** A NEW event's name (#1406): the confirmation text takes it, and with `nameFormAfterEvent` so do the form's title and web address. */
     eventName?: string;
+    nameFormAfterEvent?: boolean;
     /** The immutable template version this definition is a copy of (#1065); omitted for any other source. */
     sourceTemplateVersionId?: string | null;
     summary: (formName: string) => string;
@@ -346,10 +347,10 @@ export async function createRegistrationFormFromDefinitionInTransaction(
   },
 ) {
   const parsed = registrationFormDefinitionSchema.parse(structuredClone(source.definition));
-  const definition = source.eventName ? renameFormDefinitionForEvent(parsed, source.eventName) : parsed;
+  const definition = source.eventName ? renameFormDefinitionForEvent(parsed, source.eventName, source.nameFormAfterEvent ?? false) : parsed;
   // Meal ticket prices come from the event's meal plan (#210), the one place they are set.
   const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(applyMealPricesToDefinition(definition, await loadTicketPrices(tx, eventId))));
-  const baseSlug = (source.eventName ? undefined : source.preferredSlug) || slugify(definition.title);
+  const baseSlug = (source.eventName && source.nameFormAfterEvent ? undefined : source.preferredSlug) || slugify(definition.title);
   let slug = baseSlug;
   let suffix = 2;
   while (await tx.registrationForm.findUnique({ where: { eventId_slug: { eventId, slug } }, select: { id: true } })) {

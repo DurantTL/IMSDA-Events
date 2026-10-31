@@ -20,6 +20,8 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromDefinitionInTransaction, createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCreationModules } from "@/modules/event-modules/defaults";
+import { formIndexToNameAfterEvent } from "@/modules/forms/event-form-naming";
+import { loadFormTemplate } from "@/modules/forms/seeded-templates";
 import { DEFAULT_EVENT_TIME_ZONE, eventInstant } from "@/modules/events/event-times";
 import { creationModuleKeys } from "@/modules/event-modules/catalog";
 import { creationFlagKeys, type CreationFlagKey } from "@/modules/event-features/creation";
@@ -437,6 +439,7 @@ export async function applyEventTemplate(
           name: input.name,
           slug: input.slug,
           // The chosen start and end times are wall-clock times in the event's time zone (the column default); none keeps noon UTC (#1406).
+          timezone: DEFAULT_EVENT_TIME_ZONE,
           startsAt: eventInstant(input.startsOn, input.startTime, DEFAULT_EVENT_TIME_ZONE),
           endsAt: eventInstant(input.endsOn, input.endTime, DEFAULT_EVENT_TIME_ZONE),
           ...(fromItem?.location ? { location: fromItem.location } : {}),
@@ -512,16 +515,23 @@ export async function applyEventTemplate(
         await createMealDefinitions(tx, event.id, mealDefinitionsFromTemplate(payload.meals, input.startsOn), actorUserId);
       }
 
-      for (const templateKey of payload.formTemplateKeys) {
-        await createRegistrationFormFromTemplateInTransaction(tx, event.id, actorUserId, templateKey, undefined, input.name);
+      // Only the one form that is the event's registration form takes the event's name (#1406); the rest keep their own.
+      const copiedTitles = [
+        ...(await Promise.all(payload.formTemplateKeys.map(async (templateKey) => (await loadFormTemplate(tx, templateKey))?.definition.title ?? ""))),
+        ...(payload.registrationForms ?? []).map((templateForm) => templateForm.definition.title),
+      ];
+      const namedFormIndex = formIndexToNameAfterEvent(copiedTitles);
+      for (const [index, templateKey] of payload.formTemplateKeys.entries()) {
+        await createRegistrationFormFromTemplateInTransaction(tx, event.id, actorUserId, templateKey, undefined, { eventName: input.name, nameFormAfterEvent: index === namedFormIndex });
       }
 
       // Forms saved from an event (#154): each is a new draft built from the template's own copy of the definition.
-      for (const templateForm of payload.registrationForms ?? []) {
+      for (const [formIndex, templateForm] of (payload.registrationForms ?? []).entries()) {
         await createRegistrationFormFromDefinitionInTransaction(tx, event.id, actorUserId, {
           definition: templateForm.definition,
           preferredSlug: templateForm.slug,
           eventName: input.name,
+          nameFormAfterEvent: payload.formTemplateKeys.length + formIndex === namedFormIndex,
           summary: (formName) => `Created ${formName} from the ${template.name} template, version ${version.versionNumber}.`,
           metadata: { templateId: template.id, templateVersionId: version.id },
         });

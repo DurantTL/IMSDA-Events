@@ -3,6 +3,7 @@ import "server-only";
 import { ConsentPolicyVersionStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
+import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   applicabilityMatches,
@@ -487,8 +488,10 @@ export async function updateEventPolicyApplicability(eventId: string, applicabil
  */
 export async function resolveApplicablePolicies(eventId: string, subject: ApplicabilitySubject) {
   const prisma = getPrisma();
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { startsAt: true } });
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { startsAt: true, timezone: true } });
   if (!event) return [];
+  // Ages count on the event's own calendar day, not the UTC day its start instant falls on (#1406).
+  const eventDate = new Date(`${calendarDateInEventTimeZone(event.startsAt, event.timezone)}T00:00:00.000Z`);
   const rows = await prisma.eventConsentPolicyApplicability.findMany({
     where: { eventId, isActive: true },
     include: applicabilityInclude,
@@ -496,7 +499,7 @@ export async function resolveApplicablePolicies(eventId: string, subject: Applic
   });
   const byPolicy = new Map<string, { policy: ApplicabilityRow["policy"]; isRequired: boolean }>();
   for (const row of rows) {
-    if (!applicabilityMatches(row, subject, event.startsAt)) continue;
+    if (!applicabilityMatches(row, subject, eventDate)) continue;
     const existing = byPolicy.get(row.policyId);
     byPolicy.set(row.policyId, { policy: row.policy, isRequired: (existing?.isRequired ?? false) || row.isRequired });
   }

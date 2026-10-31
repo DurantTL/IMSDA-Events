@@ -428,7 +428,7 @@ describe("per-event policy applicability", () => {
 
   it("resolves applicable policies by age band on the event start date", async () => {
     const tx = client();
-    tx.event.findUnique.mockResolvedValue({ startsAt: new Date("2026-07-10T00:00:00Z") });
+    tx.event.findUnique.mockResolvedValue({ startsAt: new Date("2026-07-10T00:00:00Z"), timezone: "America/Chicago" });
     const policy = (id: string, kind: string) => ({ id, kind, scope: "EVENT", slug: id, name: `Synthetic ${id}`, eventId: "event-1", currentVersionId: null });
     const row = (id: string, policyId: string, kind: string, overrides: Record<string, unknown>) => ({
       id, eventId: "event-1", policyId, attendeeTypeDefinitionId: null, role: null, minimumAge: null, maximumAge: null,
@@ -454,6 +454,19 @@ describe("per-event policy applicability", () => {
       ["policy-photo-ack", false],
     ]);
     expect(tx.eventConsentPolicyApplicability.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event-1", isActive: true } }));
+  });
+});
+
+describe("consent age band on the event's calendar day (#1406)", () => {
+  it("counts a person as 17 on a 7 PM Chicago start the day before their 18th birthday", async () => {
+    const tx = client();
+    tx.event.findUnique.mockResolvedValue({ startsAt: new Date("2027-03-06T01:00:00.000Z"), timezone: "America/Chicago" });
+    tx.eventConsentPolicyApplicability.findMany.mockResolvedValue([
+      { id: "a", policyId: "policy-guardian", isRequired: true, attendeeTypeDefinitionId: null, role: null, minimumAge: null, maximumAge: 17, policy: { id: "policy-guardian" } },
+    ]);
+    useClient(tx);
+    const result = await resolveApplicablePolicies("event-1", { attendeeTypeDefinitionId: null, role: null, dateOfBirth: new Date("2009-03-06T00:00:00.000Z") });
+    expect(result.map((entry) => entry.policy.id)).toEqual(["policy-guardian"]);
   });
 });
 
