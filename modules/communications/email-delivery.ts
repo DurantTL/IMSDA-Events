@@ -28,7 +28,7 @@ import {
   REGISTRATION_MANAGE_API_SENTINEL,
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
-import { renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { markdownToPlainText, renderEmailHtmlDocument } from "@/modules/communications/email-html";
 import { checkRecipientDeliverable, loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import {
   AccountEmailNotConfiguredError,
@@ -1242,9 +1242,9 @@ async function runDeliveryLoop(
         toEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         subject: message.subjectSnapshot,
-        bodyText: unsubscribe
+        bodyText: markdownToPlainText(unsubscribe
           ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
-          : preparedBody.bodyText,
+          : preparedBody.bodyText),
         listUnsubscribe: unsubscribe?.oneClickUrl ? { url: unsubscribe.oneClickUrl } : null,
         // Wrapped, not rendered: the body fragment was rendered at enqueue from
         // the same template and context as the text snapshot, where trusted and

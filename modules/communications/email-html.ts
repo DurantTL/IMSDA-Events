@@ -74,6 +74,22 @@ export function plainTextFromEscapedMarkdown(value: string) {
 }
 
 /**
+ * The text part of an email is read as plain text, so the Markdown the body is
+ * authored in is flattened here, at send time (the stored snapshot is left as
+ * written): heading marks and bold or italic wrappers are dropped and
+ * `[label](url)` becomes `label: url`. Idempotent on text that has no Markdown.
+ */
+export function markdownToPlainText(value: string) {
+  return value
+    .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, label: string, url: string) =>
+      label.trim() === url ? url : `${label}: ${url}`,
+    )
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, "")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/(^|[\s(])_([^_\s][^_\n]*[^_\s]|[^_\s])_(?=$|[\s).,;:!?])/gm, "$1$2");
+}
+
+/**
  * Removes only the backslash escapes `escapeMarkdown` added, leaving the block's own
  * Markdown (bold, headings, links) as the text part has always shown it.
  */

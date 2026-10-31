@@ -161,3 +161,29 @@ describe("synthetic verification environment", () => {
     expect(plain.SECRET_ENCRYPTION_KEY).toBe("synthetic-not-a-secret");
   });
 });
+
+describe("development startup warning (#1411 S1)", () => {
+  const developmentEnv = { ...productionEnv, NODE_ENV: "development" };
+  const warning = "SECRET_ENCRYPTION_KEY is not set";
+
+  it("warns once when no key is configured, without throwing", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(() => assertServerEnvAtStartup(developmentEnv)).not.toThrow();
+      expect(warn.mock.calls.flat().join("\n")).toContain(warning);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("stays quiet when the key is set, and never prints it", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      assertServerEnvAtStartup({ ...developmentEnv, SECRET_ENCRYPTION_KEY: syntheticKey });
+      expect(warn.mock.calls.flat().join("\n")).not.toContain(warning);
+      expect(warn.mock.calls.flat().join("\n")).not.toContain(syntheticKey);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

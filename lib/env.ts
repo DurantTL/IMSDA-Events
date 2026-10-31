@@ -605,6 +605,13 @@ export function assertServerEnvAtStartup(
   const result = validateServerEnv(source);
   // Record how the key was loaded at startup, for /api/health.
   if (source === process.env) getEncryptionKeyStatus();
+  // Development only: production already refuses to start without the key.
+  // Never print the key itself.
+  if (source.NODE_ENV !== "production" && !describeEncryptionKey(source).configured) {
+    console.warn(
+      "[env] SECRET_ENCRYPTION_KEY is not set. Staff sign-in will fail at two-factor enrolment. Set it in .env (any 32+ characters locally).",
+    );
+  }
   if (result.ok) return result;
 
   const report = result.issues.map((issue) => `  - ${issue}`).join("\n");

@@ -1186,7 +1186,7 @@ export function PeopleWorkspace({
                 )}
                 {lifecycleAction && (
                   <form className="form-stack lifecycle-confirmation" onSubmit={updateLifecycle}>
-                    <div><p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p><h3>{lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}</h3><p>{lifecycleCopy[lifecycleAction].detail}</p>{lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}</div>
+                    <div><p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p><h3>{lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}</h3><p>{lifecycleCopy[lifecycleAction].detail}</p>{lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}{lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <p className="form-error" role="note">Already checked in. Cancelling does not undo the check-in.</p>}</div>
                     <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" /></label>
                     {error && <p className="form-error" role="alert">{error}</p>}
                     <div className="form-actions">
