@@ -10,6 +10,7 @@ import {
   type SystemReport,
 } from "@/modules/system-admin/system-report/model";
 import styles from "./page.module.css";
+import { SystemReportTesters } from "./system-report-testers";
 import { TestConnectionsButton } from "./test-connections-button";
 
 /** The shared status chip colors. "Count only" has no verdict, so it is drawn plain, never green. */
@@ -80,7 +81,7 @@ function Section({ section, now }: { section: ReportSection; now: Date }) {
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report }: { report: SystemReport }) {
+export function SystemReportView({ report, testerDefaultEmail = "" }: { report: SystemReport; testerDefaultEmail?: string }) {
   const now = new Date(report.generatedAt);
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
@@ -125,6 +126,8 @@ export function SystemReportView({ report }: { report: SystemReport }) {
           ))}
         </ul>
       </section>
+
+      <SystemReportTesters defaultEmail={testerDefaultEmail} />
 
       {report.sections.map((section) => <Section key={section.key} section={section} now={now} />)}
 

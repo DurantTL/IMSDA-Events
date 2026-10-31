@@ -17,7 +17,7 @@ export default async function SystemReportPage() {
   return (
     <>
       <AdminSectionHeaderFor path="/admin/system-report" section="system" />
-      <SystemReportView report={await loadSystemReport()} />
+      <SystemReportView report={await loadSystemReport()} testerDefaultEmail={user.email} />
     </>
   );
 }

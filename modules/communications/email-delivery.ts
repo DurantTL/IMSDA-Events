@@ -1343,6 +1343,10 @@ async function prepareAccountEmailBody(
   if (input.templateKey?.startsWith("NEW_CLUB_APPLICATION_")) {
     return { bodyText: input.bodyText };
   }
+  // The System report's test email (#1383): a fixed plain body with no sentinel and no account; never rewrite it.
+  if (input.templateKey === "SYSTEM_TEST_EMAIL") {
+    return { bodyText: input.bodyText };
+  }
   // Module request email (#741) carries free text and no sentinel: never replace anything in it.
   if (input.templateKey?.startsWith("MODULE_REQUEST_")) {
     return { bodyText: input.bodyText };
