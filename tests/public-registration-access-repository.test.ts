@@ -689,12 +689,14 @@ describe("private registration access repository", () => {
     it("says pay below, and shows the panel, when the form takes payment and Square is configured", async () => {
       const view = await viewWith({ formTakesPayment: true, squareConfigured: true });
       expect(view?.payment.onlinePaymentOffered).toBe(true);
+      expect(view?.payment.paymentPanelShown).toBe(true);
       expect(view?.payment.detail).toContain("below");
     });
 
     it("never says pay below when Square is not configured", async () => {
       const view = await viewWith({ formTakesPayment: true, squareConfigured: false });
       expect(view?.payment.onlinePaymentOffered).toBe(false);
+      expect(view?.payment.paymentPanelShown).toBe(false);
       expect(view?.payment.detail).not.toContain("below");
       expect(view?.payment.detail).toContain("Contact the event team");
     });
@@ -706,7 +708,12 @@ describe("private registration access repository", () => {
       vi.stubEnv("SQUARE_APPLICATION_ID", "");
       const client = { registrationAccessToken: { findUnique: vi.fn().mockResolvedValue(record) } };
       const view = await resolveRegistrationAccessToken(createOpaqueToken(), { client: client as never, now: new Date("2026-08-01T12:00:00.000Z") });
-      expect(view?.payment.onlinePaymentOffered).toBe(true);
+      // The panel stays (pay later can be recorded), but nothing says "pay below" or offers payment: checkout is not configured.
+      expect(view?.payment.paymentPanelShown).toBe(true);
+      expect(view?.payment.onlinePaymentOffered).toBe(false);
+      expect(view?.payment.paymentEligible).toBe(false);
+      expect(view?.payment.detail).toContain("Contact the event team");
+      expect(view?.payment.detail).not.toContain("below");
     });
 
     it("never says pay below when the form takes no payment", async () => {

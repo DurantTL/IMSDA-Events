@@ -186,6 +186,14 @@ describe("church-billed payment-choice endpoints (#621)", () => {
   });
 
   it("still returns the quote on a self-pay promoted registration", async () => {
+    // A card choice needs online card payment to be possible (#1405).
+    for (const [key, value] of Object.entries({
+      SQUARE_APPLICATION_ID: "sandbox-sq0idb-example",
+      SQUARE_LOCATION_ID: "sandbox-location",
+      SQUARE_ACCESS_TOKEN: "sandbox-access-token",
+      SQUARE_WEBHOOK_SIGNATURE_KEY: "sandbox-signature-key",
+      SQUARE_WEBHOOK_NOTIFICATION_URL: "https://events.imsda.test/api/webhooks/square",
+    })) vi.stubEnv(key, value);
     useRegistration("ATTENDEE_PAY");
     const response = await PUBLIC_POST(
       request(`https://events.imsda.test/api/public/manage/${token}/payment-choice`),
@@ -193,5 +201,6 @@ describe("church-billed payment-choice endpoints (#621)", () => {
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ paymentChoice: { totalCents: 8_270 } });
+    vi.unstubAllEnvs();
   });
 });

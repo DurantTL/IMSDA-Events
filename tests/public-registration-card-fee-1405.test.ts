@@ -278,7 +278,8 @@ describe("card fee only when card payment is possible (#1405)", () => {
 
       expect(confirmation).toMatchObject({ totalCents: 10_000, processingFeeCents: 0, cardSelected: false });
       const snapshot = (tx.publicRegistrationSubmission.create.mock.calls[0]![0] as { data: { pricingSnapshot: Record<string, unknown> } }).data.pricingSnapshot;
-      expect(snapshot).not.toHaveProperty("cardFeeDeferred");
+      // The marker follows the published form, not the stripped copy, so a later amendment never adds the fee to the total.
+      expect(snapshot).toMatchObject({ cardFeeDeferred: true, processingFeeCents: 0, totalCents: 10_000, currency: "USD" });
     });
 
     it("still refuses a card answer posted to a card-only form when Square is off", async () => {

@@ -339,7 +339,7 @@ describe("verified attendee registration views", () => {
   }
   afterEach(() => { vi.unstubAllEnvs(); });
 
-  function directRegistrationFixture(status: string, payments: unknown[] = [], options: { takesPayment?: boolean } = {}) {
+  function directRegistrationFixture(status: string, payments: unknown[] = [], options: { takesPayment?: boolean; promoted?: boolean } = {}) {
     dependencies.getPrisma.mockReturnValue({
       $queryRaw: vi.fn().mockResolvedValue([{ id: "registration-1" }]),
       registration: {
@@ -369,12 +369,20 @@ describe("verified attendee registration views", () => {
           attendees: [],
           publicFormSubmission: options.takesPayment ? takesPaymentSubmission : null,
           payments,
-          waitlistEntry: null,
+          waitlistEntry: options.promoted ? { position: 1, status: "PROMOTED" } : null,
           operations: [],
         }]),
       },
     });
   }
+
+  it("does not offer Continue payment to a promoted registrant while Square is off (#1405)", async () => {
+    stubSquare(false);
+    directRegistrationFixture("SUBMITTED", [], { takesPayment: true, promoted: true });
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration?.payment.paymentEligible).toBe(false);
+    expect(registration?.payment.detail).toContain("Contact the event team");
+  });
 
   it("never shows a waitlisted or cancelled registration as payable (#1100)", async () => {
     for (const status of ["WAITLISTED", "CANCELLED"]) {

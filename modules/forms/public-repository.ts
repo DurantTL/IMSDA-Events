@@ -1002,6 +1002,9 @@ async function createPublicRegistrationTransaction(
   // hides them otherwise, but the answer is checked here, before validation, so it is never accepted and priced with a
   // fee nobody can pay. The form is then validated without them: a form left with no payment choice has the field
   // dropped, so nothing required is missing and the registration is priced as pay-later.
+  // What the form as published says about payment, kept before the definition may be rebound without its online
+  // choices: the deferral marker and the currency follow the form, not the stripped copy (#1405).
+  const publishedPayment = definition.payment;
   if (!isWaitlisted && definition.payment?.enabled && !onlineCardPaymentPossible({
     paymentEnabled: true,
     squareConfigured: getSquareConfiguration().paymentConfigured,
@@ -1231,7 +1234,7 @@ async function createPublicRegistrationTransaction(
       }
     // The online card fee is not part of what the registration owes (#1405): it is added to the total when the person
     // pays online by card, so the stored total and balance are the subtotal. The form still showed the fee.
-    : definition.payment?.enabled
+    : publishedPayment?.enabled
       ? withoutDeferredCardFee(pricedCalculation)
       : pricedCalculation;
 
@@ -1273,7 +1276,7 @@ async function createPublicRegistrationTransaction(
       registrationId: registration.id,
       claimed: claimedPromo,
       appliedDiscountCents: ledgerPromoDiscountCents,
-      currency: definition.payment?.currency ?? "USD",
+      currency: publishedPayment?.currency ?? "USD",
     });
   }
   // Shadow ledger (#117): the same transaction as the stored total, which stays authoritative.
@@ -1282,11 +1285,11 @@ async function createPublicRegistrationTransaction(
     registrationId: registration.id,
     totalCents: admittedCalculation.totalCents,
     appliedDiscountCents: ledgerPromoDiscountCents,
-    currency: definition.payment?.currency ?? "USD",
+    currency: publishedPayment?.currency ?? "USD",
     pricingSnapshot: {
       ...moneyOnlyPricingSnapshot({
         ...admittedCalculation,
-        ...(!isWaitlisted && definition.payment?.enabled ? { cardFeeDeferred: true } : {}),
+        ...(!isWaitlisted && publishedPayment?.enabled ? { cardFeeDeferred: true } : {}),
       }),
       pricingDate: prepared.pricingDate,
       formVersionId: version.id,
@@ -1532,7 +1535,7 @@ async function createPublicRegistrationTransaction(
     });
   }
   const snapshot: PricingSnapshot = {
-    currency: definition.payment?.currency ?? "USD",
+    currency: publishedPayment?.currency ?? "USD",
     formVersionId: version.id,
     eventTimeZone: form.event.timezone,
     pricingDate: prepared.pricingDate,
@@ -1546,8 +1549,8 @@ async function createPublicRegistrationTransaction(
     processingFeeCents: admittedCalculation.processingFeeCents,
     totalCents: admittedCalculation.totalCents,
     cardSelected: !isWaitlisted && isCardSelected(definition, prepared.registrationResponses),
-    ...(!isWaitlisted && definition.payment?.enabled ? { cardFeeDeferred: true } : {}),
-    ...(!isWaitlisted && definition.payment?.enabled && isCardSelected(definition, prepared.registrationResponses) && pricedCalculation.processingFeeCents > 0
+    ...(!isWaitlisted && publishedPayment?.enabled ? { cardFeeDeferred: true } : {}),
+    ...(!isWaitlisted && publishedPayment?.enabled && isCardSelected(definition, prepared.registrationResponses) && pricedCalculation.processingFeeCents > 0
       ? { deferredCardFeeCents: pricedCalculation.processingFeeCents }
       : {}),
     depositSelected: !isWaitlisted && depositOptionSelected(definition, prepared.registrationResponses),

@@ -330,10 +330,14 @@ function serializeRegistrationAccess(
   const submissionDefinition = registration.publicFormSubmission
     ? registrationFormDefinitionSchema.safeParse(registration.publicFormSubmission.formVersion.definition)
     : null;
-  const onlinePaymentOffered = event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE"
-    && !registration.groupRegistration
-    && (registration.waitlistEntry?.status === "PROMOTED"
-    || (getSquareConfiguration().paymentConfigured && Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled)));
+  const squareReady = getSquareConfiguration().paymentConfigured;
+  const selfPay = event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE" && !registration.groupRegistration;
+  const promotedWaitlist = registration.waitlistEntry?.status === "PROMOTED";
+  // The panel is shown for a promoted registrant even with Square off (to record pay later); the summary only says
+  // "pay below" and offers payment when an online payment can actually be taken.
+  const paymentPanelShown = selfPay
+    && (promotedWaitlist || (squareReady && Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled)));
+  const onlinePaymentOffered = paymentPanelShown && squareReady;
   const paymentSummary = summarizePublicPayment({
     status: registration.status,
     totalCents: moneyToCents(registration.totalAmount),
@@ -363,12 +367,13 @@ function serializeRegistrationAccess(
         detail: paymentSummary.detail,
         paymentEligible: false,
         onlinePaymentOffered: false,
+        paymentPanelShown: false,
         totalCents: null,
         paidCents: null,
         refundedCents: null,
         amountDueCents: null,
       }
-    : { ...paymentSummary, onlinePaymentOffered };
+    : { ...paymentSummary, onlinePaymentOffered, paymentPanelShown };
   const accountHolder = registration.accountHolderPerson;
   const contact = publicContactFromSnapshot(
     registration.contactSnapshot,

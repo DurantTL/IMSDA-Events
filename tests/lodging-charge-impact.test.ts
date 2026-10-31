@@ -8,6 +8,7 @@ vi.mock("@/modules/communications/transactional-messages", () => ({ enqueueRegis
 
 import { registrationFormDefinitionSchema, type FormCalculation } from "@/modules/forms/definition";
 import { priceAmendedRegistration } from "@/modules/registrations/amendments-repository";
+import { isCardFeeDeferred } from "@/modules/payments/online-card-fee";
 import { lodgingChargeImpact, promoContextOf, type RegistrationPromo } from "@/modules/lodging/pricing";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { currentLodgingChargeCents } from "@/modules/lodging/pricing";
@@ -313,5 +314,15 @@ describe("an amendment never adds the form's card fee to a deferred-fee registra
     const priced = priceAmendedRegistration({ definition: cardForm, responses: answers, calculation: lines(10_000), storedLine: null, redemption: null, coversLodging: true });
     expect(priced.processingFeeCents).toBeGreaterThan(0);
     expect(priced.totalCents).toBe(priced.subtotalCents + priced.processingFeeCents);
+  });
+
+  it("keeps the fee out when staff amend a registration whose payment field was dropped to the card answer", () => {
+    // Saved while online payment was impossible: pay-later, but marked from the published form.
+    const savedSnapshot = { subtotalCents: 10_000, processingFeeCents: 0, totalCents: 10_000, cardFeeDeferred: true };
+    const priced = priceAmendedRegistration({
+      definition: cardForm, responses: answers, calculation: lines(10_000), storedLine: null, redemption: null, coversLodging: true,
+      cardFeeDeferred: isCardFeeDeferred(savedSnapshot),
+    });
+    expect(priced).toMatchObject({ processingFeeCents: 0, totalCents: 10_000 });
   });
 });

@@ -392,7 +392,7 @@ export default async function PublicManagePage({
               <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
             )}
             {/* Only when online payment is offered (#1405): the summary above says "pay below" only then. */}
-            {!view.perPerson && !view.isGroup && view.payment.onlinePaymentOffered && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
+            {!view.perPerson && !view.isGroup && view.payment.paymentPanelShown && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
           </section>
 
           {cancellationView && (cancellationView.available || cancellationView.requests.length > 0) && (
