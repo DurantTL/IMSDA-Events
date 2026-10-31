@@ -8,6 +8,7 @@ const dependencies = vi.hoisted(() => ({
   getBackupStatus: vi.fn(),
   getCurrentSessionPassive: vi.fn(),
   dispatchUnsuppressedAlert: vi.fn(),
+  getOffsiteBackups: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +31,10 @@ vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({
 }));
 vi.mock("@/modules/operations/backup-status-repository", () => ({
   getBackupStatus: dependencies.getBackupStatus,
+}));
+
+vi.mock("@/modules/operations/offsite-backups-reader", () => ({
+  getOffsiteBackups: dependencies.getOffsiteBackups,
 }));
 
 import { resetServerEnvCache } from "@/lib/env";
@@ -77,6 +82,7 @@ beforeEach(() => {
   dependencies.getOutboxQueueHealth.mockResolvedValue(healthyQueue);
   dependencies.getSweepHeartbeat.mockResolvedValue(recentSweep);
   dependencies.getBackupStatus.mockResolvedValue(healthyBackups);
+  dependencies.getOffsiteBackups.mockResolvedValue({ state: "not_connected" });
   dependencies.getCurrentSessionPassive.mockResolvedValue({ user: null });
   dependencies.dispatchUnsuppressedAlert.mockResolvedValue(undefined);
   resetServerEnvCache();
@@ -392,7 +398,9 @@ describe("health endpoint, full detail", () => {
       lastRehearsalAt: healthyBackups.lastRehearsalAt,
     });
     expect(JSON.stringify(body)).not.toContain("dumpBytes");
-    expect(JSON.stringify(body)).not.toContain("offsite");
+    expect(JSON.stringify(body.backups)).not.toContain("offsite");
+    // R2 is not set up in this test.
+    expect(body.offsiteBackups).toEqual({ status: "not_connected", newestDatabase: null, newestFiles: null, partial: false, checkedAt: null });
   });
 
   it("reports degraded, not 503, when the last backup is stale", async () => {
@@ -428,7 +436,7 @@ describe("health endpoint, full detail", () => {
     expect(body.backups).not.toHaveProperty("offsiteOk");
   });
 
-  it("does not degrade before the first backup has reported", async () => {
+  it("does not degrade, and reports not_connected, when the helper never reported and R2 is not set up (#1412)", async () => {
     dependencies.getBackupStatus.mockResolvedValue({
       ...healthyBackups,
       status: "never",
@@ -444,8 +452,25 @@ describe("health endpoint, full detail", () => {
 
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
-      services: { backups: "never" },
+      services: { backups: "not_connected" },
     });
+  });
+
+  it("does not degrade for a stale helper that never reported (it is not in use)", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({
+      ...healthyBackups,
+      status: "stale",
+      stale: true,
+      needsAttention: true,
+      lastSuccessAt: null,
+      lastRunAt: null,
+      lastRunOk: null,
+      lastRehearsalAt: null,
+      lastRehearsalOk: null,
+    });
+    const body = await (await GET(healthRequest(sweepToken))).json();
+    expect(body.status).toBe("ok");
+    expect(body.services.backups).toBe("not_connected");
   });
 
   it("marks backups unknown when their status cannot be read", async () => {
@@ -459,5 +484,96 @@ describe("health endpoint, full detail", () => {
       services: { backups: "unknown" },
       backups: null,
     });
+  });
+});
+
+describe("health endpoint, offsite R2 backups (#1412)", () => {
+  const checked = (database: { at: string; bytes: number | null } | null) => ({
+    state: "checked" as const,
+    database: database ? { ...database, label: "Database dump (.sql.gz)" } : null,
+    files: { at: "2026-10-31T03:20:00.000Z", bytes: 900, label: "Files archive (.tgz)" },
+    partial: false,
+    scanned: 10,
+    checkedAt: "2026-10-31T12:00:00.000Z",
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-31T12:00:00.000Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("never runs the R2 read for a public caller", async () => {
+    await GET(healthRequest());
+    expect(dependencies.getOffsiteBackups).not.toHaveBeenCalled();
+  });
+
+  it("shows a fresh database backup as ok, with times and sizes but no labels", async () => {
+    dependencies.getOffsiteBackups.mockResolvedValue(checked({ at: "2026-10-31T03:00:00.000Z", bytes: 4096 }));
+    const body = await (await GET(healthRequest(sweepToken))).json();
+    expect(body.status).toBe("ok");
+    expect(body.services.backups).toBe("ok");
+    expect(body.services.offsiteBackups).toBe("ok");
+    expect(body.offsiteBackups).toEqual({
+      status: "ok",
+      newestDatabase: { at: "2026-10-31T03:00:00.000Z", bytes: 4096 },
+      newestFiles: { at: "2026-10-31T03:20:00.000Z", bytes: 900 },
+      partial: false,
+      checkedAt: "2026-10-31T12:00:00.000Z",
+    });
+    expect(JSON.stringify(body)).not.toContain("Database dump");
+  });
+
+  it("degrades (still 200) for a stale or missing database backup", async () => {
+    dependencies.getOffsiteBackups.mockResolvedValue(checked({ at: "2026-10-29T03:00:00.000Z", bytes: 1 }));
+    const stale = await GET(healthRequest(sweepToken));
+    expect(stale.status).toBe(200);
+    expect(await stale.json()).toMatchObject({ status: "degraded", services: { offsiteBackups: "stale" }, offsiteBackups: { status: "stale" } });
+
+    dependencies.getOffsiteBackups.mockResolvedValue(checked(null));
+    expect(await (await GET(healthRequest(sweepToken))).json()).toMatchObject({ status: "degraded", services: { offsiteBackups: "missing" }, offsiteBackups: { status: "missing" } });
+  });
+
+  it("shows an R2 error and a misconfiguration without degrading", async () => {
+    dependencies.getOffsiteBackups.mockResolvedValue({ state: "error", reason: "timed out", checkedAt: "2026-10-31T12:00:00.000Z" });
+    const error = await (await GET(healthRequest(sweepToken))).json();
+    expect(error).toMatchObject({ status: "ok", services: { offsiteBackups: "error" }, offsiteBackups: { status: "error", reason: "timed out" } });
+
+    dependencies.getOffsiteBackups.mockResolvedValue({ state: "misconfigured", missing: ["BACKUP_R2_READ_BUCKET"], invalid: [] });
+    const bad = await (await GET(healthRequest(sweepToken))).json();
+    expect(bad).toMatchObject({ status: "ok", services: { offsiteBackups: "misconfigured" }, offsiteBackups: { status: "misconfigured" } });
+    expect(JSON.stringify(bad)).not.toContain("BACKUP_R2_READ_BUCKET");
+  });
+
+  it("keeps the helper status separate so a failing helper is not hidden behind R2 ok", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({ ...healthyBackups, status: "stale", stale: true, needsAttention: true });
+    dependencies.getOffsiteBackups.mockResolvedValue(checked({ at: "2026-10-31T03:00:00.000Z", bytes: 1 }));
+    const body = await (await GET(healthRequest(sweepToken))).json();
+    expect(body).toMatchObject({ status: "degraded", services: { backups: "stale", offsiteBackups: "ok" } });
+    dependencies.getOffsiteBackups.mockResolvedValue({ state: "not_connected" });
+    expect(await (await GET(healthRequest(sweepToken))).json()).toMatchObject({ status: "degraded", services: { backups: "stale", offsiteBackups: "not_connected" } });
+  });
+
+  it("reports partial without degrading when the listing was cut short and nothing fresh was seen", async () => {
+    for (const database of [null, { at: "2026-10-29T03:00:00.000Z", bytes: 1 }]) {
+      dependencies.getOffsiteBackups.mockResolvedValue({ ...checked(database), partial: true, scanned: 10000 });
+      const response = await GET(healthRequest(sweepToken));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ status: "ok", services: { offsiteBackups: "partial" }, offsiteBackups: { status: "partial", partial: true, scanned: 10000 } });
+    }
+  });
+
+  it("stays ok for a fresh dump found in a cut-short listing", async () => {
+    dependencies.getOffsiteBackups.mockResolvedValue({ ...checked({ at: "2026-10-31T03:00:00.000Z", bytes: 1 }), partial: true, scanned: 10000 });
+    expect(await (await GET(healthRequest(sweepToken))).json()).toMatchObject({ status: "ok", offsiteBackups: { status: "ok", partial: true } });
+  });
+
+  it("keeps the app up when the R2 read itself throws", async () => {
+    dependencies.getOffsiteBackups.mockRejectedValue(new Error("boom my-bucket"));
+    const response = await GET(healthRequest(sweepToken));
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(JSON.parse(text)).toMatchObject({ status: "ok", offsiteBackups: { status: "error" } });
+    expect(text).not.toContain("my-bucket");
   });
 });
