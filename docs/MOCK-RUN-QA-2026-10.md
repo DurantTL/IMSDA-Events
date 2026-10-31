@@ -28,8 +28,9 @@ no page scrolled sideways at phone width.
 What would hurt on a real event day:
 
 1. **Scheduled emails reach nobody.** No event has attendee types set up (not
-   the seeded ones, not ones made from a template), so the app treats every
-   attendee as "age unknown", which it handles like a child. A balance reminder
+   the seeded ones, not ones made from a template), so every attendee's age is
+   "unknown", and the app only emails people it knows are adults (the screen
+   calls them "Youth"). A balance reminder
    for Women's Retreat 2026 shows "Will receive it: 0 people". Nothing in event
    setup warns about this.
 2. **On a phone, Submit can silently do nothing.** Right after choosing card
@@ -38,10 +39,10 @@ What would hurt on a real event day:
    seconds first worked.
 3. **Card fees are added even when card payment can't happen.** The form
    offered "Credit / debit card" and added a $4.35 card fee while online
-   payment was not set up. At check-in the same person is then quoted a second
-   card fee on top.
+   payment was not set up. That fee stays in the balance, so a cash payer at
+   check-in is asked for it too.
 4. **Events made from a template keep last year's wording.** The 2027 event's
-   form is titled "Women's Retreat 2026 registration", its web address says
+   form is titled "Women’s Retreat 2026 registration", its web address says
    2026, and every event's private page says "Convention shirts".
 5. **The form builder's test run fails without saying why.** The preview lets
    you skip required questions; the saved test is invalid, and the panel only
@@ -54,7 +55,7 @@ What would hurt on a real event day:
 7. **A fresh local copy can't sign staff in.** Following the README, admin
    sign-in fails because `SECRET_ENCRYPTION_KEY` is blank.
 
-In all: 33 findings, 7 of them broken. Nine draft issues are at the end. Items 1 to 3 touch money or who receives
+In all: 33 tested findings, 7 of them broken. Nine draft issues are at the end. Items 1 to 3 touch money or who receives
 email, so they should not wait.
 
 ## Findings by journey
@@ -121,16 +122,19 @@ twice on the same page.
   the private page says "Pay the balance below" with nothing below
   (`modules/public-access/domain.ts:245`), and "Continue payment" on the account
   opens "Online payment is not available yet". At check-in the roster says
-  "$139.35 due · Card in Square app: $143.23 (includes $3.88 card fee)", a
-  second fee on a total that already has one, and "Cash or check is the balance
-  shown", so a cash payer is asked for the online card fee.
-- Fix: hide the card choice and fee when online payment is off; at check-in,
-  quote cash without the online card fee. Money correctness, so not deferrable.
+  "$139.35 due · Card in Square app: $143.23 (includes $3.88 card fee)" and
+  "Cash or check is the balance shown". The in-person card rate (2.6% + 15¢) is
+  the approved design; the fault is that the $139.35 balance already contains
+  the $4.35 online card fee, so a cash payer is asked for it and an in-person
+  card payer pays both.
+- Fix: hide the card choice and fee when online payment is off, and keep the
+  online card fee out of the balance unless the person pays online. Money
+  correctness, so not deferrable.
 - Screenshots: [`registration-card-fee-390.png`](mock-run-qa/registration-card-fee-390.png),
   [`checkin-double-card-fee-390.png`](mock-run-qa/checkin-double-card-fee-390.png)
 
 **A3. Broken: an event made from a template shows last year's form name.** The
-form title "Women's Retreat 2026 registration", the web address
+form title "Women’s Retreat 2026 registration", the web address
 `/register/mock-run-retreat-2027/women-s-retreat-2026-registration` and the
 confirmation "Your Women's Retreat registration has been received" all came over
 unchanged to Mock Run Retreat 2027. Fix: name the copied form after the new event
@@ -342,7 +346,7 @@ and showed clear success messages.
 - #137 Event templates as data: related to A3 and E1 (templates carrying the
   right wording and attendee types).
 - #1112 Director portal: related to C1 and C2.
-- #1114 Design review (public calendar, club finder): related to P2.
+- #1114 Design review (public calendar, club finder): loosely related to P2.
 - #1342 and the consistency follow-ups: E7 extends them.
 - #1383 System report testers: covers X5.
 
@@ -371,8 +375,8 @@ Not created. In priority order; each is sized for one build.
 - Hide the "Credit / debit card" choice and its fee when online payment is not
   configured for the event.
 - Remove "Pay the balance below" when there is nothing below.
-- Check-in: quote cash and in-person card without the online card fee already in
-  the total. Run `rg` on the fee helpers in `scripts/` and update the pricing
+- Keep the online card fee out of the balance unless the person pays online,
+  so check-in cash and in-person card amounts don't include it. Run `rg` on the fee helpers in `scripts/` and update the pricing
   scripts.
 
 ### 4. New event from a template: rename what carries last year's name
