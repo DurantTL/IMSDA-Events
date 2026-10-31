@@ -52,7 +52,7 @@ function Timeline({ status }: { status: EmailTestStatus }) {
   if (status.state === "queued") {
     steps.push(<Step key="s" kind="wait" title="Sent to the email provider" sub="Waiting to be picked up." time="—" />);
   } else if (!status.sentAt && status.state === "unavailable") {
-    steps.push(<Step key="u" kind="warn" title="Not sent" sub={status.reason ?? undefined} time={clockTime(status.outcomeAt)} />);
+    steps.push(<Step key="u" kind="warn" title="Not confirmed as sent" sub={status.reason ?? undefined} time={clockTime(status.outcomeAt)} />);
   } else if (!status.sentAt) {
     steps.push(<Step key="f" kind="fail" title="Could not be sent" sub={status.reason ?? undefined} time={clockTime(status.outcomeAt)} />);
   } else {
@@ -123,10 +123,10 @@ function Result({ status }: { status: EmailTestStatus }) {
     case "unavailable":
       return (
         <div className={`${styles.result} ${styles.resultWarn}`}>
-          <strong>The test email was not sent.</strong>
+          <strong>The test email was not confirmed as sent.</strong>
           <p>{status.reason}</p>
           <ol>
-            <li>Check the inbox for “IMSDA Events test email”. It may still arrive.</li>
+            <li>Check the inbox for “IMSDA Events test email” in case it went out anyway.</li>
             <li>If it does not, try again later. If it keeps happening, run Test connections and check Email settings.</li>
           </ol>
           {ref}

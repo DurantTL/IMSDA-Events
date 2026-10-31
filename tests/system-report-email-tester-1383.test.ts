@@ -191,7 +191,7 @@ describe("email tester: sending", () => {
     mocks.outbox.findFirst.mockResolvedValue(row({ status: "CANCELLED", sentAt: null, provider: null, providerDeliveryStatus: null, failedAt: now }));
     const result = await runEmailTest({ user: admin, body: { to: "me@example.org" }, now });
     expect(mocks.outbox.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "msg_test_1", status: "PENDING" }, data: expect.objectContaining({ status: "CANCELLED" }) }));
-    expect(result).toMatchObject({ kind: "started", status: { state: "unavailable", reason: EMAIL_TEST_REASONS.unavailable, final: true } });
+    expect(result).toMatchObject({ kind: "started", status: { state: "unavailable", reason: EMAIL_TEST_REASONS["not-sent"], final: true } });
     expect(JSON.stringify(result)).not.toMatch(/secret provider|re_live_key/);
   });
 });
@@ -222,9 +222,9 @@ describe("email tester: status mapping", () => {
     expect(map({ providerDeliveryStatus: "FAILED" })).toMatchObject({ state: "failed", reason: EMAIL_TEST_REASONS.failed });
     expect(map({ status: "SUPPRESSED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "suppressed", reason: EMAIL_TEST_REASONS.suppressed });
     expect(map({ status: "FAILED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "failed", reason: EMAIL_TEST_REASONS.failed });
-    expect(map({ status: "CANCELLED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "unavailable", reason: EMAIL_TEST_REASONS.unavailable, final: true });
+    expect(map({ status: "CANCELLED", sentAt: null, providerDeliveryStatus: null })).toMatchObject({ state: "unavailable", reason: EMAIL_TEST_REASONS["not-sent"], final: true });
     const stuck = row({ status: "PROCESSING", sentAt: null, provider: null, providerDeliveryStatus: null, createdAt: new Date(now.getTime() - EMAIL_NOTICE_WAIT_MS) });
-    expect(mapEmailTestStatus(stuck, [], now)).toMatchObject({ state: "unavailable", final: true });
+    expect(mapEmailTestStatus(stuck, [], now)).toMatchObject({ state: "unavailable", reason: EMAIL_TEST_REASONS.unavailable, final: true });
   });
 
   it("uses a provider notice that the outbox row has not caught up with, and the worst one wins", () => {

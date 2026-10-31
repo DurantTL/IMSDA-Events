@@ -49,6 +49,7 @@ export const EMAIL_TEST_REASONS = {
   complained: "The recipient marked it as spam.",
   failed: "The email provider could not send it.",
   unavailable: "The email provider did not confirm the send in time. It may still arrive.",
+  "not-sent": "The email provider could not be reached or did not answer, so the test was not confirmed as sent.",
   suppressed: "This address is on the do-not-send list after an earlier bounce or spam report.",
   "no-notice": "The provider has not reported delivered or bounced yet.",
 } as const;
@@ -108,13 +109,18 @@ export function mapEmailTestStatus(
     queuedAt: row.createdAt.toISOString(),
     sentAt: row.sentAt?.toISOString() ?? null,
   };
-  const done = (state: Exclude<EmailTestState, "queued" | "waiting" | "no-notice" | "delivered">, at: Date | null): EmailTestStatus => ({
-    ...base, state, outcomeAt: at?.toISOString() ?? null, reason: EMAIL_TEST_REASONS[state], final: true,
+  const done = (
+    state: Exclude<EmailTestState, "queued" | "waiting" | "no-notice" | "delivered">,
+    at: Date | null,
+    reason: string = EMAIL_TEST_REASONS[state],
+  ): EmailTestStatus => ({
+    ...base, state, outcomeAt: at?.toISOString() ?? null, reason, final: true,
   });
 
   if (row.status === "SUPPRESSED") return done("suppressed", row.failedAt ?? row.createdAt);
-  // A test is closed as CANCELLED only when the provider could not be reached or nothing was claimed.
-  if (row.status === "CANCELLED") return done("unavailable", row.failedAt ?? null);
+  // CANCELLED: the inline send claimed nothing or the provider did not answer, or the sweep closed an abandoned
+  // test. Nothing confirms a send, so say exactly that rather than promising it may still arrive.
+  if (row.status === "CANCELLED") return done("unavailable", row.failedAt ?? null, EMAIL_TEST_REASONS["not-sent"]);
   if (row.status === "FAILED") return done("failed", row.failedAt ?? null);
   if (row.status !== "SENT") {
     // Still held by a worker after the notice wait: stop promising a result.
