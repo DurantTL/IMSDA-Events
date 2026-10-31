@@ -206,7 +206,12 @@ GitHub or chat.
   and talk to Nginx directly. That skips Cloudflare's firewall and bot rules.
   It also lets them write any visitor address they like into the header the
   app trusts, which defeats the app's per-visitor limits (step C).
-- **Choose one of these two.** Both block visitors who skip Cloudflare.
+- **Choose one of these two.** Both block ordinary visitors who skip
+  Cloudflare. Neither can tell our Cloudflare account from someone else's: a
+  person with their own Cloudflare account could still route traffic to this
+  server. That leftover risk is small, and we accept it for now. A custom
+  origin-pull certificate for our zone (ask xCloud support) or Cloudflare
+  Tunnel would close it.
 
 **Option 1: firewall allowlist (recommended to start).**
 
@@ -292,13 +297,14 @@ every request, and Nginx refuses any request without it.
 
   The app then reads each visitor's address from the `CF-Connecting-IP` header
   Cloudflare sets. The hops value must be `1`: `0` turns the lookup off and
-  puts every visitor in one shared limit. The compose default
+  puts every visitor in one shared limit, and `2` or more stops the app from
+  starting with this header. The compose default
   (`x-forwarded-for` with hops `1`) is right only with no Cloudflare in front.
   Redeploy after saving. See also "Rate limits behind Cloudflare" in
   `docs/DEPLOY-DOCKER.md`.
 - **Proof:** the two-network test in `docs/WR26-GO-LIVE-REVIEW.md` (finding F1,
   step 3) passes: test registrations from one network don't block a second
-  network.
+  network. Use a test event, and delete the test registrations afterwards.
 
 ## Log
 

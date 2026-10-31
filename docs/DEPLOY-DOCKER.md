@@ -145,7 +145,7 @@ MESSAGE_FILE_SWEEP_DELETE=       # "true" lets the scheduled sweep delete; anyth
 ACCOUNT_EMAIL_SENDER_NAME=IMSDA Events
 ACCOUNT_EMAIL_REPLY_TO=
 RATE_LIMIT_CLIENT_IP_HEADER=cf-connecting-ip  # behind Cloudflare; needs the origin lock (see below)
-RATE_LIMIT_TRUSTED_PROXY_HOPS=1  # with cf-connecting-ip; x-forwarded-for + 1 only without Cloudflare
+RATE_LIMIT_TRUSTED_PROXY_HOPS=1  # must be 1 with cf-connecting-ip
 OUTBOX_SWEEP_INTERVAL_SECONDS=300  # also read by the app for the broadcast dialog's time estimate
 BACKUP_RETENTION_DAYS=14
 BACKUP_VERIFY_EVERY=7            # rehearse a restore every Nth backup
@@ -162,8 +162,10 @@ from the header Cloudflare sets. This pair is only safe once the server accepts
 web traffic from Cloudflare alone, because anyone who reaches the server
 directly can write any address into that header. Lock the origin first:
 "Behind Cloudflare" in `docs/SERVER-SECURITY-CHECKLIST.md`. The compose default
-(`x-forwarded-for` with hops `1`) is right only for a server with no Cloudflare
-in front. Background: findings 2 and 3 in
+(`x-forwarded-for` with hops `1`, used when both are left unset) is right only
+for a server with no Cloudflare in front. With `cf-connecting-ip`, hops `0`
+puts every visitor in one shared limit and hops `2` or more stops the app from
+starting. Background: findings 2 and 3 in
 `docs/CLOUDFLARE-SECURITY-AUDIT-2026-10.md`.
 
 Add each approved church website origin to `EMBED_ALLOWED_ORIGINS`; do not use
