@@ -217,6 +217,8 @@ describe("server environment contract", () => {
       const result = assertServerEnvAtStartup({
         NODE_ENV: "development",
         DATABASE_URL: "not-a-url",
+        // Set so the separate local-key warning (#1411) does not count here.
+        SECRET_ENCRYPTION_KEY: "synthetic-local-key-0123456789-abcdefghijklmnop",
       });
       expect(result.ok).toBe(false);
     } finally {

@@ -32,10 +32,10 @@ describe("event setup pages sit in the staff workspace (#981 batch 3)", () => {
       const source = read(file);
       expect(source).not.toContain("BrandMark");
       expect(source).not.toContain("<h1");
-      // The permission checks and redirects are unchanged.
+      // The permission checks and redirects are unchanged, except the redirect names event creation (#1411).
       expect(source).toContain('redirect(await staffLoginRedirectPath())');
       expect(source).toContain('user.globalRole !== "SYSTEM_ADMIN"');
-      expect(source).toContain('redirect("/no-access")');
+      expect(source).toContain('redirect("/no-access?from=event-setup")');
     }
   });
 

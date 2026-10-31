@@ -244,7 +244,8 @@ describe("external email queue", () => {
     });
 
     expect(payload).not.toBeNull();
-    expect(payload!.bodyText).toBe("# Registration confirmed\n\nHello **Avery**.");
+    // The text part is flattened to plain text at send time (#1411); the stored snapshot stays as written.
+    expect(payload!.bodyText).toBe("Registration confirmed\n\nHello Avery.");
     expect(payload!.bodyHtml).toContain("<!DOCTYPE html>");
     expect(payload!.bodyHtml).toContain("<h1>Registration confirmed</h1>");
     expect(payload!.bodyHtml).toContain("<strong>Avery</strong>");

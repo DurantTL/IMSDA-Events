@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Start from template" };
 export default async function StartFromTemplatePage({ searchParams }: { searchParams: Promise<{ fromCalendarEntry?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Every template that is not archived (#617). Starters are added as drafts, so filtering to
   // published ones alone left the list blank; the picker disables the ones `applyEventTemplate`

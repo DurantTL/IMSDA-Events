@@ -81,6 +81,8 @@ export function plainTextFromEscapedMarkdown(value: string) {
  */
 export function markdownToPlainText(value: string) {
   return value
+    // An image has no use in plain text (a check-in QR is also shown as a link): drop it entirely.
+    .replace(/!\[[^\]\n]*\]\([^)\s]*\)/g, "")
     .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, label: string, url: string) =>
       label.trim() === url ? url : `${label}: ${url}`,
     )

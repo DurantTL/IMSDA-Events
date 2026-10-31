@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Save an event as a template", robots
 export default async function SaveEventAsTemplatePage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Newest first: the event you most likely want to save is the latest reviewed one.
   const events = (await listEventsForUser(user.id, true, { archived: "include" })).slice().reverse();

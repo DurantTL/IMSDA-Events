@@ -1242,7 +1242,8 @@ async function runDeliveryLoop(
         toEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         subject: message.subjectSnapshot,
-        bodyText: markdownToPlainText(unsubscribe
+        // Only a row with an HTML snapshot is flattened; a pre-HTML text-only row goes out word for word.
+        bodyText: (parts.bodyHtml ? markdownToPlainText : (text: string) => text)(unsubscribe
           ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
           : preparedBody.bodyText),
         listUnsubscribe: unsubscribe?.oneClickUrl ? { url: unsubscribe.oneClickUrl } : null,
