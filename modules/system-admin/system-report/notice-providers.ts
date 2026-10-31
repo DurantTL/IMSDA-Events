@@ -2,9 +2,11 @@ import "server-only";
 
 import { getActiveEmailProviderName, getEmailAvailability } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
+import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
 import { getSquareConfiguration } from "@/modules/payments/square-config";
 import {
   emailNoticeFields,
+  NOTICE_GRACE_MS,
   NOTICE_LOOKBACK_MS,
   NOTICE_WINDOW_MS,
   rejectedNoticeFields,
@@ -41,15 +43,15 @@ function activeEmail(ctx: ReportContext) {
 function lastEmailNotice(ctx: ReportContext, provider: EmailProviderLabel) {
   return ctx.once(`notices:email-last:${provider}`, async () => {
     const prisma = getPrisma();
-    const [last, oldestSent] = await Promise.all([
+    const [last, newestSent] = await Promise.all([
       prisma.messageProviderEvent.findFirst({ where: { provider }, orderBy: { receivedAt: "desc" }, select: { receivedAt: true } }),
       prisma.messageOutbox.findFirst({
-        where: { provider, sentAt: { gte: new Date(ctx.now.getTime() - NOTICE_WINDOW_MS) } },
-        orderBy: { sentAt: "asc" },
+        where: { provider, sentAt: { gte: new Date(ctx.now.getTime() - NOTICE_WINDOW_MS), lte: new Date(ctx.now.getTime() - NOTICE_GRACE_MS) } },
+        orderBy: { sentAt: "desc" },
         select: { sentAt: true },
       }),
     ]);
-    return { lastNoticeAt: last?.receivedAt ?? null, oldestSentAt: oldestSent?.sentAt ?? null };
+    return { lastNoticeAt: last?.receivedAt ?? null, newestSentAt: newestSent?.sentAt ?? null };
   });
 }
 
@@ -59,7 +61,7 @@ async function emailRow(ctx: ReportContext, key: string, provider: EmailProvider
   const base = { active: config.value.active, webhookConfigured: config.value.webhookConfigured, now: ctx.now };
   // Nothing to read for a provider that is not in use, or one whose notices are not set up.
   if (config.value.active !== provider || !config.value.webhookConfigured) {
-    return emailNoticeFields(key, provider, { ...base, lastNoticeAt: null, oldestSentAt: null });
+    return emailNoticeFields(key, provider, { ...base, lastNoticeAt: null, newestSentAt: null });
   }
   const read = await lastEmailNotice(ctx, provider);
   if (!read.ok) return triedRow(key, read.readAt);
@@ -80,18 +82,25 @@ export function buildNoticeProviders(define: typeof defineProvider): SignalProvi
       // 1. Square notices.
       const square = await ctx.once("notices:square", async () => {
         const configured = getSquareConfiguration().webhookConfigured;
-        if (!configured) return { configured, lastNoticeAt: null, oldestPaymentAt: null, ignoredCount: 0 };
+        if (!configured) return { configured, lastNoticeAt: null, newestPaymentAt: null, ignoredCount: 0 };
         const prisma = getPrisma();
-        const [last, ignoredCount, oldest] = await Promise.all([
+        const [last, ignoredCount, newest] = await Promise.all([
           prisma.squareWebhookEvent.findFirst({ orderBy: { receivedAt: "desc" }, select: { receivedAt: true } }),
           prisma.squareWebhookEvent.count({ where: { status: "IGNORED", receivedAt: { gte: new Date(ctx.now.getTime() - NOTICE_LOOKBACK_MS) } } }),
           prisma.payment.findFirst({
-            where: { method: "CARD_REFERENCE", status: "SUCCEEDED", receivedAt: { gte: new Date(ctx.now.getTime() - NOTICE_WINDOW_MS) } },
-            orderBy: { receivedAt: "asc" },
+            // CARD_REFERENCE also covers imports and staff matches, which Square sends no notice for; only a payment
+            // linked to a Square checkout attempt came through the live online path.
+            where: {
+              method: "CARD_REFERENCE",
+              status: "SUCCEEDED",
+              paymentAttempt: { isNot: null },
+              receivedAt: { gte: new Date(ctx.now.getTime() - NOTICE_WINDOW_MS), lte: new Date(ctx.now.getTime() - NOTICE_GRACE_MS) },
+            },
+            orderBy: { receivedAt: "desc" },
             select: { receivedAt: true },
           }),
         ]);
-        return { configured, lastNoticeAt: last?.receivedAt ?? null, oldestPaymentAt: oldest?.receivedAt ?? null, ignoredCount };
+        return { configured, lastNoticeAt: last?.receivedAt ?? null, newestPaymentAt: newest?.receivedAt ?? null, ignoredCount };
       });
       rows.push(square.ok ? squareNoticeFields("square-notices", { ...square.value, now: ctx.now }) : triedRow("square-notices", square.readAt));
 
@@ -113,7 +122,7 @@ export function buildNoticeProviders(define: typeof defineProvider): SignalProvi
         ? triedRow("rejected-notices", rejected.readAt)
         : !config.ok
           ? triedRow("rejected-notices", config.readAt)
-          : rejectedNoticeFields("rejected-notices", { ...rejected.value, active: config.value.active, now: ctx.now }));
+          : rejectedNoticeFields("rejected-notices", { ...rejected.value, active: config.value.active, alertDeliveryConfigured: isAlertDeliveryConfigured(), now: ctx.now }));
 
       // 5. Bounces and complaints.
       const suppressed = await ctx.once("notices:suppressions", () =>

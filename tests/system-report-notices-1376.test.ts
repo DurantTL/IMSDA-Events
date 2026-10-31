@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getActiveEmailProviderName: vi.fn(),
   getEmailAvailability: vi.fn(),
   getSquareConfiguration: vi.fn(),
+  isAlertDeliveryConfigured: vi.fn(),
   logError: vi.fn(),
 }));
 
@@ -18,6 +19,7 @@ vi.mock("@/integrations/email/provider", () => ({
   getActiveEmailProviderName: mocks.getActiveEmailProviderName,
   getEmailAvailability: mocks.getEmailAvailability,
 }));
+vi.mock("@/modules/operations/alerting", () => ({ isAlertDeliveryConfigured: mocks.isAlertDeliveryConfigured }));
 vi.mock("@/modules/payments/square-config", () => ({ getSquareConfiguration: mocks.getSquareConfiguration }));
 
 import { SECTION_DEFINITIONS } from "@/modules/system-admin/system-report/model";
@@ -40,41 +42,49 @@ afterEach(() => vi.useRealTimers());
 describe("Square notices", () => {
   const base = { configured: true, ignoredCount: 3, now };
   it("is information when Square is not set up", () => {
-    expect(squareNoticeFields("k", { ...base, configured: false, lastNoticeAt: null, oldestPaymentAt: null })).toMatchObject({ state: "info", resultText: expect.stringContaining("not set up") });
+    expect(squareNoticeFields("k", { ...base, configured: false, lastNoticeAt: null, newestPaymentAt: null })).toMatchObject({ state: "info", resultText: expect.stringContaining("not set up") });
   });
   it("is information, never OK, with no payments to compare", () => {
-    const row = squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(2), oldestPaymentAt: null });
+    const row = squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(2), newestPaymentAt: null });
     expect(row.state).toBe("info");
     expect(row.resultText).toContain("3 notices were ignored");
   });
-  it("is OK when a notice arrived at or after the oldest payment", () => {
-    expect(squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(3), oldestPaymentAt: hoursAgo(3) }).state).toBe("ok");
+  it("watches when a notice came between the oldest and the newest payment but none since the newest", () => {
+    // oldest payment 20h ago, notice 10h ago, newest payment 3h ago: notices stopped mid-window.
+    expect(squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(10), newestPaymentAt: hoursAgo(3) }).state).toBe("watch");
+  });
+  it("is OK when a notice arrived at or after the newest due payment", () => {
+    expect(squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(3), newestPaymentAt: hoursAgo(3) }).state).toBe("ok");
   });
   it("watches when payments were made and no notice came after them", () => {
-    expect(squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(30), oldestPaymentAt: hoursAgo(3) }).state).toBe("watch");
-    expect(squareNoticeFields("k", { ...base, lastNoticeAt: null, oldestPaymentAt: hoursAgo(3) })).toMatchObject({ state: "watch", checkedAt: null, noTimeLabel: "Never" });
+    expect(squareNoticeFields("k", { ...base, lastNoticeAt: hoursAgo(30), newestPaymentAt: hoursAgo(3) }).state).toBe("watch");
+    expect(squareNoticeFields("k", { ...base, lastNoticeAt: null, newestPaymentAt: hoursAgo(3) })).toMatchObject({ state: "watch", checkedAt: null, noTimeLabel: "Never" });
   });
 });
 
 describe("email notices", () => {
   const input = { active: "RESEND" as const, webhookConfigured: true, now };
   it("says Not in use for the other provider", () => {
-    expect(emailNoticeFields("k", "SES", { ...input, lastNoticeAt: null, oldestSentAt: null })).toMatchObject({ state: "info", resultText: expect.stringContaining("Not in use") });
+    expect(emailNoticeFields("k", "SES", { ...input, lastNoticeAt: null, newestSentAt: null })).toMatchObject({ state: "info", resultText: expect.stringContaining("Not in use") });
   });
   it("watches when the active provider's notices are not set up", () => {
-    const row = emailNoticeFields("k", "RESEND", { ...input, webhookConfigured: false, lastNoticeAt: null, oldestSentAt: null });
+    const row = emailNoticeFields("k", "RESEND", { ...input, webhookConfigured: false, lastNoticeAt: null, newestSentAt: null });
     expect(row.state).toBe("watch");
     expect(row.resultText).toContain("bounces and complaints aren't received");
   });
+  it("is information when nothing is older than the grace period", () => {
+    // The provider reads only sends older than 15 minutes, so a send inside the grace period arrives as null here.
+    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: hoursAgo(5), newestSentAt: null }).state).toBe("info");
+  });
   it("compares sends with notices", () => {
-    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: null, oldestSentAt: null }).state).toBe("info");
-    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: hoursAgo(1), oldestSentAt: hoursAgo(5) }).state).toBe("ok");
-    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: hoursAgo(50), oldestSentAt: hoursAgo(5) }).state).toBe("watch");
+    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: null, newestSentAt: null }).state).toBe("info");
+    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: hoursAgo(1), newestSentAt: hoursAgo(5) }).state).toBe("ok");
+    expect(emailNoticeFields("k", "RESEND", { ...input, lastNoticeAt: hoursAgo(50), newestSentAt: hoursAgo(5) }).state).toBe("watch");
   });
 });
 
 describe("rejected notices", () => {
-  const base = { active: "RESEND" as const, now };
+  const base = { active: "RESEND" as const, alertDeliveryConfigured: false, now };
   it("needs attention for a Square rejection, even when Resend also rejected", () => {
     const row = rejectedNoticeFields("k", { ...base, squareRejectedAt: hoursAgo(5), resendRejectedAt: hoursAgo(1) });
     expect(row.state).toBe("attention");
@@ -89,6 +99,12 @@ describe("rejected notices", () => {
     const ses = rejectedNoticeFields("k", { ...base, active: "SES", squareRejectedAt: null, resendRejectedAt: null });
     expect(ses.state).toBe("info");
     expect(ses.resultText).toContain("server log");
+  });
+  it("is information, never OK, when an alert webhook is set up (a failed alert is not kept)", () => {
+    const row = rejectedNoticeFields("k", { ...base, alertDeliveryConfigured: true, squareRejectedAt: null, resendRejectedAt: null });
+    expect(row.state).toBe("info");
+    expect(row.resultText).toContain("could not be delivered is not kept");
+    expect(rejectedNoticeFields("k", { ...base, alertDeliveryConfigured: true, squareRejectedAt: hoursAgo(1), resendRejectedAt: null }).state).toBe("attention");
   });
 });
 
@@ -112,6 +128,7 @@ describe("the notices provider", () => {
     ...overrides,
   });
   beforeEach(() => {
+    mocks.isAlertDeliveryConfigured.mockReturnValue(false);
     mocks.getSquareConfiguration.mockReturnValue({ webhookConfigured: true });
     mocks.getActiveEmailProviderName.mockReturnValue("RESEND");
     mocks.getEmailAvailability.mockReturnValue({ deliveryConfigured: true, webhookConfigured: true });
@@ -133,8 +150,15 @@ describe("the notices provider", () => {
       "rejected-notices": "ok",
       "bounces-complaints": "info",
     });
-    expect(prisma.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { method: "CARD_REFERENCE", status: "SUCCEEDED", receivedAt: { gte: hoursAgo(24) } } }));
-    expect(prisma.messageOutbox.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { provider: "RESEND", sentAt: { gte: hoursAgo(24) } } }));
+    const window = (field: "receivedAt" | "sentAt") => ({ [field]: { gte: hoursAgo(24), lte: new Date(now.getTime() - 15 * 60_000) } });
+    expect(prisma.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { method: "CARD_REFERENCE", status: "SUCCEEDED", paymentAttempt: { isNot: null }, ...window("receivedAt") },
+      orderBy: { receivedAt: "desc" },
+    }));
+    expect(prisma.messageOutbox.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { provider: "RESEND", ...window("sentAt") },
+      orderBy: { sentAt: "desc" },
+    }));
     expect(prisma.messageProviderEvent.findFirst).toHaveBeenCalledTimes(1);
   });
 

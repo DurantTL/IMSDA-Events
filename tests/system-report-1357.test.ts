@@ -47,6 +47,7 @@ vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadine
 vi.mock("@/modules/communications/message-file-usage", () => ({ getMessageFileStorageUsage: mocks.getMessageFileStorageUsage }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/modules/ledger/reconciliation", () => ({ reconcileRegistrationLedger: mocks.reconcileRegistrationLedger }));
+vi.mock("@/modules/operations/alerting", () => ({ isAlertDeliveryConfigured: () => false }));
 vi.mock("@/modules/public-metrics/repository", () => ({ getAnalyticsSummary: mocks.getAnalyticsSummary }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-30" }));
 vi.mock("@/modules/operations/database-liveness", () => ({ checkDatabaseLiveness: mocks.checkDatabaseLiveness }));

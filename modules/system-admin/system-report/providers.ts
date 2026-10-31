@@ -26,9 +26,9 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
-import { buildNoticeProviders } from "./notice-providers";
 import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
+import { buildNoticeProviders } from "./notice-providers";
 
 /**
  * The System report's signal providers (#1357). Each provider wraps ONE existing module computation and turns it into
