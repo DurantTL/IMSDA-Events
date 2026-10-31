@@ -3012,7 +3012,7 @@ export function PublicRegistrationForm({
               )}
               {(calculation.processingFeeCents ?? 0) > 0 && (
                 <div>
-                  <span>Card processing</span>
+                  <span>Card processing<small>Added when you pay online by card</small></span>
                   <strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong>
                 </div>
               )}
@@ -3773,7 +3773,7 @@ export function PublicRegistrationForm({
                   <div><span>Discounted subtotal</span><strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong></div>
                 </>
               )}
-              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong></div>}
+              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing<small>Added when you pay online by card</small></span><strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong></div>}
               <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{formatCents((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
             </div>
           )}

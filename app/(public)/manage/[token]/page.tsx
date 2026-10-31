@@ -391,7 +391,8 @@ export default async function PublicManagePage({
             {(view.registration.status === "SUBMITTED" || view.registration.status === "CONFIRMED") && (
               <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
             )}
-            {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
+            {/* Only when online payment is offered (#1405): the summary above says "pay below" only then. */}
+            {!view.perPerson && !view.isGroup && view.payment.onlinePaymentOffered && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
           </section>
 
           {cancellationView && (cancellationView.available || cancellationView.requests.length > 0) && (

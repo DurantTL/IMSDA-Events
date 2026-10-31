@@ -6,6 +6,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { depositOptionSelected } from "@/modules/payments/deposit-domain";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
+import { definitionWithoutCardOption, onlineCardPaymentPossible, withoutDeferredCardFee } from "@/modules/payments/online-card-fee";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { isLockTimeoutError, isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { admitToLocation } from "@/modules/event-locations/admission";
@@ -249,6 +251,12 @@ type PricingSnapshot = {
   processingFeeCents: number;
   totalCents: number;
   cardSelected: boolean;
+  /**
+   * The stored total and `processingFeeCents` leave the online card fee out (#1405): it joins the total only when the
+   * registrant pays online by card. Absent on a registration submitted earlier, whose total already holds the fee when
+   * card was chosen.
+   */
+  cardFeeDeferred?: boolean;
   /** The registrant chose "Pay a deposit now" (#415): the card fee applies to the deposit only, when it is paid. */
   depositSelected?: boolean;
   paymentCollected: false;
@@ -334,6 +342,11 @@ export type PublicRegistrationExperience = {
   };
   choiceUsage: ChoiceUsage;
   pricingDate: string;
+  /**
+   * Whether a registrant can pay by card online (#1405): payment on, Square configured, event not billed to a church.
+   * When false the form comes back without its card choice and never shows a card processing fee.
+   */
+  onlineCardPayment: boolean;
   /** The lodging step (#199): null when the event collects no lodging. Never offered to club or group registrations. */
   lodging: PublicLodgingOffer | null;
   lifecycle: {
@@ -638,8 +651,14 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
     now
   );
   const lodging = await getPublicLodgingOffer(form.eventId, prisma);
+  const onlineCardPayment = onlineCardPaymentPossible({
+    paymentEnabled: Boolean(definition.payment?.enabled),
+    squareConfigured: getSquareConfiguration().paymentConfigured,
+    billingMode: form.event.billingMode,
+  });
 
   return {
+    onlineCardPayment,
     event: {
       name: form.event.name,
       slug: form.event.slug,
@@ -660,7 +679,8 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
       slug: form.slug,
       versionId: version.id,
       versionNumber: version.versionNumber,
-      definition,
+      // Without the card choice when nobody could pay by it (#1405); the server refuses a card answer all the same.
+      definition: onlineCardPayment || !definition.payment?.enabled ? definition : definitionWithoutCardOption(definition),
       // The wording of each policy-version acknowledgment (#150), read by exact version id: only what the form shows.
       acknowledgmentContent: await loadAcknowledgmentDisplayContent(form.eventId, definition),
     },
@@ -1015,6 +1035,33 @@ async function createPublicRegistrationTransaction(
     );
   }
 
+  // The card choice is only valid when an online card payment can be taken (#1405). The browser hides it otherwise,
+  // but the answer is checked here: a card answer is never accepted and priced with a fee nobody can pay.
+  if (
+    !isWaitlisted
+    && definition.payment?.enabled
+    && isCardSelected(definition, prepared.registrationResponses)
+    && !onlineCardPaymentPossible({
+      paymentEnabled: true,
+      squareConfigured: getSquareConfiguration().paymentConfigured,
+      billingMode: form.event.billingMode,
+    })
+  ) {
+    throw new PublicRegistrationError(
+      "INVALID_SUBMISSION",
+      "Review the highlighted fields and submit again.",
+      [{
+        kind: "validation",
+        code: "INVALID_RESPONSE",
+        fieldId: null,
+        key: definition.payment.paymentMethodFieldKey,
+        path: `responses.${definition.payment.paymentMethodFieldKey}`,
+        attendeeIndex: null,
+        message: "Card payment is not available for this event right now. Choose another payment option.",
+      }],
+    );
+  }
+
   // "Responsible adult" for each minor (#131): decided from the submitted ages, never from the browser. Club and
   // group rosters have their own adults and youth, so only an individual registration asks.
   const responsibleAdultPlan = bulk || !prepared.rosterEnabled
@@ -1177,7 +1224,11 @@ async function createPublicRegistrationTransaction(
         processingFeeCents: 0,
         totalCents: pricedCalculation.subtotalCents,
       }
-    : pricedCalculation;
+    // The online card fee is not part of what the registration owes (#1405): it is added to the total when the person
+    // pays online by card, so the stored total and balance are the subtotal. The form still showed the fee.
+    : definition.payment?.enabled
+      ? withoutDeferredCardFee(pricedCalculation)
+      : pricedCalculation;
 
   const identity: PublicContactIdentity = prepared.identity;
   const accountHolder = await tx.person.upsert({
@@ -1487,6 +1538,7 @@ async function createPublicRegistrationTransaction(
     processingFeeCents: admittedCalculation.processingFeeCents,
     totalCents: admittedCalculation.totalCents,
     cardSelected: !isWaitlisted && isCardSelected(definition, prepared.registrationResponses),
+    ...(!isWaitlisted && definition.payment?.enabled ? { cardFeeDeferred: true } : {}),
     depositSelected: !isWaitlisted && depositOptionSelected(definition, prepared.registrationResponses),
     paymentCollected: false,
     rosterEnabled: getAttendeeRosterConfig(definition).enabled,

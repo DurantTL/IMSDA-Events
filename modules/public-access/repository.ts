@@ -41,6 +41,7 @@ import {
 } from "@/modules/events/public-domain";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { getAttendeeRosterConfig, registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 import { currentPricingSnapshot, isChurchBilledBillingMode, perPersonPriceFromSnapshot } from "@/modules/club-registrations/per-person-price";
 
 export { REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
@@ -324,6 +325,16 @@ function serializeRegistrationAccess(
     registration.status,
     waitlistPosition,
   );
+  // Whether the private page has an online payment panel (#1405): Square is ready and either the form takes payment
+  // or a promoted waitlist registrant picks how to pay. Without it the summary must not say "pay below".
+  const submissionDefinition = registration.publicFormSubmission
+    ? registrationFormDefinitionSchema.safeParse(registration.publicFormSubmission.formVersion.definition)
+    : null;
+  const onlinePaymentOffered = event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE"
+    && !registration.groupRegistration
+    && getSquareConfiguration().paymentConfigured
+    && (registration.waitlistEntry?.status === "PROMOTED"
+      || Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled));
   const paymentSummary = summarizePublicPayment({
     status: registration.status,
     totalCents: moneyToCents(registration.totalAmount),
@@ -336,6 +347,7 @@ function serializeRegistrationAccess(
     })),
     isDeferredOrganizationBilling: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     billedToGroup: Boolean(registration.groupRegistration),
+    onlinePaymentOffered,
   });
   // A "Group" (#650) is billed to its contact and is shown its price and estimated total.
   const isGroup = Boolean(registration.groupRegistration);
@@ -351,12 +363,13 @@ function serializeRegistrationAccess(
         label: paymentSummary.label,
         detail: paymentSummary.detail,
         paymentEligible: false,
+        onlinePaymentOffered: false,
         totalCents: null,
         paidCents: null,
         refundedCents: null,
         amountDueCents: null,
       }
-    : paymentSummary;
+    : { ...paymentSummary, onlinePaymentOffered };
   const accountHolder = registration.accountHolderPerson;
   const contact = publicContactFromSnapshot(
     registration.contactSnapshot,

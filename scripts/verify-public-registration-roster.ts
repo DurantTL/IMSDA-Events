@@ -3,6 +3,7 @@ import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard"
 import { futureEventWindow } from "./support/fixture-dates";
 import { PrismaClient, RegistrationFormStatus } from "@prisma/client";
 import { registrationFormDefinitionSchema } from "../modules/forms/definition";
+import { getSquareConfiguration } from "../modules/payments/square-config-domain";
 
 loadEnvConfig(process.cwd());
 // Local-only: these suites write fictitious rows and call a local app.
@@ -193,13 +194,18 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: actorId } });
 }
 
+// The card choice is only accepted when online payment is configured (#1405). The app under test reads the same
+// environment as this script, so a card answer is posted only when Square is ready; otherwise it must be refused.
+const squareReady = getSquareConfiguration().paymentConfigured;
+const cardAnswer = "Credit / debit card";
+
 const firstRequestBody = {
   versionId: formVersionId,
   idempotencyKey: submissionIdempotencyKey,
   responses: {
     contact_name: "RosterVerify Contact",
     email: registrantEmail,
-    payment_method: "Credit / debit card",
+    payment_method: squareReady ? cardAnswer : "Pay later",
   },
   attendees: [
     {
@@ -322,6 +328,19 @@ async function main() {
     },
   });
 
+  if (!squareReady) {
+    const refused = await postRegistration({
+      ...firstRequestBody,
+      idempotencyKey: "0d7c2b1e-6a43-4f0e-9b6a-3c1f5e8a7d21",
+      responses: { ...firstRequestBody.responses, payment_method: cardAnswer },
+    });
+    assert(refused.status === 400, "A card answer was accepted while online payment is not configured.", refused);
+    assert(
+      (await prisma.registration.count({ where: { eventId } })) === 0,
+      "A refused card answer still saved a registration.",
+    );
+  }
+
   const first = await postRegistration(firstRequestBody);
   assert(first.status === 201, "The three-attendee registration did not succeed.", first);
   const confirmation = asRecord(first.body.confirmation);
@@ -333,8 +352,9 @@ async function main() {
     confirmation,
   );
   assert(confirmation.subtotalCents === 2500, "The server-calculated roster subtotal was incorrect.", confirmation);
-  assert(confirmation.processingFeeCents === 106, "The single grossed-up card fee was incorrect.", confirmation);
-  assert(confirmation.totalCents === 2606, "The server-calculated roster total was incorrect.", confirmation);
+  // The online card fee ($1.06 on $25.00) is not part of what is owed; it joins the total when the person pays by card.
+  assert(confirmation.processingFeeCents === 0, "The stored confirmation carried the online card fee.", confirmation);
+  assert(confirmation.totalCents === 2500, "The server-calculated roster total was incorrect.", confirmation);
   assert(confirmation.notificationStatus === "CAPTURED", "The local confirmation was not captured.", confirmation);
 
   const registration = await prisma.registration.findFirstOrThrow({
@@ -366,7 +386,10 @@ async function main() {
   );
   const pricingSnapshot = asRecord(registration.publicFormSubmission?.pricingSnapshot);
   assert(pricingSnapshot.attendeeCount === 3, "The pricing snapshot did not retain attendee count.", pricingSnapshot);
-  assert(pricingSnapshot.totalCents === 2606, "The pricing snapshot did not retain the authoritative total.", pricingSnapshot);
+  assert(pricingSnapshot.totalCents === 2500, "The pricing snapshot did not retain the authoritative total.", pricingSnapshot);
+  assert(pricingSnapshot.processingFeeCents === 0, "The pricing snapshot stored the online card fee.", pricingSnapshot);
+  assert(pricingSnapshot.cardFeeDeferred === true, "The pricing snapshot did not mark the card fee as deferred.", pricingSnapshot);
+  assert(Number(registration.totalAmount) === 25, "The stored registration total included the online card fee.", registration.totalAmount);
 
   const cabinReservations = registration.capacityReservations.filter(
     (reservation) => reservation.fieldKey === "lodging" && reservation.optionValue === "Shared cabin",

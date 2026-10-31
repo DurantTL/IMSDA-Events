@@ -294,3 +294,24 @@ describe("a church correction for an earlier change is shown apart (#813)", () =
     expect(chargeChangeSentence({ churchShare: { status: "UPDATED", deltaCents: 2000, churchName: "Example Church", registrationOwedCents: 4500 }, promo: { code: "HALFOFF", coversLodging: true, sponsored: true } })).not.toContain("corrected");
   });
 });
+
+describe("an amendment never adds the form's card fee to a deferred-fee registration (#1405)", () => {
+  const cardForm = registrationFormDefinitionSchema.parse({
+    title: "Synthetic", description: "", confirmationMessage: "Received.",
+    payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
+    sections: [{ id: "sec_1", title: "Registration", description: "", isReviewStep: false, fields: [{ id: "fld_1", key: "payment_method", label: "Payment method", helpText: "", type: "RADIO", scope: "REGISTRATION", required: true, options: ["Pay later", "Card"] }] }],
+  });
+  const answers = { payment_method: "Card" };
+  const lines = (cents: number): FormCalculation => ({ subtotalCents: cents, processingFeeCents: 330, totalCents: cents + 330, lineItems: [{ key: "registration_fee", label: "Registration fee", amountCents: cents }] });
+
+  it("keeps the stored total at the subtotal when the snapshot marks the fee deferred", () => {
+    const priced = priceAmendedRegistration({ definition: cardForm, responses: answers, calculation: lines(10_000), storedLine: null, redemption: null, coversLodging: true, cardFeeDeferred: true });
+    expect(priced).toMatchObject({ subtotalCents: 10_000, processingFeeCents: 0, totalCents: 10_000 });
+  });
+
+  it("keeps a legacy card registration's fee in its total, as before", () => {
+    const priced = priceAmendedRegistration({ definition: cardForm, responses: answers, calculation: lines(10_000), storedLine: null, redemption: null, coversLodging: true });
+    expect(priced.processingFeeCents).toBeGreaterThan(0);
+    expect(priced.totalCents).toBe(priced.subtotalCents + priced.processingFeeCents);
+  });
+});
