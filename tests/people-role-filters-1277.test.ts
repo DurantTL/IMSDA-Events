@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** #1277: "who has this role" filters, Club leaders, and the links between levels. Synthetic data only. */
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/two-step-status", () => ({ accountHasTwoStepOn: async () => false, accountIdsWithTwoStepOn: async () => new Set<string>() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
@@ -217,7 +218,7 @@ describe("Club leaders", () => {
   });
 
   it("links people only for a viewer who can open People & access", () => {
-    const leaders = [{ key: "k", accountId: "a1", name: "Dee Director", email: "dee@example.test", clubId: "o1", clubName: "Synthetic Club", role: "DIRECTOR" as const, roleLabel: "Director" }];
+    const leaders = [{ key: "k", accountId: "a1", name: "Dee Director", email: "dee@example.test", clubId: "o1", clubName: "Synthetic Club", role: "DIRECTOR" as const, roleLabel: "Director", twoStepOn: false }];
     const props = { leaders, clubs: [{ id: "o1", name: "Synthetic Club" }], filters: { clubId: null, role: null } };
     expect(renderToStaticMarkup(createElement(ClubLeadersList, { ...props, canOpenPeople: true }))).toContain('href="/admin/people/account/a1"');
     const plain = renderToStaticMarkup(createElement(ClubLeadersList, { ...props, canOpenPeople: false }));
@@ -226,7 +227,7 @@ describe("Club leaders", () => {
   });
 
   it("says when the list is capped", () => {
-    const many = Array.from({ length: 2000 }, (_, i) => ({ key: `k${i}`, accountId: `a${i}`, name: "N", email: "n@example.test", clubId: "o", clubName: "C", role: "DIRECTOR" as const, roleLabel: "Director" }));
+    const many = Array.from({ length: 2000 }, (_, i) => ({ key: `k${i}`, accountId: `a${i}`, name: "N", email: "n@example.test", clubId: "o", clubName: "C", role: "DIRECTOR" as const, roleLabel: "Director", twoStepOn: false }));
     const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: many, clubs: [], filters: { clubId: null, role: null }, canOpenPeople: false }));
     expect(html).toContain("Showing the first 2000 current roles");
   });

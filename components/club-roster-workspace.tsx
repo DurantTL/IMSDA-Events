@@ -775,9 +775,6 @@ export function ClubRosterWorkspace({
         </div>
         {population.length === 0 ? (
           <EmptyState
-            action={{ label: "Add to roster", onClick: () => openDialog(null) }}
-            actionClass="secondary-button"
-            canCreate={!readOnly}
             className="empty-state public-manage-empty"
             hint={readOnly ? "A club director adds people to the roster." : undefined}
             icon={<UsersRound size={17} aria-hidden="true" />}

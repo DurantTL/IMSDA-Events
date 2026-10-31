@@ -1,13 +1,12 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { createClubTeamInvite } from "@/modules/club-imports/invites";
 import { ACT_AS_OWN_ACCOUNT_MESSAGE, isActingAdminsOwnEmail } from "@/modules/organizations/act-as-own-account";
-import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { accountHasTwoStepOn, accountIdsWithTwoStepOn } from "@/modules/attendee-accounts/two-step-status";
+import { queueClubRoleGivenEmail } from "@/modules/organizations/club-role-notice";
 import {
   clubDirectorRoleLabels,
   clubRoleIsAssignableByClub,
@@ -19,24 +18,6 @@ import {
 import type { CreateClubTeamGrantInput, CreateDirectorGrantInput } from "@/modules/organizations/director-grants-schemas";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
 
-/** A short notice for someone who already has an account (#425): the invite email explains it, this doesn't need to. */
-function clubTeamRoleNotificationEmail(input: { role: ClubRole; clubName: string }) {
-  const role = clubDirectorRoleLabels[input.role];
-  const accountUrl = new URL("/account", getServerEnv().APP_BASE_URL).toString();
-  return {
-    subject: `You've been given ${role} access to ${input.clubName}`,
-    bodyText: [
-      `You've been given ${role} access to ${input.clubName} on IMSDA Events.`,
-      "",
-      `Sign in to your account to see it: ${accountUrl}`,
-      "",
-      "If you weren't expecting this, contact the club's director.",
-      "",
-      "IMSDA Events",
-    ].join("\n"),
-  };
-}
-
 const grantInclude = {
   attendeeAccount: { select: { id: true, displayName: true, email: true } },
   grantedBy: { select: { id: true, displayName: true } },
@@ -45,7 +26,7 @@ const grantInclude = {
 
 type StoredGrant = Prisma.ClubDirectorGrantGetPayload<{ include: typeof grantInclude }>;
 
-function serializeGrant(grant: StoredGrant, now: Date) {
+function serializeGrant(grant: StoredGrant, now: Date, twoStepOn: boolean) {
   return {
     id: grant.id,
     organizationId: grant.organizationId,
@@ -58,6 +39,8 @@ function serializeGrant(grant: StoredGrant, now: Date) {
     revokeReason: grant.revokeReason,
     createdAt: grant.createdAt.toISOString(),
     account: grant.attendeeAccount,
+    /** Only a yes or no: whether this person has an authenticator app or passkey set up (#1410). */
+    twoStepOn,
     grantedBy: grant.grantedBy,
     revokedBy: grant.revokedBy,
   };
@@ -97,7 +80,8 @@ export async function listDirectorGrants(organizationId: string, now = new Date(
     include: grantInclude,
     orderBy: [{ revokedAt: { sort: "desc", nulls: "first" } }, { effectiveFrom: "desc" }],
   });
-  return { club, grants: grants.map((grant) => serializeGrant(grant, now)) };
+  const twoStep = await accountIdsWithTwoStepOn(grants.map((grant) => grant.attendeeAccountId));
+  return { club, grants: grants.map((grant) => serializeGrant(grant, now, twoStep.has(grant.attendeeAccountId))) };
 }
 
 function isSerializationFailure(error: unknown) {
@@ -127,6 +111,7 @@ export async function createDirectorGrant(
   actorUserId: string,
   now = new Date(),
 ) {
+  let given: { accountId: string; displayName: string; email: string; twoStepOn: boolean; messageId: string | null } | null = null as { accountId: string; displayName: string; email: string; twoStepOn: boolean; messageId: string | null } | null;
   const effectiveFrom = input.effectiveFrom ? new Date(input.effectiveFrom) : now;
   const effectiveTo = input.effectiveTo ? new Date(input.effectiveTo) : null;
   if (effectiveTo && (effectiveTo <= effectiveFrom || effectiveTo <= now)) {
@@ -140,7 +125,7 @@ export async function createDirectorGrant(
     const club = await requireClub(tx, organizationId, { mustBeActive: true });
     const account = await tx.attendeeAccount.findUnique({
       where: { email: input.email },
-      select: { id: true, status: true, emailVerifiedAt: true, disabledAt: true },
+      select: { id: true, email: true, displayName: true, status: true, emailVerifiedAt: true, disabledAt: true },
     });
     if (!account || account.status !== "ACTIVE" || !account.emailVerifiedAt || account.disabledAt) {
       throw new OrganizationOperationError(
@@ -185,9 +170,23 @@ export async function createDirectorGrant(
         effectiveTo: effectiveTo?.toISOString() ?? null,
       },
     }, tx);
+    // One email per grant (#1410), queued with the grant. The person is told about two-step sign-in only if they lack it.
+    const twoStepOn = await accountHasTwoStepOn(account.id);
+    const messageId = await queueClubRoleGivenEmail(tx, {
+      grantId: grant.id,
+      accountId: account.id,
+      email: account.email,
+      displayName: account.displayName,
+      organizationId,
+      clubName: club.name,
+      role: input.role,
+      startsOn: input.effectiveFrom ? effectiveFrom : null,
+      twoStepOn,
+    });
+    given = { accountId: account.id, displayName: account.displayName, email: account.email, twoStepOn, messageId };
   });
 
-  return listDirectorGrants(organizationId, now);
+  return { ...(await listDirectorGrants(organizationId, now)), given };
 }
 
 export async function revokeDirectorGrant(
@@ -286,7 +285,7 @@ export async function grantClubTeamRole(
   const prisma = getPrisma();
   const account = await prisma.attendeeAccount.findUnique({
     where: { email: input.email },
-    select: { id: true, status: true, emailVerifiedAt: true, disabledAt: true },
+    select: { id: true, email: true, displayName: true, status: true, emailVerifiedAt: true, disabledAt: true },
   });
   // A disabled or non-ACTIVE account is refused outright (#425), not silently invited: inviting it
   // would let the invite's acceptance route around whatever put the account in that state.
@@ -342,32 +341,18 @@ export async function grantClubTeamRole(
       },
     }, tx);
 
-    // Best-effort: the grant stands even where account email isn't configured (local dev).
-    if (isAccountEmailConfigured()) {
-      const sender = getAccountEmailSender();
-      const content = clubTeamRoleNotificationEmail({ role: input.role, clubName: club.name });
-      const message = await tx.messageOutbox.create({
-        data: {
-          eventId: null,
-          templateKey: "CLUB_TEAM_ROLE_NOTIFICATION",
-          recipientKind: "ACCOUNT",
-          recipientEmail: input.email,
-          recipientName: null,
-          accountAttendeeId: accountId,
-          senderNameSnapshot: sender.name,
-          senderEmailSnapshot: sender.address,
-          replyToEmailSnapshot: sender.replyTo,
-          subjectSnapshot: content.subject,
-          bodyTextSnapshot: content.bodyText,
-          metadata: { trigger: "CLUB_TEAM_ROLE_GRANTED", accountEmail: true, realDelivery: true, grantId: grant.id },
-          idempotencyKey: `club-role-notice:${grant.id}:${randomUUID()}`,
-          correlationId: randomUUID(),
-          status: "PENDING",
-        },
-        select: { id: true },
-      });
-      messageId = message.id;
-    }
+    // One email per grant (#1410); the grant stands even where account email isn't configured (local dev).
+    messageId = await queueClubRoleGivenEmail(tx, {
+      grantId: grant.id,
+      accountId,
+      email: input.email,
+      displayName: account!.displayName,
+      organizationId,
+      clubName: club.name,
+      role: input.role,
+      startsOn: null,
+      twoStepOn: await accountHasTwoStepOn(accountId),
+    });
   });
   return { team: await listClubTeam(organizationId, now), invited: false, messageId };
 }

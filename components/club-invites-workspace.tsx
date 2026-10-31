@@ -1,6 +1,7 @@
 "use client";
 
 import { useConfirm } from "@/components/use-confirm";
+import Link from "next/link";
 import { useState } from "react";
 import { Ban, Pencil, Send } from "lucide-react";
 import type { ClubInviteRecord } from "@/modules/club-imports/invites";
@@ -86,6 +87,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
           </p>
         </div>
         <div className="intro-actions">
+          <Link className="secondary-button" href="/admin/clubs">Add a leader</Link>
           <button
             className="primary-button"
             disabled={busy || pending.length === 0 || !emailConfigured}
@@ -104,7 +106,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {clubs.length === 0 && (
-        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them.</p></div>
+        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them, or use Add a leader to give a club a Director now.</p></div>
       )}
 
       {clubs.map((club) => {

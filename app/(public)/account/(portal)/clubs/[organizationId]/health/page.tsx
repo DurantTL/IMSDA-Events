@@ -10,7 +10,7 @@ import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventH
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 
-export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
+export const metadata: Metadata = { title: "Health", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
 /**

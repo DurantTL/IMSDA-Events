@@ -465,3 +465,8 @@ export function yearEndProgress(clubs: ReadonlyArray<{ status: "NONE" | "DRAFT" 
   const submitted = clubs.filter((club) => club.status === "SUBMITTED").length;
   return { submitted, missing: clubs.length - submitted, drafts: clubs.filter((club) => club.status === "DRAFT").length };
 }
+
+/** Whether a Pathfinder year was already over on the calendar date a club joined (#1410): nothing was due from it. */
+export function reportYearEndedBeforeJoined(reportYear: string, joinedOn: string) {
+  return reportYearRange(reportYear).end < joinedOn;
+}

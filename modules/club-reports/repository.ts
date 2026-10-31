@@ -113,6 +113,15 @@ export async function getClubReport(organizationId: string, reportMonth: string)
 }
 
 /** A club's year: every month, its report if any, and the year-to-date standing. */
+/**
+ * The calendar day a club joined: when it was created here. The data model has no separate join date, and
+ * Monthly Records and the Year-End Report use this to skip periods that ended before it (#1410).
+ */
+export async function getClubJoinedOn(organizationId: string): Promise<string | null> {
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { createdAt: true } });
+  return club ? calendarDateIn(club.createdAt) : null;
+}
+
 export async function getClubReportYear(organizationId: string, clubYear: string) {
   const prisma = getPrisma();
   const [reports, standing] = await Promise.all([

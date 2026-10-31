@@ -20,7 +20,7 @@ import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthEntryStatusesForMembers, healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
 
-export const metadata: Metadata = { title: "Club roster" };
+export const metadata: Metadata = { title: "Roster" };
 export const dynamic = "force-dynamic";
 
 function complianceFilterFrom(value: string | undefined): ComplianceFilterValue | null {

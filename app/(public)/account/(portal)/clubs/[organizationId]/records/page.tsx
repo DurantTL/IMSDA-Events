@@ -15,14 +15,16 @@ import {
   isLockedForClub,
   onTimePoints,
   reportDueDate,
+  reportMonthBeforeJoined,
   reportMonthLabel,
   yearToDate,
 } from "@/modules/club-reports/domain";
-import { getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
+import { getClubJoinedOn, getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
 import {
   formatReportYearDueDate,
   isPastDue,
   reportYearSpanLabel,
+  reportYearEndedBeforeJoined,
   reportableReportYears,
 } from "@/modules/club-reports/year-end-domain";
 import { listYearEndReportsForClub } from "@/modules/club-reports/year-end-repository";
@@ -59,7 +61,7 @@ export default async function ClubRecordsPage({
   const month = recordsMonth(monthParam, now);
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
   const currentMonth = calendarDateIn(now).slice(0, 7);
-  const switcherMonths = clubYearMonths(clubYear).filter((candidate) => candidate <= currentMonth);
+  const joinedOn = await getClubJoinedOn(organizationId);
 
   // The check-off lists roster names, so it needs the roster's own gate (MFA and an open unlock), not just the report role.
   const attendanceAvailable = (await getRosterAccessState(organizationId, now)).state === "OPEN";
@@ -72,6 +74,9 @@ export default async function ClubRecordsPage({
     getClubReportYear(organizationId, clubYear),
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
+  // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
+  const switcherMonths = clubYearMonths(clubYear).filter((candidate) =>
+    candidate <= currentMonth && (reportsByMonth.has(candidate) || !joinedOn || !reportMonthBeforeJoined(candidate, joinedOn)));
   const submittedReports = reportYear.reports.filter((entry) => entry.status === "SUBMITTED");
   // The export only serves the previous, current and next club year.
   const exportable = clubYearChoices(now).includes(clubYear);
@@ -91,6 +96,8 @@ export default async function ClubRecordsPage({
   const recordsBase = `/account/clubs/${organizationId}/records`;
   const yearEndYears = reportableReportYears(now);
   const yearEndReports = await listYearEndReportsForClub(organizationId, yearEndYears);
+  const dueYearEndYears = yearEndYears.filter((year) =>
+    yearEndReports.has(year) || !joinedOn || !reportYearEndedBeforeJoined(year, joinedOn));
 
   return (
     <>
@@ -118,6 +125,7 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Reports are due the 10th of the next month</p>
           <h2>Monthly Records</h2>
         </div>
+        {switcherMonths.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
         <ul className="public-manage-club-list">
           {[...switcherMonths].reverse().map((candidate) => {
             const filed = reportsByMonth.get(candidate);
@@ -184,8 +192,9 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Due April 1, pre-filled from your roster, honors, and classes</p>
           <h2 id="club-year-end-heading">Year-End Report</h2>
         </div>
+        {dueYearEndYears.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
         <ul className="public-manage-club-list">
-          {yearEndYears.map((year) => {
+          {dueYearEndYears.map((year) => {
             const yearEnd = yearEndReports.get(year);
             const submitted = yearEnd?.status === "SUBMITTED";
             const yearEndDue = formatReportYearDueDate(year);

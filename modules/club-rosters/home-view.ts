@@ -316,7 +316,7 @@ export function clubHomeUsefulLinks({
       ? [{ key: "forms", label: "Club forms", description: "Fill in or send forms for your club's files.", href: `${base}/forms` }]
       : []),
     ...(capabilities.manageTeam
-      ? [{ key: "team", label: "Club team", description: "Who can work in this club's portal.", href: `${base}/club-info#club-team` }]
+      ? [{ key: "team", label: "Club admins", description: "Who can work in this club's portal.", href: `${base}/club-info#club-team` }]
       : []),
   ];
 }

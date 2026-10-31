@@ -46,6 +46,7 @@ const client = {
 };
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/two-step-status", () => ({ accountHasTwoStepOn: async () => false, accountIdsWithTwoStepOn: async () => new Set<string>() }));
 // The attendee second step is covered in tests/club-second-step.test.ts; here it has been passed.
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => "OK" }));
 vi.mock("next/server", async (importOriginal) => ({
@@ -109,7 +110,7 @@ beforeEach(() => {
   mocks.findSettings.mockResolvedValue({ passkeyRpId: null });
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.findOrganization.mockResolvedValue({ id: "club-1", name: "Test Pathfinders", type: "CLUB", isActive: true });
-  mocks.findAccount.mockResolvedValue({ id: "account-2", status: "ACTIVE", emailVerifiedAt: now, disabledAt: null });
+  mocks.findAccount.mockResolvedValue({ id: "account-2", email: "helper@example.test", displayName: "Hollis Helper", status: "ACTIVE", emailVerifiedAt: now, disabledAt: null });
   mocks.findGrants.mockResolvedValue([]);
   mocks.createGrant.mockResolvedValue({ id: "grant-2" });
   mocks.listRoster.mockResolvedValue([]);
@@ -230,7 +231,10 @@ describe("the club team", () => {
     expect(body.invited).toBe(false);
     const message = mocks.outboxCreate.mock.calls[0][0].data;
     expect(message).toMatchObject({ templateKey: "CLUB_TEAM_ROLE_NOTIFICATION", recipientEmail: "helper@example.test", accountAttendeeId: "account-2" });
-    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account");
+    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account/clubs/club-1");
+    expect(message.subjectSnapshot).toBe("You're now Registrar of Test Pathfinders");
+    expect(message.bodyTextSnapshot).toContain("Hi Hollis,");
+    expect(message.idempotencyKey).toBe("club-role-notice:grant-2");
     expect(mocks.after).toHaveBeenCalledOnce();
     const queued = mocks.after.mock.calls[0][0];
     await queued();

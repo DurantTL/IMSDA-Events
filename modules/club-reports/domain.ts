@@ -182,3 +182,11 @@ export function monthlyReportProgress(clubYear: string, now: Date, filedMonths: 
 export function yearToDate(reports: ReadonlyArray<{ totalPoints: number }>, registrationOnTime: boolean) {
   return reports.reduce((sum, report) => sum + report.totalPoints, 0) + (registrationOnTime ? YEARLY_REGISTRATION_POINTS : 0);
 }
+
+/**
+ * Whether a report month ended before the club joined (#1410). Joining is the day the club was created here
+ * (`joinedOn`, a calendar date); the month it joined in still counts. Months are "YYYY-MM".
+ */
+export function reportMonthBeforeJoined(reportMonth: string, joinedOn: string) {
+  return reportMonth < joinedOn.slice(0, 7);
+}
