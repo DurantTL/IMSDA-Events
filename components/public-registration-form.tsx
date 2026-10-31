@@ -716,6 +716,11 @@ export function PublicRegistrationForm({
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const submitInFlight = useRef(false);
+  /** Submit pressed while a promo re-quote was pending (#1404): the real submit runs once the quote settles. */
+  const [submitQueued, setSubmitQueued] = useState(false);
+  const submitQueuedRef = useRef(false);
+  /** Why the re-quote behind a queued submit failed; set by the apply functions, read when the quote settles. */
+  const requoteFailureRef = useRef<string | null>(null);
   // Club cards tuck roster-known answers away (#853); once a question has been shown (a server issue, or "Change"),
   // it stays shown for the rest of the visit. Keyed by `${clientId}:${fieldKey}`, or `${clientId}:*` for "Change".
   const [revealedFields, setRevealedFields] = useState<Record<string, true>>({});
@@ -1080,6 +1085,9 @@ export function PublicRegistrationForm({
   }
 
   function goToStep(step: PublicRegistrationStep) {
+    // Leaving the review step cancels a submit queued behind a re-quote (#1404); coming back needs a new tap.
+    submitQueuedRef.current = false;
+    setSubmitQueued(false);
     setSheetOpen(false);
     setCurrentStepId(step.id);
     setIssues([]);
@@ -1195,6 +1203,7 @@ export function PublicRegistrationForm({
         setIssues([issue]);
         setPromoCodeQuote(null);
         setPromoCodeNotice(issue.message);
+        requoteFailureRef.current = issue.message;
         return;
       }
       const quote = result.quote;
@@ -1216,6 +1225,7 @@ export function PublicRegistrationForm({
       );
       setIdempotencyKey(null);
     } catch {
+      requoteFailureRef.current = "The promo code could not be checked right now. Try again.";
       setPromoCodeQuote(null);
       setPromoCodeNotice(
         "The promo code could not be checked right now. Try again.",
@@ -1270,7 +1280,9 @@ export function PublicRegistrationForm({
       setIdempotencyKey(null);
     } catch (caught) {
       setAttendeePromo(null);
-      setError(caught instanceof Error ? caught.message : "The promo codes could not be checked right now. Try again.");
+      const failure = caught instanceof Error ? caught.message : "The promo codes could not be checked right now. Try again.";
+      requoteFailureRef.current = failure;
+      setError(failure);
     } finally {
       setAttendeePromoChecking(false);
     }
@@ -1316,6 +1328,12 @@ export function PublicRegistrationForm({
     const timer = window.setTimeout(() => void applyPromoCodeRef.current(), 700);
     return () => window.clearTimeout(timer);
   }, [promoCodeNeedsRecheck, promoCodeApplying, calculationBasis]);
+
+  // A re-quote is pending while a changed price waits on its debounce or a check is in flight (#1404).
+  const requotePending = promoCodeNeedsRecheck || promoCodeApplying || attendeePromoNeedsRecheck || promoTicksChanged || attendeePromoChecking;
+  // When the quote behind a queued submit settles: send it with the fresh quote, or stop and keep the message.
+  // The handler lives in a ref so it always sees the latest state when the effect calls it.
+  const finishQueuedSubmitRef = useRef<() => void>(() => undefined);
 
   function removePromoCode() {
     if (!promoField) return;
@@ -3171,6 +3189,17 @@ export function PublicRegistrationForm({
       window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
       return;
     }
+    if (submitQueuedRef.current) return;
+    if (requotePending) {
+      // The total is being re-quoted: validating now would judge a stale quote. Check it at once and submit after (#1404).
+      submitQueuedRef.current = true;
+      requoteFailureRef.current = null;
+      setSubmitQueued(true);
+      setError("");
+      if (promoCodeNeedsRecheck && !promoCodeApplying) void applyPromoCode();
+      if ((attendeePromoNeedsRecheck || promoTicksChanged) && !attendeePromoChecking) void applyAttendeePromoCodes();
+      return;
+    }
     const clientIssues = allClientIssues();
     setServerIssues([]);
     if (clientIssues.length > 0) {
@@ -3297,6 +3326,27 @@ export function PublicRegistrationForm({
       submitInFlight.current = false;
     }
   }
+
+  useEffect(() => {
+    finishQueuedSubmitRef.current = () => {
+      submitQueuedRef.current = false;
+      setSubmitQueued(false);
+      if (!currentStep.isReview) return;
+      const failure = requoteFailureRef.current;
+      if (failure) {
+        requoteFailureRef.current = null;
+        // The promo issue already carries this sentence in the summary list; don't read it twice.
+        setError(issues.some((issue) => issue.message === failure) ? "Your total could not be updated." : failure);
+        window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
+        return;
+      }
+      void submit();
+    };
+  });
+
+  useEffect(() => {
+    if (submitQueued && !requotePending) finishQueuedSubmitRef.current();
+  }, [submitQueued, requotePending]);
 
   function startAnotherRegistration() {
     setDraftDirty(false);
@@ -3583,6 +3633,7 @@ export function PublicRegistrationForm({
             )}
           </section>
 
+          <p className="sr-only" role="status" aria-live="polite">{submitQueued ? "Updating total…" : ""}</p>
           {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
             <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
@@ -3673,7 +3724,8 @@ export function PublicRegistrationForm({
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}
                 iconSize={19}
                 label={club?.submitLabel ?? group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
-                submitting={submitting}
+                submitting={submitting || submitQueued}
+                submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
             )}
           </nav>
@@ -3691,7 +3743,8 @@ export function PublicRegistrationForm({
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}
                 iconSize={19}
                 label={club?.submitLabel ?? group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
-                submitting={submitting}
+                submitting={submitting || submitQueued}
+                submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
             </section>
           )}
