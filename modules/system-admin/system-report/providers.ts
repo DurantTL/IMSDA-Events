@@ -31,6 +31,7 @@ import { calendarRefreshFields, diskFields, generalLinkExpiryFields, messageFile
 import { runPricingSelfTest } from "./pricing-self-test";
 import { countPublicSubmissionsSince, readOpenRegistrationEvents, readUnreleasedHoldCounts } from "./registration-reads";
 import { openWithoutFormFields, pricingSelfTestFields, registrationsReceivedFields, unreleasedHoldsFields } from "./registration-signals";
+import { buildMoneyProviders } from "./money-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -605,6 +606,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
     return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields)];
   }),
+  ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
 ];
 
 /* ---------- Environment status rows ---------- */

@@ -17,7 +17,7 @@ import { expireStalePendingTeams } from "@/modules/general-link-registrations/re
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordJobRun, recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
-import { CALENDAR_FEED_REFRESH_JOB, GENERAL_LINK_EXPIRY_JOB, MESSAGE_FILE_CLEANUP_JOB } from "@/modules/operations/sweep-heartbeat";
+import { CALENDAR_FEED_REFRESH_JOB, GENERAL_LINK_EXPIRY_JOB, MESSAGE_FILE_CLEANUP_JOB, PAY_ON_SQUARE_LINK_SWEEP_JOB } from "@/modules/operations/sweep-heartbeat";
 import { withRequestContext } from "@/lib/request-context";
 import { sweepMessageFiles } from "@/modules/communications/message-file-sweep";
 import { messageFileSweepDeletes } from "@/modules/communications/message-file-config";
@@ -105,6 +105,14 @@ async function postHandler(request: Request) {
     const hostedLinks = await sweepHostedCheckouts().catch((error) => {
       logError("The Pay on Square link sweep failed after a successful outbox sweep", error);
       return null;
+    });
+    // The System report (#1374) shows when this step last ran and what it found: counts only. Recording never fails the sweep.
+    await recordJobRun(
+      PAY_ON_SQUARE_LINK_SWEEP_JOB,
+      hostedLinks ? "SUCCEEDED" : "FAILED",
+      hostedLinks ? { withdrawn: hostedLinks.withdrawn, deleted: hostedLinks.deleted, failed: hostedLinks.failed } : undefined,
+    ).catch((error) => {
+      logError("Could not record the Pay on Square link sweep run", error);
     });
     // Honors Weekend class waitlists (#831): offers that ran out pass to the next youth in line, each director
     // emailed once for a new offer. Its failure must not make a successful sweep look failed.

@@ -27,7 +27,8 @@ export type SectionKey =
   | "setup"
   | "public-site"
   | "checklist"
-  | "registration";
+  | "registration"
+  | "money";
 
 export type Signal = {
   key: string;
@@ -79,6 +80,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "public-site", title: "Public site", fixHref: "/admin/analytics", fixLabel: "Open analytics" },
   { key: "registration", title: "Registration and checkout", fixHref: "/people", fixLabel: "Open registrations" },
   { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
+  { key: "money", title: "Refunds and payment follow-up", fixHref: "/finance", fixLabel: "Open finance" },
 ];
 
 export type SignalMeta = Pick<Signal, "key" | "name" | "description" | "fixHref" | "fixLabel">;

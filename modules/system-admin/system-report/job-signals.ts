@@ -46,6 +46,21 @@ export function calendarRefreshFields(key: string, run: JobRun, readAt: Date): F
     : { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: text };
 }
 
+export function payOnSquareLinkSweepFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the Pay on Square link sweep");
+  if (problem) return problem;
+  const withdrawn = num(run.summary, "withdrawn");
+  const deleted = num(run.summary, "deleted");
+  const failed = num(run.summary, "failed");
+  if (withdrawn === null || deleted === null || failed === null) {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "It ran, but its counts were not recorded." };
+  }
+  const text = `${withdrawn} withdrawn, ${deleted} deleted at Square, ${failed} deletions failed.`;
+  return failed > 0
+    ? { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${text} The next sweep tries again.` }
+    : { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: text };
+}
+
 export function messageFileCleanupFields(key: string, run: JobRun, readAt: Date): Fields {
   const problem = runProblem(key, run, readAt, "the message file cleanup");
   if (problem) return problem;
