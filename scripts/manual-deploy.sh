@@ -183,7 +183,15 @@ log "Waiting up to ${HEALTH_TIMEOUT}s for $HEALTH_URL to report $SHORT_SHA"
 WAITED=0
 while :; do
   container_running "$APP" || rollback
-  BODY="$(curl -fsS --max-time 10 "$HEALTH_URL" 2>/dev/null || true)"
+  # /api/health shows the release SHA only to a caller with OUTBOX_SWEEP_TOKEN
+  # (#1400). Read it from the container being checked (exactly what the app
+  # received), send it on stdin, never on argv or the screen. No token yet keeps
+  # waiting; an image from before #1400 ignores the header.
+  TOKEN="$(timeout 10 docker exec "$APP" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
+  BODY=""
+  if [ -n "$TOKEN" ]; then
+    BODY="$(printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -fsS --max-time 10 -H @- "$HEALTH_URL" 2>/dev/null || true)"
+  fi
   if printf '%s' "$BODY" | grep -q "\"$SHA\""; then
     printf '%s' "$BODY" | grep -q '"status":"ok"' \
       || log "WARNING: health is not \"ok\"; check $HEALTH_URL (backups or outbox can degrade it without breaking the site)"

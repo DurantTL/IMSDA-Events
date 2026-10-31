@@ -1,5 +1,6 @@
 import type { SweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import type { BackupEvidence } from "./readiness-backup";
+import { backupHelperHasReported } from "@/modules/operations/backup-status";
 import { BACKUP_ITEM_KEYS } from "./readiness-items";
 
 /**
@@ -68,7 +69,7 @@ export function pendingMigrationNames(shipped: readonly string[], rows: readonly
 
 /**
  * The two backup rows, from the same assessment `/api/health` uses (`assessBackupStatus`), so the two never
- * disagree. Dates and yes/no only. A backup that has never run is attention, not ok. When the backup log could not
+ * disagree. Dates and yes/no only. A helper that never reported is `info` ("not in use", #1412); one that has reported keeps the stale and failing rules. When the backup log could not
  * be read the rows say so ("unknown") and the manual ticks stay visible (unreadable is not evidence).
  */
 export function evaluateBackupItems(backup: BackupEvidence, now: Date): AutomaticReadinessRow[] {
@@ -79,6 +80,15 @@ export function evaluateBackupItems(backup: BackupEvidence, now: Date): Automati
     ];
   }
   const s = backup.status;
+  // Production backups are made by xCloud outside the app (#1412). A helper that never wrote a run or a restore test
+  // is not in use; that is neither stale nor failing. One that has reported keeps the logic below.
+  if (!backupHelperHasReported(s)) {
+    const notInUse = "The app's own backup helper has not reported, so it is not in use. Production backups are made outside the app.";
+    return [
+      { key: "backup-offsite", title: "Last successful backup", status: "info", summary: notInUse, people: [] },
+      { key: "restore-rehearsal", title: "Last restore test", status: "info", summary: notInUse, people: [] },
+    ];
+  }
   const day = (iso: string) => iso.slice(0, 10);
   const when = (iso: string) => `${day(iso)} (${age(new Date(iso), now)})`;
 

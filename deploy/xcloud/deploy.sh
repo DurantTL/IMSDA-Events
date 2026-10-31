@@ -45,7 +45,8 @@ done
 #     old code then runs on the new schema, so migrations must be additive
 #     (docs/DEPLOY-DOCKER.md, "Deploys without downtime");
 #  2. the new version starts as `standby` on port 8101 and must report this SHA
-#     on /api/health. If it never does, the live app is not restarted;
+#     on /api/health (read with the container's own OUTBOX_SWEEP_TOKEN). If it
+#     never does, the live app is not restarted;
 #  3. the live tag moves and `app` restarts on 8100 with the preparation
 #     skipped, so it answers within seconds. nginx can fail over to 8101 for
 #     those seconds;
@@ -57,10 +58,18 @@ FAILED_FILE="${IMSDA_FAILED_SHA_FILE:-/var/lib/imsda/failed-sha}"
 # Compose reads this from the environment for the standby service.
 export IMSDA_STANDBY_TAG=next
 
-wait_for_release() { # port sha
+# /api/health shows the release SHA only to a caller with OUTBOX_SWEEP_TOKEN
+# (#1400). The token is read from the container being checked, so it is exactly
+# what that app received, and goes to curl on stdin (never argv or the screen).
+# No token yet (container not ready) means keep waiting; an image from before
+# #1400 ignores the header and still answers with the SHA.
+wait_for_release() { # port sha service [compose profile args]
   waited=0
+  port="$1"; want="$2"; service="$3"; shift 3
   while [ "$waited" -lt "$HEALTH_SECONDS" ]; do
-    if curl -fsS --max-time 5 "http://127.0.0.1:$1/api/health" 2>/dev/null | grep -q "\"sha\":\"$2\""; then
+    token="$(timeout 10 docker compose -f "$COMPOSE" "$@" exec -T "$service" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
+    if [ -n "$token" ] && printf 'Authorization: Bearer %s\n' "$token" \
+      | curl -fsS --max-time 5 -H @- "http://127.0.0.1:$port/api/health" 2>/dev/null | grep -q "\"sha\":\"$want\""; then
       return 0
     fi
     sleep 3
@@ -115,7 +124,7 @@ else
   stop_standby
   IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" --profile standby up -d --no-deps standby \
     || fail "Could not start $SHA on port 8101. The live app was not restarted (the database is already migrated)."
-  if ! wait_for_release 8101 "$SHA"; then
+  if ! wait_for_release 8101 "$SHA" standby --profile standby; then
     docker compose -f "$COMPOSE" --profile standby logs --tail 50 standby >&2 || true
     fail "$SHA did not become healthy on port 8101. The live app was not restarted (the database is already migrated)."
   fi
@@ -128,7 +137,7 @@ else
   # A failed `up` is caught by the health wait below, which rolls back.
   IMSDA_SKIP_DB_PREP=1 docker compose -f "$COMPOSE" up -d --no-deps app \
     || echo "[deploy] Restarting the app on $SHA failed." >&2
-  if ! wait_for_release 8100 "$SHA"; then
+  if ! wait_for_release 8100 "$SHA" app; then
     echo "[deploy] $SHA did not come up on port 8100; putting the previous version back." >&2
     if [ "$HAD_LIVE" = 1 ]; then
       docker tag imsda-events:previous imsda-events:live
@@ -137,7 +146,7 @@ else
         || echo "[deploy] Restarting the previous version failed." >&2
       # Keep the standby serving (through the nginx fallback) until it is back.
       if [ -n "$PREVIOUS_SHA" ]; then
-        wait_for_release 8100 "$PREVIOUS_SHA" \
+        wait_for_release 8100 "$PREVIOUS_SHA" app \
           || echo "[deploy] The previous version $PREVIOUS_SHA is not healthy on 8100 either. Check it now." >&2
       else
         sleep 30

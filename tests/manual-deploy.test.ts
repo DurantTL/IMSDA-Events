@@ -13,6 +13,8 @@ const app = "xcloud-site-1-app-1";
 const fakeDocker = `#!/bin/sh
 echo "$*" >> "$FAKE_DOCKER_LOG"
 case "$1" in
+  exec)
+    case "$*" in *printenv*) printf '%s' "$FAKE_TOKEN"; exit 0 ;; esac ;;
   inspect)
     case "$*" in
       *State.Running*) echo "$FAKE_RUNNING" ;;
@@ -24,7 +26,12 @@ case "$1" in
 esac
 exit 0
 `;
+// Like the real endpoint (#1400): the detail answers only to the bearer header on stdin (-H @-).
+const sweepToken = "synthetic-sweep-token-0123456789-abcdefghij";
 const fakeCurl = `#!/bin/sh
+echo "curl $*" >> "$FAKE_DOCKER_LOG"
+header="$(cat)"
+[ "$header" = "Authorization: Bearer $FAKE_TOKEN" ] || exit 0
 printf '%s' "$FAKE_HEALTH"
 `;
 
@@ -65,6 +72,7 @@ function setup(envFile: string, keyFile?: string) {
         FAKE_DOCKER_LOG: log,
         FAKE_EXISTING: app,
         FAKE_RUNNING: "true",
+        FAKE_TOKEN: sweepToken,
         FAKE_HEALTH: `{"status":"ok","release":{"sha":"${sha}"}}`,
         ...env,
       },
@@ -118,6 +126,33 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toMatch(/run -d --name xcloud-site-1-app-1 .*SECRET_ENCRYPTION_KEY_FILE=\/run\/secrets\/encryption-key/);
     expect(result.calls).toMatch(/run -d .*imsda_events_assets:\/app\/storage\/event-assets/);
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
+  });
+
+  it("sends the sweep token to the health URL on stdin, never on the command line", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const result = run([sha]);
+    expect(result.status).toBe(0);
+    expect(result.calls).toMatch(/^curl .*-H @- /m);
+    expect(result.calls).not.toContain(sweepToken);
+    expect(result.stdout).not.toContain(sweepToken);
+  });
+
+  it("reads the token from the new container and sends a quoted value verbatim", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const quoted = `"${sweepToken}"`;
+    const result = run([sha], { FAKE_TOKEN: quoted });
+    expect(result.status).toBe(0);
+    expect(result.calls).toContain(`exec ${app} printenv OUTBOX_SWEEP_TOKEN`);
+    expect(result.calls).not.toContain(sweepToken);
+  });
+
+  it("rolls back, without calling the endpoint or printing a token, when the container has none", () => {
+    const { run } = setup(envWithKey);
+    const result = run([sha], { FAKE_TOKEN: "" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("rolled back");
+    expect(result.calls).not.toMatch(/^curl /m);
+    expect(`${result.stdout}${result.stderr}${result.calls}`).not.toContain(sweepToken);
   });
 
   it("rolls back to the old container when the new one never reports healthy", () => {

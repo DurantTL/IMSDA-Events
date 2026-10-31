@@ -179,7 +179,7 @@ Ticking only records that someone did the work. This sheet remains the full inst
   - the panel either doesn't hold the key or requires MFA;
   - the master copy's account is separate from the backup account;
   - `/etc/imsda/secret-encryption-key` is `root:root` mode 0400, the env file and
-    panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` shows
+    panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
     `"encryptionKey":{"configured":true,"source":"file"}`.
 
 ## Log

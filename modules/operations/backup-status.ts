@@ -155,7 +155,15 @@ export function assessBackupStatus(
   };
 }
 
-/** Health reports "degraded" (still HTTP 200) for any of these. */
+/**
+ * Whether the app's own backup helper (`imsda-backup`) has ever written a run or a restore test. Production backups
+ * are made by xCloud outside the app (#1412), so a helper that never reported is "not in use", not "stale".
+ */
+export function backupHelperHasReported(status: BackupStatus | null): boolean {
+  return status !== null && (status.lastRunAt !== null || status.lastRehearsalAt !== null);
+}
+
+/** Health reports "degraded" (still HTTP 200) when a helper that has reported needs attention. */
 export function backupStatusDegradesHealth(status: BackupStatus | null) {
-  return status?.needsAttention ?? false;
+  return backupHelperHasReported(status) && (status?.needsAttention ?? false);
 }

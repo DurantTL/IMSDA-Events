@@ -122,6 +122,11 @@ export function summarizePublicPayment(input: {
   isDeferredOrganizationBilling?: boolean;
   /** A "Group" registration (#650) is billed to its contact, not to an organization. */
   billedToGroup?: boolean;
+  /**
+   * Whether the page that shows this summary has an online payment panel under it (#1405). Left out it is assumed,
+   * the behavior before. When false the wording must not point at "below": it sends the person to the event team.
+   */
+  onlinePaymentOffered?: boolean;
 }): PublicPaymentSummary {
   const totalCents = cents(input.totalCents);
   const grossPaidCents = input.payments.reduce(
@@ -135,6 +140,7 @@ export function summarizePublicPayment(input: {
   const paidCents = Math.max(grossPaidCents - refundedCents, 0);
   const activeForPayment = input.status === "SUBMITTED" || input.status === "CONFIRMED";
   const balanceCents = Math.max(totalCents - paidCents, 0);
+  const onlinePaymentOffered = input.onlinePaymentOffered !== false;
 
   // The recorded amount on a deferred-organization registration is the
   // responsible organization's estimated rate, never an attendee balance:
@@ -229,12 +235,14 @@ export function summarizePublicPayment(input: {
       currency: "USD",
       state: "PARTIALLY_PAID",
       label: "Partial payment received",
-      detail: "A balance remains. Pay it below, or contact the event team for another payment option.",
+      detail: onlinePaymentOffered
+        ? "A balance remains. Pay it below, or contact the event team for another payment option."
+        : "A balance remains. Contact the event team to arrange payment.",
       totalCents,
       paidCents,
       refundedCents,
       amountDueCents: balanceCents,
-      paymentEligible: activeForPayment,
+      paymentEligible: activeForPayment && onlinePaymentOffered,
     };
   }
 
@@ -242,12 +250,14 @@ export function summarizePublicPayment(input: {
     currency: "USD",
     state: "BALANCE_DUE",
     label: "Balance due",
-    detail: "No successful payment is recorded. Pay the balance below, or contact the event team for another payment option.",
+    detail: onlinePaymentOffered
+      ? "No successful payment is recorded. Pay the balance below, or contact the event team for another payment option."
+      : "No successful payment is recorded. Contact the event team to arrange payment.",
     totalCents,
     paidCents,
     refundedCents,
     amountDueCents: balanceCents,
-    paymentEligible: activeForPayment,
+    paymentEligible: activeForPayment && onlinePaymentOffered,
   };
 }
 

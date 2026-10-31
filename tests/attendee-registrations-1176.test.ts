@@ -609,3 +609,20 @@ describe("an event with no cancellation policy (#1408)", () => {
     expect(registrationActions(registration("a", "CONFIRMED"), { editable: true, cancellation: openRequests }).cancellationUnavailable).toBe(false);
   });
 });
+
+describe("balance owed without online payment (#1405)", () => {
+  it("still shows the amount remaining and says how to pay when the card can't be paid online", () => {
+    const summary = registrationMoneySummary(registration("n", "SUBMITTED", {
+      payment: { state: "PARTIALLY_PAID", label: "Partial payment received", detail: "A balance remains. Contact the event team to arrange payment.", paymentEligible: false },
+    }));
+    expect(summary.headline).toBe("$40.00 remaining");
+    expect(summary.detail).toBe("$40.00 paid toward your $80.00 registration. Contact the event team to arrange payment.");
+    expect(summary.tone).toBe("due");
+  });
+
+  it("keeps the payable wording unchanged when online payment is offered", () => {
+    const summary = registrationMoneySummary(registration("p", "SUBMITTED"));
+    expect(summary.headline).toBe("$40.00 remaining");
+    expect(summary.detail).toBe("$40.00 paid toward your $80.00 registration.");
+  });
+});

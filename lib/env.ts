@@ -117,6 +117,22 @@ export const serverEnvSchema = z
     // means the endpoint is always 401 and the report reads "Not reporting yet".
     HOST_JOB_HEARTBEAT_TOKEN: optionalTrimmed,
 
+    // Lets an uptime monitor read the detailed /api/health (release, backups, outbox, sweep) without holding the sweep
+    // token (#1400). Optional, at least 32 characters; unset or short means only the sweep token or a system
+    // administrator sees the detail.
+    HEALTH_MONITOR_TOKEN: optionalTrimmed,
+
+    // Read-only look at the production backups xCloud writes to Cloudflare R2 (#1412). All optional: with none set the
+    // System report says backups are managed outside the app. The key must be an R2 token with Object Read only; the
+    // app only ever lists objects. Patterns are comma-separated case-insensitive file-name globs (`*` only).
+    BACKUP_R2_READ_ACCOUNT_ID: optionalTrimmed,
+    BACKUP_R2_READ_ACCESS_KEY_ID: optionalTrimmed,
+    BACKUP_R2_READ_SECRET_ACCESS_KEY: optionalTrimmed,
+    BACKUP_R2_READ_BUCKET: optionalTrimmed,
+    BACKUP_R2_READ_PREFIX: optionalTrimmed,
+    BACKUP_R2_READ_DATABASE_PATTERNS: optionalTrimmed,
+    BACKUP_R2_READ_FILES_PATTERNS: optionalTrimmed,
+
     // Message files (#845). The quota is the most one event may keep, in whole megabytes. The grace period is how old an
     // unreferenced upload must be before the sweep may remove it (never less than 24 hours: the reader clamps it). The
     // sweep only reports what it would remove unless MESSAGE_FILE_SWEEP_DELETE is exactly "true".
@@ -420,6 +436,14 @@ export const SERVER_ENV_KEYS = [
     "SQUARE_ENABLE_PRODUCTION",
     "OUTBOX_SWEEP_TOKEN",
     "HOST_JOB_HEARTBEAT_TOKEN",
+    "HEALTH_MONITOR_TOKEN",
+    "BACKUP_R2_READ_ACCOUNT_ID",
+    "BACKUP_R2_READ_ACCESS_KEY_ID",
+    "BACKUP_R2_READ_SECRET_ACCESS_KEY",
+    "BACKUP_R2_READ_BUCKET",
+    "BACKUP_R2_READ_PREFIX",
+    "BACKUP_R2_READ_DATABASE_PATTERNS",
+    "BACKUP_R2_READ_FILES_PATTERNS",
     "MESSAGE_FILE_EVENT_QUOTA_MB",
     "MESSAGE_FILE_SWEEP_GRACE_HOURS",
     "MESSAGE_FILE_SWEEP_DELETE",

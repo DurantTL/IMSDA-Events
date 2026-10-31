@@ -62,6 +62,8 @@ type SquareCheckout = {
     cardProcessingFeeCents: number;
     cardTotalCents: number;
     payLaterTotalCents: number;
+    /** False when online card payment cannot be taken right now (#1405): only pay later is offered. */
+    cardAvailable?: boolean;
   } | null;
   square: {
     environment: "sandbox" | "production";
@@ -802,6 +804,7 @@ export function PublicSquarePayment({
           aria-pressed={cardChoice?.selected}
           disabled={
             !paymentChoice.available
+            || paymentChoice.cardAvailable === false
             || paymentChoice.locked
             || Boolean(choiceSubmitting)
           }
@@ -815,7 +818,7 @@ export function PublicSquarePayment({
                   ? "Retry card choice"
                   : cardChoice?.title}
             </strong>
-            <small>{cardChoice?.detail}</small>
+            <small>{paymentChoice.cardAvailable === false ? "Online card payment is not available right now." : cardChoice?.detail}</small>
           </span>
           <b translate="no">{formatCents(cardChoice?.totalCents ?? 0)}</b>
         </button>

@@ -7,7 +7,10 @@ import { withRequestContext } from "@/lib/request-context";
 import { getReleaseIdentity } from "@/lib/release";
 import { getSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
 import { getBackupStatus } from "@/modules/operations/backup-status-repository";
-import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/operations/backup-status";
+import { hasHealthDetailToken, isSystemAdministratorSession } from "@/modules/operations/health-access";
+import { backupHelperHasReported, backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/operations/backup-status";
+import { getOffsiteBackups } from "@/modules/operations/offsite-backups-reader";
+import { offsiteDatabaseStatus, type OffsiteBackupResult } from "@/modules/operations/offsite-backups";
 
 /**
  * Liveness and readiness in one response.
@@ -16,12 +19,39 @@ import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/oper
  * broken, so the outbox is checked too. A backed-up queue is `degraded`, not
  * `unavailable`: the container should stay up and keep serving registrations
  * while somebody investigates, so only a database failure returns 503.
+ *
+ * The public answer (#1400) is only "the app is up and the database answers":
+ * status, time and the database check. The detail below (release, backups,
+ * outbox, sweep, key source) needs the sweep token, the monitor token or a
+ * system-administrator session. The public status is never degraded by backups,
+ * the outbox or the sweep, and those queries do not run for public callers.
  */
-async function getHandler() {
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+type OffsiteHealthStatus = "ok" | "stale" | "missing" | "partial" | "not_connected" | "misconfigured" | "error";
+
+function offsiteHealthStatus(result: OffsiteBackupResult): OffsiteHealthStatus {
+  if (result.state !== "checked") return result.state;
+  return offsiteDatabaseStatus(result, new Date()) ?? "error";
+}
+
+/** Times and sizes only: no labels, keys, bucket or account. */
+function offsiteSummary(result: OffsiteBackupResult, status: OffsiteHealthStatus) {
+  const entry = (value: { at: string; bytes: number | null } | null) => (value ? { at: value.at, bytes: value.bytes } : null);
+  return {
+    status,
+    newestDatabase: result.state === "checked" ? entry(result.database) : null,
+    newestFiles: result.state === "checked" ? entry(result.files) : null,
+    partial: result.state === "checked" ? result.partial : false,
+    ...(result.state === "checked" && result.partial ? { scanned: result.scanned } : {}),
+    checkedAt: result.state === "checked" || result.state === "error" ? result.checkedAt : null,
+    ...(result.state === "error" ? { reason: result.reason } : {}),
+  };
+}
+
+async function getHandler(request: Request) {
+  const tokenAuthorized = hasHealthDetailToken(request);
   const checkedAt = new Date().toISOString();
-  const release = getReleaseIdentity();
-  // Whether a key is configured and how it was loaded. Never the key itself.
-  const encryptionKey = getEncryptionKeyStatus();
 
   const database = await checkDatabaseLiveness();
   if (!database.ok) {
@@ -36,17 +66,35 @@ async function getHandler() {
       summary: "The database is unreachable",
       detail: "Registrations, check-in, and payment cannot be recorded until it returns.",
     }).catch(() => undefined);
+    // Neither of these needs the database, so a token holder still gets them;
+    // the public body stays minimal.
     return Response.json(
-      {
-        status: "degraded",
-        checkedAt,
-        release,
-        services: { application: "ok", database: "unavailable" },
-        encryptionKey,
-      },
-      { status: 503 }
+      tokenAuthorized
+        ? {
+            status: "degraded",
+            checkedAt,
+            release: getReleaseIdentity(),
+            services: { application: "ok", database: "unavailable" },
+            encryptionKey: getEncryptionKeyStatus(),
+          }
+        : { status: "degraded", checkedAt, services: { database: "unavailable" } },
+      { status: 503, headers: NO_STORE }
     );
   }
+
+  // Only now, with the database answering, look up a session. A lookup error
+  // is an unauthorized caller, never a failed health check.
+  const authorized = tokenAuthorized || (await isSystemAdministratorSession());
+  if (!authorized) {
+    return Response.json(
+      { status: "ok", checkedAt, services: { database: "ok" } },
+      { headers: NO_STORE }
+    );
+  }
+
+  const release = getReleaseIdentity();
+  // Whether a key is configured and how it was loaded. Never the key itself.
+  const encryptionKey = getEncryptionKeyStatus();
 
   let outbox: Awaited<ReturnType<typeof getOutboxQueueHealth>> | null = null;
   try {
@@ -79,9 +127,27 @@ async function getHandler() {
   }
   const backupsDegraded = backupStatusDegradesHealth(backups);
 
-  return Response.json({
+  // Production backups are made by xCloud into Cloudflare R2 (#1412). With read-only R2 settings the app lists the
+  // newest objects (cached, time-boxed, list-only). A stale or missing database backup degrades; an R2 read error is
+  // shown but never degrades, so a Cloudflare blip does not flap the monitor. Only this authorized branch reads it.
+  let offsite: OffsiteBackupResult = { state: "not_connected" };
+  try {
+    offsite = await getOffsiteBackups();
+  } catch (error) {
+    logError("Offsite backup check failed", error);
+    offsite = { state: "error", reason: "could not be read", checkedAt };
+  }
+  const offsiteStatus = offsiteHealthStatus(offsite);
+  const offsiteDegraded = offsiteStatus === "stale" || offsiteStatus === "missing";
+  // The app's own helper keeps its own entry, so a failing helper is never hidden behind an R2 "ok".
+  const backupsService = backupHelperHasReported(backups)
+    ? (backups?.status ?? "unknown")
+    : backups ? "not_connected" : "unknown";
+
+  return Response.json(
+    {
     status:
-      (outbox && outbox.status !== "ok") || sweepDegraded || backupsDegraded
+      (outbox && outbox.status !== "ok") || sweepDegraded || backupsDegraded || offsiteDegraded
         ? "degraded"
         : "ok",
     checkedAt,
@@ -91,8 +157,10 @@ async function getHandler() {
       database: "ok",
       messageOutbox: outbox?.status ?? "unknown",
       outboxSweep: outboxSweep?.status ?? "unknown",
-      backups: backups?.status ?? "unknown",
+      backups: backupsService,
+      offsiteBackups: offsiteStatus,
     },
+    offsiteBackups: offsiteSummary(offsite, offsiteStatus),
     outboxSweep,
     backups: backups ? toPublicBackupStatus(backups) : null,
     encryptionKey,
@@ -108,7 +176,9 @@ async function getHandler() {
           eventsWithDueMessages: outbox.eventsWithDueMessages,
         }
       : null,
-  });
+    },
+    { headers: NO_STORE }
+  );
 }
 
 export const GET = withRequestContext(getHandler);

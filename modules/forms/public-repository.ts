@@ -6,6 +6,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { depositOptionSelected } from "@/modules/payments/deposit-domain";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
+import { definitionWithoutCardOption, onlineCardPaymentPossible, onlinePaymentOptionValues, withoutDeferredCardFee } from "@/modules/payments/online-card-fee";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { isLockTimeoutError, isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { admitToLocation } from "@/modules/event-locations/admission";
@@ -250,6 +252,14 @@ type PricingSnapshot = {
   processingFeeCents: number;
   totalCents: number;
   cardSelected: boolean;
+  /**
+   * The stored total and `processingFeeCents` leave the online card fee out (#1405): it joins the total only when the
+   * registrant pays online by card. Absent on a registration submitted earlier, whose total already holds the fee when
+   * card was chosen.
+   */
+  cardFeeDeferred?: boolean;
+  /** The card processing fee the form showed for this registration (#1405), added when it is paid online by card; absent when none. */
+  deferredCardFeeCents?: number;
   /** The registrant chose "Pay a deposit now" (#415): the card fee applies to the deposit only, when it is paid. */
   depositSelected?: boolean;
   paymentCollected: false;
@@ -283,6 +293,8 @@ export type PublicRegistrationConfirmation = {
   discountAmountCents?: number;
   promoCode: string | null;
   processingFeeCents?: number;
+  /** The card fee added when the registration is paid online by card (#1405); the stored total leaves it out. */
+  deferredCardFeeCents?: number;
   /** Empty on a church-billed event (#621): raw lines would add back up to the total. */
   lineItems: FormCalculation["lineItems"];
   /** Church-billed events only (#621): the per-person price shown instead of any total. */
@@ -335,6 +347,11 @@ export type PublicRegistrationExperience = {
   };
   choiceUsage: ChoiceUsage;
   pricingDate: string;
+  /**
+   * Whether a registrant can pay by card online (#1405): payment on, Square configured, event not billed to a church.
+   * When false the form comes back without its card choice and never shows a card processing fee.
+   */
+  onlineCardPayment: boolean;
   /** The lodging step (#199): null when the event collects no lodging. Never offered to club or group registrations. */
   lodging: PublicLodgingOffer | null;
   lifecycle: {
@@ -572,6 +589,7 @@ function confirmationFromSnapshot(
         preDiscountSubtotalCents: snapshot.preDiscountSubtotalCents ?? snapshot.subtotalCents,
         discountAmountCents: snapshot.discountAmountCents ?? 0,
         processingFeeCents: snapshot.processingFeeCents,
+        ...(snapshot.deferredCardFeeCents ? { deferredCardFeeCents: snapshot.deferredCardFeeCents } : {}),
       };
   return {
     confirmationCode,
@@ -639,8 +657,14 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
     now
   );
   const lodging = await getPublicLodgingOffer(form.eventId, prisma);
+  const onlineCardPayment = onlineCardPaymentPossible({
+    paymentEnabled: Boolean(definition.payment?.enabled),
+    squareConfigured: getSquareConfiguration().paymentConfigured,
+    billingMode: form.event.billingMode,
+  });
 
   return {
+    onlineCardPayment,
     event: {
       name: form.event.name,
       slug: form.event.slug,
@@ -661,7 +685,8 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
       slug: form.slug,
       versionId: version.id,
       versionNumber: version.versionNumber,
-      definition,
+      // Without the card choice when nobody could pay by it (#1405); the server refuses a card answer all the same.
+      definition: onlineCardPayment || !definition.payment?.enabled ? definition : definitionWithoutCardOption(definition),
       // The wording of each policy-version acknowledgment (#150), read by exact version id: only what the form shows.
       acknowledgmentContent: await loadAcknowledgmentDisplayContent(form.eventId, definition),
     },
@@ -785,7 +810,7 @@ async function createPublicRegistrationTransaction(
   });
   // A group is validated and priced against the form it was shown: the same
   // questions without the club and church ones (#650).
-  const definition = group ? groupFormDefinition(hydratedDefinition) : hydratedDefinition;
+  let definition = group ? groupFormDefinition(hydratedDefinition) : hydratedDefinition;
   if (form.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE" && definition.payment?.enabled) {
     // A deferred-organization event must never create an attendee balance or
     // online payment. This form should never have been published with a
@@ -974,6 +999,36 @@ async function createPublicRegistrationTransaction(
         select: { fieldId: true, optionValue: true, rank: true },
       });
   const usage = usageFromReservations(definition, reservations);
+  // The online choices (card, deposit) are only valid when an online card payment can be taken (#1405). The browser
+  // hides them otherwise, but the answer is checked here, before validation, so it is never accepted and priced with a
+  // fee nobody can pay. The form is then validated without them: a form left with no payment choice has the field
+  // dropped, so nothing required is missing and the registration is priced as pay-later.
+  // What the form as published says about payment, kept before the definition may be rebound without its online
+  // choices: the deferral marker and the currency follow the form, not the stripped copy (#1405).
+  const publishedPayment = definition.payment;
+  if (!isWaitlisted && definition.payment?.enabled && !onlineCardPaymentPossible({
+    paymentEnabled: true,
+    squareConfigured: getSquareConfiguration().paymentConfigured,
+    billingMode: form.event.billingMode,
+  })) {
+    const paymentKey = definition.payment.paymentMethodFieldKey;
+    if (onlinePaymentOptionValues(definition).includes(input.responses[paymentKey] as string)) {
+      throw new PublicRegistrationError(
+        "INVALID_SUBMISSION",
+        "Review the highlighted fields and submit again.",
+        [{
+          kind: "validation",
+          code: "INVALID_RESPONSE",
+          fieldId: null,
+          key: paymentKey,
+          path: `responses.${paymentKey}`,
+          attendeeIndex: null,
+          message: "Card payment is not available for this event right now. Choose another payment option.",
+        }],
+      );
+    }
+    definition = definitionWithoutCardOption(definition);
+  }
   const deferredPaymentFieldKey = isWaitlisted && definition.payment?.enabled
     ? definition.payment.paymentMethodFieldKey
     : null;
@@ -1178,7 +1233,11 @@ async function createPublicRegistrationTransaction(
         processingFeeCents: 0,
         totalCents: pricedCalculation.subtotalCents,
       }
-    : pricedCalculation;
+    // The online card fee is not part of what the registration owes (#1405): it is added to the total when the person
+    // pays online by card, so the stored total and balance are the subtotal. The form still showed the fee.
+    : publishedPayment?.enabled
+      ? withoutDeferredCardFee(pricedCalculation)
+      : pricedCalculation;
 
   const identity: PublicContactIdentity = prepared.identity;
   const accountHolder = await tx.person.upsert({
@@ -1218,7 +1277,7 @@ async function createPublicRegistrationTransaction(
       registrationId: registration.id,
       claimed: claimedPromo,
       appliedDiscountCents: ledgerPromoDiscountCents,
-      currency: definition.payment?.currency ?? "USD",
+      currency: publishedPayment?.currency ?? "USD",
     });
   }
   // Shadow ledger (#117): the same transaction as the stored total, which stays authoritative.
@@ -1227,9 +1286,12 @@ async function createPublicRegistrationTransaction(
     registrationId: registration.id,
     totalCents: admittedCalculation.totalCents,
     appliedDiscountCents: ledgerPromoDiscountCents,
-    currency: definition.payment?.currency ?? "USD",
+    currency: publishedPayment?.currency ?? "USD",
     pricingSnapshot: {
-      ...moneyOnlyPricingSnapshot(admittedCalculation),
+      ...moneyOnlyPricingSnapshot({
+        ...admittedCalculation,
+        ...(!isWaitlisted && publishedPayment?.enabled ? { cardFeeDeferred: true } : {}),
+      }),
       pricingDate: prepared.pricingDate,
       formVersionId: version.id,
       waitlisted: isWaitlisted,
@@ -1478,7 +1540,7 @@ async function createPublicRegistrationTransaction(
     });
   }
   const snapshot: PricingSnapshot = {
-    currency: definition.payment?.currency ?? "USD",
+    currency: publishedPayment?.currency ?? "USD",
     formVersionId: version.id,
     eventTimeZone: form.event.timezone,
     pricingDate: prepared.pricingDate,
@@ -1492,6 +1554,10 @@ async function createPublicRegistrationTransaction(
     processingFeeCents: admittedCalculation.processingFeeCents,
     totalCents: admittedCalculation.totalCents,
     cardSelected: !isWaitlisted && isCardSelected(definition, prepared.registrationResponses),
+    ...(!isWaitlisted && publishedPayment?.enabled ? { cardFeeDeferred: true } : {}),
+    ...(!isWaitlisted && publishedPayment?.enabled && isCardSelected(definition, prepared.registrationResponses) && pricedCalculation.processingFeeCents > 0
+      ? { deferredCardFeeCents: pricedCalculation.processingFeeCents }
+      : {}),
     depositSelected: !isWaitlisted && depositOptionSelected(definition, prepared.registrationResponses),
     paymentCollected: false,
     rosterEnabled: getAttendeeRosterConfig(definition).enabled,

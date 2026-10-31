@@ -10,6 +10,107 @@ in its own container). The Compose `backup` service described in
 > so the nightly assets archive includes them. See "Message files" in `DEPLOY-DOCKER.md`
 > for the per-event quota and the cleanup sweep.
 
+## Production backups: xCloud to R2, checked read-only by the app (#1412)
+
+In production the backups are **not** made by the app. xCloud makes them and
+sends them to a Cloudflare R2 bucket. The `imsda-backup` helper described
+below is the app's own optional backup tool; if it is not running, the System
+report says "the app's own backup helper is not in use" for its two rows. That
+is normal, not a failure.
+
+The app can look in the R2 bucket and show how fresh the backups are. It can
+only **list** the files (names, dates and sizes). It never downloads, writes or
+deletes anything, and the key you create below cannot do those things either.
+On **/admin/system-report** (Jobs section) you get:
+
+- **Newest database backup**: its date (UTC) and size. It turns to
+  "needs attention" if the newest one is more than 26 hours old, or none is
+  found.
+- **Newest files backup**: its date and size, for information only.
+
+The app never shows the bucket name, folder, file names or keys on the page,
+only a label such as "Database dump (.sql.gz)". Until the settings below are
+added, both rows say "Backups are managed outside the app; connect read-only R2
+to check them." That is a neutral note, not a warning.
+
+### Create the read-only key (Caleb, in Cloudflare)
+
+1. Sign in to the Cloudflare dashboard and open **R2 Object Storage**.
+2. On the R2 overview, copy the **Account ID** (shown on the right). Keep it.
+3. Click **Manage API tokens** (also labelled **API** or **Manage R2 API
+   Tokens**), then **Create API token** (an Account API token or a User API
+   token both work).
+4. Name it, for example `imsda-events-backup-read`.
+5. Permissions: choose **Object Read only**. Do not choose any option with
+   Write.
+6. Specify bucket(s): choose **Apply to specific buckets only** and pick only the
+   backup bucket.
+7. TTL: **Forever** (or set an end date and put a reminder in the calendar to
+   replace the key before then; when it expires the System report says "R2
+   refused the read-only key").
+8. Click **Create API token**.
+9. Copy the **Access Key ID** and the **Secret Access Key** now. Cloudflare
+   shows the secret only once. (You do not need the "Token value" or the
+   endpoint URL.)
+
+### Give the key to the app (Caleb, in xCloud)
+
+Add these lines in the xCloud site's **environment panel** (the same place as
+the other settings; xCloud writes them to `/home/u_events/239298/.env`, see
+`DEPLOY-DOCKER.md`, "xCloud site setup"). The values are placeholders:
+
+```
+BACKUP_R2_READ_ACCOUNT_ID=<the 32-character Account ID>
+BACKUP_R2_READ_ACCESS_KEY_ID=<Access Key ID>
+BACKUP_R2_READ_SECRET_ACCESS_KEY=<Secret Access Key>
+BACKUP_R2_READ_BUCKET=<the backup bucket's name>
+```
+
+Optional:
+
+```
+BACKUP_R2_READ_PREFIX=<folder in the bucket, e.g. events.imsda.org/>
+BACKUP_R2_READ_DATABASE_PATTERNS=
+BACKUP_R2_READ_FILES_PATTERNS=
+```
+
+Leave the two pattern lines blank to use the defaults. The database default is
+`*.sql,*.sql.gz,*.sql.zst,*.dump,*.dump.gz` and the files default is
+`*.tar,*.tar.gz,*.tgz,*.zip,*.tar.zst`.
+
+If the bucket holds more than about 10,000 files, the app reads only the first
+10 pages and the System report says the listing was cut short (state "watch",
+not a warning to health). Set `BACKUP_R2_READ_PREFIX` to the folder with the
+database dumps to fix that.
+
+The patterns are matched against each file's name (the last part of its path),
+ignoring capital letters, and `*` is the only wildcard. If xCloud names its
+backups differently (for example `.sql.bz2`), add the pattern here.
+
+All four required settings must be set together. If only some are set, the
+System report says which names are missing (never the values).
+
+Then **redeploy** the site so the container picks up the new environment (a
+plain restart of the old container does not re-read it).
+
+### Check it worked
+
+1. Open **/admin/system-report** and find **Newest database backup** and
+   **Newest files backup** in the Jobs section. The
+   answer is cached for 10 minutes (1 minute after a failure), so wait a moment
+   if you just changed something.
+2. A fresh database backup shows its date and size with a green "OK".
+3. The detailed `/api/health` answer (token or administrator sign-in) shows the
+   same under `offsiteBackups` and `services.offsiteBackups` (`services.backups` is the app's own helper). A stale or missing
+   database backup makes it `degraded` (still HTTP 200). A failed R2 read is
+   shown as `error` but does not make it `degraded`. A listing cut short (more
+   than 10,000 objects under the prefix) with no fresh dump seen shows `partial`
+   and does not make it `degraded` either; set `BACKUP_R2_READ_PREFIX` to the
+   database folder to fix it.
+4. If a row says "R2 refused the read-only key", the key or Account ID is wrong,
+   or the key was not given access to that bucket. If it says "could not reach
+   R2" or "timed out", try again in a minute.
+
 ## What runs
 
 A small second container, **`imsda-backup`**, started next to the app and the
@@ -87,7 +188,8 @@ Each row: `kind` (`BACKUP` or `REHEARSAL`), `startedAt`, `finishedAt`, `ok`,
 `dumpBytes`, `assetsBytes`, `offsiteOk` (null when no off-site copy is
 configured). No file names, paths, row contents or credentials.
 
-`/api/health` is public, so it shows only a small `backups` block (and
+The detailed `/api/health` (bearer token or system admin only, #1400; the public
+answer has no backup fields) shows only a small `backups` block (and
 `services.backups`):
 
 | Field | Meaning |
@@ -253,7 +355,8 @@ Expect `[backup] wrote ...`, `[offsite-r2] uploaded imsda-events/imsda-events-<s
 1. The container waits for `BACKUP_AT_HOUR`, so right after starting it nothing
    is recorded yet. Run the one-off "back up right now" command above to get
    a first run immediately.
-2. `curl -s https://<app host>/api/health` and check that `backups.status` is
+2. read the detailed health answer (token from the running container, sent on stdin; a missing or wrong token only returns the public answer, which has no `backups` block):
+   `T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health`, and check that `backups.status` is
    `ok`, `backups.needsAttention` is `false`, and `backups.lastSuccessAt` and
    `backups.lastRehearsalAt` are set. (`backups.status` of `never` means no run
    has been recorded: the container is not running, cannot reach the database,
@@ -272,7 +375,7 @@ The scheduler restores the newest local dump into a private temporary
 PostgreSQL inside the backup container (see "What runs"; the production server
 is never used) every 7th run and records the result. Weekly, a human:
 
-1. Reads `/api/health`: `backups.needsAttention` is `false` and
+1. Reads `/api/health` (the same token-from-the-container command as above): `backups.needsAttention` is `false` and
    `backups.lastRehearsalAt` is within about 8 days (health turns `degraded` after 8
    days without a successful rehearsal).
 2. `docker logs imsda-backup 2>&1 | grep restore-verify` shows row counts for

@@ -86,17 +86,17 @@ describe("Square payment domain", () => {
       definition,
       responses: { payment_method: "Credit / debit card" },
       formHasPublishedVersion: true,
-    })).toEqual({ configured: true, cardSelected: true });
+    })).toEqual({ configured: true, cardSelected: true, cardChosen: true });
     expect(selectedCardPayment({
       definition,
       responses: { payment_method: "Pay later" },
       formHasPublishedVersion: true,
-    })).toEqual({ configured: true, cardSelected: false });
+    })).toEqual({ configured: true, cardSelected: false, cardChosen: false });
     expect(selectedCardPayment({
       definition,
       responses: { payment_method: "Credit / debit card" },
       formHasPublishedVersion: false,
-    })).toEqual({ configured: false, cardSelected: false });
+    })).toEqual({ configured: false, cardSelected: false, cardChosen: false });
   });
 
   it("calculates the server balance net of successful refunds", () => {

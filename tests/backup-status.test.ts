@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: prisma.getPrisma }));
 import {
   BACKUP_STALE_AFTER_MS,
   assessBackupStatus,
+  backupHelperHasReported,
   backupStatusDegradesHealth,
   toPublicBackupStatus,
   type BackupRunRecord,
@@ -103,10 +104,19 @@ describe("assessBackupStatus", () => {
     expect(unknownAge.status).toBe("never");
   });
 
-  it("goes stale when nothing was ever recorded 36 hours after the table was created", () => {
+  it("assesses as stale when nothing was ever recorded 36 hours after the table was created, but does not degrade health (#1412)", () => {
     const status = assessBackupStatus({ ...empty, migrationFinishedAt: hoursAgo(37) }, now);
 
     expect(status).toMatchObject({ status: "stale", stale: true, needsAttention: true });
+    // Production backups run outside the app, so a helper that never reported is not in use rather than stale.
+    expect(backupHelperHasReported(status)).toBe(false);
+    expect(backupStatusDegradesHealth(status)).toBe(false);
+  });
+
+  it("degrades health once the helper has reported and then gone stale (#1412)", () => {
+    const old = run({ hours: 60 });
+    const status = assessBackupStatus({ ...empty, latest: old, latestSuccess: old, latestOffsiteSuccess: old }, now);
+    expect(backupHelperHasReported(status)).toBe(true);
     expect(backupStatusDegradesHealth(status)).toBe(true);
   });
 

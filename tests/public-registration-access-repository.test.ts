@@ -665,6 +665,64 @@ describe("private registration access repository", () => {
     expect(view?.payment.totalCents).toBe(25000);
   });
 
+  describe("the payment summary only points at a payment panel that is shown (#1405)", () => {
+    const payment = { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true };
+    async function viewWith(options: { formTakesPayment: boolean; squareConfigured: boolean }) {
+      const record = accessRecord();
+      (record.registration.event as unknown as { billingMode: string }).billingMode = "ATTENDEE_PAY";
+      if (options.formTakesPayment) {
+        const definition = record.registration.publicFormSubmission.formVersion.definition as unknown as { payment: unknown; sections: Array<{ fields: unknown[] }> };
+        definition.payment = payment;
+        definition.sections[0]!.fields.push({ id: "payment_method", key: "payment_method", label: "Payment method", helpText: "", type: "RADIO", scope: "REGISTRATION", required: true, options: ["Pay later", "Credit / debit card"] });
+      }
+      for (const [key, value] of Object.entries({
+        SQUARE_APPLICATION_ID: "sandbox-sq0idb-example",
+        SQUARE_LOCATION_ID: "sandbox-location",
+        SQUARE_ACCESS_TOKEN: "sandbox-access-token",
+        SQUARE_WEBHOOK_SIGNATURE_KEY: "sandbox-signature-key",
+        SQUARE_WEBHOOK_NOTIFICATION_URL: "https://events.imsda.test/api/webhooks/square",
+      })) vi.stubEnv(key, options.squareConfigured ? value : "");
+      const client = { registrationAccessToken: { findUnique: vi.fn().mockResolvedValue(record) } };
+      return resolveRegistrationAccessToken(createOpaqueToken(), { client: client as never, now: new Date("2026-08-01T12:00:00.000Z") });
+    }
+
+    it("says pay below, and shows the panel, when the form takes payment and Square is configured", async () => {
+      const view = await viewWith({ formTakesPayment: true, squareConfigured: true });
+      expect(view?.payment.onlinePaymentOffered).toBe(true);
+      expect(view?.payment.paymentPanelShown).toBe(true);
+      expect(view?.payment.detail).toContain("below");
+    });
+
+    it("never says pay below when Square is not configured", async () => {
+      const view = await viewWith({ formTakesPayment: true, squareConfigured: false });
+      expect(view?.payment.onlinePaymentOffered).toBe(false);
+      expect(view?.payment.paymentPanelShown).toBe(false);
+      expect(view?.payment.detail).not.toContain("below");
+      expect(view?.payment.detail).toContain("Contact the event team");
+    });
+
+    it("keeps the payment panel for a promoted waitlist registrant even with Square off, to record pay later", async () => {
+      const record = accessRecord();
+      (record.registration.event as unknown as { billingMode: string }).billingMode = "ATTENDEE_PAY";
+      (record.registration as unknown as { waitlistEntry: unknown }).waitlistEntry = { position: 1, status: "PROMOTED" };
+      vi.stubEnv("SQUARE_APPLICATION_ID", "");
+      const client = { registrationAccessToken: { findUnique: vi.fn().mockResolvedValue(record) } };
+      const view = await resolveRegistrationAccessToken(createOpaqueToken(), { client: client as never, now: new Date("2026-08-01T12:00:00.000Z") });
+      // The panel stays (pay later can be recorded), but nothing says "pay below" or offers payment: checkout is not configured.
+      expect(view?.payment.paymentPanelShown).toBe(true);
+      expect(view?.payment.onlinePaymentOffered).toBe(false);
+      expect(view?.payment.paymentEligible).toBe(false);
+      expect(view?.payment.detail).toContain("Contact the event team");
+      expect(view?.payment.detail).not.toContain("below");
+    });
+
+    it("never says pay below when the form takes no payment", async () => {
+      const view = await viewWith({ formTakesPayment: false, squareConfigured: true });
+      expect(view?.payment.onlinePaymentOffered).toBe(false);
+      expect(view?.payment.detail).not.toContain("below");
+    });
+  });
+
   it("rejects malformed, expired, and revoked links with the same null result", async () => {
     const token = createOpaqueToken();
     const findUnique = vi.fn();

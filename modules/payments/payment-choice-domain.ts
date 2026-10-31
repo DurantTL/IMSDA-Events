@@ -41,6 +41,8 @@ export type PromotedWaitlistPaymentChoiceView = {
   cardProcessingFeeCents: number;
   cardTotalCents: number;
   payLaterTotalCents: number;
+  /** False when online card payment cannot be taken right now (#1405): only pay later is offered. Absent means available. */
+  cardAvailable?: boolean;
 };
 
 const waitlistPricingSnapshotSchema = z.object({

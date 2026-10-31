@@ -7,6 +7,7 @@ import {
 import type {
   PromotedWaitlistPaymentChoiceView,
 } from "@/modules/payments/payment-choice-domain";
+import { isCardFeeDeferred } from "@/modules/payments/online-card-fee";
 import { paymentKinds, type PaymentKind } from "@/modules/payments/deposit-domain";
 
 export const squarePaymentInputSchema = z.strictObject({
@@ -172,22 +173,31 @@ export function selectedCardPayment(input: {
    * version's definition still decides the payment fields and pricing.
    */
   formHasPublishedVersion: boolean;
-}) {
+  /**
+   * The submission's pricing snapshot. A new submission marks it `cardFeeDeferred` (#1405): its stored total never
+   * held the online card fee, so choosing card does not mean the fee is already in the total.
+   */
+  pricingSnapshot?: unknown;
+}): { configured: boolean; cardSelected: boolean; cardChosen: boolean } {
   if (!input.formHasPublishedVersion) {
-    return { configured: false, cardSelected: false };
+    return { configured: false, cardSelected: false, cardChosen: false };
   }
   const definition = registrationFormDefinitionSchema.safeParse(
     input.definition,
   );
   if (!definition.success || !definition.data.payment?.enabled) {
-    return { configured: false, cardSelected: false };
+    return { configured: false, cardSelected: false, cardChosen: false };
   }
   const payment = definition.data.payment;
   const responses = record(input.responses);
+  const cardChosen =
+    responses[payment.paymentMethodFieldKey] === payment.cardOptionValue;
   return {
     configured: true,
-    cardSelected:
-      responses[payment.paymentMethodFieldKey] === payment.cardOptionValue,
+    // "The fee is already in the total": card was chosen AND the total was priced with it (a registration submitted
+    // before #1405). A deferred-fee registration is charged the fee when it pays, exactly like pay-later.
+    cardSelected: cardChosen && !isCardFeeDeferred(input.pricingSnapshot),
+    cardChosen,
   };
 }
 

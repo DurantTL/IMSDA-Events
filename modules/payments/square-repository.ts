@@ -267,23 +267,28 @@ export function checkoutFromRegistration(
           selected: latestPaymentChoice?.choice ?? null,
           currentOperationId: latestPaymentChoice?.id ?? null,
           ...promotedQuote,
+          cardAvailable: configuration.paymentConfigured,
         }
       : null;
   const paymentSelection = promotedWaitlist
     ? {
         configured: Boolean(promotedQuote),
         cardSelected: latestPaymentChoice?.choice === "CARD",
+        cardChosen: latestPaymentChoice?.choice === "CARD",
       }
     : submission
     ? selectedCardPayment({
         definition: submission.formVersion.definition,
         responses: submission.responses,
         formHasPublishedVersion: submission.formVersion.form.versions.length > 0,
+        pricingSnapshot: submission.pricingSnapshot,
       })
-    : { configured: false, cardSelected: false };
+    : { configured: false, cardSelected: false, cardChosen: false };
   const balanceCents = registrationBalanceCents(registration);
-  // A registration priced for card already carries its fee in the total. One
-  // that chose pay-later does not, so settling it by card now adds the same
+  // A registration whose total already holds the card fee (`paymentSelection.cardSelected`: card chosen on a
+  // registration submitted before #1405, or a promoted-waitlist card choice) gets no surcharge. A registration
+  // submitted since stores its subtotal only, whatever it chose, so it is charged the fee here when it pays, which
+  // is the same amount the form showed. A pay-later registration settling by card now is charged the same
   // surcharge the card path always charged — computed on what is actually
   // being run through the card, which is the outstanding balance.
   //
@@ -402,6 +407,8 @@ export function checkoutFromRegistration(
       ? "Pay the deposit now to hold your reservation. The card processing fee applies to the deposit only; the rest stays as your balance."
       : paymentSelection.cardSelected || surchargeCents === 0
         ? "Secure card payment is available through Square."
+        : paymentSelection.cardChosen
+        ? "The card processing fee shown on the form is added to the balance when you pay by card."
         : "This registration chose to pay later. The balance can still be paid by card now, with the same card processing fee a card registration is charged.",
     square,
   };

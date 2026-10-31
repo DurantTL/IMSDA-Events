@@ -41,6 +41,7 @@ import {
 } from "@/modules/events/public-domain";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { getAttendeeRosterConfig, registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 import { currentPricingSnapshot, isChurchBilledBillingMode, perPersonPriceFromSnapshot } from "@/modules/club-registrations/per-person-price";
 
 export { REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
@@ -324,6 +325,19 @@ function serializeRegistrationAccess(
     registration.status,
     waitlistPosition,
   );
+  // Whether the private page has a payment panel (#1405): a promoted waitlist registrant picks how to pay (even with Square off,
+  // to record pay-later), or Square is ready and the form takes payment. Without it the summary must not say "pay below".
+  const submissionDefinition = registration.publicFormSubmission
+    ? registrationFormDefinitionSchema.safeParse(registration.publicFormSubmission.formVersion.definition)
+    : null;
+  const squareReady = getSquareConfiguration().paymentConfigured;
+  const selfPay = event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE" && !registration.groupRegistration;
+  const promotedWaitlist = registration.waitlistEntry?.status === "PROMOTED";
+  // The panel is shown for a promoted registrant even with Square off (to record pay later); the summary only says
+  // "pay below" and offers payment when an online payment can actually be taken.
+  const paymentPanelShown = selfPay
+    && (promotedWaitlist || (squareReady && Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled)));
+  const onlinePaymentOffered = paymentPanelShown && squareReady;
   const paymentSummary = summarizePublicPayment({
     status: registration.status,
     totalCents: moneyToCents(registration.totalAmount),
@@ -336,6 +350,7 @@ function serializeRegistrationAccess(
     })),
     isDeferredOrganizationBilling: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     billedToGroup: Boolean(registration.groupRegistration),
+    onlinePaymentOffered,
   });
   // A "Group" (#650) is billed to its contact and is shown its price and estimated total.
   const isGroup = Boolean(registration.groupRegistration);
@@ -351,12 +366,14 @@ function serializeRegistrationAccess(
         label: paymentSummary.label,
         detail: paymentSummary.detail,
         paymentEligible: false,
+        onlinePaymentOffered: false,
+        paymentPanelShown: false,
         totalCents: null,
         paidCents: null,
         refundedCents: null,
         amountDueCents: null,
       }
-    : paymentSummary;
+    : { ...paymentSummary, onlinePaymentOffered, paymentPanelShown };
   const accountHolder = registration.accountHolderPerson;
   const contact = publicContactFromSnapshot(
     registration.contactSnapshot,
