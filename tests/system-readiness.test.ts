@@ -178,12 +178,21 @@ describe("automatic backup rows (#895)", () => {
     expect(row.status).toBe("attention");
     expect(row.summary).toContain("Latest run reached the offsite copy: no");
 
-    // Never run, shortly after the table was created: health says "never", which is attention here, not ok.
-    const fresh = evidence({ migrationFinishedAt: new Date(now.getTime() - 3_600_000) });
-    const never = evaluateBackupItems(fresh, now);
-    expect(never.map((candidate) => candidate.status)).toEqual(["attention", "attention"]);
-    expect(never[0].summary).toContain("No backup has run yet");
-    expect(never[1].summary).toContain("No restore test has run yet");
+  });
+
+  it("calls a helper that never reported not in use, not stale or never succeeded (#1412)", () => {
+    for (const migrationFinishedAt of [new Date(now.getTime() - 3_600_000), new Date(now.getTime() - 90 * 24 * 3_600_000)]) {
+      const never = evaluateBackupItems(evidence({ migrationFinishedAt }), now);
+      expect(never.map((candidate) => candidate.status)).toEqual(["info", "info"]);
+      for (const row of never) {
+        expect(row.summary).toContain("has not reported");
+        expect(row.summary).toContain("made outside the app");
+        expect(row.summary).not.toMatch(/stale|overdue|never succeeded|No backup has run/i);
+      }
+    }
+    // One that has reported keeps its stale logic.
+    const old = record(60);
+    expect(evaluateBackupItems(evidence({ latest: old, latestSuccess: old, latestOffsiteSuccess: old }), now)[0]).toMatchObject({ status: "attention" });
   });
 
   it("flags stopped offsite copies and a backup that never reached offsite", () => {

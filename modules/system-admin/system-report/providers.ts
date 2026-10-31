@@ -74,6 +74,8 @@ import {
 } from "./job-signals";
 import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
 import { getServerEnv } from "@/lib/env";
+import { getOffsiteBackups } from "@/modules/operations/offsite-backups-reader";
+import { offsiteBackupFields } from "./backup-signals";
 import { buildCommunicationsProviders } from "./communications-providers";
 import { buildEventOpsProviders } from "./event-ops-providers";
 import { buildSelfTestProviders } from "./self-test-providers";
@@ -302,6 +304,12 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
   };
 }
 
+/** The production backups xCloud writes to R2, read through the cached read-only listing (#1412). */
+async function offsiteBackupRows(ctx: ReportContext) {
+  const read = await ctx.once("offsite-backups", () => getOffsiteBackups());
+  return offsiteBackupFields(read.ok ? read.value : null, ctx.now);
+}
+
 /* ---------- Stored job runs and connection tests ---------- */
 
 /** A step the sweep records on `SystemJobHeartbeat`: judged stale after an hour without a success. */
@@ -436,6 +444,8 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
   defineProvider("jobs", [
     m("email-sweep", "Email sweep", "The scheduled job that sends queued email succeeded in the last 15 minutes.", null, serverFix),
+    m("backup-r2-database", "Newest database backup", "The newest database backup in the read-only Cloudflare R2 backup bucket is less than 26 hours old.", null, "Set on the server"),
+    m("backup-r2-files", "Newest files backup", "The newest uploaded-files backup in the read-only Cloudflare R2 backup bucket (shown for information).", null, "Set on the server"),
     m("backup-last", "Last backup", "The last backup succeeded recently and reached its offsite copy.", "/admin/readiness", "Open readiness"),
     m("backup-restore-test", "Restore test", "A backup was restored as a test recently.", "/admin/readiness", "Open readiness"),
     m("calendar-feed-refresh", "Calendar feed refresh", "The imported calendar feeds that came due were refreshed by the last sweep.", "/admin/calendar", "Open calendar"),
@@ -454,6 +464,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("server-runtime-guard", "Runtime guard", "The server's check that the app container keeps its settings ran in the last 15 minutes.", null, serverFix),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
+    ...(await offsiteBackupRows(ctx)),
     await readinessRow(ctx, "backup-offsite", "backup-last"),
     await readinessRow(ctx, "restore-rehearsal", "backup-restore-test"),
     await jobRow(ctx, CALENDAR_FEED_REFRESH_JOB, "calendar-feed-refresh", calendarRefreshFields),

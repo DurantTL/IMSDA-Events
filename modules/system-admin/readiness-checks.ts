@@ -1,5 +1,6 @@
 import type { SweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import type { BackupEvidence } from "./readiness-backup";
+import { backupHelperHasReported } from "@/modules/operations/backup-status";
 import { BACKUP_ITEM_KEYS } from "./readiness-items";
 
 /**
@@ -79,6 +80,15 @@ export function evaluateBackupItems(backup: BackupEvidence, now: Date): Automati
     ];
   }
   const s = backup.status;
+  // Production backups are made by xCloud outside the app (#1412). A helper that never wrote a run or a restore test
+  // is not in use; that is neither stale nor failing. One that has reported keeps the logic below.
+  if (!backupHelperHasReported(s)) {
+    const notInUse = "The app's own backup helper has not reported, so it is not in use. Production backups are made outside the app.";
+    return [
+      { key: "backup-offsite", title: "Last successful backup", status: "info", summary: notInUse, people: [] },
+      { key: "restore-rehearsal", title: "Last restore test", status: "info", summary: notInUse, people: [] },
+    ];
+  }
   const day = (iso: string) => iso.slice(0, 10);
   const when = (iso: string) => `${day(iso)} (${age(new Date(iso), now)})`;
 

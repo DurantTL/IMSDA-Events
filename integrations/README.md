@@ -13,3 +13,7 @@ The builder and public registration transaction calculate and snapshot server-au
 ## Resend
 
 `integrations/email/resend.ts` is the server-only Resend provider boundary; `modules/communications/email-delivery.ts` calls it to send committed outbox snapshots when an event selects external email and `RESEND_API_KEY` is configured. Provider idempotency, claim locks, backoff, delivery-event reconciliation, and in-memory private-link insertion prevent duplicate sends and keep raw bearer links out of storage. Inbound provider events are verified in `integrations/email/resend-webhook.ts`.
+
+## Cloudflare R2 backups (read-only)
+
+`integrations/backups/r2-read.ts` is the server-only, list-only look at the production backups xCloud writes to Cloudflare R2 (#1412). It signs one fixed request, ListObjectsV2 (`GET` with `list-type=2`), with `aws4fetch` and an Object Read only token; it has no download, write, copy or delete function. `modules/operations/offsite-backups*.ts` turns the listing into "newest database backup" and "newest files backup" for the System report and the detailed `/api/health`. Settings and the Cloudflare token steps are in `docs/BACKUPS.md`.

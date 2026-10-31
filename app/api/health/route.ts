@@ -8,7 +8,9 @@ import { getReleaseIdentity } from "@/lib/release";
 import { getSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
 import { getBackupStatus } from "@/modules/operations/backup-status-repository";
 import { hasHealthDetailToken, isSystemAdministratorSession } from "@/modules/operations/health-access";
-import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/operations/backup-status";
+import { backupHelperHasReported, backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/operations/backup-status";
+import { getOffsiteBackups } from "@/modules/operations/offsite-backups-reader";
+import { offsiteDatabaseStatus, type OffsiteBackupResult } from "@/modules/operations/offsite-backups";
 
 /**
  * Liveness and readiness in one response.
@@ -25,6 +27,26 @@ import { backupStatusDegradesHealth, toPublicBackupStatus } from "@/modules/oper
  * the outbox or the sweep, and those queries do not run for public callers.
  */
 const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+type OffsiteHealthStatus = "ok" | "stale" | "missing" | "not_connected" | "misconfigured" | "error";
+
+function offsiteHealthStatus(result: OffsiteBackupResult): OffsiteHealthStatus {
+  if (result.state !== "checked") return result.state;
+  return offsiteDatabaseStatus(result, new Date()) ?? "error";
+}
+
+/** Times and sizes only: no labels, keys, bucket or account. */
+function offsiteSummary(result: OffsiteBackupResult, status: OffsiteHealthStatus) {
+  const entry = (value: { at: string; bytes: number | null } | null) => (value ? { at: value.at, bytes: value.bytes } : null);
+  return {
+    status,
+    newestDatabase: result.state === "checked" ? entry(result.database) : null,
+    newestFiles: result.state === "checked" ? entry(result.files) : null,
+    partial: result.state === "checked" ? result.partial : false,
+    checkedAt: result.state === "checked" || result.state === "error" ? result.checkedAt : null,
+    ...(result.state === "error" ? { reason: result.reason } : {}),
+  };
+}
 
 async function getHandler(request: Request) {
   const tokenAuthorized = hasHealthDetailToken(request);
@@ -104,10 +126,27 @@ async function getHandler(request: Request) {
   }
   const backupsDegraded = backupStatusDegradesHealth(backups);
 
+  // Production backups are made by xCloud into Cloudflare R2 (#1412). With read-only R2 settings the app lists the
+  // newest objects (cached, time-boxed, list-only). A stale or missing database backup degrades; an R2 read error is
+  // shown but never degrades, so a Cloudflare blip does not flap the monitor. Only this authorized branch reads it.
+  let offsite: OffsiteBackupResult = { state: "not_connected" };
+  try {
+    offsite = await getOffsiteBackups();
+  } catch (error) {
+    logError("Offsite backup check failed", error);
+    offsite = { state: "error", reason: "could not be read", checkedAt };
+  }
+  const offsiteStatus = offsiteHealthStatus(offsite);
+  const offsiteDegraded = offsiteStatus === "stale" || offsiteStatus === "missing";
+  const backupsService =
+    offsite.state !== "not_connected" ? offsiteStatus
+    : backupHelperHasReported(backups) ? (backups?.status ?? "unknown")
+    : backups ? "not_connected" : "unknown";
+
   return Response.json(
     {
     status:
-      (outbox && outbox.status !== "ok") || sweepDegraded || backupsDegraded
+      (outbox && outbox.status !== "ok") || sweepDegraded || backupsDegraded || offsiteDegraded
         ? "degraded"
         : "ok",
     checkedAt,
@@ -117,8 +156,9 @@ async function getHandler(request: Request) {
       database: "ok",
       messageOutbox: outbox?.status ?? "unknown",
       outboxSweep: outboxSweep?.status ?? "unknown",
-      backups: backups?.status ?? "unknown",
+      backups: backupsService,
     },
+    offsiteBackups: offsiteSummary(offsite, offsiteStatus),
     outboxSweep,
     backups: backups ? toPublicBackupStatus(backups) : null,
     encryptionKey,
