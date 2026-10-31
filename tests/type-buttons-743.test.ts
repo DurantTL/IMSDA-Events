@@ -200,7 +200,7 @@ describe("submitting state (#743)", () => {
 
   it("is wired into public registration with a failure path that keeps the answers and re-enables", () => {
     const source = read("components/public-registration-form.tsx");
-    expect(source).toMatch(/<SubmitButton[\s\S]{0,400}?submitting=\{submitting\}/);
+    expect(source).toMatch(/<SubmitButton[\s\S]{0,400}?submitting=\{submitting( \|\| submitQueued)?\}/);
     const submit = source.slice(source.indexOf("async function submit("), source.indexOf("function startAnotherRegistration"));
     // Both failure routes leave the form state alone and the finally block re-enables the button.
     expect(submit).toContain("Your answers are still here; please try again.");
