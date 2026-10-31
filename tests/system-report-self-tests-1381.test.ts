@@ -191,7 +191,7 @@ describe("the report rows", () => {
   });
 
   it("the real provider loads eight passing rows", async () => {
-    const rows = await systemReportProviders.at(-1)!.load(new Date("2026-10-31T12:00:00.000Z"));
+    const rows = await systemReportProviders.find((candidate) => candidate.section === "self-tests")!.load(new Date("2026-10-31T12:00:00.000Z"));
     expect(rows).toHaveLength(8);
     for (const row of rows) {
       expect(row.state).toBe("ok");
