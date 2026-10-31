@@ -154,7 +154,7 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
       {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} />)}
 
       <p className={styles.footerLine}>
-        Counts and states only: no settings values, names or attendee details.{" "}
+        Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}
         {report.releaseSha ? <>Release <code>{report.releaseSha.slice(0, 7)}</code>.</> : "Release not recorded."}
       </p>
     </section>

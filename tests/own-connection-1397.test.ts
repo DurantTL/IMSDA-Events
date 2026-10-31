@@ -95,10 +95,42 @@ describe("describeOwnConnection", () => {
     expect(result.warnings[0]).toContain("RATE_LIMIT_CLIENT_IP_HEADER=cf-connecting-ip");
   });
 
-  it("reports invalid settings instead of throwing", () => {
+  it("reports invalid settings instead of throwing, keeping a readable header", () => {
     const result = describeOwnConnection(request({}), env({ RATE_LIMIT_TRUSTED_PROXY_HOPS: "abc" }));
-    expect(result).toMatchObject({ resolvedIp: null, header: null, hops: null, state: "invalid" });
+    expect(result).toMatchObject({ resolvedIp: null, header: "x-forwarded-for", hops: null, state: "invalid" });
     expect(result.warnings[0]).toContain("RATE_LIMIT_TRUSTED_PROXY_HOPS");
+  });
+
+  it("blames the rate-limit settings, not the proxy, for a bad secret, and still shows the good header and hops without echoing the secret", () => {
+    const result = describeOwnConnection(request({}), {
+      NODE_ENV: "production",
+      RATE_LIMIT_HASH_SECRET: "too-short-secret",
+      RATE_LIMIT_TRUSTED_PROXY_HOPS: "1",
+      RATE_LIMIT_CLIENT_IP_HEADER: "cf-connecting-ip",
+    });
+    expect(result).toMatchObject({ state: "invalid", header: "cf-connecting-ip", hops: 1 });
+    expect(result.warnings[0]).toContain("rate-limit settings are invalid");
+    expect(result.warnings[0]).not.toContain("proxy settings");
+    expect(JSON.stringify(result)).not.toContain("too-short-secret");
+  });
+
+  it("warns in production when hops are set but no address could be resolved", () => {
+    const result = describeOwnConnection(request({}), env({ RATE_LIMIT_TRUSTED_PROXY_HOPS: "1" }));
+    expect(result.state).toBe("warning");
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain("every visitor shares one rate limit");
+    expect(result.warnings[0]).toContain("replacing X-Forwarded-For");
+  });
+
+  it("does not repeat the cf-connecting-ip advice when that header is already in use", () => {
+    const result = describeOwnConnection(
+      request({ "cf-connecting-ip": "104.16.0.1" }),
+      env({ RATE_LIMIT_TRUSTED_PROXY_HOPS: "1", RATE_LIMIT_CLIENT_IP_HEADER: "cf-connecting-ip" }),
+    );
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain("Nginx");
+    expect(result.warnings[0]).toContain("only from Cloudflare");
+    expect(result.warnings[0]).not.toContain("Set RATE_LIMIT_CLIENT_IP_HEADER");
   });
 });
 
