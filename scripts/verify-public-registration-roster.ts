@@ -334,7 +334,11 @@ async function main() {
       idempotencyKey: "0d7c2b1e-6a43-4f0e-9b6a-3c1f5e8a7d21",
       responses: { ...firstRequestBody.responses, payment_method: cardAnswer },
     });
-    assert(refused.status === 400, "A card answer was accepted while online payment is not configured.", refused);
+    assert(
+      refused.status === 422 && JSON.stringify(refused.body).includes("Card payment is not available"),
+      "A card answer was accepted while online payment is not configured.",
+      refused,
+    );
     assert(
       (await prisma.registration.count({ where: { eventId } })) === 0,
       "A refused card answer still saved a registration.",
