@@ -1,8 +1,9 @@
 "use client";
 
+import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { EMAIL_PROBLEM, inlineFieldProblem, isEmail, problemMessage } from "@/lib/field-validation";
@@ -137,6 +138,15 @@ type MessagingSettingsDraft = {
   replyToEmail: string;
   internalNotificationEmails: string;
 };
+
+export const communicationsTabId = (view: CommunicationsView) => `communications-tab-${view}`;
+export const communicationsPanelId = (view: CommunicationsView) => `communications-panel-${view}`;
+
+/** A view's tab panel when the tab row is shown; just the view when it is not (nothing then labels a panel). */
+function ViewPanel({ managed, view, children }: { managed: boolean; view: CommunicationsView; children: ReactNode }) {
+  if (!managed) return <>{children}</>;
+  return <TabPanel id={communicationsPanelId(view)} tabId={communicationsTabId(view)}>{children}</TabPanel>;
+}
 
 function settingsDraftFromMessaging(
   messaging: MessagingWorkspaceData | null,
@@ -1476,22 +1486,26 @@ export function CommunicationsWorkspace({
       </div>
 
       {canManage && (
-        <nav className="communications-tabs" aria-label="Communication tools" role="tablist">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              aria-current={view === id ? "page" : undefined}
-              aria-selected={view === id}
-              className={view === id ? "active" : ""}
-              role="tab"
-              type="button"
-              onClick={() => changeView(id)}
-              key={id}
-            >
-              <Icon aria-hidden="true" size={17} /> {label}
-              {id === "deliveries" && messaging && <span>{messaging.messages.length}</span>}
-            </button>
-          ))}
-        </nav>
+        <TabList
+          label="Communication tools"
+          className="communications-tabs"
+          selectedClassName="active"
+          activation="manual"
+          selectedKey={view}
+          onSelect={(key) => void changeView(key as CommunicationsView)}
+          tabs={tabs.map(({ id, label, icon: Icon }) => ({
+            key: id,
+            id: communicationsTabId(id),
+            // Only the open view is in the page (and only once its data is), so only its tab names a panel.
+            panelId: view === id && (id === "announcements" || messaging) ? communicationsPanelId(id) : undefined,
+            label: (
+              <>
+                <Icon aria-hidden="true" size={17} /> {label}
+                {id === "deliveries" && messaging && <span>{messaging.messages.length}</span>}
+              </>
+            ),
+          }))}
+        />
       )}
 
       {siteUpdating && !draftOpen && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => retryRef.current?.()} />}
@@ -1499,6 +1513,7 @@ export function CommunicationsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       {view === "announcements" && (
+        <ViewPanel managed={canManage} view="announcements">
         <div className="communications-grid">
           <section className="announcement-list">
             {announcements.map((announcement) => (
@@ -1597,10 +1612,12 @@ export function CommunicationsWorkspace({
             )}
           </aside>
         </div>
+        </ViewPanel>
       )}
 
       {view === "reminders" && messaging && (
-        <div className="reminder-workspace" role="tabpanel" aria-label="Balance reminders">
+        <ViewPanel managed={canManage} view="reminders">
+        <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
               <div>
@@ -1740,10 +1757,12 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
+        </ViewPanel>
       )}
 
       {view === "shirt-sizes" && messaging && (
-        <div className="reminder-workspace" role="tabpanel" aria-label="Shirt size requests">
+        <ViewPanel managed={canManage} view="shirt-sizes">
+        <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
               <div>
@@ -1897,9 +1916,11 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
+        </ViewPanel>
       )}
 
       {view === "templates" && messaging && (
+        <ViewPanel managed={canManage} view="templates">
         <div className="message-template-layout">
           <aside className="panel message-template-list">
             <div className="section-heading"><div><p className="eyebrow">Future messages</p><h2>Templates</h2></div></div>
@@ -2093,9 +2114,11 @@ export function CommunicationsWorkspace({
             </aside>
           )}
         </div>
+        </ViewPanel>
       )}
 
       {view === "deliveries" && messaging && (
+        <ViewPanel managed={canManage} view="deliveries">
         <div className="message-delivery-stack">
           <section className="message-delivery-summary">
             <article className="panel"><span className="message-stat-icon gold"><Clock3 size={18} /></span><small>Queued</small><strong>{messaging.counts.PENDING + messaging.counts.PROCESSING}</strong></article>
@@ -2370,9 +2393,11 @@ export function CommunicationsWorkspace({
             </div>
           </section>
         </div>
+        </ViewPanel>
       )}
 
       {view === "settings" && messaging && (
+        <ViewPanel managed={canManage} view="settings">
         <div className="message-settings-layout">
           <form className="panel message-settings-form" onSubmit={saveSettings}>
             <div className="section-heading"><div><p className="eyebrow">Event-level configuration</p><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
@@ -2404,6 +2429,7 @@ export function CommunicationsWorkspace({
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
           </aside>
         </div>
+        </ViewPanel>
       )}
 
       {draftOpen && (

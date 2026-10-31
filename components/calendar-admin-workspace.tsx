@@ -2,6 +2,7 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
+import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
@@ -59,6 +60,10 @@ const pageSize = 50;
 export const noRepeat: RepeatDraft = { frequency: "NEVER", interval: 1, weekdays: [], endMode: "never", until: "", count: 10, weekStart: 0 };
 
 /** 0 = Sunday ... 6 = Saturday for a YYYY-MM-DD date, or null while the date is blank. */
+type CalendarTab = "entries" | "events" | "imports" | "reminders";
+const calendarTabId = (tab: CalendarTab) => `calendar-tab-${tab}`;
+const calendarPanelId = (tab: CalendarTab) => `calendar-panel-${tab}`;
+
 function weekdayOf(calendarDate: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(calendarDate) ? new Date(`${calendarDate}T00:00:00Z`).getUTCDay() : null;
 }
@@ -123,7 +128,7 @@ export function CalendarAdminWorkspace({
   /** The upcoming-events widget's embed code (#107); empty hides the section. */
   widgetEmbedCode?: string;
 }) {
-  const [tab, setTab] = useState<"entries" | "events" | "imports" | "reminders">("entries");
+  const [tab, setTab] = useState<CalendarTab>("entries");
   const [reminderCount, setReminderCount] = useState(initialReminders.batches.length);
   const [entries, setEntries] = useState(initialEntries);
   const [events, setEvents] = useState(initialEvents);
@@ -284,39 +289,42 @@ export function CalendarAdminWorkspace({
         {categoryOptions.map((category) => <option key={category} value={category} />)}
       </datalist>
 
-      <div className="communications-tabs" role="tablist" aria-label="Calendar settings">
-        <button aria-selected={tab === "entries"} className={tab === "entries" ? "active" : ""} onClick={() => setTab("entries")} role="tab" type="button">
-          Calendar entries <span>{entries.length}</span>
-        </button>
-        <button aria-selected={tab === "events"} className={tab === "events" ? "active" : ""} onClick={() => setTab("events")} role="tab" type="button">
-          Events <span>{events.filter((event) => event.isPublished && event.showOnCalendar).length}</span>
-        </button>
-        <button aria-selected={tab === "imports"} className={tab === "imports" ? "active" : ""} onClick={() => setTab("imports")} role="tab" type="button">
-          Imported calendars <span>{initialFeeds.length}</span>
-        </button>
-        <button aria-selected={tab === "reminders"} className={tab === "reminders" ? "active" : ""} onClick={() => setTab("reminders")} role="tab" type="button">
-          Deadline reminders <span>{reminderCount}</span>
-        </button>
-      </div>
+      <TabList
+        label="Calendar settings"
+        className="communications-tabs"
+        selectedClassName="active"
+        selectedKey={tab}
+        onSelect={(key) => setTab(key as CalendarTab)}
+        tabs={([
+          { key: "entries", label: <>Calendar entries <span>{entries.length}</span></> },
+          { key: "events", label: <>Events <span>{events.filter((event) => event.isPublished && event.showOnCalendar).length}</span></> },
+          { key: "imports", label: <>Imported calendars <span>{initialFeeds.length}</span></>, kept: true },
+          { key: "reminders", label: <>Deadline reminders <span>{reminderCount}</span></>, kept: true },
+        ] as const).map(({ key, label, ...rest }) => ({
+          key,
+          id: calendarTabId(key),
+          label,
+          // Only a panel that is in the page is named; the others render while their tab is selected.
+          panelId: "kept" in rest || tab === key ? calendarPanelId(key) : undefined,
+        }))}
+      />
 
       {/* Kept mounted so a send in progress and its notice survive switching tabs. */}
-      <div hidden={tab !== "reminders"}>
+      <TabPanel id={calendarPanelId("reminders")} tabId={calendarTabId("reminders")} stack={false} hidden={tab !== "reminders"}>
         <DeadlineRemindersPanel initial={initialReminders} onCountChange={setReminderCount} />
-      </div>
+      </TabPanel>
 
       {/* Kept mounted so the list of feeds survives switching tabs. */}
-      <div hidden={tab !== "imports"}>
+      <TabPanel id={calendarPanelId("imports")} tabId={calendarTabId("imports")} stack={false} hidden={tab !== "imports"}>
         <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={setEntries} />
-      </div>
-
-      {widgetEmbedCode && tab === "events" && <CalendarWidgetEmbed code={widgetEmbedCode} />}
+      </TabPanel>
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While a dialog is open, its own alert shows the error; one announcement, not two. */}
       {error && !removeTarget && !bulkTarget && !editing && <div className="inline-notice error" role="alert">{error}</div>}
 
       {tab === "entries" && (
-        <>
+        <TabPanel id={calendarPanelId("entries")} tabId={calendarTabId("entries")}>
           <EntryForm
             eyebrow="New entry"
             heading="Add a date to the calendar"
@@ -491,10 +499,12 @@ export function CalendarAdminWorkspace({
               </>
             )}
           </section>
-        </>
+        </TabPanel>
       )}
 
       {tab === "events" && (
+        <TabPanel id={calendarPanelId("events")} tabId={calendarTabId("events")}>
+          {widgetEmbedCode && <CalendarWidgetEmbed code={widgetEmbedCode} />}
         <section className="panel">
           <div className="section-heading">
             <div>
@@ -556,6 +566,7 @@ export function CalendarAdminWorkspace({
             </ul>
           )}
         </section>
+        </TabPanel>
       )}
 
       {editing && (
