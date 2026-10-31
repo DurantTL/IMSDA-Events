@@ -182,6 +182,124 @@ Ticking only records that someone did the work. This sheet remains the full inst
     panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
     `"encryptionKey":{"configured":true,"source":"file"}`.
 
+## Behind Cloudflare
+
+`events.imsda.org` is served through Cloudflare, with xCloud's Nginx on the
+server behind it. These three steps make sure Cloudflare's protection can't be
+skipped and that the app's rate limits see each visitor's real address. Do them
+in this order: the rate-limit setting in step C is only safe after step A.
+
+The reasons are in `docs/CLOUDFLARE-SECURITY-AUDIT-2026-10.md` (findings 2 and
+3, and the recommended settings table). As with the rest of this sheet, never
+write the server's address, firewall rules or certificate files into this file,
+GitHub or chat.
+
+| Step | What | Done |
+| --- | --- | --- |
+| A | Only Cloudflare can reach the server | ☐ |
+| B | SSL/TLS mode is Full (strict) | ☐ |
+| C | Rate-limit settings match Cloudflare | ☐ |
+
+### A. Only Cloudflare can reach the server
+
+- **Why:** if someone learns the server's address, they can skip Cloudflare
+  and talk to Nginx directly. That skips Cloudflare's firewall and bot rules.
+  It also lets them write any visitor address they like into the header the
+  app trusts, which defeats the app's per-visitor limits (step C).
+- **Choose one of these two.** Both block visitors who skip Cloudflare.
+
+**Option 1: firewall allowlist (recommended to start).**
+
+1. Open Cloudflare's published address list:
+   `https://www.cloudflare.com/ips/`. It has an IPv4 list and an IPv6 list.
+2. In the server firewall (or xCloud's firewall screen for this server), allow
+   ports **80** and **443** only from the addresses on both lists. Block 80 and
+   443 from everywhere else.
+3. Don't touch the SSH rule. Changing it could lock everyone out.
+4. If other websites run on the same server, they are blocked from direct
+   visits too. Check each one is also behind Cloudflare first.
+5. Put a reminder on the calendar to compare the firewall with Cloudflare's
+   list every three months. Cloudflare adds addresses occasionally, and a
+   missing one means some visitors get errors.
+
+- **Trade-offs:** no change to Nginx, and xCloud's panel or support can usually
+  do it. But the list must be kept up to date by hand.
+
+**Option 2: Authenticated Origin Pulls.** Cloudflare shows a certificate on
+every request, and Nginx refuses any request without it.
+
+1. Cloudflare dashboard → select the `imsda.org` zone → **SSL/TLS** →
+   **Origin Server** → turn **Authenticated Origin Pulls** on. Nothing changes
+   for visitors yet.
+2. Ask xCloud support to make this site's Nginx require Cloudflare's
+   origin-pull client certificate (the `ssl_client_certificate` and
+   `ssl_verify_client on` lines, using the certificate from Cloudflare's
+   Authenticated Origin Pulls page). Do step 1 before this step, or the site
+   goes down until Cloudflare starts sending the certificate.
+3. After xCloud confirms, open `https://events.imsda.org` and check it loads.
+
+- **Trade-offs:** nothing to keep up to date by hand, but it needs an Nginx
+  change only xCloud can make, and xCloud's own config updates could undo it.
+  If it's undone, the site still works but the lock is gone silently, so
+  recheck after any xCloud change to the site.
+
+**For either option:**
+
+- In Cloudflare **DNS**, the `events` record must show the orange cloud
+  (**Proxied**). Check that no grey-cloud (**DNS only**) record points to the
+  same server, because that would reveal its address.
+- A third choice, **Cloudflare Tunnel**, is the strongest but the biggest
+  change (a connector on the server and no public 80 or 443). It's described
+  in the audit, finding 3.
+
+- **Proof:** from a computer outside the server, a direct request to the
+  server's address (not through `events.imsda.org`) is refused or times out,
+  and `https://events.imsda.org` still loads. Record the date and which option
+  was used in the log below, never the address.
+
+### B. SSL/TLS mode is Full (strict)
+
+- **Why:** it makes Cloudflare check the server's certificate, so the
+  connection from Cloudflare to the server is encrypted and can't be
+  impersonated. Never use **Flexible**: it sends traffic to the server
+  unencrypted.
+- **How:**
+  1. Make sure the server has a valid certificate for `events.imsda.org`:
+     xCloud's Let's Encrypt certificate, or a **Cloudflare Origin
+     Certificate** (Cloudflare dashboard → **SSL/TLS** → **Origin Server** →
+     **Create Certificate**, then give it to xCloud support to install).
+  2. Cloudflare dashboard → `imsda.org` zone → **SSL/TLS** → **Overview** →
+     set the encryption mode to **Full (strict)**.
+  3. Open `https://events.imsda.org`. If it shows Cloudflare error 526, the
+     server's certificate isn't valid: switch back to **Full** for the moment
+     and ask xCloud to fix the certificate, then try again.
+- **Proof:** the mode shows **Full (strict)** and the site loads.
+
+### C. Rate-limit settings match Cloudflare
+
+- **Why:** the app limits how often one visitor can try to sign in or
+  register. Behind Cloudflare, the wrong settings make every visitor who
+  shares a Cloudflare server look like one person, so a busy registration
+  opening can lock out real families. Settings that trust too much let an
+  attacker get around the limits.
+- **How:** **do step A first.** Then, in the xCloud environment panel for this
+  site, set exactly this pair:
+
+  ```
+  RATE_LIMIT_CLIENT_IP_HEADER=cf-connecting-ip
+  RATE_LIMIT_TRUSTED_PROXY_HOPS=1
+  ```
+
+  The app then reads each visitor's address from the `CF-Connecting-IP` header
+  Cloudflare sets. The hops value must be `1`: `0` turns the lookup off and
+  puts every visitor in one shared limit. The compose default
+  (`x-forwarded-for` with hops `1`) is right only with no Cloudflare in front.
+  Redeploy after saving. See also "Rate limits behind Cloudflare" in
+  `docs/DEPLOY-DOCKER.md`.
+- **Proof:** the two-network test in `docs/WR26-GO-LIVE-REVIEW.md` (finding F1,
+  step 3) passes: test registrations from one network don't block a second
+  network.
+
 ## Log
 
 | Date | Item | What was done | Evidence kept at | Initials |

@@ -144,8 +144,8 @@ MESSAGE_FILE_SWEEP_GRACE_HOURS=  # age before an unused message file may be swep
 MESSAGE_FILE_SWEEP_DELETE=       # "true" lets the scheduled sweep delete; anything else only reports
 ACCOUNT_EMAIL_SENDER_NAME=IMSDA Events
 ACCOUNT_EMAIL_REPLY_TO=
-RATE_LIMIT_TRUSTED_PROXY_HOPS=1  # 1 for a single Nginx; 2 if Cloudflare is also in front
-RATE_LIMIT_CLIENT_IP_HEADER=x-forwarded-for   # cf-connecting-ip behind Cloudflare
+RATE_LIMIT_CLIENT_IP_HEADER=cf-connecting-ip  # behind Cloudflare; needs the origin lock (see below)
+RATE_LIMIT_TRUSTED_PROXY_HOPS=1  # with cf-connecting-ip; x-forwarded-for + 1 only without Cloudflare
 OUTBOX_SWEEP_INTERVAL_SECONDS=300  # also read by the app for the broadcast dialog's time estimate
 BACKUP_RETENTION_DAYS=14
 BACKUP_VERIFY_EVERY=7            # rehearse a restore every Nth backup
@@ -155,9 +155,26 @@ GOOGLE_OAUTH_CLIENT_SECRET=
 EMBED_ALLOWED_ORIGINS='self' https://imsda.org https://*.imsda.org
 ```
 
+**Rate limits behind Cloudflare.** Use the pair shown above:
+`RATE_LIMIT_CLIENT_IP_HEADER=cf-connecting-ip` with
+`RATE_LIMIT_TRUSTED_PROXY_HOPS=1`. The app then reads each visitor's address
+from the header Cloudflare sets. This pair is only safe once the server accepts
+web traffic from Cloudflare alone, because anyone who reaches the server
+directly can write any address into that header. Lock the origin first:
+"Behind Cloudflare" in `docs/SERVER-SECURITY-CHECKLIST.md`. The compose default
+(`x-forwarded-for` with hops `1`) is right only for a server with no Cloudflare
+in front. Background: findings 2 and 3 in
+`docs/CLOUDFLARE-SECURITY-AUDIT-2026-10.md`.
+
 Add each approved church website origin to `EMBED_ALLOWED_ORIGINS`; do not use
-a bare `*`. The embed response uses this value for CSP `frame-ancestors` and does not
-send a conflicting `X-Frame-Options: SAMEORIGIN` header. Because the public
+a bare `*`. The embed response uses this value for CSP `frame-ancestors`. The
+app itself sends no `X-Frame-Options` header, but the xCloud Nginx config can
+add `X-Frame-Options: SAMEORIGIN` to every response, the embed included. Modern
+browsers follow `frame-ancestors` and ignore it, but older and some in-app
+browsers may then refuse to show the calendar on a church website. Ask xCloud
+support to remove that header (and `X-XSS-Protection`) from the site's Nginx
+config, or remove them with a Cloudflare Response Header Transform Rule (finding
+7 in `docs/CLOUDFLARE-SECURITY-AUDIT-2026-10.md`). Because the public
 registration POST is stateless, it does not require a `SameSite=None` session
 cookie inside the third-party frame.
 
