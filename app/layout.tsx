@@ -6,6 +6,7 @@ import "@fontsource/noto-sans/700.css";
 import "./globals.css";
 import { PublicWebVitals } from "@/components/public-metrics-beacon";
 import { sidebarCollapseInitScript } from "@/components/sidebar-collapse";
+import { getRequestNonce } from "@/modules/security/request-nonce";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
@@ -18,10 +19,13 @@ export const metadata: Metadata = {
   applicationName: "IMSDA Events",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Reading the request nonce makes every page render per request, which the
+// nonce-based Content-Security-Policy from proxy.ts needs (#1401).
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = await getRequestNonce();
   return (
     <html lang="en" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: sidebarCollapseInitScript }} /></head>
+      <head><script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: sidebarCollapseInitScript }} /></head>
       <body>{children}<PublicWebVitals /></body>
     </html>
   );

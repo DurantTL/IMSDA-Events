@@ -39,6 +39,7 @@ import { NextRequest } from "next/server";
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { config, proxy } from "@/proxy";
 import { staffLoginPathFor } from "@/modules/access/login-routing";
+import { wantsRequestTarget } from "@/modules/access/request-target";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
 
@@ -144,17 +145,18 @@ describe("proxy", () => {
 
     expect(response.headers.get("x-middleware-request-x-imsda-request-target")).toBe("/more/documents?event=evt_1");
     expect(response.headers.get("location")).toBeNull();
-    expect(response.headers.get("content-security-policy")).toBeNull();
+    // The nonce policy is sent by the same proxy (#1401); see tests/content-security-proxy.test.ts.
+    expect(response.headers.get("content-security-policy")).toContain("'nonce-");
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
   });
 
-  it("matches workspace pages but not assets, API routes or public pages", () => {
+  it("matches workspace pages but not assets or API routes", () => {
     const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
 
     expect(matches("/admin/team")).toBe(true);
     expect(matches("/more/documents?event=evt_1")).toBe(true);
     expect(matches("/select-event")).toBe(true);
-    for (const path of ["/_next/static/app.js", "/_next/image", "/favicon.ico", "/api/auth/login", "/events/x", "/login", "/robots.txt"]) {
+    for (const path of ["/_next/static/app.js", "/_next/image", "/favicon.ico", "/api/auth/login"]) {
       expect(matches(path)).toBe(false);
     }
   });
@@ -175,7 +177,8 @@ describe("page coverage guards", () => {
     return `/${segments.join("/")}`;
   }
   const pages = pageFiles(appDir).map((file) => ({ file, url: urlOf(file), source: readFileSync(file, "utf8") }));
-  const covered = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+  // The proxy now runs on every page (#1401) but records the request target on these paths only.
+  const covered = (url: string) => wantsRequestTarget(url);
 
   it("finds pages to check", () => {
     expect(pages.length).toBeGreaterThan(50);

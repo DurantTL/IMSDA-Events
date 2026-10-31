@@ -4,7 +4,7 @@
 iframe on another website. It reads `listPublicCalendarItems` (the same read as `/calendar`
 and `feed.ics`), so nothing unpublished, hidden, archived, deadline-only or
 `showOnCalendar = false` can appear. It inherits the embed layout (auto-resize through
-`/embed/embed.js`) and the `/embed/:path*` Content-Security-Policy `frame-ancestors`
+`/embed/embed.js`) and the `/embed/*` Content-Security-Policy `frame-ancestors` (built in `modules/security/content-security-policy.ts`, sent by `proxy.ts`)
 allow-list (`EMBED_ALLOWED_ORIGINS`; imsda.org and its subdomains by default).
 
 Options (query string):

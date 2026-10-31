@@ -1,47 +1,27 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { buildContentSecurityPolicy } from "@/modules/security/content-security-policy";
 
 const tileOrigin = "https://tile.openstreetmap.org";
 const locationPath = "/admin/organizations/org_synthetic_church/location";
 
-// Next.js applies every matching header rule in order and, for a key set by
-// more than one rule, sends the last value: one header, not several. This
-// mirrors that for the `:name` and `:name*` patterns next.config.ts uses.
-function sourceMatches(source: string, pathname: string) {
-  const pattern = source
-    .replace(/:[A-Za-z]+\*/g, ".*")
-    .replace(/:[A-Za-z]+/g, "[^/]+");
-  return new RegExp(`^${pattern}$`).test(pathname);
-}
-
-async function sentHeaders(pathname: string) {
-  vi.resetModules();
-  const nextConfig = (await import("../next.config")).default;
-  const rules = (await nextConfig.headers?.()) ?? [];
-  const sent = new Map<string, string>();
-  for (const rule of rules.filter((candidate) => sourceMatches(candidate.source, pathname))) {
-    for (const header of rule.headers) {
-      // A later rule's value for the same key replaces the earlier one.
-      sent.set(header.key.toLowerCase(), header.value);
-    }
-  }
-  return sent;
+function policyFor(pathname: string) {
+  return buildContentSecurityPolicy({ pathname, nonce: "synthetic-nonce", isDevelopment: false });
 }
 
 describe("church location map: Content-Security-Policy (#542)", () => {
-  it("sends one policy for the location page, and it admits the tile origin", async () => {
-    const policy = (await sentHeaders(locationPath)).get("content-security-policy") ?? "";
-    const directives = policy.split("; ");
+  it("sends one policy for the location page, and it admits the tile origin", () => {
+    const directives = policyFor(locationPath).split("; ");
 
     expect(directives.filter((entry) => entry.startsWith("default-src "))).toHaveLength(1);
     expect(directives.find((entry) => entry.startsWith("img-src "))?.split(" ")).toContain(tileOrigin);
   });
 
-  it("does not admit the tile origin on the neighbouring staff pages", async () => {
+  it("does not admit the tile origin on the neighbouring staff pages", () => {
     for (const pathname of ["/admin", "/admin/organizations", "/admin/organizations/org_synthetic_church"]) {
-      const policy = (await sentHeaders(pathname)).get("content-security-policy") ?? "";
-      expect(policy).not.toContain(tileOrigin);
+      expect(policyFor(pathname)).not.toContain(tileOrigin);
     }
   });
 });

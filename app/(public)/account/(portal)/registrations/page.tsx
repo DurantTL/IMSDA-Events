@@ -26,6 +26,7 @@ import {
   type AttendeeRegistrationSummary,
 } from "@/modules/attendee-accounts/registrations-repository";
 import { logError } from "@/lib/logger";
+import { getRequestNonce } from "@/modules/security/request-nonce";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ async function cancellationFor(registration: AttendeeRegistrationSummary, editab
  * The contextual secondary actions of one card (#1176). View registration, the clear default, is on the card itself.
  * Each action here is the existing service's own panel, shown only where `registrationActions` says it is allowed.
  */
-function CardActions({
+async function CardActions({
   registration,
   editable,
   cancellation,
@@ -60,6 +61,7 @@ function CardActions({
   cancellation: RegistrantRequestView | null;
   headingLevel: 4 | 5;
 }) {
+  const nonce = await getRequestNonce();
   const actions = registrationActions(registration, { editable, cancellation });
   const requestCount = cancellation?.requests.length ?? 0;
   const hasAny = actions.continuePayment || actions.editContact || actions.cancellation || actions.details;
@@ -80,7 +82,7 @@ function CardActions({
     <div className="attendee-reg-actions" role="group" aria-label={`More for ${registration.event.name}`}>
       {actions.continuePayment && (
         <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${formatCents(registration.balanceCents)} remaining`}>
-          <PublicSquarePayment manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`} />
+          <PublicSquarePayment manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`} nonce={nonce} />
         </RegistrationActionDisclosure>
       )}
       {actions.editContact && (
