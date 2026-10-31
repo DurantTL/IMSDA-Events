@@ -11,6 +11,7 @@ import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "Sterling Volunteers" };
 export const dynamic = "force-dynamic";
@@ -50,7 +51,7 @@ export default async function BackgroundChecksPage() {
           to staff only.
         </p>
         {summary.lastRecordedAt && (
-          <p className="field-help">Last recorded {new Date(summary.lastRecordedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" })}.</p>
+          <p className="field-help">Last recorded {formatInConferenceTime(summary.lastRecordedAt, { dateStyle: "medium", timeStyle: "short" })}.</p>
         )}
       </div>
 

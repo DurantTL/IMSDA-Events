@@ -4,6 +4,7 @@ import { ListChecks } from "lucide-react";
 import { getPrisma } from "@/lib/prisma";
 import { listWaitingClubsForCoordinator } from "@/modules/event-locations/waitlist";
 import { currentAreaCoordinator, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "Waitlists", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export default async function AreaWaitlistsPage() {
                         <strong translate="no">#{club.place} · {club.clubName}</strong>
                         <small>
                           {club.attendeeCount} {club.attendeeCount === 1 ? "person" : "people"} · joined{" "}
-                          {new Date(club.joinedAt).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "America/Chicago" })}
+                          {formatInConferenceTime(club.joinedAt, { dateStyle: "medium" })}
                         </small>
                       </span>
                     </li>
