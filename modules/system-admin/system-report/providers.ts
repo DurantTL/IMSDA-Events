@@ -31,6 +31,12 @@ import {
   RETENTION_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
+  SERVER_AUTODEPLOY_JOB,
+  SERVER_AUTODEPLOY_STALE_AFTER_MS,
+  SERVER_DOCKER_CLEANUP_JOB,
+  SERVER_DOCKER_CLEANUP_STALE_AFTER_MS,
+  SERVER_RUNTIME_GUARD_JOB,
+  SERVER_RUNTIME_GUARD_STALE_AFTER_MS,
 } from "@/modules/operations/sweep-heartbeat";
 import { getJobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { getSquareConfiguration } from "@/modules/payments/square-config";
@@ -49,10 +55,12 @@ import { buildMoneyProviders } from "./money-providers";
 import {
   alertDeliveryFields,
   alertScanFields,
+  autodeployFields,
   calendarRefreshFields,
   classWaitlistFields,
   deadlineReminderFields,
   diskFields,
+  dockerCleanupFields,
   generalLinkExpiryFields,
   healthSnapshotFields,
   honorWatchSummaryFields,
@@ -61,6 +69,7 @@ import {
   messageFileCleanupFields,
   reachabilityFields,
   retentionCleanupFields,
+  runtimeGuardFields,
   type ReachabilityKind,
 } from "./job-signals";
 import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
@@ -296,8 +305,14 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
 /* ---------- Stored job runs and connection tests ---------- */
 
 /** A step the sweep records on `SystemJobHeartbeat`: judged stale after an hour without a success. */
-async function jobRow(ctx: ReportContext, job: string, key: string, fields: (key: string, run: Awaited<ReturnType<typeof getJobRun>>, readAt: Date) => ReturnType<typeof calendarRefreshFields>) {
-  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, SWEEP_STEP_STALE_AFTER_MS));
+async function jobRow(
+  ctx: ReportContext,
+  job: string,
+  key: string,
+  fields: (key: string, run: Awaited<ReturnType<typeof getJobRun>>, readAt: Date) => ReturnType<typeof calendarRefreshFields>,
+  staleAfterMs = SWEEP_STEP_STALE_AFTER_MS,
+) {
+  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, staleAfterMs));
   if (!read.ok) return { key, ...tried(read, "The last run could not be read. It is not shown as healthy.") };
   return fields(key, read.value, read.readAt);
 }
@@ -434,6 +449,9 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("honor-watch-summaries", "Honor watch summaries", "The daily watch summaries of who joined or left classes.", "/admin/email", "Open email settings"),
     m("health-snapshots", "Sealed health copies", "The sweep that seals event-start health copies and deletes expired ones.", null, serverFix),
     m("retention-cleanups", "Retention clean-ups", "The clean-ups of old community posts, alert feed items and analytics.", null, serverFix),
+    m("server-autodeploy", "Auto-deploy", "The server's deploy timer checked for a new version in the last 30 minutes and the latest run did not fail.", null, serverFix),
+    m("server-docker-cleanup", "Docker cleanup", "The server's daily Docker cleanup ran in the last 30 hours.", null, serverFix),
+    m("server-runtime-guard", "Runtime guard", "The server's check that the app container keeps its settings ran in the last 15 minutes.", null, serverFix),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
     await readinessRow(ctx, "backup-offsite", "backup-last"),
@@ -449,6 +467,9 @@ export const systemReportProviders: readonly SignalProvider[] = [
     await jobRow(ctx, HONOR_WATCH_SUMMARIES_JOB, "honor-watch-summaries", honorWatchSummaryFields),
     await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, healthRecordsSwitchedOn())),
     await jobRow(ctx, RETENTION_CLEANUP_JOB, "retention-cleanups", retentionCleanupFields),
+    await jobRow(ctx, SERVER_AUTODEPLOY_JOB, "server-autodeploy", autodeployFields, SERVER_AUTODEPLOY_STALE_AFTER_MS),
+    await jobRow(ctx, SERVER_DOCKER_CLEANUP_JOB, "server-docker-cleanup", dockerCleanupFields, SERVER_DOCKER_CLEANUP_STALE_AFTER_MS),
+    await jobRow(ctx, SERVER_RUNTIME_GUARD_JOB, "server-runtime-guard", runtimeGuardFields, SERVER_RUNTIME_GUARD_STALE_AFTER_MS),
   ]),
 
   defineProvider("email", [

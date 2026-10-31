@@ -93,3 +93,13 @@ export function assessSweepHeartbeat(
     ageMs,
   };
 }
+
+/** Host jobs (#1382) that report one heartbeat per run through `/api/internal/system-jobs/heartbeat`. */
+export const SERVER_AUTODEPLOY_JOB = "server-autodeploy";
+export const SERVER_DOCKER_CLEANUP_JOB = "server-docker-cleanup";
+export const SERVER_RUNTIME_GUARD_JOB = "server-runtime-guard";
+
+/** Stale thresholds: the auto-deploy timer runs every 2 minutes, cleanup daily, the runtime guard every 30 seconds. */
+export const SERVER_AUTODEPLOY_STALE_AFTER_MS = 30 * 60 * 1000;
+export const SERVER_DOCKER_CLEANUP_STALE_AFTER_MS = 30 * 60 * 60 * 1000;
+export const SERVER_RUNTIME_GUARD_STALE_AFTER_MS = 15 * 60 * 1000;

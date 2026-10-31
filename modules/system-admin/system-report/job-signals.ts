@@ -280,3 +280,100 @@ export function reachabilityFields(kind: ReachabilityKind, key: string, input: {
   }
   return { ...common, state: "unavailable", whenLabel: "Tried", resultText: `${words.name} did not answer in time or could not be reached.${old ? " That was over 24 hours ago. Test again." : ""}` };
 }
+
+/* ---------- Host jobs (#1382): the server's own timers report one run each ---------- */
+
+const NOT_REPORTING = "Not reporting yet: the server has not sent a run. Setting the heartbeat token on the server turns this on (deploy guide).";
+
+type HostJob = {
+  name: string;
+  /** Plain reason for each failing result word. */
+  failures: Record<string, string>;
+  /** Text for a failing run whose result word is missing or unknown. */
+  failureFallback: string;
+  stale: string;
+};
+
+function hostProblem(job: HostJob, key: string, run: JobRun, readAt: Date): Fields | null {
+  if (run.status === "never") {
+    return { key, state: "unavailable", checkedAt: iso(readAt), whenLabel: "Tried", resultText: NOT_REPORTING };
+  }
+  if (run.status === "failing") {
+    const result = run.summary?.result;
+    const reason = (typeof result === "string" && job.failures[result]) || job.failureFallback;
+    return { key, state: "attention", checkedAt: run.lastFailedAt, whenLabel: "Last failure", resultText: reason };
+  }
+  if (run.status === "stale") {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: job.stale };
+  }
+  return null;
+}
+
+const NO_COUNTS = "It ran, but its counts were not recorded.";
+
+const AUTODEPLOY: HostJob = {
+  name: "auto-deploy",
+  failures: {
+    "deploy-failed": "The latest deploy failed; the live version kept running.",
+    "fetch-failed": "The server could not check GitHub for a new version. It will try again.",
+    "failed-commit-held": "The newest version failed to deploy earlier and is being held back. A newer version is needed.",
+    "no-owner": "The site folder on the server has no known owner, so nothing was checked or deployed.",
+    "fast-forward-failed": "The server could not move its copy of the code to the new version; nothing was deployed.",
+  },
+  failureFallback: "The latest auto-deploy run failed. Check the server.",
+  stale: "No successful auto-deploy check in over 30 minutes. The server's two-minute deploy timer may have stopped.",
+};
+
+const AUTODEPLOY_OK: Record<string, string> = {
+  "up-to-date": "Up to date.",
+  "outside-window": "A new version is waiting for the night deploy window.",
+  "image-pending": "Waiting for the new version's image.",
+  deployed: "Deployed a new version.",
+};
+
+export function autodeployFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = hostProblem(AUTODEPLOY, key, run, readAt);
+  if (problem) return problem;
+  const result = run.summary?.result;
+  const text = typeof result === "string" ? AUTODEPLOY_OK[result] : undefined;
+  if (!text) return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: NO_COUNTS };
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: text };
+}
+
+const CLEANUP: HostJob = {
+  name: "Docker cleanup",
+  failures: {},
+  failureFallback: "The latest Docker cleanup failed. Check the server.",
+  stale: "No successful Docker cleanup in over 30 hours. The daily cleanup timer may have stopped, and the disk can fill up.",
+};
+
+export function dockerCleanupFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = hostProblem(CLEANUP, key, run, readAt);
+  if (problem) return problem;
+  if (run.summary?.result === "skipped-lock-busy") {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "Skipped: a deploy was running. It runs again tomorrow." };
+  }
+  const after = num(run.summary, "diskUsedAfterPct");
+  const removed = num(run.summary, "imagesRemoved");
+  if (run.summary?.result !== "cleaned" || after === null || removed === null) {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: NO_COUNTS };
+  }
+  const text = `Disk ${after}% used after cleanup; ${removed} ${removed === 1 ? "image" : "images"} removed.`;
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: text };
+}
+
+const GUARD: HostJob = {
+  name: "runtime guard",
+  failures: { failed: "The latest check found the app container missing its settings and could not restore them. Check the server." },
+  failureFallback: "The latest runtime guard run failed. Check the server.",
+  stale: "No successful runtime guard check in over 15 minutes. Its timer on the server may have stopped.",
+};
+
+export function runtimeGuardFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = hostProblem(GUARD, key, run, readAt);
+  if (problem) return problem;
+  if (run.summary?.result !== "ok") {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: NO_COUNTS };
+  }
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "The app container has its settings." };
+}
