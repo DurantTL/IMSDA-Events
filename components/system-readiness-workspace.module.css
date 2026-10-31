@@ -97,18 +97,6 @@
   gap: 8px;
 }
 
-.tickButton {
-  width: auto;
-  min-height: 36px;
-  padding-block: 4px;
-}
-
-@media (max-width: 640px) {
-  .tickButton {
-    min-height: 44px;
-  }
-}
-
 .bullets {
   display: grid;
   gap: 6px;

@@ -79,7 +79,7 @@ export function HelpSearch({ guides, selectedEventId }: { guides: readonly HubGu
                 ? `There is no ${workspaceFilterLabels[workspace]} guide to show.`
                 : "No guide matches. Try a shorter or different word, or read the glossary."}
           </p>
-          {filtered && <button className={`secondary-button ${styles.linkButton}`} onClick={clear} type="button">Show all guides</button>}
+          {filtered && <button className="secondary-button" onClick={clear} type="button">Show all guides</button>}
         </div>
       ) : groups.map((group) => {
         const inGroup = shown.filter((guide) => guide.workspace === group.workspace);

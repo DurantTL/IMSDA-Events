@@ -31,7 +31,7 @@ export default async function HelpPage({ searchParams }: { searchParams: Promise
         </div>
         <HelpSearch guides={guides} selectedEventId={viewer.selectedEventId} />
         <div className={styles.glossaryLinkRow}>
-          <Link className={`secondary-button ${styles.linkButton}`} href={withCurrentEvent("/help/glossary", viewer.selectedEventId)}>Open the glossary</Link>
+          <Link className="secondary-button" href={withCurrentEvent("/help/glossary", viewer.selectedEventId)}>Open the glossary</Link>
         </div>
       </div>
     </section>

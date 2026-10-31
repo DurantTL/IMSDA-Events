@@ -115,12 +115,6 @@
   gap: 8px;
 }
 
-.linkButton {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-
 .section {
   display: grid;
   gap: 8px;

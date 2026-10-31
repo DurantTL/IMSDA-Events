@@ -48,7 +48,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
             </select>
           </label>
           {view.nextMonth ? <Link aria-label={`Next month, ${view.picker.find((item) => item.month === view.nextMonth)!.label}`} className={styles.step} href={here({ month: view.nextMonth })} prefetch={false}>›</Link> : <span aria-hidden="true" className={styles.stepOff}>›</span>}
-          <button className={styles.go} type="submit">Go</button>
+          <button className={`secondary-button ${styles.go}`} type="submit">Go</button>
         </form>
       </nav>
 
