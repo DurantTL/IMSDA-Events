@@ -53,6 +53,7 @@ import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
 import { getRegistrationByIdWithClient } from "@/modules/registrations/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
+import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-answer";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
@@ -546,6 +547,9 @@ export function resolveAmendmentAttendeeType(
     );
   }
   if (selector && selected) return { attendeeType: selected.label, attendeeTypeDefinitionId: selected.id };
+  // No selector: an attendee without a type yet is linked from the legacy `attendee_type` answer when it matches exactly.
+  const legacy = !selector && !current?.attendeeTypeDefinitionId ? matchLegacyAttendeeTypeAnswer(responses, configuredTypes) : null;
+  if (legacy) return { attendeeType: legacy.label, attendeeTypeDefinitionId: legacy.id };
   return current
     ? { attendeeType: current.attendeeType, attendeeTypeDefinitionId: current.attendeeTypeDefinitionId }
     : { attendeeType: attendeeType(responses), attendeeTypeDefinitionId: null };

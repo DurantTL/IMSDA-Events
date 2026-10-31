@@ -33,6 +33,7 @@ export type ModuleEnablement = z.infer<typeof moduleEnablementSchema>;
  * creates brand-new `EventAttendeeType` rows for the new event — never a
  * reference to another event's rows, since attendee types are event-owned. */
 export const templateAttendeeTypeSchema = attendeeTypeInputSchema;
+export type TemplateAttendeeType = z.input<typeof templateAttendeeTypeSchema>;
 export const templateAttendeeClassificationSchema = attendeeClassificationInputSchema;
 
 /** An override for one of the event's message templates (#152). Only keys a

@@ -369,6 +369,8 @@ export const SCHEDULE_EXCLUSION_LABELS = {
   PROVIDER_BOUNCED: "The last email to this address bounced",
   PROVIDER_COMPLAINED: "The last email to this address was marked as spam",
   MINOR_RECIPIENT: "Youth are not sent scheduled email, so a minor's own address is never used",
+  AGE_UNKNOWN_RECIPIENT: "Age unknown (no attendee type)",
+  AGE_UNKNOWN_NO_RANGE: "Age unknown (attendee type has no adult age range)",
   APPROVER_NOT_PERMITTED: "The person who approved this schedule no longer has permission to send it",
   SCHEDULE_NOT_ACTIVE: "The schedule was paused or cancelled before this was sent",
   SCHEDULE_TOO_LATE: "It was not sent within six hours of its scheduled time, so it was not sent at all",
@@ -399,6 +401,8 @@ export type CurrentAudienceView = {
    * audience builder, so a recipient is never sent to on one rule's say-so alone.
    */
   minorTargets: ReadonlySet<string>;
+  /** The subset of `minorTargets` refused only because the age is unknown, not because a known minor is behind it. */
+  unknownAgeTargets?: ReadonlySet<string>;
   /** The event bills the organization, so a balance reminder is never sent to an attendee. */
   isOrganizationBilled: boolean;
 };
@@ -424,7 +428,8 @@ export function decideRecipientEligibility(
   if (!registration.active) return "REGISTRATION_NOT_ACTIVE";
   // Youth never receive these. Checked before the audience's own answer, so an attendee who is now a minor is named as one
   // rather than as "no longer matches", and so the rule holds even if the audience were ever to list the address.
-  if (view.minorTargets.has(targetKey(email, recipient.registrationId))) return "MINOR_RECIPIENT";
+  const youthKey = targetKey(email, recipient.registrationId);
+  if (view.minorTargets.has(youthKey)) return view.unknownAgeTargets?.has(youthKey) ? "AGE_UNKNOWN_RECIPIENT" : "MINOR_RECIPIENT";
   const target = view.targets.get(targetKey(email, recipient.registrationId));
   if (!target) {
     const fromBuilder = view.exclusionByEmail.get(email);
@@ -529,7 +534,16 @@ export type YouthCheckRegistration = {
 };
 
 /** Everyone in the WHOLE event who is a non-adult attendee (minor or age unknown) on any registration, built once per evaluation. */
-export type EventMinors = { personIds: ReadonlySet<string>; emails: ReadonlySet<string> };
+export type EventMinors = {
+  personIds: ReadonlySet<string>;
+  emails: ReadonlySet<string>;
+  /** The subset whose attendee type says they are a minor (not merely unknown). Omitted means none is known. */
+  knownMinorPersonIds?: ReadonlySet<string>;
+  knownMinorEmails?: ReadonlySet<string>;
+};
+
+/** Why a youth target is refused: a known minor is behind it, or only an unknown age. */
+export type YouthRefusalReason = "MINOR" | "UNKNOWN";
 
 /**
  * Owner decision (#177, Oct 17, 2026): a youth's own address may receive a scheduled email only when an ADULT is genuinely
@@ -551,7 +565,20 @@ export function refusedYouthTargets(
   registrations: ReadonlyMap<string, YouthCheckRegistration>,
   eventMinors: EventMinors,
 ): Set<string> {
-  const refused = new Set<string>();
+  return new Set(refusedYouthTargetReasons(targets, registrations, eventMinors).keys());
+}
+
+/**
+ * The same rule as `refusedYouthTargets`, with the reason for each refusal: MINOR when an attendee type says a minor is
+ * behind the address, UNKNOWN when it is refused only because an attendee has no type (or no usable age range). The refused
+ * set is identical; only the label differs.
+ */
+export function refusedYouthTargetReasons(
+  targets: ReadonlyArray<{ email: string; registrationId: string; roles: readonly string[] }>,
+  registrations: ReadonlyMap<string, YouthCheckRegistration>,
+  eventMinors: EventMinors,
+): Map<string, YouthRefusalReason> {
+  const refused = new Map<string, YouthRefusalReason>();
   for (const target of targets) {
     const email = target.email.trim().toLowerCase();
     const registration = registrations.get(target.registrationId);
@@ -570,11 +597,17 @@ export function refusedYouthTargets(
     const adultBehindIt = target.roles.some((role) => role === "GROUP_LEADER" || role === "ORGANIZATION_CONTACT")
       || (target.roles.includes("REGISTRATION_CONTACT") && !holderIsMinor)
       || adultAttendeeHoldsIt;
+    const holderKnownMinor = eventMinors.knownMinorPersonIds?.has(registration.accountHolderPersonId)
+      || registration.attendees.some((attendee) => attendee.personId === registration.accountHolderPersonId && attendee.age === "MINOR");
+    const knownMinorBehindIt = Boolean(eventMinors.knownMinorEmails?.has(email))
+      || registration.attendees.some((attendee) => attendee.age === "MINOR" && attendee.email === email)
+      || Boolean(holderKnownMinor && holderIsMinor && email === contactEmail);
+    const reason: YouthRefusalReason = knownMinorBehindIt ? "MINOR" : "UNKNOWN";
     if (youthAddresses.has(email)) {
-      if (!adultBehindIt) refused.add(key);
+      if (!adultBehindIt) refused.set(key, reason);
       continue;
     }
-    if (target.roles.length > 0 && target.roles.every((role) => role === "ATTENDEE") && !adultAttendeeHoldsIt) refused.add(key);
+    if (target.roles.length > 0 && target.roles.every((role) => role === "ATTENDEE") && !adultAttendeeHoldsIt) refused.set(key, reason);
   }
   return refused;
 }

@@ -27,9 +27,9 @@
     },
     {
       "key": "man_camp_export",
-      "sha256": "ee69f32a570e039012d3d1b9dc504539999ce6e2380c16b9e3302cef4383c5c9",
+      "sha256": "0e65e523495b2ada679e79d356b12e38fcdcf8896e6423bd3bd1978b6a58c307",
       "sections": 3,
-      "fields": 28
+      "fields": 29
     },
     {
       "key": "spring_camporee_export",
@@ -45,9 +45,9 @@
     },
     {
       "key": "camp_meeting_export",
-      "sha256": "08a58c97d419af5f60bed8cb9207acb599589b6e1b1835e80aea99c2982877ae",
+      "sha256": "0e1312d94f13d89034d16ac84ddc0c016b0a6c50b0e4406351cb6def2bd11ff1",
       "sections": 5,
-      "fields": 34
+      "fields": 35
     },
     {
       "key": "honors_weekend",

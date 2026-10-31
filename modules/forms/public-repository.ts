@@ -70,6 +70,7 @@ import {
   type ClaimedPromoCode,
 } from "@/modules/promo-codes/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
+import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-answer";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
@@ -1269,9 +1270,13 @@ async function createPublicRegistrationTransaction(
     const selectedTypeCode = configuredTypeSelector
       ? String(mergedResponses[configuredTypeSelector.key] ?? "")
       : null;
+    // A form without an attendee-type selector (Women's Retreat asks "Adult, Teen or Child") still gets a typed attendee when
+    // the answer matches one of the event's types exactly; club registrations are never typed this way.
     const selectedType = selectedTypeCode
       ? form.event.attendeeTypes.find((candidate) => candidate.code === selectedTypeCode)
-      : null;
+      : !configuredTypeSelector && !clubAttendees
+        ? matchLegacyAttendeeTypeAnswer(mergedResponses, form.event.attendeeTypes)
+        : null;
     if (configuredTypeSelector && !selectedType) {
       throw new PublicRegistrationError("INVALID_SUBMISSION", "Select an active attendee type.", [{
         kind: "validation",

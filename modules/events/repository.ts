@@ -187,6 +187,7 @@ export async function getEventSettings(eventId: string) {
         featureUntil: true,
         createdAt: true,
         updatedAt: true,
+        _count: { select: { attendeeTypes: { where: { isActive: true, OR: [{ minimumAge: { not: null } }, { maximumAge: { not: null } }] } } } },
       },
     }),
     prisma.registrationForm.findMany({
@@ -209,6 +210,8 @@ export async function getEventSettings(eventId: string) {
   ]);
   if (!event) return null;
   const publishedFormCount = publishedForms.length;
+  // Undefined (an event row without the count) leaves the attendee-types item out of readiness.
+  const attendeeTypesWithAgeRangeCount = event._count?.attendeeTypes;
   const view = {
     id: event.id,
     name: event.name,
@@ -255,6 +258,7 @@ export async function getEventSettings(eventId: string) {
     featureUntil: event.featureUntil,
     publishedFormCount,
     publishedForms,
+    ...(attendeeTypesWithAgeRangeCount === undefined ? {} : { attendeeTypesWithAgeRangeCount }),
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString(),
   };

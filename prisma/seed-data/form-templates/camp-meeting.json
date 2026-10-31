@@ -1,6 +1,6 @@
 {
   "key": "camp_meeting_export",
-  "version": 1,
+  "version": 2,
   "name": "Camp Meeting 2026",
   "description": "Household contact, capacity-aware housing by night, guest roster, adult and child meal tickets, and payment.",
   "audience": "Household / camp",
@@ -380,6 +380,17 @@
             "scope": "ATTENDEE",
             "required": true,
             "options": []
+          },
+          {
+            "id": "cm_age_group",
+            "key": "age_group",
+            "label": "Age group",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [],
+            "optionSource": "ATTENDEE_TYPES"
           }
         ]
       },
