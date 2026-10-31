@@ -155,7 +155,8 @@ describe("the report model", () => {
     expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 1, info: 0 });
     expect(report.overall.state).toBe("ok");
     expect(report.overall.readingsTried).toBe(1);
-    const last = report.sections.at(-1)!;
+    // Sections with no signals in this synthetic list sort by declared order, so look at the last one that has rows.
+    const last = report.sections.filter((section) => section.signals.length > 0).at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
     expect(last.stateLabel).toBe("11 of 13 ticked");
