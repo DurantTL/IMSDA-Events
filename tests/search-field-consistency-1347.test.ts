@@ -90,7 +90,7 @@ describe("one search field in the CSS (#1347)", () => {
     expect(field).toContain("min-height: var(--touch-target, 44px)");
     expect(field).toContain("border-radius: var(--field-radius)");
     expect(field).not.toContain("#5a6e79");
-    expect(css).toContain(".search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }");
+    expect(css).toMatch(/:root:root:root :is\([^)]*\.search-field, \.filter-field\):focus-within \{[^}]*outline: 2px solid var\(--field-focus\);/);
     const input = rule(".search-field input");
     expect(input).toMatch(/border: 0/);
     expect(input).toMatch(/outline: 0/);

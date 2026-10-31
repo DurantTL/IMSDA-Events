@@ -6,7 +6,8 @@
   box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: 12px;
   background: #fff; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1rem;
 }
-.eventsDirectoryField input:focus-visible, .eventsDirectoryField select:focus-visible, .eventsDirectoryActions :is(button, a):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+/* Fields take the one shared purple ring from app/globals.css (#1349); only the action buttons and links keep the navy one. */
+.eventsDirectoryActions :is(button, a):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
 /* The search box is the shared .search-field wrapper: it draws the border and the one ring, so the input inside draws none. */
 .eventsDirectoryField :global(.search-field) input { border: 0; border-radius: 0; background: transparent; padding: 0; }
 .eventsDirectoryField :global(.search-field) input:focus-visible { outline: 0; }
