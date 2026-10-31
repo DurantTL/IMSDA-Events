@@ -11,7 +11,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 
 import { systemReportProviders } from "@/modules/system-admin/system-report/providers";
 import { FILE_CLEANUP_REPEATED_ATTEMPTS } from "@/modules/system-admin/system-report/communications-providers";
-import { SECTION_DEFINITIONS } from "@/modules/system-admin/system-report/model";
+import { buildSystemReport, SECTION_DEFINITIONS, type Signal } from "@/modules/system-admin/system-report/model";
 
 /** #1378: the Communications checks. Synthetic data only. */
 
@@ -72,7 +72,12 @@ describe("communications checks (#1378)", () => {
     expect(rows["calendar-feeds-failing"].state).toBe("watch");
     expect(rows["file-removals-retrying"].state).toBe("watch");
     expect(db.messageFileStorageCleanup.count).toHaveBeenCalledWith({ where: { attempts: { gte: FILE_CLEANUP_REPEATED_ATTEMPTS } } });
-    expect(db.calendarFeed.count).toHaveBeenCalledWith({ where: { lastStatus: "FAILED" } });
+    expect(db.calendarFeed.count).toHaveBeenCalledWith({ where: { isEnabled: true, lastStatus: "FAILED" } });
+    const cutoff = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+    expect(db.scheduledEmailBatch.count).toHaveBeenCalledWith({ where: { status: "ACTIVE", claimToken: null, sendAt: { lt: cutoff(15) } } });
+    expect(db.scheduledEmailBatch.count).toHaveBeenCalledWith({
+      where: { status: "ACTIVE", claimToken: { not: null }, claimedAt: { lt: cutoff(10) }, recipients: { some: { status: "PLANNED" } } },
+    });
     expect(db.messageOutbox.count).toHaveBeenCalledWith({
       where: { status: "PROCESSING", lockedAt: { lte: new Date(now.getTime() - 10 * 60_000) } },
     });
@@ -103,5 +108,17 @@ describe("communications checks (#1378)", () => {
       expect(row.resultText).not.toMatch(/@|https?:\/\//);
       expect(row.items).toBeUndefined();
     }
+  });
+
+  it("keeps the readiness checklist last with the communications section present", () => {
+    const make = (section: Signal["section"], key: string, extra: Partial<Signal> = {}): Signal => ({
+      key, section, name: key, description: key, checkedAt: now.toISOString(), whenLabel: "Checked", state: "ok", resultText: "x", fixHref: null, fixLabel: null, ...extra,
+    });
+    const report = buildSystemReport([
+      make("communications", "c"),
+      make("checklist", "k", { state: "attention", countsTowardOverall: false, sectionLabel: "1 of 2 ticked" }),
+    ], now);
+    expect(report.sections.at(-1)!.key).toBe("checklist");
+    expect(report.overall.state).toBe("ok");
   });
 });

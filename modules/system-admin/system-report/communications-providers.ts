@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { EMAIL_DELIVERY_LOCK_TIMEOUT_MS } from "@/modules/communications/delivery-timing";
-import { SCHEDULED_EMAIL_STALE_CLAIM_MS } from "@/modules/communications/scheduled-email-domain";
+import { scheduledEmailAbandonedClaimWhere } from "@/modules/communications/scheduled-email-domain";
 import { SCHEDULED_EMAIL_OVERDUE_AFTER_MINUTES } from "@/modules/system-admin/attention-model";
 import { scheduledEmailOverdueWhere } from "@/modules/system-admin/attention-repository";
 import type { defineProvider, Read, SignalProvider } from "./providers";
@@ -31,13 +31,12 @@ export function buildCommunicationsProviders(kit: CommunicationsKit): SignalProv
       m("scheduled-emails-stuck", "Scheduled emails overdue or stuck", "Scheduled emails past their send time that have not started, or that started and never finished.", "/communications/scheduled", "Open scheduled email"),
       m("delivery-locks-stale", "Delivery locks left behind", "Emails marked as being sent for far longer than a send takes.", null, "Cleared by the next email sweep"),
       m("deadline-reminders-waiting", "Deadline reminders waiting for a person", "Prepared deadline reminders that no one has approved or skipped yet.", "/admin/calendar", "Open calendar"),
-      m("calendar-feeds-failing", "Calendar feeds failing", "Calendar feeds whose last refresh failed.", "/admin/calendar", "Open calendar"),
+      m("calendar-feeds-failing", "Calendar feeds failing", "Enabled calendar feeds whose last refresh failed.", "/admin/calendar", "Open calendar"),
       m("file-removals-retrying", "Attachment removals retrying", "Removed attachments whose files could not be deleted from storage after repeated tries.", null, "Retried by the file cleanup job"),
     ], async (ctx) => {
       const prisma = getPrisma();
       const now = ctx.now;
       const overdueBefore = new Date(now.getTime() - SCHEDULED_EMAIL_OVERDUE_AFTER_MINUTES * 60_000);
-      const staleClaimBefore = new Date(now.getTime() - SCHEDULED_EMAIL_STALE_CLAIM_MS);
       const lockedBefore = new Date(now.getTime() - EMAIL_DELIVERY_LOCK_TIMEOUT_MS);
 
       const [scheduled, locks, reminders, feeds, removals] = await Promise.all([
@@ -45,7 +44,7 @@ export function buildCommunicationsProviders(kit: CommunicationsKit): SignalProv
           const [overdue, stuck] = await Promise.all([
             prisma.scheduledEmailBatch.count({ where: scheduledEmailOverdueWhere(overdueBefore) }),
             prisma.scheduledEmailBatch.count({
-              where: { status: "ACTIVE", claimToken: { not: null }, completedAt: null, claimedAt: { lt: staleClaimBefore } },
+              where: { status: "ACTIVE", claimToken: { not: null }, ...scheduledEmailAbandonedClaimWhere(now) },
             }),
           ]);
           return { overdue, stuck };
@@ -54,7 +53,7 @@ export function buildCommunicationsProviders(kit: CommunicationsKit): SignalProv
           prisma.messageOutbox.count({ where: { status: "PROCESSING", lockedAt: { lte: lockedBefore } } }),
         ),
         ctx.once("comms-reminders-pending", () => prisma.deadlineReminderBatch.count({ where: { status: "PENDING" } })),
-        ctx.once("comms-feeds-failed", () => prisma.calendarFeed.count({ where: { lastStatus: "FAILED" } })),
+        ctx.once("comms-feeds-failed", () => prisma.calendarFeed.count({ where: { isEnabled: true, lastStatus: "FAILED" } })),
         ctx.once("comms-removals-retrying", () =>
           prisma.messageFileStorageCleanup.count({ where: { attempts: { gte: FILE_CLEANUP_REPEATED_ATTEMPTS } } }),
         ),
