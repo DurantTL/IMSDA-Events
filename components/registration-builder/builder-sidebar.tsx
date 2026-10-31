@@ -3,7 +3,7 @@
 // itself does not change when a tab's content does.
 import { ChevronLeft } from "lucide-react";
 import { useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
-import { TabList, TabPanel } from "@/components/dashboard-tabs";
+import { TabList, TabPanel } from "@/components/tab-list";
 import type { SidebarTab } from "./sidebar-tabs";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, widthFromPointer, type EditorLayout } from "./editor-layout";
 

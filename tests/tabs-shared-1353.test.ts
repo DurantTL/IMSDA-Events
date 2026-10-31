@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/communications",
 }));
 
-import { TabList, TabPanel } from "@/components/dashboard-tabs";
+import { TabList, TabPanel } from "@/components/tab-list";
 import { CalendarAdminWorkspace } from "@/components/calendar-admin-workspace";
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
 import { BuilderSidebar } from "@/components/registration-builder/builder-sidebar";
@@ -97,10 +97,22 @@ describe("TabList", () => {
     expect(tabsIn(mounted.container).map((tab) => tab.hasAttribute("aria-controls"))).toEqual([true, false, true]);
   });
 
-  it("TabPanel adds no box by default and can be hidden", async () => {
+  it("a click moves aria-selected, the roving tabindex and aria-controls to the clicked tab", async () => {
+    mounted = await mount(createElement(Harness, { tabs: items.map((item) => ({ ...item })) }));
+    await click(tabsIn(mounted.container)[2]!);
+    const tabs = tabsIn(mounted.container);
+    expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "false", "true"]);
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([-1, -1, 0]);
+    expect(tabs[2]!.getAttribute("aria-controls")).toBe("p-c");
+  });
+
+  it("TabPanel is a real, focusable, labelled box and can be hidden", async () => {
     mounted = await mount(createElement(TabPanel, { id: "x", tabId: "y", hidden: true }, "Body"));
     const panel = mounted.container.firstElementChild as HTMLElement;
     expect(panel.hidden).toBe(true);
+    expect(panel.getAttribute("role")).toBe("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe("y");
+    expect(panel.tabIndex).toBe(0);
     expect(panel.className).toContain("panel");
   });
 });
@@ -121,9 +133,16 @@ describe("calendar admin tabs", () => {
       const id = tab.getAttribute("aria-controls");
       if (id) expect(root.querySelector(`#${id}`)?.getAttribute("aria-labelledby")).toBe(tab.id);
     }
-    await press(tabs[0]!, "ArrowRight");
+    await press(tabs[0]!, "End");
+    expect(tabsIn(root)[3]!.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tabsIn(root)[3]);
+    await press(tabsIn(root)[3]!, "Home");
+    expect(tabsIn(root)[0]!.getAttribute("aria-selected")).toBe("true");
+    await press(tabsIn(root)[0]!, "ArrowRight");
     const after = tabsIn(root);
     expect(after[1]!.getAttribute("aria-selected")).toBe("true");
+    expect(after[1]!.getAttribute("aria-controls")).toBe("calendar-panel-events");
+    expect(after[0]!.hasAttribute("aria-controls")).toBe(false);
     expect(after[1]!.className).toBe("active");
     expect(document.activeElement).toBe(after[1]);
     expect(root.querySelector("#calendar-panel-events")).not.toBeNull();
@@ -153,6 +172,37 @@ describe("communications tabs", () => {
     expect(document.activeElement).toBe(tabs[1]);
     expect(tabsIn(root)[0]!.getAttribute("aria-selected")).toBe("true");
     expect(tabsIn(root)[1]!.getAttribute("aria-selected")).toBe("false");
+  });
+});
+
+describe("communications without the tab row or data", () => {
+  const props = { eventId: "event-1", eventName: "Synthetic Event", initialAnnouncements: [], initialMessaging: null };
+
+  it("canManage false: no tablist, no tabpanel, nothing labelled by a missing tab", async () => {
+    mounted = await mount(createElement(CommunicationsWorkspace, { ...props, canManage: false, initialView: "announcements" }));
+    const root = mounted.container;
+    expect(root.querySelector('[role="tablist"]')).toBeNull();
+    expect(root.querySelector('[role="tabpanel"]')).toBeNull();
+    expect(root.querySelector("[aria-labelledby^='communications-tab-']")).toBeNull();
+    expect(root.querySelector(".communications-grid")).not.toBeNull();
+  });
+
+  it("a selected view whose panel is not rendered yet (no messaging data) leaves aria-controls off", async () => {
+    mounted = await mount(createElement(CommunicationsWorkspace, { ...props, canManage: true, initialView: "templates" }));
+    const root = mounted.container;
+    expect(root.querySelector('[role="tab"][aria-selected="true"]')).not.toBeNull();
+    expect(root.querySelectorAll('[role="tab"][aria-controls]')).toHaveLength(0);
+    expect(root.querySelector('[role="tabpanel"]')).toBeNull();
+  });
+
+  it("Home and End move focus only (manual), wrapping nothing", async () => {
+    mounted = await mount(createElement(CommunicationsWorkspace, { ...props, canManage: true, initialView: "announcements" }));
+    const tabs = () => tabsIn(mounted!.container);
+    await press(tabs()[0]!, "End");
+    expect(document.activeElement).toBe(tabs()[tabs().length - 1]);
+    expect(tabs()[0]!.getAttribute("aria-selected")).toBe("true");
+    await press(tabs()[tabs().length - 1]!, "Home");
+    expect(document.activeElement).toBe(tabs()[0]);
   });
 });
 

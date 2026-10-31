@@ -1,9 +1,9 @@
 "use client";
 
-import { TabList, TabPanel } from "@/components/dashboard-tabs";
+import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { EMAIL_PROBLEM, inlineFieldProblem, isEmail, problemMessage } from "@/lib/field-validation";
@@ -141,6 +141,12 @@ type MessagingSettingsDraft = {
 
 export const communicationsTabId = (view: CommunicationsView) => `communications-tab-${view}`;
 export const communicationsPanelId = (view: CommunicationsView) => `communications-panel-${view}`;
+
+/** A view's tab panel when the tab row is shown; just the view when it is not (nothing then labels a panel). */
+function ViewPanel({ managed, view, children }: { managed: boolean; view: CommunicationsView; children: ReactNode }) {
+  if (!managed) return <>{children}</>;
+  return <TabPanel id={communicationsPanelId(view)} tabId={communicationsTabId(view)}>{children}</TabPanel>;
+}
 
 function settingsDraftFromMessaging(
   messaging: MessagingWorkspaceData | null,
@@ -1490,8 +1496,8 @@ export function CommunicationsWorkspace({
           tabs={tabs.map(({ id, label, icon: Icon }) => ({
             key: id,
             id: communicationsTabId(id),
-            // Only the open view is in the page, so only its tab names a panel.
-            panelId: view === id ? communicationsPanelId(id) : undefined,
+            // Only the open view is in the page (and only once its data is), so only its tab names a panel.
+            panelId: view === id && (id === "announcements" || messaging) ? communicationsPanelId(id) : undefined,
             label: (
               <>
                 <Icon aria-hidden="true" size={17} /> {label}
@@ -1507,7 +1513,7 @@ export function CommunicationsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       {view === "announcements" && (
-        <TabPanel id={communicationsPanelId("announcements")} tabId={communicationsTabId("announcements")}>
+        <ViewPanel managed={canManage} view="announcements">
         <div className="communications-grid">
           <section className="announcement-list">
             {announcements.map((announcement) => (
@@ -1606,11 +1612,11 @@ export function CommunicationsWorkspace({
             )}
           </aside>
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {view === "reminders" && messaging && (
-        <TabPanel id={communicationsPanelId("reminders")} tabId={communicationsTabId("reminders")}>
+        <ViewPanel managed={canManage} view="reminders">
         <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
@@ -1751,11 +1757,11 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {view === "shirt-sizes" && messaging && (
-        <TabPanel id={communicationsPanelId("shirt-sizes")} tabId={communicationsTabId("shirt-sizes")}>
+        <ViewPanel managed={canManage} view="shirt-sizes">
         <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
@@ -1910,11 +1916,11 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {view === "templates" && messaging && (
-        <TabPanel id={communicationsPanelId("templates")} tabId={communicationsTabId("templates")}>
+        <ViewPanel managed={canManage} view="templates">
         <div className="message-template-layout">
           <aside className="panel message-template-list">
             <div className="section-heading"><div><p className="eyebrow">Future messages</p><h2>Templates</h2></div></div>
@@ -2108,11 +2114,11 @@ export function CommunicationsWorkspace({
             </aside>
           )}
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {view === "deliveries" && messaging && (
-        <TabPanel id={communicationsPanelId("deliveries")} tabId={communicationsTabId("deliveries")}>
+        <ViewPanel managed={canManage} view="deliveries">
         <div className="message-delivery-stack">
           <section className="message-delivery-summary">
             <article className="panel"><span className="message-stat-icon gold"><Clock3 size={18} /></span><small>Queued</small><strong>{messaging.counts.PENDING + messaging.counts.PROCESSING}</strong></article>
@@ -2387,11 +2393,11 @@ export function CommunicationsWorkspace({
             </div>
           </section>
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {view === "settings" && messaging && (
-        <TabPanel id={communicationsPanelId("settings")} tabId={communicationsTabId("settings")}>
+        <ViewPanel managed={canManage} view="settings">
         <div className="message-settings-layout">
           <form className="panel message-settings-form" onSubmit={saveSettings}>
             <div className="section-heading"><div><p className="eyebrow">Event-level configuration</p><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
@@ -2423,7 +2429,7 @@ export function CommunicationsWorkspace({
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
           </aside>
         </div>
-        </TabPanel>
+        </ViewPanel>
       )}
 
       {draftOpen && (

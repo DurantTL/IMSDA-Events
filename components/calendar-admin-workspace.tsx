@@ -2,7 +2,7 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
-import { TabList, TabPanel } from "@/components/dashboard-tabs";
+import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
@@ -310,16 +310,14 @@ export function CalendarAdminWorkspace({
       />
 
       {/* Kept mounted so a send in progress and its notice survive switching tabs. */}
-      <TabPanel id={calendarPanelId("reminders")} tabId={calendarTabId("reminders")} contents={false} hidden={tab !== "reminders"}>
+      <TabPanel id={calendarPanelId("reminders")} tabId={calendarTabId("reminders")} stack={false} hidden={tab !== "reminders"}>
         <DeadlineRemindersPanel initial={initialReminders} onCountChange={setReminderCount} />
       </TabPanel>
 
       {/* Kept mounted so the list of feeds survives switching tabs. */}
-      <TabPanel id={calendarPanelId("imports")} tabId={calendarTabId("imports")} contents={false} hidden={tab !== "imports"}>
+      <TabPanel id={calendarPanelId("imports")} tabId={calendarTabId("imports")} stack={false} hidden={tab !== "imports"}>
         <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={setEntries} />
       </TabPanel>
-
-      {widgetEmbedCode && tab === "events" && <CalendarWidgetEmbed code={widgetEmbedCode} />}
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While a dialog is open, its own alert shows the error; one announcement, not two. */}
@@ -506,6 +504,7 @@ export function CalendarAdminWorkspace({
 
       {tab === "events" && (
         <TabPanel id={calendarPanelId("events")} tabId={calendarTabId("events")}>
+          {widgetEmbedCode && <CalendarWidgetEmbed code={widgetEmbedCode} />}
         <section className="panel">
           <div className="section-heading">
             <div>
