@@ -182,7 +182,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
           <a className="secondary-button" download href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</a>
           <label className={`secondary-button ${styles.upload}`}>
             <FileUp aria-hidden="true" size={14} /> {busy && !preview ? "Reading…" : "Upload CSV"}
-            <input accept=".csv,text/csv" disabled={busy} onChange={chooseFile} type="file" />
+            <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
           </label>
         </div>
       </section>

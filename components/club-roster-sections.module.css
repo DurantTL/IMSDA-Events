@@ -3,7 +3,7 @@
 .section { min-width: 0; }
 .summary {
   display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 13px; cursor: pointer; list-style: none;
-  border-radius: 8px; background: #f6f9fa; box-shadow: inset 4px 0 0 var(--imsda-navy); color: var(--ink);
+  border-radius: var(--radius-sm); background: var(--table-head); box-shadow: inset 4px 0 0 var(--imsda-navy); color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700;
 }
 .summary::-webkit-details-marker { display: none; }
@@ -18,7 +18,7 @@
 .rosterSearchPanel, .rosterSearchField { grid-template-columns: minmax(0, 1fr); }
 .rosterSearchRow, .rosterSearchInput { min-width: 0; }
 /* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
-.rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: #fff; }
 .rosterSearchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
 .rosterSearchField { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
 /* The box is the shared .search-field wrapper (one border, one ring); the input inside draws nothing. */

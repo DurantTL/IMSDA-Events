@@ -3,7 +3,7 @@
 .eventsDirectoryField { display: grid; gap: 4px; min-width: 0; }
 .eventsDirectoryField label { color: var(--ink); font-size: 1rem; font-weight: 700; }
 .eventsDirectoryField input, .eventsDirectoryField select {
-  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: 12px;
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-card);
   background: #fff; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1rem;
 }
 /* Fields take the one shared purple ring from app/globals.css (#1349); only the action buttons and links keep the navy one. */

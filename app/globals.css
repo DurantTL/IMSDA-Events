@@ -56,6 +56,16 @@
   --gold-text: #805807;
   --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
   --sidebar-width: 260px;
+  /* #1350: tokens from docs/design-system/tokens.css, same values as the literals they replace. */
+  --secondary-bg: #f9fbfb;
+  --table-head: #f6f9fa;
+  --touch-target: 44px;
+  --radius-sm: 8px;
+  --radius-card: 12px;
+  --radius-info: 14px;
+  --radius-panel: 19px;
+  --radius-modal: 20px;
+  --radius-pill: 999px;
 }
 
 /* #743: on screen the floors apply at every size. Measured before: desktop admin
@@ -5570,8 +5580,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .public-square-notice.is-success { background: var(--green-soft); color: var(--green); }
 .public-square-notice.is-error { background: #fff1ef; color: var(--coral); }
 .public-square-notice.is-pending { background: var(--imsda-gold-soft); color: #6f5316; }
-.is-spinning { animation: public-square-spin 800ms linear infinite; }
-@keyframes public-square-spin { to { transform: rotate(360deg); } }
+.is-spinning { animation: spin 800ms linear infinite; }
 
 @media (max-width: 680px) {
   .public-payment-choice-options { grid-template-columns: 1fr; }

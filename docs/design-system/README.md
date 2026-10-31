@@ -26,6 +26,7 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 
 - Tap targets are at least 44px (`touch-target`); public calls to action are 48px (`target-cta`).
 - Radii: `radius-field` 10px for fields and buttons, `radius-card` for panels, `radius-modal` for dialogs, `radius-pill` for chips.
+- App tokens (#1350): `--secondary-bg`, `--table-head`, `--touch-target` and the radii `--radius-sm`, `--radius-card`, `--radius-info`, `--radius-panel`, `--radius-modal`, `--radius-pill` now exist in `app/globals.css`, with the same values as in `tokens.css`.
 - Shadows are soft and navy-tinted: `shadow-metric` on cards, `shadow` on menus and heroes, `shadow-modal` on dialogs, `shadow-tabbar` on the phone tab bar.
 - Club portal: masthead, navy banner and one flat tab row of ten tools (no "More" menu). Staff: 260px navy sidebar on desktop, five-slot bottom tab bar on phones.
 

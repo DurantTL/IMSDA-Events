@@ -3,21 +3,21 @@
 
 .picker { display: grid; gap: 10px; min-width: 0; }
 .stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.current { font-size: max(var(--type-staff-floor, 0px), 1rem); color: #003b5c; }
+.current { font-size: max(var(--type-staff-floor, 0px), 1rem); color: var(--imsda-navy); }
 .step {
   display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px;
-  border: 1px solid var(--line, #d6dee2); border-radius: 8px; background: #fff; color: #003b5c;
+  border: 1px solid var(--line, #d6dee2); border-radius: var(--radius-sm); background: #fff; color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; text-decoration: none;
 }
 .stepOff { color: #5b6870; background: #f3f6f7; }
 .months { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; list-style: none; margin: 0; padding: 0; }
 .monthLink {
   display: grid; justify-items: center; align-content: center; gap: 0; min-height: 44px; padding: 4px 2px;
-  border: 1px solid var(--line, #d6dee2); border-radius: 8px; background: #fff; color: #1f2a30; text-decoration: none;
+  border: 1px solid var(--line, #d6dee2); border-radius: var(--radius-sm); background: #fff; color: #1f2a30; text-decoration: none;
 }
 .monthLink small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: #3f4b52; }
 .monthName { font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.monthSelected { background: #003b5c; border-color: #003b5c; color: #fff; }
+.monthSelected { background: var(--imsda-navy); border-color: var(--imsda-navy); color: #fff; }
 .monthSelected small { color: #fff; }
 @media (min-width: 900px) { .months { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
 
@@ -29,7 +29,7 @@
 .state small { font-weight: 400; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .icon { display: inline-block; min-width: 1em; text-align: center; }
 .open {
-  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: #003b5c;
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600;
 }
 .more { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: #3f4b52; }
@@ -47,6 +47,6 @@
 
 .fullYear { min-width: 0; }
 .fullYear > summary {
-  display: flex; align-items: center; min-height: 44px; cursor: pointer; font-weight: 600; color: #003b5c;
+  display: flex; align-items: center; min-height: 44px; cursor: pointer; font-weight: 600; color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }

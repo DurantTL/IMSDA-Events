@@ -6,7 +6,7 @@
 .hero {
   display: grid;
   gap: 6px;
-  border-radius: 20px;
+  border-radius: var(--radius-modal);
   background:
     radial-gradient(circle at 85% 15%, rgba(240, 179, 35, 0.28), transparent 30%),
     linear-gradient(140deg, var(--imsda-navy-deep), var(--imsda-navy) 56%, #245a74);
@@ -67,7 +67,7 @@
   width: 40px;
   height: 40px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
 }
@@ -182,7 +182,7 @@
 
 .status,
 .countdown {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
   padding: 4px 10px;
@@ -236,7 +236,7 @@
   align-items: center;
   gap: 12px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-info);
   background: white;
   padding: 10px 14px;
 }
@@ -400,7 +400,7 @@
   gap: 6px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-info);
   background: white;
   padding: 12px 14px;
 }

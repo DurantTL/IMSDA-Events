@@ -24,7 +24,7 @@
    external host. The pin is 44px wide (the church map's is 40) so it meets
    the tap-target minimum; the logo and dot sit exactly as they do there. */
 .markerIcon {
-  --pin-dot: #003b5c;
+  --pin-dot: var(--imsda-navy);
   box-sizing: border-box;
   position: relative;
   background: none;
@@ -111,7 +111,7 @@
   z-index: 1000;
   margin: 0;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.92);
   color: var(--muted);
   font-size: max(var(--type-body-floor, 0px), 0.8rem);

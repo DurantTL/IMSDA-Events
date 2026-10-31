@@ -62,7 +62,7 @@
 }
 
 .organizationHeading em {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 7px;
   font-size: max(var(--type-floor, 0px), 0.52rem);
   font-style: normal;
