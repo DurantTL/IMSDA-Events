@@ -28,7 +28,7 @@ export function buildCommunicationsProviders(kit: CommunicationsKit): SignalProv
   const { defineProvider: define, tried, iso, m } = kit;
   return [
     define("communications", [
-      m("scheduled-emails-stuck", "Scheduled emails overdue or stuck", "Scheduled emails past their send time that have not started, or that started and never finished.", "/communications/scheduled", "Open scheduled email"),
+      m("scheduled-emails-stuck", "Scheduled emails overdue or stuck", "Scheduled emails past their send time that have not started, or whose sending stopped partway.", "/communications/scheduled", "Open scheduled email"),
       m("delivery-locks-stale", "Delivery locks left behind", "Emails marked as being sent for far longer than a send takes.", null, "Cleared by the next email sweep"),
       m("deadline-reminders-waiting", "Deadline reminders waiting for a person", "Prepared deadline reminders that no one has approved or skipped yet.", "/admin/calendar", "Open calendar"),
       m("calendar-feeds-failing", "Calendar feeds failing", "Enabled calendar feeds whose last refresh failed.", "/admin/calendar", "Open calendar"),
