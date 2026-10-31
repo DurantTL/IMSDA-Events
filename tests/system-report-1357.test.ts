@@ -47,6 +47,7 @@ vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadine
 vi.mock("@/modules/communications/message-file-usage", () => ({ getMessageFileStorageUsage: mocks.getMessageFileStorageUsage }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/modules/ledger/reconciliation", () => ({ reconcileRegistrationLedger: mocks.reconcileRegistrationLedger }));
+vi.mock("@/modules/lodging/church-share-drift", () => ({ reportChurchShareDrift: vi.fn() }));
 vi.mock("@/modules/public-metrics/repository", () => ({ getAnalyticsSummary: mocks.getAnalyticsSummary }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-30" }));
 vi.mock("@/modules/operations/database-liveness", () => ({ checkDatabaseLiveness: mocks.checkDatabaseLiveness }));
@@ -149,12 +150,13 @@ describe("the report model", () => {
   it("keeps the readiness checklist out of the overall status and always last", () => {
     const report = buildSystemReport([
       signal("setup", "key", "ok"),
+      signal("money", "money-key", "ok"),
       signal("checklist", "server", "watch", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
       signal("checklist", "go-live", "attention", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
     ], now);
-    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 1, info: 0 });
+    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 2, info: 0 });
     expect(report.overall.state).toBe("ok");
-    expect(report.overall.readingsTried).toBe(1);
+    expect(report.overall.readingsTried).toBe(2);
     const last = report.sections.at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
@@ -255,10 +257,10 @@ describe("providers", () => {
       const report = await loadSystemReport(now);
       const rows = report.sections.flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "refund-self-test"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(0); // the release identity and start time are information, never counted as OK
+      expect(report.overall.tally.ok).toBe(1); // only the refund self-test, which needs no source; the release identity and start time are information
       expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");

@@ -17,6 +17,7 @@ export const CALENDAR_FEED_REFRESH_JOB = "calendar-feed-refresh";
 export const MESSAGE_FILE_CLEANUP_JOB = "message-file-cleanup";
 export const EMAIL_REACHABILITY_JOB = "email-reachability";
 export const SQUARE_REACHABILITY_JOB = "square-reachability";
+export const PAY_ON_SQUARE_LINK_SWEEP_JOB = "pay-on-square-link-sweep";
 
 /**
  * Calendar refresh and message file cleanup run on every five-minute sweep, so twelve missed runs (an hour without a

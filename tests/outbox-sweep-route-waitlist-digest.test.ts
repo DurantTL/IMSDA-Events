@@ -210,6 +210,25 @@ describe("the sweep records its steps for the System report (#1357)", () => {
     expect(JSON.stringify(mocks.recordJobRun.mock.calls)).not.toContain("x.pdf");
   });
 
+  it("records the Pay on Square link sweep with counts only (#1374), and as FAILED when it throws", async () => {
+    mocks.sweepHostedCheckouts.mockResolvedValueOnce({ withdrawn: 3, deleted: 2, failed: 1 });
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("pay-on-square-link-sweep", "SUCCEEDED", { withdrawn: 3, deleted: 2, failed: 1 });
+    mocks.recordJobRun.mockClear();
+    mocks.sweepHostedCheckouts.mockRejectedValueOnce(new Error("synthetic"));
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("pay-on-square-link-sweep", "FAILED", undefined);
+  });
+
+  it("does not fail the sweep when the Pay on Square run cannot be recorded", async () => {
+    mocks.recordJobRun.mockImplementation(async (job: string) => {
+      if (job === "pay-on-square-link-sweep") throw new Error("synthetic");
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect(mocks.logError).toHaveBeenCalledWith(expect.stringContaining("Pay on Square link sweep run"), expect.any(Error));
+  });
+
   it("records a step that failed as FAILED", async () => {
     mocks.refreshDueCalendarFeeds.mockRejectedValueOnce(new Error("synthetic"));
     mocks.sweepMessageFiles.mockRejectedValueOnce(new Error("synthetic"));
