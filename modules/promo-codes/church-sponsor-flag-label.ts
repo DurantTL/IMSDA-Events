@@ -13,5 +13,5 @@ export function signedMoney(cents: number) {
 
 export function churchSponsorFlagLabel(flag: ChurchSponsorFlagFigures) {
   if (flag.reviewedShareCents === null) return `church share ${signedMoney(flag.deltaCents)} not applied`;
-  return `Church share now ${formatCents(flag.shareCents)}; finance reviewed ${formatCents(flag.reviewedShareCents)} (difference ${signedMoney(flag.deltaCents)} not applied)`;
+  return `Church share now ${formatCents(Math.abs(flag.shareCents))}; finance reviewed ${formatCents(Math.abs(flag.reviewedShareCents))} (difference ${signedMoney(flag.deltaCents)} not applied)`;
 }

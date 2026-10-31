@@ -740,7 +740,7 @@ export function PublicSquarePayment({
 
   const paymentChoice = checkout.paymentChoice;
   const paymentChoiceOptions = paymentChoice
-    ? paymentChoiceOptionPresentations(paymentChoice, money)
+    ? paymentChoiceOptionPresentations(paymentChoice, formatCents)
     : [];
   const cardChoice = paymentChoiceOptions.find(
     (option) => option.choice === "CARD",

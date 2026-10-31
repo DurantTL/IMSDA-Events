@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatCardMoney } from "@/modules/event-info-cards/domain";
 import { formatPdfMoney } from "@/modules/invoices/invoice-pdf";
 import { formatCents as formatCloseoutCents } from "@/modules/meals/closeout";
-import { signedMoney } from "@/modules/promo-codes/church-sponsor-flag-label";
+import { churchSponsorFlagLabel, signedMoney } from "@/modules/promo-codes/church-sponsor-flag-label";
 import { formatMerchandiseMoney } from "@/components/merchandise-admin-ui";
 import { invoiceMoney } from "@/components/invoices";
 
@@ -31,5 +31,14 @@ describe("shared money helpers keep their output (#1363)", () => {
   it("keeps the church sponsor sign handling over the absolute amount", () => {
     expect(signedMoney(123456)).toBe("+$1,234.56");
     expect(signedMoney(-500)).toBe("-$5.00");
+  });
+
+  it("prints church sponsor shares as absolute amounts", () => {
+    expect(churchSponsorFlagLabel({ shareCents: -500, reviewedShareCents: -123456, deltaCents: 5 })).toBe(
+      "Church share now $5.00; finance reviewed $1,234.56 (difference +$0.05 not applied)",
+    );
+    expect(churchSponsorFlagLabel({ shareCents: -0, reviewedShareCents: -0, deltaCents: 0 })).toBe(
+      "Church share now $0.00; finance reviewed $0.00 (difference +$0.00 not applied)",
+    );
   });
 });
