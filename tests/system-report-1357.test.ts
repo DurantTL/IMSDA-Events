@@ -258,12 +258,16 @@ describe("providers", () => {
     it("shows every reading as unavailable when every source fails, and never as OK", async () => {
       everySourceDown();
       const report = await loadSystemReport(now);
-      const rows = report.sections.flatMap((section) => section.signals);
+      // The built-in self-tests (#1381) read no source, so they still pass when every source is down.
+      const selfTests = report.sections.find((section) => section.key === "self-tests")!.signals;
+      expect(selfTests).toHaveLength(8);
+      for (const row of selfTests) expect(row.state, row.key).toBe("ok");
+      const rows = report.sections.filter((section) => section.key !== "self-tests").flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts (including whether alert delivery, Google sign-in and the breach check are on) are read from the process, not from a failing source.
       const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test", "refund-self-test", "alert-delivery", "google-keys-reachable", "breach-service-reachable"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(2); // only the pricing and refund self-tests, which read no source; the release identity and start time are information
+      expect(report.overall.tally.ok).toBe(10); // only the eight self-tests and the pricing and refund self-tests, which read no source; the release identity and start time are information
       expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");

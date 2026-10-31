@@ -31,7 +31,8 @@ export type SectionKey =
   | "money"
   | "communications"
   | "notices"
-  | "event-operations";
+  | "event-operations"
+  | "self-tests";
 
 export type Signal = {
   key: string;
@@ -68,7 +69,7 @@ export type SectionDefinition = {
   fixLabel: string | null;
 };
 
-/** The declared order of the sections. A new section is appended here and gets a provider in `providers.ts`. */
+/** The declared order of the sections. A new section is added here, before the checklist, and gets a provider in `providers.ts`. */
 export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "release", title: "App version", fixHref: null, fixLabel: null },
   { key: "database", title: "Database", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
@@ -86,6 +87,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "communications", title: "Communications", fixHref: "/communications/scheduled", fixLabel: "Open scheduled email" },
   { key: "notices", title: "Payment and email notices", fixHref: null, fixLabel: null },
   { key: "event-operations", title: "Event operations", fixHref: "/more/health", fixLabel: "Open operational health" },
+  { key: "self-tests", title: "Built-in self-tests", fixHref: null, fixLabel: null },
   // Declared last: it never counts, so it always sorts last, and an empty section declared after it would follow it.
   { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
 ];
