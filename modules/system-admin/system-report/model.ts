@@ -29,7 +29,8 @@ export type SectionKey =
   | "checklist"
   | "registration"
   | "money"
-  | "communications";
+  | "communications"
+  | "notices";
 
 export type Signal = {
   key: string;
@@ -82,6 +83,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "registration", title: "Registration and checkout", fixHref: "/people", fixLabel: "Open registrations" },
   { key: "money", title: "Refunds and payment follow-up", fixHref: "/finance", fixLabel: "Open finance" },
   { key: "communications", title: "Communications", fixHref: "/communications/scheduled", fixLabel: "Open scheduled email" },
+  { key: "notices", title: "Payment and email notices", fixHref: null, fixLabel: null },
   // Declared last: it never counts, so it always sorts last, and an empty section declared after it would follow it.
   { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
 ];

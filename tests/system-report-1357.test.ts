@@ -48,6 +48,7 @@ vi.mock("@/modules/communications/message-file-usage", () => ({ getMessageFileSt
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/modules/ledger/reconciliation", () => ({ reconcileRegistrationLedger: mocks.reconcileRegistrationLedger }));
 vi.mock("@/modules/lodging/church-share-drift", () => ({ reportChurchShareDrift: vi.fn() }));
+vi.mock("@/modules/operations/alerting", () => ({ isAlertDeliveryConfigured: () => false }));
 vi.mock("@/modules/public-metrics/repository", () => ({ getAnalyticsSummary: mocks.getAnalyticsSummary }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-30" }));
 vi.mock("@/modules/operations/database-liveness", () => ({ checkDatabaseLiveness: mocks.checkDatabaseLiveness }));
@@ -152,12 +153,13 @@ describe("the report model", () => {
       signal("setup", "key", "ok"),
       signal("money", "money-key", "ok"),
       signal("communications", "communications-key", "ok"),
+      signal("notices", "notices-key", "ok"),
       signal("checklist", "server", "watch", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
       signal("checklist", "go-live", "attention", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
     ], now);
-    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 3, info: 0 });
+    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 4, info: 0 });
     expect(report.overall.state).toBe("ok");
-    expect(report.overall.readingsTried).toBe(3);
+    expect(report.overall.readingsTried).toBe(4);
     const last = report.sections.at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
