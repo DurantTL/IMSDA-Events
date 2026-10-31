@@ -51,6 +51,11 @@ export type RegistrationActions = {
   editContact: boolean;
   /** The existing cancellation request panel (a request for the event team, never a cancellation or refund). */
   cancellation: "request" | "status" | null;
+  /**
+   * The event has no cancellation policy in effect (#1408), so the request control is hidden and the card says to contact
+   * the event team instead. Only on a live registration of the person's own session.
+   */
+  cancellationUnavailable: boolean;
   /** The registration's answers: editable only where the existing policy allows, and read-only inline on a cancelled record (it has no hub page). */
   details: boolean;
   /** Past and cancelled records are read-only history. */
@@ -68,7 +73,7 @@ export function registrationActions(
     /** The person's own session (not a staff user looking at the portal). */
     editable: boolean;
     /** The existing cancellation view (null when there is nothing to offer or show). */
-    cancellation: { available: boolean; requests: unknown[] } | null;
+    cancellation: { available: boolean; requests: unknown[]; noPolicy?: boolean } | null;
     now?: Date;
   },
 ): RegistrationActions {
@@ -82,6 +87,7 @@ export function registrationActions(
     continuePayment: context.editable && registration.payment.paymentEligible && registration.balanceCents > 0,
     editContact: context.editable && live,
     cancellation: context.editable ? cancellation : null,
+    cancellationUnavailable: context.editable && live && Boolean(context.cancellation?.noPolicy) && !context.cancellation?.available,
     details: (live || registration.lifecycle === "CANCELLED") && registration.answerEditing.fields.length > 0,
     readOnlyHistory: !live,
   };

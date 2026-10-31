@@ -226,6 +226,7 @@ const baseFields = {
   featuredOrder: null,
   featureUntil: null,
   publishedFormCount: 1,
+  attendeeTypesWithAgeRangeCount: 1, attendeeTypeNames: ["Adult"], centralSenderEmail: "events@example.test", hasCancellationPolicy: true,
   publishedForms: [],
   createdAt: "2027-01-01T00:00:00.000Z",
   updatedAt: "2027-01-01T00:00:00.000Z",
@@ -332,7 +333,7 @@ describe("Event settings save and publish clarity (#742)", () => {
   it("offers Publish with no blocker once everything is ready", () => {
     const markup = render();
     expect(markup).not.toContain("Can&#x27;t publish yet");
-    expect(markup).toContain("Every checklist item is complete");
+    expect(markup).toContain("Every required item is done");
     expect(markup).toContain('aria-disabled="false"');
   });
 

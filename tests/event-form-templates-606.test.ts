@@ -461,6 +461,10 @@ describe("the #606 starters", () => {
       event: { findUnique: vi.fn().mockResolvedValue({ ...eventRow, billingMode: starter.billingMode }) },
       registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
       eventPaymentInstructionVersion: { findFirst: vi.fn().mockResolvedValue(null) },
+      // The settings view reads the required readiness inputs (#1408).
+      platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderEmail: null }) },
+      eventAttendeeType: { findMany: vi.fn().mockResolvedValue([]) },
+      eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue([]) },
       eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
     });
     await applyEventTemplate("template-1", "usr_actor", { name: `${starter.name} 2027`, slug: `${key.replace(/_/g, "-")}-2027`, startsOn: "2027-06-01", endsOn: "2027-06-03", requestKey: `b606-request-key-${key}` });

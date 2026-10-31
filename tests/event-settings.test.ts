@@ -169,7 +169,7 @@ describe("event settings", () => {
     }, 1);
     expect(readyWithoutUrl.ready).toBe(true);
     expect(readyWithoutUrl.items.map((item) => item.id)).not.toContain("public-info");
-    expect(readyWithoutUrl.optionalItems).toEqual([
+    expect(readyWithoutUrl.recommendedItems).toEqual([
       expect.objectContaining({ id: "public-info", complete: true }),
     ]);
 
@@ -180,7 +180,7 @@ describe("event settings", () => {
       publicInfoUrl: "not-a-url",
     }, 1);
     expect(readyWithInvalidUrl.ready).toBe(true);
-    expect(readyWithInvalidUrl.optionalItems).toEqual([
+    expect(readyWithInvalidUrl.recommendedItems).toEqual([
       expect.objectContaining({ id: "public-info", complete: false }),
     ]);
 
@@ -189,7 +189,7 @@ describe("event settings", () => {
       ...validEvent,
       publicInfoUrl: "https://imsda.org/event/womens-retreat/",
     }, 1);
-    expect(readyWithValidUrl.optionalItems).toEqual([
+    expect(readyWithValidUrl.recommendedItems).toEqual([
       expect.objectContaining({ id: "public-info", complete: true }),
     ]);
   });

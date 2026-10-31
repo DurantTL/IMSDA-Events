@@ -125,6 +125,10 @@ describe("Fall Camporee starter", () => {
       event: { findUnique: vi.fn().mockResolvedValue(eventRow) },
       registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
       eventPaymentInstructionVersion: { findFirst: vi.fn().mockResolvedValue(null) },
+      // The settings view reads the required readiness inputs (#1408).
+      platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderEmail: null }) },
+      eventAttendeeType: { findMany: vi.fn().mockResolvedValue([]) },
+      eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue([]) },
       eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
     });
     await applyEventTemplate("template-1", "usr_actor", { name: "Fall Camporee 2027", slug: "fall-camporee-2027", startsOn: "2027-10-08", endsOn: "2027-10-10", requestKey: "idempotency-key-0593" });

@@ -224,7 +224,8 @@ export async function getRegistrantRequestView(target: RequestTarget, now = new 
     take: 20,
     select: requestSelect,
   });
-  const empty = (reason: string | null): RegistrantRequestView => ({
+  const empty = (reason: string | null, noPolicy = false): RegistrantRequestView => ({
+    noPolicy,
     available: false,
     unavailableReason: reason,
     allowedScopes: [],
@@ -237,7 +238,7 @@ export async function getRegistrantRequestView(target: RequestTarget, now = new 
   // A registrant with an open request can still see and withdraw it when the registration stops being eligible.
   if (eligibility.reason) return empty(eligibility.reason);
   const policy = await policyInEffect(target.eventId, now);
-  if (!policy) return empty("Online cancellation requests are not available for this event yet. Contact the event team to cancel.");
+  if (!policy) return empty("Online cancellation requests are not available for this event yet. Contact the event team to cancel.", true);
   const { facts, summary } = await loadRegistrationFacts(target.eventId, target.registrationId, now);
   const names = new Map((summary?.attendees ?? []).map((attendee) => [attendee.id, attendee.name]));
   const components = cancellableComponents(facts.charges, policy.rules).map((charge) => ({ id: charge.id, label: charge.label, amountCents: charge.amountCents }));

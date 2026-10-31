@@ -1,0 +1,20 @@
+/* Publish readiness groups (#1408): "Required before publishing" and "Recommended". */
+.groupHeading {
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.groupNote {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}

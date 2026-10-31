@@ -88,6 +88,7 @@ const baseFields = {
   featuredOrder: null,
   featureUntil: null,
   publishedFormCount: 1,
+  attendeeTypesWithAgeRangeCount: 1, attendeeTypeNames: ["Adult"], centralSenderEmail: "events@example.test", hasCancellationPolicy: true,
   publishedForms: [],
   createdAt: "2027-01-01T00:00:00.000Z",
   updatedAt: "2027-01-01T00:00:00.000Z",

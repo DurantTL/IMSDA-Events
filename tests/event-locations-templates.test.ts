@@ -54,6 +54,10 @@ function mockApply(payload: unknown) {
     event: { findUnique: vi.fn().mockResolvedValue(eventRow) },
     registrationForm: { findMany: vi.fn().mockResolvedValue([]) },
     eventPaymentInstructionVersion: { findFirst: vi.fn().mockResolvedValue(null) },
+    // The settings view reads the required readiness inputs (#1408).
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderEmail: null }) },
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue([]) },
+    eventCancellationPolicyVersion: { findMany: vi.fn().mockResolvedValue([]) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
   });
   return { tx, locationCreateMany, auditLogCreate };
