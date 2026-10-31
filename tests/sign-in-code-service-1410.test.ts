@@ -164,6 +164,14 @@ describe("serialized per account and nothing decryptable left behind", () => {
     expect(state.order.slice(1)).not.toContain("lock");
   });
 
+  it("takes the same lock at the start of an entry, so a send cannot race a successful one", async () => {
+    const { code } = await sendCode();
+    state.order = [];
+    await verifyAttendeeSignInCode({ accountId: "account-1", sessionId: "session-1", code, now: NOW });
+    expect(state.order[0]).toBe("lock:SELECT pg_advisory_xact_lock(hashtext(?)):attendee-sign-in-code:account-1");
+    expect(state.order.slice(1)).not.toContain("lock");
+  });
+
   it("clears the sealed copy and the hash when a code is spent, retired by a new send, or used up", async () => {
     const first = await sendCode("account-1", "session-1", "msg-a");
     await sendCode("account-1", "session-1", "msg-b");

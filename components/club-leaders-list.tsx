@@ -22,7 +22,6 @@ export function ClubLeadersList({
     <div className={styles.wrap}>
       <p className={styles.addLeader}>
         <Link className="secondary-button" href={addHref}>Add a leader</Link>
-        <span>{filters.clubId ? "Opens this club's Club admins page." : "Pick the club, then open Club admins."}</span>
       </p>
       <form action="/admin/clubs/leaders" className={styles.search} method="get">
         <label className={styles.searchField}>

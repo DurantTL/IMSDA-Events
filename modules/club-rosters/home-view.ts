@@ -208,11 +208,12 @@ export function monthlyRecordSteps(
   clubYear: string,
   base: string,
   now: Date,
+  joinedOn: string | null = null,
 ): { steps: ClubHomeStep[]; deadlines: Record<string, string> } {
   const steps: ClubHomeStep[] = [];
   const deadlines: Record<string, string> = {};
   const started = new Set(reports.map((report) => report.reportMonth));
-  for (const month of reportableMonths(clubYear, now)) {
+  for (const month of reportableMonths(clubYear, now, { joinedOn, keep: started })) {
     if (started.has(month) || isLockedForClub(month, now) || reportDueDate(month).slice(0, 7) !== calendarDateIn(now).slice(0, 7)) continue;
     steps.push({
       key: `report-${month}`,

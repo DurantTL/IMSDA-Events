@@ -75,29 +75,36 @@ export async function startSignInCodeIfRequired(input: {
   accountId: string;
   sessionToken: string;
 }): Promise<{ required: false } | ({ required: true } & Pick<IssuedSignInCode, "sent" | "developmentCode">)> {
-  const session = await getPrisma().attendeeSession.findUnique({
-    where: { tokenHash: hashOpaqueToken(input.sessionToken) },
-    select: { id: true },
-  });
-  if (!session) return { required: false };
-  if ((await accountNeedsSignInStep(input.accountId, session.id)) !== "EMAIL_CODE") return { required: false };
-  const account = await getPrisma().attendeeAccount.findUnique({
-    where: { id: input.accountId },
-    select: { email: true, displayName: true },
-  });
-  if (!account) return { required: false };
   try {
-    const issued = await issueSignInCode({
-      request: input.request,
-      accountId: input.accountId,
-      sessionId: session.id,
-      email: account.email,
-      displayName: account.displayName,
+    const session = await getPrisma().attendeeSession.findUnique({
+      where: { tokenHash: hashOpaqueToken(input.sessionToken) },
+      select: { id: true },
     });
-    return { required: true, sent: issued.sent, developmentCode: issued.developmentCode };
+    if (!session) return { required: false };
+    if ((await accountNeedsSignInStep(input.accountId, session.id)) !== "EMAIL_CODE") return { required: false };
+    const account = await getPrisma().attendeeAccount.findUnique({
+      where: { id: input.accountId },
+      select: { email: true, displayName: true },
+    });
+    if (!account) return { required: false };
+    try {
+      const issued = await issueSignInCode({
+        request: input.request,
+        accountId: input.accountId,
+        sessionId: session.id,
+        email: account.email,
+        displayName: account.displayName,
+      });
+      return { required: true, sent: issued.sent, developmentCode: issued.developmentCode };
+    } catch (error) {
+      // The session already owes the code, so nothing opens because a send failed; the code page offers "Send a new code".
+      logError("The sign-in code could not be sent after sign-in", error, { accountId: input.accountId });
+      return { required: true, sent: false };
+    }
   } catch (error) {
-    // The session already owes the code, so nothing is opened by a failed send; the code page offers "Send a new code".
-    logError("The sign-in code could not be sent after sign-in", error);
-    return { required: true, sent: false };
+    // The gate lookup failed. Ids only. The session gate still sends this person to the code page, where "Send a new code" works, so
+    // nothing opens because this step failed and the sign-in itself need not fail with it.
+    logError("The sign-in code step failed after sign-in", error, { accountId: input.accountId });
+    return { required: false };
   }
 }

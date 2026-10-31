@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   passkeysConfigured: vi.fn(),
   emailConfigured: vi.fn(),
   outboxCreate: vi.fn(),
+  orgFind: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,6 +19,7 @@ vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     attendeeMfaEnrollment: { findMany: mocks.mfaFindMany },
     attendeePasskey: { findMany: mocks.passkeyFindMany },
+    organization: { findUnique: mocks.orgFind },
   }),
 }));
 vi.mock("@/modules/attendee-accounts/passkeys", () => ({ passkeysConfigured: mocks.passkeysConfigured }));
@@ -28,8 +30,10 @@ vi.mock("@/modules/communications/account-email", () => ({
 
 import { ClubDirectorsWorkspace } from "@/components/club-directors-workspace";
 import { accountIdsWithTwoStepOn } from "@/modules/attendee-accounts/two-step-status";
-import { reportMonthBeforeJoined } from "@/modules/club-reports/domain";
-import { reportYearEndedBeforeJoined } from "@/modules/club-reports/year-end-domain";
+import { monthlyReportProgress, reportMonthBeforeJoined, reportableMonths } from "@/modules/club-reports/domain";
+import { monthlyRecordSteps } from "@/modules/club-rosters/home-view";
+import { getClubJoinedOn } from "@/modules/club-reports/repository";
+import { reportYearDueBeforeJoined } from "@/modules/club-reports/year-end-domain";
 import { clubRoleGivenEmail, queueClubRoleGivenEmail } from "@/modules/organizations/club-role-notice";
 
 describe("two-step status for a screen: ids only, no secrets (#1410)", () => {
@@ -116,9 +120,13 @@ describe("periods before the club joined (#1410, C3)", () => {
     expect(reportMonthBeforeJoined("2026-11", "2026-10-31")).toBe(false);
   });
 
-  it("a Pathfinder year already over when the club joined is skipped; the running one is not", () => {
-    expect(reportYearEndedBeforeJoined("2025-26", "2026-10-31")).toBe(true);
-    expect(reportYearEndedBeforeJoined("2026-27", "2026-10-31")).toBe(false);
+  it("a Pathfinder year whose Year-End due date (April 1) had passed when the club joined is skipped, even if it joined before the year's end", () => {
+    expect(reportYearDueBeforeJoined("2025-26", "2026-10-31")).toBe(true);
+    // Created between April 2 and April 30, 2026: the 2025-26 report was already past due.
+    expect(reportYearDueBeforeJoined("2025-26", "2026-04-02")).toBe(true);
+    expect(reportYearDueBeforeJoined("2025-26", "2026-04-30")).toBe(true);
+    expect(reportYearDueBeforeJoined("2025-26", "2026-04-01")).toBe(false);
+    expect(reportYearDueBeforeJoined("2026-27", "2026-10-31")).toBe(false);
   });
 });
 
@@ -136,5 +144,42 @@ describe("the Role given notice and leader chips", () => {
     expect(html(false)).toContain("Two-step not set up");
     expect(html(true)).toContain("Two-step on");
     expect(html(true)).not.toContain("Two-step not set up");
+  });
+});
+
+describe("every view agrees on which months are due (#1410)", () => {
+  const NOW = new Date("2026-10-31T18:00:00Z");
+  const JOINED = "2026-10-31";
+
+  it("reportableMonths skips months before the join month, keeps ones filed anyway, and filters nothing without a join date", () => {
+    expect(reportableMonths("2026-27", NOW)).toEqual(["2026-09", "2026-10"]);
+    expect(reportableMonths("2026-27", NOW, { joinedOn: JOINED })).toEqual(["2026-10"]);
+    expect(reportableMonths("2026-27", NOW, { joinedOn: JOINED, keep: new Set(["2026-09"]) })).toEqual(["2026-09", "2026-10"]);
+    expect(reportableMonths("2026-27", NOW, { joinedOn: null })).toEqual(["2026-09", "2026-10"]);
+  });
+
+  it("the staff overview counts: a club made today is not missing September", () => {
+    expect(monthlyReportProgress("2026-27", NOW, new Set())).toMatchObject({ filed: 0, missing: 1 });
+    expect(monthlyReportProgress("2026-27", NOW, new Set(), JOINED)).toMatchObject({ filed: 0, missing: 0 });
+    expect(monthlyReportProgress("2026-27", NOW, new Set(["2026-09"]), JOINED)).toMatchObject({ filed: 1 });
+  });
+
+  it("the club home 'What's next' list is built from the same months", () => {
+    const early = new Date("2026-10-10T12:00:00Z");
+    const without = monthlyRecordSteps([], "2026-27", "/account/clubs/c1", early);
+    const withJoin = monthlyRecordSteps([], "2026-27", "/account/clubs/c1", early, "2026-10-09");
+    expect(without.steps.map((step) => step.key)).toContain("report-2026-09");
+    expect(withJoin.steps.map((step) => step.key)).not.toContain("report-2026-09");
+  });
+});
+
+describe("only a club made through a new-club application has a join date", () => {
+  it("returns the creation day for an application club, and null for an imported or other club", async () => {
+    mocks.orgFind.mockResolvedValue({ createdAt: new Date("2026-10-31T18:00:00Z"), newClubApplicationCreated: { id: "app-1" } });
+    await expect(getClubJoinedOn("club-1")).resolves.toBe("2026-10-31");
+    mocks.orgFind.mockResolvedValue({ createdAt: new Date("2026-10-31T18:00:00Z"), newClubApplicationCreated: null });
+    await expect(getClubJoinedOn("club-2")).resolves.toBeNull();
+    mocks.orgFind.mockResolvedValue(null);
+    await expect(getClubJoinedOn("missing")).resolves.toBeNull();
   });
 });

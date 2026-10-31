@@ -106,7 +106,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {clubs.length === 0 && (
-        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them, or use Add a leader to give a club a Director now.</p></div>
+        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them.</p></div>
       )}
 
       {clubs.map((club) => {

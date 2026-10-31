@@ -10,12 +10,13 @@ const mocks = vi.hoisted(() => ({
   exchangeGoogleAuthorizationCode: vi.fn(),
   verifyGoogleIdToken: vi.fn(),
   signInWithGoogle: vi.fn(),
+  startSignIn: vi.fn(),
   checkStartRateLimit: vi.fn(),
   checkCallbackRateLimit: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: (...args: unknown[]) => mocks.startSignIn(...args) }));
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({
     get: mocks.cookieGet,
@@ -83,8 +84,10 @@ beforeEach(() => {
     emailVerified: true,
     name: "Person",
   });
+  mocks.startSignIn.mockResolvedValue({ required: false });
   mocks.signInWithGoogle.mockResolvedValue({
     outcome: "signed-in",
+    accountId: "account-1",
     linkage: "existing-identity",
     session: {
       token: "attendee-session-token",
@@ -105,6 +108,16 @@ describe("Google attendee route redirects", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://events.imsda.org/account");
+  });
+
+  it("lands on the sign-in code page, with the way back, when the new session owes the emailed code (#1410)", async () => {
+    mocks.startSignIn.mockResolvedValue({ required: true, sent: true });
+    const response = await callback(new Request(
+      "http://10.42.0.19:3100/api/attendee/oauth/google/callback?code=authorization-code&state=expected-state",
+    ));
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://events.imsda.org/account/sign-in/code");
+    expect(mocks.startSignIn).toHaveBeenCalledWith(expect.objectContaining({ accountId: "account-1", sessionToken: "attendee-session-token" }));
   });
 
   it("returns callback failures to the public sign-in URL", async () => {

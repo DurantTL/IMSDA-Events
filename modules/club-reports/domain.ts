@@ -124,10 +124,15 @@ export function clubYearMonths(clubYear: string) {
   });
 }
 
-/** Months of the club year a club can report on now: through the current month. */
-export function reportableMonths(clubYear: string, now: Date) {
+/**
+ * Months of the club year a club can report on now: through the current month. For a club created through a
+ * new-club application (#1410), pass `joinedOn` to skip months before it joined; `keep` names months it filed
+ * anyway, which stay. Every view (Records page, staff overview, club home) reads the months through here.
+ */
+export function reportableMonths(clubYear: string, now: Date, joined: { joinedOn?: string | null; keep?: ReadonlySet<string> } = {}) {
   const current = calendarDateIn(now).slice(0, 7);
-  return clubYearMonths(clubYear).filter((month) => month <= current);
+  return clubYearMonths(clubYear).filter((month) =>
+    month <= current && (!joined.joinedOn || joined.keep?.has(month) || !reportMonthBeforeJoined(month, joined.joinedOn)));
 }
 
 export function reportMonthLabel(reportMonth: string) {
@@ -166,8 +171,8 @@ export type MonthlyReportProgress = {
  * current month, and last month before its due date, are "due soon"
  * instead, matching the "What's next" list on the same page.
  */
-export function monthlyReportProgress(clubYear: string, now: Date, filedMonths: ReadonlySet<string>): MonthlyReportProgress {
-  const due = reportableMonths(clubYear, now);
+export function monthlyReportProgress(clubYear: string, now: Date, filedMonths: ReadonlySet<string>, joinedOn: string | null = null): MonthlyReportProgress {
+  const due = reportableMonths(clubYear, now, { joinedOn, keep: filedMonths });
   const unfiled = due.filter((month) => !filedMonths.has(month));
   const missing = unfiled.filter((month) => isLockedForClub(month, now));
   const dueSoon = unfiled.filter((month) => !isLockedForClub(month, now));

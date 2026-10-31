@@ -97,13 +97,13 @@ export async function ClubOverview({
   // A club's own draft isn't shown here as filed (#426); staff open the report itself to see or edit one.
   const submittedReports = reportYear.reports.filter((report) => report.status === "SUBMITTED");
   const reportsByMonth = new Map(submittedReports.map((report) => [report.reportMonth, report]));
-  const dueMonths = reportableMonths(clubYear, now);
+  const dueMonths = reportableMonths(clubYear, now, { joinedOn: reportYear.joinedOn, keep: new Set(submittedReports.map((report) => report.reportMonth)) });
   const months = [...dueMonths].reverse();
   const roster = rosterYearSummary(members);
   const complianceTile = compliance
     ? { missing: compliance.missing, notInCompliance: compliance.notInCompliance, expiringSoon: compliance.expiringSoon }
     : reminderCounts;
-  const reportProgress = monthlyReportProgress(clubYear, now, new Set(submittedReports.map((report) => report.reportMonth)));
+  const reportProgress = monthlyReportProgress(clubYear, now, new Set(submittedReports.map((report) => report.reportMonth)), reportYear.joinedOn);
 
   return (
     <>

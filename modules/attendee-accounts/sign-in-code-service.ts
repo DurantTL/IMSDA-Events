@@ -39,6 +39,11 @@ function codeExpiry(now: Date) {
   return new Date(now.getTime() + SIGN_IN_CODE_LIFETIME_MINUTES * 60 * 1_000);
 }
 
+/** Serializes every send and every entry for one account, for the rest of the transaction. */
+async function lockAccountCodes(tx: Prisma.TransactionClient, accountId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendee-sign-in-code:${accountId}`}))`;
+}
+
 /** What a spent or retired sign-in code keeps: nothing that could be decrypted or compared. */
 const SPENT = (now: Date) => ({ consumedAt: now, sealedCode: null, codeHash: null });
 
@@ -49,7 +54,7 @@ const SPENT = (now: Date) => ({ consumedAt: now, sealedCode: null, codeHash: nul
  */
 export async function beginAttendeeSignInCode(accountId: string, sessionId: string, now = new Date()) {
   const pending = await getPrisma().$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendee-sign-in-code:${accountId}`}))`;
+    await lockAccountCodes(tx, accountId);
     // Past their ten minutes, a code's sealed copy has no use either.
     await tx.attendeeStepUpCode.updateMany({
       where: { accountId, purpose: "SIGN_IN", sealedCode: { not: null }, codeExpiresAt: { lt: now } },
@@ -170,6 +175,8 @@ export async function verifyAttendeeSignInCode(input: {
 }): Promise<SignInCodeOutcome> {
   const now = input.now ?? new Date();
   const outcome = await getPrisma().$transaction(async (tx): Promise<SignInCodeOutcome> => {
+    // The same lock a send takes: a new code cannot be issued between this entry's checks and its writes.
+    await lockAccountCodes(tx, input.accountId);
     const record = await tx.attendeeStepUpCode.findFirst({
       where: {
         accountId: input.accountId,

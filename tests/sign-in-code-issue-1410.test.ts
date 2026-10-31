@@ -109,6 +109,16 @@ describe("startSignInCodeIfRequired", () => {
     expect(mocks.needsStep).toHaveBeenCalledWith("account-1", "session-1");
   });
 
+  it("a failed gate lookup is logged with ids only and the sign-in proceeds: the session gate still sends them to the code page", async () => {
+    mocks.needsStep.mockRejectedValue(new Error("database down"));
+    await expect(startSignInCodeIfRequired(input)).resolves.toEqual({ required: false });
+    expect(mocks.queue).not.toHaveBeenCalled();
+    expect(mocks.logError).toHaveBeenCalledWith(expect.any(String), expect.any(Error), { accountId: "account-1" });
+    mocks.needsStep.mockResolvedValue("EMAIL_CODE");
+    mocks.sessionFind.mockRejectedValue(new Error("database down"));
+    await expect(startSignInCodeIfRequired(input)).resolves.toEqual({ required: false });
+  });
+
   it("a failed send still reports the code as owed: the session is gated, so nothing opens", async () => {
     mocks.queue.mockRejectedValue(new Error("outbox down"));
     await expect(startSignInCodeIfRequired(input)).resolves.toEqual({ required: true, sent: false });

@@ -112,23 +112,28 @@ export async function getClubReport(organizationId: string, reportMonth: string)
   return report ? serializeReport(report) : null;
 }
 
-/** A club's year: every month, its report if any, and the year-to-date standing. */
 /**
- * The calendar day a club joined: when it was created here. The data model has no separate join date, and
- * Monthly Records and the Year-End Report use this to skip periods that ended before it (#1410).
+ * The calendar day a club joined, only for a club created through a new-club application (#1410): its
+ * creation date. Imported and other clubs return null and keep every period, as before, because their
+ * `createdAt` is an import date, not a join date.
  */
 export async function getClubJoinedOn(organizationId: string): Promise<string | null> {
-  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { createdAt: true } });
-  return club ? calendarDateIn(club.createdAt) : null;
+  const club = await getPrisma().organization.findUnique({
+    where: { id: organizationId },
+    select: { createdAt: true, newClubApplicationCreated: { select: { id: true } } },
+  });
+  return club?.newClubApplicationCreated ? calendarDateIn(club.createdAt) : null;
 }
 
+/** A club's year: every month, its report if any, the year-to-date standing, and the day it joined (new-club applications only). */
 export async function getClubReportYear(organizationId: string, clubYear: string) {
   const prisma = getPrisma();
-  const [reports, standing] = await Promise.all([
+  const [reports, standing, joinedOn] = await Promise.all([
     prisma.clubMonthlyReport.findMany({ where: { organizationId, clubYear }, select: reportSelect, orderBy: { reportMonth: "asc" } }),
     prisma.clubYearStanding.findUnique({ where: { organizationId_clubYear: { organizationId, clubYear } }, select: { registrationOnTime: true } }),
+    getClubJoinedOn(organizationId),
   ]);
-  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false };
+  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false, joinedOn };
 }
 
 /**

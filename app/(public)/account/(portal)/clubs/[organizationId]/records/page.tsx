@@ -4,27 +4,25 @@ import { ArrowRight, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
 import { PortalContextualHelp } from "@/components/contextual-help-slot";
 import { ClubMeetingNotes } from "@/components/club-meeting-notes";
 import { ClubReportForm } from "@/components/club-report-form";
-import { calendarDateIn } from "@/modules/calendar/domain";
 import { attendanceMonthExportHref, defaultMeetingDate, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { listAttendanceRoster, listClubMeetingNotes, monthlyNotesSummary } from "@/modules/club-meeting-notes/repository";
 import {
   ON_TIME_POINTS,
   YEARLY_REGISTRATION_POINTS,
-  clubYearMonths,
   formatDueDate,
   isLockedForClub,
   onTimePoints,
   reportDueDate,
-  reportMonthBeforeJoined,
+  reportableMonths,
   reportMonthLabel,
   yearToDate,
 } from "@/modules/club-reports/domain";
-import { getClubJoinedOn, getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
+import { getClubReport, getClubReportYear, reportPrefill } from "@/modules/club-reports/repository";
 import {
   formatReportYearDueDate,
   isPastDue,
   reportYearSpanLabel,
-  reportYearEndedBeforeJoined,
+  reportYearDueBeforeJoined,
   reportableReportYears,
 } from "@/modules/club-reports/year-end-domain";
 import { listYearEndReportsForClub } from "@/modules/club-reports/year-end-repository";
@@ -60,8 +58,6 @@ export default async function ClubRecordsPage({
   const now = new Date();
   const month = recordsMonth(monthParam, now);
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
-  const currentMonth = calendarDateIn(now).slice(0, 7);
-  const joinedOn = await getClubJoinedOn(organizationId);
 
   // The check-off lists roster names, so it needs the roster's own gate (MFA and an open unlock), not just the report role.
   const attendanceAvailable = (await getRosterAccessState(organizationId, now)).state === "OPEN";
@@ -75,8 +71,8 @@ export default async function ClubRecordsPage({
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
   // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
-  const switcherMonths = clubYearMonths(clubYear).filter((candidate) =>
-    candidate <= currentMonth && (reportsByMonth.has(candidate) || !joinedOn || !reportMonthBeforeJoined(candidate, joinedOn)));
+  const joinedOn = reportYear.joinedOn;
+  const switcherMonths = reportableMonths(clubYear, now, { joinedOn, keep: new Set(reportsByMonth.keys()) });
   const submittedReports = reportYear.reports.filter((entry) => entry.status === "SUBMITTED");
   // The export only serves the previous, current and next club year.
   const exportable = clubYearChoices(now).includes(clubYear);
@@ -97,7 +93,7 @@ export default async function ClubRecordsPage({
   const yearEndYears = reportableReportYears(now);
   const yearEndReports = await listYearEndReportsForClub(organizationId, yearEndYears);
   const dueYearEndYears = yearEndYears.filter((year) =>
-    yearEndReports.has(year) || !joinedOn || !reportYearEndedBeforeJoined(year, joinedOn));
+    yearEndReports.has(year) || !joinedOn || !reportYearDueBeforeJoined(year, joinedOn));
 
   return (
     <>
