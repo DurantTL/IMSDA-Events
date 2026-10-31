@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dependencies = vi.hoisted(() => ({
   getPrisma: vi.fn(),
@@ -135,6 +135,9 @@ beforeEach(() => {
 });
 
 describe("church-billed payment-choice endpoints (#621)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
   it("refuses the private-link endpoint with no amounts and changes nothing", async () => {
     const tx = useRegistration("DEFERRED_ORGANIZATION_INVOICE");
     const response = await PUBLIC_POST(
@@ -201,6 +204,5 @@ describe("church-billed payment-choice endpoints (#621)", () => {
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ paymentChoice: { totalCents: 8_270 } });
-    vi.unstubAllEnvs();
   });
 });
