@@ -103,7 +103,10 @@ plain restart of the old container does not re-read it).
 3. The detailed `/api/health` answer (token or administrator sign-in) shows the
    same under `offsiteBackups` and `services.offsiteBackups` (`services.backups` is the app's own helper). A stale or missing
    database backup makes it `degraded` (still HTTP 200). A failed R2 read is
-   shown as `error` but does not make it `degraded`.
+   shown as `error` but does not make it `degraded`. A listing cut short (more
+   than 10,000 objects under the prefix) with no fresh dump seen shows `partial`
+   and does not make it `degraded` either; set `BACKUP_R2_READ_PREFIX` to the
+   database folder to fix it.
 4. If a row says "R2 refused the read-only key", the key or Account ID is wrong,
    or the key was not given access to that bucket. If it says "could not reach
    R2" or "timed out", try again in a minute.
