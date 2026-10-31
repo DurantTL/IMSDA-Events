@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import {
   attendeeProfileSchema,
   getAttendeeProfile,
@@ -37,7 +37,7 @@ function secondStepRequired() {
 async function getHandler() {
   const attendee = await account();
   if (!attendee) return json({ message: "Sign in to manage your profile." }, { status: 401 });
-  if (await attendeeSecondStepPending()) return secondStepRequired();
+  if (await attendeeSignInStepPending()) return secondStepRequired();
   return json({ profile: await getAttendeeProfile(attendee.id) });
 }
 
@@ -46,7 +46,7 @@ async function patchHandler(request: Request) {
   if (originError) return originError;
   const attendee = await account();
   if (!attendee) return json({ message: "Sign in to manage your profile." }, { status: 401 });
-  if (await attendeeSecondStepPending()) return secondStepRequired();
+  if (await attendeeSignInStepPending()) return secondStepRequired();
   try {
     const input = attendeeProfileSchema.parse(await request.json());
     return json({ profile: await updateAttendeeProfile(attendee.id, input) });

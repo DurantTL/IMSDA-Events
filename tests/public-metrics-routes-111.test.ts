@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
 const mocks = vi.hoisted(() => ({
   count: vi.fn(),
   authenticateWithPassword: vi.fn(),

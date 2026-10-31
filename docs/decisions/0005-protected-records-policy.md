@@ -1092,3 +1092,33 @@ by the club's director and deputy, every Area Coordinator, and staff holding
   through `csvCell`. Audit rows and logs hold column keys and counts, never a
   value.
 - **Retention.** Unchanged: deleted when the member is removed.
+
+## Addendum F: Two gates for club roles, and the emailed sign-in code
+
+Status: **Proposed**, like the rest of this ADR. Recorded 2026-10-31 for GitHub
+issue #1410, from the owner decisions of that date. It narrows the 2026-09-23
+rule that every account page needs a second step for a club role.
+
+- **Two gates, one module** (`modules/attendee-accounts/sign-in-gate.ts`).
+  The **club gate** (club pages, rosters, area coordinator and honors instructor
+  pages and APIs, club registration, health and medical data) opens only after
+  a real second step in this session: an authenticator app or a passkey. The
+  **sign-in step** (a person's own registrations, profile, payments, events,
+  forms, help and sign-in security) opens for a club role after an emailed
+  code, when the account has no second step yet.
+- **Never a password alone.** A club-role account (club roles, Area
+  Coordinators, accepted honors instructors) that has not set up two-step
+  sign-in enters a six-digit code emailed to it after its password. Accounts
+  with no such role sign in exactly as before. Staff accounts are unchanged;
+  they cannot get a session without their own second step.
+- **The code.** Single use, ten minutes from delivery, five wrong guesses per
+  code, a new code retires the earlier ones, bound to the session that is
+  signing in, rate-limited to send and to enter. It is stored hashed (with the
+  sealed copy only so a delivery retry resends the same code), minted when the
+  message is delivered, and shown in the subject and body of that message only.
+  Audit entries hold ids, never the code.
+- **Setup waits for the code.** Adding an authenticator or a passkey is refused
+  for a session that still owes the code, so someone who only knows a password
+  cannot enrol their own device and skip it.
+- **Passkey first.** Setup lists the passkey ("Easiest") before the
+  authenticator app when passkeys are switched on.

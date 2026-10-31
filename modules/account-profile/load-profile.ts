@@ -9,7 +9,7 @@ import { listUserSessions, SESSION_COOKIE_NAME, SESSION_IDLE_TIMEOUT_SECONDS } f
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
 import { getPasskeySettings as getAttendeePasskeySettings } from "@/modules/attendee-accounts/passkeys";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import type { MfaStatus } from "@/components/mfa-manager";
@@ -68,7 +68,7 @@ export async function loadProfileData(sessions: ProfileSessions, twoStep: string
   const { staff, attendeeAccount, sessionId, linkedAttendee } = sessions;
   // A club role that hasn't passed its second step sees nothing of its
   // registration account yet.
-  const secondStepPending = attendeeAccount ? await attendeeSecondStepPending() : false;
+  const secondStepPending = attendeeAccount ? await attendeeSignInStepPending() : false;
   const [mfaStatus, passkeySettings] = staff
     ? await Promise.all([getMfaStatus(staff.id) as Promise<MfaStatus>, getPasskeySettings(staff)])
     : [null, null];

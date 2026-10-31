@@ -22,7 +22,7 @@ vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown)
 vi.mock("qrcode", () => ({ default: { toString: mocks.qrToString } }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.pending }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.pending }));
 vi.mock("@/modules/checkin/attendee-pass-repository", () => ({ createAccountAttendeePass: mocks.createAccountAttendeePass }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
   authorizeAttendeeRegistration: mocks.authorize,

@@ -18,7 +18,7 @@ vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/events/public-repository", () => ({ getPublicEventLanding: mocks.getLanding }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.secondStep }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.secondStep }));
 vi.mock("@/modules/information-forms/responses", () => ({ storeInformationFormResponse: mocks.store }));
 vi.mock("@/modules/rate-limit/service", () => ({ checkInformationFormRateLimit: mocks.rateLimit, checkInformationFormClientRateLimit: mocks.clientLimit }));
 

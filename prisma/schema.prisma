@@ -558,6 +558,8 @@ enum AttendeeTokenPurpose {
 /// one today; the enum exists so adding the next reason is not a migration.
 enum AttendeeStepUpPurpose {
   REGISTRATION_EDIT
+  /// The emailed one-time code a club-role account without two-step sign-in enters after its password (#1410).
+  SIGN_IN
 }
 
 enum AttendeeEditPolicy {
@@ -595,6 +597,8 @@ enum MessageTemplateKey {
   ATTENDEE_EMAIL_VERIFICATION
   ATTENDEE_PASSWORD_RESET
   ATTENDEE_EDIT_VERIFICATION
+  /// The emailed sign-in code for a club-role account that has not set up two-step sign-in (#1410).
+  ATTENDEE_SIGN_IN_CODE
   REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED
   CLUB_INVITE
   CLUB_ASSIGNMENTS
@@ -1255,6 +1259,9 @@ model AttendeeSession {
   /// When this session last passed the authenticator check that opens club
   /// rosters (ADR 0005 Addendum A). Sign-in alone never sets it.
   secondFactorVerifiedAt DateTime?
+  /// When this session entered the emailed sign-in code (#1410). Only a club-role account without
+  /// two-step sign-in is asked for one; it opens the person's own pages, never club pages.
+  emailCodeVerifiedAt DateTime?
   createdAt     DateTime  @default(now())
 
   account           AttendeeAccount            @relation(fields: [accountId], references: [id], onDelete: Cascade)

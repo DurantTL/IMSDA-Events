@@ -161,7 +161,8 @@ export function LoginForm({
 
       const landing: string = result.redirectTo ?? DEFAULT_DESTINATION;
       // Registrants return to where they came from (the account area), staff to their workspace.
-      const attendeeReturn = unified && (landing === "/account" || landing.startsWith("/account/")) ? takeAttendeeAuthReturnPath() : null;
+      // Not while the emailed sign-in code is owed (#1410): `landing` is already the code page, which carries the way back.
+      const attendeeReturn = unified && !result.signInCode?.required && (landing === "/account" || landing.startsWith("/account/")) ? takeAttendeeAuthReturnPath() : null;
       router.replace(attendeeReturn ?? landing);
       router.refresh();
     } catch (caught) {

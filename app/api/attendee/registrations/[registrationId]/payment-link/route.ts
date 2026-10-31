@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
 import { squarePaymentLinkInputSchema } from "@/modules/payments/square-domain";
 import { createAttendeeSquarePaymentLink } from "@/modules/payments/square-hosted-repository";
@@ -58,7 +58,7 @@ async function postHandler(request: Request, context: Context) {
     return json({ message: "This registration is unavailable." }, { status: 404 });
   }
   // Same role-dependent second step the portal enforces (#744).
-  if (await attendeeSecondStepPending()) {
+  if (await attendeeSignInStepPending()) {
     return json(
       { code: "SECOND_STEP_REQUIRED", message: "Finish two-step sign-in to manage payment." },
       { status: 403 },

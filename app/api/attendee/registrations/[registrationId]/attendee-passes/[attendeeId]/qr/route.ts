@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { createAccountAttendeePass } from "@/modules/checkin/attendee-pass-repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
@@ -32,7 +32,7 @@ async function getHandler(_request: Request, context: Context) {
         { status: 403, headers: privateHeaders },
       );
     }
-    if (await attendeeSecondStepPending()) {
+    if (await attendeeSignInStepPending()) {
       return Response.json(
         { code: "SECOND_STEP_REQUIRED", message: "Finish two-step sign-in to view an attendee pass." },
         { status: 403, headers: privateHeaders },

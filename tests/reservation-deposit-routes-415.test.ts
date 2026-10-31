@@ -50,7 +50,7 @@ vi.mock("@/modules/payments/repository", () => ({
   recordManualPayment: mocks.recordManualPayment,
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.pending }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.pending }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ authorizeAttendeeRegistration: mocks.authorize }));
 vi.mock("@/modules/rate-limit/service", () => ({ checkPublicPaymentRateLimit: mocks.rateLimit }));
 vi.mock("@/modules/payments/square-repository", () => ({

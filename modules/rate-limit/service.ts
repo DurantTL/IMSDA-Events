@@ -772,6 +772,68 @@ export async function checkAttendeeRosterUnlockRateLimit(
   ], configuration);
 }
 
+/**
+ * Sending the emailed sign-in code (#1410), from the sign-in step and from "Send a new code". Each send
+ * retires the previous code, so an unlimited budget would also keep a real owner's code perpetually stale.
+ */
+export async function checkAttendeeSignInCodeSendRateLimit(
+  request: Request,
+  accountId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier(
+    "attendee-sign-in-code-send",
+    accountId,
+    configuration,
+  );
+  return evaluate([
+    {
+      policy: "attendee.sign-in-code-send.client",
+      limit: 20,
+      windowSeconds: oneHour,
+      identifierHashes: [client],
+    },
+    {
+      policy: "attendee.sign-in-code-send.account",
+      limit: 6,
+      windowSeconds: oneHour,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}
+
+/**
+ * Entering the emailed sign-in code (#1410). Each code already stops after five wrong guesses; this caps
+ * the guesses across fresh codes, per account and per client, before anything is checked.
+ */
+export async function checkAttendeeSignInCodeVerifyRateLimit(
+  request: Request,
+  accountId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier(
+    "attendee-sign-in-code-verify",
+    accountId,
+    configuration,
+  );
+  return evaluate([
+    {
+      policy: "attendee.sign-in-code-verify.client",
+      limit: 30,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [client],
+    },
+    {
+      policy: "attendee.sign-in-code-verify.account",
+      limit: 10,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}
+
 const oneDay = 24 * 60 * 60;
 
 /**

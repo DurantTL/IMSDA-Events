@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * A signed-out director opening a club page signs in, passes the second step
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   requestTarget: null as string | null,
   getCurrentAttendee: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
+  accountNeedsSignInStep: vi.fn(),
   getRosterAccessStateForPage: vi.fn(),
   getAttendeeEventHub: vi.fn(),
   redirect: vi.fn((path: string) => {
@@ -28,7 +29,10 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({
+  accountNeedsSecondStep: mocks.accountNeedsSecondStep,
+  accountNeedsSignInStep: mocks.accountNeedsSignInStep,
+}));
 vi.mock("@/modules/attendee-accounts/event-hub-repository", () => ({
   getAttendeeEventHub: mocks.getAttendeeEventHub,
   getStaffEventHubPreview: vi.fn(),
@@ -53,12 +57,17 @@ import { config } from "@/proxy";
 import {
   attendeeReturnDestination,
   attendeeSignInPathFor,
+  signInCodePathFor,
   twoStepPathFor,
 } from "@/modules/attendee-accounts/return-destination";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 
 const ROSTER = "/account/clubs/club-1/roster";
 const ROSTER_NEXT = encodeURIComponent(ROSTER);
+
+beforeEach(() => {
+  mocks.accountNeedsSignInStep.mockResolvedValue("OK");
+});
 
 afterEach(() => {
   mocks.requestTarget = null;
@@ -105,7 +114,7 @@ describe("attendeeReturnDestination", () => {
   });
 
   it("never returns to a sign-in screen", () => {
-    for (const loop of ["/account/sign-in", "/account/sign-in?next=%2Faccount", "/account/two-step", "/account/sign-up", "/profile/sign-in"]) {
+    for (const loop of ["/account/sign-in", "/account/sign-in?next=%2Faccount", "/account/sign-in/code", "/account/two-step", "/account/sign-up", "/profile/sign-in"]) {
       expect(attendeeReturnDestination(loop, "/account")).toBe("/account");
     }
   });
@@ -115,6 +124,8 @@ describe("attendeeReturnDestination", () => {
     expect(twoStepPathFor(ROSTER)).toBe(`/account/two-step?next=${ROSTER_NEXT}`);
     expect(attendeeSignInPathFor("https://evil.example/")).toBe("/account/sign-in");
     expect(twoStepPathFor(null)).toBe("/account/two-step");
+    expect(signInCodePathFor(ROSTER)).toBe(`/account/sign-in/code?next=${ROSTER_NEXT}`);
+    expect(signInCodePathFor("https://evil.example/")).toBe("/account/sign-in/code");
   });
 });
 
@@ -203,7 +214,7 @@ describe("second step still owed", () => {
   it("the event hub sends an owed second step to the challenge, carrying the hub", async () => {
     mocks.requestTarget = "/account/events/retreat";
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "a1", verifiedEmail: "p@example.test" }, via: "attendee", sessionId: "s1" });
-    mocks.accountNeedsSecondStep.mockResolvedValue("VERIFY");
+    mocks.accountNeedsSignInStep.mockResolvedValue("VERIFY");
     await expect(EventHubPage(hubProps)).rejects.toThrow(`REDIRECT:/account/two-step?next=${encodeURIComponent("/account/events/retreat")}`);
     expect(mocks.getAttendeeEventHub).not.toHaveBeenCalled();
   });
@@ -224,12 +235,16 @@ describe("second step still owed", () => {
 });
 
 describe("setup finish card", () => {
-  it("says two-step verification is on and links to next, else /profile", () => {
+  it("links back to the club page they wanted by name, else the security page, and names the method used", () => {
     for (const [next, href] of [[ROSTER, ROSTER], [undefined, "/account/profile?twoStep=on"]] as const) {
-      const markup = renderToStaticMarkup(createElement(TwoStepFinished, { next }));
-      expect(markup).toContain("Two-step verification is on.");
+      const markup = renderToStaticMarkup(createElement(TwoStepFinished, { next, clubName: "Sample Pathfinder Club", method: "passkey" }));
+      expect(markup).toContain("Sample Pathfinder Club is open.");
+      expect(markup).toContain("you&#x27;ll use your passkey instead of an emailed code");
       expect(markup).toContain(`href="${href}"`);
     }
+    const authenticator = renderToStaticMarkup(createElement(TwoStepFinished, { next: ROSTER }));
+    expect(authenticator).toContain("your authenticator app");
+    expect(authenticator).toContain("Continue");
   });
 });
 

@@ -14,7 +14,7 @@ import {
   getAttendeeProfile,
   withoutPersonalDetails,
 } from "@/modules/attendee-accounts/profile-service";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
 import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
@@ -66,7 +66,7 @@ export default async function PublicRegistrationPage({
   // The address and emergency contact follow the profile API (#745): only the
   // attendee's own session, with any second step finished, gets them prefilled.
   const mayPrefillPersonalDetails = account
-    ? via === "attendee" && !(await attendeeSecondStepPending())
+    ? via === "attendee" && !(await attendeeSignInStepPending())
     : false;
   const profilePrefill = account
     ? attendeeProfilePrefill(

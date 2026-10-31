@@ -10,7 +10,8 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { unifiedPasswordSignIn } from "@/modules/account-merge/unified-sign-in";
-import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
+import { attendeeReturnDestination, signInCodePathFor } from "@/modules/attendee-accounts/return-destination";
+import { startSignInCodeIfRequired } from "@/modules/attendee-accounts/sign-in-code-issue";
 import {
   ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
@@ -143,10 +144,23 @@ async function postHandler(request: Request) {
       });
     }
     countPublicMetric(request, "LOGIN_SUCCESS", "unified-password");
-    const redirectTo = outcome.staff
+    // An attendee-only session for a club role without two-step sign-in owes the emailed code (#1410). Staff
+    // sessions already passed their own stronger second step, and their linked attendee session is marked verified.
+    const signInCode = outcome.attendee && !outcome.staff
+      ? await startSignInCodeIfRequired({
+        request,
+        accountId: outcome.attendee.accountId,
+        sessionToken: outcome.attendee.session.token,
+      })
+      : null;
+    const redirectTo = signInCode?.required
+      ? signInCodePathFor(input.next)
+      : outcome.staff
       ? await staffDestinationOrDefault({ id: outcome.staff.userId, globalRole: outcome.staff.globalRole }, input.next)
       : attendeeReturnDestination(input.next, "/account");
-    return applyRateLimitHeaders(Response.json({ ok: true, redirectTo }), rateLimit);
+    return applyRateLimitHeaders(Response.json(signInCode?.required
+      ? { ok: true, redirectTo, signInCode: { required: true, sent: signInCode.sent, developmentCode: signInCode.developmentCode } }
+      : { ok: true, redirectTo }), rateLimit);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const response = Response.json({ error: "INVALID_LOGIN", message: "Enter a valid email address and password." }, { status: 400 });

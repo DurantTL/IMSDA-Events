@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { InformationFormFillIn } from "@/components/information-form-fill-in";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInPathFor, twoStepPathFor } from "@/modules/attendee-accounts/return-destination";
 import { publicInformationFormKey, publicInformationFormPath, resolvePublicInformationForm, type PublicInformationFormTarget } from "@/modules/information-forms/public";
 import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
@@ -86,7 +86,7 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
         </Notice>
       );
     }
-    if (await attendeeSecondStepPending()) {
+    if (await attendeeSignInStepPending()) {
       return (
         <Notice eyebrow={view.eventName ?? "Sign in"} title={form.name}>
           <p>Finish your second sign-in step to answer this form.</p>

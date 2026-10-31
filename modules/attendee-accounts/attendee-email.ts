@@ -19,7 +19,13 @@ import {
   createOneTimeCode,
   hashOneTimeCode,
   EMAIL_VERIFICATION_LIFETIME_MINUTES,
+  SIGN_IN_CODE_LIFETIME_MINUTES,
 } from "@/modules/attendee-accounts/codes";
+import {
+  attachAttendeeSignInCode,
+  reuseAttendeeSignInCode,
+  revokeAttendeeSignInCode,
+} from "@/modules/attendee-accounts/sign-in-code-service";
 import {
   attachAttendeeStepUpCode,
   reuseAttendeeStepUpCode,
@@ -43,6 +49,14 @@ import {
 export const VERIFICATION_CODE_SENTINEL = "{{attendee_verification_code}}";
 export const PASSWORD_RESET_CODE_SENTINEL = "{{attendee_password_reset_code}}";
 export const EDIT_VERIFICATION_CODE_SENTINEL = "{{attendee_edit_verification_code}}";
+/** The sign-in code (#1410). One in the subject as digits, one in the body as "518 207"; neither contains the other. */
+export const SIGN_IN_CODE_SENTINEL = "{{attendee_sign_in_code}}";
+export const SIGN_IN_CODE_DISPLAY_SENTINEL = "{{attendee_sign_in_code_display}}";
+
+/** "518207" as "518 207", the way the email shows it and the sign-in field accepts it. */
+export function spacedSignInCode(code: string) {
+  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
 
 function greeting(displayName: string) {
   return displayName.trim() || "there";
@@ -174,10 +188,27 @@ function editVerificationBody(displayName: string) {
   };
 }
 
+function signInCodeBody() {
+  return {
+    // The code is put in the subject at delivery only (see `PreparedEmailBody.subject`); the stored row keeps the sentinel.
+    subject: `Your IMSDA Events sign-in code: ${SIGN_IN_CODE_SENTINEL}`,
+    bodyText: [
+      "Enter this code to finish signing in:",
+      "",
+      SIGN_IN_CODE_DISPLAY_SENTINEL,
+      "",
+      `It works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes. If you didn't try to sign in, change your password. Someone may know it.`,
+      "",
+      "IMSDA Events",
+    ].join("\n"),
+  };
+}
+
 type AttendeeEmailKind =
   | { kind: "verification"; alreadyRegistered: boolean; adminSent?: boolean }
   | { kind: "password-reset"; federatedOnly: boolean }
-  | { kind: "edit-verification" };
+  | { kind: "edit-verification" }
+  | { kind: "sign-in-code" };
 
 function contentFor(selection: AttendeeEmailKind, displayName: string) {
   if (selection.kind === "verification") {
@@ -196,6 +227,13 @@ function contentFor(selection: AttendeeEmailKind, displayName: string) {
       templateKey: "ATTENDEE_EDIT_VERIFICATION" as MessageTemplateKey,
       trigger: "ATTENDEE_REGISTRATION_EDIT_REQUESTED",
       ...editVerificationBody(displayName),
+    };
+  }
+  if (selection.kind === "sign-in-code") {
+    return {
+      templateKey: "ATTENDEE_SIGN_IN_CODE" as MessageTemplateKey,
+      trigger: "ATTENDEE_SIGN_IN_CODE_REQUESTED",
+      ...signInCodeBody(),
     };
   }
   return {
@@ -251,6 +289,52 @@ export async function enqueueAttendeeEmail(input: {
 }
 
 /**
+ * The sign-in code (#1410), minted at delivery like the others and put into the subject and body only in the
+ * message being sent. The stored outbox row keeps the sentinels.
+ */
+async function prepareSignInCodeForDelivery(input: {
+  messageId: string;
+  accountAttendeeId: string | null;
+  bodyText: string;
+  now: Date;
+}): Promise<{ bodyText: string; subject: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+  if (!input.accountAttendeeId) {
+    throw new Error("An attendee email cannot mint a code without an account.");
+  }
+  // The code goes only to the address the account has now: a message queued for a mailbox that was since replaced must not deliver one.
+  const [message, account] = await Promise.all([
+    getPrisma().messageOutbox.findUnique({ where: { id: input.messageId }, select: { recipientEmail: true } }),
+    getPrisma().attendeeAccount.findUnique({ where: { id: input.accountAttendeeId }, select: { email: true } }),
+  ]);
+  if (!message || !account || message.recipientEmail.trim().toLowerCase() !== account.email.trim().toLowerCase()) {
+    throw new Error("The account's address changed after this message was queued; no code is sent.");
+  }
+  const reused = await reuseAttendeeSignInCode({
+    accountId: input.accountAttendeeId,
+    messageId: input.messageId,
+    now: input.now,
+  });
+  const code = reused ?? await attachAttendeeSignInCode({
+    accountId: input.accountAttendeeId,
+    messageId: input.messageId,
+    now: input.now,
+  });
+  if (!code) {
+    // Superseded by a newer code, spent, or expired while queued: sending a code nothing will accept helps nobody.
+    throw new Error("There is no live attendee code for this account to send.");
+  }
+  return {
+    bodyText: input.bodyText
+      .replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, spacedSignInCode(code))
+      .replaceAll(SIGN_IN_CODE_SENTINEL, code),
+    subject: `Your IMSDA Events sign-in code: ${code}`,
+    ...(reused
+      ? {}
+      : { revokeOnDefinitiveFailure: async () => { await revokeAttendeeSignInCode(hashOneTimeCode(code), input.now); } }),
+  };
+}
+
+/**
  * Mints the code at delivery, exactly as a private registration link is minted
  * at delivery: the credential is created when the message actually leaves, so a
  * database read never yields a usable one, and its twenty minutes start when it
@@ -262,7 +346,8 @@ export async function prepareAttendeeEmailBodyForDelivery(input: {
   templateKey: string;
   bodyText: string;
   now: Date;
-}) {
+}): Promise<{ bodyText: string; subject?: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+  if (input.templateKey === "ATTENDEE_SIGN_IN_CODE") return prepareSignInCodeForDelivery(input);
   const reset = input.templateKey === "ATTENDEE_PASSWORD_RESET";
   const edit = input.templateKey === "ATTENDEE_EDIT_VERIFICATION";
   const sentinel = edit
@@ -349,11 +434,18 @@ export function isAttendeeEmailConfigured() {
  */
 export async function mintAttendeeCodeWithoutSending(input: {
   accountId: string;
-  purpose: "verification" | "password-reset" | "edit-verification";
+  purpose: "verification" | "password-reset" | "edit-verification" | "sign-in-code";
   messageId?: string;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
+  if (input.purpose === "sign-in-code") {
+    return attachAttendeeSignInCode({
+      accountId: input.accountId,
+      messageId: input.messageId ?? `development:${input.purpose}:${input.accountId}:${now.getTime()}`,
+      now,
+    });
+  }
   const code = createOneTimeCode();
   const attach = input.purpose === "edit-verification"
     ? attachAttendeeStepUpCode

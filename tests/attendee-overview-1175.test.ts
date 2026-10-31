@@ -44,8 +44,14 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
     sessionId: "a1",
   }),
 }));
-vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => mocks.secondStep }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: async () => undefined }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({
+  accountNeedsSecondStep: async () => "OK",
+  accountNeedsSignInStep: async () => mocks.secondStep,
+}));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({
+  requireAttendeeSignInStep: async () => undefined,
+  signInStepRedirectPath: async () => "/account/sign-in/code",
+}));
 vi.mock("@/modules/attendee-accounts/mfa-service", () => ({
   getAttendeeMfaStatus: async () => ({ status: mocks.mfaActive ? "ACTIVE" : "NONE" }),
 }));
@@ -321,8 +327,8 @@ describe("account header and tabs (#1175)", () => {
     expect(html).not.toContain("account-header-identity");
   });
 
-  it("shows no attendee name while a second step is still pending", async () => {
-    mocks.secondStep = "REQUIRED";
+  it("shows no attendee name while the sign-in step is still pending", async () => {
+    mocks.secondStep = "EMAIL_CODE";
     mocks.acting = { role: "CLUB_DIRECTOR" };
     const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
     expect(html).not.toContain("Taylor Lane");

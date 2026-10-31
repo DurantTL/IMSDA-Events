@@ -26,7 +26,7 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
     sessionId: "a1",
   }),
 }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: async () => undefined }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSignInStep: async () => undefined }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
   listRegistrationsForVerifiedEmail: async () => {
     if (mocks.registrationsFail) throw new Error("synthetic load failure");

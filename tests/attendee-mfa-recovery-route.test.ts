@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSignInStep: async () => "OK" }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/lib/secret-box", () => ({ openSecret: mocks.openSecret, sealSecret: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({

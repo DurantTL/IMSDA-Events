@@ -2,7 +2,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { PasskeySessionError, requireOwnAttendeeSession } from "@/modules/attendee-accounts/passkey-api";
+import { PasskeySessionError, SignInCodeRequiredError, requireOwnAttendeeSession, signInCodeRequired } from "@/modules/attendee-accounts/passkey-api";
 import { markRosterUnlocked } from "@/modules/club-rosters/access";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
 import { checkAttendeeRosterUnlockRateLimit } from "@/modules/rate-limit/service";
@@ -29,6 +29,7 @@ const actionSchema = z.discriminatedUnion("action", [
 ]);
 
 function failure(error: unknown) {
+  if (error instanceof SignInCodeRequiredError) return signInCodeRequired();
   if (error instanceof PasskeySessionError) return ownSessionRequired();
   if (error instanceof AttendeeMfaError) {
     const status = error.code === "MFA_LOCKED" ? 429

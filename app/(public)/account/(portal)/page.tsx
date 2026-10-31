@@ -9,7 +9,7 @@ import { AreaCoordinatorCardSection, AreaCoordinatorCardSkeleton } from "@/compo
 import { AreaCoordinatorInviteAccept, ClubInviteAccept } from "@/components/club-invite-accept";
 import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
 import { accountAmountDue, upcomingRegistrations } from "@/modules/attendee-accounts/account-overview";
 import { overviewPrimaryCardId } from "@/modules/attendee-accounts/registration-card";
@@ -40,7 +40,7 @@ function emailWithBreaks(email: string) {
  * existing grants; it adds no new authority.
  */
 export default async function AttendeeAccountOverviewPage() {
-  await requireAttendeeSecondStep();
+  await requireAttendeeSignInStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 

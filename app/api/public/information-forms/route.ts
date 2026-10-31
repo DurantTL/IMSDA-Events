@@ -3,7 +3,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { logError } from "@/lib/logger";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { InformationFormError } from "@/modules/information-forms/errors";
 import { publicInformationFormKey, resolvePublicInformationForm } from "@/modules/information-forms/public";
 import { storeInformationFormResponse } from "@/modules/information-forms/responses";
@@ -58,7 +58,7 @@ async function readCapped(request: Request, limit: number): Promise<string | nul
 /** The verified attendee account of this browser, or null (also null while a required second step is pending). */
 async function verifiedAccountId() {
   const { account } = await getCurrentAttendee();
-  if (!account || (await attendeeSecondStepPending())) return null;
+  if (!account || (await attendeeSignInStepPending())) return null;
   return account.id;
 }
 
