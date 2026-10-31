@@ -53,7 +53,6 @@ describe("required and recommended readiness items (#1408)", () => {
         expect(readiness.items.find((item) => item.id === "central-sender")).toMatchObject({
           complete: false,
           detail: "Confirmation and reminder emails wait until a system administrator saves the sender address.",
-          actionLabel: "Ask a system administrator",
         });
       }
     }
@@ -79,6 +78,17 @@ describe("required and recommended readiness items (#1408)", () => {
       actionLabel: "Set a cancellation policy",
       href: "/finance/cancellation-policy?event=evt_1",
     });
+  });
+});
+
+describe("the cancellation recommendation only where online cancellation applies (#1408)", () => {
+  it("is absent for a club event and a church-billed event, present for an attendee-pay general event", () => {
+    const ids = (source: object) => getEventPublishReadiness({ ...complete, hasCancellationPolicy: false, ...source }, 1).recommendedItems.map((item) => item.id);
+    expect(ids({})).toContain("cancellation-policy");
+    expect(ids({ audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" })).not.toContain("cancellation-policy");
+    expect(ids({ billingMode: "DEFERRED_ORGANIZATION_INVOICE" })).not.toContain("cancellation-policy");
+    const club = getEventPublishReadiness({ ...complete, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", hasCancellationPolicy: false }, 1);
+    expect(club.recommendedOpenCount).toBe(0);
   });
 });
 
@@ -212,9 +222,9 @@ describe("the readiness panel (#1408)", () => {
     seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: false, featured: false, featuredOrder: null, featureUntil: null,
     publishedFormCount: 1, publishedForms: [], createdAt: "2027-01-01T00:00:00.000Z", updatedAt: "2027-01-01T00:00:00.000Z",
   };
-  const render = (overrides: Record<string, unknown> = {}) => {
+  const render = (overrides: Record<string, unknown> = {}, canOpenPlatformSettings = false) => {
     const event = { ...fields, ...overrides, warnings: [] } as unknown as EventSettingsRecord;
-    return renderToStaticMarkup(createElement(EventSettingsWorkspace, { mode: "edit", initialEvent: event, canDeleteEvent: false }));
+    return renderToStaticMarkup(createElement(EventSettingsWorkspace, { mode: "edit", initialEvent: event, canDeleteEvent: false, canOpenPlatformSettings }));
   };
 
   it("shows the two groups, sr-only status text, and 'Ready to publish' with the recommended count", () => {
@@ -236,8 +246,10 @@ describe("the readiness panel (#1408)", () => {
     const markup = render({ centralSenderEmail: null, attendeeTypesWithAgeRangeCount: 0, attendeeTypeNames: [] });
     expect(markup).toContain("4 of 6 required ready");
     expect(markup).toContain("Publishing needs 2 required items first.");
-    expect(markup).toContain("Ask a system administrator");
     expect(markup).toContain("Set attendee types");
+    expect(markup).toContain("Next: ask a system administrator to save the central email sender.");
+    expect(markup).not.toContain('href="/help"');
+    expect(markup).not.toContain("/admin/email");
     expect(markup).toContain("Confirmation and reminder emails wait until a system administrator saves the sender address.");
     expect(markup).toContain('aria-disabled="true"');
   });
@@ -245,7 +257,22 @@ describe("the readiness panel (#1408)", () => {
   it("leads the publish box with the sender when it is the first thing missing", () => {
     const markup = render({ centralSenderEmail: null });
     expect(markup).toContain("Publishing needs 1 required item first.");
-    expect(markup).toContain("ask a system administrator to set this up");
+    expect(markup).toContain("Next: ask a system administrator to save the central email sender.");
+  });
+
+  it("links a system administrator to the platform email settings", () => {
+    const markup = render({ centralSenderEmail: null }, true);
+    expect(markup).toContain("Next: save the central email sender.");
+    expect(markup).toContain('href="/admin/email"');
+    expect(markup).toContain("Open email settings");
+  });
+
+  it("leads with the first missing required step as a lower-case imperative with a link", () => {
+    const markup = render({ attendeeTypesWithAgeRangeCount: 0, attendeeTypeNames: [] });
+    expect(markup).toContain("Publishing needs 1 required item first.");
+    expect(markup).toContain("Next: set attendee types.");
+    expect(markup).toContain("Go to attendee types");
+    expect(markup).not.toContain("Can&#x27;t publish yet");
   });
 });
 

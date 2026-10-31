@@ -129,7 +129,7 @@ describe("EventSettingsWorkspace never folds publish state into a settings save 
     }));
     expect(markup).toContain("Private draft");
     expect(markup).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Publish event<\/button>/);
-    expect(markup).toContain("the registration support contact is missing");
+    expect(markup).toContain("Next: add the registration support contact.");
   });
 
   describe("Public page and links overview (#448)", () => {

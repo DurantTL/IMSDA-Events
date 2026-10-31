@@ -1,3 +1,4 @@
+import { onlineCancellationApplies } from "@/modules/cancellation-policy/online-cancellation";
 import { DUPLICATE_PUBLIC_FORMS_MESSAGE, duplicatePublicFormGroups, publicFormLookKey } from "@/modules/forms/duplicate-public-forms";
 
 export type EventReadinessSource = {
@@ -26,7 +27,7 @@ export type EventReadinessSource = {
    * is left out. `null` or blank is loaded and not saved, so the item is undone and publishing is blocked (#1408).
    */
   centralSenderEmail?: string | null;
-  /** Whether a cancellation policy is in effect (`eventHasCancellationPolicy`); `undefined` leaves the recommendation out. */
+  /** Whether a cancellation policy is in effect (`eventHasCancellationPolicy`); `undefined` leaves the recommendation out, as does an event with no online cancellation. */
   hasCancellationPolicy?: boolean;
 };
 
@@ -38,9 +39,6 @@ export const CLUB_EVENT_BILLING_MESSAGE = "Club registration uses church billing
  * only a system administrator saves the sender, so the message says who to ask.
  */
 export const CENTRAL_SENDER_MESSAGE = "The central email sender address is not saved, so confirmation and reminder emails could not be sent. Ask a system administrator to set this up.";
-
-/** Where event staff are sent to ask for the sender address (they cannot change it). */
-export const CENTRAL_SENDER_HELP_HREF = "/help";
 
 export type EventReadinessItem = {
   id: "basics" | "location" | "support" | "registration-form" | "central-sender" | "attendee-types" | "club-billing";
@@ -149,7 +147,6 @@ export function getCentralSenderReadinessItem(event: Pick<EventReadinessSource, 
       ? `Emails go out from ${address}.`
       : "Confirmation and reminder emails wait until a system administrator saves the sender address.",
     complete: done,
-    ...(done ? {} : { href: CENTRAL_SENDER_HELP_HREF, actionLabel: "Ask a system administrator" }),
   };
 }
 
@@ -209,7 +206,8 @@ export function getEventPublishReadiness(
   }
 
   const recommendedItems: EventReadinessRecommendedItem[] = [];
-  if (typeof event.hasCancellationPolicy === "boolean") {
+  // Only where attendees could cancel online: club and church-billed events are handled by the event team.
+  if (typeof event.hasCancellationPolicy === "boolean" && onlineCancellationApplies(event)) {
     const policyHref = event.id ? `/finance/cancellation-policy?event=${encodeURIComponent(event.id)}` : undefined;
     recommendedItems.push({
       id: "cancellation-policy",

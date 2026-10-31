@@ -1,3 +1,4 @@
+import { onlineCancellationApplies } from "@/modules/cancellation-policy/online-cancellation";
 import "server-only";
 
 import { Prisma } from "@prisma/client";
@@ -151,7 +152,7 @@ async function loadEligibility(db: Pick<Client, "registration">, target: Request
   if (!ACTIVE_REGISTRATION_STATUSES.includes(registration.status)) {
     return { registration, reason: "Only an active registration can be cancelled. Contact the event team if you need help." };
   }
-  if (registration.event.billingMode !== "ATTENDEE_PAY" || registration.groupRegistration || registration.clubRegistration) {
+  if (!onlineCancellationApplies({ billingMode: registration.event.billingMode }) || registration.groupRegistration || registration.clubRegistration) {
     return { registration, reason: "This registration is billed through a church or group, so cancellations go through the event team. Contact them to cancel." };
   }
   return { registration, reason: null };

@@ -40,6 +40,7 @@ function dataSource(overrides: {
     publicInfoUrl: "https://www.imsda.org/synthetic-retreat",
     supportContact: "Registration team",
     isPublished: true,
+    billingMode: "ATTENDEE_PAY",
     ...overrides.event,
   };
   const templates = overrides.templates ?? [
@@ -128,6 +129,9 @@ describe("collectEventReadinessReport", () => {
     expect(check(report, "PUBLISH_CANCELLATION_POLICY")?.severity).toBe("WARNING");
     expect(report?.summary.blockers).toBe(0);
     expect(check(await collectEventReadinessReport(dataSource().prisma, "synthetic-retreat", readyEnv), "PUBLISH_CANCELLATION_POLICY")?.severity).toBe("READY");
+    // Not where online cancellation never applies (club or church-billed events).
+    const club = await collectEventReadinessReport(dataSource({ policyVersions: [], event: { audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" } }).prisma, "synthetic-retreat", readyEnv);
+    expect(check(club, "PUBLISH_CANCELLATION_POLICY")).toBeUndefined();
   });
 
   it("never blocks publish on the optional IMSDA.org information page (#467)", async () => {

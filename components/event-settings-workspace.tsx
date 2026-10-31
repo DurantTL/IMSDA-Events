@@ -141,8 +141,11 @@ function readinessInputsFrom(event: EventSettingsRecord | null | undefined): Pic
   };
 }
 
+/** The platform email settings (System management > Email), where the central sender is saved. */
+const CENTRAL_SENDER_SETTINGS_HREF = "/admin/email";
+
 /** One group of the readiness panel. Each row keeps its status as text for screen readers (the icon is decorative). */
-function ReadinessList({ items, ...rest }: { items: ReadonlyArray<EventReadinessItem | EventReadinessRecommendedItem>; "aria-labelledby": string }) {
+function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: ReadonlyArray<EventReadinessItem | EventReadinessRecommendedItem>; canOpenPlatformSettings: boolean; "aria-labelledby": string }) {
   return (
     <ul className="event-readiness-list" {...rest}>
       {items.map((item) => (
@@ -152,6 +155,7 @@ function ReadinessList({ items, ...rest }: { items: ReadonlyArray<EventReadiness
             <strong><span className="sr-only">{item.complete ? "Done: " : "Not done: "}</span>{item.label}</strong>
             <small>{item.detail}</small>
             {!item.complete && item.href && item.actionLabel && <small><Link className={readinessStyles.action} href={item.href}>{item.actionLabel}</Link></small>}
+            {!item.complete && item.id === "central-sender" && canOpenPlatformSettings && <small><Link className={readinessStyles.action} href={CENTRAL_SENDER_SETTINGS_HREF}>Open email settings</Link></small>}
           </span>
         </li>
       ))}
@@ -485,7 +489,7 @@ export function EventSettingsWorkspace({
     const missing = readiness.items.find((item) => !item.complete);
     if (!missing) return null;
     if (missing.id === "registration-form") {
-      return { text: "Can't publish yet: a published registration form is missing.", actionLabel: "Open registration form", href: `/registration-builder?event=${initialEvent?.id ?? ""}` };
+      return { text: "Next: publish a registration form.", actionLabel: "Open registration form", href: `/registration-builder?event=${initialEvent?.id ?? ""}` };
     }
     if (missing.id === "basics") {
       const first = ([
@@ -496,18 +500,21 @@ export function EventSettingsWorkspace({
         ["timezone", "event-field-timezone", "Event timezone"],
       ] as const).find(([key]) => !String(savedDraft[key] ?? "").trim());
       const [, targetId, controlLabel] = first ?? ["name", "event-field-name", "Event name"];
-      return { text: `Can't publish yet: ${controlLabel} is missing.`, actionLabel: `Go to ${controlLabel}`, targetId };
+      return { text: `Next: fill in ${controlLabel.toLowerCase()}.`, actionLabel: `Go to ${controlLabel}`, targetId };
     }
-    if (missing.id === "location") return { text: "Can't publish yet: the event location is missing.", actionLabel: "Go to Location", targetId: "event-field-location" };
-    if (missing.id === "support") return { text: "Can't publish yet: the registration support contact is missing.", actionLabel: "Go to Registration support contact", targetId: "event-field-support-contact" };
+    if (missing.id === "location") return { text: "Next: add the event location.", actionLabel: "Go to Location", targetId: "event-field-location" };
+    if (missing.id === "support") return { text: "Next: add the registration support contact.", actionLabel: "Go to Registration support contact", targetId: "event-field-support-contact" };
     if (missing.id === "central-sender") {
-      return { text: "Can't publish yet: the central email sender isn't saved. Event staff can't change it; ask a system administrator to set this up.", actionLabel: missing.actionLabel, href: missing.href };
+      // Only a system administrator can save the sender, so everyone else gets the instruction with no dead-end link.
+      return canOpenPlatformSettings
+        ? { text: "Next: save the central email sender.", actionLabel: "Open email settings", href: CENTRAL_SENDER_SETTINGS_HREF }
+        : { text: "Next: ask a system administrator to save the central email sender." };
     }
     if (missing.id === "attendee-types") {
-      return { text: "Can't publish yet: attendee types aren't set.", actionLabel: missing.actionLabel, href: missing.href };
+      return { text: "Next: set attendee types.", actionLabel: "Go to attendee types", href: missing.href };
     }
-    return { text: "Can't publish yet: club registration needs church billing.", actionLabel: "Go to Billing mode", targetId: "event-field-billing-mode" };
-  }, [publishBlockedBySave, saving, readiness, savedDraft, initialEvent?.id]);
+    return { text: "Next: choose church billing.", actionLabel: "Go to Billing mode", targetId: "event-field-billing-mode" };
+  }, [publishBlockedBySave, saving, readiness, savedDraft, initialEvent?.id, canOpenPlatformSettings]);
 
   // Open the block that holds a control (a "Go to ..." link, an error, a jump
   // link), then scroll to it and focus it. The block is opened in the DOM at
@@ -1233,7 +1240,7 @@ export function EventSettingsWorkspace({
             <p>Publishing turns on the event’s public registration links. Form versions and registration dates still control what attendees can submit.</p>
             {mode === "edit" && dirty && <p className="field-help">This checklist reflects the saved settings. Save your changes to update it.</p>}
             <p className={readinessStyles.groupHeading} id="event-readiness-required-heading">Required before publishing</p>
-            <ReadinessList aria-labelledby="event-readiness-required-heading" items={readiness.items} />
+            <ReadinessList canOpenPlatformSettings={canOpenPlatformSettings} aria-labelledby="event-readiness-required-heading" items={readiness.items} />
             {/* Never blocks publish (#575): a warning only. */}
             {!published && publishWarnings.map((warning) => (
               <div className="inline-notice clone-warning" key={warning} role="status"><AlertTriangle size={17} aria-hidden="true" /> {warning}</div>
@@ -1246,7 +1253,7 @@ export function EventSettingsWorkspace({
             <p className={readinessStyles.groupHeading} id="event-readiness-recommended-heading">
               Recommended <span className={readinessStyles.groupNote}>doesn’t block publishing</span>
             </p>
-            <ReadinessList aria-labelledby="event-readiness-recommended-heading" items={readiness.recommendedItems} />
+            <ReadinessList canOpenPlatformSettings={canOpenPlatformSettings} aria-labelledby="event-readiness-recommended-heading" items={readiness.recommendedItems} />
             {!readiness.items.find((item) => item.id === "registration-form")?.complete && (
               mode === "edit"
                 ? <a className="secondary-button full-button" href={`/registration-builder?event=${initialEvent?.id}`}>Open registration form</a>

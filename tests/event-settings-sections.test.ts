@@ -318,7 +318,7 @@ describe("Event settings save and publish clarity (#742)", () => {
 
   it("explains the first missing requirement and points at its control instead of a dead button", () => {
     const markup = render({ supportContact: null });
-    expect(markup).toContain("Can&#x27;t publish yet: the registration support contact is missing.");
+    expect(markup).toContain("Next: add the registration support contact.");
     expect(markup).toContain("Go to Registration support contact");
     expect(markup).toContain('id="event-field-support-contact"');
     expect(markup).toContain('aria-disabled="true"');
@@ -326,13 +326,13 @@ describe("Event settings save and publish clarity (#742)", () => {
 
   it("links to the registration builder when the form is the missing piece", () => {
     const markup = render({ publishedFormCount: 0 });
-    expect(markup).toContain("a published registration form is missing");
+    expect(markup).toContain("Next: publish a registration form.");
     expect(markup).toContain('href="/registration-builder?event=event-1"');
   });
 
   it("offers Publish with no blocker once everything is ready", () => {
     const markup = render();
-    expect(markup).not.toContain("Can&#x27;t publish yet");
+    expect(markup).not.toContain("Next: ");
     expect(markup).toContain("Every required item is done");
     expect(markup).toContain('aria-disabled="false"');
   });
