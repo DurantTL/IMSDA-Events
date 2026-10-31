@@ -204,7 +204,7 @@ describe("the report rows", () => {
     const rows = await provider.load(new Date("2026-10-31T12:00:00.000Z"));
     const failing = rows.find((row) => row.key === "invoice-figures")!;
     expect(failing.state).toBe("attention");
-    expect(failing.resultText).toBe("1 of 3 fixed examples gave a different answer for invoice figures. A developer should check this calculation before the next event.");
+    expect(failing.resultText).toBe("1 of 3 fixed examples gave a different answer for invoice figures. A developer should check this calculation, or the server's time zone and language settings, before the next event.");
     expect(failing.resultText).not.toMatch(/Church|Reyes|5000|5001|\{|\[|"/);
     expect(rows.filter((row) => row.key !== "invoice-figures").every((row) => row.state === "ok")).toBe(true);
   });

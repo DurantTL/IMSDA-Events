@@ -25,7 +25,7 @@ export function selfTestRow(kit: Pick<SelfTestKit, "tried">, definition: SelfTes
     return {
       key: definition.key,
       state: "attention" as const,
-      resultText: `${result.differing} of ${examples(result.total)} gave a different answer for ${definition.name.toLowerCase()}. A developer should check this calculation before the next event.`,
+      resultText: `${result.differing} of ${examples(result.total)} gave a different answer for ${definition.name.toLowerCase()}. A developer should check this calculation, or the server's time zone and language settings, before the next event.`,
     };
   } catch (error) {
     // The self-test's key only: the error can carry the example's own values.
