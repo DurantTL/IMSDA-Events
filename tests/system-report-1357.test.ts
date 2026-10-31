@@ -35,7 +35,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
-vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
+vi.mock("@/lib/logger", async () => ({ ...(await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger")), logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
 vi.mock("@/lib/release", () => ({ getReleaseIdentity: mocks.getReleaseIdentity, getReleaseTimes: mocks.getReleaseTimes }));
 vi.mock("@/modules/operations/disk-space", () => ({ readDiskSpace: mocks.readDiskSpace }));
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ getJobRun: mocks.getJobRun }));
@@ -47,6 +47,8 @@ vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadine
 vi.mock("@/modules/communications/message-file-usage", () => ({ getMessageFileStorageUsage: mocks.getMessageFileStorageUsage }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/modules/ledger/reconciliation", () => ({ reconcileRegistrationLedger: mocks.reconcileRegistrationLedger }));
+vi.mock("@/modules/lodging/church-share-drift", () => ({ reportChurchShareDrift: vi.fn() }));
+vi.mock("@/modules/operations/alerting", () => ({ isAlertDeliveryConfigured: () => false }));
 vi.mock("@/modules/public-metrics/repository", () => ({ getAnalyticsSummary: mocks.getAnalyticsSummary }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-30" }));
 vi.mock("@/modules/operations/database-liveness", () => ({ checkDatabaseLiveness: mocks.checkDatabaseLiveness }));
@@ -149,12 +151,15 @@ describe("the report model", () => {
   it("keeps the readiness checklist out of the overall status and always last", () => {
     const report = buildSystemReport([
       signal("setup", "key", "ok"),
+      signal("money", "money-key", "ok"),
+      signal("communications", "communications-key", "ok"),
+      signal("notices", "notices-key", "ok"),
       signal("checklist", "server", "watch", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
       signal("checklist", "go-live", "attention", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
     ], now);
-    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 1, info: 0 });
+    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 4, info: 0 });
     expect(report.overall.state).toBe("ok");
-    expect(report.overall.readingsTried).toBe(1);
+    expect(report.overall.readingsTried).toBe(4);
     const last = report.sections.at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
@@ -253,12 +258,16 @@ describe("providers", () => {
     it("shows every reading as unavailable when every source fails, and never as OK", async () => {
       everySourceDown();
       const report = await loadSystemReport(now);
-      const rows = report.sections.flatMap((section) => section.signals);
-      // The release identity and the environment's set-up facts are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test"].includes(row.key));
+      // The built-in self-tests (#1381) read no source, so they still pass when every source is down.
+      const selfTests = report.sections.find((section) => section.key === "self-tests")!.signals;
+      expect(selfTests).toHaveLength(8);
+      for (const row of selfTests) expect(row.state, row.key).toBe("ok");
+      const rows = report.sections.filter((section) => section.key !== "self-tests").flatMap((section) => section.signals);
+      // The release identity and the environment's set-up facts (including whether alert delivery, Google sign-in and the breach check are on) are read from the process, not from a failing source.
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test", "refund-self-test", "alert-delivery", "google-keys-reachable", "breach-service-reachable"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
-      expect(report.overall.tally.ok).toBe(1); // only the pricing self-test, which reads no source; the release identity and start time are information
+      expect(report.overall.tally.ok).toBe(10); // only the eight self-tests and the pricing and refund self-tests, which read no source; the release identity and start time are information
       expect(report.overall.tally.info).toBe(2);
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");

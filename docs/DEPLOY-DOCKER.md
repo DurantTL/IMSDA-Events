@@ -59,6 +59,7 @@ MANAGE_LINK_DERIVATION_SECRET=<openssl rand -base64 48>
 ATTENDEE_PASS_SIGNING_SECRET=<openssl rand -base64 48>
 RATE_LIMIT_HASH_SECRET=<openssl rand -base64 48>
 OUTBOX_SWEEP_TOKEN=<openssl rand -base64 48>
+HOST_JOB_HEARTBEAT_TOKEN=<openssl rand -base64 48>   # optional, see "System report heartbeats"
 SECRET_ENCRYPTION_KEY=<openssl rand -base64 48>
 RESEND_API_KEY=<from the Resend dashboard>
 ACCOUNT_EMAIL_SENDER_ADDRESS=<a verified sender, e.g. no-reply@imsda.org>
@@ -92,6 +93,8 @@ builds, naming the variable in the deploy output.
 > with `ACCOUNT_EMAIL_SENDER_ADDRESS` when account email became the only way an
 > invited colleague receives a link. A deployment that predates any of them must
 > add it before its next deploy, or the app container will refuse to start.
+> `HOST_JOB_HEARTBEAT_TOKEN` (System report heartbeats) is optional and never
+> blocks a start.
 
 `SECRET_ENCRYPTION_KEY` seals the TOTP secrets behind two-factor
 authentication and every club roster birth date (ADR 0005 Addendum A).
@@ -511,6 +514,8 @@ is a separate PR for #1263.
    install -m 644 -o u_events -g u_events deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml
    install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
    install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+   install -m 755 deploy/xcloud/cleanup.sh /usr/local/bin/imsda-cleanup
+   install -m 755 deploy/xcloud/heartbeat.sh /usr/local/bin/imsda-heartbeat
    docker compose -f /home/u_events/239298/docker-compose.yml --profile standby config --quiet && echo config-ok
    ```
 
@@ -568,6 +573,7 @@ Install or update (as `root`, from a checkout of `main`):
 install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
 install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
 install -m 755 deploy/xcloud/cleanup.sh /usr/local/bin/imsda-cleanup
+install -m 755 deploy/xcloud/heartbeat.sh /usr/local/bin/imsda-heartbeat
 cat > /etc/systemd/system/imsda-autodeploy.service <<'UNIT'
 [Unit]
 Description=Deploy the GitHub-built IMSDA Events image for the checked-out commit
@@ -610,6 +616,37 @@ with `timedatectl`.
 
 Run `imsda-cleanup` by hand to free space now, and check it with
 `journalctl -u imsda-cleanup.service` and `df -h /`.
+
+### System report heartbeats
+
+The System report's "Background jobs" section shows three server jobs:
+auto-deploy, Docker cleanup and the runtime guard. Each run sends one small
+heartbeat (a result word and a few counts, never an address, path, commit or
+key) to the app on this machine through `imsda-heartbeat`.
+
+1. Set `HOST_JOB_HEARTBEAT_TOKEN` (`openssl rand -base64 48`, at least 32
+   characters) in the app's environment and deploy.
+2. Put the same value on the host, as `root`:
+
+   ```bash
+   install -m 600 /dev/null /etc/default/imsda-heartbeat
+   nano /etc/default/imsda-heartbeat
+   ```
+
+   Add the line `IMSDA_HEARTBEAT_TOKEN=<the same value>` and save. Use an
+   editor rather than `echo`, so the token does not end up in shell history.
+
+3. Re-install the scripts (the `install -m 755` lines above, including
+   `imsda-heartbeat`). Re-run `scripts/install-xcloud-runtime-guard.sh` only if
+   the runtime guard is in use; it adds the line that reports each guard run.
+
+Nothing breaks without it: a heartbeat never fails a job (it adds at most a few
+seconds if the app does not answer), and the rows simply read "Not reporting
+yet". Each run logs one `[heartbeat]` line, and the helper needs curl 7.55 or
+newer. `imsda-heartbeat` only talks to
+`http://127.0.0.1:8100` (override with `IMSDA_HEARTBEAT_URL`, loopback only).
+The host's other cron jobs (the touch job and the `.xcloud` cleanup) are not in
+this repository and are not reported.
 
 By hand, as `root`:
 

@@ -7,15 +7,36 @@ import { getMessageFileStorageUsage } from "@/modules/communications/message-fil
 import { conferenceToday } from "@/modules/calendar/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { getEmailAvailability } from "@/integrations/email/provider";
+import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
+import { isBreachCheckEnabled } from "@/modules/access/password-breach";
 import { checkDatabaseLiveness } from "@/modules/operations/database-liveness";
 import { readDiskSpace } from "@/modules/operations/disk-space";
 import {
+  ALERT_SCAN_JOB,
+  ALERT_WEBHOOK_DELIVERY_JOB,
+  APPLE_PAY_FILE_REACHABILITY_JOB,
+  BREACH_SERVICE_REACHABILITY_JOB,
+  CALENDAR_FEED_REACHABILITY_JOB,
   CALENDAR_FEED_REFRESH_JOB,
+  CLASS_WAITLIST_SWEEP_JOB,
+  DEADLINE_REMINDER_PREPARATION_JOB,
   EMAIL_REACHABILITY_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  GOOGLE_KEYS_REACHABILITY_JOB,
+  HEALTH_SNAPSHOT_SWEEP_JOB,
+  HONOR_WATCH_SUMMARIES_JOB,
+  INSTRUCTOR_CLASS_EMAILS_JOB,
+  LOCATION_WAITLIST_DIGEST_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
+  RETENTION_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
+  SERVER_AUTODEPLOY_JOB,
+  SERVER_AUTODEPLOY_STALE_AFTER_MS,
+  SERVER_DOCKER_CLEANUP_JOB,
+  SERVER_DOCKER_CLEANUP_STALE_AFTER_MS,
+  SERVER_RUNTIME_GUARD_JOB,
+  SERVER_RUNTIME_GUARD_STALE_AFTER_MS,
 } from "@/modules/operations/sweep-heartbeat";
 import { getJobRun } from "@/modules/operations/sweep-heartbeat-repository";
 import { getSquareConfiguration } from "@/modules/payments/square-config";
@@ -27,11 +48,37 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
-import { calendarRefreshFields, diskFields, generalLinkExpiryFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
 import { runPricingSelfTest } from "./pricing-self-test";
 import { countPublicSubmissionsSince, readOpenRegistrationEvents, readUnreleasedHoldCounts } from "./registration-reads";
 import { openWithoutFormFields, pricingSelfTestFields, registrationsReceivedFields, unreleasedHoldsFields } from "./registration-signals";
+import { buildMoneyProviders } from "./money-providers";
+import {
+  alertDeliveryFields,
+  alertScanFields,
+  autodeployFields,
+  calendarRefreshFields,
+  classWaitlistFields,
+  deadlineReminderFields,
+  diskFields,
+  dockerCleanupFields,
+  generalLinkExpiryFields,
+  healthSnapshotFields,
+  honorWatchSummaryFields,
+  instructorClassEmailFields,
+  locationWaitlistDigestFields,
+  messageFileCleanupFields,
+  reachabilityFields,
+  retentionCleanupFields,
+  runtimeGuardFields,
+  type ReachabilityKind,
+} from "./job-signals";
+import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
+import { getServerEnv } from "@/lib/env";
+import { buildCommunicationsProviders } from "./communications-providers";
+import { buildEventOpsProviders } from "./event-ops-providers";
+import { buildSelfTestProviders } from "./self-test-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
+import { buildNoticeProviders } from "./notice-providers";
 
 /**
  * The System report's signal providers (#1357). Each provider wraps ONE existing module computation and turns it into
@@ -258,19 +305,48 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
 /* ---------- Stored job runs and connection tests ---------- */
 
 /** A step the sweep records on `SystemJobHeartbeat`: judged stale after an hour without a success. */
-async function jobRow(ctx: ReportContext, job: string, key: string, fields: typeof calendarRefreshFields) {
-  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, SWEEP_STEP_STALE_AFTER_MS));
+async function jobRow(
+  ctx: ReportContext,
+  job: string,
+  key: string,
+  fields: (key: string, run: Awaited<ReturnType<typeof getJobRun>>, readAt: Date) => ReturnType<typeof calendarRefreshFields>,
+  staleAfterMs = SWEEP_STEP_STALE_AFTER_MS,
+) {
+  const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, staleAfterMs));
   if (!read.ok) return { key, ...tried(read, "The last run could not be read. It is not shown as healthy.") };
   return fields(key, read.value, read.readAt);
 }
 
+/** Same rule as `healthRecordsEnabled()` in modules/health-records/flag.ts, copied because tests/health-records-privacy-guards.test.ts forbids importing that module here.
+ * The health records switch, read from the environment like the module does (exactly "true" is on; a failed read is off). */
+function healthRecordsSwitchedOn() {
+  try {
+    return getServerEnv().HEALTH_RECORDS_ENABLED === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Alert delivery (#1377): recorded only when an alert is sent, so it is never judged stale. */
+async function alertDeliveryRow(ctx: ReportContext, key: string) {
+  let configured: boolean;
+  try {
+    configured = isAlertDeliveryConfigured();
+  } catch {
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+  }
+  if (!configured) return alertDeliveryFields(key, { configured: false, run: null }, ctx.now);
+  const read = await ctx.once(`job:${ALERT_WEBHOOK_DELIVERY_JOB}`, () => getJobRun(ALERT_WEBHOOK_DELIVERY_JOB, ctx.now));
+  return alertDeliveryFields(key, { configured: true, run: read.ok ? read.value : null }, ctx.now);
+}
+
 /** The stored result of an on-demand connection test. Never run on page load: the Test connections button runs it. */
-async function reachabilityRow(ctx: ReportContext, kind: "email" | "square", key: string, job: string, isConfigured: () => boolean) {
+async function reachabilityRow(ctx: ReportContext, kind: ReachabilityKind, key: string, job: string, isConfigured: () => boolean) {
   let configured: boolean;
   try {
     configured = isConfigured();
   } catch {
-    return { key, checkedAt: iso(new Date()), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
   }
   if (!configured) return reachabilityFields(kind, key, { configured: false, run: null }, ctx.now);
   const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now));
@@ -364,12 +440,36 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("backup-restore-test", "Restore test", "A backup was restored as a test recently.", "/admin/readiness", "Open readiness"),
     m("calendar-feed-refresh", "Calendar feed refresh", "The imported calendar feeds that came due were refreshed by the last sweep.", "/admin/calendar", "Open calendar"),
     m("message-file-cleanup", "Message file cleanup", "The last sweep's cleanup of message attachments nothing refers to.", "/admin/email", "Open email settings"),
+    m("alert-scan", "Alert scan", "The last sweep's scan for problems that need an alert.", null, serverFix),
+    m("alert-delivery", "Alert delivery", "The latest alert reached the alert webhook.", null, serverFix),
+    m("deadline-reminders", "Deadline reminder preparation", "The last sweep prepared the deadline reminder batches that came due.", "/admin/calendar", "Open calendar"),
+    m("location-waitlist-digest", "Location waitlist digest", "The daily digest of location waitlist changes.", "/admin/email", "Open email settings"),
+    m("class-waitlists", "Honors class waitlists", "The last sweep passed expired class offers to the next youth in line.", null, serverFix),
+    m("instructor-class-emails", "Instructor class emails", "The emails telling instructors who joined or left their classes.", "/admin/email", "Open email settings"),
+    m("honor-watch-summaries", "Honor watch summaries", "The daily watch summaries of who joined or left classes.", "/admin/email", "Open email settings"),
+    m("health-snapshots", "Sealed health copies", "The sweep that seals event-start health copies and deletes expired ones.", null, serverFix),
+    m("retention-cleanups", "Retention clean-ups", "The clean-ups of old community posts, alert feed items and analytics.", null, serverFix),
+    m("server-autodeploy", "Auto-deploy", "The server's deploy timer checked for a new version in the last 30 minutes and the latest run did not fail.", null, serverFix),
+    m("server-docker-cleanup", "Docker cleanup", "The server's daily Docker cleanup ran in the last 30 hours.", null, serverFix),
+    m("server-runtime-guard", "Runtime guard", "The server's check that the app container keeps its settings ran in the last 15 minutes.", null, serverFix),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
     await readinessRow(ctx, "backup-offsite", "backup-last"),
     await readinessRow(ctx, "restore-rehearsal", "backup-restore-test"),
     await jobRow(ctx, CALENDAR_FEED_REFRESH_JOB, "calendar-feed-refresh", calendarRefreshFields),
     await jobRow(ctx, MESSAGE_FILE_CLEANUP_JOB, "message-file-cleanup", messageFileCleanupFields),
+    await jobRow(ctx, ALERT_SCAN_JOB, "alert-scan", alertScanFields),
+    await alertDeliveryRow(ctx, "alert-delivery"),
+    await jobRow(ctx, DEADLINE_REMINDER_PREPARATION_JOB, "deadline-reminders", deadlineReminderFields),
+    await jobRow(ctx, LOCATION_WAITLIST_DIGEST_JOB, "location-waitlist-digest", locationWaitlistDigestFields),
+    await jobRow(ctx, CLASS_WAITLIST_SWEEP_JOB, "class-waitlists", classWaitlistFields),
+    await jobRow(ctx, INSTRUCTOR_CLASS_EMAILS_JOB, "instructor-class-emails", instructorClassEmailFields),
+    await jobRow(ctx, HONOR_WATCH_SUMMARIES_JOB, "honor-watch-summaries", honorWatchSummaryFields),
+    await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, healthRecordsSwitchedOn())),
+    await jobRow(ctx, RETENTION_CLEANUP_JOB, "retention-cleanups", retentionCleanupFields),
+    await jobRow(ctx, SERVER_AUTODEPLOY_JOB, "server-autodeploy", autodeployFields, SERVER_AUTODEPLOY_STALE_AFTER_MS),
+    await jobRow(ctx, SERVER_DOCKER_CLEANUP_JOB, "server-docker-cleanup", dockerCleanupFields, SERVER_DOCKER_CLEANUP_STALE_AFTER_MS),
+    await jobRow(ctx, SERVER_RUNTIME_GUARD_JOB, "server-runtime-guard", runtimeGuardFields, SERVER_RUNTIME_GUARD_STALE_AFTER_MS),
   ]),
 
   defineProvider("email", [
@@ -390,6 +490,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("payment-setup", "Payment setup", "Square and its payment notices are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("square-environment", "Square environment", "Whether Square is in test or live mode.", "/admin/settings", "Platform settings"),
     m("square-reachable", "Square reachable", "A read-only test that Square answers and accepts our token. It charges nothing.", null, "Press Test connections"),
+    m("apple-pay-file-reachable", "Apple Pay domain file", "A read-only test that Square's Apple Pay domain file can be fetched. It sends and changes nothing.", null, "Press Test connections"),
   ], async (ctx) => {
     const attempts = await rollupIssues(ctx, {
       key: "payment-attempts",
@@ -405,6 +506,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       setup,
       await readinessRow(ctx, "square-environment", "square-environment"),
       await reachabilityRow(ctx, "square", "square-reachable", SQUARE_REACHABILITY_JOB, () => getSquareConfiguration().paymentConfigured),
+      await reachabilityRow(ctx, "apple-pay-file", "apple-pay-file-reachable", APPLE_PAY_FILE_REACHABILITY_JOB, () => getSquareConfiguration().paymentConfigured),
     ];
   }),
 
@@ -494,21 +596,27 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings"),
     m("admin-protection", "Administrator sign-in protection", "System administrators use two-step sign-in or a passkey.", "/admin/readiness", "Open readiness"),
     m("connected-services", "Connected services", "Payments, email, Google sign-in, alerts and the email sweep are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
+    m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections"),
+    m("breach-service-reachable", "Password breach service", "A read-only test that the password breach service answers one fixed, made-up lookup. No password is used.", null, "Press Test connections"),
   ], async (ctx) => {
     const env = await environment(ctx);
     return [
       await readinessRow(ctx, "encryption-key", "encryption-key"),
       await readinessRow(ctx, "admins-mfa", "admin-protection"),
       !env.ok ? { key: "connected-services", ...tried(env) } : connectedServices(env.value, env.readAt),
+      await reachabilityRow(ctx, "google-keys", "google-keys-reachable", GOOGLE_KEYS_REACHABILITY_JOB, isGoogleSignInConfigured),
+      await reachabilityRow(ctx, "breach-service", "breach-service-reachable", BREACH_SERVICE_REACHABILITY_JOB, isBreachCheckEnabled),
     ];
   }),
 
   defineProvider("public-site", [
     m("broken-links", "Broken links and images", "Pages not found and images that failed to load, last 30 days.", "/admin/analytics", "Open analytics"),
     m("page-speed", "Page speed", "How public pages loaded for visitors, last 30 days.", "/admin/analytics", "Open analytics"),
+    m("calendar-feed-reachable", "Calendar feed", "A read-only test that our own public calendar feed builds. No network is used and nothing is changed.", null, "Press Test connections"),
   ], async (ctx) => {
     const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday()));
-    if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }];
+    const calendarFeed = await reachabilityRow(ctx, "calendar-feed", "calendar-feed-reachable", CALENDAR_FEED_REACHABILITY_JOB, () => true);
+    if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }, calendarFeed];
     const { totals, vitals } = read.value;
     const checkedAt = iso(read.readAt);
     const rating = (key: "good" | "needsImprovement" | "poor") => vitals.reduce((sum, vital) => sum + vital[key], 0);
@@ -516,6 +624,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     return [
       { key: "broken-links", state: "info", checkedAt, whenLabel: "Checked", resultText: `${totals.NOT_FOUND} pages not found, ${totals.IMAGE_ERROR} image errors.` },
       { key: "page-speed", state: "info", checkedAt, whenLabel: "Checked", resultText: `${rating("good")} good, ${rating("needsImprovement")} needs improvement, ${rating("poor")} poor ratings.` },
+      calendarFeed,
     ];
   }),
 
@@ -605,6 +714,11 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
     return [pricing, holds, noForm, received, await jobRow(ctx, GENERAL_LINK_EXPIRY_JOB, "general-link-expiry", generalLinkExpiryFields)];
   }),
+  ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
+  ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),
+  ...buildNoticeProviders(defineProvider),
+  ...buildEventOpsProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, couldNotReadNote, eventHref }),
+  ...buildSelfTestProviders({ defineProvider, m, tried }),
 ];
 
 /* ---------- Environment status rows ---------- */

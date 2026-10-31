@@ -272,6 +272,24 @@ describe("operational health aggregation", () => {
     ]);
   });
 
+  it("rolls a FAILED import run with no errors or warnings up as urgent (#1379)", () => {
+    const report = buildOperationalHealth(source({
+      importRuns: [{
+        id: "import-failed",
+        fileName: "failed.csv",
+        status: "FAILED",
+        warnings: 0,
+        errors: 0,
+        startedAt: new Date("2026-09-01T16:00:00.000Z"),
+        records: [],
+      }],
+    }), fullAccess, now);
+
+    expect(report.imports).toEqual([
+      expect.objectContaining({ id: "import-failed", status: "FAILED", errors: 0, warnings: 0, severity: "URGENT" }),
+    ]);
+  });
+
   it("flags event and explicit choice limits while ignoring unlimited and ranked interest", () => {
     const definition = {
       title: "Capacity form",

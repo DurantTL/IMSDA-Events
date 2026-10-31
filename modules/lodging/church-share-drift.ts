@@ -19,11 +19,11 @@ export type ChurchShareDriftRow = {
 /**
  * Before #813 a lodging edit never moved a church's bill, and #806 told staff to ask the finance office instead. The first
  * time a registration edited under that interim rule is touched after #813, the recompute moves the church's share. This
- * report shows, for every church-sponsored registration-level redemption, what is stored against what the recompute would
+ * report shows, for every church-sponsored registration-level redemption (or one event's, with `eventId`), what is stored against what the recompute would
  * give, so finance can see what will move before the deploy. It runs in a READ ONLY transaction (the database itself refuses a
  * write), and returns ids and amounts only: no names, confirmation codes or contact details.
  */
-export async function reportChurchShareDrift(client: PrismaClient, options: { batchSize?: number } = {}): Promise<{ scanned: number; rows: ChurchShareDriftRow[] }> {
+export async function reportChurchShareDrift(client: PrismaClient, options: { batchSize?: number; eventId?: string } = {}): Promise<{ scanned: number; rows: ChurchShareDriftRow[] }> {
   const batchSize = Math.max(1, options.batchSize ?? 100);
   const rows: ChurchShareDriftRow[] = [];
   let scanned = 0;
@@ -37,6 +37,7 @@ export async function reportChurchShareDrift(client: PrismaClient, options: { ba
         where: {
           promoCode: { sponsoringOrganizationId: { not: null } },
           registration: { status: { in: [...CHURCH_SPONSORED_BILLED_STATUSES] } },
+          ...(options.eventId ? { eventId: options.eventId } : {}),
           ...(lastId ? { id: { gt: lastId } } : {}),
         },
         orderBy: { id: "asc" },

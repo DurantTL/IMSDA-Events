@@ -831,6 +831,47 @@ describe("account email queue", () => {
     );
   });
 
+  it("keeps the System report test email out of every sweep, claim and stale recovery (#1383)", async () => {
+    configureAccountEmail("no-reply@imsda.org");
+    const sweep = accountStore();
+    await processAccountEmailQueue({ dependencies: { ...dependencies, prisma: sweep.prisma as never, sendEmail: vi.fn(), prepareBodyText: vi.fn() } });
+    const claims = claimQueries(sweep);
+    expect(claims.length).toBeGreaterThan(0);
+    for (const call of claims) expect(call.where).toMatchObject({ templateKey: { not: "SYSTEM_TEST_EMAIL" } });
+
+    const named = accountStore();
+    await processAccountEmailQueue({ messageIds: ["message-1"], dependencies: { ...dependencies, prisma: named.prisma as never, sendEmail: vi.fn(), prepareBodyText: vi.fn() } });
+    for (const call of claimQueries(named)) {
+      expect(call.where).toMatchObject({ id: { in: ["message-1"] } });
+      expect(call.where).not.toHaveProperty("templateKey");
+    }
+  });
+
+  it("closes abandoned System report test emails in the sweep without sending them, and only then (#1383)", async () => {
+    configureAccountEmail("no-reply@imsda.org");
+    const store = accountStore();
+    const sendEmail = vi.fn(async () => ({ provider: "RESEND" as const, providerMessageId: "email-provider-real" }));
+    const prepareBodyText = vi.fn(async () => ({ bodyText: "Choose a new one." }));
+    const swept = await processAccountEmailQueue({ dependencies: { ...dependencies, prisma: store.prisma as never, sendEmail, prepareBodyText } });
+    const now = dependencies.now().getTime();
+    const closes = store.prisma.messageOutbox.updateMany.mock.calls
+      .map((call) => call[0] as { where: Record<string, unknown>; data: Record<string, unknown> })
+      .filter((call) => call.where.templateKey === "SYSTEM_TEST_EMAIL");
+    expect(closes).toHaveLength(2);
+    const pending = closes.find((call) => call.where.status === "PENDING")!;
+    const processing = closes.find((call) => call.where.status === "PROCESSING")!;
+    expect(pending.where).toMatchObject({ eventId: null, createdAt: { lte: new Date(now - 5 * 60 * 1000) } });
+    expect(processing.where).toMatchObject({ eventId: null, lockedAt: { lte: new Date(now - EMAIL_DELIVERY_LOCK_TIMEOUT_MS) } });
+    for (const call of closes) expect(call.data).toMatchObject({ status: "CANCELLED", lastError: "SYSTEM_TEST_ABANDONED", lockedAt: null, lockToken: null });
+    // The close is a status update only. Real mail in the same sweep is sent exactly as before, and only it.
+    expect(swept.sentIds).toEqual(["message-1"]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+
+    const named = accountStore();
+    await processAccountEmailQueue({ messageIds: ["message-1"], dependencies: { ...dependencies, prisma: named.prisma as never, sendEmail: vi.fn(), prepareBodyText: vi.fn() } });
+    expect(named.prisma.messageOutbox.updateMany.mock.calls.some((call) => (call[0] as { where: Record<string, unknown> }).where.templateKey === "SYSTEM_TEST_EMAIL")).toBe(false);
+  });
+
   it("refuses to run, rather than send from nowhere, with no sender configured", async () => {
     configureAccountEmail(undefined);
     const store = accountStore();

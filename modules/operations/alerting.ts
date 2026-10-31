@@ -4,6 +4,8 @@ import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import { logError, logInfo, logWarn } from "@/lib/logger";
 import { currentCorrelationId } from "@/lib/request-context";
+import { recordJobRun } from "@/modules/operations/sweep-heartbeat-repository";
+import { ALERT_WEBHOOK_DELIVERY_JOB } from "@/modules/operations/sweep-heartbeat";
 
 /**
  * Something that watches the signals.
@@ -42,6 +44,9 @@ export type AlertDispatchResult = {
 
 const WEBHOOK_TIMEOUT_MS = 5000;
 
+/** What one webhook attempt came to: a fixed word and, when the server answered, its HTTP status number. Never the address. */
+type WebhookDelivery = { delivered: boolean; attempted: boolean; status?: number | null };
+
 export function isAlertDeliveryConfigured() {
   return Boolean(getServerEnv().ALERT_WEBHOOK_URL);
 }
@@ -59,7 +64,7 @@ export function isAlertDue(
 async function postToWebhook(
   alert: Alert,
   options: { fetchImpl?: typeof fetch } = {},
-) {
+): Promise<WebhookDelivery> {
   const url = getServerEnv().ALERT_WEBHOOK_URL;
   if (!url) return { delivered: false, attempted: false };
 
@@ -86,15 +91,32 @@ async function postToWebhook(
         alertKey: alert.key,
         status: response.status,
       });
-      return { delivered: false, attempted: true };
+      return { delivered: false, attempted: true, status: response.status };
     }
-    return { delivered: true, attempted: true };
+    return { delivered: true, attempted: true, status: response.status };
   } catch (error) {
     logWarn("The alert webhook could not be reached.", {
       alertKey: alert.key,
       error: error instanceof Error ? error.name : typeof error,
     });
-    return { delivered: false, attempted: true };
+    return { delivered: false, attempted: true, status: null };
+  }
+}
+
+/**
+ * The System report (#1377) shows whether alerts reach their webhook. Counts and fixed words only: never the address,
+ * the alert's key, summary or detail. Recording must never change what dispatching does, so a failure is logged and dropped.
+ */
+async function recordWebhookDelivery(delivery: WebhookDelivery) {
+  try {
+    const status = typeof delivery.status === "number" ? delivery.status : null;
+    await recordJobRun(
+      ALERT_WEBHOOK_DELIVERY_JOB,
+      delivery.delivered ? "SUCCEEDED" : "FAILED",
+      { outcome: delivery.delivered ? "delivered" : status === null ? "unreachable" : "refused", status },
+    );
+  } catch (error) {
+    logError("Could not record the alert webhook delivery", error);
   }
 }
 
@@ -149,6 +171,7 @@ export async function dispatchAlerts(
 
     record(alert);
     const delivery = await postToWebhook(alert, { fetchImpl: options.fetchImpl });
+    if (delivery.attempted) await recordWebhookDelivery(delivery);
     if (delivery.attempted && !delivery.delivered) {
       result.undelivered.push(alert);
       continue;

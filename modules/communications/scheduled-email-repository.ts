@@ -24,7 +24,7 @@ import {
   ensureEventMessagingDefaults,
 } from "@/modules/communications/messaging-repository";
 import {
-  SCHEDULED_EMAIL_STALE_CLAIM_MS,
+  scheduledEmailAbandonedClaimWhere,
   SCHEDULED_EMAIL_MAX_LATE_MS,
   SCHEDULED_EMAIL_STATUS_LABELS,
   SCHEDULED_EMAIL_TEMPLATE_LABELS,
@@ -1190,7 +1190,7 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
       sendAt: { lte: now },
       OR: [
         { claimToken: null },
-        { claimedAt: { lt: new Date(now.getTime() - SCHEDULED_EMAIL_STALE_CLAIM_MS) }, recipients: { some: { status: "PLANNED" } } },
+        scheduledEmailAbandonedClaimWhere(now),
       ],
     },
     data: { claimToken, claimedAt: now },
@@ -1406,7 +1406,7 @@ export async function dispatchDueScheduledEmails(options: { now?: Date; limit?: 
       // and is only waiting for delivery has nothing to run.
       OR: [
         { claimToken: null },
-        { claimedAt: { lt: new Date(now.getTime() - SCHEDULED_EMAIL_STALE_CLAIM_MS) }, recipients: { some: { status: "PLANNED" } } },
+        scheduledEmailAbandonedClaimWhere(now),
       ],
     },
     orderBy: [{ sendAt: "asc" }, { id: "asc" }],

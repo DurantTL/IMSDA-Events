@@ -18,6 +18,21 @@ export const MESSAGE_FILE_CLEANUP_JOB = "message-file-cleanup";
 export const GENERAL_LINK_EXPIRY_JOB = "general-link-expiry";
 export const EMAIL_REACHABILITY_JOB = "email-reachability";
 export const SQUARE_REACHABILITY_JOB = "square-reachability";
+export const PAY_ON_SQUARE_LINK_SWEEP_JOB = "pay-on-square-link-sweep";
+/** The rest of the sweep's steps (#1377). The alert webhook job is recorded when a delivery is attempted, not on every sweep. */
+export const ALERT_SCAN_JOB = "alert-scan";
+export const ALERT_WEBHOOK_DELIVERY_JOB = "alert-webhook-delivery";
+export const DEADLINE_REMINDER_PREPARATION_JOB = "deadline-reminder-preparation";
+export const LOCATION_WAITLIST_DIGEST_JOB = "location-waitlist-digest";
+export const CLASS_WAITLIST_SWEEP_JOB = "class-waitlist-sweep";
+export const INSTRUCTOR_CLASS_EMAILS_JOB = "instructor-class-emails";
+export const HONOR_WATCH_SUMMARIES_JOB = "honor-watch-summaries";
+export const HEALTH_SNAPSHOT_SWEEP_JOB = "health-snapshot-sweep";
+export const RETENTION_CLEANUP_JOB = "retention-cleanup";
+export const GOOGLE_KEYS_REACHABILITY_JOB = "google-keys-reachability";
+export const BREACH_SERVICE_REACHABILITY_JOB = "breach-service-reachability";
+export const APPLE_PAY_FILE_REACHABILITY_JOB = "apple-pay-file-reachability";
+export const CALENDAR_FEED_REACHABILITY_JOB = "calendar-feed-reachability";
 
 /**
  * Calendar refresh and message file cleanup run on every five-minute sweep, so twelve missed runs (an hour without a
@@ -78,3 +93,13 @@ export function assessSweepHeartbeat(
     ageMs,
   };
 }
+
+/** Host jobs (#1382) that report one heartbeat per run through `/api/internal/system-jobs/heartbeat`. */
+export const SERVER_AUTODEPLOY_JOB = "server-autodeploy";
+export const SERVER_DOCKER_CLEANUP_JOB = "server-docker-cleanup";
+export const SERVER_RUNTIME_GUARD_JOB = "server-runtime-guard";
+
+/** Stale thresholds: the auto-deploy timer runs every 2 minutes, cleanup daily, the runtime guard every 30 seconds. */
+export const SERVER_AUTODEPLOY_STALE_AFTER_MS = 30 * 60 * 1000;
+export const SERVER_DOCKER_CLEANUP_STALE_AFTER_MS = 30 * 60 * 60 * 1000;
+export const SERVER_RUNTIME_GUARD_STALE_AFTER_MS = 15 * 60 * 1000;

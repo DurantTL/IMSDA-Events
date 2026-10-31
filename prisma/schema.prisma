@@ -663,6 +663,8 @@ enum MessageTemplateKey {
   HONOR_INSTRUCTOR_CLASS_CHANGE
   /// The daily summary of youth who joined or left classes an event's honor watch looks at (#1099): one email per watch address, names, clubs and ages only. Not an event template.
   HONOR_WATCH_SUMMARY
+  /// The one plain test email a system administrator sends from the System report (#1383), to one typed address. No event, no attendee data, no links. Not an event template.
+  SYSTEM_TEST_EMAIL
 }
 
 enum MessageTemplateStatus {
@@ -4275,6 +4277,7 @@ model SquareWebhookEvent {
   @@index([eventType, objectId, occurredAt])
   @@index([paymentAttemptId, occurredAt])
   @@index([eventId, occurredAt])
+  @@index([receivedAt])
 }
 
 model CheckIn {
@@ -5323,6 +5326,7 @@ model MessageProviderEvent {
   @@unique([provider, providerEventId])
   @@index([provider, providerMessageId, occurredAt])
   @@index([messageOutboxId, occurredAt])
+  @@index([provider, receivedAt])
 }
 
 /// Why an address is not being sent to (#863).

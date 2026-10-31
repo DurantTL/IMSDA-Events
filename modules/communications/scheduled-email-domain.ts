@@ -57,6 +57,17 @@ export const SCHEDULED_EMAIL_MIN_LEAD_MS = 5 * 60 * 1000;
 /** A claim older than this belongs to a worker that stopped; another worker may take it over (sends are idempotent). */
 export const SCHEDULED_EMAIL_STALE_CLAIM_MS = 10 * 60 * 1000;
 
+/**
+ * A claim whose worker stopped with recipients still to queue (#1378). A batch that has queued everyone and is only
+ * waiting on delivery is working normally, so it never matches.
+ */
+export function scheduledEmailAbandonedClaimWhere(now: Date) {
+  return {
+    claimedAt: { lt: new Date(now.getTime() - SCHEDULED_EMAIL_STALE_CLAIM_MS) },
+    recipients: { some: { status: "PLANNED" as const } },
+  };
+}
+
 const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a calendar date in YYYY-MM-DD form.").refine((value) => {
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;

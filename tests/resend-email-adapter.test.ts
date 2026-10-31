@@ -19,6 +19,15 @@ const input = {
 };
 
 describe("Resend email adapter", () => {
+  it("time-boxes the request and reports a timeout as a retryable network error", async () => {
+    const request = vi.fn<typeof fetch>(async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    await expect(sendEmailWithResend(input, { apiKey: "re_test_only", apiUrl: "https://api.resend.test" }, request))
+      .rejects.toMatchObject({ code: "NETWORK_ERROR", retryable: true });
+    expect(request.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("sends the immutable message snapshot with provider idempotency", async () => {
     const request = vi.fn<typeof fetch>(async () => new Response(
       JSON.stringify({ id: "email_provider_123" }),

@@ -44,6 +44,8 @@ export function getResendEmailConfiguration(): ResendEmailConfiguration {
   };
 }
 
+const RESEND_REQUEST_TIMEOUT_MS = 10_000;
+
 export async function sendEmailWithResend(
   input: EmailDeliveryInput,
   configuration = getResendEmailConfiguration(),
@@ -91,6 +93,8 @@ export async function sendEmailWithResend(
         tags: [{ name: "message_id", value: input.messageId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 256) }],
       }),
       cache: "no-store",
+      // A provider that does not answer ends as a retryable NETWORK_ERROR instead of holding the send open.
+      signal: AbortSignal.timeout(RESEND_REQUEST_TIMEOUT_MS),
     });
   } catch {
     throw new EmailProviderRequestError(

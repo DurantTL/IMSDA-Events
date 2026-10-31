@@ -1,5 +1,4 @@
-const squareAssociationFile =
-  "https://app.squareup.com/digital-wallets/apple-pay/apple-developer-merchantid-domain-association";
+import { SQUARE_APPLE_PAY_ASSOCIATION_URL as squareAssociationFile } from "@/modules/payments/apple-pay-association";
 
 /**
  * Apple verifies the public payment-page domain through this extensionless
