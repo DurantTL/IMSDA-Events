@@ -71,6 +71,7 @@ export default async function ClubRecordsPage({
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
   // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
+  // Any month with a report, a draft included, stays listed whatever the join day (the staff overview does the same).
   const joinedOn = reportYear.joinedOn;
   const switcherMonths = reportableMonths(clubYear, now, { joinedOn, keep: new Set(reportsByMonth.keys()) });
   const submittedReports = reportYear.reports.filter((entry) => entry.status === "SUBMITTED");

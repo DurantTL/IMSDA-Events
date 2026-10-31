@@ -1,10 +1,11 @@
-import { clubYearMonths, isLockedForClub, reportMonthLabel, yearToDate } from "@/modules/club-reports/domain";
+import { clubYearMonths, isLockedForClub, monthNotDueForClub, reportMonthLabel, yearToDate } from "@/modules/club-reports/domain";
 import { toCsv } from "@/modules/reporting/csv";
 
 type ClubYearRow = {
   name: string;
   church: string;
   registrationOnTime: boolean;
+  joinedOn?: string | null;
   reports: Record<string, { totalPoints: number; onTime: boolean }>;
 };
 
@@ -18,7 +19,7 @@ export function clubYearReportCsv(clubYear: string, clubs: readonly ClubYearRow[
     const cells = months.map((month) => {
       const report = club.reports[month];
       if (report) return report.totalPoints;
-      return isLockedForClub(month, now) ? "missing" : "";
+      return isLockedForClub(month, now) && !monthNotDueForClub(month, club.joinedOn, false) ? "missing" : "";
     });
     rows.push([
       club.name,

@@ -5,6 +5,8 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   clubReportClosedMessage,
+  clubJoinSelect,
+  clubJoinedOn,
   clubYearMonths,
   isLockedForClub,
   onTimePoints,
@@ -118,11 +120,8 @@ export async function getClubReport(organizationId: string, reportMonth: string)
  * `createdAt` is an import date, not a join date.
  */
 export async function getClubJoinedOn(organizationId: string): Promise<string | null> {
-  const club = await getPrisma().organization.findUnique({
-    where: { id: organizationId },
-    select: { createdAt: true, newClubApplicationCreated: { select: { id: true } } },
-  });
-  return club?.newClubApplicationCreated ? calendarDateIn(club.createdAt) : null;
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: clubJoinSelect });
+  return club ? clubJoinedOn(club) : null;
 }
 
 /** A club's year: every month, its report if any, the year-to-date standing, and the day it joined (new-club applications only). */
@@ -302,7 +301,7 @@ export async function listClubReportsForYear(clubYear: string) {
     prisma.organization.findMany({
       where: { type: "CLUB", isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, parentOrganization: { select: { name: true } } },
+      select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
     }),
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, status: "SUBMITTED" },
@@ -316,6 +315,8 @@ export async function listClubReportsForYear(clubYear: string) {
     name: club.name,
     church: club.parentOrganization?.name ?? "",
     registrationOnTime: onTimeByClub.get(club.id) ?? false,
+    /** The day it joined, for a club made through a new-club application; null otherwise. */
+    joinedOn: clubJoinedOn(club),
     reports: Object.fromEntries(reports
       .filter((report) => report.organizationId === club.id)
       .map((report) => [report.reportMonth, { totalPoints: report.totalPoints, onTime: report.onTimePoints > 0, reviewed: Boolean(report.reviewedAt) }])) as Record<string, { totalPoints: number; onTime: boolean; reviewed: boolean }>,

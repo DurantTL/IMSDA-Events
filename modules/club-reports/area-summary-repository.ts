@@ -8,6 +8,7 @@ import {
   type AreaClubSummary,
   type AreaEventClubRow,
 } from "@/modules/club-reports/area-summary-domain";
+import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -26,7 +27,7 @@ export async function getAreaClubsSummary(
   const clubs = await prisma.organization.findMany({
     where: { type: "CLUB", isActive: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, parentOrganization: { select: { name: true } } },
+    select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
   });
   const clubIds = clubs.map((club) => club.id);
   const [reports, standings, rosterGroups, adultGroups, grants] = await Promise.all([
@@ -74,6 +75,7 @@ export async function getAreaClubsSummary(
       rosterSize: roster.get(club.id) ?? 0,
       adultCount: adults.get(club.id) ?? 0,
       registrationOnTime: onTime.get(club.id) ?? false,
+      joinedOn: clubJoinedOn(club),
       backgroundChecks: checks.get(club.id) ?? { missing: 0, notInCompliance: 0, expiringSoon: 0 },
       reports: reports.filter((report) => report.organizationId === club.id),
     }, clubYear, now));

@@ -52,6 +52,8 @@ export function clubsNeedingAttention(input: {
   now: Date;
   reports: readonly ClubReportRow[];
   checks: ReadonlyMap<string, ClubChecks>;
+  /** Join days of clubs made through a new-club application (#1410); other clubs keep every month. */
+  joinedOn?: ReadonlyMap<string, string | null>;
 }) {
   const months = clubYearMonths(input.clubYear);
   let overdueReports = 0;
@@ -59,7 +61,7 @@ export function clubsNeedingAttention(input: {
   let either = 0;
   for (const id of input.clubIds) {
     const byMonth = new Map(input.reports.filter((report) => report.organizationId === id).map((report) => [report.reportMonth, report]));
-    const overdue = months.some((month) => monthCell(month, byMonth.get(month), input.now).status === "MISSING");
+    const overdue = months.some((month) => monthCell(month, byMonth.get(month), input.now, input.joinedOn?.get(id) ?? null).status === "MISSING");
     const checks = input.checks.get(id);
     const reminder = Boolean(checks && checks.missing + checks.notInCompliance + checks.expiringSoon > 0);
     if (overdue) overdueReports += 1;

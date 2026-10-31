@@ -95,15 +95,16 @@ export async function ClubOverview({
   const registered = events.filter((event) => event.registration);
   const open = events.filter((event) => !event.registration && event.available && event.phase === "OPEN");
   // A club's own draft isn't shown here as filed (#426); staff open the report itself to see or edit one.
+  // Any month with a report, a draft included, stays listed whatever the join day: the Records page does the same (#1410).
   const submittedReports = reportYear.reports.filter((report) => report.status === "SUBMITTED");
   const reportsByMonth = new Map(submittedReports.map((report) => [report.reportMonth, report]));
-  const dueMonths = reportableMonths(clubYear, now, { joinedOn: reportYear.joinedOn, keep: new Set(submittedReports.map((report) => report.reportMonth)) });
+  const dueMonths = reportableMonths(clubYear, now, { joinedOn: reportYear.joinedOn, keep: new Set(reportYear.reports.map((report) => report.reportMonth)) });
   const months = [...dueMonths].reverse();
   const roster = rosterYearSummary(members);
   const complianceTile = compliance
     ? { missing: compliance.missing, notInCompliance: compliance.notInCompliance, expiringSoon: compliance.expiringSoon }
     : reminderCounts;
-  const reportProgress = monthlyReportProgress(clubYear, now, new Set(submittedReports.map((report) => report.reportMonth)), reportYear.joinedOn);
+  const reportProgress = monthlyReportProgress(clubYear, now, new Set(submittedReports.map((report) => report.reportMonth)), reportYear.joinedOn, new Set(reportYear.reports.map((report) => report.reportMonth)));
 
   return (
     <>
