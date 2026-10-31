@@ -210,6 +210,18 @@ describe("the sweep records its steps for the System report (#1357)", () => {
     expect(JSON.stringify(mocks.recordJobRun.mock.calls)).not.toContain("x.pdf");
   });
 
+  it("records the pending-team expiry with counts only (#1375), as FAILED when it throws, and never fails the sweep", async () => {
+    mocks.expireStalePendingTeams.mockResolvedValueOnce({ expired: 3, events: 1 });
+    await POST(request());
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("general-link-expiry", "SUCCEEDED", { expired: 3, events: 1 });
+
+    mocks.recordJobRun.mockClear();
+    mocks.expireStalePendingTeams.mockRejectedValueOnce(new Error("synthetic"));
+    const failed = await POST(request());
+    expect(failed.status).toBe(200);
+    expect(mocks.recordJobRun).toHaveBeenCalledWith("general-link-expiry", "FAILED", undefined);
+  });
+
   it("records a step that failed as FAILED", async () => {
     mocks.refreshDueCalendarFeeds.mockRejectedValueOnce(new Error("synthetic"));
     mocks.sweepMessageFiles.mockRejectedValueOnce(new Error("synthetic"));

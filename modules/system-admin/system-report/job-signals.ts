@@ -61,6 +61,18 @@ export function messageFileCleanupFields(key: string, run: JobRun, readAt: Date)
   return { key, state: failed > 0 ? "watch" : "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: text };
 }
 
+/** Step 14 of the sweep: waiting general-link teams past retention. Counts only; a quiet run (0 expired) is normal. */
+export function generalLinkExpiryFields(key: string, run: JobRun, readAt: Date): Fields {
+  const problem = runProblem(key, run, readAt, "the pending-team expiry");
+  if (problem) return problem;
+  const expired = num(run.summary, "expired");
+  const events = num(run.summary, "events");
+  if (expired === null || events === null) {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "It ran, but its counts were not recorded." };
+  }
+  return { key, state: "ok", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: `${expired} waiting ${expired === 1 ? "team" : "teams"} expired across ${events} ${events === 1 ? "event" : "events"}.` };
+}
+
 /** Under 10% free is attention, under 20% is watch. Only a percentage and a size are ever shown, never the path. */
 export const DISK_ATTENTION_PERCENT = 10;
 export const DISK_WATCH_PERCENT = 20;

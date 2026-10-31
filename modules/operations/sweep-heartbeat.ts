@@ -15,6 +15,7 @@ export const OUTBOX_SWEEP_JOB = "outbox-sweep";
 /** Other unattended steps and on-demand tests that record a run on the same row (#1357). */
 export const CALENDAR_FEED_REFRESH_JOB = "calendar-feed-refresh";
 export const MESSAGE_FILE_CLEANUP_JOB = "message-file-cleanup";
+export const GENERAL_LINK_EXPIRY_JOB = "general-link-expiry";
 export const EMAIL_REACHABILITY_JOB = "email-reachability";
 export const SQUARE_REACHABILITY_JOB = "square-reachability";
 
