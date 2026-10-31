@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
-vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
+vi.mock("@/lib/logger", async () => ({ ...(await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger")), logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
 vi.mock("@/lib/release", () => ({ getReleaseIdentity: vi.fn(), getReleaseTimes: vi.fn() }));
 vi.mock("@/modules/operations/disk-space", () => ({ readDiskSpace: vi.fn() }));
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ getJobRun: mocks.getJobRun }));

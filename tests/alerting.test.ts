@@ -6,6 +6,7 @@ const dependencies = vi.hoisted(() => ({
   logError: vi.fn(),
   logWarn: vi.fn(),
   logInfo: vi.fn(),
+  recordJobRun: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -16,6 +17,7 @@ vi.mock("@/lib/logger", () => ({
   logWarn: dependencies.logWarn,
   logInfo: dependencies.logInfo,
 }));
+vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordJobRun: dependencies.recordJobRun }));
 vi.mock("@/lib/request-context", () => ({ currentCorrelationId: () => "corr-1" }));
 
 import {
@@ -62,6 +64,7 @@ function okFetch() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dependencies.recordJobRun.mockResolvedValue(undefined);
   dependencies.getServerEnv.mockReturnValue({
     ALERT_WEBHOOK_URL: "https://hooks.test/imsda",
     ALERT_REPEAT_MINUTES: 60,
@@ -272,5 +275,57 @@ describe("what counts as an alert", () => {
       "system.payments.failed",
       "system.payments.stuck",
     ]);
+  });
+});
+
+describe("recording alert webhook deliveries (#1377)", () => {
+  it("records a delivered alert as SUCCEEDED with the HTTP status and nothing else", async () => {
+    prismaFixture();
+    const result = await dispatchAlerts([urgent], { now, fetchImpl: okFetch() });
+    expect(result.sent).toEqual([urgent]);
+    expect(dependencies.recordJobRun).toHaveBeenCalledWith("alert-webhook-delivery", "SUCCEEDED", { outcome: "delivered", status: 200 });
+  });
+
+  it("records a refused delivery as FAILED with the status number, never the address or alert text", async () => {
+    prismaFixture();
+    const fetchImpl = vi.fn(async () => new Response("no", { status: 502 }));
+    const result = await dispatchAlerts([urgent], { now, fetchImpl });
+    expect(result.undelivered).toEqual([urgent]);
+    expect(dependencies.recordJobRun).toHaveBeenCalledWith("alert-webhook-delivery", "FAILED", { outcome: "refused", status: 502 });
+    const stored = JSON.stringify(dependencies.recordJobRun.mock.calls);
+    expect(stored).not.toContain("hooks.test");
+    expect(stored).not.toContain(urgent.key);
+    expect(stored).not.toContain(urgent.summary);
+    expect(stored).not.toContain("31 messages");
+  });
+
+  it("records an unreachable webhook as FAILED with no status", async () => {
+    prismaFixture();
+    const fetchImpl = vi.fn(async () => { throw new Error("connect refused"); });
+    await dispatchAlerts([urgent], { now, fetchImpl });
+    expect(dependencies.recordJobRun).toHaveBeenCalledWith("alert-webhook-delivery", "FAILED", { outcome: "unreachable", status: null });
+  });
+
+  it("records nothing when no webhook is set (nothing was attempted) or the alert was held back", async () => {
+    prismaFixture();
+    dependencies.getServerEnv.mockReturnValue({ ALERT_WEBHOOK_URL: undefined, ALERT_REPEAT_MINUTES: 60 });
+    await dispatchAlerts([urgent], { now });
+    prismaFixture({ lastSentAt: new Date(now.getTime() - 60_000), resolvedAt: null, id: "x" });
+    dependencies.getServerEnv.mockReturnValue({ ALERT_WEBHOOK_URL: "https://hooks.test/imsda", ALERT_REPEAT_MINUTES: 60 });
+    await dispatchAlerts([urgent], { now, fetchImpl: okFetch() });
+    expect(dependencies.recordJobRun).not.toHaveBeenCalled();
+  });
+
+  it("returns the same result and records the alert when recording fails", async () => {
+    const { upserts } = prismaFixture();
+    dependencies.recordJobRun.mockRejectedValue(new Error("synthetic database fault"));
+    const result = await dispatchAlerts([urgent], { now, fetchImpl: okFetch() });
+    expect(result).toEqual({ sent: [urgent], suppressed: [], undelivered: [] });
+    expect(upserts).toHaveLength(1);
+    expect(dependencies.logError).toHaveBeenCalledWith("Could not record the alert webhook delivery", expect.any(Error));
+
+    const failedFetch = vi.fn(async () => new Response("no", { status: 500 }));
+    const undelivered = await dispatchAlerts([urgent], { now, fetchImpl: failedFetch });
+    expect(undelivered).toEqual({ sent: [], suppressed: [], undelivered: [urgent] });
   });
 });

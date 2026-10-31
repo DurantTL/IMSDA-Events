@@ -10,10 +10,19 @@ import { getEmailAvailability } from "@/integrations/email/provider";
 import { checkDatabaseLiveness } from "@/modules/operations/database-liveness";
 import { readDiskSpace } from "@/modules/operations/disk-space";
 import {
+  ALERT_SCAN_JOB,
+  ALERT_WEBHOOK_DELIVERY_JOB,
   CALENDAR_FEED_REFRESH_JOB,
+  CLASS_WAITLIST_SWEEP_JOB,
+  DEADLINE_REMINDER_PREPARATION_JOB,
   EMAIL_REACHABILITY_JOB,
   GENERAL_LINK_EXPIRY_JOB,
+  HEALTH_SNAPSHOT_SWEEP_JOB,
+  HONOR_WATCH_SUMMARIES_JOB,
+  INSTRUCTOR_CLASS_EMAILS_JOB,
+  LOCATION_WAITLIST_DIGEST_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
+  RETENTION_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
 } from "@/modules/operations/sweep-heartbeat";
@@ -27,11 +36,28 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
-import { calendarRefreshFields, diskFields, generalLinkExpiryFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
 import { runPricingSelfTest } from "./pricing-self-test";
 import { countPublicSubmissionsSince, readOpenRegistrationEvents, readUnreleasedHoldCounts } from "./registration-reads";
 import { openWithoutFormFields, pricingSelfTestFields, registrationsReceivedFields, unreleasedHoldsFields } from "./registration-signals";
 import { buildMoneyProviders } from "./money-providers";
+import {
+  alertDeliveryFields,
+  alertScanFields,
+  calendarRefreshFields,
+  classWaitlistFields,
+  deadlineReminderFields,
+  diskFields,
+  generalLinkExpiryFields,
+  healthSnapshotFields,
+  honorWatchSummaryFields,
+  instructorClassEmailFields,
+  locationWaitlistDigestFields,
+  messageFileCleanupFields,
+  reachabilityFields,
+  retentionCleanupFields,
+} from "./job-signals";
+import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
+import { getServerEnv } from "@/lib/env";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -259,10 +285,33 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
 /* ---------- Stored job runs and connection tests ---------- */
 
 /** A step the sweep records on `SystemJobHeartbeat`: judged stale after an hour without a success. */
-async function jobRow(ctx: ReportContext, job: string, key: string, fields: typeof calendarRefreshFields) {
+async function jobRow(ctx: ReportContext, job: string, key: string, fields: (key: string, run: Awaited<ReturnType<typeof getJobRun>>, readAt: Date) => ReturnType<typeof calendarRefreshFields>) {
   const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now, SWEEP_STEP_STALE_AFTER_MS));
   if (!read.ok) return { key, ...tried(read, "The last run could not be read. It is not shown as healthy.") };
   return fields(key, read.value, read.readAt);
+}
+
+/** Same rule as `healthRecordsEnabled()` in modules/health-records/flag.ts, copied because tests/health-records-privacy-guards.test.ts forbids importing that module here.
+ * The health records switch, read from the environment like the module does (exactly "true" is on; a failed read is off). */
+function healthRecordsSwitchedOn() {
+  try {
+    return getServerEnv().HEALTH_RECORDS_ENABLED === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Alert delivery (#1377): recorded only when an alert is sent, so it is never judged stale. */
+async function alertDeliveryRow(ctx: ReportContext, key: string) {
+  let configured: boolean;
+  try {
+    configured = isAlertDeliveryConfigured();
+  } catch {
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+  }
+  if (!configured) return alertDeliveryFields(key, { configured: false, run: null }, ctx.now);
+  const read = await ctx.once(`job:${ALERT_WEBHOOK_DELIVERY_JOB}`, () => getJobRun(ALERT_WEBHOOK_DELIVERY_JOB, ctx.now));
+  return alertDeliveryFields(key, { configured: true, run: read.ok ? read.value : null }, ctx.now);
 }
 
 /** The stored result of an on-demand connection test. Never run on page load: the Test connections button runs it. */
@@ -271,7 +320,7 @@ async function reachabilityRow(ctx: ReportContext, kind: "email" | "square", key
   try {
     configured = isConfigured();
   } catch {
-    return { key, checkedAt: iso(new Date()), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
+    return { key, checkedAt: iso(ctx.now), whenLabel: "Tried", state: "unavailable" as const, resultText: "Whether this is set up could not be read." };
   }
   if (!configured) return reachabilityFields(kind, key, { configured: false, run: null }, ctx.now);
   const read = await ctx.once(`job:${job}`, () => getJobRun(job, ctx.now));
@@ -365,12 +414,30 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("backup-restore-test", "Restore test", "A backup was restored as a test recently.", "/admin/readiness", "Open readiness"),
     m("calendar-feed-refresh", "Calendar feed refresh", "The imported calendar feeds that came due were refreshed by the last sweep.", "/admin/calendar", "Open calendar"),
     m("message-file-cleanup", "Message file cleanup", "The last sweep's cleanup of message attachments nothing refers to.", "/admin/email", "Open email settings"),
+    m("alert-scan", "Alert scan", "The last sweep's scan for problems that need an alert.", null, serverFix),
+    m("alert-delivery", "Alert delivery", "The latest alert reached the alert webhook.", null, serverFix),
+    m("deadline-reminders", "Deadline reminder preparation", "The last sweep prepared the deadline reminder batches that came due.", "/admin/calendar", "Open calendar"),
+    m("location-waitlist-digest", "Location waitlist digest", "The daily digest of location waitlist changes.", "/admin/email", "Open email settings"),
+    m("class-waitlists", "Honors class waitlists", "The last sweep passed expired class offers to the next youth in line.", null, serverFix),
+    m("instructor-class-emails", "Instructor class emails", "The emails telling instructors who joined or left their classes.", "/admin/email", "Open email settings"),
+    m("honor-watch-summaries", "Honor watch summaries", "The daily watch summaries of who joined or left classes.", "/admin/email", "Open email settings"),
+    m("health-snapshots", "Sealed health copies", "The sweep that seals event-start health copies and deletes expired ones.", null, serverFix),
+    m("retention-cleanups", "Retention clean-ups", "The clean-ups of old community posts, alert feed items and analytics.", null, serverFix),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
     await readinessRow(ctx, "backup-offsite", "backup-last"),
     await readinessRow(ctx, "restore-rehearsal", "backup-restore-test"),
     await jobRow(ctx, CALENDAR_FEED_REFRESH_JOB, "calendar-feed-refresh", calendarRefreshFields),
     await jobRow(ctx, MESSAGE_FILE_CLEANUP_JOB, "message-file-cleanup", messageFileCleanupFields),
+    await jobRow(ctx, ALERT_SCAN_JOB, "alert-scan", alertScanFields),
+    await alertDeliveryRow(ctx, "alert-delivery"),
+    await jobRow(ctx, DEADLINE_REMINDER_PREPARATION_JOB, "deadline-reminders", deadlineReminderFields),
+    await jobRow(ctx, LOCATION_WAITLIST_DIGEST_JOB, "location-waitlist-digest", locationWaitlistDigestFields),
+    await jobRow(ctx, CLASS_WAITLIST_SWEEP_JOB, "class-waitlists", classWaitlistFields),
+    await jobRow(ctx, INSTRUCTOR_CLASS_EMAILS_JOB, "instructor-class-emails", instructorClassEmailFields),
+    await jobRow(ctx, HONOR_WATCH_SUMMARIES_JOB, "honor-watch-summaries", honorWatchSummaryFields),
+    await jobRow(ctx, HEALTH_SNAPSHOT_SWEEP_JOB, "health-snapshots", (key, run, readAt) => healthSnapshotFields(key, run, readAt, healthRecordsSwitchedOn())),
+    await jobRow(ctx, RETENTION_CLEANUP_JOB, "retention-cleanups", retentionCleanupFields),
   ]),
 
   defineProvider("email", [
