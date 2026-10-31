@@ -1085,6 +1085,9 @@ export function PublicRegistrationForm({
   }
 
   function goToStep(step: PublicRegistrationStep) {
+    // Leaving the review step cancels a submit queued behind a re-quote (#1404); coming back needs a new tap.
+    submitQueuedRef.current = false;
+    setSubmitQueued(false);
     setSheetOpen(false);
     setCurrentStepId(step.id);
     setIssues([]);
@@ -3332,7 +3335,8 @@ export function PublicRegistrationForm({
       const failure = requoteFailureRef.current;
       if (failure) {
         requoteFailureRef.current = null;
-        setError(failure);
+        // The promo issue already carries this sentence in the summary list; don't read it twice.
+        setError(issues.some((issue) => issue.message === failure) ? "Your total could not be updated." : failure);
         window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
         return;
       }

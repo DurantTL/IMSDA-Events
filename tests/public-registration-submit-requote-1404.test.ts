@@ -135,6 +135,7 @@ describe("public registration: submit during a promo re-quote (#1404)", () => {
     const alert = container.querySelector(".public-registration-error-summary")!;
     expect(alert.getAttribute("role")).toBe("alert");
     expect(alert.textContent).toContain("That promo code has expired.");
+    expect(alert.textContent!.split("That promo code has expired.")).toHaveLength(2); // read once, not as heading and list item
     expect(submitButtons(container)[0]!.textContent).toContain("Submit registration");
     expect(submitButtons(container)[0]!.disabled).toBe(false);
   });
