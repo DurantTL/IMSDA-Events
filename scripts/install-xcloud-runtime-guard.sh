@@ -52,7 +52,7 @@ fi
   # Reports each run to the System report (#1382) when imsda-heartbeat is installed; a no-op otherwise, and the leading
   # "-" means it can never fail the unit. $$ is systemd's escape, so the shell sees $H and $SERVICE_RESULT.
   cat <<'HEARTBEAT_LINE'
-ExecStopPost=-/bin/sh -c 'H=/usr/local/bin/imsda-heartbeat; [ -x /usr/local/sbin/imsda-heartbeat ] && H=/usr/local/sbin/imsda-heartbeat; [ -x "$$H" ] || exit 0; if [ "$$SERVICE_RESULT" = success ]; then "$$H" server-runtime-guard SUCCEEDED result=ok; else "$$H" server-runtime-guard FAILED result=failed; fi'
+ExecStopPost=-/bin/sh -c 'H=/usr/local/bin/imsda-heartbeat; [ -x "$$H" ] || exit 0; if [ "$$SERVICE_RESULT" = success ]; then "$$H" server-runtime-guard SUCCEEDED result=ok; else "$$H" server-runtime-guard FAILED result=failed; fi'
 HEARTBEAT_LINE
 } > "$IMSDA_GUARD_SERVICE_FILE"
 

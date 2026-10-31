@@ -12,7 +12,7 @@
 
 JOB="${1:-}"
 OUTCOME="${2:-}"
-[ "$#" -ge 2 ] && shift 2 || shift "$#"
+if [ "$#" -ge 2 ]; then shift 2; else shift "$#"; fi
 
 ENV_FILE="${IMSDA_HEARTBEAT_ENV_FILE:-/etc/default/imsda-heartbeat}"
 if [ -r "$ENV_FILE" ]; then
@@ -27,13 +27,21 @@ if [ -z "$TOKEN" ]; then
   echo "[heartbeat] ${JOB:-unknown} not sent (no token set)"
   exit 0
 fi
+# Only http://127.0.0.1:<digits>/... or http://localhost:<digits>/..., and never a URL with "@" (user info).
+LOOPBACK=no
 case "$URL" in
-  http://127.0.0.1:* | http://localhost:*) ;;
-  *)
-    echo "[heartbeat] ${JOB:-unknown} not sent (the address must be this machine)"
-    exit 0
+  *@*) ;;
+  http://127.0.0.1:[0-9]* | http://localhost:[0-9]*)
+    AUTHORITY="${URL#http://}"
+    AUTHORITY="${AUTHORITY%%/*}"
+    PORT="${AUTHORITY#*:}"
+    case "$PORT" in "" | *[!0-9]*) ;; *) LOOPBACK=yes ;; esac
     ;;
 esac
+if [ "$LOOPBACK" != "yes" ]; then
+  echo "[heartbeat] ${JOB:-unknown} not sent (the address must be this machine)"
+  exit 0
+fi
 
 case "$JOB" in *[!a-z-]* | "") echo "[heartbeat] job name not accepted"; exit 0 ;; esac
 case "$OUTCOME" in SUCCEEDED | FAILED) ;; *) echo "[heartbeat] $JOB outcome not accepted"; exit 0 ;; esac
@@ -45,6 +53,7 @@ for pair in "$@"; do
   case "$pair" in *=*) ;; *) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac
   case "$key" in "" | *[!a-zA-Z]*) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac
   case "$value" in
+    0[0-9]*) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;;
     "") echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;;
     *[!0-9]*)
       case "$value" in *[!a-z-]*) echo "[heartbeat] $JOB not sent (bad detail)"; exit 0 ;; esac

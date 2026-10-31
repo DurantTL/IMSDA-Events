@@ -630,15 +630,20 @@ key) to the app on this machine through `imsda-heartbeat`.
 
    ```bash
    install -m 600 /dev/null /etc/default/imsda-heartbeat
-   echo 'IMSDA_HEARTBEAT_TOKEN=<the same value>' >> /etc/default/imsda-heartbeat
+   nano /etc/default/imsda-heartbeat
    ```
+
+   Add the line `IMSDA_HEARTBEAT_TOKEN=<the same value>` and save. Use an
+   editor rather than `echo`, so the token does not end up in shell history.
 
 3. Re-install the scripts (the `install -m 755` lines above, including
    `imsda-heartbeat`). Re-run `scripts/install-xcloud-runtime-guard.sh` only if
    the runtime guard is in use; it adds the line that reports each guard run.
 
-Nothing breaks without it: a heartbeat can never fail or delay a job, and the
-rows simply read "Not reporting yet". `imsda-heartbeat` only talks to
+Nothing breaks without it: a heartbeat never fails a job (it adds at most a few
+seconds if the app does not answer), and the rows simply read "Not reporting
+yet". Each run logs one `[heartbeat]` line, and the helper needs curl 7.55 or
+newer. `imsda-heartbeat` only talks to
 `http://127.0.0.1:8100` (override with `IMSDA_HEARTBEAT_URL`, loopback only).
 The host's other cron jobs (the touch job and the `.xcloud` cleanup) are not in
 this repository and are not reported.

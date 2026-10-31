@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -83,7 +83,7 @@ describe("heartbeat.sh", () => {
     expect(result.args).toBe("");
   });
 
-  it.each(["https://events.imsda.org/api/internal/system-jobs/heartbeat", "http://example.com:8100/x", "http://127.0.0.1.evil.test/x"])(
+  it.each(["https://events.imsda.org/api/internal/system-jobs/heartbeat", "http://example.com:8100/x", "http://127.0.0.1.evil.test/x", "http://127.0.0.1:8100@other.host/x", "http://localhost:80@other.host/", "http://127.0.0.1:81x/y", "http://127.0.0.1:/x"])(
     "refuses a non-loopback address (%s) and never prints it",
     (url) => {
       const result = run(["server-autodeploy", "SUCCEEDED", "result=deployed"], { IMSDA_HEARTBEAT_URL: url });
@@ -100,6 +100,7 @@ describe("heartbeat.sh", () => {
     ["an uppercase word value", ["result=OK"]],
     ["no equals sign", ["result"]],
     ["an empty value", ["result="]],
+    ["a leading-zero number", ["imagesRemoved=007"]],
   ])("sends nothing for %s, and exits 0", (_name, pairs) => {
     const result = run(["server-runtime-guard", "SUCCEEDED", ...pairs], {});
     expect(result.status).toBe(0);
@@ -239,16 +240,33 @@ printf 'Filesystem Size Used Avail Use%% Mounted\\n/dev/x 100G 70G 30G %s%% /\\n
     expect(result.out).toContain("Disk after:");
   });
 
+  it("leaves the image count out when Docker does not answer, rather than reporting zero removed", () => {
+    const downDocker = `#!/bin/sh\ncase "$*" in "image ls -q") exit 1 ;; esac\nexit 0\n`;
+    const result = run({ IMSDA_LOCK_HELD: "1" }, { docker: downDocker });
+    expect(result.status).toBe(0);
+    expect(result.beats).toHaveLength(1);
+    expect(result.beats[0]).toContain("result=cleaned");
+    expect(result.beats[0]).not.toContain("imagesRemoved");
+    expect(result.beats[0]).toContain("diskUsedAfterPct=71");
+  });
+
+  it("leaves a percentage out when df cannot be read", () => {
+    const result = run({ IMSDA_LOCK_HELD: "1" }, { df: "#!/bin/sh\necho garbage\n" });
+    expect(result.status).toBe(0);
+    expect(result.beats[0]).not.toContain("diskUsed");
+    expect(result.beats[0]).toContain("imagesRemoved=4");
+  });
+
   it("still cleans and exits 0 with the heartbeat helper missing", () => {
     const result = run({ IMSDA_LOCK_HELD: "1" }, {}, false);
     expect(result.status).toBe(0);
     expect(result.out).toContain("Disk after:");
   });
 
-  it("reports one skipped-lock-busy failure from the outer lock branch and exits 0", () => {
+  it("reports one skipped-lock-busy run (not a failure) from the outer lock branch and exits 0", () => {
     const result = run({ IMSDA_LOCK_FILE: "/nonexistent/lock" }, { flock: "#!/bin/sh\nexit 200\n" });
     expect(result.status).toBe(0);
-    expect(result.beats).toEqual(["heartbeat server-docker-cleanup FAILED result=skipped-lock-busy"]);
+    expect(result.beats).toEqual(["heartbeat server-docker-cleanup SUCCEEDED result=skipped-lock-busy"]);
   });
 
   it("does not add a second heartbeat in the outer branch after a real run", () => {
@@ -270,26 +288,27 @@ describe("runtime guard installer", () => {
     expect(line).not.toMatch(/(?<!\$)\$(?!\$)/);
   });
 
-  function runStopPost(serviceResult: string, helperDir: "sbin" | "bin" | "none") {
+  function runStopPost(serviceResult: string, installed: boolean) {
     const ctx = setup({});
     // What systemd hands the shell: "$$" becomes "$"; the quoted program is the argument after "-c".
     const program = line!.replace(/^ExecStopPost=-\/bin\/sh -c '/, "").replace(/'$/, "").replaceAll("$$", "$");
-    const rewritten = program.replaceAll("/usr/local/sbin/imsda-heartbeat", path.join(ctx.dir, "sbin-heartbeat")).replaceAll("/usr/local/bin/imsda-heartbeat", path.join(ctx.dir, "bin-heartbeat"));
-    if (helperDir !== "none") {
-      const target = path.join(ctx.dir, `${helperDir}-heartbeat`);
-      writeFileSync(target, `#!/bin/sh\necho "${helperDir} $*" >> "${ctx.log}"\n`);
+    expect(program).not.toContain("sbin");
+    const target = path.join(ctx.dir, "bin-heartbeat");
+    const rewritten = program.replaceAll("/usr/local/bin/imsda-heartbeat", target);
+    if (installed) {
+      writeFileSync(target, `#!/bin/sh\necho "$*" >> "${ctx.log}"\n`);
       chmodSync(target, 0o755);
     }
     const result = spawnSync("sh", ["-c", rewritten], { encoding: "utf8", env: { NODE_ENV: "test", PATH: "/usr/bin:/bin", SERVICE_RESULT: serviceResult } });
-    return { status: result.status, calls: readFileSync(ctx.log, "utf8").trim(), exists: existsSync(ctx.log) };
+    return { status: result.status, calls: readFileSync(ctx.log, "utf8").trim() };
   }
 
-  it.each(["sbin", "bin"] as const)("reports ok on success and failed otherwise, using the helper in %s", (dir) => {
-    expect(runStopPost("success", dir)).toMatchObject({ status: 0, calls: `${dir} server-runtime-guard SUCCEEDED result=ok` });
-    expect(runStopPost("exit-code", dir)).toMatchObject({ status: 0, calls: `${dir} server-runtime-guard FAILED result=failed` });
+  it("reports ok on success and failed otherwise, using /usr/local/bin/imsda-heartbeat", () => {
+    expect(runStopPost("success", true)).toMatchObject({ status: 0, calls: "server-runtime-guard SUCCEEDED result=ok" });
+    expect(runStopPost("exit-code", true)).toMatchObject({ status: 0, calls: "server-runtime-guard FAILED result=failed" });
   });
 
   it("does nothing when the helper is not installed", () => {
-    expect(runStopPost("success", "none")).toMatchObject({ status: 0, calls: "" });
+    expect(runStopPost("success", false)).toMatchObject({ status: 0, calls: "" });
   });
 });

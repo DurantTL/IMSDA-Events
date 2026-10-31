@@ -172,9 +172,7 @@ export function autodeployFields(key: string, run: JobRun, readAt: Date): Fields
 
 const CLEANUP: HostJob = {
   name: "Docker cleanup",
-  failures: {
-    "skipped-lock-busy": "The last cleanup was skipped because a deploy held the server too long. It will run again.",
-  },
+  failures: {},
   failureFallback: "The latest Docker cleanup failed. Check the server.",
   stale: "No successful Docker cleanup in over 30 hours. The daily cleanup timer may have stopped, and the disk can fill up.",
 };
@@ -182,6 +180,9 @@ const CLEANUP: HostJob = {
 export function dockerCleanupFields(key: string, run: JobRun, readAt: Date): Fields {
   const problem = hostProblem(CLEANUP, key, run, readAt);
   if (problem) return problem;
+  if (run.summary?.result === "skipped-lock-busy") {
+    return { key, state: "watch", checkedAt: run.lastSucceededAt, whenLabel: "Last success", resultText: "Skipped: a deploy was running. It runs again tomorrow." };
+  }
   const after = num(run.summary, "diskUsedAfterPct");
   const removed = num(run.summary, "imagesRemoved");
   if (run.summary?.result !== "cleaned" || after === null || removed === null) {

@@ -64,10 +64,13 @@ export const hostJobHeartbeatSchema = z
     z.object({ job: z.literal(SERVER_RUNTIME_GUARD_JOB), outcome, summary: guardSummary }).strict(),
   ])
   .refine((value) => {
+    // A cleanup that skipped because a deploy held the lock is a normal, successful run.
     const succeeds =
       value.job === SERVER_AUTODEPLOY_JOB
         ? (AUTODEPLOY_SUCCESS_RESULTS as readonly string[]).includes(value.summary.result)
-        : value.summary.result === "cleaned" || value.summary.result === "ok";
+        : value.job === SERVER_DOCKER_CLEANUP_JOB
+          ? true
+          : value.summary.result === "ok";
     return succeeds === (value.outcome === "SUCCEEDED");
   });
 

@@ -28,7 +28,7 @@ if [ -z "${IMSDA_LOCK_HELD:-}" ] && command -v flock >/dev/null 2>&1; then
   rc=$?
   if [ "$rc" -eq 200 ]; then
     echo "[cleanup] A deploy held the lock too long; skipping this run."
-    heartbeat server-docker-cleanup FAILED result=skipped-lock-busy
+    heartbeat server-docker-cleanup SUCCEEDED result=skipped-lock-busy
   fi
   exit 0
 fi
@@ -42,7 +42,11 @@ used_pct() {
   pct="${1%%%*}"
   case "$pct" in "" | *[!0-9]*) ;; *) echo "$pct" ;; esac
 }
-image_count() { docker image ls -q 2>/dev/null | wc -l | tr -dc '0-9'; }
+# Prints nothing when Docker does not answer, so a failed count is never reported as zero images.
+image_count() {
+  listed="$(docker image ls -q 2>/dev/null)" || return 0
+  if [ -z "$listed" ]; then echo 0; else printf '%s\n' "$listed" | wc -l | tr -dc '0-9'; fi
+}
 LINE_BEFORE="$(disk_line)"
 echo "[cleanup] Disk before: $LINE_BEFORE"
 USED_BEFORE="$(used_pct "$LINE_BEFORE")"

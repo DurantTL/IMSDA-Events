@@ -66,6 +66,7 @@ describe("POST /api/internal/system-jobs/heartbeat", () => {
     ["an extra summary key", { ...good, summary: { result: "deployed", sha: "abc" } }],
     ["an unknown result word", { ...good, summary: { result: "exploded" } }],
     ["a result that does not match the outcome", { ...good, outcome: "FAILED" }],
+    ["a skipped cleanup sent as FAILED", { job: "server-docker-cleanup", outcome: "FAILED", summary: { result: "skipped-lock-busy" } }],
     ["a bad outcome", { ...good, outcome: "OK" }],
     ["a cleanup count out of range", { job: "server-docker-cleanup", outcome: "SUCCEEDED", summary: { result: "cleaned", diskUsedAfterPct: 101 } }],
     ["a negative count", { job: "server-docker-cleanup", outcome: "SUCCEEDED", summary: { result: "cleaned", imagesRemoved: -1 } }],
@@ -97,11 +98,13 @@ describe("POST /api/internal/system-jobs/heartbeat", () => {
   it("records failed runs with their summary, and cleanup counts", async () => {
     await send({ job: "server-autodeploy", outcome: "FAILED", summary: { result: "deploy-failed" } });
     expect(mocks.recordJobRun).toHaveBeenLastCalledWith("server-autodeploy", "FAILED", { result: "deploy-failed" });
+    expect((await send({ job: "server-docker-cleanup", outcome: "SUCCEEDED", summary: { result: "cleaned" } })).status).toBe(200);
     await send({ job: "server-docker-cleanup", outcome: "SUCCEEDED", summary: { result: "cleaned", diskUsedBeforePct: 80, diskUsedAfterPct: 71, imagesRemoved: 4 } });
     expect(mocks.recordJobRun).toHaveBeenLastCalledWith("server-docker-cleanup", "SUCCEEDED", { result: "cleaned", diskUsedBeforePct: 80, diskUsedAfterPct: 71, imagesRemoved: 4 });
-    await send({ job: "server-docker-cleanup", outcome: "FAILED", summary: { result: "skipped-lock-busy" } });
+    await send({ job: "server-docker-cleanup", outcome: "SUCCEEDED", summary: { result: "skipped-lock-busy" } });
+    expect(mocks.recordJobRun).toHaveBeenLastCalledWith("server-docker-cleanup", "SUCCEEDED", { result: "skipped-lock-busy" });
     await send({ job: "server-runtime-guard", outcome: "FAILED", summary: { result: "failed" } });
-    expect(mocks.recordJobRun).toHaveBeenCalledTimes(4);
+    expect(mocks.recordJobRun).toHaveBeenCalledTimes(5);
   });
 
   it("is a generic 500 when the write fails", async () => {
@@ -149,7 +152,12 @@ describe("host job report rows", () => {
       .toMatchObject({ state: "ok", resultText: "Disk 71% used after cleanup; 4 images removed." });
     expect(dockerCleanupFields("k", run({ summary: { result: "cleaned", diskUsedAfterPct: 71, imagesRemoved: 1 } }), now).resultText).toContain("1 image removed");
     expect(dockerCleanupFields("k", run({ summary: { result: "cleaned" } }), now).state).toBe("watch");
-    expect(dockerCleanupFields("k", run({ status: "failing", summary: { result: "skipped-lock-busy" } }), now).state).toBe("attention");
+    expect(dockerCleanupFields("k", run({ summary: { result: "skipped-lock-busy" } }), now))
+      .toMatchObject({ state: "watch", resultText: "Skipped: a deploy was running. It runs again tomorrow." });
+    // Counts left out (Docker did not answer, df unreadable) is watch, never OK.
+    expect(dockerCleanupFields("k", run({ summary: { result: "cleaned", diskUsedAfterPct: 71 } }), now))
+      .toMatchObject({ state: "watch", resultText: "It ran, but its counts were not recorded." });
+    expect(dockerCleanupFields("k", run({ summary: { result: "cleaned", imagesRemoved: 2 } }), now).state).toBe("watch");
     expect(dockerCleanupFields("k", run({ status: "stale" }), now).state).toBe("watch");
   });
 
