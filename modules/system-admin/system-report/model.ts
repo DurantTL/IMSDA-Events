@@ -28,7 +28,8 @@ export type SectionKey =
   | "public-site"
   | "checklist"
   | "registration"
-  | "money";
+  | "money"
+  | "communications";
 
 export type Signal = {
   key: string;
@@ -79,8 +80,10 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "setup", title: "Security and setup", fixHref: "/admin/settings", fixLabel: "Platform settings" },
   { key: "public-site", title: "Public site", fixHref: "/admin/analytics", fixLabel: "Open analytics" },
   { key: "registration", title: "Registration and checkout", fixHref: "/people", fixLabel: "Open registrations" },
-  { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
   { key: "money", title: "Refunds and payment follow-up", fixHref: "/finance", fixLabel: "Open finance" },
+  { key: "communications", title: "Communications", fixHref: "/communications/scheduled", fixLabel: "Open scheduled email" },
+  // Declared last: it never counts, so it always sorts last, and an empty section declared after it would follow it.
+  { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
 ];
 
 export type SignalMeta = Pick<Signal, "key" | "name" | "description" | "fixHref" | "fixLabel">;

@@ -80,8 +80,12 @@ async function rows() {
 }
 
 describe("the money section", () => {
-  it("is declared once, last, and every row is declared so a failed read shows as unavailable", () => {
-    expect(SECTION_DEFINITIONS.at(-1)).toMatchObject({ key: "money", title: "Refunds and payment follow-up", fixHref: "/finance" });
+  it("is declared once, after registration and before the checklist, and every row is declared so a failed read shows as unavailable", () => {
+    const keys = SECTION_DEFINITIONS.map((definition) => definition.key);
+    expect(keys.filter((key) => key === "money")).toHaveLength(1);
+    expect(SECTION_DEFINITIONS.find((definition) => definition.key === "money")).toMatchObject({ key: "money", title: "Refunds and payment follow-up", fixHref: "/finance" });
+    expect(keys.indexOf("money")).toBeGreaterThan(keys.indexOf("registration"));
+    expect(keys.at(-1)).toBe("checklist");
     const providers = systemReportProviders.filter((candidate) => candidate.section === "money");
     expect(providers).toHaveLength(1);
     expect(providers[0].signals.map((row) => row.key)).toEqual(["cancellations-stuck", "refunds-stuck", "duplicate-charges", "pay-on-square-sweep", "church-share-drift", "refund-self-test"]);
