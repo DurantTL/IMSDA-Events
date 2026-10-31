@@ -7,11 +7,17 @@ import { getMessageFileStorageUsage } from "@/modules/communications/message-fil
 import { conferenceToday } from "@/modules/calendar/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { getEmailAvailability } from "@/integrations/email/provider";
+import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
+import { isBreachCheckEnabled } from "@/modules/access/password-breach";
 import { checkDatabaseLiveness } from "@/modules/operations/database-liveness";
 import { readDiskSpace } from "@/modules/operations/disk-space";
 import {
+  APPLE_PAY_FILE_REACHABILITY_JOB,
+  BREACH_SERVICE_REACHABILITY_JOB,
+  CALENDAR_FEED_REACHABILITY_JOB,
   CALENDAR_FEED_REFRESH_JOB,
   EMAIL_REACHABILITY_JOB,
+  GOOGLE_KEYS_REACHABILITY_JOB,
   MESSAGE_FILE_CLEANUP_JOB,
   SQUARE_REACHABILITY_JOB,
   SWEEP_STEP_STALE_AFTER_MS,
@@ -26,7 +32,7 @@ import { buildHealthSignals, type HealthSignal } from "@/modules/system-admin/he
 import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-checks";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
-import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
+import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields, type ReachabilityKind } from "./job-signals";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -261,7 +267,7 @@ async function jobRow(ctx: ReportContext, job: string, key: string, fields: type
 }
 
 /** The stored result of an on-demand connection test. Never run on page load: the Test connections button runs it. */
-async function reachabilityRow(ctx: ReportContext, kind: "email" | "square", key: string, job: string, isConfigured: () => boolean) {
+async function reachabilityRow(ctx: ReportContext, kind: ReachabilityKind, key: string, job: string, isConfigured: () => boolean) {
   let configured: boolean;
   try {
     configured = isConfigured();
@@ -386,6 +392,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("payment-setup", "Payment setup", "Square and its payment notices are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("square-environment", "Square environment", "Whether Square is in test or live mode.", "/admin/settings", "Platform settings"),
     m("square-reachable", "Square reachable", "A read-only test that Square answers and accepts our token. It charges nothing.", null, "Press Test connections"),
+    m("apple-pay-file-reachable", "Apple Pay domain file", "A read-only test that Square's Apple Pay domain file can be fetched. It sends and changes nothing.", null, "Press Test connections"),
   ], async (ctx) => {
     const attempts = await rollupIssues(ctx, {
       key: "payment-attempts",
@@ -401,6 +408,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       setup,
       await readinessRow(ctx, "square-environment", "square-environment"),
       await reachabilityRow(ctx, "square", "square-reachable", SQUARE_REACHABILITY_JOB, () => getSquareConfiguration().paymentConfigured),
+      await reachabilityRow(ctx, "apple-pay-file", "apple-pay-file-reachable", APPLE_PAY_FILE_REACHABILITY_JOB, () => getSquareConfiguration().paymentConfigured),
     ];
   }),
 
@@ -490,21 +498,27 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings"),
     m("admin-protection", "Administrator sign-in protection", "System administrators use two-step sign-in or a passkey.", "/admin/readiness", "Open readiness"),
     m("connected-services", "Connected services", "Payments, email, Google sign-in, alerts and the email sweep are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
+    m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections"),
+    m("breach-service-reachable", "Password breach service", "A read-only test that the password breach service answers one fixed, made-up lookup. No password is used.", null, "Press Test connections"),
   ], async (ctx) => {
     const env = await environment(ctx);
     return [
       await readinessRow(ctx, "encryption-key", "encryption-key"),
       await readinessRow(ctx, "admins-mfa", "admin-protection"),
       !env.ok ? { key: "connected-services", ...tried(env) } : connectedServices(env.value, env.readAt),
+      await reachabilityRow(ctx, "google-keys", "google-keys-reachable", GOOGLE_KEYS_REACHABILITY_JOB, isGoogleSignInConfigured),
+      await reachabilityRow(ctx, "breach-service", "breach-service-reachable", BREACH_SERVICE_REACHABILITY_JOB, isBreachCheckEnabled),
     ];
   }),
 
   defineProvider("public-site", [
     m("broken-links", "Broken links and images", "Pages not found and images that failed to load, last 30 days.", "/admin/analytics", "Open analytics"),
     m("page-speed", "Page speed", "How public pages loaded for visitors, last 30 days.", "/admin/analytics", "Open analytics"),
+    m("calendar-feed-reachable", "Calendar feed", "A read-only test that our own public calendar feed builds. No network is used and nothing is changed.", null, "Press Test connections"),
   ], async (ctx) => {
     const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday()));
-    if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }];
+    const calendarFeed = await reachabilityRow(ctx, "calendar-feed", "calendar-feed-reachable", CALENDAR_FEED_REACHABILITY_JOB, () => true);
+    if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }, calendarFeed];
     const { totals, vitals } = read.value;
     const checkedAt = iso(read.readAt);
     const rating = (key: "good" | "needsImprovement" | "poor") => vitals.reduce((sum, vital) => sum + vital[key], 0);
@@ -512,6 +526,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     return [
       { key: "broken-links", state: "info", checkedAt, whenLabel: "Checked", resultText: `${totals.NOT_FOUND} pages not found, ${totals.IMAGE_ERROR} image errors.` },
       { key: "page-speed", state: "info", checkedAt, whenLabel: "Checked", resultText: `${rating("good")} good, ${rating("needsImprovement")} needs improvement, ${rating("poor")} poor ratings.` },
+      calendarFeed,
     ];
   }),
 

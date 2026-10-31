@@ -254,8 +254,8 @@ describe("providers", () => {
       everySourceDown();
       const report = await loadSystemReport(now);
       const rows = report.sections.flatMap((section) => section.signals);
-      // The release identity and the environment's set-up facts are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services"].includes(row.key));
+      // The release identity and the environment's set-up facts (including whether Google sign-in and the breach check are on) are read from the process, not from a failing source.
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "google-keys-reachable", "breach-service-reachable"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
       expect(report.overall.tally.ok).toBe(0); // the release identity and start time are information, never counted as OK
