@@ -20,6 +20,7 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromDefinitionInTransaction, createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCreationModules } from "@/modules/event-modules/defaults";
+import { DEFAULT_EVENT_TIME_ZONE, eventInstant } from "@/modules/events/event-times";
 import { creationModuleKeys } from "@/modules/event-modules/catalog";
 import { creationFlagKeys, type CreationFlagKey } from "@/modules/event-features/creation";
 import { assertCalendarEntryLinkable, linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
@@ -44,10 +45,6 @@ export class EventTemplateOperationError extends Error {
     super(message);
     this.name = "EventTemplateOperationError";
   }
-}
-
-function eventDate(value: string) {
-  return new Date(`${value}T12:00:00.000Z`);
 }
 
 const templateInclude = {
@@ -339,7 +336,7 @@ export async function unarchiveEventTemplate(templateId: string, actorUserId: st
   return getEventTemplate(templateId);
 }
 
-type RequestInput = Pick<ApplyEventTemplateInput, "name" | "slug" | "startsOn" | "endsOn" | "calendarEntryId">;
+type RequestInput = Pick<ApplyEventTemplateInput, "name" | "slug" | "startsOn" | "endsOn" | "startTime" | "endTime" | "calendarEntryId">;
 
 /** The flag overrides the features step actually set (an absent key keeps the template's value). */
 function definedFlagOverrides(features: ApplyEventTemplateInput["features"]) {
@@ -354,7 +351,7 @@ function definedFlagOverrides(features: ApplyEventTemplateInput["features"]) {
 
 function requestInputOf(input: ApplyEventTemplateInput): RequestInput {
   // The calendar item the event was set up from (#445) is part of the request: the same key with another item is a reused key.
-  return { name: input.name, slug: input.slug, startsOn: input.startsOn, endsOn: input.endsOn, ...(input.calendarEntryId ? { calendarEntryId: input.calendarEntryId } : {}) };
+  return { name: input.name, slug: input.slug, startsOn: input.startsOn, endsOn: input.endsOn, ...(input.startTime ? { startTime: input.startTime } : {}), ...(input.endTime ? { endTime: input.endTime } : {}), ...(input.calendarEntryId ? { calendarEntryId: input.calendarEntryId } : {}) };
 }
 
 /**
@@ -375,6 +372,8 @@ async function resolveExistingApplication(actorUserId: string, templateId: strin
     && stored.slug === requested.slug
     && stored.startsOn === requested.startsOn
     && stored.endsOn === requested.endsOn
+    && (stored.startTime ?? undefined) === requested.startTime
+    && (stored.endTime ?? undefined) === requested.endTime
     && (stored.calendarEntryId ?? undefined) === requested.calendarEntryId;
   if (!sameRequest) {
     throw new EventTemplateOperationError("REQUEST_KEY_REUSED", "This request was already used to create a different event. Reload the page and try again.");
@@ -437,8 +436,9 @@ export async function applyEventTemplate(
         data: {
           name: input.name,
           slug: input.slug,
-          startsAt: eventDate(input.startsOn),
-          endsAt: eventDate(input.endsOn),
+          // The chosen start and end times are wall-clock times in the event's time zone (the column default); none keeps noon UTC (#1406).
+          startsAt: eventInstant(input.startsOn, input.startTime, DEFAULT_EVENT_TIME_ZONE),
+          endsAt: eventInstant(input.endsOn, input.endTime, DEFAULT_EVENT_TIME_ZONE),
           ...(fromItem?.location ? { location: fromItem.location } : {}),
           isPublished: false,
           waitlistEnabled: flags.waitlistEnabled,
@@ -513,7 +513,7 @@ export async function applyEventTemplate(
       }
 
       for (const templateKey of payload.formTemplateKeys) {
-        await createRegistrationFormFromTemplateInTransaction(tx, event.id, actorUserId, templateKey);
+        await createRegistrationFormFromTemplateInTransaction(tx, event.id, actorUserId, templateKey, undefined, input.name);
       }
 
       // Forms saved from an event (#154): each is a new draft built from the template's own copy of the definition.
@@ -521,6 +521,7 @@ export async function applyEventTemplate(
         await createRegistrationFormFromDefinitionInTransaction(tx, event.id, actorUserId, {
           definition: templateForm.definition,
           preferredSlug: templateForm.slug,
+          eventName: input.name,
           summary: (formName) => `Created ${formName} from the ${template.name} template, version ${version.versionNumber}.`,
           metadata: { templateId: template.id, templateVersionId: version.id },
         });

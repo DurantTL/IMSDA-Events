@@ -223,7 +223,7 @@ describe("applyEventTemplate (#152)", () => {
     await applyEventTemplate("template-1", "usr_actor", applyInput);
 
     expect(registrationFormCreate).toHaveBeenCalledTimes(1);
-    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ eventId: "event-1", slug: "retreat-form", name: "Retreat form" });
+    expect(registrationFormCreate.mock.calls[0]![0].data).toMatchObject({ eventId: "event-1", slug: "weekend-retreat-2027-registration", name: "Weekend Retreat 2027 registration" }); // named after the new event (#1406)
     expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: "REGISTRATION_FORM_CREATED", metadata: expect.objectContaining({ templateVersionId: "version-1" }) }),
     }));

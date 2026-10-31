@@ -6,6 +6,7 @@ import {
   shirtSizeOptions,
   type ShirtSize,
 } from "@/modules/merchandise/legacy-shirt-size-compat";
+import { shirtSizeStatus } from "@/modules/merchandise/shirt-size-status";
 
 type ShirtSizeAttendee = {
   id: string;
@@ -24,15 +25,6 @@ type SaveState =
   | { kind: "saving"; message: "Saving shirt sizes…" }
   | { kind: "saved"; message: "Shirt sizes confirmed." }
   | { kind: "error"; message: string };
-
-function confirmationLabel(value: string | null) {
-  if (!value) return "Needs confirmation";
-  return `Confirmed ${new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value))}`;
-}
 
 export function PublicShirtSizeConfirmation({
   token,
@@ -124,7 +116,7 @@ export function PublicShirtSizeConfirmation({
       onSubmit={confirmShirtSizes}
     >
       <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">Convention shirts</p>
+        <p className="public-registration-eyebrow">Shirt sizes</p>
         <h2>Confirm shirt sizes</h2>
         <p>
           Choose the final shirt size for every attendee. You can return to this
@@ -144,8 +136,8 @@ export function PublicShirtSizeConfirmation({
                 <small>Attendee {index + 1}</small>
                 <strong>{attendee.name}</strong>
               </span>
-              <em className={attendee.shirtSizeConfirmedAt ? "is-confirmed" : ""}>
-                {confirmationLabel(attendee.shirtSizeConfirmedAt)}
+              <em className={shirtSizeStatus(attendee).isConfirmed ? "is-confirmed" : ""}>
+                {shirtSizeStatus(attendee).label}
               </em>
             </span>
             <select

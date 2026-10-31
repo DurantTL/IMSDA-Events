@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { eventTimeProblems } from "@/modules/events/event-times";
 
 export const eventTimeZones = [
   "America/New_York",
@@ -17,6 +18,9 @@ export const calendarDateSchema = z.string().regex(
   const date = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }, "Enter a valid calendar date.");
+
+/** A wall-clock time as `<input type="time">` submits it ("HH:MM", 24-hour). */
+export const timeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter the time as hours and minutes, like 7:00 AM.");
 
 const nullableText = (maximum: number) => z.string()
   .trim()
@@ -110,6 +114,9 @@ export const eventSettingsInputSchema = z.object({
   slug: eventSlugSchema,
   startsOn: calendarDateSchema,
   endsOn: calendarDateSchema,
+  /** Used when an event is created (#1406); absent keeps noon UTC. A settings save keeps the stored clock time instead. */
+  startTime: timeOfDaySchema.optional(),
+  endTime: timeOfDaySchema.optional(),
   timezone: z.enum(eventTimeZones),
   location: nullableText(200),
   publicInfoUrl: publicInfoUrlSchema,
@@ -184,6 +191,8 @@ export const eventSettingsInputSchema = z.object({
       message: "The event cannot end before it starts.",
     });
   }
+  const timeProblem = value.startTime && value.endTime ? eventTimeProblems(value).endTime : undefined;
+  if (timeProblem) context.addIssue({ code: "custom", path: ["endTime"], message: timeProblem });
   if (value.registrationOpensOn && value.registrationOpensOn > value.endsOn) {
     context.addIssue({
       code: "custom",

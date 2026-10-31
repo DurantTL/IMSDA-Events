@@ -89,8 +89,8 @@ export async function assertEventReadyToPublish(tx: Tx, eventId: string, event: 
     {
       name: event.name,
       slug: event.slug,
-      startsOn: event.startsAt.toISOString().slice(0, 10),
-      endsOn: event.endsAt.toISOString().slice(0, 10),
+      startsOn: calendarDateInEventTimeZone(event.startsAt, event.timezone),
+      endsOn: calendarDateInEventTimeZone(event.endsAt, event.timezone),
       timezone: event.timezone,
       location: event.location,
       publicInfoUrl: event.publicInfoUrl,
