@@ -1,5 +1,6 @@
 import "server-only";
 
+import { IMPORTED_SUBMISSION_KEY_PREFIX } from "@/modules/imports/submission-keys";
 import { getPrisma } from "@/lib/prisma";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
 import { publishedFormVersionWhere } from "@/modules/events/public-registration-status";
@@ -57,12 +58,11 @@ export async function readUnreleasedHoldCounts(eventIds: string[]): Promise<Arra
 
 /**
  * Public form submissions (one `PublicRegistrationSubmission` per registration made through the public form) since a
- * time. WR26 imports also write these rows, stamped with the import time, so they are left out.
+ * time. Imports also write these rows, stamped with the import time, so they are left out.
  */
-export const IMPORTED_SUBMISSION_PREFIX = "wr26-import:";
 export async function countPublicSubmissionsSince(eventIds: string[], since: Date): Promise<number> {
   if (eventIds.length === 0) return 0;
   return getPrisma().publicRegistrationSubmission.count({
-    where: { eventId: { in: eventIds }, createdAt: { gte: since }, NOT: { idempotencyKey: { startsWith: IMPORTED_SUBMISSION_PREFIX } } },
+    where: { eventId: { in: eventIds }, createdAt: { gte: since }, NOT: { idempotencyKey: { startsWith: IMPORTED_SUBMISSION_KEY_PREFIX } } },
   });
 }

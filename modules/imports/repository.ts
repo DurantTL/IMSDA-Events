@@ -1,4 +1,5 @@
 import "server-only";
+import { IMPORTED_SUBMISSION_KEY_PREFIX } from "@/modules/imports/submission-keys";
 import { appendSubmissionCharge, staffLedgerActor } from "@/modules/ledger/entries";
 import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 
@@ -656,7 +657,7 @@ async function syncImportedDetails(
           eventId,
           formVersionId: formVersion.id,
           registrationId,
-          idempotencyKey: `wr26-import:${data.sourceId}`,
+          idempotencyKey: `${IMPORTED_SUBMISSION_KEY_PREFIX}${data.sourceId}`,
           requestHash,
           responses,
           attendeeResponses,
