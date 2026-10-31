@@ -10,7 +10,7 @@
 .phoneMonth { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding: 2px; }
 .monthSelect { flex: 1 1 0; min-width: 0; width: auto; }
 .monthSelect select { width: 100%; min-height: 44px; }
-.go { flex: 0 0 auto; min-width: 56px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); font: inherit; font-weight: 700; cursor: pointer; }
+.phoneMonth .go { flex: 0 0 auto; width: auto; min-width: 56px; padding: 0 14px; }
 .search button.secondary-button, .search a.secondary-button { flex: 0 0 auto; width: auto; max-width: none; min-width: 64px; min-height: 44px; padding: 0 14px; }
 .phoneMonth :focus-visible { outline-offset: 2px; }
 .stripNote { display: block; }

@@ -25,12 +25,7 @@
 }
 .cisLookupRow input { flex: 1 1 14rem; }
 .cisForm input[inputmode] { width: 100%; }
-.cisButton {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 48px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: #f9fbfb; color: var(--imsda-navy); cursor: pointer; padding: 8px 16px; font: inherit; font-size: 1rem; font-weight: 700;
-}
-.cisButtonPrimary { border-color: var(--imsda-navy); background: var(--imsda-navy); color: white; }
-.cisButtonQuiet { background: white; }
-.cisButton:disabled { cursor: not-allowed; opacity: 0.58; }
+.cisShell .large { min-height: 48px; padding: 0 18px; font-size: 1rem; }
 .cisPeople { display: grid; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
 .cisPerson { border: 1px solid var(--line); border-radius: 12px; }
 .cisPersonBody { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 56px; padding: 8px 12px; }

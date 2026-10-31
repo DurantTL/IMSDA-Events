@@ -1,0 +1,15 @@
+/* A tab panel: a real box (so its role and focus work in every browser) that spaces its content like .page-stack does (#1353). */
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-content: start;
+}
+
+.panel > * {
+  min-width: 0;
+}
+
+.panel[hidden] {
+  display: none;
+}
