@@ -244,6 +244,8 @@ describe("the read-only reachability tests", () => {
 });
 
 describe("Test connections", () => {
+  const notSetUp = async () => ({ outcome: "not-configured" as const });
+  const others = { googleKeys: notSetUp, breachService: notSetUp, applePayFile: notSetUp, calendarFeed: notSetUp };
   const runConnectionTests = async (deps: Parameters<typeof import("@/modules/system-admin/system-report/connection-tests").runConnectionTests>[0]) =>
     (await vi.importActual<typeof import("@/modules/system-admin/system-report/connection-tests")>("@/modules/system-admin/system-report/connection-tests")).runConnectionTests(deps);
 
@@ -252,9 +254,10 @@ describe("Test connections", () => {
     const results = await runConnectionTests({
       email: async () => ({ outcome: "reachable", ms: 90 }),
       square: async () => ({ outcome: "not-configured" }),
+      ...others,
       record,
     });
-    expect(results).toEqual({ email: "reachable", square: "not-configured" });
+    expect(results).toMatchObject({ email: "reachable", square: "not-configured" });
     expect(record).toHaveBeenCalledTimes(1);
     expect(record).toHaveBeenCalledWith("email-reachability", "SUCCEEDED", { outcome: "reachable", ms: 90 });
   });
@@ -264,9 +267,10 @@ describe("Test connections", () => {
     const results = await runConnectionTests({
       email: async () => ({ outcome: "refused", ms: 40 }),
       square: async () => { throw new Error("boom"); },
+      ...others,
       record,
     });
-    expect(results).toEqual({ email: "refused", square: "unavailable" });
+    expect(results).toMatchObject({ email: "refused", square: "unavailable" });
     expect(record).toHaveBeenCalledWith("email-reachability", "FAILED", { outcome: "refused", ms: 40 });
     expect(record).toHaveBeenCalledWith("square-reachability", "FAILED", { outcome: "unavailable", ms: 0 });
   });

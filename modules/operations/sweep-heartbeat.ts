@@ -29,6 +29,10 @@ export const INSTRUCTOR_CLASS_EMAILS_JOB = "instructor-class-emails";
 export const HONOR_WATCH_SUMMARIES_JOB = "honor-watch-summaries";
 export const HEALTH_SNAPSHOT_SWEEP_JOB = "health-snapshot-sweep";
 export const RETENTION_CLEANUP_JOB = "retention-cleanup";
+export const GOOGLE_KEYS_REACHABILITY_JOB = "google-keys-reachability";
+export const BREACH_SERVICE_REACHABILITY_JOB = "breach-service-reachability";
+export const APPLE_PAY_FILE_REACHABILITY_JOB = "apple-pay-file-reachability";
+export const CALENDAR_FEED_REACHABILITY_JOB = "calendar-feed-reachability";
 
 /**
  * Calendar refresh and message file cleanup run on every five-minute sweep, so twelve missed runs (an hour without a

@@ -242,13 +242,19 @@ export function diskFields(key: string, disk: DiskSpace, readAt: Date): Fields {
 const REACHABLE_WORDS = {
   email: { name: "The email service", refused: "The email service refused the key. Check the email settings on the server." },
   square: { name: "Square", refused: "Square refused the access token. Check the Square settings on the server." },
+  "google-keys": { name: "Google's sign-in keys page", refused: "Google refused the request for its sign-in keys. Check the Google sign-in settings on the server." },
+  "breach-service": { name: "The password breach service", refused: "The password breach service refused the request. Check the password breach settings on the server." },
+  "apple-pay-file": { name: "Square's Apple Pay domain file", refused: "Square refused the request for the Apple Pay domain file. Check the Square settings on the server." },
+  "calendar-feed": { name: "The public calendar feed", refused: "The public calendar feed refused the request." },
 } as const;
+
+export type ReachabilityKind = keyof typeof REACHABLE_WORDS;
 
 /**
  * A stored connection test (never run on page load). Never tested reads unavailable with no time; a result over 24
  * hours old reads "Test again"; "refused" is attention; "unavailable" is unavailable; only a fresh "reachable" is OK.
  */
-export function reachabilityFields(kind: keyof typeof REACHABLE_WORDS, key: string, input: { configured: boolean; run: JobRun | null }, now: Date): Fields {
+export function reachabilityFields(kind: ReachabilityKind, key: string, input: { configured: boolean; run: JobRun | null }, now: Date): Fields {
   const words = REACHABLE_WORDS[kind];
   if (!input.configured) {
     return { key, state: "watch", checkedAt: iso(now), whenLabel: "Checked", resultText: "Not set up, so it was not tested." };
