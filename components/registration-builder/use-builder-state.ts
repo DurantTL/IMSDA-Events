@@ -1,7 +1,7 @@
 // Owns the builder's authoritative draft and every piece of local UI state.
 // There is exactly one copy of the unsaved definition; zones read it through
 // the builder context and change it only through the edit and action hooks.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { emptyHistory, type EditHistory } from "./edit-history";
 import { focusTargetId, type FocusRequest } from "./version-history";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -10,6 +10,7 @@ import { localCalendarDate, type RegistrationFormDefinition } from "@/modules/fo
 import type { PublicRegistrationStepId } from "@/modules/forms/public-registration-steps";
 import { duplicatePublicFormGroups } from "@/modules/forms/duplicate-public-forms";
 import { noInformationIssues, type InformationIssueMap } from "./information-mode";
+import type { ContinueBlock, PreviewIssue } from "./preview-continue";
 import { type PreviewValue, type DragState, moduleCategories, type PreviewAttendee, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 
 export function useBuilderState({ initialForms, templates: initialTemplates = [], focusTarget = null, information = null }: Pick<BuilderWorkspaceProps, "initialForms"> & Partial<Pick<BuilderWorkspaceProps, "focusTarget" | "templates">> & { information?: BuilderWorkspaceProps["information"] | null }) {
@@ -54,7 +55,11 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
   const [error, setError] = useState("");
   // What "Try again" re-runs when the site was restarting during a save (#1263); the edits stay in the editor.
   const retryRef = useRef<(() => void) | null>(null);
-  const [testIssues, setTestIssues] = useState<Array<{ fieldId: string | null; key: string; message: string; attendeeIndex?: number | null; path?: string }>>([]);
+  const [testIssues, setTestIssuesRaw] = useState<PreviewIssue[]>([]);
+  // Set while the preview's Continue is blocked on a step (#1407); attempt re-announces a repeated block.
+  const [continueBlock, setContinueBlock] = useState<ContinueBlock | null>(null);
+  // Every ordinary reset or replacement of the test issues (version switch, edit, test run) also ends a Continue block.
+  const setTestIssues = useCallback((next: PreviewIssue[]) => { setTestIssuesRaw(next); setContinueBlock(null); }, [setTestIssuesRaw, setContinueBlock]);
   const [showTemplates, setShowTemplates] = useState(initialForms.length === 0);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
@@ -120,7 +125,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { information, informationIssues, setInformationIssues, history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, retryRef, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary, libraryTarget, setLibraryTarget, libraryRefresh, setLibraryRefresh, libraryRepairs, setLibraryRepairs };
+  return { information, informationIssues, setInformationIssues, history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, retryRef, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary, libraryTarget, setLibraryTarget, libraryRefresh, setLibraryRefresh, libraryRepairs, setLibraryRepairs };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;

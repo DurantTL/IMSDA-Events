@@ -1,6 +1,7 @@
 // Preview zone: the live public-form preview, the order summary and the
 // Run test submission button.
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
+import { useEffect, useRef } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ClipboardCheck, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -9,9 +10,48 @@ import { getAvailabilityMode, isFieldVisible, isLatePricingActive, type Registra
 import { type PreviewValue, localId } from "./builder-types";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useLoadedBuilder } from "./builder-context";
+import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "./preview-continue";
 
 export function BuilderPreview() {
-  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information } = useLoadedBuilder();
+  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information } = useLoadedBuilder();
+  const stepIssues = (step: NonNullable<typeof previewStep>) => previewStepIssues({ definition, roster, responses, attendees: previewAttendees, choiceUsage: selectedVersion.choiceUsage ?? {}, step });
+  const currentStepId = previewStep?.id ?? null;
+  const blockedRef = useRef(continueBlock);
+  const stepIssuesRef = useRef(stepIssues);
+  useEffect(() => { blockedRef.current = continueBlock; stepIssuesRef.current = stepIssues; });
+  // While Continue is blocked, fixing an answer clears that question's issue; the rest stay until fixed or the step is left.
+  // A test run or any reset ends the block (setTestIssues), so this never overwrites a test run's issues.
+  useEffect(() => {
+    const current = blockedRef.current;
+    if (!current) return;
+    // Leaving the blocked step any way (including the top bar's test-panel link) ends the block.
+    const step = current.stepId === currentStepId
+      ? previewSteps.find((candidate) => candidate.id === current.stepId)
+      : undefined;
+    const remaining = step ? stepIssuesRef.current(step) : [];
+    if (remaining.length === 0) setTestIssues([]);
+    else setTestIssuesRaw(remaining);
+  }, [responses, previewAttendees, previewSteps, currentStepId, setTestIssues, setTestIssuesRaw]);
+  function goToPreviewStep(stepId: string) {
+    if (continueBlock) setTestIssues([]);
+    setPreviewStepId(stepId);
+  }
+  function continuePreview() {
+    if (!previewStep) return;
+    const issues = stepIssues(previewStep);
+    if (issues.length > 0) {
+      setTestIssuesRaw(issues);
+      setContinueBlock(nextContinueBlock(continueBlock, previewStep));
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const target = previewRef.current?.querySelector<HTMLElement>(".preview-field.invalid, fieldset.invalid");
+        const focusable = target?.matches("input, textarea, select, button") ? target : target?.querySelector<HTMLElement>("input:not([disabled]), textarea, select, button:not([disabled])");
+        // No invalid field (for example only the attendee count): focus the alert, which names the problem.
+        (focusable ?? previewRef.current?.querySelector<HTMLElement>(".preview-test-alert"))?.focus();
+      }));
+      return;
+    }
+    goToPreviewStep(previewSteps[previewStepIndex + 1]!.id);
+  }
   function renderPreviewField(
     field: RegistrationFormField,
     options: {
@@ -170,6 +210,7 @@ export function BuilderPreview() {
     </section>;
   }
 
+  const failedReasons = lastFailedTestReasons(selectedVersion.testSubmissions, roster?.enabled ? roster.attendeeLabel : null);
   const previewAllowedFieldKeys = new Set(previewStep?.fieldKeys ?? []);
   return (
 <aside className="panel builder-preview" data-testid="live-form-preview" id="live-form-preview" ref={previewRef} tabIndex={-1}>
@@ -189,7 +230,7 @@ export function BuilderPreview() {
                       aria-label={`Preview step ${index + 1}: ${step.shortLabel}`}
                       className={step.id === previewStep.id ? "selected" : ""}
                       type="button"
-                      onClick={() => setPreviewStepId(step.id)}
+                      onClick={() => goToPreviewStep(step.id)}
                       key={step.id}
                     >
                       <b>{index + 1}</b>
@@ -198,7 +239,7 @@ export function BuilderPreview() {
                   ))}
                 </div>
               </nav>}
-              {testIssues.length > 0 && <div className="preview-test-alert" role="alert"><AlertTriangle size={14} /><span><strong>{testIssues.length} test issue{testIssues.length === 1 ? "" : "s"}</strong><small>Fix the highlighted answer, then run the test again.</small></span></div>}
+              {testIssues.length > 0 && <div className="preview-test-alert" role="alert" tabIndex={-1} key={continueBlock ? `block-${continueBlock.attempt}` : "test"}><AlertTriangle size={14} /><span><strong>{continueBlock ? continueBlock.message : `${testIssues.length} test issue${testIssues.length === 1 ? "" : "s"}`}</strong><small>{continueBlock ? `${testIssues.length} answer${testIssues.length === 1 ? "" : "s"} to fix. Fix the highlighted answers to continue.` : "Fix the highlighted answer, then run the test again."}</small>{continueBlock && fieldlessIssues(testIssues).map((issue, index) => <small key={index}>{issue.message}</small>)}</span></div>}
               {previewStep && <section className="preview-current-step" aria-labelledby="preview-current-step-title">
                 <span>Step {previewStepIndex + 1}</span>
                 <h4 id="preview-current-step-title">{previewStep.title}</h4>
@@ -212,8 +253,8 @@ export function BuilderPreview() {
               </section>}
               {!information && calculation && (calculation.lineItems.length > 0 || definition.payment?.enabled) && <section className="preview-order-summary" aria-label="Order summary"><h4>Order summary</h4>{calculation.lineItems.length === 0 ? <p>Select a priced option to see the total.</p> : <>{calculation.lineItems.map((item) => <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong>{formatCents(item.amountCents)}</strong></div>)}<div><span>Subtotal</span><strong>{formatCents(calculation.subtotalCents)}</strong></div>{calculation.processingFeeCents > 0 && <div><span>Card processing</span><strong>{formatCents(calculation.processingFeeCents)}</strong></div>}<div className="preview-total"><span>Total</span><strong>{formatCents(calculation.totalCents)}</strong></div></>}</section>}
               {previewStep && <nav className="preview-step-actions" aria-label="Move through preview">
-                <button className="secondary-button" type="button" disabled={previewStepIndex === 0} onClick={() => setPreviewStepId(previewSteps[previewStepIndex - 1]!.id)}>Back</button>
-                {!previewStep.isReview && <button className="secondary-button" type="button" onClick={() => setPreviewStepId(previewSteps[previewStepIndex + 1]!.id)}>Continue</button>}
+                <button className="secondary-button" type="button" disabled={previewStepIndex === 0} onClick={() => goToPreviewStep(previewSteps[previewStepIndex - 1]!.id)}>Back</button>
+                {!previewStep.isReview && <button className="secondary-button" type="button" onClick={continuePreview}>Continue</button>}
               </nav>}
               {!information && previewStep?.isReview && <>
                 <button className="secondary-button full-button" type="button" disabled={busy !== null || isHistorical || dirty} title={isHistorical ? "Historical versions are read-only and cannot be tested." : dirty ? "Save your changes as a draft first, then run the test." : undefined} onClick={runTest}><ClipboardCheck size={16} /> {busy === "test" ? "Testing…" : dirty ? "Save draft to test" : "Run test submission"}</button>
@@ -223,7 +264,7 @@ export function BuilderPreview() {
           </div>
           {information
             ? <p className="fb-hint fb-info-preview-note"><ShieldCheck size={13} aria-hidden="true" /> Preview only: nothing you type here is saved or sent. Publish, then open the form in Form settings to collect answers.</p>
-            : <div className="test-summary"><Settings2 size={17} /><span><strong>{selectedVersion.testSubmissionCount} test submission{selectedVersion.testSubmissionCount === 1 ? "" : "s"}</strong><small>{hasValidTest ? "Valid test passed for this version" : testRequired ? "A valid test is required before this form's first publish" : "A test is optional now that this form has been published"}</small></span>{hasValidTest && <CheckCircle2 className="success-icon" size={18} />}</div>}
+            : <div className="test-summary"><Settings2 size={17} /><span><strong>{selectedVersion.testSubmissionCount} test submission{selectedVersion.testSubmissionCount === 1 ? "" : "s"}</strong><small>{hasValidTest ? "Valid test passed for this version" : testRequired ? "A valid test is required before this form's first publish" : "A test is optional now that this form has been published"}</small>{failedReasons.length > 0 && <small>The last test failed:</small>}{failedReasons.map((reason, index) => <small key={index}>{reason}</small>)}</span>{hasValidTest && <CheckCircle2 className="success-icon" size={18} />}</div>}
         </aside>
   );
 }

@@ -35,7 +35,8 @@ describe("reopening a club or group registration with an old bad answer (#855)",
 
   it("is wired through the form and both editors", () => {
     const form = readFileSync("components/public-registration-form.tsx", "utf8");
-    expect(form).toContain("previousResponses: club?.previousResponses?.[attendee.clientId]");
+    expect(form).toContain("previousResponses: club?.previousResponses,");
+    expect(readFileSync("modules/forms/roster-validation.ts", "utf8")).toContain("previousResponses: input.previousResponses?.[attendee.clientId]");
     for (const file of ["components/club-registration-editor.tsx", "components/group-registration-editor.tsx"]) {
       const source = readFileSync(file, "utf8");
       expect(source).toMatch(/const club = useMemo\(\(\) => \(\{\s+initialAttendees,\s+previousResponses,/);
