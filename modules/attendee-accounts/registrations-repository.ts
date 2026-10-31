@@ -17,6 +17,7 @@ import {
   processQueuedMessageIdsAfterCommit,
 } from "@/modules/communications/messaging-repository";
 import { getAttendeeRosterConfig, registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { enqueueRegistrationContactUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { moneyToCents } from "@/modules/payments/square-domain";
@@ -430,6 +431,16 @@ export async function listRegistrationsForVerifiedEmail(
     // owes (#409), never an attendee or director balance to pay online.
     // Lifecycle-aware (#1100): the same summary the public management page and checkout use,
     // so a waitlisted or cancelled registration never reads as owing money.
+    // Whether "Continue payment" has anything to open (#1405): Square is ready and the form takes payment (or a promoted
+    // waitlist registrant picks how to pay). Otherwise the summary sends the person to the event team.
+    const submissionPayment = registration.publicFormSubmission
+      ? registrationFormDefinitionSchema.safeParse(registration.publicFormSubmission.formVersion.definition)
+      : null;
+    const onlinePaymentOffered = !isDeferredOrganizationBilling
+      && !registration.groupRegistration
+      && getSquareConfiguration().paymentConfigured
+      && (registration.waitlistEntry?.status === "PROMOTED"
+        || Boolean(submissionPayment?.success && submissionPayment.data.payment?.enabled));
     const paymentSummary = summarizePublicPayment({
       status: registration.status,
       totalCents,
@@ -439,6 +450,7 @@ export async function listRegistrationsForVerifiedEmail(
       })),
       isDeferredOrganizationBilling,
       billedToGroup: Boolean(registration.groupRegistration),
+      onlinePaymentOffered,
     });
     const balanceCents = isDeferredOrganizationBilling ? 0 : paymentSummary.amountDueCents;
     const parsedDefinition = registration.publicFormSubmission

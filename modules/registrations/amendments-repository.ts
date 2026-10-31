@@ -48,6 +48,7 @@ import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
 import { cancelMealSelectionsForAttendees, plannedAttendeeMealCredit, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { MealError } from "@/modules/meals/errors";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
+import { isCardFeeDeferred, withoutDeferredCardFee } from "@/modules/payments/online-card-fee";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
 import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/modules/registrations/amendment-answers";
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
@@ -689,12 +690,19 @@ export function priceAmendedRegistration(input: {
   storedLine: FormCalculation["lineItems"][number] | null;
   redemption: AmendmentRegistration["promoCodeRedemption"];
   coversLodging: boolean;
+  /**
+   * The registration's snapshot is marked `cardFeeDeferred` (#1405): its stored total never held the online card fee,
+   * so repricing from the answers must not add the form's card fee to it (a card answer would). A fee actually paid
+   * is added back through `appliedCardSurchargeCents`, as ever. Absent or false for a registration submitted
+   * earlier, whose total already holds the fee.
+   */
+  cardFeeDeferred?: boolean;
 }) {
   const { definition, responses, calculation, storedLine, redemption } = input;
-  if (storedLine && !input.coversLodging) {
-    return addUndiscountedLine(definition, responses, applyStoredPromo(definition, responses, calculation, redemption), storedLine);
-  }
-  return applyStoredPromo(definition, responses, storedLine ? calculationWithLine(definition, responses, calculation, LODGING_LINE_KEY, storedLine) : calculation, redemption);
+  const priced = storedLine && !input.coversLodging
+    ? addUndiscountedLine(definition, responses, applyStoredPromo(definition, responses, calculation, redemption), storedLine)
+    : applyStoredPromo(definition, responses, storedLine ? calculationWithLine(definition, responses, calculation, LODGING_LINE_KEY, storedLine) : calculation, redemption);
+  return input.cardFeeDeferred ? withoutDeferredCardFee(priced) : priced;
 }
 
 function sameName(
@@ -1379,6 +1387,7 @@ async function prepareAmendment(
     storedLine: storedLodgingLine as unknown as FormCalculation["lineItems"][number] | null,
     redemption: registration.promoCodeRedemption,
     coversLodging: pricingSnapshot.promoCoversLodging === true,
+    cardFeeDeferred: isCardFeeDeferred(pricingSnapshot),
   });
   const netPaidCents = paidCents(registration);
   // Staff adjustments (#396) stay on top of whatever the new answers cost.

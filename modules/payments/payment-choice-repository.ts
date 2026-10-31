@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 import {
   paymentChoiceQuoteForSelection,
   paymentChoiceRequestFingerprint,
@@ -219,6 +220,15 @@ async function choosePromotedWaitlistPaymentInTransaction(
     throw new PaymentChoiceOperationError(
       "PAYMENT_CHOICE_UNAVAILABLE",
       "The original registration payment settings could not be verified. Contact the event team before paying.",
+    );
+  }
+
+  // A card choice re-prices the total with the card fee, so it needs online card payment to be possible (#1405).
+  // Pay later never adds a fee and stays available. (An organization-billed event was refused above.)
+  if (input.choice === "CARD" && !getSquareConfiguration().paymentConfigured) {
+    throw new PaymentChoiceOperationError(
+      "PAYMENT_CHOICE_UNAVAILABLE",
+      "Online card payment is not available right now. Choose pay later, or contact the event team.",
     );
   }
 

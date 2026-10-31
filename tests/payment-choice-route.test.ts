@@ -154,6 +154,20 @@ describe("promoted waitlist payment-choice route", () => {
     });
   });
 
+  it("answers a card choice that cannot be taken with a clean 422 (#1405)", async () => {
+    mocks.choosePublicPromotedWaitlistPayment.mockRejectedValue(
+      new mocks.PaymentChoiceOperationError(
+        "PAYMENT_CHOICE_UNAVAILABLE",
+        "Online card payment is not available right now. Choose pay later, or contact the event team.",
+      ),
+    );
+
+    const response = await POST(choiceRequest(requestBody), context);
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: "PAYMENT_CHOICE_UNAVAILABLE", retryable: false });
+  });
+
   it("rejects rate-limited or cross-origin mutations before saving", async () => {
     mocks.checkPublicManageRateLimit.mockResolvedValue(
       rateLimitOutcome(false),

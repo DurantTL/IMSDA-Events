@@ -60,11 +60,14 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
       .join(" \u00b7 ");
     return { headline: "Nothing due now", detail: `${kept}. No payment is due on a cancelled registration.`, tone: "calm" };
   }
-  if (registration.payment.paymentEligible && registration.balanceCents > 0) {
+  if (registration.balanceCents > 0 && (registration.payment.paymentEligible || registration.payment.state === "BALANCE_DUE" || registration.payment.state === "PARTIALLY_PAID")) {
     const paid = registration.paidCents ?? 0;
+    const owed = paid > 0 ? `${formatCents(paid)} paid toward your ${formatCents(total)} registration.` : `Your registration total is ${formatCents(total)}.`;
+    // The balance is owed whether or not it can be paid online (#1405): without online payment the card still shows it and
+    // says how to pay, instead of dropping the amount.
     return {
       headline: `${formatCents(registration.balanceCents)} remaining`,
-      detail: paid > 0 ? `${formatCents(paid)} paid toward your ${formatCents(total)} registration.` : `Your registration total is ${formatCents(total)}.`,
+      detail: registration.payment.paymentEligible ? owed : `${owed} Contact the event team to arrange payment.`,
       tone: "due",
     };
   }

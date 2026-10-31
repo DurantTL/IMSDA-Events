@@ -297,6 +297,11 @@ describe("money-only snapshots", () => {
     expect(moneyOnlyPricingSnapshot(null)).toEqual({});
   });
 
+  it("records that the card fee was deferred (#1405) and nothing else new", () => {
+    expect(moneyOnlyPricingSnapshot({ totalCents: 100, cardSelected: true, cardFeeDeferred: true, deferredCardFeeCents: 330 }))
+      .toEqual({ totalCents: 100, cardSelected: true, cardFeeDeferred: true });
+  });
+
   it("strips name and contact keys at any depth as a backstop", () => {
     expect(stripPersonalKeys({ totalCents: 1, attendeeNames: ["x"], nested: [{ email: "a", amountCents: 2, firstName: "Pat" }] })).toEqual({ totalCents: 1, nested: [{ amountCents: 2 }] });
   });

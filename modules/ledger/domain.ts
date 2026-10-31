@@ -29,7 +29,7 @@ export function ledgerActor(type: LedgerActorType, id: string | null, name: stri
 
 const moneyKeys = [
   "pricingDate", "formVersionId", "preDiscountSubtotalCents", "discountAmountCents", "promoCode", "subtotalCents",
-  "processingFeeCents", "totalCents", "cardSelected", "depositSelected", "registrationStatus",
+  "processingFeeCents", "totalCents", "cardSelected", "cardFeeDeferred", "depositSelected", "registrationStatus",
 ] as const;
 
 /**

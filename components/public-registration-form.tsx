@@ -222,6 +222,8 @@ type Confirmation = {
   discountAmountCents?: number;
   promoCode: string | null;
   processingFeeCents?: number;
+  /** The card fee added when this registration is paid online by card; the recorded total leaves it out (#1405). */
+  deferredCardFeeCents?: number;
   /** Church-billed events: the computed per-person price; `lineItems` is empty (#621). */
   perPerson?: PerPersonPrice;
   lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string }>;
@@ -3012,7 +3014,7 @@ export function PublicRegistrationForm({
               )}
               {(calculation.processingFeeCents ?? 0) > 0 && (
                 <div>
-                  <span>Card processing</span>
+                  <span>Card processing<small>Added when you pay online by card</small></span>
                   <strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong>
                 </div>
               )}
@@ -3419,7 +3421,7 @@ export function PublicRegistrationForm({
                   {confirmation.paymentCollected
                     ? "Your payment is recorded. Keep this confirmation code and private registration link."
                     : confirmation.cardSelected
-                      ? "Your registration is saved, but the card is not charged yet. Continue through the private registration link below to complete secure Square checkout."
+                      ? `Your registration is saved, but the card is not charged yet. Continue through the private registration link below to complete secure Square checkout.${(confirmation.deferredCardFeeCents ?? 0) > 0 ? ` A card processing fee of ${formatCents(confirmation.deferredCardFeeCents ?? 0)} is added when you pay online by card.` : ""}`
                       : confirmation.depositSelected
                         ? "Your registration is saved, but the deposit is not charged yet. Continue through the private registration link below to pay the deposit and hold your reservation."
                       : "Keep this confirmation code and private registration link for future changes."}
@@ -3773,7 +3775,7 @@ export function PublicRegistrationForm({
                   <div><span>Discounted subtotal</span><strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong></div>
                 </>
               )}
-              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing</span><strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong></div>}
+              {(calculation.processingFeeCents ?? 0) > 0 && <div><span>Card processing<small>Added when you pay online by card</small></span><strong translate="no">{formatCents(calculation.processingFeeCents ?? 0)}</strong></div>}
               <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{formatCents((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
             </div>
           )}

@@ -293,6 +293,73 @@ describe("Square payment repository", () => {
     });
   });
 
+  it("charges a new card registration (fee deferred, #1405) the fee on its stored balance, the same total the form showed", async () => {
+    const client = transactionClient();
+    // A new submission stores the subtotal only: no payment yet, so the whole $100.00 is owed.
+    client.registration.findUnique.mockResolvedValue({
+      ...registration(),
+      payments: [],
+      publicFormSubmission: {
+        ...registration().publicFormSubmission,
+        pricingSnapshot: {
+          currency: "USD",
+          subtotalCents: 10_000,
+          processingFeeCents: 0,
+          totalCents: 10_000,
+          cardSelected: true,
+          cardFeeDeferred: true,
+        },
+      },
+    });
+
+    const checkout = await getPublicSquareCheckout("a".repeat(43), {
+      client: client as never,
+      configuration,
+    });
+
+    // The form showed Card processing $3.30 and a $103.30 card total: 2.9% + 30c grossed up on $100.00.
+    expect(checkout).toMatchObject({
+      state: "READY",
+      balanceCents: 10_000,
+      surchargeCents: 330,
+      amountCents: 10_330,
+      cardSelected: false,
+    });
+    expect(checkout?.message).toContain("card processing fee");
+  });
+
+  it("keeps a legacy card registration (fee already in its stored total, no marker) at no surcharge", async () => {
+    const client = transactionClient();
+    client.registration.findUnique.mockResolvedValue({
+      ...registration(),
+      totalAmount: 103.3,
+      payments: [],
+      publicFormSubmission: {
+        ...registration().publicFormSubmission,
+        pricingSnapshot: {
+          currency: "USD",
+          subtotalCents: 10_000,
+          processingFeeCents: 330,
+          totalCents: 10_330,
+          cardSelected: true,
+        },
+      },
+    });
+
+    const checkout = await getPublicSquareCheckout("a".repeat(43), {
+      client: client as never,
+      configuration,
+    });
+
+    expect(checkout).toMatchObject({
+      state: "READY",
+      balanceCents: 10_330,
+      surchargeCents: 0,
+      amountCents: 10_330,
+      cardSelected: true,
+    });
+  });
+
   it("adds no surcharge when the event absorbs the processing fee", async () => {
     const client = transactionClient();
     client.registration.findUnique.mockResolvedValue({
@@ -344,6 +411,25 @@ describe("Square payment repository", () => {
     });
 
     expect(checkout).toMatchObject({ surchargeCents: 0, amountCents: 8_000 });
+  });
+
+  it("offers a promoted waitlist registrant only pay later while online card payment is not configured (#1405)", async () => {
+    const client = transactionClient();
+    const promoted = {
+      ...registration(),
+      waitlistEntry: { status: "PROMOTED" },
+      paymentChoiceOperations: [],
+    };
+    client.registration.findUnique.mockResolvedValue(promoted);
+
+    const off = await getPublicSquareCheckout("a".repeat(43), {
+      client: client as never,
+      configuration: { ...configuration, paymentConfigured: false },
+    });
+    const on = await getPublicSquareCheckout("a".repeat(43), { client: client as never, configuration });
+
+    expect(off).toMatchObject({ state: "CHOICE_REQUIRED", paymentChoice: { available: true, cardAvailable: false } });
+    expect(on).toMatchObject({ paymentChoice: { cardAvailable: true } });
   });
 
   it("reports no balance rather than a card form once a pay-later registration is settled", async () => {

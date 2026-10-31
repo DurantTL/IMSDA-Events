@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   paymentChoiceRequestFingerprint,
   type PaymentChoiceInput,
@@ -23,6 +23,7 @@ vi.mock("@/modules/public-access/repository", () => ({
 }));
 
 import {
+  chooseAttendeePromotedWaitlistPayment,
   choosePublicPromotedWaitlistPayment,
 } from "@/modules/payments/payment-choice-repository";
 
@@ -121,8 +122,23 @@ function prismaFor(tx: ReturnType<typeof transactionClient>) {
   };
 }
 
+function stubSquare(configured: boolean) {
+  for (const [key, value] of Object.entries({
+    SQUARE_APPLICATION_ID: "sandbox-sq0idb-example",
+    SQUARE_LOCATION_ID: "sandbox-location",
+    SQUARE_ACCESS_TOKEN: "sandbox-access-token",
+    SQUARE_WEBHOOK_SIGNATURE_KEY: "sandbox-signature-key",
+    SQUARE_WEBHOOK_NOTIFICATION_URL: "https://events.imsda.test/api/webhooks/square",
+  })) vi.stubEnv(key, configured ? value : "");
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
+  stubSquare(true);
   dependencies.authorizeRegistrationAccessToken.mockResolvedValue({
     accessTokenId: "access-1",
     registrationId: "registration-1",
@@ -283,5 +299,40 @@ describe("promoted waitlist payment-choice repository", () => {
       code: "PAYMENT_CHOICE_LOCKED",
     });
     expect(tx.registration.update).not.toHaveBeenCalled();
+  });
+
+  describe("when online card payment is not possible (#1405)", () => {
+    it("refuses a card choice on the private link and re-prices nothing", async () => {
+      stubSquare(false);
+      const tx = transactionClient();
+      dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+
+      await expect(choosePublicPromotedWaitlistPayment("a".repeat(43), input)).rejects.toMatchObject({
+        code: "PAYMENT_CHOICE_UNAVAILABLE",
+        message: expect.stringContaining("not available"),
+      });
+      expect(tx.registration.update).not.toHaveBeenCalled();
+      expect(tx.registrationPaymentChoiceOperation.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses it from the attendee account too", async () => {
+      stubSquare(false);
+      const tx = transactionClient();
+      dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+
+      await expect(chooseAttendeePromotedWaitlistPayment({ registrationId: "registration-1", eventId: "event-1" }, input))
+        .rejects.toMatchObject({ code: "PAYMENT_CHOICE_UNAVAILABLE" });
+      expect(tx.registration.update).not.toHaveBeenCalled();
+    });
+
+    it("still records pay later, with no fee", async () => {
+      stubSquare(false);
+      const tx = transactionClient();
+      dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+
+      const result = await choosePublicPromotedWaitlistPayment("a".repeat(43), { ...input, choice: "PAY_LATER" });
+
+      expect(result).toMatchObject({ choice: "PAY_LATER", processingFeeCents: 0, totalCents: 8_000 });
+    });
   });
 });
