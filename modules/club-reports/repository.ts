@@ -5,6 +5,8 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   clubReportClosedMessage,
+  clubJoinSelect,
+  clubJoinedOn,
   clubYearMonths,
   isLockedForClub,
   onTimePoints,
@@ -112,14 +114,25 @@ export async function getClubReport(organizationId: string, reportMonth: string)
   return report ? serializeReport(report) : null;
 }
 
-/** A club's year: every month, its report if any, and the year-to-date standing. */
+/**
+ * The calendar day a club joined, only for a club created through a new-club application (#1410): its
+ * creation date. Imported and other clubs return null and keep every period, as before, because their
+ * `createdAt` is an import date, not a join date.
+ */
+export async function getClubJoinedOn(organizationId: string): Promise<string | null> {
+  const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: clubJoinSelect });
+  return club ? clubJoinedOn(club) : null;
+}
+
+/** A club's year: every month, its report if any, the year-to-date standing, and the day it joined (new-club applications only). */
 export async function getClubReportYear(organizationId: string, clubYear: string) {
   const prisma = getPrisma();
-  const [reports, standing] = await Promise.all([
+  const [reports, standing, joinedOn] = await Promise.all([
     prisma.clubMonthlyReport.findMany({ where: { organizationId, clubYear }, select: reportSelect, orderBy: { reportMonth: "asc" } }),
     prisma.clubYearStanding.findUnique({ where: { organizationId_clubYear: { organizationId, clubYear } }, select: { registrationOnTime: true } }),
+    getClubJoinedOn(organizationId),
   ]);
-  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false };
+  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false, joinedOn };
 }
 
 /**
@@ -288,7 +301,7 @@ export async function listClubReportsForYear(clubYear: string) {
     prisma.organization.findMany({
       where: { type: "CLUB", isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, parentOrganization: { select: { name: true } } },
+      select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
     }),
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, status: "SUBMITTED" },
@@ -302,6 +315,8 @@ export async function listClubReportsForYear(clubYear: string) {
     name: club.name,
     church: club.parentOrganization?.name ?? "",
     registrationOnTime: onTimeByClub.get(club.id) ?? false,
+    /** The day it joined, for a club made through a new-club application; null otherwise. */
+    joinedOn: clubJoinedOn(club),
     reports: Object.fromEntries(reports
       .filter((report) => report.organizationId === club.id)
       .map((report) => [report.reportMonth, { totalPoints: report.totalPoints, onTime: report.onTimePoints > 0, reviewed: Boolean(report.reviewedAt) }])) as Record<string, { totalPoints: number; onTime: boolean; reviewed: boolean }>,

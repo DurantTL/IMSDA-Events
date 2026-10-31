@@ -17,8 +17,8 @@ vi.mock("next/navigation", () => ({ notFound: vi.fn(), redirect: vi.fn() }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({
-  requireAttendeeSecondStep: vi.fn(),
-  attendeeSecondStepPending: vi.fn().mockResolvedValue(false),
+  requireAttendeeSignInStep: vi.fn(),
+  attendeeSignInStepPending: vi.fn().mockResolvedValue(false),
 }));
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({ attendeeSignInRedirectPath: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/event-hub-repository", () => ({

@@ -10,8 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
   getCurrentAttendee: vi.fn(),
-  attendeeSecondStepPending: vi.fn(),
-  requireAttendeeSecondStep: vi.fn(),
+  attendeeSignInStepPending: vi.fn(),
+  requireAttendeeSignInStep: vi.fn(),
   listDirectedClubs: vi.fn(),
   getMfaStatus: vi.fn(),
   getPasskeySettings: vi.fn(),
@@ -44,8 +44,8 @@ vi.mock("@/modules/access/session-store", () => ({
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({
-  attendeeSecondStepPending: mocks.attendeeSecondStepPending,
-  requireAttendeeSecondStep: mocks.requireAttendeeSecondStep,
+  attendeeSignInStepPending: mocks.attendeeSignInStepPending,
+  requireAttendeeSignInStep: mocks.requireAttendeeSignInStep,
 }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 const attendeeMfaStatus = vi.hoisted(() => vi.fn());
@@ -107,8 +107,8 @@ async function renderPortal(query: { twoStep?: string } = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.attendeeSecondStepPending.mockResolvedValue(false);
-  mocks.requireAttendeeSecondStep.mockResolvedValue(undefined);
+  mocks.attendeeSignInStepPending.mockResolvedValue(false);
+  mocks.requireAttendeeSignInStep.mockResolvedValue(undefined);
   mocks.listDirectedClubs.mockResolvedValue([]);
   mocks.listUserSessions.mockResolvedValue([]);
   mocks.currentStaffActingContext.mockResolvedValue(null);
@@ -183,14 +183,14 @@ describe("/profile (staff, inside the workspace layout)", () => {
     signedIn({ staff, attendee: true, sessionVia: "staff" });
     expect(await render()).not.toContain("Announcements");
     signedIn({ staff, attendee: true });
-    mocks.attendeeSecondStepPending.mockResolvedValue(true);
+    mocks.attendeeSignInStepPending.mockResolvedValue(true);
     expect(await render()).not.toContain("Announcements");
     expect(mocks.listAccountBannerAnnouncements).not.toHaveBeenCalled();
   });
 
   it("hides settings, the verified email and announcements while a second step is pending, without redirecting staff", async () => {
     signedIn({ staff, attendee: true });
-    mocks.attendeeSecondStepPending.mockResolvedValue(true);
+    mocks.attendeeSignInStepPending.mockResolvedValue(true);
     const markup = await render();
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(markup).toContain('data-manager="staff-mfa"');
@@ -201,7 +201,7 @@ describe("/profile (staff, inside the workspace layout)", () => {
     expect(markup).toContain("Sign out of registration account");
     expect(mocks.listAccountBannerAnnouncements).not.toHaveBeenCalled();
 
-    mocks.attendeeSecondStepPending.mockResolvedValue(false);
+    mocks.attendeeSignInStepPending.mockResolvedValue(false);
     expect(await render()).toContain("pat@imsda-events.test");
   });
 
@@ -293,7 +293,7 @@ describe("/account/profile (attendee, inside the portal layout)", () => {
 
   it("applies the club second step first", async () => {
     signedIn({ attendee: true });
-    mocks.requireAttendeeSecondStep.mockImplementation(async () => {
+    mocks.requireAttendeeSignInStep.mockImplementation(async () => {
       mocks.redirect("/account/two-step");
     });
     await expect(renderPortal()).rejects.toThrow("REDIRECT /account/two-step");
@@ -358,7 +358,7 @@ describe("old attendee URLs", () => {
   });
 
   it("still applies the club second step first", async () => {
-    mocks.requireAttendeeSecondStep.mockImplementation(async () => {
+    mocks.requireAttendeeSignInStep.mockImplementation(async () => {
       mocks.redirect("/account/two-step");
     });
     await expect(AttendeeSecurityRedirect()).rejects.toThrow("REDIRECT /account/two-step");

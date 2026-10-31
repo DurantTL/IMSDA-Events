@@ -1,0 +1,91 @@
+/* Step 2 of 2 of sign-in for a club role without two-step sign-in (#1410). */
+.icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: var(--imsda-purple-soft);
+  color: var(--imsda-purple);
+}
+
+.form {
+  display: grid;
+  gap: 15px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.field label {
+  display: grid;
+  gap: 6px;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--field-border);
+  border-radius: 11px;
+  background: #fbfcfd;
+  color: var(--ink);
+  padding: 11px 12px;
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+}
+
+.status {
+  margin: 0;
+  color: var(--green);
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  font-weight: 600;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
+.linkButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--imsda-purple);
+  cursor: pointer;
+  font: inherit;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.linkButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.notice {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  border: 1px solid #d9c9ea;
+  border-radius: 12px;
+  background: var(--imsda-purple-soft);
+  color: #3f1f5e;
+  padding: 12px 14px;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+
+.notice p {
+  margin: 0;
+}

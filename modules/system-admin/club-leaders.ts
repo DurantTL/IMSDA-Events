@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { accountIdsWithTwoStepOn } from "@/modules/attendee-accounts/two-step-status";
 import {
   buildLeadersWhere,
   CLUB_LEADERS_MAX_ROWS,
@@ -22,6 +23,7 @@ export async function listClubLeaders(filters: ClubLeaderFilters, now = new Date
       organization: { select: { id: true, name: true } },
     },
   });
+  const twoStep = await accountIdsWithTwoStepOn(grants.map((grant) => grant.attendeeAccount.id));
   return sortClubLeaders(grants.map((grant) => ({
     key: grant.id,
     accountId: grant.attendeeAccount.id,
@@ -31,5 +33,6 @@ export async function listClubLeaders(filters: ClubLeaderFilters, now = new Date
     clubName: grant.organization.name,
     role: grant.role,
     roleLabel: leaderRoleLabel(grant.role),
+    twoStepOn: twoStep.has(grant.attendeeAccount.id),
   })));
 }

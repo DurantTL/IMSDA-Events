@@ -33,7 +33,7 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
     sessionId: "a1",
   }),
 }));
-vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => "OK" }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => "OK", accountNeedsSignInStep: async () => "OK" }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ isAreaCoordinator: async () => false }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: async () => [] }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => null }));

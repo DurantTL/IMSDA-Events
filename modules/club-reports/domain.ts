@@ -124,10 +124,15 @@ export function clubYearMonths(clubYear: string) {
   });
 }
 
-/** Months of the club year a club can report on now: through the current month. */
-export function reportableMonths(clubYear: string, now: Date) {
+/**
+ * Months of the club year a club can report on now: through the current month. For a club created through a
+ * new-club application (#1410), pass `joinedOn` to skip months before it joined; `keep` names months it filed
+ * anyway, which stay. Every view (Records page, staff overview, club home) reads the months through here.
+ */
+export function reportableMonths(clubYear: string, now: Date, joined: { joinedOn?: string | null; keep?: ReadonlySet<string> } = {}) {
   const current = calendarDateIn(now).slice(0, 7);
-  return clubYearMonths(clubYear).filter((month) => month <= current);
+  return clubYearMonths(clubYear).filter((month) =>
+    month <= current && (!joined.joinedOn || joined.keep?.has(month) || !reportMonthBeforeJoined(month, joined.joinedOn)));
 }
 
 export function reportMonthLabel(reportMonth: string) {
@@ -166,8 +171,15 @@ export type MonthlyReportProgress = {
  * current month, and last month before its due date, are "due soon"
  * instead, matching the "What's next" list on the same page.
  */
-export function monthlyReportProgress(clubYear: string, now: Date, filedMonths: ReadonlySet<string>): MonthlyReportProgress {
-  const due = reportableMonths(clubYear, now);
+export function monthlyReportProgress(
+  clubYear: string,
+  now: Date,
+  filedMonths: ReadonlySet<string>,
+  joinedOn: string | null = null,
+  /** Months with any report, drafts included, which stay listed whatever the join day. Defaults to the filed months. */
+  keepMonths: ReadonlySet<string> = filedMonths,
+): MonthlyReportProgress {
+  const due = reportableMonths(clubYear, now, { joinedOn, keep: keepMonths });
   const unfiled = due.filter((month) => !filedMonths.has(month));
   const missing = unfiled.filter((month) => isLockedForClub(month, now));
   const dueSoon = unfiled.filter((month) => !isLockedForClub(month, now));
@@ -181,4 +193,32 @@ export function monthlyReportProgress(clubYear: string, now: Date, filedMonths: 
 /** Year-to-date points: every report's total, plus the yearly registration when it was on time. */
 export function yearToDate(reports: ReadonlyArray<{ totalPoints: number }>, registrationOnTime: boolean) {
   return reports.reduce((sum, report) => sum + report.totalPoints, 0) + (registrationOnTime ? YEARLY_REGISTRATION_POINTS : 0);
+}
+
+/**
+ * Whether a report month ended before the club joined (#1410). Joining is the day the club was created here
+ * (`joinedOn`, a calendar date); the month it joined in still counts. Months are "YYYY-MM".
+ */
+export function reportMonthBeforeJoined(reportMonth: string, joinedOn: string) {
+  return reportMonth < joinedOn.slice(0, 7);
+}
+
+/** What to select from an organization to know its join day (#1410). */
+export const clubJoinSelect = { createdAt: true, newClubApplicationCreated: { select: { id: true } } } as const;
+
+/**
+ * The calendar day a club joined, only for a club created through a new-club application (#1410); its
+ * creation date. Imported and other clubs return null and keep every period, because their `createdAt` is an
+ * import date. One rule for every view, from one row shape, so batch grids need no extra query per club.
+ */
+export function clubJoinedOn(club: { createdAt: Date; newClubApplicationCreated: { id: string } | null }): string | null {
+  return club.newClubApplicationCreated ? calendarDateIn(club.createdAt) : null;
+}
+
+/**
+ * A month the club owes nothing for because it joined later and has no report for it. A month with any report,
+ * draft included, is never hidden: one rule on every page ("keep any month with a report").
+ */
+export function monthNotDueForClub(month: string, joinedOn: string | null | undefined, hasReport: boolean) {
+  return Boolean(joinedOn) && !hasReport && reportMonthBeforeJoined(month, joinedOn!);
 }

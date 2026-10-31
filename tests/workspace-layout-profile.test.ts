@@ -49,7 +49,7 @@ vi.mock("@/modules/access/membership-repository", () => ({
   listActiveEventRolesForUser: async () => new Map(),
 }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => null }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: async () => false }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: async () => false }));
 vi.mock("@/modules/access/mfa-service", () => ({ getMfaStatus: vi.fn() }));
 vi.mock("@/modules/access/passkeys", () => ({ getPasskeySettings: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/mfa-service", () => ({ getAttendeeMfaStatus: vi.fn() }));

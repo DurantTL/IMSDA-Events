@@ -6,7 +6,7 @@ import {
   resolveProfileSessions,
   twoStepQuery,
 } from "@/modules/account-profile/load-profile";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export default async function AttendeeProfilePage({
   searchParams: Promise<{ twoStep?: string | string[] }>;
 }) {
   const { twoStep } = await searchParams;
-  await requireAttendeeSecondStep();
+  await requireAttendeeSignInStep();
   const sessions = await resolveProfileSessions();
   if (!sessions.attendeeAccount) redirect(`/profile${twoStepQuery(twoStep)}`);
   return <ProfileView data={await loadProfileData(sessions, twoStep)} variant="portal" />;

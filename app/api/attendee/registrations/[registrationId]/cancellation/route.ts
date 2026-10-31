@@ -1,6 +1,6 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
 import { privateJson, readBoundedBody, registrantAction, registrantView, requestError } from "@/modules/cancellation-requests/api";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
@@ -21,7 +21,7 @@ async function authorize(context: Context) {
   if (!account || via !== "attendee") {
     return { ok: false as const, response: privateJson({ error: "SIGN_IN_REQUIRED", message: "Sign in to manage cancellation requests." }, { status: 401 }) };
   }
-  if (await attendeeSecondStepPending()) {
+  if (await attendeeSignInStepPending()) {
     return { ok: false as const, response: privateJson({ code: "SECOND_STEP_REQUIRED", message: "Finish two-step sign-in to manage cancellation requests." }, { status: 403 }) };
   }
   const { registrationId } = await context.params;

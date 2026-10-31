@@ -16,8 +16,13 @@ export function ClubLeadersList({
   canOpenPeople: boolean;
 }) {
   const filtered = Boolean(filters.clubId || filters.role);
+  // Leaders are added on the club's own page (Club admins). With one club picked, go straight there.
+  const addHref = filters.clubId ? `/admin/organizations/${encodeURIComponent(filters.clubId)}/directors` : "/admin/clubs";
   return (
     <div className={styles.wrap}>
+      <p className={styles.addLeader}>
+        <Link className="secondary-button" href={addHref}>Add a leader</Link>
+      </p>
       <form action="/admin/clubs/leaders" className={styles.search} method="get">
         <label className={styles.searchField}>
           Club
@@ -57,7 +62,10 @@ export function ClubLeadersList({
                 ) : (
                   <div className={styles.rowLink}>{who}</div>
                 )}
-                <p className={styles.access}><span translate="no">{leader.clubName}</span> · {leader.roleLabel}</p>
+                <p className={styles.access}>
+                  <span translate="no">{leader.clubName}</span> · {leader.roleLabel}{" "}
+                  <span className={`status-chip ${leader.twoStepOn ? "green" : "gold"}`}>{leader.twoStepOn ? "Two-step on" : "Two-step not set up"}</span>
+                </p>
               </li>
             );
           })}

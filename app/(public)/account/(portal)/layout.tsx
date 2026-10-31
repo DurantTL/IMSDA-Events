@@ -12,8 +12,9 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSignInRedirectPath, twoStepRedirectPath } from "@/modules/attendee-accounts/return-redirect";
-import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate";
+import { signInStepRedirectPath } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
+import { accountNeedsSignInStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
@@ -22,8 +23,9 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  * The signed-in attendee area: one header and one row of tabs, with each
  * job (registrations, clubs, profile, sign-in security) on its own page.
  * Every page still checks the session itself; this layout is only chrome,
- * except that it sends club roles to /account/two-step until this session has
- * passed a second step.
+ * except that it sends a session that owes the sign-in step (#1410) on: the
+ * emailed code for a club role without two-step sign-in, or the authenticator
+ * or passkey it already has. Club pages ask for a real second step themselves.
  *
  * A staff member "acting as" a club role (#442) reaches this portal with no
  * attendee account at all — the accounts stay separate. Chrome that assumes
@@ -38,15 +40,17 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     currentStaffActingContext(),
   ]);
   if (!account && !acting) redirect(await attendeeSignInRedirectPath());
-  // Club roles pass a second step before any account page (staff viewing an account use their own).
-  const secondStepPending = Boolean(account && via === "attendee" && (await accountNeedsSecondStep(account.id, sessionId)) !== "OK");
+  // A club role without two-step sign-in enters its emailed code first; one with it confirms it (staff viewing an
+  // account use their own). Their own pages open after that; club pages ask for a real second step themselves (#1410).
+  const signInStep = account && via === "attendee" ? await accountNeedsSignInStep(account.id, sessionId) : "OK";
+  const signInStepPending = signInStep !== "OK";
   // While a staff "act as" is active (#442), act-as pages resolve purely from
   // the staff session: an unrelated attendee cookie on this browser that
-  // hasn't passed its second step doesn't send them to /account/two-step.
+  // hasn't finished its sign-in step doesn't send them to /account/two-step.
   // Its account chrome is left out instead, and each page that shows the
-  // attendee account checks the second step itself.
-  if (secondStepPending && !acting) redirect(await twoStepRedirectPath());
-  const chromeAccount = secondStepPending ? null : account;
+  // attendee account checks the sign-in step itself.
+  if (signInStep !== "OK" && !acting) redirect(await signInStepRedirectPath(signInStep));
+  const chromeAccount = signInStepPending ? null : account;
   // The one other workspace this attendee identity may switch into (#108):
   // the staff workspace, only when this browser also carries a live staff
   // session — the same decision `app-shell.tsx` makes in the other direction.

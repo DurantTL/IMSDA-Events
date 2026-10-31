@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { clubsComplianceReminderCounts } from "@/modules/background-checks/repository";
+import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
 import {
   clubsNeedingAttention,
   registrationWindow,
@@ -33,7 +34,7 @@ export type AreaCoordinatorCard = {
 /** Counts of active clubs needing attention, without building the full per-club summary. */
 async function loadClubsNeedingAttention(clubYear: string, now: Date) {
   const prisma = getPrisma();
-  const clubs = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, select: { id: true } });
+  const clubs = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, select: { id: true, ...clubJoinSelect } });
   const clubIds = clubs.map((club) => club.id);
   const [reports, checks] = await Promise.all([
     prisma.clubMonthlyReport.findMany({
@@ -42,7 +43,7 @@ async function loadClubsNeedingAttention(clubYear: string, now: Date) {
     }),
     clubsComplianceReminderCounts(clubIds, clubYear),
   ]);
-  return { ...clubsNeedingAttention({ clubIds, clubYear, now, reports, checks }), clubYear };
+  return { ...clubsNeedingAttention({ clubIds, clubYear, now, reports, checks, joinedOn: new Map(clubs.map((club) => [club.id, clubJoinedOn(club)])) }), clubYear };
 }
 
 /**

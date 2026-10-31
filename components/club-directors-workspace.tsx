@@ -12,9 +12,12 @@ import {
   type DirectorGrantStatus,
 } from "@/modules/organizations/director-grants-domain";
 import type { DirectorGrantRecord } from "@/modules/organizations/director-grants-repository";
+import styles from "@/components/club-directors-workspace.module.css";
 
 type GrantResponse = {
   grants?: DirectorGrantRecord[];
+  /** The person just given a role: names and a yes or no only (#1410). */
+  granted?: { displayName: string; email: string; twoStepOn: boolean; emailQueued: boolean } | null;
   message?: string;
   issues?: Array<{ message?: string }>;
 };
@@ -25,6 +28,10 @@ const statusTone: Record<DirectorGrantStatus, string> = {
   ENDED: "gold",
   REVOKED: "coral",
 };
+
+function firstName(displayName: string) {
+  return displayName.trim().split(/\s+/)[0] || "them";
+}
 
 function formatDate(value: string | null) {
   if (!value) return "No end date";
@@ -52,9 +59,10 @@ export function ClubDirectorsWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [given, setGiven] = useState<NonNullable<GrantResponse["granted"]> | null>(null);
   const base = `/api/admin/organizations/${encodeURIComponent(club.id)}/director-grants`;
 
-  async function readResponse(response: Response) {
+  async function readResponse(response: Response): Promise<GrantResponse> {
     const result = await response.json().catch(() => ({})) as GrantResponse;
     if (!response.ok || !result.grants) {
       throw new Error(
@@ -62,6 +70,7 @@ export function ClubDirectorsWorkspace({
       );
     }
     setGrants(result.grants);
+    return result;
   }
 
   async function addDirector(event: React.FormEvent<HTMLFormElement>) {
@@ -71,6 +80,7 @@ export function ClubDirectorsWorkspace({
     setSaving(true);
     setError("");
     setNotice("");
+    setGiven(null);
     try {
       const response = await fetch(base, {
         method: "POST",
@@ -83,9 +93,10 @@ export function ClubDirectorsWorkspace({
           reason: String(form.get("reason") ?? ""),
         }),
       });
-      await readResponse(response);
+      const result = await readResponse(response);
       formElement.reset();
-      setNotice("Role given. They will see this club under My club on their account.");
+      setGiven(result.granted ?? null);
+      setNotice(result.granted ? "" : "Role given. They will see this club under My club on their account.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The director could not be assigned.");
     } finally {
@@ -99,6 +110,7 @@ export function ClubDirectorsWorkspace({
     setSaving(true);
     setError("");
     setNotice("");
+    setGiven(null);
     try {
       const response = await fetch(`${base}/${encodeURIComponent(grant.id)}`, {
         method: "PATCH",
@@ -131,6 +143,20 @@ export function ClubDirectorsWorkspace({
       </div>
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
+      {given && (
+        <div className="inline-notice success" role="status">
+          <strong>Role given to <span translate="no">{given.displayName}</span> (<span translate="no">{given.email}</span>).</strong>
+          <p className={styles.givenCopy}>
+            {given.emailQueued
+              ? <>We emailed {firstName(given.displayName)}. Their own registrations open right away.</>
+              : <>Email isn&apos;t set up on this server, so we didn&apos;t email {firstName(given.displayName)}. Their own registrations open right away.</>}
+            {given.twoStepOn
+              ? null
+              : <> Before they can open club pages, they&apos;ll set up two-step sign-in. It takes about two minutes, and we walk them through it.</>}
+          </p>
+          {!given.twoStepOn && <span className="status-chip gold">Two-step sign-in: not set up yet</span>}
+        </div>
+      )}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {club.isActive ? (
@@ -215,6 +241,14 @@ export function ClubDirectorsWorkspace({
                     <strong translate="no">{grant.account.displayName}</strong>
                     <br />
                     <small translate="no">{grant.account.email}</small>
+                    {(grant.status === "ACTIVE" || grant.status === "SCHEDULED") && (
+                      <>
+                        <br />
+                        <span className={`status-chip ${grant.twoStepOn ? "green" : "gold"}`}>
+                          {grant.twoStepOn ? "Two-step on" : "Two-step not set up"}
+                        </span>
+                      </>
+                    )}
                     {canOpenPeople ? (
                       <>
                         <br />

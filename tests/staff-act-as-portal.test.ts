@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
   listDirectedClubs: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
+  accountNeedsSignInStep: vi.fn(),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
   writeAuditLog: vi.fn(),
@@ -53,7 +54,10 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/passkeys", () => ({ passkeysConfigured: async () => false }));
-vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({
+  accountNeedsSecondStep: mocks.accountNeedsSecondStep,
+  accountNeedsSignInStep: mocks.accountNeedsSignInStep,
+}));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 // A roster add now also matches the background-check list (#527) — an
 // unrelated side effect here, so it's stubbed out like the other modules
@@ -95,6 +99,7 @@ beforeEach(() => {
     accountId === "account-b" ? [{ organizationId: "club-b", name: "Club B", role: "DIRECTOR", sponsoringChurch: null }] : []
   ));
   mocks.accountNeedsSecondStep.mockResolvedValue("OK");
+  mocks.accountNeedsSignInStep.mockResolvedValue("OK");
   mocks.orgFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => clubs[where.id] ?? null);
   mocks.memberFindMany.mockResolvedValue([]);
   mocks.personCreate.mockResolvedValue({ id: "person-1" });
@@ -209,15 +214,21 @@ describe("a Clubs Administrator acting as club A's director (#1232)", () => {
 
 describe("the account portal layout while acting (#442)", () => {
   it("doesn't send an act-as to /account/two-step because of an unrelated attendee cookie", async () => {
-    mocks.accountNeedsSecondStep.mockResolvedValue("VERIFY");
+    mocks.accountNeedsSignInStep.mockResolvedValue("VERIFY");
     await expect(AccountPortalLayout({ children: null })).resolves.toBeTruthy();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
   it("still sends an attendee who hasn't passed the second step there when nobody is acting", async () => {
     mocks.actAsFindFirst.mockResolvedValue(null);
-    mocks.accountNeedsSecondStep.mockResolvedValue("VERIFY");
+    mocks.accountNeedsSignInStep.mockResolvedValue("VERIFY");
     await expect(AccountPortalLayout({ children: null })).rejects.toThrow("REDIRECT /account/two-step");
+  });
+
+  it("sends an attendee who owes the emailed code to the code page, not to club setup", async () => {
+    mocks.actAsFindFirst.mockResolvedValue(null);
+    mocks.accountNeedsSignInStep.mockResolvedValue("EMAIL_CODE");
+    await expect(AccountPortalLayout({ children: null })).rejects.toThrow("REDIRECT /account/sign-in/code");
   });
 });
 

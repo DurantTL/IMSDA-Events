@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { logError } from "@/lib/logger";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { PasskeyError } from "@/modules/attendee-accounts/passkeys";
+import { accountNeedsSignInStep } from "@/modules/attendee-accounts/sign-in-gate";
 
 const statusFor: Record<PasskeyError["code"], number> = {
   PASSKEYS_NOT_AVAILABLE: 409,
@@ -17,14 +18,30 @@ const statusFor: Record<PasskeyError["code"], number> = {
 
 export class PasskeySessionError extends Error {}
 
+/**
+ * The session still owes the emailed sign-in code (#1410). Two-step setup is refused until it is entered:
+ * otherwise someone who only knows a club director's password could enrol their own authenticator or passkey
+ * and walk past the code.
+ */
+export class SignInCodeRequiredError extends PasskeySessionError {}
+
+export function signInCodeRequired() {
+  return Response.json(
+    { error: "SIGN_IN_CODE_REQUIRED", message: "Enter the sign-in code we emailed you before changing two-step sign-in." },
+    { status: 403 },
+  );
+}
+
 /** Passkeys belong to a person's own attendee sign-in, never a staff session viewing as them. */
 export async function requireOwnAttendeeSession() {
   const { account, via, sessionId } = await getCurrentAttendee();
   if (!account || via !== "attendee" || !sessionId) throw new PasskeySessionError();
+  if ((await accountNeedsSignInStep(account.id, sessionId)) === "EMAIL_CODE") throw new SignInCodeRequiredError();
   return { account, sessionId };
 }
 
 export function passkeyApiError(error: unknown, action: string) {
+  if (error instanceof SignInCodeRequiredError) return signInCodeRequired();
   if (error instanceof PasskeySessionError) {
     return Response.json(
       { error: "OWN_SESSION_REQUIRED", message: "Sign in with your own attendee account to manage passkeys." },

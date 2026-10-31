@@ -1,4 +1,4 @@
-import { clubYearMonths, isLockedForClub, reportMonthLabel, yearToDate } from "@/modules/club-reports/domain";
+import { clubYearMonths, isLockedForClub, monthNotDueForClub, reportMonthLabel, yearToDate } from "@/modules/club-reports/domain";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { toCsv } from "@/modules/reporting/csv";
 import { firstParam } from "@/lib/search-params";
@@ -32,6 +32,8 @@ export type AreaSummaryInput = {
   /** Active roster members of type Adult or Staff (#1186). Optional so older callers keep compiling; counts only. */
   adultCount?: number;
   registrationOnTime: boolean;
+  /** The day the club joined, for a club made through a new-club application (#1410); null or absent keeps every month. */
+  joinedOn?: string | null;
   backgroundChecks: { missing: number; notInCompliance: number; expiringSoon: number };
   reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number; reviewedAt?: Date | null }>;
 };
@@ -60,18 +62,20 @@ export function monthCell(
   month: string,
   report: AreaSummaryInput["reports"][number] | undefined,
   now: Date,
+  joinedOn: string | null = null,
 ): MonthCell {
   if (report?.status === "SUBMITTED") {
     return { month, status: report.onTimePoints > 0 ? "SUBMITTED" : "LATE", points: report.totalPoints, reviewed: Boolean(report.reviewedAt) };
   }
   if (report?.status === "DRAFT") return { month, status: "DRAFT", points: null };
-  if (month > calendarDateIn(now).slice(0, 7)) return { month, status: "FUTURE", points: null };
+  // Before the club joined, with no report: nothing is owed, so it is "not yet due" like a future month (#1410).
+  if (month > calendarDateIn(now).slice(0, 7) || monthNotDueForClub(month, joinedOn, false)) return { month, status: "FUTURE", points: null };
   return { month, status: isLockedForClub(month, now) ? "MISSING" : "DUE", points: null };
 }
 
 export function summarizeClub(input: AreaSummaryInput, clubYear: string, now: Date): AreaClubSummary {
   const byMonth = new Map(input.reports.map((report) => [report.reportMonth, report]));
-  const months = clubYearMonths(clubYear).map((month) => monthCell(month, byMonth.get(month), now));
+  const months = clubYearMonths(clubYear).map((month) => monthCell(month, byMonth.get(month), now, input.joinedOn ?? null));
   const submittedReports = input.reports.filter((report) => report.status === "SUBMITTED");
   const submittedMonths = months.filter((cell) => cell.status === "SUBMITTED" || cell.status === "LATE");
   return {

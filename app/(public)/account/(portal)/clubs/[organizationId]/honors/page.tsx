@@ -4,7 +4,7 @@ import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
 
-export const metadata: Metadata = { title: "Club honors" };
+export const metadata: Metadata = { title: "Honors" };
 export const dynamic = "force-dynamic";
 
 /**

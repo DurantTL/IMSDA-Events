@@ -21,7 +21,7 @@ import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 
-export const metadata: Metadata = { title: "Club forms" };
+export const metadata: Metadata = { title: "Forms" };
 export const dynamic = "force-dynamic";
 
 /**

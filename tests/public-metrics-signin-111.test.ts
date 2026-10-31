@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** #111: the attendee sign-in route counts worked/failed by method only and answers exactly as before. Synthetic data only. */
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
 const mocks = vi.hoisted(() => ({
   authenticateAttendee: vi.fn(),
   recordPublicMetric: vi.fn(),

@@ -1,10 +1,14 @@
 import { notFound } from "next/navigation";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorViewerActive, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /** The Area Coordinator's Clubs section (#657): its own menu, view only, nothing for anyone but a coordinator. */
 export default async function AreaClubsLayout({ children }: { children: React.ReactNode }) {
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  if (!(await currentAreaCoordinatorViewerActive())) {
+    // A coordinator without a real second step in this session is sent to the club gate, not shown a 404 (#1410).
+    await requireSecondStepForAreaCoordinator();
+    notFound();
+  }
   return (
     <>
       <CoordinatorShellHeader>

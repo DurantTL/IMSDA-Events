@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.pending }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.pending }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ authorizeAttendeeRegistration: mocks.authorize }));
 vi.mock("@/modules/payments/square-hosted-repository", () => ({ createAttendeeSquarePaymentLink: mocks.createLink }));
 vi.mock("@/modules/payments/square-repository", () => ({ SquarePaymentOperationError: mocks.SquarePaymentOperationError }));

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,6 @@ export const dynamic = "force-dynamic";
  * second step is still sent to /account/two-step first, exactly as before.
  */
 export default async function AttendeeSecurityPage() {
-  await requireAttendeeSecondStep();
+  await requireAttendeeSignInStep();
   redirect("/account/profile");
 }

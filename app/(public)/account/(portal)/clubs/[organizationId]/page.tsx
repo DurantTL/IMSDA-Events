@@ -99,7 +99,7 @@ export default async function ClubHomePage({
       load(listUpcomingDeadlines()),
       access.capabilities.submitReports ? load(getClubReportYear(organizationId, clubYear)) : Promise.resolve(null),
     ]);
-    const { steps, deadlines } = reportYear && reportYear !== "ERROR" ? monthlyRecordSteps(reportYear.reports, clubYear, base, now) : { steps: [], deadlines: {} };
+    const { steps, deadlines } = reportYear && reportYear !== "ERROR" ? monthlyRecordSteps(reportYear.reports, clubYear, base, now, reportYear.joinedOn) : { steps: [], deadlines: {} };
     const reportsFailed = reportYear === "ERROR";
     return (
       <>
@@ -168,7 +168,7 @@ export default async function ClubHomePage({
     else steps.push(...rosterSteps(members, base));
     if (reportYear === "ERROR") unavailable.push("Monthly Records");
     else if (reportYear) {
-      const records = monthlyRecordSteps(reportYear.reports, clubYear, base, now);
+      const records = monthlyRecordSteps(reportYear.reports, clubYear, base, now, reportYear.joinedOn);
       steps.push(...records.steps);
       Object.assign(deadlines, records.deadlines);
     }

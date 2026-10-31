@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { getPrisma } from "@/lib/prisma";
 import { listWaitingClubsForCoordinator } from "@/modules/event-locations/waitlist";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinator, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Waitlists", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -15,7 +15,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaWaitlistsPage() {
   const coordinator = await currentAreaCoordinator();
-  if (!coordinator) notFound();
+  if (!coordinator) {
+    // Sent to the club gate when the second step is what is missing (#1410), otherwise there is nothing here.
+    await requireSecondStepForAreaCoordinator();
+    notFound();
+  }
   const locations = await listWaitingClubsForCoordinator(getPrisma(), coordinator.id);
   const withClubs = locations.filter((location) => location.clubs.length > 0);
 

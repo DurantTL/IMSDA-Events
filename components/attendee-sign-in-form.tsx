@@ -5,7 +5,7 @@ import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
-import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
+import { attendeeReturnDestination, signInCodePathFor } from "@/modules/attendee-accounts/return-destination";
 import {
   attendeeAuthReturnPathFromHash,
   attendeeSignUpEmailPrefill,
@@ -43,7 +43,9 @@ export function AttendeeSignInForm({ next }: { next?: string }) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to sign in.");
-      router.replace(takeAttendeeAuthReturnPath() ?? attendeeReturnDestination(next, "/account"));
+      const destination = takeAttendeeAuthReturnPath() ?? attendeeReturnDestination(next, "/account");
+      // Step 2 of 2: a club role without two-step sign-in enters the code just emailed to them (#1410).
+      router.replace(result.signInCode?.required ? signInCodePathFor(destination) : destination);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to sign in.");

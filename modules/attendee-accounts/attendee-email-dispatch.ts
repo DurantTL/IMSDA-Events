@@ -101,3 +101,25 @@ export async function queueAttendeeEditVerificationEmail(input: {
   }
   return dispatch;
 }
+
+/** Queues the sign-in code email (#1410). The pending code row is bound to this message so delivery can mint into it. */
+export async function queueAttendeeSignInCodeEmail(input: {
+  accountId: string;
+  stepUpCodeId: string;
+  email: string;
+  displayName: string;
+}): Promise<AttendeeEmailDispatch> {
+  const dispatch = await queue({
+    accountId: input.accountId,
+    email: input.email,
+    displayName: input.displayName,
+    selection: { kind: "sign-in-code" },
+  });
+  if (
+    dispatch.messageId
+    && !await bindAttendeeStepUpMessage(input.stepUpCodeId, dispatch.messageId)
+  ) {
+    throw new Error("The sign-in code message could not be bound to its session.");
+  }
+  return dispatch;
+}

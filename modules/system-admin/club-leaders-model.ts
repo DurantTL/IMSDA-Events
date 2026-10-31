@@ -39,6 +39,8 @@ export type ClubLeader = {
   clubName: string;
   role: ClubRoleValue;
   roleLabel: string;
+  /** Only a yes or no: an authenticator app or passkey is set up (#1410). */
+  twoStepOn: boolean;
 };
 
 const roleOrder = new Map<string, number>(CLUB_ROLE_VALUES.map((role, index) => [role, index]));

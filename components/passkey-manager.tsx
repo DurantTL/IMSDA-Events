@@ -22,6 +22,9 @@ export function PasskeyManager({
   needsConfirmation,
   hasAuthenticator,
   onAdded,
+  heading = "Passkeys",
+  eyebrow = "Sign-in and second step",
+  hideIntro = false,
 }: {
   initialPasskeys: PasskeySummary[];
   /** Whether an administrator has switched passkeys on for this site. */
@@ -31,6 +34,11 @@ export function PasskeyManager({
   hasAuthenticator: boolean;
   /** Called once a new passkey is added. */
   onAdded?: () => void;
+  /** The setup screen names the method, not the feature (#1410). */
+  heading?: string;
+  eyebrow?: string;
+  /** The setup screen already said why; skip the generic paragraph. */
+  hideIntro?: boolean;
 }) {
   const [passkeys, setPasskeys] = useState(initialPasskeys);
   const [name, setName] = useState("");
@@ -85,14 +93,16 @@ export function PasskeyManager({
     <section className="public-manage-card passkey-manager" aria-labelledby="passkeys-heading">
       {confirmDialog}
       <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">Sign-in and second step</p>
-        <h2 id="passkeys-heading"><Fingerprint size={20} aria-hidden="true" /> Passkeys</h2>
+        <p className="public-registration-eyebrow">{eyebrow}</p>
+        <h2 id="passkeys-heading"><Fingerprint size={20} aria-hidden="true" /> {heading}</h2>
       </div>
-      <p>
-        Use your phone or computer&apos;s fingerprint, face, or PIN instead of typing a code. It works
-        anywhere your authenticator code does, and you can keep both. You can also sign in with a passkey
-        instead of your password; that counts as the second step too.
-      </p>
+      {!hideIntro && (
+        <p>
+          Use your phone or computer&apos;s fingerprint, face, or PIN instead of typing a code. It works
+          anywhere your authenticator code does, and you can keep both. You can also sign in with a passkey
+          instead of your password; that counts as the second step too.
+        </p>
+      )}
 
       {!available ? (
         <p className="public-manage-empty">Passkeys aren&apos;t turned on for this site yet. Your authenticator app works as before.</p>

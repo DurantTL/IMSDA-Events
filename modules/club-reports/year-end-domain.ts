@@ -465,3 +465,8 @@ export function yearEndProgress(clubs: ReadonlyArray<{ status: "NONE" | "DRAFT" 
   const submitted = clubs.filter((club) => club.status === "SUBMITTED").length;
   return { submitted, missing: clubs.length - submitted, drafts: clubs.filter((club) => club.status === "DRAFT").length };
 }
+
+/** Whether a Pathfinder year's Year-End Report was already past due on the calendar date a club joined (#1410): nothing was owed from it. */
+export function reportYearDueBeforeJoined(reportYear: string, joinedOn: string) {
+  return reportYearDueDate(reportYear) < joinedOn;
+}

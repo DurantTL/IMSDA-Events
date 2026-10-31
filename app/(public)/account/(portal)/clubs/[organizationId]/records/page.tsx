@@ -4,17 +4,16 @@ import { ArrowRight, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
 import { PortalContextualHelp } from "@/components/contextual-help-slot";
 import { ClubMeetingNotes } from "@/components/club-meeting-notes";
 import { ClubReportForm } from "@/components/club-report-form";
-import { calendarDateIn } from "@/modules/calendar/domain";
 import { attendanceMonthExportHref, defaultMeetingDate, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { listAttendanceRoster, listClubMeetingNotes, monthlyNotesSummary } from "@/modules/club-meeting-notes/repository";
 import {
   ON_TIME_POINTS,
   YEARLY_REGISTRATION_POINTS,
-  clubYearMonths,
   formatDueDate,
   isLockedForClub,
   onTimePoints,
   reportDueDate,
+  reportableMonths,
   reportMonthLabel,
   yearToDate,
 } from "@/modules/club-reports/domain";
@@ -23,6 +22,7 @@ import {
   formatReportYearDueDate,
   isPastDue,
   reportYearSpanLabel,
+  reportYearDueBeforeJoined,
   reportableReportYears,
 } from "@/modules/club-reports/year-end-domain";
 import { listYearEndReportsForClub } from "@/modules/club-reports/year-end-repository";
@@ -58,8 +58,6 @@ export default async function ClubRecordsPage({
   const now = new Date();
   const month = recordsMonth(monthParam, now);
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
-  const currentMonth = calendarDateIn(now).slice(0, 7);
-  const switcherMonths = clubYearMonths(clubYear).filter((candidate) => candidate <= currentMonth);
 
   // The check-off lists roster names, so it needs the roster's own gate (MFA and an open unlock), not just the report role.
   const attendanceAvailable = (await getRosterAccessState(organizationId, now)).state === "OPEN";
@@ -72,6 +70,10 @@ export default async function ClubRecordsPage({
     getClubReportYear(organizationId, clubYear),
   ]);
   const reportsByMonth = new Map(reportYear.reports.map((entry) => [entry.reportMonth, entry]));
+  // A club made this month is not behind on earlier ones (#1410). A month the club did file anyway stays listed.
+  // Any month with a report, a draft included, stays listed whatever the join day (the staff overview does the same).
+  const joinedOn = reportYear.joinedOn;
+  const switcherMonths = reportableMonths(clubYear, now, { joinedOn, keep: new Set(reportsByMonth.keys()) });
   const submittedReports = reportYear.reports.filter((entry) => entry.status === "SUBMITTED");
   // The export only serves the previous, current and next club year.
   const exportable = clubYearChoices(now).includes(clubYear);
@@ -91,6 +93,8 @@ export default async function ClubRecordsPage({
   const recordsBase = `/account/clubs/${organizationId}/records`;
   const yearEndYears = reportableReportYears(now);
   const yearEndReports = await listYearEndReportsForClub(organizationId, yearEndYears);
+  const dueYearEndYears = yearEndYears.filter((year) =>
+    yearEndReports.has(year) || !joinedOn || !reportYearDueBeforeJoined(year, joinedOn));
 
   return (
     <>
@@ -118,6 +122,7 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Reports are due the 10th of the next month</p>
           <h2>Monthly Records</h2>
         </div>
+        {switcherMonths.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
         <ul className="public-manage-club-list">
           {[...switcherMonths].reverse().map((candidate) => {
             const filed = reportsByMonth.get(candidate);
@@ -184,8 +189,9 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Due April 1, pre-filled from your roster, honors, and classes</p>
           <h2 id="club-year-end-heading">Year-End Report</h2>
         </div>
+        {dueYearEndYears.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
         <ul className="public-manage-club-list">
-          {yearEndYears.map((year) => {
+          {dueYearEndYears.map((year) => {
             const yearEnd = yearEndReports.get(year);
             const submitted = yearEnd?.status === "SUBMITTED";
             const yearEndDue = formatReportYearDueDate(year);

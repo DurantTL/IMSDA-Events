@@ -37,6 +37,13 @@ export const ONE_TIME_CODE_MAX_ATTEMPTS = 5;
 export const EMAIL_VERIFICATION_LIFETIME_MINUTES = 20;
 
 /**
+ * The emailed sign-in code a club-role account without two-step sign-in enters after its
+ * password (#1410). Shorter than the other codes on purpose: it guards the front door, and
+ * the person is at their inbox right now.
+ */
+export const SIGN_IN_CODE_LIFETIME_MINUTES = 10;
+
+/**
  * How long the browser handle may wait for a queued message to be prepared.
  *
  * This is deliberately longer than the code lifetime. The handle grants

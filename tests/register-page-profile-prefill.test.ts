@@ -17,7 +17,7 @@ vi.mock("@/modules/forms/public-repository", () => ({ getPublicRegistrationExper
 vi.mock("@/modules/event-info-cards/repository", () => ({ getAutoEventInfoCards: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/modules/events/content-repository", () => ({ listPublishedRegistrationInfoCards: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.secondStepPending }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.secondStepPending }));
 vi.mock("@/modules/attendee-accounts/profile-service", async () => {
   const actual = await vi.importActual<typeof import("@/modules/attendee-accounts/profile-service")>(
     "@/modules/attendee-accounts/profile-service",

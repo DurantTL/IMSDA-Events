@@ -19,7 +19,7 @@ import { AttendeeCommunityBoard } from "@/components/attendee-community-board";
 import { AttendeePassGrid } from "@/components/attendee-pass-grid";
 import { BrandMark } from "@/components/brand-mark";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { attendeeSecondStepPending, requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending, requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { splitParagraphs } from "@/modules/communications/account-banner-domain";
@@ -54,7 +54,7 @@ export async function generateMetadata({
     if (query.preview === "staff" && staffSession.user) {
       return getEventHubTitleForViewer({ eventSlug, staffUser: staffSession.user });
     }
-    if (!attendeeSession.account || (await attendeeSecondStepPending())) return null;
+    if (!attendeeSession.account || (await attendeeSignInStepPending())) return null;
     return getEventHubTitleForViewer({ eventSlug, attendeeEmail: attendeeSession.account.verifiedEmail });
   })().catch(() => null);
   return {
@@ -122,7 +122,7 @@ export default async function AttendeeEventHubPage({
   } else {
     if (!attendeeSession.account) redirect(await attendeeSignInRedirectPath());
     // Same second-step gate as the rest of the portal (#568).
-    await requireAttendeeSecondStep();
+    await requireAttendeeSignInStep();
     const attendeeHub = await getAttendeeEventHub(
       attendeeSession.account.verifiedEmail,
       eventSlug,

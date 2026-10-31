@@ -1,6 +1,7 @@
 "use client";
 
 import { useConfirm } from "@/components/use-confirm";
+import Link from "next/link";
 import { useState } from "react";
 import { Ban, Pencil, Send } from "lucide-react";
 import type { ClubInviteRecord } from "@/modules/club-imports/invites";
@@ -86,6 +87,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
           </p>
         </div>
         <div className="intro-actions">
+          <Link className="secondary-button" href="/admin/clubs">Add a leader</Link>
           <button
             className="primary-button"
             disabled={busy || pending.length === 0 || !emailConfigured}

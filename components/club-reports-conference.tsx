@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { clubYearMonths, isLockedForClub, yearToDate } from "@/modules/club-reports/domain";
+import { clubYearMonths, isLockedForClub, monthNotDueForClub, yearToDate } from "@/modules/club-reports/domain";
 import type { ClubYearSummary } from "@/modules/club-reports/repository";
 import { cardCell } from "@/components/table-card-labels";
 
@@ -46,7 +46,7 @@ export function ClubReportsConference({
     }
   }
 
-  const missingTotal = clubs.reduce((sum, club) => sum + months.filter((month) => !club.reports[month] && isLockedForClub(month, today)).length, 0);
+  const missingTotal = clubs.reduce((sum, club) => sum + months.filter((month) => !club.reports[month] && !monthNotDueForClub(month, club.joinedOn, false) && isLockedForClub(month, today)).length, 0);
 
   return (
     <section className="page-stack">
@@ -90,7 +90,8 @@ export function ClubReportsConference({
                   <th role="rowheader" scope="row" translate="no">{club.name}{club.church && <small>{club.church}</small>}</th>
                   {months.map((month) => {
                     const report = club.reports[month];
-                    const future = month > now.slice(0, 7);
+                    // A month before a new club joined is shown like a future month: nothing is owed for it (#1410).
+                    const future = month > now.slice(0, 7) || monthNotDueForClub(month, club.joinedOn, false);
                     const href = viewOnlyReportHref
                       ? `${viewOnlyReportHref.base}/${encodeURIComponent(club.id)}/${month}${viewOnlyReportHref.query}`
                       : `/admin/clubs/reports/${encodeURIComponent(club.id)}/${month}`;

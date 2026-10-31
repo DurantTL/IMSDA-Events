@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
 import { paymentChoiceInputSchema } from "@/modules/payments/payment-choice-domain";
 import {
@@ -38,7 +38,7 @@ async function postHandler(request: Request, context: Context) {
   if (!account || via !== "attendee") {
     return json({ message: "This registration is unavailable." }, { status: 404 });
   }
-  if (await attendeeSecondStepPending()) return secondStepRequired();
+  if (await attendeeSignInStepPending()) return secondStepRequired();
   const { registrationId } = await context.params;
   const access = await authorizeAttendeeRegistration(
     account.verifiedEmail,

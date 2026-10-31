@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
 import { squarePaymentInputSchema } from "@/modules/payments/square-domain";
 import {
@@ -41,7 +41,7 @@ type Access =
 async function access(context: Context): Promise<Access> {
   const { account, via } = await getCurrentAttendee();
   if (!account || via !== "attendee") return { authorized: null };
-  if (await attendeeSecondStepPending()) return { blocked: secondStepRequired() };
+  if (await attendeeSignInStepPending()) return { blocked: secondStepRequired() };
   const { registrationId } = await context.params;
   return { authorized: await authorizeAttendeeRegistration(account.verifiedEmail, registrationId) };
 }

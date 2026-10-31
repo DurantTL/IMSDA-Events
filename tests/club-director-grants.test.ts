@@ -11,9 +11,12 @@ const mocks = vi.hoisted(() => ({
   createGrant: vi.fn(),
   updateGrants: vi.fn(),
   getCurrentAttendee: vi.fn(),
+  queueEmail: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/two-step-status", () => ({ accountHasTwoStepOn: async () => false, accountIdsWithTwoStepOn: async () => new Set<string>() }));
+vi.mock("@/modules/organizations/club-role-notice", () => ({ queueClubRoleGivenEmail: mocks.queueEmail }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
@@ -76,6 +79,7 @@ beforeEach(() => {
   mocks.createGrant.mockResolvedValue({ id: "grant-1" });
   mocks.updateGrants.mockResolvedValue({ count: 1 });
   mocks.writeAuditLog.mockResolvedValue({});
+  mocks.queueEmail.mockResolvedValue("message-1");
 });
 
 describe("director grant rules", () => {

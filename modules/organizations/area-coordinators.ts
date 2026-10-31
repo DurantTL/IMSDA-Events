@@ -6,6 +6,7 @@ import { resolveClubsActor } from "@/modules/access/admin-roles";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
@@ -37,6 +38,17 @@ export async function isAreaCoordinator(attendeeAccountId: string, now = new Dat
     select: { revokedAt: true, expiresAt: true },
   });
   return areaGrantActive(grant, now);
+}
+
+/**
+ * For Area Coordinator pages: a coordinator (by grant alone) whose session has not passed a real second step
+ * goes to the club gate (#1410). Anyone else is left alone, so the page can answer notFound() straight away.
+ */
+export async function requireSecondStepForAreaCoordinator() {
+  const { account, via } = await getCurrentAttendee();
+  if (!account || via !== "attendee") return;
+  if (!(await isAreaCoordinator(account.id))) return;
+  await requireAttendeeSecondStep();
 }
 
 /**

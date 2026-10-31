@@ -415,7 +415,8 @@ describe("empty states offer a create action only to an authorized viewer (#743)
       canSeeBirthDates: false, clubYear: "2026-27", initialMembers: [], organizationId: "org-1", readOnly,
     }));
     expect(render(false)).toContain("No one is on the roster yet");
-    expect(render(false)).toContain(">Add to roster</button>");
+    // One "Add to roster" button, in the heading: the empty state does not repeat it (#1410).
+    expect(render(false).match(/>Add to roster<\/button>|Add to roster<\/button>/g)).toHaveLength(1);
     expect(render(true)).toContain("No one is on the roster yet");
     expect(render(true)).not.toContain("Add to roster");
   });

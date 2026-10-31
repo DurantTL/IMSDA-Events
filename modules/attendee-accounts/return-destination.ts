@@ -2,6 +2,8 @@ import { safeReturnTo } from "@/lib/return-to";
 
 export const ATTENDEE_SIGN_IN_PATH = "/account/sign-in";
 export const TWO_STEP_PATH = "/account/two-step";
+/** The emailed sign-in code page (#1410): step 2 of 2 for a club-role account without two-step sign-in. */
+export const SIGN_IN_CODE_PATH = "/account/sign-in/code";
 /** Short-lived cookie carrying the destination across the Google round trip. */
 export const ATTENDEE_OAUTH_NEXT_COOKIE_NAME = "imsda_attendee_oauth_next";
 
@@ -11,6 +13,7 @@ const NON_RETURNABLE_PATHS = [
   "/account/sign-up",
   "/account/forgot-password",
   TWO_STEP_PATH,
+  SIGN_IN_CODE_PATH,
   "/profile/sign-in",
 ] as const;
 
@@ -56,4 +59,9 @@ export function attendeeSignInPathFor(target: string | null | undefined): string
 /** `/account/two-step`, carrying `target` as `?next=` only when it is a safe destination. */
 export function twoStepPathFor(target: string | null | undefined): string {
   return pathWithNext(TWO_STEP_PATH, target);
+}
+
+/** `/account/sign-in/code`, carrying `target` as `?next=` only when it is a safe destination. */
+export function signInCodePathFor(target: string | null | undefined): string {
+  return pathWithNext(SIGN_IN_CODE_PATH, target);
 }

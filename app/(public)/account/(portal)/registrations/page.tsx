@@ -14,7 +14,7 @@ import { getRegistrantRequestViewById } from "@/modules/cancellation-requests/re
 import type { RegistrantRequestView } from "@/modules/cancellation-requests/views";
 import { registrationViewLink } from "@/modules/attendee-accounts/registration-card";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 import {
   parseHistoryFilter,
   registrationActions,
@@ -137,7 +137,7 @@ export default async function AttendeeRegistrationsPage({
 }: {
   searchParams?: Promise<{ show?: string | string[] }>;
 } = {}) {
-  await requireAttendeeSecondStep();
+  await requireAttendeeSignInStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
   const filter = parseHistoryFilter((await searchParams)?.show);

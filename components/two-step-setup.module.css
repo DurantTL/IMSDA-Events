@@ -1,0 +1,137 @@
+/* The club gate and two-step setup (#1410). */
+.why {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid #d9c9ea;
+  border-radius: 14px;
+  background: var(--imsda-purple-soft);
+  color: #3f1f5e;
+  padding: 15px;
+}
+
+.why > svg {
+  margin-top: 1px;
+}
+
+.why strong {
+  display: block;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.why p {
+  margin: 4px 0 0;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+
+.checks {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+}
+
+.checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.checks svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--green);
+}
+
+.primary {
+  display: inline-flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+}
+
+.skip {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--imsda-purple);
+  cursor: pointer;
+  font: inherit;
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+}
+
+.options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  padding: 12px 14px;
+}
+
+.option input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--imsda-purple);
+}
+
+.option strong,
+.option small {
+  display: block;
+}
+
+.option small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+}
+
+.selected {
+  border-color: var(--imsda-purple);
+  background: var(--imsda-purple-soft);
+}
+
+.chip {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--imsda-gold-soft);
+  color: #6f5316;
+  padding: 1px 8px;
+  font-size: max(var(--type-floor, 0px), 0.8125rem);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.finish p {
+  font-size: max(var(--type-body-floor, 0px), 0.9375rem);
+}

@@ -435,7 +435,7 @@ export function ClubOrderWorkspace({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="public-registration-eyebrow">Club supplies</p>
+          <p className="public-registration-eyebrow">Honors, uniforms and supplies</p>
           <h2>Orders</h2>
         </div>
         <span className="count-badge">{onList.length} {onList.length === 1 ? "line" : "lines"}</span>

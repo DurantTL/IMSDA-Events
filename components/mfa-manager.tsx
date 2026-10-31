@@ -26,6 +26,9 @@ export function MfaManager({
   attendee = false,
   otherMethodAvailable = false,
   onEnrolled,
+  heading = "Two-factor authentication",
+  eyebrow = "Account security",
+  hideIntro = false,
 }: {
   initialStatus: MfaStatus;
   endpoint?: string;
@@ -34,6 +37,11 @@ export function MfaManager({
   otherMethodAvailable?: boolean;
   /** Called once an authenticator is confirmed and turned on. */
   onEnrolled?: () => void;
+  /** The setup screen names the method, not the feature (#1410). */
+  heading?: string;
+  eyebrow?: string;
+  /** The setup screen already said why; skip the generic paragraph. */
+  hideIntro?: boolean;
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [offer, setOffer] = useState<{ secret: string; otpauthUri: string } | null>(null);
@@ -102,8 +110,8 @@ export function MfaManager({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Account security</p>
-          <h2>Two-factor authentication</h2>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{heading}</h2>
         </div>
         <span className="count-badge">
           {status.status === "ACTIVE"
@@ -118,7 +126,7 @@ export function MfaManager({
           {status.confirmedAt ? ` since ${new Date(status.confirmedAt).toLocaleDateString()}` : ""}.
           {" "}{status.unusedRecoveryCodes} recovery code{status.unusedRecoveryCodes === 1 ? "" : "s"} remain unused.
         </p>
-      ) : !offer && (
+      ) : !offer && !hideIntro && (
         // Only before setup starts: once the key is on screen its own help text takes over (#568).
         <p className="quiet-copy">
           {status.required

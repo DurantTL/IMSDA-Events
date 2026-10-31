@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
 vi.mock("next/server", async (importOriginal) => ({
   ...await importOriginal<typeof import("next/server")>(),
   after: mocks.after,

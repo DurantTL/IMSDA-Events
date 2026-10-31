@@ -89,3 +89,5 @@
 .activeChip > span { min-width: 0; overflow-wrap: anywhere; }
 .remove { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: var(--radius-pill); color: var(--imsda-purple); font-size: 1.25rem; line-height: 1; text-decoration: none; }
 .clearAll { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 6px; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.addLeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); color: var(--muted); }
+.addLeader :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

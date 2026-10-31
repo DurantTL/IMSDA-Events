@@ -37,7 +37,7 @@ vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolv
 vi.mock("@/modules/public-access/repository", () => ({ authorizeRegistrationAccessToken: mocks.authorizeToken }));
 vi.mock("@/modules/rate-limit/service", () => ({ checkPublicManageRateLimit: mocks.rateLimit }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.secondStepPending }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSignInStepPending: mocks.secondStepPending }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ authorizeAttendeeRegistration: mocks.authorizeAttendeeRegistration }));
 vi.mock("@/modules/cancellation-requests/repository", () => {
   class CancellationRequestError extends Error {

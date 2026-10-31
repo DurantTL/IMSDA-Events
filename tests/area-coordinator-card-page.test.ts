@@ -16,7 +16,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
-vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: vi.fn() }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSignInStep: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/mfa-service", () => ({ getAttendeeMfaStatus: vi.fn(async () => ({ status: "NONE" })) }));
 vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ listRegistrationsForVerifiedEmail: vi.fn(async () => []) }));
 vi.mock("@/modules/club-imports/invites", () => ({ listInvitesForAccount: vi.fn(async () => []) }));

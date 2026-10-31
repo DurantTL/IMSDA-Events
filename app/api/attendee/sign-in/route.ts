@@ -14,6 +14,7 @@ import {
   type RateLimitOutcome,
 } from "@/modules/rate-limit/domain";
 import { checkAttendeeSignInRateLimit } from "@/modules/rate-limit/service";
+import { startSignInCodeIfRequired } from "@/modules/attendee-accounts/sign-in-code-issue";
 
 /**
  * Password sign-in for a registrant. Separate from `/api/auth/login` by
@@ -70,7 +71,19 @@ async function postHandler(request: Request) {
       priority: "high",
     });
     countPublicMetric(request, "LOGIN_SUCCESS", "attendee-password");
-    return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
+    // A club role without two-step sign-in is never let in on a password alone (#1410): the code is sent now and
+    // the form moves to step 2. Everyone else gets the same body as before. Only reached once the password was right.
+    const signInCode = await startSignInCodeIfRequired({
+      request,
+      accountId: authentication.accountId,
+      sessionToken: authentication.session.token,
+    });
+    return applyRateLimitHeaders(
+      Response.json(signInCode.required
+        ? { ok: true, signInCode: { required: true, sent: signInCode.sent, developmentCode: signInCode.developmentCode } }
+        : { ok: true }),
+      rateLimit,
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       const response = Response.json({
