@@ -187,7 +187,7 @@ while :; do
   # (#1400). Read it from the container being checked (exactly what the app
   # received), send it on stdin, never on argv or the screen. No token yet keeps
   # waiting; an image from before #1400 ignores the header.
-  TOKEN="$(docker exec "$APP" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
+  TOKEN="$(timeout 10 docker exec "$APP" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
   BODY=""
   if [ -n "$TOKEN" ]; then
     BODY="$(printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -fsS --max-time 10 -H @- "$HEALTH_URL" 2>/dev/null || true)"

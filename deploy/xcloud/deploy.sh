@@ -22,6 +22,12 @@ COMPOSE="${XCLOUD_COMPOSE_FILE:-/home/u_events/239298/docker-compose.yml}"
 SHA="$(git -c safe.directory="$SITE" -C "$SITE" rev-parse HEAD)"
 IMAGE="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}:$SHA"
 WAIT_SECONDS="${IMSDA_IMAGE_WAIT_SECONDS:-1200}"
+
+grep -q 'imsda-events:live' "$COMPOSE" || {
+  echo "[deploy] $COMPOSE is not the IMSDA version (xCloud regenerated it?). Copy deploy/xcloud/docker-compose.yml over it first." >&2
+  exit 1
+}
+
 # GitHub publishes the image about 10 minutes after a merge.
 WAITED=0
 until docker pull --quiet "$IMAGE"; do
@@ -61,7 +67,7 @@ wait_for_release() { # port sha service [compose profile args]
   waited=0
   port="$1"; want="$2"; service="$3"; shift 3
   while [ "$waited" -lt "$HEALTH_SECONDS" ]; do
-    token="$(docker compose -f "$COMPOSE" "$@" exec -T "$service" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
+    token="$(timeout 10 docker compose -f "$COMPOSE" "$@" exec -T "$service" printenv OUTBOX_SWEEP_TOKEN 2>/dev/null </dev/null || true)"
     if [ -n "$token" ] && printf 'Authorization: Bearer %s\n' "$token" \
       | curl -fsS --max-time 5 -H @- "http://127.0.0.1:$port/api/health" 2>/dev/null | grep -q "\"sha\":\"$want\""; then
       return 0

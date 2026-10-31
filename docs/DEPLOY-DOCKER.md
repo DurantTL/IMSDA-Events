@@ -491,19 +491,30 @@ sweep token, and the old copy of the script sends no token. If the merge deploys
 with the old script, it can never see the new SHA, the deploy fails, and the SHA
 is written to `/var/lib/imsda/failed-sha`, which blocks further deploys.
 
-**Before the merge reaches the server (as `root`, from a checkout that has the
-new script):**
+**Before the merge reaches the server**, install the new script from the PR
+branch (as `root`). The server checkout is still on `main` at this point, so
+take the file straight from the branch:
 
 ```bash
-install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+cd /var/www/events.imsda.org
+# Fetch as the checkout's owner (u_events) so .git stays owned by it.
+runuser -u u_events -- git fetch origin claude/issue-1400-health-trim
+runuser -u u_events -- git show FETCH_HEAD:deploy/xcloud/deploy.sh > /tmp/imsda-deploy.new
+install -m 755 /tmp/imsda-deploy.new /usr/local/bin/imsda-deploy && rm /tmp/imsda-deploy.new
 ```
 
 The new script reads the token from the container it is checking and works with
 older images too (they ignore the header and still show the SHA publicly), so
 installing it early is safe.
 
-**If it was missed and a deploy failed:** install the new script (command above),
-then `rm -f /var/lib/imsda/failed-sha`, then run `imsda-deploy` by hand.
+**If it was missed and a deploy failed** (after the merge, so `main` has the new
+script):
+
+```bash
+install -m 755 /var/www/events.imsda.org/deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+rm -f /var/lib/imsda/failed-sha
+imsda-deploy
+```
 
 ### Deploys without downtime (#1263)
 
