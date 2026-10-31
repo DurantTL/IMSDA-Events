@@ -8,6 +8,7 @@ import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
+import { validateRosterResponses as validateRosterResponsesShared } from "@/modules/forms/roster-validation";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
@@ -474,46 +475,6 @@ function hasResponses(responses: FormResponses) {
           ? value.trim().length > 0
           : hasAddressValue(value)
   ));
-}
-
-function cloneChoiceUsage(definition: RegistrationFormDefinition, usage: ChoiceUsage): ChoiceUsage {
-  const clone: ChoiceUsage = {};
-  for (const section of definition.sections) {
-    for (const field of section.fields) {
-      if (getAvailabilityMode(field) === "NONE") continue;
-      clone[field.key] = Object.fromEntries(field.options.map((option) => {
-        const stats = usage[field.key]?.[option] ?? { total: 0, first: 0, second: 0 };
-        return [option, { ...stats }];
-      }));
-    }
-  }
-  return clone;
-}
-
-function addResponsesToUsage(
-  definition: RegistrationFormDefinition,
-  responses: FormResponses,
-  usage: ChoiceUsage,
-  scope: RegistrationFormField["scope"],
-) {
-  for (const section of definition.sections) {
-    for (const field of section.fields) {
-      if (field.scope !== scope || getAvailabilityMode(field) === "NONE" || !isFieldVisible(field, responses)) continue;
-      const value = responses[field.key];
-      const selections = Array.isArray(value)
-        ? value
-        : typeof value === "string" && value
-          ? [value]
-          : [];
-      selections.forEach((option, rank) => {
-        const stats = usage[field.key]?.[option];
-        if (!stats) return;
-        stats.total += 1;
-        if (rank === 0) stats.first += 1;
-        if (rank === 1) stats.second += 1;
-      });
-    }
-  }
 }
 
 /** Moves focus to the confirmation heading once it appears, so screen readers read the result (#1211). Stable, so it runs on mount only. */
@@ -3126,55 +3087,17 @@ export function PublicRegistrationForm({
   }
 
   function validateRosterResponses() {
-    const nextIssues: FormIssue[] = [];
-    if (attendees.length < roster.minAttendees || attendees.length > roster.maxAttendees) {
-      nextIssues.push({
-        key: "attendees",
-        path: "attendees",
-        attendeeIndex: null,
-        message: `Add between ${roster.minAttendees} and ${roster.maxAttendees} ${pluralAttendeeLabel(roster.attendeeLabel, roster.maxAttendees)}.`,
-      });
-    }
-    const projectedUsage = cloneChoiceUsage(definition, choiceUsage);
-    const registrationValidation = validateTestResponses(
+    return validateRosterResponsesShared({
       definition,
+      roster,
       registrationResponses,
-      projectedUsage,
-      "REGISTRATION",
-      {
-        ignoredFieldKeys: joiningWaitlist && definition.payment?.enabled
-          ? [definition.payment.paymentMethodFieldKey]
-          : undefined,
-      },
-    );
-    nextIssues.push(...registrationValidation.issues.map((issue) => ({
-      ...issue,
-      path: `responses.${issue.key}`,
-      attendeeIndex: null,
-    })));
-    addResponsesToUsage(definition, registrationResponses, projectedUsage, "REGISTRATION");
-    attendees.forEach((attendee, attendeeIndex) => {
-      const merged = { ...registrationResponses, ...attendee.responses };
-      const validation = validateTestResponses(
-        definition,
-        merged,
-        projectedUsage,
-        "ATTENDEE",
-        {
-          previousResponses: club?.previousResponses?.[attendee.clientId],
-          ignoredFieldKeys: joiningWaitlist && definition.payment?.enabled
-            ? [definition.payment.paymentMethodFieldKey]
-            : undefined,
-        },
-      );
-      nextIssues.push(...validation.issues.map((issue) => ({
-        ...issue,
-        path: `attendees.${attendeeIndex}.responses.${issue.key}`,
-        attendeeIndex,
-      })));
-      addResponsesToUsage(definition, merged, projectedUsage, "ATTENDEE");
+      attendees,
+      choiceUsage,
+      ignoredFieldKeys: joiningWaitlist && definition.payment?.enabled
+        ? [definition.payment.paymentMethodFieldKey]
+        : undefined,
+      previousResponses: club?.previousResponses,
     });
-    return nextIssues;
   }
 
   async function submit(submitEvent?: React.FormEvent<HTMLFormElement>) {
