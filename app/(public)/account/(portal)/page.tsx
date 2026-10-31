@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { Suspense } from "react";
@@ -27,8 +28,6 @@ export const metadata: Metadata = {
   title: "Your account",
   robots: { index: false, follow: false, nocache: true },
 };
-
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 /** An email address with a break opportunity before "@" and each ".", so a long one wraps at a natural place. */
 function emailWithBreaks(email: string) {
@@ -89,7 +88,7 @@ export default async function AttendeeAccountOverviewPage() {
   const uncardedDue = uncardedDueCount > 0;
   // One owing registration and it is the one without a card: name it as past. Any mix says "including".
   const onlyPastDue = uncardedDueCount === 1 && amountDue.registrationCount === 1;
-  const dueAmount = <span translate="no">{moneyFormatter.format(amountDue.totalCents / 100)}</span>;
+  const dueAmount = <span translate="no">{formatCents(amountDue.totalCents)}</span>;
   const dueLine = amountDue.totalCents > 0 && (
     <p className="account-overview-alert attendee-ov-due">
       <CircleDollarSign size={16} aria-hidden="true" />{" "}

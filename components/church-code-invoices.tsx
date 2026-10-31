@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { Building2 } from "lucide-react";
 import { ChurchDraftControl } from "@/components/church-code-invoice-control";
 import {
@@ -6,10 +7,6 @@ import {
   type ChurchCodeReportRow,
 } from "@/modules/promo-codes/church-invoice";
 import type { ChurchCodeReport } from "@/modules/promo-codes/church-invoice-repository";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 /**
  * The church promo code report and invoices (#399). For each church that sponsors a code: who used it (the registrant,
@@ -44,22 +41,22 @@ export function ChurchCodeInvoices({ eventId, report, canFinalize }: { eventId: 
         <article className="finance-stat">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Covered by codes</small>
-          <strong>{money(report.totals.coveredCents)}</strong>
+          <strong>{formatCents(report.totals.coveredCents)}</strong>
         </article>
         <article className="finance-stat">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Invoiced</small>
-          <strong>{money(report.totals.invoicedCents)}</strong>
+          <strong>{formatCents(report.totals.invoicedCents)}</strong>
         </article>
         <article className="finance-stat">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Paid</small>
-          <strong>{money(report.totals.paidCents)}</strong>
+          <strong>{formatCents(report.totals.paidCents)}</strong>
         </article>
         <article className="finance-stat warning">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Still owed on invoices</small>
-          <strong>{money(report.totals.owedOnInvoiceCents)}</strong>
+          <strong>{formatCents(report.totals.owedOnInvoiceCents)}</strong>
         </article>
       </section>
       {report.rows.map((row) => <ChurchRow canFinalize={canFinalize} eventId={eventId} key={row.churchId} row={row} />)}
@@ -77,16 +74,16 @@ function ChurchRow({ eventId, row, canFinalize }: { eventId: string; row: Church
         <span>
           <strong>{churchInvoiceStateLabel(row.state)}</strong>
           <small>
-            {row.invoiceNumber ? `Invoice ${row.invoiceNumber}` : row.draftAmountCents !== null ? `Draft for ${money(row.draftAmountCents)}` : "No invoice yet"}
+            {row.invoiceNumber ? `Invoice ${row.invoiceNumber}` : row.draftAmountCents !== null ? `Draft for ${formatCents(row.draftAmountCents)}` : "No invoice yet"}
             {row.contact ? ` · billing contact ${row.contact.name}${row.contact.verified ? "" : " (not verified)"}` : " · no billing contact on file"}
           </small>
         </span>
-        <span>{money(row.coveredCents)}</span>
-        <span>{money(row.invoicedCents)} / {money(row.paidCents)}</span>
+        <span>{formatCents(row.coveredCents)}</span>
+        <span>{formatCents(row.invoicedCents)} / {formatCents(row.paidCents)}</span>
         <span>
-          <strong>{money(row.owedOnInvoiceCents)}</strong>
-          {row.notInvoicedCents !== 0 && <small>{row.notInvoicedCents > 0 ? `${money(row.notInvoicedCents)} not invoiced yet` : `${money(-row.notInvoicedCents)} invoiced beyond current use`}</small>}
-          {row.overpaidCents > 0 && <small>{money(row.overpaidCents)} overpaid</small>}
+          <strong>{formatCents(row.owedOnInvoiceCents)}</strong>
+          {row.notInvoicedCents !== 0 && <small>{row.notInvoicedCents > 0 ? `${formatCents(row.notInvoicedCents)} not invoiced yet` : `${formatCents(-row.notInvoicedCents)} invoiced beyond current use`}</small>}
+          {row.overpaidCents > 0 && <small>{formatCents(row.overpaidCents)} overpaid</small>}
         </span>
       </div>
       <div className="finance-row">
@@ -112,7 +109,7 @@ function ChurchRow({ eventId, row, canFinalize }: { eventId: string; row: Church
         : row.lines.map((line) => (
           <div className="finance-row" key={line.lineId}>
             <span><small>Used by {line.usedByName || "a person with no name on file"}, registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
-            <span>{money(line.amountCents)}</span>
+            <span>{formatCents(line.amountCents)}</span>
             <span />
             <span />
           </div>

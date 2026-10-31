@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type {
   FormCalculation,
   RegistrationFormDefinition,
@@ -52,13 +53,6 @@ export type DiscountedFormCalculation = FormCalculation & {
 };
 
 const normalizedCodePattern = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 export function normalizePromoCode(value: string) {
   return value.normalize("NFKC").trim().toUpperCase();
@@ -150,7 +144,7 @@ export function evaluatePromoCode(
       reason: "MINIMUM_NOT_MET",
       message: input.hideAmounts
         ? "This promo code's minimum isn't met for this registration."
-        : `That promo code requires a subtotal of at least ${money(rule.minimumSubtotalCents)}. Your current subtotal is ${money(eligibleSubtotalCents)}.`,
+        : `That promo code requires a subtotal of at least ${formatCents(rule.minimumSubtotalCents)}. Your current subtotal is ${formatCents(eligibleSubtotalCents)}.`,
     };
   }
   if (eligibleSubtotalCents === 0) {

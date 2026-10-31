@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useConfirm } from "@/components/use-confirm";
 import { EmptyState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -27,16 +28,9 @@ import type { PromoCodeRecord } from "@/modules/promo-codes/repository";
 const discardEditorMessage =
   "Discard your unsaved promo code changes? Your typed changes will be lost.";
 
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
-
 function discountLabel(promo: PromoCodeRecord) {
   if (promo.discountType === "FIXED_CENTS") {
-    return `${money(promo.discountValue)} off`;
+    return `${formatCents(promo.discountValue)} off`;
   }
   const percent = promo.discountValue / 100;
   return `${percent.toLocaleString("en-US", {
@@ -391,12 +385,12 @@ export function PromoCodeWorkspace({
                   </div>
                   <div>
                     <dt>Minimum</dt>
-                    <dd>{promo.minimumSubtotalCents === null ? "No minimum" : money(promo.minimumSubtotalCents)}</dd>
+                    <dd>{promo.minimumSubtotalCents === null ? "No minimum" : formatCents(promo.minimumSubtotalCents)}</dd>
                   </div>
                   {promo.discountType === "PERCENT_BPS" && (
                     <div>
                       <dt>Maximum discount</dt>
-                      <dd>{promo.maximumDiscountCents === null ? "No cap" : money(promo.maximumDiscountCents)}</dd>
+                      <dd>{promo.maximumDiscountCents === null ? "No cap" : formatCents(promo.maximumDiscountCents)}</dd>
                     </div>
                   )}
                 </dl>

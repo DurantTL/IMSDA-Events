@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -56,13 +57,6 @@ type AmendmentPreview = {
   }>;
   pricingDate: string;
 };
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 function valueString(value: unknown) {
   return typeof value === "string" || typeof value === "number"
@@ -580,7 +574,7 @@ export function RegistrationAmendmentEditor({
       const saved = result.registration as RegistrationRecord;
       onSaved(
         saved,
-        `Registration amended. ${saved.attendeeCount} attendee${saved.attendeeCount === 1 ? "" : "s"} · ${money(saved.balanceCents)} balance.`,
+        `Registration amended. ${saved.attendeeCount} attendee${saved.attendeeCount === 1 ? "" : "s"} · ${formatCents(saved.balanceCents)} balance.`,
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save this amendment.");
@@ -599,9 +593,9 @@ export function RegistrationAmendmentEditor({
         </div>
         <div className="amendment-quote-grid">
           <span><small>Attendees</small><strong>{preview.previousAttendeeCount} → {preview.attendeeCount}</strong></span>
-          <span><small>Previous total</small><strong>{money(preview.previousTotalCents)}</strong></span>
-          <span><small>New total</small><strong>{money(preview.totalCents)}</strong></span>
-          <span><small>New balance</small><strong>{money(preview.balanceCents)}</strong></span>
+          <span><small>Previous total</small><strong>{formatCents(preview.previousTotalCents)}</strong></span>
+          <span><small>New total</small><strong>{formatCents(preview.totalCents)}</strong></span>
+          <span><small>New balance</small><strong>{formatCents(preview.balanceCents)}</strong></span>
         </div>
         {(preview.addedAttendeeCount > 0 || preview.removedAttendeeCount > 0) && (
           <div className="inline-notice">
@@ -613,10 +607,10 @@ export function RegistrationAmendmentEditor({
           {preview.lineItems.map((item) => (
             <div key={item.key}>
               <span>{item.label}{item.attendeeLabel ? ` · ${item.attendeeLabel}` : ""}</span>
-              <strong>{money(item.amountCents)}</strong>
+              <strong>{formatCents(item.amountCents)}</strong>
             </div>
           ))}
-          <div className="total"><span>Total</span><strong>{money(preview.totalCents)}</strong></div>
+          <div className="total"><span>Total</span><strong>{formatCents(preview.totalCents)}</strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void confirmAmendment()} />}

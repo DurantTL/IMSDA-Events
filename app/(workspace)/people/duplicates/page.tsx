@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -18,11 +19,6 @@ import {
 import { listRegistrations } from "@/modules/registrations/repository";
 
 export const metadata: Metadata = { title: "Duplicate finder" };
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-    .format(cents / 100);
-}
 
 function ConfidenceChip({ confidence }: { confidence: DuplicateMatchConfidence }) {
   return (
@@ -133,7 +129,7 @@ export default async function DuplicateFinderPage({
                       <small>
                         {member.confirmationCode} · {member.registrationStatus.toLowerCase()} · {member.attendeeType.toLowerCase()}
                         {member.checkedIn ? " · checked in" : ""}
-                        {member.balanceCents > 0 ? ` · ${money(member.balanceCents)} due` : ""}
+                        {member.balanceCents > 0 ? ` · ${formatCents(member.balanceCents)} due` : ""}
                       </small>
                       <small className="duplicate-contact">
                         {member.email && <span><Mail aria-hidden="true" size={12} /> {member.email}</span>}
@@ -179,7 +175,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.confirmationCode}</strong>
                       <small>
-                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {money(member.totalAmountCents)} total · {money(member.balanceCents)} due
+                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {formatCents(member.totalAmountCents)} total · {formatCents(member.balanceCents)} due
                       </small>
                       <small className="duplicate-contact">
                         {member.email && <span><Mail aria-hidden="true" size={12} /> {member.email}</span>}

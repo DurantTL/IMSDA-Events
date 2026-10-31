@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
@@ -92,10 +93,6 @@ const lifecycleCopy: Record<LifecycleAction, { eyebrow: string; title: string; d
 
 function initials(record: RegistrationRecord) {
   return `${record.accountHolder.firstName[0] ?? ""}${record.accountHolder.lastName[0] ?? ""}`.toUpperCase();
-}
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
 
 function answerLabel(key: string) {
@@ -1012,7 +1009,7 @@ export function PeopleWorkspace({
                           <ul>
                             <li>Registration ID, confirmation code {selected.confirmationCode}, and {selected.status.toLowerCase()} status.</li>
                             <li>All {selected.attendeeCount} attendees, their positions, types, and form choices.</li>
-                            <li>The immutable submitted form and order snapshot, {money(selected.totalAmountCents)} total, payments, refunds, and {money(selected.balanceCents)} balance.</li>
+                            <li>The immutable submitted form and order snapshot, {formatCents(selected.totalAmountCents)} total, payments, refunds, and {formatCents(selected.balanceCents)} balance.</li>
                             <li>Promo redemption, capacity reservations, and waitlist position.</li>
                           </ul>
                         ) : (
@@ -1033,18 +1030,18 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{money(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{money(selected.balanceCents)}</strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>
                   {selectedPricing && <details open>
                     <summary>Saved promo discount</summary>
                     <dl>
-                      <div><dt>Subtotal before discount</dt><dd>{money(selectedPricing.preDiscountSubtotalCents)}</dd></div>
-                      <div><dt>Promo code</dt><dd>{selectedPricing.promoCode} · −{money(selectedPricing.discountAmountCents)}</dd></div>
-                      <div><dt>Discounted subtotal</dt><dd>{money(selectedPricing.subtotalCents)}</dd></div>
-                      {selectedPricing.processingFeeCents > 0 && <div><dt>Card processing</dt><dd>{money(selectedPricing.processingFeeCents)}</dd></div>}
-                      <div><dt>Recorded total</dt><dd>{money(selectedPricing.totalCents)}</dd></div>
+                      <div><dt>Subtotal before discount</dt><dd>{formatCents(selectedPricing.preDiscountSubtotalCents)}</dd></div>
+                      <div><dt>Promo code</dt><dd>{selectedPricing.promoCode} · −{formatCents(selectedPricing.discountAmountCents)}</dd></div>
+                      <div><dt>Discounted subtotal</dt><dd>{formatCents(selectedPricing.subtotalCents)}</dd></div>
+                      {selectedPricing.processingFeeCents > 0 && <div><dt>Card processing</dt><dd>{formatCents(selectedPricing.processingFeeCents)}</dd></div>}
+                      <div><dt>Recorded total</dt><dd>{formatCents(selectedPricing.totalCents)}</dd></div>
                     </dl>
                   </details>}
                   <details open>
@@ -1114,13 +1111,13 @@ export function PeopleWorkspace({
                   <div className="registration-related-list">
                     {selected.payments.map((payment) => <article key={payment.id}>
                       <div>
-                        <strong>{money(payment.amountCents)} · {paymentMethodLabel(payment.method)}</strong>
+                        <strong>{formatCents(payment.amountCents)} · {paymentMethodLabel(payment.method)}</strong>
                         <small>{dateTime(payment.receivedAt, eventTimezone)}{payment.externalReference ? ` · ${payment.externalReference}` : ""}</small>
                       </div>
-                      {payment.refundedCents > 0 && <span className="status-chip gold">{money(payment.refundedCents)} refunded</span>}
+                      {payment.refundedCents > 0 && <span className="status-chip gold">{formatCents(payment.refundedCents)} refunded</span>}
                       {payment.refunds.length > 0 && <details>
                         <summary>Refund details</summary>
-                        <dl>{payment.refunds.map((refund) => <div key={refund.id}><dt>{dateTime(refund.createdAt, eventTimezone)}</dt><dd>−{money(refund.amountCents)}{refund.reason ? ` · ${refund.reason}` : ""}</dd></div>)}</dl>
+                        <dl>{payment.refunds.map((refund) => <div key={refund.id}><dt>{dateTime(refund.createdAt, eventTimezone)}</dt><dd>−{formatCents(refund.amountCents)}{refund.reason ? ` · ${refund.reason}` : ""}</dd></div>)}</dl>
                       </details>}
                     </article>)}
                     {selected.payments.length === 0 && <p className="quiet-copy">No successful payments have been recorded.</p>}

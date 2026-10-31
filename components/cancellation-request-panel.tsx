@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Undo2 } from "lucide-react";
 import type { RegistrantProposal } from "@/modules/cancellation-requests/domain";
@@ -18,9 +19,6 @@ const scopeLabels: Record<Scope, string> = {
   ATTENDEE: "One or more attendees",
   COMPONENT: "Individual items",
 };
-
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const money = (cents: number) => moneyFormatter.format(cents / 100);
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
 const when = (iso: string) => dateFormatter.format(new Date(iso));
@@ -211,7 +209,7 @@ export function CancellationRequestPanel({
               <p>{request.statusDetail}</p>
               <p className="field-help">
                 For {request.scope === "FULL_REGISTRATION" ? "the whole registration" : request.scope === "ATTENDEE" ? request.attendeeNames.join(", ") || "selected attendees" : request.chargeLabels.join(", ") || "selected items"}.
-                {" "}Proposed refund when you asked: <span translate="no">{money(request.proposedRefundCents)}</span>. This is not a decision.
+                {" "}Proposed refund when you asked: <span translate="no">{formatCents(request.proposedRefundCents)}</span>. This is not a decision.
               </p>
               {request.registrantNote && (
                 <p className="cancel-request-note"><strong>The event team asks:</strong> {request.registrantNote}</p>
@@ -284,7 +282,7 @@ export function CancellationRequestPanel({
               {view.components.map((component) => (
                 <label className="cancel-request-choice" key={component.id}>
                   <input checked={chargeIds.includes(component.id)} onChange={() => toggle(chargeIds, component.id, setChargeIds)} type="checkbox" />
-                  <span>{component.label} <span translate="no">({money(component.amountCents)})</span></span>
+                  <span>{component.label} <span translate="no">({formatCents(component.amountCents)})</span></span>
                 </label>
               ))}
             </fieldset>
@@ -301,10 +299,10 @@ export function CancellationRequestPanel({
               <p><strong>{proposal.timingLabel}</strong>: {proposal.termsText}.</p>
               {proposal.afterDeadline && <p className="field-help">The refund deadline has passed, so the after-deadline terms apply. You can still ask; the event team decides.</p>}
               <dl className="cancel-request-money">
-                <div><dt>Charged on this registration</dt><dd translate="no">{money(proposal.chargedCents)}</dd></div>
-                <div><dt>Paid so far</dt><dd translate="no">{money(proposal.paidCents)}</dd></div>
-                <div className="is-total"><dt>Proposed refund</dt><dd translate="no">{money(proposal.refundCents)}</dd></div>
-                <div><dt>Kept under the policy</dt><dd translate="no">{money(proposal.retainedCents)}</dd></div>
+                <div><dt>Charged on this registration</dt><dd translate="no">{formatCents(proposal.chargedCents)}</dd></div>
+                <div><dt>Paid so far</dt><dd translate="no">{formatCents(proposal.paidCents)}</dd></div>
+                <div className="is-total"><dt>Proposed refund</dt><dd translate="no">{formatCents(proposal.refundCents)}</dd></div>
+                <div><dt>Kept under the policy</dt><dd translate="no">{formatCents(proposal.retainedCents)}</dd></div>
               </dl>
               {proposal.registrationWouldBeCancelled && <p>This would cancel the whole registration if the event team approves and carries it out.</p>}
               {proposal.creditMayBeOffered && <p>The event team may offer future-event credit instead of a refund.</p>}

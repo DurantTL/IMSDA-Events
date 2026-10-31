@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 type Lifecycle = Pick<AttendeeRegistrationSummary, "lifecycle" | "balanceCents" | "payment"> & {
@@ -32,9 +33,6 @@ export function accountAmountDue<T extends Lifecycle>(registrations: T[]) {
   };
 }
 
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-const formatMoney = (cents: number) => moneyFormatter.format(cents / 100);
-
 /**
  * The text of the Balance cell for a directly billed registration (#1100):
  * the lifecycle-aware main line, plus the payment history when money was paid
@@ -44,14 +42,14 @@ export function directBalanceCell(registration: Pick<AttendeeRegistrationSummary
   const total = registration.totalCents ?? 0;
   const { payment } = registration;
   const main = payment.paymentEligible && registration.balanceCents > 0
-    ? `${formatMoney(registration.balanceCents)} due of ${formatMoney(total)}`
+    ? `${formatCents(registration.balanceCents)} due of ${formatCents(total)}`
     : payment.state === "PAID"
-      ? `Paid in full \u00b7 ${formatMoney(total)}`
+      ? `Paid in full \u00b7 ${formatCents(total)}`
       : payment.label;
   const gross = registration.grossPaidCents ?? 0;
   const refunded = registration.refundedCents ?? 0;
   const history = payment.state === "NOT_DUE" && gross > 0
-    ? `${formatMoney(gross)} paid${refunded > 0 ? ` \u00b7 ${formatMoney(refunded)} refunded` : ""}`
+    ? `${formatCents(gross)} paid${refunded > 0 ? ` \u00b7 ${formatCents(refunded)} refunded` : ""}`
     : null;
   return { main, history };
 }

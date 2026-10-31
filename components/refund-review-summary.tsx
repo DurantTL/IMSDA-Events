@@ -1,6 +1,4 @@
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
+import { formatCents } from "@/modules/payments/format-cents";
 
 export const REFUND_REASON_MIN_LENGTH = 3;
 export const REFUND_REASON_MAX_LENGTH = 300;
@@ -48,10 +46,10 @@ export function RefundReviewFacts({
 }) {
   return (
     <dl className="confirm-dialog-facts">
-      <div><dt>Amount</dt><dd>{money(amountCents)}</dd></div>
+      <div><dt>Amount</dt><dd>{formatCents(amountCents)}</dd></div>
       <div><dt>Reason</dt><dd>{reason}</dd></div>
       <div><dt>Registration</dt><dd>{registrationLabel}</dd></div>
-      <div><dt>Payment</dt><dd>{money(paymentAmountCents)} · {paymentMethodLabel(paymentMethod)}</dd></div>
+      <div><dt>Payment</dt><dd>{formatCents(paymentAmountCents)} · {paymentMethodLabel(paymentMethod)}</dd></div>
     </dl>
   );
 }

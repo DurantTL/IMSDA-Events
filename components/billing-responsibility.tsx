@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { Building2, Download } from "lucide-react";
 import {
   BillingActionButton,
@@ -16,10 +17,6 @@ import {
 } from "@/modules/billing-responsibility/domain";
 import type { BillingResponsibilityView } from "@/modules/billing-responsibility/repository";
 import { notBilledLabel } from "@/modules/club-registrations/church-owed";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 function date(value: string) {
   return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
@@ -103,7 +100,7 @@ export function BillingResponsibility({
                     <strong>{lineLabel(line)}</strong>
                     <small>{line.confirmationCode} · {line.status.toLowerCase()} · {unresolvedReasonLabel(line.source)}{line.locationName ? ` · ${line.locationName}` : ""}</small>
                   </span>
-                  <span>{line.isBilled ? money(line.owedCents) : notBilledLabel(line.status)}</span>
+                  <span>{line.isBilled ? formatCents(line.owedCents) : notBilledLabel(line.status)}</span>
                   <span><LinkOrganizationForm eventId={eventId} hint={line.hint} needsReason={false} registrationId={line.registrationId} /></span>
                 </div>
               ))}
@@ -195,11 +192,11 @@ function GroupPanel({
               </details>
             )}
           </span>
-          <span>{line.isBilled ? money(line.owedCents) : notBilledLabel(line.status)}</span>
+          <span>{line.isBilled ? formatCents(line.owedCents) : notBilledLabel(line.status)}</span>
         </div>
       ))}
       <div className="finance-row">
-        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong>{money(group.owedCents)}</strong></span>
+        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong>{formatCents(group.owedCents)}</strong></span>
       </div>
     </section>
   );

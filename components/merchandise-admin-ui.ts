@@ -1,3 +1,5 @@
+import { formatCents } from "@/modules/payments/format-cents";
+
 export type MerchandiseAdminStatus = "enabled" | "disabled" | "archived" | "scheduled";
 
 export function merchandiseAdminStatus(input: { isEnabled: boolean; isArchived?: boolean; startsAt?: string | null; endsAt?: string | null; now?: Date }) {
@@ -10,7 +12,7 @@ export function merchandiseAdminStatus(input: { isEnabled: boolean; isArchived?:
 }
 
 export function formatMerchandiseMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+  return formatCents(cents);
 }
 
 export function merchandiseEndpoint(eventId: string, suffix = "") {

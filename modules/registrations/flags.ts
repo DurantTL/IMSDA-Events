@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 
@@ -22,10 +23,6 @@ export type RegistrationFlag = {
   detail: string;
 };
 
-function centsToDisplay(cents: number) {
-  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-}
-
 export function computeRegistrationFlags(registration: RegistrationRecord): RegistrationFlag[] {
   const flags: RegistrationFlag[] = [];
 
@@ -35,7 +32,7 @@ export function computeRegistrationFlags(registration: RegistrationRecord): Regi
     flags.push({
       kind: "BALANCE_DUE",
       label: "Balance due",
-      detail: `${centsToDisplay(registration.balanceCents)} outstanding.`,
+      detail: `${formatCents(registration.balanceCents)} outstanding.`,
     });
   }
 

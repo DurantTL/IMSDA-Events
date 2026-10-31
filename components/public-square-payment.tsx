@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import {
@@ -139,13 +140,6 @@ declare global {
 }
 
 type PaymentMethodKind = "CARD" | "APPLE_PAY" | "GOOGLE_PAY";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 function firstTokenizationError(
   errors: Array<{ message?: string; detail?: string }> | undefined,
@@ -709,7 +703,7 @@ export function PublicSquarePayment({
       setNotice({
         tone: "success",
         message: body.paymentChoice.choice === "CARD"
-          ? `Card payment selected. Your secure amount is ${money(body.paymentChoice.totalCents)}.`
+          ? `Card payment selected. Your secure amount is ${formatCents(body.paymentChoice.totalCents)}.`
           : "Pay later selected. No card payment will be requested online.",
       });
       await loadCheckout();
@@ -823,7 +817,7 @@ export function PublicSquarePayment({
             </strong>
             <small>{cardChoice?.detail}</small>
           </span>
-          <b translate="no">{money(cardChoice?.totalCents ?? 0)}</b>
+          <b translate="no">{formatCents(cardChoice?.totalCents ?? 0)}</b>
         </button>
         <button
           type="button"
@@ -846,7 +840,7 @@ export function PublicSquarePayment({
             </strong>
             <small>{payLaterChoice?.detail}</small>
           </span>
-          <b translate="no">{money(payLaterChoice?.totalCents ?? 0)}</b>
+          <b translate="no">{formatCents(payLaterChoice?.totalCents ?? 0)}</b>
         </button>
       </div>
       {paymentChoice.locked && (
@@ -921,7 +915,7 @@ export function PublicSquarePayment({
             disabled={Boolean(submittingMethod) || hostedSubmitting}
             onClick={() => void chooseKind("DEPOSIT")}
           >
-            Pay a deposit now: <span translate="no">{money(checkout.deposit.chargeCents)}</span>
+            Pay a deposit now: <span translate="no">{formatCents(checkout.deposit.chargeCents)}</span>
           </button>
           <button
             type="button"
@@ -940,18 +934,18 @@ export function PublicSquarePayment({
       <div className="public-square-heading">
         <span><CreditCard size={20} aria-hidden="true" /></span>
         <div>
-          <strong>{checkout.paymentKind === "DEPOSIT" ? "Pay the deposit of" : "Pay"} <span translate="no">{money(checkout.amountCents)}</span> securely with Square</strong>
+          <strong>{checkout.paymentKind === "DEPOSIT" ? "Pay the deposit of" : "Pay"} <span translate="no">{formatCents(checkout.amountCents)}</span> securely with Square</strong>
           {checkout.paymentKind === "DEPOSIT" && checkout.deposit && (
             <p className="public-square-fee-breakdown">
-              Deposit <span translate="no">{money(checkout.deposit.depositCents)}</span> + card processing{" "}
-              <span translate="no">{money(checkout.deposit.surchargeCents)}</span>. The rest,{" "}
-              <span translate="no">{money(checkout.deposit.balanceAfterCents)}</span>, stays as your balance and is due later.
+              Deposit <span translate="no">{formatCents(checkout.deposit.depositCents)}</span> + card processing{" "}
+              <span translate="no">{formatCents(checkout.deposit.surchargeCents)}</span>. The rest,{" "}
+              <span translate="no">{formatCents(checkout.deposit.balanceAfterCents)}</span>, stays as your balance and is due later.
             </p>
           )}
           {checkout.paymentKind !== "DEPOSIT" && checkout.surchargeCents > 0 && (
             <p className="public-square-fee-breakdown">
-              Balance <span translate="no">{money(checkout.balanceCents)}</span> + card processing{" "}
-              <span translate="no">{money(checkout.surchargeCents)}</span>. Paying by another method avoids
+              Balance <span translate="no">{formatCents(checkout.balanceCents)}</span> + card processing{" "}
+              <span translate="no">{formatCents(checkout.surchargeCents)}</span>. Paying by another method avoids
               the processing fee — contact the event team to arrange it.
             </p>
           )}
@@ -965,7 +959,7 @@ export function PublicSquarePayment({
       <div className="public-square-wallets" aria-label="Digital wallet payment methods">
         <button
           type="button"
-          aria-label={`Pay ${money(checkout.amountCents)} with Apple Pay`}
+          aria-label={`Pay ${formatCents(checkout.amountCents)} with Apple Pay`}
           className={`public-square-apple-pay${applePayReady ? "" : " is-unavailable"}`}
           disabled={!applePayReady || Boolean(submittingMethod)}
           onClick={submitApplePay}
@@ -989,7 +983,7 @@ export function PublicSquarePayment({
         {submittingMethod === "CARD" ? (
           <><LoaderCircle size={17} className="is-spinning" /> Confirming with Square…</>
         ) : (
-          <><ShieldCheck size={17} /> Pay <span translate="no">{money(checkout.amountCents)}</span></>
+          <><ShieldCheck size={17} /> Pay <span translate="no">{formatCents(checkout.amountCents)}</span></>
         )}
       </button>
       {checkout.hostedLink && (
@@ -1008,7 +1002,7 @@ export function PublicSquarePayment({
             )}
           </button>
           <p className="public-square-hosted-note">
-            Opens Square&rsquo;s own secure payment page for <span translate="no">{money(checkout.amountCents)}</span>,
+            Opens Square&rsquo;s own secure payment page for <span translate="no">{formatCents(checkout.amountCents)}</span>,
             the same amount. Use it if the form above does not work for you. After you pay, Square brings you back
             here, and your payment shows once Square confirms it.
           </p>

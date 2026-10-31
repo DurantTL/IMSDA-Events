@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -32,8 +33,6 @@ export const metadata: Metadata = {
   description: "Every IMSDA event registration made with your email address.",
   robots: { index: false, follow: false, nocache: true },
 };
-
-const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 /**
  * The request panel for one of the signed-in attendee's own registrations. Only a signed-in attendee (not a staff user
@@ -76,7 +75,7 @@ function CardActions({
   return (
     <div className="attendee-reg-actions" role="group" aria-label={`More for ${registration.event.name}`}>
       {actions.continuePayment && (
-        <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${moneyFormatter.format(registration.balanceCents / 100)} remaining`}>
+        <RegistrationActionDisclosure eventName={registration.event.name} label="Continue payment" hint={`${formatCents(registration.balanceCents)} remaining`}>
           <PublicSquarePayment manageEndpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}`} />
         </RegistrationActionDisclosure>
       )}

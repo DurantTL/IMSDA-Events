@@ -146,3 +146,15 @@ describe("shared formatter files stay import-free (#1355)", () => {
     expect(readFileSync(file, "utf8")).not.toMatch(/^\s*import\b|\bfrom\s+["']|\brequire\(|\bimport\(/m);
   });
 });
+
+describe("formatCents leftovers (#1363)", () => {
+  it("pins the whole-dollar option to the removed overview and admin copies", () => {
+    const old = (cents: number) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
+    for (const cents of [0, -0, 49, 50, 99, 100, 150, 123456, 100000000, -500, -123456]) {
+      expect(formatCents(cents, { wholeDollars: true })).toBe(old(cents));
+    }
+    expect(formatCents(123456, { wholeDollars: true })).toBe("$1,235");
+    expect(formatCents(123456)).toBe("$1,234.56");
+  });
+});

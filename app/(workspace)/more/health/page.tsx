@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -31,13 +32,6 @@ import { staffPageTitles } from "@/components/staff-navigation";
 export const metadata: Metadata = { title: staffPageTitles.operationalHealth };
 
 const visibleRowLimit = 20;
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
-}
 
 function timeLabel(value: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -226,7 +220,7 @@ export default async function OperationalHealthPage({
                 <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
-                      <strong>{issue.confirmationCode} · {money(issue.amountCents)}</strong>
+                      <strong>{issue.confirmationCode} · {formatCents(issue.amountCents)}</strong>
                       <SeverityBadge severity={issue.severity} />
                     </div>
                     <p>
@@ -255,10 +249,10 @@ export default async function OperationalHealthPage({
                 <li className={styles.issue} key={issue.registrationId}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
-                      <strong>{issue.confirmationCode} · {money(issue.balanceCents)} due</strong>
+                      <strong>{issue.confirmationCode} · {formatCents(issue.balanceCents)} due</strong>
                       <SeverityBadge severity={issue.severity} />
                     </div>
-                    <p>{money(issue.paidCents)} received toward {money(issue.totalAmountCents)}.</p>
+                    <p>{formatCents(issue.paidCents)} received toward {formatCents(issue.totalAmountCents)}.</p>
                     {issue.submittedAt && <time dateTime={issue.submittedAt}>Registered {timeLabel(issue.submittedAt, event.timezone)}</time>}
                   </div>
                   <ResolveLink href={`${financeHref}&filter=BALANCE&registration=${encodeURIComponent(issue.registrationId)}`}>Open balance</ResolveLink>

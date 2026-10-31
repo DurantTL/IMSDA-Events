@@ -25,6 +25,7 @@
  * reconciliation reporting it as missing on every future run. Voiding alone
  * leaves the bad reference in place and the report never goes quiet.
  */
+import { formatCents } from "@/modules/payments/format-cents";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
@@ -60,13 +61,6 @@ function option(argv: string[], name: string) {
   const value = argv[index + 1];
   if (!value || value.startsWith("--")) fail(`--${name} needs a value.`);
   return value;
-}
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
 }
 
 function cents(value: Prisma.Decimal | number) {
@@ -121,11 +115,11 @@ async function report(prisma: PrismaClient) {
     if (siblings.length > 0 && !voided) suspect += 1;
 
     const mark = voided ? "voided" : siblings.length > 0 ? "CHECK" : "ok";
-    console.log(`[${mark}] ${payment.registration.confirmationCode} · ${money(cents(payment.amount))}`);
+    console.log(`[${mark}] ${payment.registration.confirmationCode} · ${formatCents(cents(payment.amount))}`);
     console.log(`        attached ${attachment.createdAt.toISOString()} · payment ${payment.id}`);
     console.log(`        reference ${payment.externalReference ?? "none"}`);
     for (const sibling of siblings) {
-      console.log(`        also on this registration: ${money(cents(sibling.amount))} · ${sibling.id}`);
+      console.log(`        also on this registration: ${formatCents(cents(sibling.amount))} · ${sibling.id}`);
       console.log(`            under reference ${sibling.externalReference ?? "none"}`);
     }
     if (siblings.length > 0 && !voided) {
@@ -176,7 +170,7 @@ async function verify(prisma: PrismaClient) {
     const reference = pair.sibling.externalReference;
     if (!reference) {
       unknown += 1;
-      console.log(`[no reference] ${pair.code} · the existing ${money(cents(pair.sibling.amount))} payment carries no reference at all.`);
+      console.log(`[no reference] ${pair.code} · the existing ${formatCents(cents(pair.sibling.amount))} payment carries no reference at all.`);
       continue;
     }
     let known: boolean;
@@ -289,7 +283,7 @@ async function relink(
         },
       });
     });
-    console.log(`[relinked] ${pair.code} · ${money(cents(pair.attached.amount))}`);
+    console.log(`[relinked] ${pair.code} · ${formatCents(cents(pair.attached.amount))}`);
     console.log(`           ${pair.sibling.id} now carries ${realReference}`);
     console.log(`           ${pair.attached.id} voided`);
   }
@@ -381,12 +375,12 @@ async function link(
         && (!pair.paymentId || payment.id === pair.paymentId),
     );
     if (candidates.length === 0) {
-      console.log(`[skipped] ${pair.confirmationCode} — no successful ${money(provider.amountCents)} payment to point at.`);
+      console.log(`[skipped] ${pair.confirmationCode} — no successful ${formatCents(provider.amountCents)} payment to point at.`);
       console.log("           Attach it through Finance instead; the money is not recorded here.");
       continue;
     }
     if (candidates.length > 1) {
-      console.log(`[skipped] ${pair.confirmationCode} — more than one ${money(provider.amountCents)} payment. Pick one by hand.`);
+      console.log(`[skipped] ${pair.confirmationCode} — more than one ${formatCents(provider.amountCents)} payment. Pick one by hand.`);
       continue;
     }
     const existing = candidates[0]!;
@@ -429,7 +423,7 @@ async function link(
         },
       });
     });
-    console.log(`[linked]  ${registration.confirmationCode} · ${money(provider.amountCents)}`);
+    console.log(`[linked]  ${registration.confirmationCode} · ${formatCents(provider.amountCents)}`);
     console.log(`          ${existing.id} now carries ${provider.id}`);
   }
 }
@@ -513,7 +507,7 @@ async function autoLink(
   }> = [];
 
   for (const finding of report.findings.filter(isActionable)) {
-    const label = `${money(finding.amountCents)} ${finding.providerPaymentId}`;
+    const label = `${formatCents(finding.amountCents)} ${finding.providerPaymentId}`;
     // The payment note is only half the evidence. A payment-link or Square
     // Online checkout writes what was bought — usually the attendee's name —
     // onto the order's line items, and leaves the payment note generic.
@@ -651,9 +645,9 @@ async function autoLink(
     );
     if (candidates.length === 0) {
       const held = registration.payments
-        .map((payment) => money(cents(payment.amount)))
+        .map((payment) => formatCents(cents(payment.amount)))
         .join(", ") || "no payments";
-      console.log(`[skip] ${label} — ${registration.confirmationCode} (${matched}) holds ${held}, not ${money(finding.amountCents)}.`);
+      console.log(`[skip] ${label} — ${registration.confirmationCode} (${matched}) holds ${held}, not ${formatCents(finding.amountCents)}.`);
       console.log("       Not a mislabelled payment. Attach it through Finance if the money was never recorded.");
       continue;
     }
@@ -787,7 +781,7 @@ async function voidPayment(
       },
     });
   });
-  console.log(`Voided ${money(cents(payment.amount))} on ${payment.registration.confirmationCode}.`);
+  console.log(`Voided ${formatCents(cents(payment.amount))} on ${payment.registration.confirmationCode}.`);
   console.log("Balances count only successful payments, so this no longer counts as received.");
 }
 

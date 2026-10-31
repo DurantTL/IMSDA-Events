@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import { FileText } from "lucide-react";
 import { CreateDraftsControl, InvoiceClubTypeForm, InvoiceCodeForm } from "@/components/invoice-controls";
 import { blockerReasonLabel } from "@/modules/attendance-reconciliation/domain";
@@ -5,7 +6,7 @@ import { versionStatusLabel, type InvoiceVersionStatus } from "@/modules/invoice
 import type { InvoiceListRow, InvoicesView } from "@/modules/invoices/repository";
 
 export function invoiceMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+  return formatCents(cents);
 }
 
 export function invoiceWhen(value: string) {

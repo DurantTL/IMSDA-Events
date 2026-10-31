@@ -1,3 +1,4 @@
+import { formatCents } from "@/modules/payments/format-cents";
 import Link from "next/link";
 import { Building2, Download } from "lucide-react";
 import {
@@ -11,10 +12,6 @@ import {
   summarizeSponsoredLines,
   type ChurchSponsoredPromoLine,
 } from "@/modules/promo-codes/church-sponsored";
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 /**
  * What each church owes for this event (#409): an estimate from the pricing
@@ -106,7 +103,7 @@ export function ChurchAmountsOwed({
         <article className="finance-stat warning">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Estimated amount owed</small>
-          <strong>{money(summary.totalOwedCents + groupSummary.totalOwedCents + sponsored.totalCents)}</strong>
+          <strong>{formatCents(summary.totalOwedCents + groupSummary.totalOwedCents + sponsored.totalCents)}</strong>
         </article>
       </section>
       {summary.churches.length > 0 && (
@@ -117,7 +114,7 @@ export function ChurchAmountsOwed({
               <span><strong>{church.churchName}</strong></span>
               <span>{church.clubCount} {church.clubCount === 1 ? unit : `${unit}s`}</span>
               <span />
-              <span>{money(church.amountOwedCents)}</span>
+              <span>{formatCents(church.amountOwedCents)}</span>
             </div>
           ))}
         </section>
@@ -129,7 +126,7 @@ export function ChurchAmountsOwed({
             <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {row.status.toLowerCase()}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
             <span>{row.confirmationCode}</span>
             <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-            <span>{money(row.amountOwedCents)}</span>
+            <span>{formatCents(row.amountOwedCents)}</span>
           </div>
         ))}
         {billed.length === 0 && (
@@ -157,7 +154,7 @@ export function ChurchAmountsOwed({
               </span>
               <span>{row.confirmationCode}</span>
               <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-              <span>{money(row.amountOwedCents)}</span>
+              <span>{formatCents(row.amountOwedCents)}</span>
             </div>
           ))}
         </section>
@@ -171,14 +168,14 @@ export function ChurchAmountsOwed({
                 <span><strong>{church.churchName}</strong><small>{church.lineCount} {church.lineCount === 1 ? "registration" : "registrations"} used a code this church sponsors</small></span>
                 <span />
                 <span />
-                <span><strong>{money(church.amountCents)}</strong></span>
+                <span><strong>{formatCents(church.amountCents)}</strong></span>
               </div>
               {church.lines.map((line) => (
                 <div className="finance-row" key={line.lineId}>
                   <span><small>Promo code {line.promoCode}</small></span>
                   <span>{line.confirmationCode}</span>
                   <span>{line.status.toLowerCase()}</span>
-                  <span>{money(line.amountCents)}</span>
+                  <span>{formatCents(line.amountCents)}</span>
                 </div>
               ))}
             </div>
@@ -193,7 +190,7 @@ export function ChurchAmountsOwed({
               <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {notBilledLabel(row.status)}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
               <span>{row.confirmationCode}</span>
               <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-              <span>{money(0)}</span>
+              <span>{formatCents(0)}</span>
             </div>
           ))}
         </section>

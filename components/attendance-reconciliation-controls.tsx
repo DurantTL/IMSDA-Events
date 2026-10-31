@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
@@ -88,10 +89,6 @@ export const PRORATE_NOTE = "Prorating scales the whole registration's estimate,
 
 export const REASON_HELP = "Don't include health or medical details. A short reason like 'did not attend' or 'missed at check-in' is enough.";
 
-function dollars(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
-
 /**
  * Staff choose which figure to bill for a registration whose prices cannot be matched to people with
  * certainty: the per-person best match or the prorated estimate. A reason is required.
@@ -135,8 +132,8 @@ export function AcknowledgeForm({
       {alternatives && (
         <fieldset>
           <legend>Which figure should be billed?</legend>
-          <label><input checked={choice === "PER_PERSON"} name={`choice-${registrationId}`} onChange={() => setChoice("PER_PERSON")} type="radio" /> Per-person (best match): {dollars(alternatives.perPersonCents)}</label>
-          <label><input checked={choice === "PRORATED"} name={`choice-${registrationId}`} onChange={() => setChoice("PRORATED")} type="radio" /> Prorated: {dollars(alternatives.proratedCents)}</label>
+          <label><input checked={choice === "PER_PERSON"} name={`choice-${registrationId}`} onChange={() => setChoice("PER_PERSON")} type="radio" /> Per-person (best match): {formatCents(alternatives.perPersonCents)}</label>
+          <label><input checked={choice === "PRORATED"} name={`choice-${registrationId}`} onChange={() => setChoice("PRORATED")} type="radio" /> Prorated: {formatCents(alternatives.proratedCents)}</label>
           {positionsUnreliable && <small>{POSITIONS_WARNING}</small>}
           <small>{PRORATE_NOTE}</small>
           {hasArrival && choice === "PRORATED" && <small role="alert">{ARRIVAL_PRORATE_WARNING}</small>}

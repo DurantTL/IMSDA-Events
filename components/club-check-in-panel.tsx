@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   AlertTriangle,
   CheckCheck,
@@ -34,10 +35,6 @@ export type ClubCheckInAttendeeView = {
 };
 
 export type ClubCheckInProgress = { current: number; total: number };
-
-function money(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 /**
  * Who "Check in all" checks in: everyone not already checked in and not
@@ -268,7 +265,7 @@ export function ClubCheckInPanel({
         </div>
         {amountOwedCents !== null && (
           <span className="count-badge club-billed-badge">
-            {money(amountOwedCents)} billed to church
+            {formatCents(amountOwedCents)} billed to church
           </span>
         )}
       </div>
