@@ -643,6 +643,33 @@ async function cancelIfInvoiceReplaced(
   return true;
 }
 
+/**
+ * The System report's test email (#1383) is one-shot: only a run that names its id may claim or recover it, so the
+ * scheduled sweep never sends it, retries it or re-sends it after a stale lock.
+ */
+const SWEEP_SKIPS_SYSTEM_TEST = { templateKey: { not: "SYSTEM_TEST_EMAIL" } } as const;
+
+/** How long a test email may sit PENDING before the sweep closes it unsent. */
+const SYSTEM_TEST_ABANDONED_PENDING_MS = 5 * 60 * 1000;
+
+/**
+ * Closes System report test emails nobody finished (#1383), without sending them: PENDING for about 5 minutes (the
+ * process stopped before its own cleanup), or PROCESSING past the usual lock timeout. They end CANCELLED with a fixed
+ * error code, so they do not sit in the queue or in its health counts.
+ */
+async function closeAbandonedSystemTests(prisma: DeliveryPrisma, now: Date) {
+  const base = { templateKey: "SYSTEM_TEST_EMAIL" as const, eventId: null };
+  const data = { status: "CANCELLED" as const, failedAt: now, lockedAt: null, lockToken: null, lastError: "SYSTEM_TEST_ABANDONED" };
+  await prisma.messageOutbox.updateMany({
+    where: { ...base, status: "PENDING", createdAt: { lte: new Date(now.getTime() - SYSTEM_TEST_ABANDONED_PENDING_MS) } },
+    data,
+  });
+  await prisma.messageOutbox.updateMany({
+    where: { ...base, status: "PROCESSING", lockedAt: { lte: new Date(now.getTime() - EMAIL_DELIVERY_LOCK_TIMEOUT_MS) } },
+    data,
+  });
+}
+
 async function recoverStaleClaims(
   prisma: DeliveryPrisma,
   scope: OutboxScope,
@@ -656,7 +683,7 @@ async function recoverStaleClaims(
       ...scope,
       status: "PROCESSING",
       lockedAt: { lte: staleBefore },
-      ...(messageIds ? { id: { in: messageIds } } : {}),
+      ...(messageIds ? { id: { in: messageIds } } : SWEEP_SKIPS_SYSTEM_TEST),
     },
     orderBy: { lockedAt: "asc" },
     take: EMAIL_DELIVERY_BATCH_SIZE,
@@ -748,7 +775,7 @@ async function claimNextMessage(
           status: "PENDING",
           availableAt: { lte: now },
           attemptCount: { lt: MAX_EMAIL_DELIVERY_ATTEMPTS },
-          ...(messageIds ? { id: { in: messageIds } } : {}),
+          ...(messageIds ? { id: { in: messageIds } } : SWEEP_SKIPS_SYSTEM_TEST),
         },
         orderBy: [{ availableAt: "asc" }, { createdAt: "asc" }],
         select: {
@@ -1087,6 +1114,7 @@ async function runDeliveryLoop(
     Math.min(EMAIL_DELIVERY_BATCH_SIZE, options.limit ?? EMAIL_DELIVERY_BATCH_SIZE)
   );
 
+  if (!uniqueMessageIds && scope.eventId === null) await closeAbandonedSystemTests(prisma, now());
   const recoveredIds = await recoverStaleClaims(
     prisma,
     scope,
@@ -1107,6 +1135,7 @@ async function runDeliveryLoop(
     const due = await prisma.messageOutbox.findFirst({
       where: {
         ...scope,
+        ...(uniqueMessageIds ? {} : SWEEP_SKIPS_SYSTEM_TEST),
         status: "PENDING",
         availableAt: { lte: now() },
         attemptCount: { lt: MAX_EMAIL_DELIVERY_ATTEMPTS },
@@ -1341,6 +1370,10 @@ async function prepareAccountEmailBody(
     return { bodyText: input.bodyText };
   }
   if (input.templateKey?.startsWith("NEW_CLUB_APPLICATION_")) {
+    return { bodyText: input.bodyText };
+  }
+  // The System report's test email (#1383): a fixed plain body with no sentinel and no account; never rewrite it.
+  if (input.templateKey === "SYSTEM_TEST_EMAIL") {
     return { bodyText: input.bodyText };
   }
   // Module request email (#741) carries free text and no sentinel: never replace anything in it.

@@ -118,6 +118,18 @@ describe("outbox queue readiness", () => {
     });
   });
 
+  it("leaves the System report test email out of every count (#1383)", async () => {
+    const prisma = prismaFixture({ counts: [1, 1, 1, 1, 1], oldestDue: null });
+    await getOutboxQueueSnapshot(new Date("2026-07-24T12:00:00.000Z"));
+    const wheres = [
+      ...prisma.messageOutbox.count.mock.calls.map((call) => call[0].where),
+      ...prisma.messageOutbox.findFirst.mock.calls.map((call) => call[0].where),
+      ...prisma.messageOutbox.groupBy.mock.calls.map((call) => call[0].where),
+    ];
+    expect(wheres).toHaveLength(7);
+    for (const where of wheres) expect(where).toMatchObject({ templateKey: { not: "SYSTEM_TEST_EMAIL" } });
+  });
+
   it("reports no age when nothing is due", async () => {
     prismaFixture({ counts: [0, 0, 0, 0, 0], oldestDue: null });
 

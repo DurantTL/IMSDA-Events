@@ -1074,3 +1074,34 @@ export async function checkCheckInStationLookupRateLimit(stationId: string, limi
     identifierHashes: [station],
   }], configuration);
 }
+
+/**
+ * The System report's email tester (#1383): each press sends one real email, so a system administrator gets three an
+ * hour. Charged per account, keyed by the user id (hashed, like the other staff budgets).
+ */
+export const systemEmailTestBudget = { limit: 3, windowSeconds: oneHour } as const;
+
+export async function checkSystemEmailTestRateLimit(userId: string) {
+  const configuration = getRateLimitConfiguration();
+  const account = hashRateLimitIdentifier("system-report-email-test", userId, configuration);
+  return evaluate([{
+    policy: "system-report.email-test.account",
+    limit: systemEmailTestBudget.limit,
+    windowSeconds: systemEmailTestBudget.windowSeconds,
+    identifierHashes: [account],
+  }], configuration);
+}
+
+/** The System report's Square tester (#1383): a handful of runs an hour per system administrator. */
+export const systemSquareTestBudget = { limit: 5, windowSeconds: oneHour } as const;
+
+export async function checkSystemSquareTestRateLimit(userId: string) {
+  const configuration = getRateLimitConfiguration();
+  const account = hashRateLimitIdentifier("system-report-square-test", userId, configuration);
+  return evaluate([{
+    policy: "system-report.square-test.account",
+    limit: systemSquareTestBudget.limit,
+    windowSeconds: systemSquareTestBudget.windowSeconds,
+    identifierHashes: [account],
+  }], configuration);
+}
