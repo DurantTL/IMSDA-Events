@@ -27,25 +27,25 @@
 .cisForm input[inputmode] { width: 100%; }
 .cisShell .large { min-height: 48px; padding: 0 18px; font-size: 1rem; }
 .cisPeople { display: grid; gap: 8px; margin: 8px 0; padding: 0; list-style: none; }
-.cisPerson { border: 1px solid var(--line); border-radius: 12px; }
+.cisPerson { border: 1px solid var(--line); border-radius: var(--radius-card); }
 .cisPersonBody { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 56px; padding: 8px 12px; }
 .cisPersonBody > span:not(.cisType):not(.cisStatus) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .cisPersonPick { cursor: pointer; }
 .cisPersonPick input[type="checkbox"], .cisChoice input[type="radio"] { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
 .cisPerson strong { overflow-wrap: anywhere; }
 .cisType { color: var(--muted); font-size: 0.95rem; }
-.cisStatus { border-radius: 999px; padding: 2px 10px; font-size: 0.875rem; font-weight: 700; }
+.cisStatus { border-radius: var(--radius-pill); padding: 2px 10px; font-size: 0.875rem; font-weight: 700; }
 .cisStatusOk { background: #eef8f2; color: #1c6b4a; }
 .cisStatusHold { background: var(--imsda-gold-soft); color: #6f5316; }
 .cisActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .cisPayment { display: grid; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
 .cisPayment :global(.checkin-payment-due) { margin-top: 0; }
-.cisForm fieldset { display: grid; gap: 8px; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.cisForm fieldset { display: grid; gap: 8px; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px; }
 .cisForm legend { padding: 0 6px; font-weight: 700; }
 .cisForm label { font-size: 1rem; }
 .cisChoice { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .cisChoice label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
 .cisDue, .cisOk, .cisError, .cisDeskNotice { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 0; font-size: 1rem; }
 .cisOk { color: #1c6b4a; font-weight: 700; }
-.cisError { border-radius: 9px; background: #fff1ef; color: var(--coral); padding: 9px 11px; }
+.cisError { border-radius: 9px; background: var(--coral-soft); color: var(--coral); padding: 9px 11px; }
 .cisDeskNotice { border-radius: 9px; background: var(--imsda-gold-soft); color: #6f5316; padding: 9px 11px; font-weight: 700; }
