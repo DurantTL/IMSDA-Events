@@ -46,8 +46,8 @@ export function EmailDeliverySection({
   /** The environment can send but the central sender address is blank: messages are waiting, not sent and not lost. */
   senderMissing?: boolean;
 }) {
-  // A saved sender address clears the "sender missing" state without a reload: the page props were read before the save.
-  const [senderSaved, setSenderSaved] = useState(false);
+  // The sender address saved in this visit, if any, decides the "sender missing" state without a reload: the page props were read before the save.
+  const [savedSenderEmail, setSavedSenderEmail] = useState<string | null>(null);
   const router = useRouter();
   const [sender, setSender] = useState(initialSender);
   const [draft, setDraft] = useState(initialSender);
@@ -60,8 +60,10 @@ export function EmailDeliverySection({
   const [dialogError, setDialogError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const senderMissing = initialSenderMissing && !senderSaved;
-  const platformConfigured = initialConfigured || (initialSenderMissing && senderSaved);
+  const canSend = initialConfigured || initialSenderMissing;
+  const senderBlank = savedSenderEmail === null ? initialSenderMissing : !savedSenderEmail.trim();
+  const senderMissing = canSend && senderBlank;
+  const platformConfigured = canSend && !senderBlank;
   const dirty = JSON.stringify(draft) !== JSON.stringify(sender);
   const paused = events.filter((event) => event.paused);
   const pausable = events.filter((event) => !event.paused && !event.archived);
@@ -88,10 +90,8 @@ export function EmailDeliverySection({
       };
       setSender(saved);
       setDraft(saved);
-      if (initialSenderMissing && saved.email.trim()) {
-        setSenderSaved(true);
-        router.refresh();
-      }
+      setSavedSenderEmail(saved.email);
+      router.refresh();
       setNotice("Central sender saved.");
     } catch (caught) {
       setSenderError(caught instanceof Error ? caught.message : failedMessage);
