@@ -1,5 +1,6 @@
 "use client";
 
+import { TabList, TabPanel } from "@/components/dashboard-tabs";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -137,6 +138,9 @@ type MessagingSettingsDraft = {
   replyToEmail: string;
   internalNotificationEmails: string;
 };
+
+export const communicationsTabId = (view: CommunicationsView) => `communications-tab-${view}`;
+export const communicationsPanelId = (view: CommunicationsView) => `communications-panel-${view}`;
 
 function settingsDraftFromMessaging(
   messaging: MessagingWorkspaceData | null,
@@ -1476,22 +1480,26 @@ export function CommunicationsWorkspace({
       </div>
 
       {canManage && (
-        <nav className="communications-tabs" aria-label="Communication tools" role="tablist">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              aria-current={view === id ? "page" : undefined}
-              aria-selected={view === id}
-              className={view === id ? "active" : ""}
-              role="tab"
-              type="button"
-              onClick={() => changeView(id)}
-              key={id}
-            >
-              <Icon aria-hidden="true" size={17} /> {label}
-              {id === "deliveries" && messaging && <span>{messaging.messages.length}</span>}
-            </button>
-          ))}
-        </nav>
+        <TabList
+          label="Communication tools"
+          className="communications-tabs"
+          selectedClassName="active"
+          activation="manual"
+          selectedKey={view}
+          onSelect={(key) => void changeView(key as CommunicationsView)}
+          tabs={tabs.map(({ id, label, icon: Icon }) => ({
+            key: id,
+            id: communicationsTabId(id),
+            // Only the open view is in the page, so only its tab names a panel.
+            panelId: view === id ? communicationsPanelId(id) : undefined,
+            label: (
+              <>
+                <Icon aria-hidden="true" size={17} /> {label}
+                {id === "deliveries" && messaging && <span>{messaging.messages.length}</span>}
+              </>
+            ),
+          }))}
+        />
       )}
 
       {siteUpdating && !draftOpen && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => retryRef.current?.()} />}
@@ -1499,6 +1507,7 @@ export function CommunicationsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       {view === "announcements" && (
+        <TabPanel id={communicationsPanelId("announcements")} tabId={communicationsTabId("announcements")}>
         <div className="communications-grid">
           <section className="announcement-list">
             {announcements.map((announcement) => (
@@ -1597,10 +1606,12 @@ export function CommunicationsWorkspace({
             )}
           </aside>
         </div>
+        </TabPanel>
       )}
 
       {view === "reminders" && messaging && (
-        <div className="reminder-workspace" role="tabpanel" aria-label="Balance reminders">
+        <TabPanel id={communicationsPanelId("reminders")} tabId={communicationsTabId("reminders")}>
+        <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
               <div>
@@ -1740,10 +1751,12 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
+        </TabPanel>
       )}
 
       {view === "shirt-sizes" && messaging && (
-        <div className="reminder-workspace" role="tabpanel" aria-label="Shirt size requests">
+        <TabPanel id={communicationsPanelId("shirt-sizes")} tabId={communicationsTabId("shirt-sizes")}>
+        <div className="reminder-workspace">
           <section className="panel reminder-preview-panel">
             <div className="message-delivery-toolbar">
               <div>
@@ -1897,9 +1910,11 @@ export function CommunicationsWorkspace({
             </button>
           </form>
         </div>
+        </TabPanel>
       )}
 
       {view === "templates" && messaging && (
+        <TabPanel id={communicationsPanelId("templates")} tabId={communicationsTabId("templates")}>
         <div className="message-template-layout">
           <aside className="panel message-template-list">
             <div className="section-heading"><div><p className="eyebrow">Future messages</p><h2>Templates</h2></div></div>
@@ -2093,9 +2108,11 @@ export function CommunicationsWorkspace({
             </aside>
           )}
         </div>
+        </TabPanel>
       )}
 
       {view === "deliveries" && messaging && (
+        <TabPanel id={communicationsPanelId("deliveries")} tabId={communicationsTabId("deliveries")}>
         <div className="message-delivery-stack">
           <section className="message-delivery-summary">
             <article className="panel"><span className="message-stat-icon gold"><Clock3 size={18} /></span><small>Queued</small><strong>{messaging.counts.PENDING + messaging.counts.PROCESSING}</strong></article>
@@ -2370,9 +2387,11 @@ export function CommunicationsWorkspace({
             </div>
           </section>
         </div>
+        </TabPanel>
       )}
 
       {view === "settings" && messaging && (
+        <TabPanel id={communicationsPanelId("settings")} tabId={communicationsTabId("settings")}>
         <div className="message-settings-layout">
           <form className="panel message-settings-form" onSubmit={saveSettings}>
             <div className="section-heading"><div><p className="eyebrow">Event-level configuration</p><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
@@ -2404,6 +2423,7 @@ export function CommunicationsWorkspace({
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
           </aside>
         </div>
+        </TabPanel>
       )}
 
       {draftOpen && (

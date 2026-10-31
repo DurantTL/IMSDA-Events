@@ -3,7 +3,8 @@
 // itself does not change when a tab's content does.
 import { ChevronLeft } from "lucide-react";
 import { useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from "react";
-import { nextTabIndex, type SidebarTab } from "./sidebar-tabs";
+import { TabList, TabPanel } from "@/components/dashboard-tabs";
+import type { SidebarTab } from "./sidebar-tabs";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, widthFromPointer, type EditorLayout } from "./editor-layout";
 
 export type { SidebarTab };
@@ -32,18 +33,8 @@ export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidt
   /** True while the aside is a full-screen phone sheet: it is then a modal dialog. */
   modal?: boolean;
 }) {
-  const tabRefs = useRef(new Map<SidebarTab, HTMLButtonElement>());
   const dragging = useRef(false);
   const lastDragWidth = useRef<number | null>(null);
-
-  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const next = nextTabIndex(event.key, index, tabs.length);
-    if (next === null) return;
-    event.preventDefault();
-    const tab = tabs[next]!;
-    onTabChange(tab.id);
-    tabRefs.current.get(tab.id)?.focus();
-  }
 
   function onHandleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     // The arrow that points away from the form widens the sidebar, whichever side it is on.
@@ -100,27 +91,18 @@ export function BuilderSidebar({ tabs, activeTab, onTabChange, layout, shownWidt
       )}
       {inspector?.note && <p className="fb-inspector-note fb-hint">{inspector.note}</p>}
       {inspector?.notices && <div className="fb-inspector-notices">{inspector.notices}</div>}
-      <div className="fb-tablist" role="tablist" aria-label="Sidebar">
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            ref={(node) => { if (node) tabRefs.current.set(tab.id, node); else tabRefs.current.delete(tab.id); }}
-            type="button"
-            role="tab"
-            id={sidebarTabId(tab.id)}
-            aria-selected={activeTab === tab.id}
-            aria-controls={sidebarPanelId(tab.id)}
-            tabIndex={activeTab === tab.id ? 0 : -1}
-            className="fb-tab"
-            onClick={() => onTabChange(tab.id)}
-            onKeyDown={(event) => onTabKeyDown(event, index)}
-          >{tab.label}</button>
-        ))}
-      </div>
+      <TabList
+        label="Sidebar"
+        className="fb-tablist"
+        tabClassName="fb-tab"
+        selectedKey={activeTab}
+        onSelect={(key) => onTabChange(key as SidebarTab)}
+        tabs={tabs.map((tab) => ({ key: tab.id, id: sidebarTabId(tab.id), label: tab.label, panelId: sidebarPanelId(tab.id) }))}
+      />
       {tabs.map((tab) => (
-        <div key={tab.id} className="fb-tabpanel" role="tabpanel" id={sidebarPanelId(tab.id)} aria-labelledby={sidebarTabId(tab.id)} hidden={activeTab !== tab.id}>
+        <TabPanel key={tab.id} id={sidebarPanelId(tab.id)} tabId={sidebarTabId(tab.id)} className="fb-tabpanel" hidden={activeTab !== tab.id}>
           {tab.panel}
-        </div>
+        </TabPanel>
       ))}
     </aside>
   );

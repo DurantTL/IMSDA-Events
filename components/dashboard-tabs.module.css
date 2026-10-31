@@ -64,3 +64,12 @@
     white-space: nowrap;
   }
 }
+
+/* A tab panel adds no box of its own, so the page lays out as it did before the panel wrapper (#1353). */
+.panel {
+  display: contents;
+}
+
+.panel[hidden] {
+  display: none;
+}
