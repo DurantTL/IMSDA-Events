@@ -2,7 +2,7 @@
 .block { display: grid; gap: 12px; }
 .block h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; color: var(--imsda-navy); }
 .help:global(.field-help) { margin: 4px 0 0; }
-.item { display: grid; gap: 10px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.item { display: grid; gap: 10px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px; }
 .item label, .step label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
 .item input, .item select, .item textarea { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
 .legend { padding: 0 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
@@ -12,4 +12,4 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .hint { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .versions { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

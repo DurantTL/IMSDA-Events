@@ -11,7 +11,7 @@
 .tile {
   min-width: 0;
   border: 1px solid var(--line, #d6dee2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #fff;
 }
 
@@ -24,7 +24,7 @@
   color: inherit;
   text-decoration: none;
 }
-.tileLink { border-radius: 8px; }
+.tileLink { border-radius: var(--radius-sm); }
 
 .tileLabel,
 .tileDetail {
@@ -35,7 +35,7 @@
 .tileValue {
   font-size: 1.5rem;
   line-height: 1.15;
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .figure {
@@ -48,7 +48,7 @@
 .caption {
   font-weight: 700;
   font-size: max(var(--type-staff-floor, 0px), 1rem);
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .captionYear {
@@ -74,7 +74,7 @@
 
 .monthSelected {
   font-weight: 700;
-  color: #003b5c;
+  color: var(--imsda-navy);
   text-decoration: underline;
 }
 
@@ -109,13 +109,13 @@
   border-radius: 2px;
 }
 
-.seriesDark { background: #003b5c; color: #fff; }
+.seriesDark { background: var(--imsda-navy); color: #fff; }
 .seriesLight { background: #7fa6bd; color: #00263a; }
 .seriesHatch {
   background: repeating-linear-gradient(45deg, #ffffff 0 3px, #8a949a 3px 4px);
   color: #1f2a30;
 }
-.seriesPale { background: #e6f0f4; color: #1f2a30; }
+.seriesPale { background: var(--imsda-navy-soft); color: #1f2a30; }
 .stripDraft { background: #fff7e0; color: #5c4300; }
 .stripDue { background: #ffffff; color: #1f2a30; }
 
@@ -129,7 +129,7 @@
   min-height: 44px;
   cursor: pointer;
   font-weight: 600;
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .tableWrap {
@@ -179,7 +179,7 @@
 .barTotal {
   grid-area: total;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .barTrack {
@@ -191,7 +191,7 @@
   overflow: hidden;
 }
 
-.barReport { background: #003b5c; }
+.barReport { background: var(--imsda-navy); }
 .barRegistration { background: #7fa6bd; }
 
 @media (min-width: 640px) {
@@ -211,7 +211,7 @@
   align-items: center;
   min-height: 44px;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .strip {

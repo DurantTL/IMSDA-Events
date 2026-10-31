@@ -284,7 +284,7 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
         <div className={styles.actions}>
           <label className={`secondary-button ${styles.upload}`}>
             <FileUp aria-hidden="true" size={14} /> {busy && !preview ? "Reading…" : "Upload rules file"}
-            <input accept=".json,application/json" disabled={busy} onChange={chooseFile} type="file" />
+            <input accept=".json,application/json" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
           </label>
         </div>
       </section>

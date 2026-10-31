@@ -103,7 +103,7 @@
 
 .section {
   border: 1px solid var(--line);
-  border-radius: 19px;
+  border-radius: var(--radius-panel);
   background: white;
   padding: 21px;
   box-shadow: 0 8px 24px rgba(0, 59, 92, 0.045);
@@ -130,7 +130,7 @@
   height: 40px;
   flex: 0 0 40px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
 }
@@ -151,7 +151,7 @@
 
 .count {
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--paper);
   color: var(--imsda-navy);
   padding: 6px 10px;
@@ -173,7 +173,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  border: 1px solid #dce6ea;
+  border: 1px solid var(--line);
   border-left: 4px solid var(--imsda-gold);
   border-radius: 13px;
   background: #fbfcfd;
@@ -218,9 +218,9 @@
 
 .badge {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--imsda-gold-soft);
-  color: #805807;
+  color: var(--gold-text);
   padding: 4px 7px;
   font-size: max(var(--type-floor, 0px), 0.55rem);
   font-weight: 900;
@@ -229,7 +229,7 @@
 }
 
 .badgeUrgent {
-  background: #fff1ef;
+  background: var(--coral-soft);
   color: #a63a2d;
 }
 

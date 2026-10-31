@@ -1,5 +1,5 @@
 /* Platform settings: homepage ministry tiles (#1251). Staff labels at least 14px. */
-.ministryTileFields { display: grid; gap: 12px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; }
+.ministryTileFields { display: grid; gap: 12px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px 14px 14px; }
 .ministryTileFields > legend { padding: 0 6px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
 .ministryTileFields label { min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .ministryTileFields label > small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

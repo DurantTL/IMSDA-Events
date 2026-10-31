@@ -18,7 +18,7 @@
   min-height: 44px;
   cursor: pointer;
   font-weight: 600;
-  color: #003b5c;
+  color: var(--imsda-navy);
 }
 
 .sortNote {

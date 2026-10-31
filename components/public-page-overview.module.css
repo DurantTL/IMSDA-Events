@@ -1,5 +1,5 @@
 /* Public page and links overview (#448): the short read-only summary at the top of Step 3. */
-.publicPageOverview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: 12px; padding: 10px 12px; }
+.publicPageOverview { display: grid; gap: 8px; margin: 0; border: 1px solid #d7dee2; border-radius: var(--radius-card); padding: 10px 12px; }
 .publicPageOverview > div { display: grid; gap: 2px; }
 .publicPageOverview dt { font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .publicPageOverview dd { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
