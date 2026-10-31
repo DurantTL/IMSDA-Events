@@ -11,6 +11,13 @@ export type EventReadinessSource = {
   supportContact?: string | null;
   audience?: "GENERAL" | "CLUB" | null;
   billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE" | null;
+  /** The event's id, for the link on the attendee-types item. */
+  id?: string | null;
+  /**
+   * Active attendee types with a minimum age of 18 or more (#1403), the rule that makes an attendee an adult. Omitted by a caller that has not loaded them, which leaves the
+   * "Attendee types set" item out rather than reporting it undone.
+   */
+  attendeeTypesWithAgeRangeCount?: number | null;
 };
 
 /** Shown as the publish blocker and the settings/readiness flag (#565). */
@@ -30,10 +37,12 @@ export type EventReadinessItem = {
  * it can, without folding it back into readiness math.
  */
 export type EventReadinessOptionalItem = {
-  id: "public-info";
+  id: "public-info" | "attendee-types";
   label: string;
   detail: string;
   complete: boolean;
+  /** Where to fix it, when the item points at one page. */
+  href?: string;
 };
 
 export const pastEventPublishWarning =
@@ -71,6 +80,27 @@ function isPublicWebUrl(value: string | null | undefined) {
   } catch {
     return false;
   }
+}
+
+/**
+ * "Attendee types set" (#1403): attendee types matter for events (GENERAL), never club events. Age class comes only from a
+ * type's age range, so without one every attendee's age is unknown and scheduled email reaches nobody. Recommended, never a
+ * publish blocker. Null for a club event, and for a caller that has not loaded the count.
+ */
+export function getAttendeeTypesReadinessItem(
+  event: Pick<EventReadinessSource, "audience" | "id" | "attendeeTypesWithAgeRangeCount">,
+): EventReadinessOptionalItem | null {
+  if (event.audience === "CLUB" || typeof event.attendeeTypesWithAgeRangeCount !== "number") return null;
+  const done = event.attendeeTypesWithAgeRangeCount > 0;
+  return {
+    id: "attendee-types",
+    label: "Attendee types set",
+    detail: done
+      ? "An adult attendee type tells scheduled email who is an adult."
+      : "Add an adult attendee type (minimum age 18 or more). Without one, scheduled email cannot reach attendees because their age is unknown.",
+    complete: done,
+    ...(event.id ? { href: `/more/attendee-configuration?event=${encodeURIComponent(event.id)}` } : {}),
+  };
 }
 
 export function getEventPublishReadiness(
@@ -135,6 +165,9 @@ export function getEventPublishReadiness(
       complete: publicInfoComplete,
     },
   ];
+
+  const attendeeTypesItem = getAttendeeTypesReadinessItem(event);
+  if (attendeeTypesItem) optionalItems.push(attendeeTypesItem);
 
   return {
     ready: items.every((item) => item.complete),

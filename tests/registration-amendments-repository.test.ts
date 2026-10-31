@@ -402,6 +402,30 @@ describe("registration amendments repository", () => {
     })).toEqual({ attendeeType: "Youth", attendeeTypeDefinitionId: "type-youth" });
   });
 
+  it("re-types from the legacy attendee_type answer on a general event, failing closed (#1403)", () => {
+    const configured = [{ id: "type-adult", code: "ADULT", label: "Adult" }, { id: "type-teen", code: "TEEN", label: "Teen" }];
+    const asAdult = { attendeeType: "Adult", attendeeTypeDefinitionId: "type-adult", attendeeTypeDefinition: { id: "type-adult", code: "ADULT", label: "Adult" } };
+    // Amended from Adult to Teen: the attendee is no longer an adult.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Teen" }, configured, asAdult, "GENERAL"))
+      .toEqual({ attendeeType: "Teen", attendeeTypeDefinitionId: "type-teen" });
+    // No match, or a blank answer, clears the type.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Worker" }, configured, asAdult, "GENERAL"))
+      .toEqual({ attendeeType: "WORKER", attendeeTypeDefinitionId: null });
+    // The stale "Adult" label goes too, so the attendee-type backfill cannot re-link a minor as an adult.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Teen" }, [configured[0]!], asAdult, "GENERAL"))
+      .toEqual({ attendeeType: "CHILD", attendeeTypeDefinitionId: null });
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "" }, configured, asAdult, "GENERAL"))
+      .toMatchObject({ attendeeTypeDefinitionId: null });
+    // An unchanged answer for a since-deactivated type keeps it.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Adult" }, [configured[1]!], asAdult, "GENERAL"))
+      .toMatchObject({ attendeeTypeDefinitionId: "type-adult" });
+    // Without the answer, or on a club event, the current type is left alone.
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, {}, configured, asAdult, "GENERAL"))
+      .toMatchObject({ attendeeTypeDefinitionId: "type-adult" });
+    expect(resolveAmendmentAttendeeType(definition as RegistrationFormDefinition, { attendee_type: "Teen" }, configured, asAdult, "CLUB"))
+      .toMatchObject({ attendeeTypeDefinitionId: "type-adult" });
+  });
+
   it("rejects cross-attendee and new-attendee use of a deactivated type", () => {
     const sourcedDefinition = structuredClone(definition) as RegistrationFormDefinition;
     sourcedDefinition.sections[1]!.fields.push({

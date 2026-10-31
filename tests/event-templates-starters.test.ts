@@ -48,7 +48,8 @@ describe("starter event templates (#546)", () => {
     expect(payload.moduleEnablement.waitlistEnabled).toBe(false);
     expect(payload.moduleEnablement.autoPromoteWaitlist).toBe(false);
     expect(payload.messageTemplateDefaults).toEqual([]);
-    expect(payload.attendeeTypes).toEqual([]);
+    // Only the general events carry attendee types (#1403): the age ranges messaging needs, nothing priced.
+    expect(payload.attendeeTypes.length > 0).toBe(["womens_retreat", "man_camp", "camp_meeting"].includes(starter.starterKey));
     // The Pathfinder Bible Experience (#809) also carries its team rules and registration deadline, and (#931) turns on the
     // general registration link.
     expect(Object.keys(payload).filter((key) => !["locations", "teamSettings", "registrationClosesOn", "generalRegistrationLink"].includes(key)).sort()).toEqual([

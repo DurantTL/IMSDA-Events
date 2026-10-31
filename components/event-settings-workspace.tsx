@@ -29,7 +29,7 @@ import {
   sectionsWithNonDefaultValues,
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
-import { getEventPublishReadiness, getEventPublishWarnings } from "@/modules/events/readiness";
+import { getAttendeeTypesReadinessItem, getEventPublishReadiness, getEventPublishWarnings } from "@/modules/events/readiness";
 import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
@@ -246,10 +246,19 @@ export function EventSettingsWorkspace({
   // Readiness reflects the saved event (#471), not unsaved edits: that is
   // what the server checks when Publish is clicked, so the checklist and the
   // button never promise something a save hasn't made true yet.
-  const readiness = useMemo(
+  const baseReadiness = useMemo(
     () => getEventPublishReadiness(savedDraft, publishedFormCount),
     [savedDraft, publishedFormCount],
   );
+  // The attendee-types item reads the event's saved types, which the settings draft does not carry (#1403).
+  const readiness = useMemo(() => {
+    const item = getAttendeeTypesReadinessItem({
+      audience: savedDraft.audience,
+      id: initialEvent?.id,
+      attendeeTypesWithAgeRangeCount: initialEvent?.attendeeTypesWithAgeRangeCount,
+    });
+    return item ? { ...baseReadiness, optionalItems: [...baseReadiness.optionalItems, item] } : baseReadiness;
+  }, [baseReadiness, savedDraft.audience, initialEvent?.id, initialEvent?.attendeeTypesWithAgeRangeCount]);
   const publishWarnings = useMemo(
     () => getEventPublishWarnings(savedDraft),
     [savedDraft],
@@ -1214,7 +1223,7 @@ export function EventSettingsWorkspace({
               {readiness.optionalItems.map((item) => (
                 <li className={item.complete ? "complete" : ""} key={item.id}>
                   {item.complete ? <CheckCircle2 size={18} aria-hidden="true" /> : <span aria-hidden="true" />}
-                  <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+                  <span><strong>{item.label}</strong><small>{item.detail}</small>{item.href && !item.complete && <small><Link href={item.href}>Open attendee setup</Link></small>}</span>
                 </li>
               ))}
             </ul>

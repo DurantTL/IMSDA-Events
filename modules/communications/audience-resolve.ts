@@ -101,6 +101,8 @@ export type AudienceCandidate = {
   blocked?: "MINOR_ATTENDEE";
   /** Why: under 18, or an age group that is not known. Only used to word the exclusion. */
   blockedAge?: "MINOR" | "UNKNOWN";
+  /** For an UNKNOWN age: no attendee type at all, or a type whose age range does not show an adult. */
+  blockedCause?: "NO_TYPE" | "NO_RANGE";
 };
 
 const emailSchema = z.email();
@@ -194,9 +196,9 @@ export function evaluateAudienceRegistration(
 
   const balanceCents = audienceBalanceCents(row, context.isOrganizationBilled);
   const candidates: AudienceCandidate[] = [];
-  const push = (role: AudienceRole, contact: AudienceContactRow, blockedAge?: "MINOR" | "UNKNOWN") => {
+  const push = (role: AudienceRole, contact: AudienceContactRow, blockedAge?: "MINOR" | "UNKNOWN", blockedCause?: "NO_TYPE" | "NO_RANGE") => {
     candidates.push({
-      ...(blockedAge ? { blocked: "MINOR_ATTENDEE" as const, blockedAge } : {}),
+      ...(blockedAge ? { blocked: "MINOR_ATTENDEE" as const, blockedAge, ...(blockedCause ? { blockedCause } : {}) } : {}),
       role,
       name: contact.name.trim() || "Recipient",
       email: contact.email,
@@ -220,7 +222,7 @@ export function evaluateAudienceRegistration(
         }
         const age = context.attendeeAge.get(attendee.attendeeType) ?? "UNKNOWN";
         if (age === "ADULT") push(role, { name: attendee.name, email: attendee.email });
-        else push(role, { name: "", email: null }, age);
+        else push(role, { name: "", email: null }, age, age === "UNKNOWN" ? (attendee.attendeeType ? "NO_RANGE" : "NO_TYPE") : undefined);
       }
     }
   }
@@ -293,6 +295,10 @@ export type AudienceExclusion = {
   /** How many contacts this row stands for: several attendees of one registration can all lack an address. */
   contactCount: number;
   reasons: AudienceReason[];
+  /** For a MINOR_ATTENDEE exclusion: a known minor, or an unknown age (and why). Absent on every other exclusion. */
+  blockedAge?: "MINOR" | "UNKNOWN";
+  /** For an UNKNOWN age: how many of `contactCount` have no attendee type at all, and how many have a type with no adult age range. */
+  unknownCauses?: { noType: number; noRange: number };
 };
 
 export type AudienceCounts = {
@@ -368,6 +374,7 @@ export class AudienceAccumulator {
       const existing = this.contactExclusions.get(key);
       if (existing) {
         existing.contactCount += 1;
+        if (existing.unknownCauses && candidate.blockedCause) existing.unknownCauses[candidate.blockedCause === "NO_TYPE" ? "noType" : "noRange"] += 1;
         return;
       }
       this.contactExclusions.set(key, {
@@ -379,6 +386,8 @@ export class AudienceAccumulator {
         registrations: [{ registrationId: candidate.registrationId, confirmationCode: candidate.confirmationCode }],
         contactCount: 1,
         reasons: candidate.reasons,
+        ...(candidate.blockedAge ? { blockedAge: candidate.blockedAge } : {}),
+        ...(candidate.blockedCause ? { unknownCauses: { noType: candidate.blockedCause === "NO_TYPE" ? 1 : 0, noRange: candidate.blockedCause === "NO_RANGE" ? 1 : 0 } } : {}),
       });
       return;
     }

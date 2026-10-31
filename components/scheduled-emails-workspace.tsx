@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
@@ -397,6 +398,7 @@ export function ScheduledEmailsWorkspace({
           {formReview && (
             <ReviewPanel
               review={formReview}
+              eventId={eventId}
               action={(
                 <button className="primary-button" type="button" onClick={() => void save()} disabled={busy || formReview.eligibleCount === 0}>
                   {form.editing ? "Save changes" : "Save schedule"}
@@ -413,6 +415,7 @@ export function ScheduledEmailsWorkspace({
           <h2>Approve {approval.schedule.name}</h2>
           <ReviewPanel
             review={approval.review}
+            eventId={eventId}
             action={(
               <button className="primary-button" type="button" onClick={() => void approve()} disabled={busy || approval.review.eligibleCount === 0}>
                 Approve and schedule
@@ -499,13 +502,18 @@ export function ScheduledEmailsWorkspace({
   );
 }
 
+/** Left out because the age is not known: the fix is the event's attendee types. */
+const ageUnknownCodes: ReadonlySet<string> = new Set(["AGE_UNKNOWN_RECIPIENT", "AGE_UNKNOWN_NO_RANGE"]);
+
 function ReviewPanel({
   review,
+  eventId,
   action,
   secondary,
   note,
 }: {
   review: ScheduledEmailReviewView;
+  eventId: string;
   action: React.ReactNode;
   secondary?: React.ReactNode;
   note: string;
@@ -523,7 +531,14 @@ function ReviewPanel({
       <p className="field-help">{review.projection.dstNote}</p>
       {review.exclusions.length > 0 && (
         <ul className="scheduled-email-exclusions" aria-label="Who is left out and why">
-          {review.exclusions.map((entry) => <li key={entry.code}>{entry.label}: {entry.count}</li>)}
+          {review.exclusions.map((entry) => (
+            <li key={entry.code}>
+              {entry.label}: {entry.count}
+              {ageUnknownCodes.has(entry.code) && (
+                <> <Link href={`/more/attendee-configuration?event=${encodeURIComponent(eventId)}`}>Set attendee types</Link></>
+              )}
+            </li>
+          ))}
         </ul>
       )}
       <p className="field-help">Everyone is checked again when the email is due and just before it is sent, so anyone who has paid, cancelled, transferred or opted out by then is dropped.</p>
