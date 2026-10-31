@@ -41,6 +41,11 @@ const NONE: EventCount = { total: 0, topEventId: null };
 const groupedCount = (rows: Array<{ eventId: string | null; _count: { _all: number } }>) =>
   eventCountFromGroups(rows.map((row) => ({ eventId: row.eventId, count: row._count._all })));
 
+/** Scheduled batches past their send time that no worker has started (shared with the System report, #1378). */
+export function scheduledEmailOverdueWhere(overdueBefore: Date) {
+  return { status: "ACTIVE" as const, claimToken: null, sendAt: { lt: overdueBefore } };
+}
+
 export async function loadAttentionSignals(now = new Date()): Promise<AttentionSignals> {
   const prisma = getPrisma();
   const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
@@ -145,7 +150,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     read("scheduled-emails-overdue", "overdue scheduled email", NONE, async () => {
       const rows = await prisma.scheduledEmailBatch.groupBy({
         by: ["eventId"],
-        where: { status: "ACTIVE", claimToken: null, sendAt: { lt: overdueBefore } },
+        where: scheduledEmailOverdueWhere(overdueBefore),
         _count: { _all: true },
       });
       return groupedCount(rows);

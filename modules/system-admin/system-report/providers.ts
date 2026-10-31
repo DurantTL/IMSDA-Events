@@ -27,6 +27,7 @@ import type { AutomaticReadinessRow } from "@/modules/system-admin/readiness-che
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { getSystemHealth } from "@/modules/system-admin/repository";
 import { calendarRefreshFields, diskFields, messageFileCleanupFields, reachabilityFields } from "./job-signals";
+import { buildCommunicationsProviders } from "./communications-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 
 /**
@@ -541,6 +542,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       };
     });
   }),
+  ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),
 ];
 
 /* ---------- Environment status rows ---------- */

@@ -6,6 +6,9 @@
 /** Messages the delivery worker sends in one pass. */
 export const EMAIL_DELIVERY_BATCH_SIZE = 50;
 
+/** A message claimed for sending longer than this has a stale lock (#1378 reads it too). */
+export const EMAIL_DELIVERY_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** The sweep interval when `OUTBOX_SWEEP_INTERVAL_SECONDS` is not set; the same default as the sweeper container. */
 export const DEFAULT_OUTBOX_SWEEP_INTERVAL_SECONDS = 300;
 

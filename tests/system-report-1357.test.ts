@@ -149,12 +149,13 @@ describe("the report model", () => {
   it("keeps the readiness checklist out of the overall status and always last", () => {
     const report = buildSystemReport([
       signal("setup", "key", "ok"),
+      signal("communications", "communications-key", "ok"),
       signal("checklist", "server", "watch", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
       signal("checklist", "go-live", "attention", { countsTowardOverall: false, sectionLabel: "11 of 13 ticked" }),
     ], now);
-    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 1, info: 0 });
+    expect(report.overall.tally).toEqual({ attention: 0, watch: 0, unavailable: 0, ok: 2, info: 0 });
     expect(report.overall.state).toBe("ok");
-    expect(report.overall.readingsTried).toBe(1);
+    expect(report.overall.readingsTried).toBe(2);
     const last = report.sections.at(-1)!;
     expect(last.key).toBe("checklist");
     expect(last.counted).toBe(false);
