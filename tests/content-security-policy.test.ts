@@ -83,6 +83,9 @@ describe("Content Security Policy (#1401)", () => {
     const defaultPolicy = policyFor("/embed/calendar");
     expect(directiveSources(defaultPolicy, "frame-ancestors")).toEqual(["'self'", "https://imsda.org", "https://*.imsda.org"]);
     expect(policyFor("/embed/calendar", { embedAllowedOrigins: "https://example.org" })).toContain("frame-ancestors https://example.org");
+    for (const blank of ["", "   "]) {
+      expect(policyFor("/embed/calendar", { embedAllowedOrigins: blank })).toBe(defaultPolicy);
+    }
     expect(policyFor("/embedded")).toContain("frame-ancestors 'none'");
     expect(policyFor("/")).toContain("frame-ancestors 'none'");
   });

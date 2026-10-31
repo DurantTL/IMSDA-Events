@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { describe, expect, it } from "vitest";
 import { config, proxy } from "@/proxy";
 import { REQUEST_TARGET_HEADER } from "@/modules/access/login-routing";
@@ -52,26 +53,32 @@ describe("proxy matcher (#1401)", () => {
   const entries = config.matcher as Array<string | { source: string; missing?: Array<{ key: string }> }>;
   const pageEntry = entries.find((entry): entry is { source: string; missing?: Array<{ key: string }> } => typeof entry !== "string");
 
+  const matches = (url: string, headers?: Record<string, string>) =>
+    unstable_doesMiddlewareMatch({ config, url, headers });
+
   it("covers pages but not API routes, static files, the embed scripts or public files", () => {
-    if (!pageEntry) throw new Error("Missing page matcher");
-    const regex = new RegExp(`^${pageEntry.source}$`);
-    for (const pathname of ["/", "/events/synthetic", "/embed/calendar", "/overview", "/embed/embed.json"]) {
-      expect(regex.test(pathname), pathname).toBe(true);
+    for (const pathname of ["/", "/events/x", "/embed/calendar", "/overview", "/embed/embed.json"]) {
+      expect(matches(pathname), pathname).toBe(true);
     }
     for (const pathname of [
-      "/api/public/thing",
+      "/api/x",
       "/_next/static/chunk.js",
       "/_next/image",
       "/favicon.ico",
       "/embed/embed.js",
       "/embed/embed-host.js",
       "/pathfinder-logo-pin.png",
-      "/help/create-event-example.webp",
       "/fixtures/wr26-import-template.csv",
       "/.well-known/apple-developer-merchantid-domain-association.txt",
     ]) {
-      expect(regex.test(pathname), pathname).toBe(false);
+      expect(matches(pathname), pathname).toBe(false);
     }
+  });
+
+  it("does not match a prefetch of a public page, but still matches one for a staff page", () => {
+    expect(matches("/events/x", { "next-router-prefetch": "1" })).toBe(false);
+    expect(matches("/events/x", { purpose: "prefetch" })).toBe(false);
+    expect(matches("/overview", { "next-router-prefetch": "1" })).toBe(true);
   });
 
   it("skips prefetch requests for pages", () => {

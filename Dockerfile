@@ -16,7 +16,8 @@ ENV NEXT_BUILD_TSCONFIG=tsconfig.build.json
 ARG NEXT_SKIP_BUILD_TYPECHECK=1
 ENV NEXT_SKIP_BUILD_TYPECHECK=${NEXT_SKIP_BUILD_TYPECHECK}
 
-# These values affect build-time metadata and response headers. They contain no
+# These values affect build-time metadata (EMBED_ALLOWED_ORIGINS is read at
+# request time by proxy.ts, so the runtime value is the one that counts). They contain no
 # credentials, and Compose supplies the same values again when the app runs.
 # Passing them into the image keeps canonical URLs, iframe policy, and Square's
 # CSP hosts aligned when a deployment moves to a different public origin.

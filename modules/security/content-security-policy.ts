@@ -80,8 +80,10 @@ export function buildContentSecurityPolicy({
   pathname,
   nonce,
   isDevelopment,
-  embedAllowedOrigins = DEFAULT_EMBED_ALLOWED_ORIGINS,
+  embedAllowedOrigins: embedAllowedOriginsInput,
 }: ContentSecurityPolicyInput) {
+  // An empty or blank value (Compose passes `${EMBED_ALLOWED_ORIGINS:-}`) means the default.
+  const embedAllowedOrigins = embedAllowedOriginsInput?.trim() || DEFAULT_EMBED_ALLOWED_ORIGINS;
   const path = pathPolicy(pathname, embedAllowedOrigins);
   const scriptSources = [
     "'self'",

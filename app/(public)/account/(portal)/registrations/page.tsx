@@ -50,18 +50,19 @@ async function cancellationFor(registration: AttendeeRegistrationSummary, editab
  * The contextual secondary actions of one card (#1176). View registration, the clear default, is on the card itself.
  * Each action here is the existing service's own panel, shown only where `registrationActions` says it is allowed.
  */
-async function CardActions({
+function CardActions({
   registration,
   editable,
   cancellation,
   headingLevel,
+  nonce,
 }: {
   registration: AttendeeRegistrationSummary;
   editable: boolean;
   cancellation: RegistrantRequestView | null;
   headingLevel: 4 | 5;
+  nonce: string | undefined;
 }) {
-  const nonce = await getRequestNonce();
   const actions = registrationActions(registration, { editable, cancellation });
   const requestCount = cancellation?.requests.length ?? 0;
   const hasAny = actions.continuePayment || actions.editContact || actions.cancellation || actions.details;
@@ -142,6 +143,7 @@ export default async function AttendeeRegistrationsPage({
   await requireAttendeeSignInStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
+  const nonce = await getRequestNonce();
   const filter = parseHistoryFilter((await searchParams)?.show);
   const editable = via === "attendee";
 
@@ -191,6 +193,7 @@ export default async function AttendeeRegistrationsPage({
         editable={editable}
         cancellation={cancellations.get(registration.id) ?? null}
         headingLevel={level === 3 ? 4 : 5}
+        nonce={nonce}
       />
     </AccountRegistrationCard>
   );

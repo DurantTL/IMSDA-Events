@@ -26,7 +26,7 @@ export function proxy(request: NextRequest) {
     pathname,
     nonce,
     isDevelopment: process.env.NODE_ENV === "development",
-    embedAllowedOrigins: process.env.EMBED_ALLOWED_ORIGINS ?? DEFAULT_EMBED_ALLOWED_ORIGINS,
+    embedAllowedOrigins: process.env.EMBED_ALLOWED_ORIGINS?.trim() || DEFAULT_EMBED_ALLOWED_ORIGINS,
   });
 
   const requestHeaders = new Headers(request.headers);
@@ -46,8 +46,9 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Every page, except API routes, Next's static files, the two embed
-    // scripts (JavaScript, not documents), files served from `public/`, and
-    // prefetches (the guide's pattern).
+    // scripts (JavaScript, not documents), common `public/` file types, and
+    // prefetches (the guide's pattern). A `public/` file under a staff prefix
+    // (such as /help/*.webp) still matches the entries below; that is harmless.
     {
       source:
         "/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico|embed/embed(?:-host)?\\.js$|\\.well-known/|fixtures/|.*\\.(?:png|webp|jpe?g|svg|csv|txt)$).*)",
