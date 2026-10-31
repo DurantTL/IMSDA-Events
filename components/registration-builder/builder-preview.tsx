@@ -15,6 +15,7 @@ import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepI
 export function BuilderPreview() {
   const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information } = useLoadedBuilder();
   const stepIssues = (step: NonNullable<typeof previewStep>) => previewStepIssues({ definition, roster, responses, attendees: previewAttendees, choiceUsage: selectedVersion.choiceUsage ?? {}, step });
+  const currentStepId = previewStep?.id ?? null;
   const blockedRef = useRef(continueBlock);
   const stepIssuesRef = useRef(stepIssues);
   useEffect(() => { blockedRef.current = continueBlock; stepIssuesRef.current = stepIssues; });
@@ -23,11 +24,14 @@ export function BuilderPreview() {
   useEffect(() => {
     const current = blockedRef.current;
     if (!current) return;
-    const step = previewSteps.find((candidate) => candidate.id === current.stepId);
+    // Leaving the blocked step any way (including the top bar's test-panel link) ends the block.
+    const step = current.stepId === currentStepId
+      ? previewSteps.find((candidate) => candidate.id === current.stepId)
+      : undefined;
     const remaining = step ? stepIssuesRef.current(step) : [];
     if (remaining.length === 0) setTestIssues([]);
     else setTestIssuesRaw(remaining);
-  }, [responses, previewAttendees, previewSteps, setTestIssues, setTestIssuesRaw]);
+  }, [responses, previewAttendees, previewSteps, currentStepId, setTestIssues, setTestIssuesRaw]);
   function goToPreviewStep(stepId: string) {
     if (continueBlock) setTestIssues([]);
     setPreviewStepId(stepId);
