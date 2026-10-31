@@ -26,7 +26,7 @@ import { clubPortalComplianceStatuses } from "@/modules/background-checks/reposi
 import { loadDirectorSterlingFollowUp } from "@/modules/background-checks/director-follow-up";
 import { DirectorSterlingFollowUp } from "@/components/director-sterling-followup";
 import { ClubRegistrationError, getClubEventWorkspace } from "@/modules/club-registrations/repository";
-import { activeRegistrationStatuses, registrationClosedMessage } from "@/modules/events/lifecycle";
+import { activeRegistrationStatuses, calendarDateInEventTimeZone, registrationClosedMessage } from "@/modules/events/lifecycle";
 import { getClassSelectionWorkspaceIfRegistered, getRegistrationHonorsCatalog } from "@/modules/honors/enrollment-repository";
 import { TEAM_LEVELS, teamLevelLabels, draftKeySchema, singleSearchParam } from "@/modules/club-teams/domain";
 
@@ -122,7 +122,7 @@ export default async function ClubEventRegistrationPage({
   // the same people who see these statuses on the roster, and only status, never a note.
   const showingNewForm = showingTeam && !workspace.registration && !workspace.problem && workspace.event.phase === "OPEN" && Boolean(workspace.experience);
   const complianceStatuses = showingNewForm
-    ? await clubPortalComplianceStatuses(organizationId, clubYearFor(new Date(workspace.event.startsAt)), access.capabilities)
+    ? await clubPortalComplianceStatuses(organizationId, clubYearFor(new Date(`${calendarDateInEventTimeZone(new Date(workspace.event.startsAt), workspace.event.timezone)}T00:00:00Z`)), access.capabilities)
     : undefined;
   const backgroundStates = complianceStatuses
     ? Object.fromEntries(Object.entries(complianceStatuses).map(([memberId, status]) => [memberId, status.state]))

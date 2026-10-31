@@ -232,7 +232,7 @@ export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEv
             <div>
               <h3 translate="no">{event.name}</h3>
               <p className="field-help">
-                {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}
+                {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: event.timezone })}
                 {" · "}{event.clubs.filter((club) => club.status === "REGISTERED").length} clubs registered · {formatNumber(eventHeadcount(event.clubs))} people
               </p>
             </div>

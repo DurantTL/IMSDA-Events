@@ -227,7 +227,7 @@ describe("Points (#1187)", () => {
 describe("Club events (#1187)", () => {
   const events: AreaClubEvent[] = [
     {
-      id: "event-1", name: "Synthetic Camporee", startsAt: "2026-10-09T12:00:00Z",
+      id: "event-1", name: "Synthetic Camporee", startsAt: "2026-10-09T12:00:00Z", timezone: "America/Chicago",
       clubs: [
         { organizationId: "c1", name: "Alpha Club", status: "REGISTERED", headcount: 12 },
         { organizationId: "c4", name: "Delta Club", status: "NOT_REGISTERED", headcount: null },
@@ -251,6 +251,13 @@ describe("Club events (#1187)", () => {
     expect(render("zzz")).toContain("Clear search");
     const none = renderToStaticMarkup(createElement(CoordinatorClubEvents, { clearHref: "/x", events: [], query: "" }));
     expect(none).toContain("No club events are published for this club year.");
+  });
+
+  it("dates an evening start on its own day in the event's time zone (#1406)", () => {
+    const evening: AreaClubEvent[] = [{ ...events[0]!, startsAt: "2027-03-06T01:00:00.000Z", timezone: "America/Chicago" }];
+    const html = renderToStaticMarkup(createElement(CoordinatorClubEvents, { clearHref: "/x", events: evening, query: "" }));
+    expect(html).toContain("March 5, 2027");
+    expect(html).not.toContain("March 6, 2027");
   });
 
   it("puts each event's grid in a labelled scroll region", () => {

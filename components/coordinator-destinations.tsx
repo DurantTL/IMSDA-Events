@@ -168,7 +168,7 @@ export function CoordinatorClubEvents({
             <div>
               <h3 id={`coordinator-event-${event.id}`} translate="no">{event.name}</h3>
               <p className="field-help">
-                {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}
+                {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: event.timezone })}
                 {" · "}{registeredClubsLabel(event.clubs.filter((club) => club.status === "REGISTERED").length)} · {formatNumber(eventHeadcount(event.clubs))} people
               </p>
             </div>
