@@ -59,6 +59,7 @@ import {
 import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
 import { getServerEnv } from "@/lib/env";
 import { buildCommunicationsProviders } from "./communications-providers";
+import { buildEventOpsProviders } from "./event-ops-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 import { buildNoticeProviders } from "./notice-providers";
 
@@ -678,6 +679,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
   ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
   ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),
   ...buildNoticeProviders(defineProvider),
+  ...buildEventOpsProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, couldNotReadNote, eventHref }),
 ];
 
 /* ---------- Environment status rows ---------- */

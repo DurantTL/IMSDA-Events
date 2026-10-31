@@ -6,6 +6,7 @@ import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/h
 import { createHash, randomUUID } from "node:crypto";
 import { ImportRecordStatus, ImportRunStatus, Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { logError } from "@/lib/logger";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { createImportSnapshotIdentity, CsvImportError, parseImportCsv, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
 import { parseWr26Bundle, type Wr26BundleFile } from "@/modules/imports/wr26-bundle";
@@ -684,7 +685,8 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
   const existing = await loadRun(eventId, importRunId);
   if (!existing) throw new ImportOperationError("IMPORT_NOT_FOUND", "That import preview no longer exists.");
   if (existing.status === ImportRunStatus.COMPLETED) return serializeRun(existing);
-  if (existing.status !== ImportRunStatus.PENDING) throw new ImportOperationError("IMPORT_NOT_READY", "This import is not ready to commit.");
+  // A FAILED run (a commit that rolled back, #1379) stays committable: a re-upload of the same file reuses this run.
+  if (existing.status !== ImportRunStatus.PENDING && existing.status !== ImportRunStatus.FAILED) throw new ImportOperationError("IMPORT_NOT_READY", "This import is not ready to commit.");
   if (existing.records.some((record) => record.status === ImportRecordStatus.ERROR)) {
     throw new ImportOperationError("IMPORT_HAS_ERRORS", "Resolve the preview errors before committing this import.");
   }
@@ -699,9 +701,15 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
   }
 
   const touchedRegistrationIds = new Set<string>();
+  // Set only when this call's own claim lost to another commit, so that commit's run is never marked FAILED (#1379).
+  let lostClaim = false;
+  try {
   await getPrisma().$transaction(async (tx) => {
-    const claimed = await tx.importRun.updateMany({ where: { id: importRunId, eventId, status: ImportRunStatus.PENDING }, data: { status: ImportRunStatus.RUNNING } });
-    if (claimed.count !== 1) throw new ImportOperationError("IMPORT_CONFLICT", "Another commit is already processing this import.");
+    const claimed = await tx.importRun.updateMany({ where: { id: importRunId, eventId, status: { in: [ImportRunStatus.PENDING, ImportRunStatus.FAILED] } }, data: { status: ImportRunStatus.RUNNING } });
+    if (claimed.count !== 1) {
+      lostClaim = true;
+      throw new ImportOperationError("IMPORT_CONFLICT", "Another commit is already processing this import.");
+    }
     let created = 0;
     let updated = 0;
     let skipped = 0;
@@ -824,6 +832,18 @@ async function commitImportRunInner(eventId: string, importRunId: string, actorU
       },
     });
   }, { timeout: 30_000 });
+  } catch (error) {
+    // The transaction rolled the run back to PENDING. Record the failure so it shows on the System report and
+    // operational health (#1379); only a run still PENDING is touched, and a failure here never hides the real error.
+    if (!lostClaim) {
+      try {
+        await getPrisma().importRun.updateMany({ where: { id: importRunId, eventId, status: ImportRunStatus.PENDING }, data: { status: ImportRunStatus.FAILED } });
+      } catch (markError) {
+        logError("Could not record a failed import commit", markError, { importRunId });
+      }
+    }
+    throw error;
+  }
 
   // #527: imported people on the Sterling Volunteers list are matched after commit; best effort.
   await refreshBackgroundCheckMatchesForRegistrations(touchedRegistrationIds);
