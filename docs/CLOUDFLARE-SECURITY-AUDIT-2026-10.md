@@ -33,7 +33,8 @@ things worth doing first:
 
 This repository is public, so this report describes what to check and how to
 fix it. It does not record the live server's current settings or operational
-state. Anything we observed that is sensitive was sent to Caleb privately.
+state. Sensitive operational details we observed were given to Caleb
+outside the repository.
 
 The rest of this report gives each finding with evidence and a fix. Then
 comes a checklist of Cloudflare settings and draft code issues for us to
