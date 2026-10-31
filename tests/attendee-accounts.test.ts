@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dependencies = vi.hoisted(() => ({
   getPrisma: vi.fn(),
@@ -317,7 +317,29 @@ describe("verified attendee registration views", () => {
     expect(registration?.churchBilling?.perPerson.notice).toBe("$30 per person. Your church is billed after the event.");
   });
 
-  function directRegistrationFixture(status: string, payments: unknown[] = []) {
+  const takesPaymentSubmission = {
+    formVersion: {
+      definition: {
+        title: "Camporee", description: "", confirmationMessage: "Received.",
+        payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
+        sections: [{ id: "pay_section", title: "Payment", description: "", isReviewStep: false, fields: [{ id: "pay_method", key: "payment_method", label: "Payment method", helpText: "", type: "RADIO", scope: "REGISTRATION", required: true, options: ["Pay later", "Credit / debit card"] }] }],
+      },
+    },
+    pricingSnapshot: {},
+  };
+  /** Square ready (#1405): "Continue payment" only exists when the account page can open an online payment panel. */
+  function stubSquare(configured: boolean) {
+    for (const [key, value] of Object.entries({
+      SQUARE_APPLICATION_ID: "sandbox-sq0idb-example",
+      SQUARE_LOCATION_ID: "sandbox-location",
+      SQUARE_ACCESS_TOKEN: "sandbox-access-token",
+      SQUARE_WEBHOOK_SIGNATURE_KEY: "sandbox-signature-key",
+      SQUARE_WEBHOOK_NOTIFICATION_URL: "https://events.imsda.test/api/webhooks/square",
+    })) vi.stubEnv(key, configured ? value : "");
+  }
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  function directRegistrationFixture(status: string, payments: unknown[] = [], options: { takesPayment?: boolean } = {}) {
     dependencies.getPrisma.mockReturnValue({
       $queryRaw: vi.fn().mockResolvedValue([{ id: "registration-1" }]),
       registration: {
@@ -345,7 +367,7 @@ describe("verified attendee registration views", () => {
             programAssignmentRuns: [],
           },
           attendees: [],
-          publicFormSubmission: null,
+          publicFormSubmission: options.takesPayment ? takesPaymentSubmission : null,
           payments,
           waitlistEntry: null,
           operations: [],
@@ -394,11 +416,25 @@ describe("verified attendee registration views", () => {
   });
 
   it("still shows a submitted direct registration's balance as payable (#1100)", async () => {
-    directRegistrationFixture("SUBMITTED", [{ amount: { toString: () => "40" }, refunds: [] }]);
+    stubSquare(true);
+    directRegistrationFixture("SUBMITTED", [{ amount: { toString: () => "40" }, refunds: [] }], { takesPayment: true });
     const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
     expect(registration?.balanceCents).toBe(6000);
     expect(registration?.paidCents).toBe(4000);
     expect(registration?.payment.paymentEligible).toBe(true);
+    expect(registration?.payment.detail).toContain("below");
+  });
+
+  it("sends a balance to the event team, with no Continue payment, when online payment is not offered (#1405)", async () => {
+    for (const setup of [{ square: false, takesPayment: true }, { square: true, takesPayment: false }]) {
+      stubSquare(setup.square);
+      directRegistrationFixture("SUBMITTED", [{ amount: { toString: () => "40" }, refunds: [] }], { takesPayment: setup.takesPayment });
+      const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+      expect(registration?.balanceCents).toBe(6000);
+      expect(registration?.payment.paymentEligible).toBe(false);
+      expect(registration?.payment.detail).toContain("Contact the event team");
+      expect(registration?.payment.detail).not.toContain("below");
+    }
   });
 
   it("shows nothing owed by the church while a club is waitlisted or cancelled (#409)", async () => {

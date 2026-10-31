@@ -413,6 +413,25 @@ describe("Square payment repository", () => {
     expect(checkout).toMatchObject({ surchargeCents: 0, amountCents: 8_000 });
   });
 
+  it("offers a promoted waitlist registrant only pay later while online card payment is not configured (#1405)", async () => {
+    const client = transactionClient();
+    const promoted = {
+      ...registration(),
+      waitlistEntry: { status: "PROMOTED" },
+      paymentChoiceOperations: [],
+    };
+    client.registration.findUnique.mockResolvedValue(promoted);
+
+    const off = await getPublicSquareCheckout("a".repeat(43), {
+      client: client as never,
+      configuration: { ...configuration, paymentConfigured: false },
+    });
+    const on = await getPublicSquareCheckout("a".repeat(43), { client: client as never, configuration });
+
+    expect(off).toMatchObject({ state: "CHOICE_REQUIRED", paymentChoice: { available: true, cardAvailable: false } });
+    expect(on).toMatchObject({ paymentChoice: { cardAvailable: true } });
+  });
+
   it("reports no balance rather than a card form once a pay-later registration is settled", async () => {
     const client = transactionClient();
     client.registration.findUnique.mockResolvedValue({

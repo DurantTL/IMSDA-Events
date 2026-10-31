@@ -66,7 +66,7 @@ const input = publicRegistrationInputSchema.parse({
   website: "",
 });
 
-function transactionFixture() {
+function transactionFixture(formDefinition: unknown = definition) {
   const tx = {
     // The submission gate (#920): the first statement of an individual submission.
     $executeRaw: vi.fn(),
@@ -93,7 +93,7 @@ function transactionFixture() {
         versions: [{
           id: "version-1",
           versionNumber: 1,
-          definition,
+          definition: formDefinition,
           publishedAt: new Date("2026-07-01T12:00:00.000Z"),
         }],
       }),
@@ -247,6 +247,61 @@ describe("card fee only when card payment is possible (#1405)", () => {
     expect(tx.registrationLedgerEntry.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ amountCents: 10_000 }) }),
     );
-    expect(confirmation).toMatchObject({ totalCents: 10_000, processingFeeCents: 0, cardSelected: true });
+    // The confirmation says what the form showed, so it can explain the fee that is added when paying online.
+    expect(confirmation).toMatchObject({ totalCents: 10_000, processingFeeCents: 0, cardSelected: true, deferredCardFeeCents: 330 });
+    expect(tx.publicRegistrationSubmission.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ pricingSnapshot: expect.objectContaining({ deferredCardFeeCents: 330 }) }),
+    });
+    // The ledger's money snapshot records the marker too.
+    expect(tx.registrationLedgerEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ pricingSnapshot: expect.objectContaining({ cardFeeDeferred: true }) }) }),
+    );
+  });
+
+  describe("a form whose only payment choices are online", () => {
+    const onlineOnly = (options: string[], deposit = false) => registrationFormDefinitionSchema.parse({
+      ...definition,
+      payment: { ...definition.payment, ...(deposit ? { deposit: { enabled: true, amountCents: 2_500, optionValue: "Pay a deposit now by card" } } : {}) },
+      sections: [{
+        ...definition.sections[0],
+        fields: definition.sections[0]!.fields.map((field) => (field.key === "payment_method" ? { ...field, options } : field)),
+      }],
+    });
+    const withoutAnswer = { ...input, responses: Object.fromEntries(Object.entries(input.responses).filter(([key]) => key !== "payment_method")) };
+
+    it("drops the required payment field when Square is off, so the registration saves as pay-later with no fee", async () => {
+      configureSquare(false);
+      const { prisma, tx } = transactionFixture(onlineOnly(["Pay a deposit now by card", "Credit / debit card"], true));
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      const confirmation = await submitPublicRegistration("summer-retreat", "attendee", withoutAnswer, new Date("2026-08-10T12:00:00.000Z"));
+
+      expect(confirmation).toMatchObject({ totalCents: 10_000, processingFeeCents: 0, cardSelected: false });
+      const snapshot = (tx.publicRegistrationSubmission.create.mock.calls[0]![0] as { data: { pricingSnapshot: Record<string, unknown> } }).data.pricingSnapshot;
+      expect(snapshot).not.toHaveProperty("cardFeeDeferred");
+    });
+
+    it("still refuses a card answer posted to a card-only form when Square is off", async () => {
+      configureSquare(false);
+      const { prisma, tx } = transactionFixture(onlineOnly(["Pay a deposit now by card", "Credit / debit card"], true));
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      await expect(submitPublicRegistration("summer-retreat", "attendee", input, new Date("2026-08-10T12:00:00.000Z")))
+        .rejects.toMatchObject({ code: "INVALID_SUBMISSION", issues: [expect.objectContaining({ key: "payment_method" })] });
+      expect(tx.registration.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses the deposit answer too when Square is off", async () => {
+      configureSquare(false);
+      const { prisma, tx } = transactionFixture(onlineOnly(["Pay later", "Pay a deposit now by card", "Credit / debit card"], true));
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      await expect(submitPublicRegistration(
+        "summer-retreat", "attendee",
+        { ...input, responses: { ...input.responses, payment_method: "Pay a deposit now by card" } },
+        new Date("2026-08-10T12:00:00.000Z"),
+      )).rejects.toMatchObject({ code: "INVALID_SUBMISSION", issues: [expect.objectContaining({ key: "payment_method" })] });
+      expect(tx.registration.create).not.toHaveBeenCalled();
+    });
   });
 });

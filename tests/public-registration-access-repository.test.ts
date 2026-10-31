@@ -699,6 +699,16 @@ describe("private registration access repository", () => {
       expect(view?.payment.detail).toContain("Contact the event team");
     });
 
+    it("keeps the payment panel for a promoted waitlist registrant even with Square off, to record pay later", async () => {
+      const record = accessRecord();
+      (record.registration.event as unknown as { billingMode: string }).billingMode = "ATTENDEE_PAY";
+      (record.registration as unknown as { waitlistEntry: unknown }).waitlistEntry = { position: 1, status: "PROMOTED" };
+      vi.stubEnv("SQUARE_APPLICATION_ID", "");
+      const client = { registrationAccessToken: { findUnique: vi.fn().mockResolvedValue(record) } };
+      const view = await resolveRegistrationAccessToken(createOpaqueToken(), { client: client as never, now: new Date("2026-08-01T12:00:00.000Z") });
+      expect(view?.payment.onlinePaymentOffered).toBe(true);
+    });
+
     it("never says pay below when the form takes no payment", async () => {
       const view = await viewWith({ formTakesPayment: false, squareConfigured: true });
       expect(view?.payment.onlinePaymentOffered).toBe(false);

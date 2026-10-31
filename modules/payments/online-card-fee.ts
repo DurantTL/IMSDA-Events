@@ -44,19 +44,34 @@ export function withoutDeferredCardFee<T extends FormCalculation>(calculation: T
   return { ...calculation, processingFeeCents: 0, totalCents: calculation.subtotalCents };
 }
 
-/** The same form without its card choice, for a form whose registrant cannot pay online. Other choices are untouched. */
+/** The payment answers that mean "I will pay online": the card choice and, when the form offers one, the deposit choice. */
+export function onlinePaymentOptionValues(definition: RegistrationFormDefinition) {
+  const payment = definition.payment;
+  if (!payment?.enabled) return [];
+  return [payment.cardOptionValue, ...(payment.deposit?.enabled && payment.deposit.optionValue ? [payment.deposit.optionValue] : [])];
+}
+
+/**
+ * The same form without its online-payment choices (the card choice and the deposit choice), for a form whose registrant
+ * cannot pay online. Other choices are untouched. When nothing is left to choose, the payment-method field is dropped and
+ * the payment settings with it: the registration is then priced as pay-later, with no card fee and nothing to require.
+ */
 export function definitionWithoutCardOption(definition: RegistrationFormDefinition): RegistrationFormDefinition {
   const payment = definition.payment;
   if (!payment?.enabled) return definition;
+  const removed = new Set(onlinePaymentOptionValues(definition));
+  const sections = definition.sections.map((section) => ({
+    ...section,
+    fields: section.fields.flatMap((field) => {
+      if (field.key !== payment.paymentMethodFieldKey || !field.options.some((option) => removed.has(option))) return [field];
+      const options = field.options.filter((option) => !removed.has(option));
+      return options.length === 0 ? [] : [{ ...field, options }];
+    }),
+  }));
+  const fieldDropped = !sections.some((section) => section.fields.some((field) => field.key === payment.paymentMethodFieldKey));
   return {
     ...definition,
-    sections: definition.sections.map((section) => ({
-      ...section,
-      fields: section.fields.map((field) => (
-        field.key === payment.paymentMethodFieldKey && field.options.includes(payment.cardOptionValue)
-          ? { ...field, options: field.options.filter((option) => option !== payment.cardOptionValue) }
-          : field
-      )),
-    })),
+    sections,
+    payment: fieldDropped ? undefined : { ...payment, deposit: undefined },
   };
 }

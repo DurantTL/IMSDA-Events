@@ -267,6 +267,7 @@ export function checkoutFromRegistration(
           selected: latestPaymentChoice?.choice ?? null,
           currentOperationId: latestPaymentChoice?.id ?? null,
           ...promotedQuote,
+          cardAvailable: configuration.paymentConfigured,
         }
       : null;
   const paymentSelection = promotedWaitlist

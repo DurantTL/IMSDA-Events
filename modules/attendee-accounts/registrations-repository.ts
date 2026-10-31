@@ -438,9 +438,8 @@ export async function listRegistrationsForVerifiedEmail(
       : null;
     const onlinePaymentOffered = !isDeferredOrganizationBilling
       && !registration.groupRegistration
-      && getSquareConfiguration().paymentConfigured
       && (registration.waitlistEntry?.status === "PROMOTED"
-        || Boolean(submissionPayment?.success && submissionPayment.data.payment?.enabled));
+      || (getSquareConfiguration().paymentConfigured && Boolean(submissionPayment?.success && submissionPayment.data.payment?.enabled)));
     const paymentSummary = summarizePublicPayment({
       status: registration.status,
       totalCents,

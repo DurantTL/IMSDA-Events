@@ -53,6 +53,26 @@ describe("online card fee (#1405)", () => {
       expect(onlineCardPaymentPossible({ ...base, billingMode: "DEFERRED_ORGANIZATION_INVOICE" })).toBe(false);
     });
 
+    it("also strips the deposit choice, and drops a payment field left with no choices", () => {
+      const withDeposit = registrationFormDefinitionSchema.parse({
+        ...definition,
+        payment: { ...definition.payment, deposit: { enabled: true, amountCents: 2_500, optionValue: "Pay a deposit now by card" } },
+        sections: [{ ...definition.sections[0], fields: [{ ...definition.sections[0]!.fields[0], options: ["Pay later", "Pay a deposit now by card", "Credit / debit card"] }] }],
+      });
+      const stripped = definitionWithoutCardOption(withDeposit);
+      expect(stripped.sections[0]!.fields[0]!.options).toEqual(["Pay later"]);
+      expect(stripped.payment?.deposit).toBeUndefined();
+
+      const cardOnly = registrationFormDefinitionSchema.parse({
+        ...definition,
+        sections: [{ ...definition.sections[0], fields: [{ ...definition.sections[0]!.fields[0], options: ["Pay a deposit now by card", "Credit / debit card"] }] }],
+        payment: { ...definition.payment, deposit: { enabled: true, amountCents: 2_500, optionValue: "Pay a deposit now by card" } },
+      });
+      const dropped = definitionWithoutCardOption(cardOnly);
+      expect(dropped.sections[0]!.fields).toEqual([]);
+      expect(dropped.payment).toBeUndefined();
+    });
+
     it("hides only the card choice when it is not possible", () => {
       const stripped = definitionWithoutCardOption(definition);
       expect(stripped.sections[0]!.fields[0]!.options).toEqual(["Pay later"]);

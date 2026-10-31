@@ -325,16 +325,15 @@ function serializeRegistrationAccess(
     registration.status,
     waitlistPosition,
   );
-  // Whether the private page has an online payment panel (#1405): Square is ready and either the form takes payment
-  // or a promoted waitlist registrant picks how to pay. Without it the summary must not say "pay below".
+  // Whether the private page has a payment panel (#1405): a promoted waitlist registrant picks how to pay (even with Square off,
+  // to record pay-later), or Square is ready and the form takes payment. Without it the summary must not say "pay below".
   const submissionDefinition = registration.publicFormSubmission
     ? registrationFormDefinitionSchema.safeParse(registration.publicFormSubmission.formVersion.definition)
     : null;
   const onlinePaymentOffered = event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE"
     && !registration.groupRegistration
-    && getSquareConfiguration().paymentConfigured
     && (registration.waitlistEntry?.status === "PROMOTED"
-      || Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled));
+    || (getSquareConfiguration().paymentConfigured && Boolean(submissionDefinition?.success && submissionDefinition.data.payment?.enabled)));
   const paymentSummary = summarizePublicPayment({
     status: registration.status,
     totalCents: moneyToCents(registration.totalAmount),
