@@ -5,8 +5,7 @@ import { BackLink } from "@/components/back-link";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { getPrisma } from "@/lib/prisma";
 import { areaClubPortalNavItems } from "@/modules/club-rosters/portal-nav";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorViewerActive, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /**
  * An Area Coordinator's view of one club (#722): the club portal's hero and
@@ -22,7 +21,7 @@ export default async function AreaClubLayout({
 }) {
   if (!(await currentAreaCoordinatorViewerActive())) {
     // A coordinator without a real second step in this session is sent to the club gate, not shown a 404 (#1410).
-    await requireAttendeeSecondStep();
+    await requireSecondStepForAreaCoordinator();
     notFound();
   }
   const { organizationId } = await params;

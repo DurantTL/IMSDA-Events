@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({
     get: mocks.cookieGet,

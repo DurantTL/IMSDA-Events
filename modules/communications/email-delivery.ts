@@ -164,11 +164,6 @@ type ClaimedMessage = {
 
 export type PreparedEmailBody = {
   bodyText: string;
-  /**
-   * A subject resolved at delivery, for the one message that carries a secret in its subject line (the sign-in code,
-   * #1410). Never stored: the outbox row keeps the sentinel, so the code is not persisted anywhere readable.
-   */
-  subject?: string;
   bodyHtml?: string | null;
   revokeOnDefinitiveFailure?: () => Promise<void>;
 };
@@ -1246,7 +1241,7 @@ async function runDeliveryLoop(
         fromEmail: centralFromEmail ?? message.senderEmailSnapshot ?? "",
         toEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
-        subject: preparedBody.subject ?? message.subjectSnapshot,
+        subject: message.subjectSnapshot,
         bodyText: unsubscribe
           ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
           : preparedBody.bodyText,
@@ -1258,7 +1253,7 @@ async function runDeliveryLoop(
         // being re-parsed as Markdown here.
         bodyHtml: parts.bodyHtml
           ? renderEmailHtmlDocument({
-            title: preparedBody.subject ?? message.subjectSnapshot,
+            title: message.subjectSnapshot,
             bodyHtml: parts.bodyHtml,
             preheader: message.preheaderSnapshot,
             footer: unsubscribe

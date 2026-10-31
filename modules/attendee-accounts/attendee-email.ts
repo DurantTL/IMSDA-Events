@@ -49,8 +49,7 @@ import {
 export const VERIFICATION_CODE_SENTINEL = "{{attendee_verification_code}}";
 export const PASSWORD_RESET_CODE_SENTINEL = "{{attendee_password_reset_code}}";
 export const EDIT_VERIFICATION_CODE_SENTINEL = "{{attendee_edit_verification_code}}";
-/** The sign-in code (#1410). One in the subject as digits, one in the body as "518 207"; neither contains the other. */
-export const SIGN_IN_CODE_SENTINEL = "{{attendee_sign_in_code}}";
+/** The sign-in code in the body, shown as "518 207" (#1410). Never in the subject. */
 export const SIGN_IN_CODE_DISPLAY_SENTINEL = "{{attendee_sign_in_code_display}}";
 
 /** "518207" as "518 207", the way the email shows it and the sign-in field accepts it. */
@@ -190,8 +189,8 @@ function editVerificationBody(displayName: string) {
 
 function signInCodeBody() {
   return {
-    // The code is put in the subject at delivery only (see `PreparedEmailBody.subject`); the stored row keeps the sentinel.
-    subject: `Your IMSDA Events sign-in code: ${SIGN_IN_CODE_SENTINEL}`,
+    // No code in the subject: the provider's webhook stores the subject it was sent. The code is in the body only, minted at delivery.
+    subject: "Your IMSDA Events sign-in code",
     bodyText: [
       "Enter this code to finish signing in:",
       "",
@@ -290,14 +289,14 @@ export async function enqueueAttendeeEmail(input: {
 
 /**
  * The sign-in code (#1410), minted at delivery like the others and put into the subject and body only in the
- * message being sent. The stored outbox row keeps the sentinels.
+ * message being sent. The stored outbox row keeps the sentinel, and the subject carries no code.
  */
 async function prepareSignInCodeForDelivery(input: {
   messageId: string;
   accountAttendeeId: string | null;
   bodyText: string;
   now: Date;
-}): Promise<{ bodyText: string; subject: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+}): Promise<{ bodyText: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
   if (!input.accountAttendeeId) {
     throw new Error("An attendee email cannot mint a code without an account.");
   }
@@ -324,10 +323,7 @@ async function prepareSignInCodeForDelivery(input: {
     throw new Error("There is no live attendee code for this account to send.");
   }
   return {
-    bodyText: input.bodyText
-      .replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, spacedSignInCode(code))
-      .replaceAll(SIGN_IN_CODE_SENTINEL, code),
-    subject: `Your IMSDA Events sign-in code: ${code}`,
+    bodyText: input.bodyText.replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, spacedSignInCode(code)),
     ...(reused
       ? {}
       : { revokeOnDefinitiveFailure: async () => { await revokeAttendeeSignInCode(hashOneTimeCode(code), input.now); } }),
@@ -346,7 +342,7 @@ export async function prepareAttendeeEmailBodyForDelivery(input: {
   templateKey: string;
   bodyText: string;
   now: Date;
-}): Promise<{ bodyText: string; subject?: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+}): Promise<{ bodyText: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
   if (input.templateKey === "ATTENDEE_SIGN_IN_CODE") return prepareSignInCodeForDelivery(input);
   const reset = input.templateKey === "ATTENDEE_PASSWORD_RESET";
   const edit = input.templateKey === "ATTENDEE_EDIT_VERIFICATION";

@@ -15,7 +15,9 @@ import {
 import {
   ATTENDEE_OAUTH_NEXT_COOKIE_NAME,
   attendeeReturnDestination,
+  signInCodePathFor,
 } from "@/modules/attendee-accounts/return-destination";
+import { startSignInCodeIfRequired } from "@/modules/attendee-accounts/sign-in-code-issue";
 import { attendeePublicUrl } from "@/modules/attendee-accounts/public-navigation";
 import {
   ATTENDEE_OAUTH_COOKIE_NAME,
@@ -112,8 +114,16 @@ async function getHandler(request: Request) {
     cookieStore.delete(ATTENDEE_PENDING_COOKIE_NAME);
 
     logInfo("An attendee signed in with Google.", { linkage: result.linkage });
+    // A club role without two-step sign-in owes the emailed code (#1410): send it now and land on the code page.
+    const signInCode = await startSignInCodeIfRequired({
+      request,
+      accountId: result.accountId,
+      sessionToken: result.session.token,
+    });
     return applyRateLimitHeaders(
-      mutableRedirect(attendeePublicUrl((next || "/account") as `/${string}`)),
+      mutableRedirect(signInCode.required
+        ? attendeePublicUrl(signInCodePathFor(next) as `/${string}`)
+        : attendeePublicUrl((next || "/account") as `/${string}`)),
       rateLimit,
     );
   } catch (error) {

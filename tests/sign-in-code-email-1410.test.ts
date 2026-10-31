@@ -33,7 +33,6 @@ vi.mock("@/modules/attendee-accounts/sign-in-code-service", () => ({
 
 import {
   SIGN_IN_CODE_DISPLAY_SENTINEL,
-  SIGN_IN_CODE_SENTINEL,
   enqueueAttendeeEmail,
   prepareAttendeeEmailBodyForDelivery,
   spacedSignInCode,
@@ -67,10 +66,10 @@ async function queued() {
 }
 
 describe("what the sign-in code puts in the outbox (#1410)", () => {
-  it("queues placeholders in the subject and body, never a code", async () => {
+  it("queues a plain subject (the provider webhook stores subjects) and a body placeholder, never a code", async () => {
     const data = await queued();
     expect(data.templateKey).toBe("ATTENDEE_SIGN_IN_CODE");
-    expect(data.subjectSnapshot).toBe(`Your IMSDA Events sign-in code: ${SIGN_IN_CODE_SENTINEL}`);
+    expect(data.subjectSnapshot).toBe("Your IMSDA Events sign-in code");
     expect(data.bodyTextSnapshot).toContain(SIGN_IN_CODE_DISPLAY_SENTINEL);
     expect(`${data.subjectSnapshot}\n${data.bodyTextSnapshot}`).not.toMatch(/\b\d{3}\s?\d{3}\b/);
   });
@@ -85,11 +84,11 @@ describe("what the sign-in code puts in the outbox (#1410)", () => {
 describe("what delivery does with it", () => {
   const body = async () => (await queued()).bodyTextSnapshot as string;
 
-  it("puts the code in the subject and the spaced code in the body, only in the message being sent", async () => {
+  it("puts the spaced code in the body only, and nothing in the subject", async () => {
     const prepared = await prepareAttendeeEmailBodyForDelivery({
       messageId: "msg_1", accountAttendeeId: "acct_1", templateKey: "ATTENDEE_SIGN_IN_CODE", bodyText: await body(), now: NOW,
     });
-    expect(prepared.subject).toBe("Your IMSDA Events sign-in code: 518207");
+    expect(prepared).not.toHaveProperty("subject");
     expect(prepared.bodyText).toContain("518 207");
     expect(prepared.bodyText).not.toContain("{{");
     expect(spacedSignInCode("518207")).toBe("518 207");
@@ -102,7 +101,7 @@ describe("what delivery does with it", () => {
     const prepared = await prepareAttendeeEmailBodyForDelivery({
       messageId: "msg_1", accountAttendeeId: "acct_1", templateKey: "ATTENDEE_SIGN_IN_CODE", bodyText: await body(), now: NOW,
     });
-    expect(prepared.subject).toContain("518207");
+    expect(prepared.bodyText).toContain("518 207");
     expect(dependencies.attachAttendeeSignInCode).not.toHaveBeenCalled();
     expect(prepared).not.toHaveProperty("revokeOnDefinitiveFailure");
   });

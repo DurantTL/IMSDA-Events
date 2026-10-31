@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ requireSecondStepForAreaCoordinator: async () => undefined }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() }));
 vi.mock("@/modules/coordinator-health/access", () => ({
   resolveStaffHealthViewer: mocks.resolveStaffHealthViewer,

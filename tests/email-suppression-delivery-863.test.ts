@@ -169,27 +169,4 @@ describe("a suppressed address receives nothing (#863)", () => {
     expect(sendEmail).not.toHaveBeenCalled();
     expect(store.message.status).toBe("SUPPRESSED");
   });
-
-  it("sends a subject resolved at delivery (the sign-in code, #1410) and leaves the stored subject alone", async () => {
-    vi.stubEnv("NODE_ENV", "development");
-    vi.stubEnv("RESEND_API_KEY", "re_test_only");
-    vi.stubEnv("APP_BASE_URL", "https://events.imsda.test");
-    vi.stubEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "no-reply@imsda.org");
-    resetServerEnvCache();
-    const store = fakeStore({ eventId: null, templateKey: "ATTENDEE_SIGN_IN_CODE" });
-    store.message.subjectSnapshot = "Your IMSDA Events sign-in code: {{attendee_sign_in_code}}";
-    const sendEmail = accepted();
-    await processAccountEmailQueue({
-      dependencies: {
-        ...dependencies,
-        prisma: store.prisma as never,
-        sendEmail,
-        prepareBodyText: async () => ({ bodyText: "518 207", subject: "Your IMSDA Events sign-in code: 518207" }),
-      },
-    });
-    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ subject: "Your IMSDA Events sign-in code: 518207" }), expect.anything());
-    // What is stored (and what an administrator can read in the outbox) still carries the placeholder, never the code.
-    expect(store.message.subjectSnapshot).toBe("Your IMSDA Events sign-in code: {{attendee_sign_in_code}}");
-    expect(JSON.stringify(store.audits)).not.toContain("518207");
-  });
 });

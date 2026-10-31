@@ -224,14 +224,16 @@ describe("sign-in routes", () => {
     });
   });
 
-  it("the unified sign-in leaves a staff sign-in alone: its second step is already stronger", async () => {
+  it("the unified sign-in also sends the code for a staff sign-in's linked attendee session, and keeps the staff destination", async () => {
     mocks.unifiedPasswordSignIn.mockResolvedValue({
       kind: "signed_in",
       staff: { userId: "user-1", globalRole: "EVENT_ADMIN", session: authenticated.session },
       attendee: authenticated,
     });
-    await UNIFIED_SIGN_IN(post("/api/sign-in", signInBody));
-    expect(mocks.startSignInCodeIfRequired).not.toHaveBeenCalled();
+    mocks.startSignInCodeIfRequired.mockResolvedValue({ required: true, sent: true });
+    const response = await UNIFIED_SIGN_IN(post("/api/sign-in", signInBody));
+    expect(mocks.startSignInCodeIfRequired).toHaveBeenCalledOnce();
+    expect((await response.json()).redirectTo).not.toContain("/account/sign-in/code");
   });
 });
 

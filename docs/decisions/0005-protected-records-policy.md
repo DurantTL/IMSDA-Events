@@ -1108,15 +1108,18 @@ rule that every account page needs a second step for a club role.
   code, when the account has no second step yet.
 - **Never a password alone.** A club-role account (club roles, Area
   Coordinators, accepted honors instructors) that has not set up two-step
-  sign-in enters a six-digit code emailed to it after its password. Accounts
-  with no such role sign in exactly as before. Staff accounts are unchanged;
-  they cannot get a session without their own second step.
+  sign-in enters a six-digit code emailed to it after its password, whichever
+  way the session was made (password, one-sign-in, Google). Accounts with no
+  such role sign in exactly as before. The staff gate is unchanged; a staff
+  person's linked attendee session is held to the same rule when it is not
+  marked as having passed a second step.
 - **The code.** Single use, ten minutes from delivery, five wrong guesses per
   code, a new code retires the earlier ones, bound to the session that is
   signing in, rate-limited to send and to enter. It is stored hashed (with the
-  sealed copy only so a delivery retry resends the same code), minted when the
-  message is delivered, and shown in the subject and body of that message only.
-  Audit entries hold ids, never the code.
+  sealed copy only so a delivery retry resends the same code; both are cleared
+  once the code is spent or retired), minted when the message is delivered, and
+  shown in the body of that message only, never the subject, because the email
+  provider's webhook stores the subject. Audit entries hold ids, never the code.
 - **Setup waits for the code.** Adding an authenticator or a passkey is refused
   for a session that still owes the code, so someone who only knows a password
   cannot enrol their own device and skip it.

@@ -39,12 +39,25 @@ function codeExpiry(now: Date) {
   return new Date(now.getTime() + SIGN_IN_CODE_LIFETIME_MINUTES * 60 * 1_000);
 }
 
-/** Retires every unspent sign-in code of the account, then opens a new pending one for this session. */
+/** What a spent or retired sign-in code keeps: nothing that could be decrypted or compared. */
+const SPENT = (now: Date) => ({ consumedAt: now, sealedCode: null, codeHash: null });
+
+/**
+ * Retires every unspent sign-in code of the account, then opens a new pending one for this session. Sends for
+ * one account are serialized by a transaction-scoped advisory lock, so two overlapping sends cannot each create
+ * a live code (READ COMMITTED would let both pass the retire step).
+ */
 export async function beginAttendeeSignInCode(accountId: string, sessionId: string, now = new Date()) {
   const pending = await getPrisma().$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendee-sign-in-code:${accountId}`}))`;
+    // Past their ten minutes, a code's sealed copy has no use either.
+    await tx.attendeeStepUpCode.updateMany({
+      where: { accountId, purpose: "SIGN_IN", sealedCode: { not: null }, codeExpiresAt: { lt: now } },
+      data: { sealedCode: null },
+    });
     await tx.attendeeStepUpCode.updateMany({
       where: { accountId, purpose: "SIGN_IN", consumedAt: null },
-      data: { consumedAt: now },
+      data: SPENT(now),
     });
     return tx.attendeeStepUpCode.create({
       data: { accountId, sessionId, purpose: "SIGN_IN", expiresAt: requestExpiry(now) },
@@ -134,7 +147,7 @@ export async function reuseAttendeeSignInCode(input: { accountId: string; messag
 export async function revokeAttendeeSignInCode(codeHash: string, now = new Date()) {
   await getPrisma().attendeeStepUpCode.updateMany({
     where: { codeHash, purpose: "SIGN_IN", consumedAt: null },
-    data: { consumedAt: now },
+    data: SPENT(now),
   });
 }
 
@@ -183,20 +196,20 @@ export async function verifyAttendeeSignInCode(input: {
       const after = await tx.attendeeStepUpCode.findUnique({ where: { id: record.id }, select: { attempts: true } });
       const attempts = after?.attempts ?? ONE_TIME_CODE_MAX_ATTEMPTS;
       if (attempts >= ONE_TIME_CODE_MAX_ATTEMPTS) {
-        await tx.attendeeStepUpCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: now } });
+        await tx.attendeeStepUpCode.updateMany({ where: { id: record.id, consumedAt: null }, data: SPENT(now) });
       }
       return { ok: false, reason: "WRONG_CODE", attemptsLeft: Math.max(0, ONE_TIME_CODE_MAX_ATTEMPTS - attempts) };
     }
 
     const spent = await tx.attendeeStepUpCode.updateMany({
       where: { id: record.id, consumedAt: null },
-      data: { consumedAt: now },
+      data: SPENT(now),
     });
     if (spent.count !== 1) return { ok: false, reason: "NO_LIVE_CODE" };
     // Any other unspent sign-in code of this account is retired, so an older mail cannot be used later.
     await tx.attendeeStepUpCode.updateMany({
       where: { accountId: input.accountId, purpose: "SIGN_IN", consumedAt: null },
-      data: { consumedAt: now },
+      data: SPENT(now),
     });
     // The session is matched on account AND id: the mark can only land on the session that is signing in.
     const marked = await tx.attendeeSession.updateMany({

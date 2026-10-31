@@ -144,16 +144,17 @@ async function postHandler(request: Request) {
       });
     }
     countPublicMetric(request, "LOGIN_SUCCESS", "unified-password");
-    // An attendee-only session for a club role without two-step sign-in owes the emailed code (#1410). Staff
-    // sessions already passed their own stronger second step, and their linked attendee session is marked verified.
-    const signInCode = outcome.attendee && !outcome.staff
+    // An attendee session for a club role without two-step sign-in owes the emailed code (#1410), including the
+    // linked attendee session of a staff sign-in whose staff side needed no second step. The code is sent now;
+    // a staff person keeps their staff destination and meets the code page when they open their attendee side.
+    const signInCode = outcome.attendee
       ? await startSignInCodeIfRequired({
         request,
         accountId: outcome.attendee.accountId,
         sessionToken: outcome.attendee.session.token,
       })
       : null;
-    const redirectTo = signInCode?.required
+    const redirectTo = signInCode?.required && !outcome.staff
       ? signInCodePathFor(input.next)
       : outcome.staff
       ? await staffDestinationOrDefault({ id: outcome.staff.userId, globalRole: outcome.staff.globalRole }, input.next)

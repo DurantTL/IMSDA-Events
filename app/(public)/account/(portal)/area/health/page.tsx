@@ -4,7 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { EventHealthSheet } from "@/components/event-health-sheet";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
@@ -22,7 +22,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   const viewer = await resolveAreaHealthViewer();
   if (!viewer) {
     // Sent to the club gate when the second step is what is missing (#1410), otherwise there is nothing here.
-    await requireAttendeeSecondStep();
+    await requireSecondStepForAreaCoordinator();
     notFound();
   }
   const query = await searchParams;
