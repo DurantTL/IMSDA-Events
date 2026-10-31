@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Mail, Pause, Play, Save } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -7,6 +8,13 @@ import { cardCell } from "@/components/table-card-labels";
 import type { EventEmailState } from "@/modules/communications/event-email-pause";
 
 export type CentralSenderView = { name: string; email: string; replyTo: string };
+
+/** The heading for the real state: sending, waiting for a central sender, or captured locally. */
+export function deliveryHeading(platformConfigured: boolean, senderMissing: boolean): string {
+  if (platformConfigured) return "Real email is on for every event";
+  if (senderMissing) return "Emails are waiting for a central sender";
+  return "Email is captured here, not sent";
+}
 
 const failedMessage = "The email settings could not be saved.";
 
@@ -28,8 +36,8 @@ function formatDate(iso: string) {
 export function EmailDeliverySection({
   sender: initialSender,
   events: initialEvents,
-  platformConfigured,
-  senderMissing = false,
+  platformConfigured: initialConfigured,
+  senderMissing: initialSenderMissing = false,
 }: {
   sender: CentralSenderView;
   events: EventEmailState[];
@@ -38,6 +46,9 @@ export function EmailDeliverySection({
   /** The environment can send but the central sender address is blank: messages are waiting, not sent and not lost. */
   senderMissing?: boolean;
 }) {
+  // A saved sender address clears the "sender missing" state without a reload: the page props were read before the save.
+  const [senderSaved, setSenderSaved] = useState(false);
+  const router = useRouter();
   const [sender, setSender] = useState(initialSender);
   const [draft, setDraft] = useState(initialSender);
   const [events, setEvents] = useState(initialEvents);
@@ -49,6 +60,8 @@ export function EmailDeliverySection({
   const [dialogError, setDialogError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const senderMissing = initialSenderMissing && !senderSaved;
+  const platformConfigured = initialConfigured || (initialSenderMissing && senderSaved);
   const dirty = JSON.stringify(draft) !== JSON.stringify(sender);
   const paused = events.filter((event) => event.paused);
   const pausable = events.filter((event) => !event.paused && !event.archived);
@@ -75,6 +88,10 @@ export function EmailDeliverySection({
       };
       setSender(saved);
       setDraft(saved);
+      if (initialSenderMissing && saved.email.trim()) {
+        setSenderSaved(true);
+        router.refresh();
+      }
       setNotice("Central sender saved.");
     } catch (caught) {
       setSenderError(caught instanceof Error ? caught.message : failedMessage);
@@ -123,7 +140,7 @@ export function EmailDeliverySection({
         <div className="section-heading">
           <div>
             <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Delivery &amp; sender</p>
-            <h2>Real email is on for every event</h2>
+            <h2>{deliveryHeading(platformConfigured, senderMissing)}</h2>
           </div>
         </div>
         {senderMissing && (

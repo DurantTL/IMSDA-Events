@@ -193,7 +193,6 @@ export default async function SystemAdminPage({
         <h2 id="summary-heading" className="sr-only">Summary</h2>
         <div className={styles.metrics} data-testid="home-summary">
           {homeValues.map((item) => {
-            const readAt = readTimeLabel(item.readAt);
             return (
               <article key={item.key} data-value-key={item.key} data-unavailable={item.value === null ? "true" : undefined}>
                 <span className={styles.metricIcon}>
@@ -202,7 +201,7 @@ export default async function SystemAdminPage({
                 <strong>{display(item.value)}</strong>
                 <p>{item.label}</p>
                 {item.note && <small className={styles.metricNote}>{item.note}</small>}
-                <small>{item.value === null ? `${item.unit}: could not be read just now.` : `${item.unit}. ${item.scope}`}{readAt ? ` Read at ${readAt}.` : ""}</small>
+                <small>{item.value === null ? `The number of ${item.unit} could not be read just now.` : item.scope}</small>
                 {item.href && <small><Link href={item.href}>{item.linkLabel}</Link></small>}
               </article>
             );
@@ -230,7 +229,6 @@ export default async function SystemAdminPage({
             <h2 id="platform-work-heading">Work across the platform</h2>
             <p>Separate workflows, each with its own count and its own reviewers. These are not added together: one record can appear in more than one row, and a row is not a number of people.</p>
           </div>
-          {attention && <span>Read at {readTimeLabel(attention.generatedAt)}</span>}
         </div>
         {work.attentionFailed && <Unavailable what="The waiting-work checks (applications, approvals, email and scheduled-email problems)" />}
         {!work.attentionFailed && work.unavailable.length > 0 && (

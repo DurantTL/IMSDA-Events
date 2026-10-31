@@ -210,6 +210,12 @@ describe("home values", () => {
     expect(byKey["waiting-invites"].label).toBe("Staff approvals");
   });
 
+  it("writes every card scope as a capitalised sentence", () => {
+    for (const item of buildHomeValues({ events: null, attention: null })) {
+      expect(item.scope, item.key).toMatch(/^[A-Z].*\.$/);
+    }
+  });
+
   it("links staff approvals only when the bell supplies an event, never to an event-less page", () => {
     const find = (summary: AttentionSummary | null) => buildHomeValues({ events: null, attention: summary }).find((item) => item.key === "waiting-invites");
     expect(find(attention())?.href).toBeNull();
@@ -218,8 +224,9 @@ describe("home values", () => {
     expect(find(attention({ staffInvitationApprovals: { total: 2, topEventId: "e1" } }))?.href).toBe("/people/staff-invitations/approvals?event=e1");
   });
 
-  it("formats a read time in UTC and ignores a bad one", () => {
-    expect(readTimeLabel("2026-10-24T18:05:00.000Z")).toBe("6:05 PM UTC");
+  it("formats a read time in Central time and ignores a bad one", () => {
+    expect(readTimeLabel("2026-10-24T18:05:00.000Z")).toBe("1:05 PM CDT");
+    expect(readTimeLabel("2026-12-24T18:05:00.000Z")).toBe("12:05 PM CST");
     expect(readTimeLabel(null)).toBeNull();
     expect(readTimeLabel("not a date")).toBeNull();
   });

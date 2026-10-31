@@ -174,7 +174,7 @@ describe("the refreshed page", () => {
     expect(html).toMatch(/<a aria-current="page" href="\/admin">Overview</);
     for (const tab of systemHomeTabs) expect(html).toContain(`href="${tab.href}"`);
     expect(html).toContain("Everything waiting across every event. Each link opens the page that can change the record");
-    expect(html).toContain("Updated 6:00 PM UTC");
+    expect(html).toContain("Updated 1:00 PM CDT");
   });
 
   it("writes the zero wording on the cards and Next starts in N days on the events card", async () => {

@@ -21,6 +21,7 @@ import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-applic
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
+import { countLabel, pluralize } from "@/lib/pluralize";
 import styles from "./admin-clubs.module.css";
 
 export const metadata: Metadata = { title: "Club administration" };
@@ -51,6 +52,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   ]);
   const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, requiredForms, query });
   const { counts, nextEvent, registeredClubs } = home;
+  const viewAllCount = query ? registeredClubs.matchCount : registeredClubs.total;
   const href = clubsAdminHrefs(clubYear);
   const canOpenEvent = nextEvent !== null && (user.globalRole === "SYSTEM_ADMIN" || roles.eventAdminEventIds.includes(nextEvent.id));
   const eventParam = nextEvent ? encodeURIComponent(nextEvent.id) : "";
@@ -182,9 +184,11 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         ) : (
           <ClubDirectoryCards clubs={registeredClubs.rows} clubYear={clubYear} monthLabel={home.reportMonthLabel} />
         )}
-        <Link className={`secondary-button ${styles.linkButton}`} href={clubSummaryHref({ clubYear, query })} prefetch={false}>
-          View all {query ? `${registeredClubs.matchCount} matching` : registeredClubs.total} clubs
-        </Link>
+        {viewAllCount > 0 && (
+          <Link className={`secondary-button ${styles.linkButton}`} href={clubSummaryHref({ clubYear, query })} prefetch={false}>
+            View all {query ? `${viewAllCount} matching ${pluralize(viewAllCount, "club")}` : countLabel(viewAllCount, "club")}
+          </Link>
+        )}
       </section>
 
       <section className={`panel ${styles.panel}`} id="club-events" aria-labelledby="club-events-heading">

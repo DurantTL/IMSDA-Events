@@ -126,7 +126,7 @@ describe("measured health signals", () => {
     expect(signal.freshness).toBe("stale");
     expect(signal.label).toMatch(/Stale/);
     expect(signal.observedAt).toBe(stale.lastSucceededAt);
-    expect(signal.when).toContain("Last observed 4:30 PM UTC");
+    expect(signal.when).toContain("Last observed 11:30 AM CDT");
     expect(signal.when).toContain("does not show whether the job is running now");
     expect(healthPanelNote(list)).toContain("1 stale");
   });
@@ -225,7 +225,7 @@ describe("System home health panel", () => {
       });
       const html = await renderHome();
       expect(html).toContain('data-signal="email-sweep" data-freshness="stale"');
-      expect(html).toContain("Last observed 4:30 PM UTC");
+      expect(html).toContain("Last observed 11:30 AM CDT");
     } finally {
       vi.useRealTimers();
     }
@@ -372,29 +372,29 @@ describe("failing sweep and delivery counts", () => {
   it("treats a failure older than the stale threshold as stale and adds the date after a day", () => {
     const hour = build({ health: { ...goodHealth, sweep: failing("2026-10-24T16:00:00.000Z") } });
     expect(byKey(hour, "email-sweep")).toMatchObject({ freshness: "stale" });
-    expect(byKey(hour, "email-sweep").when).toContain("4:00 PM UTC");
+    expect(byKey(hour, "email-sweep").when).toContain("11:00 AM CDT");
     expect(byKey(hour, "email-sweep").when).not.toContain("2026");
     const days = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-20T16:00:00.000Z") } }), "email-sweep");
-    expect(days.when).toContain("Oct 20, 2026, 4:00 PM UTC");
+    expect(days.when).toContain("Oct 20, 2026, 11:00 AM CDT");
     expect(days.detail).toContain("4 days ago");
   });
 
   it("dates a failure from the previous evening, under a day old, so it never reads as later today", () => {
-    // Read at 6:00 PM UTC; the failure was 7:00 PM UTC the day before.
+    // Read at 1:00 PM CDT; the failure was 2:00 PM CDT the day before.
     const lastNight = byKey(build({ health: { ...goodHealth, sweep: failing("2026-10-23T19:00:00.000Z") } }), "email-sweep");
-    expect(lastNight.when).toContain("Oct 23, 2026, 7:00 PM UTC");
+    expect(lastNight.when).toContain("Oct 23, 2026, 2:00 PM CDT");
   });
 
   it("adds the date to a stale success older than a day", () => {
     const stale = { status: "stale" as const, lastSucceededAt: "2026-10-21T16:30:00.000Z", lastFailedAt: null, ageMs: 3 * 86_400_000 };
-    expect(byKey(build({ health: { ...goodHealth, sweep: stale } }), "email-sweep").when).toContain("Oct 21, 2026, 4:30 PM UTC");
+    expect(byKey(build({ health: { ...goodHealth, sweep: stale } }), "email-sweep").when).toContain("Oct 21, 2026, 11:30 AM CDT");
   });
 
   it("shows a delivery count above zero and says when it was read", () => {
     const signal = byKey(build({ attention: attention({ emailFailed: { total: 3, topEventId: null } }) }), "email-delivery");
     expect(signal).toMatchObject({ state: "bad", label: "3 to look at" });
     expect(signal.detail).toContain("3 failed, bounced or spam-marked");
-    expect(signal.when).toMatch(/^Read at 6:00 PM UTC\.$/);
+    expect(signal.when).toMatch(/^Read at 1:00 PM CDT\.$/);
     expect(signal.when).not.toContain("when this page loaded");
   });
 });

@@ -14,6 +14,7 @@
 import { SWEEP_STALE_AFTER_MS, type SweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import type { AttentionSummary } from "@/modules/system-admin/attention-model";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { attentionValue, readTimeLabel } from "@/modules/system-admin/home-model";
 
 export type HealthState = "ok" | "warn" | "bad" | "unknown";
@@ -76,13 +77,12 @@ export function agoLabel(ms: number): string {
   return `${Math.round(hours / 24)} days ago`;
 }
 
-/** The time of a reading, with its date whenever it falls on an earlier (UTC) day than the page read (`readAt`), so 7 PM yesterday never reads as later today. */
+/** The time of a reading, with its date whenever it falls on an earlier (Central) day than the page read (`readAt`), so 7 PM yesterday never reads as later today. */
 function timeWithDate(iso: string | null, readAt: string): string | null {
   const time = readTimeLabel(iso);
   if (!iso || !time) return null;
-  const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
-  const date = day.format(new Date(iso));
-  if (date === day.format(new Date(readAt))) return time;
+  const date = formatInConferenceTime(iso, { dateStyle: "medium" });
+  if (date === formatInConferenceTime(readAt, { dateStyle: "medium" })) return time;
   return `${date}, ${time}`;
 }
 

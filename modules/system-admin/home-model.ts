@@ -10,6 +10,7 @@
  * count (that contract is #75/#181), so each link reads "Open [workflow]". The one exception is the upcoming-events
  * value, whose link jumps to the list on the same page, which applies the same predicate.
  */
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { AttentionItemKey, AttentionSummary } from "@/modules/system-admin/attention-model";
 
 /** The most feature requests the review queue reads (`listPendingModuleRequests` takes 100), so a count at the cap is "at least". */
@@ -82,7 +83,7 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
       value: events ? events.upcomingEventCount : null,
       note: !events ? null : events.upcomingEventCount === 0 ? "None found" : events.nextEventNote ?? null,
       unit: "events",
-      scope: "Not archived and not ended, so an event in progress counts.",
+      scope: "Events that are not archived and have not ended, so an event in progress counts.",
       readAt: events?.generatedAt ?? null,
       linkLabel: "Go to the upcoming events list",
       href: "#upcoming-events",
@@ -104,7 +105,7 @@ export function buildHomeValues({ events, attention }: HomeValueInput): HomeValu
       value: failed,
       note: waiting(failed),
       unit: "messages",
-      scope: "Failed, bounced or marked as spam in the last 7 days and not resent, across all events and account email.",
+      scope: "Messages that failed, bounced or were marked as spam in the last 7 days and were not resent, across all events and account email.",
       readAt: attentionAt,
       linkLabel: "Open email problems",
       href: attentionHref(attention, "email-failed") ?? "/admin/email",
@@ -299,10 +300,10 @@ export const commonTaskHrefs: ReadonlyArray<{ href: string; heading: string; lab
   { href: "/admin/settings", heading: "Settings" },
 ];
 
-/** Time shown for a read, in UTC so the server and the reader agree. */
+/** Time shown for a read, in conference (Central) time with its zone, for example "1:05 PM CDT". */
 export function readTimeLabel(iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return `${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(date)} UTC`;
+  return formatInConferenceTime(date, { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }

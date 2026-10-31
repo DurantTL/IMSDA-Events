@@ -23,6 +23,7 @@ import {
   normalizePromoCodeEditorDraft,
   savedPromoCodeEditorDraft,
 } from "@/modules/promo-codes/editor-draft";
+import { countLabel } from "@/lib/pluralize";
 import type { PromoCodeRecord } from "@/modules/promo-codes/repository";
 
 const discardEditorMessage =
@@ -334,7 +335,7 @@ export function PromoCodeWorkspace({
             <p className="eyebrow">Event codes</p>
             <h2>Configured discounts</h2>
           </div>
-          <span className="count-badge">{promoCodes.length} codes</span>
+          <span className="count-badge">{countLabel(promoCodes.length, "code")}</span>
         </div>
         {promoCodes.length === 0 ? (
           <EmptyState
