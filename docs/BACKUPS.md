@@ -87,7 +87,8 @@ Each row: `kind` (`BACKUP` or `REHEARSAL`), `startedAt`, `finishedAt`, `ok`,
 `dumpBytes`, `assetsBytes`, `offsiteOk` (null when no off-site copy is
 configured). No file names, paths, row contents or credentials.
 
-`/api/health` is public, so it shows only a small `backups` block (and
+The detailed `/api/health` (bearer token or system admin only, #1400; the public
+answer has no backup fields) shows only a small `backups` block (and
 `services.backups`):
 
 | Field | Meaning |
@@ -253,7 +254,8 @@ Expect `[backup] wrote ...`, `[offsite-r2] uploaded imsda-events/imsda-events-<s
 1. The container waits for `BACKUP_AT_HOUR`, so right after starting it nothing
    is recorded yet. Run the one-off "back up right now" command above to get
    a first run immediately.
-2. `curl -s https://<app host>/api/health` and check that `backups.status` is
+2. read the detailed health answer (token from the running container, sent on stdin; a missing or wrong token only returns the public answer, which has no `backups` block):
+   `T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health`, and check that `backups.status` is
    `ok`, `backups.needsAttention` is `false`, and `backups.lastSuccessAt` and
    `backups.lastRehearsalAt` are set. (`backups.status` of `never` means no run
    has been recorded: the container is not running, cannot reach the database,
@@ -272,7 +274,7 @@ The scheduler restores the newest local dump into a private temporary
 PostgreSQL inside the backup container (see "What runs"; the production server
 is never used) every 7th run and records the result. Weekly, a human:
 
-1. Reads `/api/health`: `backups.needsAttention` is `false` and
+1. Reads `/api/health` (the same token-from-the-container command as above): `backups.needsAttention` is `false` and
    `backups.lastRehearsalAt` is within about 8 days (health turns `degraded` after 8
    days without a successful rehearsal).
 2. `docker logs imsda-backup 2>&1 | grep restore-verify` shows row counts for
