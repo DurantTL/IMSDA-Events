@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { continueBlockedMessage, lastFailedTestReasons, previewStepIssues } from "@/components/registration-builder/preview-continue";
+import { continueBlockedMessage, fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "@/components/registration-builder/preview-continue";
 import type { TestSubmissionView } from "@/components/registration-builder/builder-types";
-import { formTemplates, getAttendeeRosterConfig, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { formTemplates, getAttendeeRosterConfig, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
 import { validateRosterResponses } from "@/modules/forms/roster-validation";
 
@@ -110,5 +110,61 @@ describe("test panel failure reasons (#1407)", () => {
 
   it("falls back to Attendee when the form has no roster label", () => {
     expect(lastFailedTestReasons([test(false, [{ key: "a", message: "Meal is required.", attendeeIndex: 0 }])], null)).toEqual(["Attendee 1: Meal is required."]);
+  });
+});
+
+describe("denial cases on a synthetic roster form (#1407)", () => {
+  const f = (patch: Partial<RegistrationFormField>): RegistrationFormField => ({ id: `f_${patch.key}`, key: "x", label: "X", helpText: "", type: "TEXT", scope: "REGISTRATION", required: true, options: [], ...patch });
+  const definition = {
+    ...template("simple_rsvp"),
+    attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 3, attendeeLabel: "Camper", addButtonLabel: "Add camper" },
+    sections: [{
+      id: "sec_one", title: "Details", description: "",
+      fields: [
+        f({ key: "church", label: "Church", type: "SELECT", options: ["North", "South"] }),
+        f({ key: "mailing", label: "Mailing address", type: "ADDRESS" }),
+        f({ key: "shirt", label: "Shirt size", type: "SELECT", scope: "ATTENDEE", options: ["S", "M"] }),
+      ],
+    }],
+  } as unknown as RegistrationFormDefinition;
+  const step = plan(definition)[0]!;
+  const run = (responses: Record<string, never | string>, attendees: Array<{ clientId: string; responses: Record<string, string> }>) =>
+    previewStepIssues({ definition, roster: getAttendeeRosterConfig(definition), responses: responses as never, attendees, choiceUsage: {}, step });
+
+  it("blocks an empty required SELECT and ADDRESS", () => {
+    const keys = run({}, [{ clientId: "a1", responses: { shirt: "S" } }]).map((issue) => issue.key);
+    expect(keys).toEqual(expect.arrayContaining(["church", "mailing"]));
+  });
+
+  it("blocks an empty required attendee field with the attendee index", () => {
+    const issues = run({ church: "North", mailing: { line1: "1 Main St", city: "Ames", region: "IA", postalCode: "50010" } as never }, [{ clientId: "a1", responses: { shirt: "S" } }, { clientId: "a2", responses: {} }]);
+    expect(issues.filter((issue) => issue.key === "shirt")).toEqual([expect.objectContaining({ attendeeIndex: 1, path: "attendees.1.responses.shirt" })]);
+  });
+
+  it("reports only the attendee count as a fieldless issue", () => {
+    const issues = run({ church: "North", mailing: { line1: "1 Main St", city: "Ames", region: "IA", postalCode: "50010" } as never }, []);
+    expect(fieldlessIssues(issues).map((issue) => issue.key)).toEqual(["attendees"]);
+  });
+
+  it("starts a new attempt each time Continue is blocked, so the alert is announced again", () => {
+    const first = nextContinueBlock(null, step);
+    const second = nextContinueBlock(first, step);
+    expect(second.message).toBe(first.message);
+    expect(second.attempt).toBe(first.attempt + 1);
+  });
+
+  it("ends the Continue block on every ordinary test-issue reset", () => {
+    const source = read("components/registration-builder/use-builder-state.ts");
+    expect(source).toMatch(/setTestIssues = useCallback\(\(next: PreviewIssue\[\]\) => \{ setTestIssuesRaw\(next\); setContinueBlock\(null\); \}/);
+  });
+});
+
+describe("failed test reasons with odd stored data (#1407)", () => {
+  const odd = (validation: unknown) => [{ id: "t", isValid: false, submittedBy: "staff", createdAt: "2026-10-31T12:00:00.000Z", validation, responses: {} } as unknown as TestSubmissionView];
+  it("returns nothing for null, missing or malformed validation", () => {
+    expect(lastFailedTestReasons(odd(null), null)).toEqual([]);
+    expect(lastFailedTestReasons(odd({}), null)).toEqual([]);
+    expect(lastFailedTestReasons(odd({ issues: "nope" }), null)).toEqual([]);
+    expect(lastFailedTestReasons(odd({ issues: [null, {}, { message: 5 }, { message: "" }] }), null)).toEqual([]);
   });
 });

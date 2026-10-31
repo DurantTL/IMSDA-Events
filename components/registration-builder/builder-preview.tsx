@@ -1,7 +1,7 @@
 // Preview zone: the live public-form preview, the order summary and the
 // Run test submission button.
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ClipboardCheck, Plus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -10,39 +10,39 @@ import { getAvailabilityMode, isFieldVisible, isLatePricingActive, type Registra
 import { type PreviewValue, localId } from "./builder-types";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useLoadedBuilder } from "./builder-context";
-import { continueBlockedMessage, lastFailedTestReasons, previewStepIssues } from "./preview-continue";
+import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "./preview-continue";
 
 export function BuilderPreview() {
-  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information } = useLoadedBuilder();
-  // Set while Continue is blocked on a step (#1407); the step's issues live in testIssues.
-  const [blocked, setBlocked] = useState<{ stepId: string; message: string } | null>(null);
-  const blockedRef = useRef(blocked);
+  const { selectedVersion, definition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, busy, testIssues, setTestIssues, setTestIssuesRaw, continueBlock, setContinueBlock, pricingPreviewDate, setPreviewStepId, previewRef, policyVersions, roster, calculation, previewSteps, previewStepIndex, previewStep, isHistorical, hasValidTest, testRequired, runTest, eventName, information } = useLoadedBuilder();
   const stepIssues = (step: NonNullable<typeof previewStep>) => previewStepIssues({ definition, roster, responses, attendees: previewAttendees, choiceUsage: selectedVersion.choiceUsage ?? {}, step });
+  const blockedRef = useRef(continueBlock);
   const stepIssuesRef = useRef(stepIssues);
-  useEffect(() => { blockedRef.current = blocked; stepIssuesRef.current = stepIssues; });
-  // Fixing an answer clears that question's issue; the rest stay until fixed or the step is left.
+  useEffect(() => { blockedRef.current = continueBlock; stepIssuesRef.current = stepIssues; });
+  // While Continue is blocked, fixing an answer clears that question's issue; the rest stay until fixed or the step is left.
+  // A test run or any reset ends the block (setTestIssues), so this never overwrites a test run's issues.
   useEffect(() => {
     const current = blockedRef.current;
     if (!current) return;
     const step = previewSteps.find((candidate) => candidate.id === current.stepId);
     const remaining = step ? stepIssuesRef.current(step) : [];
-    setTestIssues(remaining);
-    if (remaining.length === 0) setBlocked(null);
-  }, [responses, previewAttendees, previewSteps, setTestIssues]);
+    if (remaining.length === 0) setTestIssues([]);
+    else setTestIssuesRaw(remaining);
+  }, [responses, previewAttendees, previewSteps, setTestIssues, setTestIssuesRaw]);
   function goToPreviewStep(stepId: string) {
-    if (blocked) { setBlocked(null); setTestIssues([]); }
+    if (continueBlock) setTestIssues([]);
     setPreviewStepId(stepId);
   }
   function continuePreview() {
     if (!previewStep) return;
     const issues = stepIssues(previewStep);
     if (issues.length > 0) {
-      setBlocked({ stepId: previewStep.id, message: continueBlockedMessage(previewStep) });
-      setTestIssues(issues);
+      setTestIssuesRaw(issues);
+      setContinueBlock(nextContinueBlock(continueBlock, previewStep));
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
         const target = previewRef.current?.querySelector<HTMLElement>(".preview-field.invalid, fieldset.invalid");
         const focusable = target?.matches("input, textarea, select, button") ? target : target?.querySelector<HTMLElement>("input:not([disabled]), textarea, select, button:not([disabled])");
-        focusable?.focus();
+        // No invalid field (for example only the attendee count): focus the alert, which names the problem.
+        (focusable ?? previewRef.current?.querySelector<HTMLElement>(".preview-test-alert"))?.focus();
       }));
       return;
     }
@@ -235,7 +235,7 @@ export function BuilderPreview() {
                   ))}
                 </div>
               </nav>}
-              {testIssues.length > 0 && <div className="preview-test-alert" role="alert"><AlertTriangle size={14} /><span><strong>{blocked ? blocked.message : `${testIssues.length} test issue${testIssues.length === 1 ? "" : "s"}`}</strong><small>{blocked ? `${testIssues.length} answer${testIssues.length === 1 ? "" : "s"} to fix. Fix the highlighted answers to continue.` : "Fix the highlighted answer, then run the test again."}</small></span></div>}
+              {testIssues.length > 0 && <div className="preview-test-alert" role="alert" tabIndex={-1} key={continueBlock ? `block-${continueBlock.attempt}` : "test"}><AlertTriangle size={14} /><span><strong>{continueBlock ? continueBlock.message : `${testIssues.length} test issue${testIssues.length === 1 ? "" : "s"}`}</strong><small>{continueBlock ? `${testIssues.length} answer${testIssues.length === 1 ? "" : "s"} to fix. Fix the highlighted answers to continue.` : "Fix the highlighted answer, then run the test again."}</small>{continueBlock && fieldlessIssues(testIssues).map((issue, index) => <small key={index}>{issue.message}</small>)}</span></div>}
               {previewStep && <section className="preview-current-step" aria-labelledby="preview-current-step-title">
                 <span>Step {previewStepIndex + 1}</span>
                 <h4 id="preview-current-step-title">{previewStep.title}</h4>

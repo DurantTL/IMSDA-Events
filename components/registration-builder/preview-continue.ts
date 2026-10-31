@@ -8,6 +8,18 @@ import type { PreviewAttendee, PreviewValue, TestSubmissionView } from "./builde
 
 export type PreviewIssue = { fieldId: string | null; key: string; message: string; attendeeIndex?: number | null; path?: string };
 
+export type ContinueBlock = { stepId: string; message: string; attempt: number };
+
+/** The next block state after a blocked Continue: same wording, but a new attempt so the alert is announced again. */
+export function nextContinueBlock(previous: ContinueBlock | null, step: Pick<PublicRegistrationStep, "id" | "shortLabel">): ContinueBlock {
+  return { stepId: step.id, message: continueBlockedMessage(step), attempt: (previous?.attempt ?? 0) + 1 };
+}
+
+/** Issues with no field to highlight (the attendee count): the alert shows their text instead. */
+export function fieldlessIssues(issues: readonly PreviewIssue[]) {
+  return issues.filter((issue) => issue.key === "attendees" || !issue.fieldId);
+}
+
 /** What is wrong on this preview step, exactly as the public form's Continue would find it. */
 export function previewStepIssues(input: {
   definition: RegistrationFormDefinition;
@@ -38,7 +50,7 @@ export function lastFailedTestReasons(testSubmissions: readonly TestSubmissionVi
   if (!newest || newest.isValid) return [];
   const issues = Array.isArray(newest.validation?.issues) ? newest.validation.issues as Array<{ message?: unknown; attendeeIndex?: unknown }> : [];
   return issues.flatMap((issue) => {
-    if (typeof issue.message !== "string" || !issue.message) return [];
+    if (!issue || typeof issue.message !== "string" || !issue.message) return [];
     return [typeof issue.attendeeIndex === "number" ? `${attendeeLabel ?? "Attendee"} ${issue.attendeeIndex + 1}: ${issue.message}` : issue.message];
   });
 }
