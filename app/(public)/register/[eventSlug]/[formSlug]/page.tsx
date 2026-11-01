@@ -8,6 +8,7 @@ import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-not
 import { EventInfoCards } from "@/components/event-info-cards";
 import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-content-blocks";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
+import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { listPublishedRegistrationInfoCards } from "@/modules/events/content-repository";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import {
@@ -107,11 +108,13 @@ export default async function PublicRegistrationPage({
   };
   const clubNotice = clubDirectorSignInNotice(clubNoticeEvent);
   const editableCards = await listPublishedRegistrationInfoCards(eventSlug);
+  const formsHelpContact = await getFormsHelpContact();
 
   return (
     <>
     <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <PublicRegistrationForm
+      formsHelpContact={formsHelpContact}
       event={{
         ...experience.event,
         startsAt: serializeDate(experience.event.startsAt),

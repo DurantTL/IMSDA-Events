@@ -41,7 +41,9 @@ import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormsHelpRow } from "@/components/forms-help";
 import { SubmitButton } from "@/components/submit-button";
+import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
@@ -306,6 +308,8 @@ export type PublicRegistrationFormProps = {
    * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
    */
   securityCheck?: SecurityCheckConfig;
+  /** The help contact for the small "Forms help" link under Submit (#1445); absent (the embed) leaves the link off. */
+  formsHelpContact?: FormsHelpContact;
   /**
    * Club registration (#358): the people come from the club roster, so the
    * party is fixed (no add, remove, or CSV) and their roster-owned fields are
@@ -513,6 +517,7 @@ export function PublicRegistrationForm({
   club,
   group,
   securityCheck = null,
+  formsHelpContact,
 }: PublicRegistrationFormProps) {
   const securityCheckRef = useRef<SecurityCheckHandle>(null);
   // Same action the route expects: the general link's team flow and the individual form share "registration".
@@ -3533,6 +3538,7 @@ export function PublicRegistrationForm({
 
       <form className="public-registration-layout" noValidate onSubmit={submit}>
         <div className="public-registration-form-column">
+          {formsHelpContact && !club && <FormsHelpRow align="end" contact={formsHelpContact} />}
           {topContent}
           {joiningWaitlist && (
             <section className="public-registration-waitlist-banner" role="status">
@@ -3722,7 +3728,7 @@ export function PublicRegistrationForm({
             <EventRefundPolicy policy={event.refundPolicy} headingLevel={3} />
           )}
 
-          {currentStep.isReview && (
+          {currentStep.isReview && (<>
             <section className="public-registration-submit-card">
               <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
@@ -3736,7 +3742,8 @@ export function PublicRegistrationForm({
                 submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
             </section>
-          )}
+            {formsHelpContact && <FormsHelpRow contact={formsHelpContact} />}
+          </>)}
         </div>
 
         <aside className="public-registration-summary" aria-label="Order summary">
