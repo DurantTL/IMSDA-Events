@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useRouter } from "next/navigation";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useState } from "react";
 
 /**
@@ -14,6 +15,7 @@ export function ClubFormCreate({ templates }: { templates: Array<{ key: string; 
   const [copyFromKey, setCopyFromKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const allowNavigation = useUnsavedChangesGuard(name.trim() !== "" || copyFromKey !== "", "This form has not been created yet. Leave this page and discard what you entered?");
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +32,7 @@ export function ClubFormCreate({ templates }: { templates: Array<{ key: string; 
         setError(result.message ?? "The form could not be created.");
         return;
       }
+      allowNavigation();
       router.push(`/admin/club-forms/${encodeURIComponent(result.key)}`);
     } catch {
       setError("The form could not be created. Check your connection and try again.");

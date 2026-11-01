@@ -1,5 +1,6 @@
 import {
   allowNextNavigation,
+  clearNavigationPass,
   consumeNavigationPass,
   guardedNavigate,
   type GuardResult,
@@ -74,14 +75,19 @@ export function createLinkNavigationListener(options: {
     const target = event.target as { closest?: (selector: string) => AnchorLike | null } | null;
     if (!target || typeof target.closest !== "function") return;
     const link = target.closest("a[href]");
-    if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+    // A link that opens a sheet or menu (aria-haspopup) does not leave the page.
+    if (!link || link.target === "_blank" || link.hasAttribute("download") || link.hasAttribute("aria-haspopup")) return;
     const href = link.getAttribute("href");
     if (!href || href.startsWith("#")) return;
     const destination = new URL(link.href, options.currentHref());
     if (destination.href === options.currentHref()) return;
     // This is the click that follows a confirmed "Leave": let it through, and tell `GuardedLink`.
-    if (consumeNavigationPass()) {
+    if (consumeNavigationPass(true)) {
       markNavigationConfirmed(event);
+      // Next's own navigation prevents the default; only a full-page one still needs the window for beforeunload.
+      setTimeout(() => {
+        if (event.defaultPrevented) clearNavigationPass();
+      }, 0);
       return;
     }
     const answer = options.confirm(options.message);

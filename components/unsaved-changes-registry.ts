@@ -68,11 +68,22 @@ export function allowNextNavigation(): void {
   pass = { until: Date.now() + navigationPassWindowMs, used: false };
 }
 
-/** True once for the in-app navigation that follows a confirmed leave. */
-export function consumeNavigationPass(): boolean {
+/**
+ * True once for the in-app navigation that follows a confirmed leave. The pass
+ * is gone afterwards, so a reload right after still warns. `keepWindow` is for
+ * the link listener only: a plain link becomes a full-page navigation after the
+ * click, and `beforeunload` still has to see the pass.
+ */
+export function consumeNavigationPass(keepWindow = false): boolean {
   if (!pass || pass.used || Date.now() > pass.until) return false;
-  pass.used = true;
+  if (keepWindow) pass.used = true;
+  else pass = null;
   return true;
+}
+
+/** Drops a pass that is no longer needed. */
+export function clearNavigationPass(): void {
+  pass = null;
 }
 
 /** Whether a confirmed leave is still fresh; does not use it up (for `beforeunload`). */

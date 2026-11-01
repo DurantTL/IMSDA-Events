@@ -269,6 +269,7 @@ export function ClubRosterWorkspace({
     const form = formRef.current;
     if (!dialogOpen || !form || !baselineRef.current) return;
     baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
+    setDialogDirty(rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form))));
   }, [guardianRev, dialogOpen]);
   const editorIsDirty = useCallback(() => {
     const form = formRef.current;
@@ -1024,6 +1025,8 @@ export function ClubRosterWorkspace({
         className="form-stack"
         key={editing?.id ?? "new"}
         noValidate
+        // Adding or removing a contact changes the form without an input event, so look again after any click once it has rendered.
+        onClick={() => window.requestAnimationFrame(() => setDialogDirty(editorIsDirty()))}
         onInput={(event) => {
           setDialogDirty(editorIsDirty());
           const name = (event.target as HTMLInputElement).name;

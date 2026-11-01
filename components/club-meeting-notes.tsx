@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
@@ -113,6 +114,8 @@ export function ClubMeetingNotes({
   const [baseline, setBaseline] = useState(() => JSON.stringify(emptyDraft(newMeetingDate)));
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const dirty = JSON.stringify(draft) !== baseline;
+  // Close and Cancel have their own discard question; this adds the warning for links, Back and reload while the editor is open and changed (#1452).
+  useUnsavedChangesGuard(editorOpen && dirty, "You have unsaved changes to these meeting notes. Leave this page and discard them?");
   // The green "Saved" banner pinned to the top of the popup (#810): it appears after a save and goes away when the draft changes again.
   const [justSaved, setJustSaved] = useState(false);
   // Whether the note being edited has a check-off on file. Kept from the note itself and from each save response, never looked up in `notes`, which only holds this month's meetings.

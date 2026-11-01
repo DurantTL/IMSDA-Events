@@ -98,6 +98,33 @@ describe("registry: leave dialog, subscribe and the one-shot pass (#1452)", () =
     expect(consumeNavigationPass()).toBe(false);
   });
 
+  it("an in-app check uses the pass up completely, so a reload right after still warns", () => {
+    allowNextNavigation();
+    expect(consumeNavigationPass()).toBe(true);
+    expect(hasNavigationPass()).toBe(false);
+  });
+
+  it("the link listener keeps the window for a full-page link, and drops it when the link navigated in-app", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout"] });
+    vi.setSystemTime(clock);
+    const listener = createLinkNavigationListener({ message: "m", confirm: async () => true, currentHref: () => "https://events.example.test/profile", isAllowed: () => false });
+    const link = { target: "", href: "https://events.example.test/people", hasAttribute: () => false, getAttribute: () => "/people" };
+    const run = (prevent: boolean) => {
+      allowNextNavigation();
+      const event = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false, target: { closest: () => link }, preventDefault() {}, stopPropagation() {} };
+      listener(event);
+      // Next's Link prevents the default after this listener has run.
+      event.defaultPrevented = prevent;
+      vi.advanceTimersByTime(1);
+    };
+    // Plain link: still passes for beforeunload.
+    run(false);
+    expect(hasNavigationPass()).toBe(true);
+    // Next Link prevented the default and navigated in the app: nothing left to pass.
+    run(true);
+    expect(hasNavigationPass()).toBe(false);
+  });
+
   it("the pass expires, and beforeunload can see it without using it up", () => {
     allowNextNavigation();
     expect(hasNavigationPass()).toBe(true);
@@ -188,6 +215,17 @@ describe("link listener with the in-page dialog (#1452)", () => {
     const no = clickOn(link);
     createLinkNavigationListener({ message: "m", confirm: () => false, currentHref, isAllowed: () => false })(no);
     expect(no.preventDefault).toHaveBeenCalled();
+  });
+
+  it("ignores a link that only opens a sheet (aria-haspopup), such as the More tab", () => {
+    const confirm = vi.fn(async () => true);
+    const listener = createLinkNavigationListener({ message: "m", confirm, currentHref, isAllowed: () => false });
+    const more = { ...anchor(), hasAttribute: (name: string) => name === "aria-haspopup" };
+    const event = clickOn(more);
+    listener(event);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(hasNavigationPass()).toBe(false);
   });
 
   it("ignores links that stay on the page, hash links and new-tab links", () => {
