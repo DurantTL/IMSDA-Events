@@ -221,8 +221,10 @@ describe("event settings: focus and error placement (#743 review)", () => {
     expect(takePendingFocus(ref)).toBeNull();
     const source = read("components/event-settings-workspace.tsx");
     expect(source).toContain("const targetId = takePendingFocus(pendingFocusRef);");
-    expect(source).toContain("if (targetId) goToControl(targetId);");
-    expect(source).not.toContain("errorSummaryRef.current?.focus()");
+    // Rule 7 / #1450 replaced the #743 focus-the-first-field behavior: the summary takes focus, and following a link opens the block.
+    expect(source).toContain("if (targetId) errorSummaryRef.current?.focus();");
+    expect(source).not.toContain("if (targetId) goToControl(targetId);");
+    expect(source).toContain("if (item.targetId) goToControl(item.targetId);");
   });
 
   it("flags and opens More settings for a field the event type moved there", () => {

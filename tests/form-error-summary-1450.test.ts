@@ -168,6 +168,8 @@ describe("event settings", () => {
     expect(source).toContain("eventSettingsClientProblems(draft, mode)");
     expect(source).toContain("<FormErrorSummary");
     expect(source).toContain("onFollow=");
+    // Rule 7: focus goes to the summary after a failed save.
+    expect(source).toContain("if (targetId) errorSummaryRef.current?.focus();");
   });
 });
 

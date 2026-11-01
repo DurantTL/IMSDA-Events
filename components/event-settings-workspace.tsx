@@ -566,13 +566,12 @@ export function EventSettingsWorkspace({
     block.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
   }
 
-  // After a failed save the first invalid field takes focus, once. goToControl
-  // opens every closed <details> around it, "More settings" included. Later
-  // changes to the errors (one clearing as someone types) never move focus.
+  // After a failed save the summary takes focus, once (rule 7, #1450): it lists every problem, and a link opens
+  // the closed block holding the field (onFollow below). Later changes to the errors (one clearing as someone
+  // types) never move focus.
   useEffect(() => {
     const targetId = takePendingFocus(pendingFocusRef);
-    if (targetId) goToControl(targetId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (targetId) errorSummaryRef.current?.focus();
   }, [fieldErrors]);
 
   function openPublishDialog() {
