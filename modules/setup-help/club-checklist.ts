@@ -152,7 +152,10 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     helpHref: portalGuideHref(GUIDE),
     helpLabel: "Getting started guide",
   });
-  return summarizeChecklist(steps);
+  // A reporter has no roster, forms, events or orders at all (their Home is Monthly Records only), so those rows are left out
+  // rather than listing pages with nothing for them to do.
+  const reporterOnly: ReadonlySet<string> = new Set(["two-step", "records", "help"]);
+  return summarizeChecklist(facts.role === "REPORTER" ? steps.filter((step) => reporterOnly.has(step.id)) : steps);
 }
 
 export const CLUB_CHECKLIST_GUIDE_HREF = portalGuideHref(GUIDE);

@@ -1,6 +1,6 @@
 "use client";
 
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { Fragment, useId, useState } from "react";

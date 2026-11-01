@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {

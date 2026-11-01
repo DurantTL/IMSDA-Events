@@ -1,5 +1,7 @@
 "use client";
 
+import { StaffViewerProvider } from "@/components/staff-viewer-context";
+import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -50,7 +52,7 @@ import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { AdminRoleSwitcher } from "@/components/admin-role-switcher";
 import { adminRoleSidebarKind, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
-import type { EventPermission } from "@/modules/access/permissions";
+import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
 import {
   buildMoreDirectoryCards,
@@ -217,6 +219,8 @@ export function AppShell({
     events.find((event) => event.id === selectedEventId)?.permissions ?? [],
   );
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
+  // What the pages below need to decide which Help links and Set up links this viewer may follow (#1435).
+  const staffViewer: HelpViewer = { isSystemAdmin, selectedEventId, permissions: isSystemAdmin ? [...eventPermissions] : [...selectedPermissions] };
   // The role switcher's view (#1225): Clubs swaps the sidebar for the club areas; System (or no switcher) is as before.
   const sidebarKind = adminRoleView ? adminRoleSidebarKind(adminRoleView.active) : "default";
   const clubsView = sidebarKind === "clubs";
@@ -687,7 +691,7 @@ export function AppShell({
               switchHref={isSystemAdmin ? "/admin" : "/select-event"}
             />
           )}
-          {children}
+          <StaffViewerProvider value={staffViewer}>{children}</StaffViewerProvider>
         </WorkspaceContent>
       </main>
 

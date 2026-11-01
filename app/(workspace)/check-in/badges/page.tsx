@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactRound, Shirt, Tags } from "lucide-react";

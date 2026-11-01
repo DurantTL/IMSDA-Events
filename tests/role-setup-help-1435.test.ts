@@ -14,7 +14,11 @@ vi.mock("next/navigation", () => ({
 import { ClubHomeEvents, ClubHomeRoster } from "@/components/club-home";
 import { CoordinatorOverviewBody } from "@/components/coordinator-overview";
 import { CoordinatorWhosMissing } from "@/components/coordinator-whos-missing";
-import { ClubSetupHelp, CoordinatorSetupHelp, EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
+import { ClubSetupHelp, CoordinatorSetupHelp } from "@/components/role-setup-help";
+import { canSeeGuide, type HelpViewer } from "@/modules/help/visibility";
+import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
+import { CoordinatorOverviewBody as OverviewBodyForSearch } from "@/components/coordinator-overview";
 import { EventSetupChecklist } from "@/components/event-setup-checklist";
 import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
 import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
@@ -284,7 +288,8 @@ describe("the club director's Getting started checklist", () => {
     expect(step("records").unavailableNote).toMatch(/Ask your club's director/);
     expect(step("roster").linkable).toBe(true);
     const reporter = buildClubChecklist(facts("REPORTER"));
-    expect(reporter.steps.find((candidate) => candidate.id === "roster")!.linkable).toBe(false);
+    // A reporter's Home is Monthly Records only, so roster, forms, events and orders rows are not listed at all.
+    expect(reporter.steps.map((candidate) => candidate.id)).toEqual(["two-step", "records", "help"]);
     expect(reporter.steps.find((candidate) => candidate.id === "records")!.linkable).toBe(true);
   });
 
@@ -428,6 +433,7 @@ const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> =
   ["components/event-settings-workspace.tsx", "readiness-public-info"],
   ["components/event-settings-workspace.tsx", "readiness-central-sender"],
   ["components/communications-workspace.tsx", "email-provider-locked"],
+  ["components/communications-workspace.tsx", "email-webhook-missing"],
   ["components/communications-workspace.tsx", "announcements-none"],
   ["components/scheduled-emails-workspace.tsx", "scheduled-emails-none"],
   ["components/cancellation-policy-workspace.tsx", "cancellation-policy-none"],
@@ -439,6 +445,7 @@ const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> =
   ["app/(workspace)/more/reports/page.tsx", "reports-no-attendees"],
   ["app/(workspace)/more/reports/page.tsx", "reports-no-fields"],
   ["components/square-payment-matching.tsx", "square-unavailable"],
+  ["components/square-payment-matching.tsx", "square-not-configured"],
   ["components/club-invites-workspace.tsx", "club-invites-none"],
   ["components/club-invites-workspace.tsx", "club-invites-email"],
   ["components/area-clubs-views.tsx", "staff-no-clubs"],
@@ -447,6 +454,7 @@ const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> =
 
 describe("event admin states have a next step (round B: H3, H4)", () => {
   const guideIds = new Set(helpGuides.map((guide) => guide.id));
+  const viewerWith = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, selectedEventId: "event_1", permissions });
   const full = { eventId: "event_1", can: () => true, systemAdmin: true };
   const none = { eventId: "event_1", can: () => false };
 
@@ -486,14 +494,21 @@ describe("event admin states have a next step (round B: H3, H4)", () => {
   });
 
   it("renders help at every inventoried event page and uses every id", () => {
-    for (const [file, id] of EVENT_SITES) expect(rendersHelp(read(file), "EventSetupHelp", id) || read(file).includes(`"${id}"`), `${file} ${id}`).toBe(true);
+    for (const [file, id] of EVENT_SITES) {
+      const source = read(file);
+      if (file === "components/event-settings-workspace.tsx") {
+        // The readiness rows pick their id in one mapping, then render the help from it.
+        expect(source, id).toContain(`"${id}"`);
+        expect(source, id).toMatch(/<EventSetupHelp[^>]*id=\{readinessHelpId\(/);
+      } else expect(rendersHelp(source, "EventSetupHelp", id), `${file} ${id}`).toBe(true);
+    }
     const used = new Set(EVENT_SITES.map(([, id]) => id));
     for (const id of EVENT_SETUP_IDS) expect(used.has(id), `unused event id ${id}`).toBe(true);
   });
 
   it("renders the panel with a staff guide link", () => {
-    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "lodging-no-properties", context: "lodging properties" }));
-    expect(html).toContain("/help/finish-event-setup");
+    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "lodging-no-properties", context: "lodging properties", viewer: viewerWith(["CONFIGURE_EVENT"]) }));
+    expect(html).toContain("/help/finish-event-setup?event=event_1");
     expect(html).toMatch(/Ask a system administrator/);
   });
 
@@ -597,7 +612,7 @@ describe("round A review fixes", () => {
     const views = read("components/area-clubs-views.tsx");
     expect(views).not.toContain("CoordinatorSetupHelp");
     expect(views).not.toContain("/account/help");
-    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-no-clubs", systemAdmin: true }));
+    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-no-clubs", systemAdmin: true, viewer: { isSystemAdmin: true, selectedEventId: "", permissions: [...eventPermissions] } }));
     expect(html).toContain("/admin/clubs/import");
     expect(html).toContain("/help/review-new-club-application");
     expect(html).not.toContain("/account/help");
@@ -613,5 +628,114 @@ describe("round A review fixes", () => {
     const css = read("components/coordinator-whos-missing.module.css");
     expect(css).toMatch(/\.table th \{[^}]*--type-staff-floor[^}]*0\.875rem/);
     expect(css).toMatch(/\.next \{[^}]*min-width/);
+  });
+});
+
+describe("round B review fixes", () => {
+  const viewer = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, selectedEventId: "event_1", permissions });
+  const render = (id: (typeof EVENT_SETUP_IDS)[number], who: HelpViewer | null, extra: Record<string, unknown> = {}) =>
+    renderToStaticMarkup(createElement(EventSetupHelp, { id, viewer: who, ...extra }));
+  const guideLinks = (html: string) => [...html.matchAll(/href="(\/help\/[^"?]+)/g)].map((match) => match[1]!.replace("/help/", ""));
+
+  it("never renders a Help guide link the viewer cannot open (a narrow viewer, every event state)", () => {
+    const viewers = [
+      viewer([]),
+      viewer(["VIEW_EVENT"]),
+      viewer(["MANAGE_FINANCE", "VIEW_REPORTS"]),
+      viewer(["MANAGE_REGISTRATION", "VIEW_REPORTS"]),
+      viewer(["MANAGE_CHECK_IN"]),
+      viewer(["MANAGE_COMMUNICATIONS"]),
+      viewer([...eventPermissions], true),
+    ];
+    for (const who of viewers) {
+      for (const id of EVENT_SETUP_IDS) {
+        for (const guideId of guideLinks(render(id, who))) {
+          const guide = helpGuides.find((candidate) => candidate.id === guideId)!;
+          expect(canSeeGuide(guide, who), `${id} links ${guideId} for ${who.permissions.join(",") || "none"}`).toBe(true);
+        }
+      }
+    }
+    // The cases the browser review reproduced.
+    expect(guideLinks(render("cancellation-policy-none", viewer(["MANAGE_FINANCE"])))).toEqual([]);
+    expect(guideLinks(render("meals-no-services", viewer(["MANAGE_FINANCE"])))).toEqual([]);
+    expect(guideLinks(render("square-unavailable", viewer(["MANAGE_FINANCE"])))).toEqual([]);
+    expect(guideLinks(render("announcements-none", viewer(["VIEW_EVENT"])))).toEqual([]);
+    expect(guideLinks(render("meals-no-services", viewer(["CONFIGURE_EVENT"])))).toEqual(["finish-event-setup"]);
+  });
+
+  it("shows no guide or cross-page link with no viewer (unknown), and carries the event on a staff guide link", () => {
+    const html = render("check-in-no-arrivals", null);
+    expect(html).not.toContain("/help/");
+    expect(render("announcements-none", viewer(["MANAGE_COMMUNICATIONS"]))).toContain("/help/schedule-event-emails?event=event_1");
+  });
+
+  it("tells a viewer who cannot act who can, and gives steps to one who can", () => {
+    const blocked = render("meals-no-services", viewer(["MANAGE_FINANCE"]));
+    expect(blocked).toContain("Only an event administrator can add or edit meal services. Ask them.");
+    expect(blocked).not.toContain("Use the form below");
+    const acts = render("meals-no-services", viewer(["CONFIGURE_EVENT"]));
+    expect(acts).toContain("Use the form below");
+    expect(render("announcements-none", viewer(["VIEW_EVENT"]))).toContain("Only an event administrator can create announcements. Ask them.");
+    expect(render("reports-no-attendees", viewer(["VIEW_REPORTS"]))).toContain("Ask them.");
+    expect(render("reports-no-fields", viewer(["VIEW_REPORTS"]))).toContain("Only an event administrator can add questions to the registration form. Ask them.");
+    for (const id of EVENT_SETUP_IDS) {
+      for (const ctx of [{ can: () => false }, {}]) expect(eventSetupFor(id, ctx).whoToAsk ?? "", id).not.toMatch(/If you cannot open it/);
+    }
+  });
+
+  it("gives check-in admins the publishing link instead of 'ask an administrator'", () => {
+    const admin = render("check-in-no-arrivals", viewer(["MANAGE_CHECK_IN", "CONFIGURE_EVENT"]));
+    expect(admin).toContain("/more/event-settings?event=event_1");
+    expect(render("check-in-no-arrivals", viewer(["MANAGE_CHECK_IN"]))).toContain("Ask them.");
+  });
+
+  it("keys provider help on the provider and gives the webhook its own entry", () => {
+    const source = read("components/communications-workspace.tsx");
+    expect(source).toMatch(/!messaging\.settings\.providerConfigured \? <EventSetupHelp[^>]*id="email-provider-locked"/);
+    expect(source).toContain('id="email-webhook-missing"');
+    const webhook = eventSetupFor("email-webhook-missing", {});
+    expect(webhook.whoToAsk).toMatch(/system administrator/i);
+    expect(JSON.stringify(webhook)).not.toMatch(/RESEND|SECRET|whsec/i);
+    // A system administrator is not told to ask a system administrator.
+    expect(render("email-provider-locked", viewer([...eventPermissions], true))).toContain("/admin/email");
+    expect(render("email-provider-locked", viewer([...eventPermissions], true))).not.toMatch(/Ask a system administrator/);
+  });
+
+  it("names the Square cause", () => {
+    expect(eventSetupFor("square-not-configured", {}).whoToAsk).toMatch(/system administrator/i);
+    expect(JSON.stringify(eventSetupFor("square-not-configured", {}).setup)).not.toMatch(/few minutes/);
+    expect(JSON.stringify(eventSetupFor("square-unavailable", {}).setup)).toMatch(/few minutes/);
+  });
+
+  it("does not link readiness rows to closed-details anchors", () => {
+    for (const id of ["readiness-basics", "readiness-location", "readiness-support", "readiness-club-billing"] as const) {
+      expect("href" in eventSetupFor(id, { eventId: "event_1", can: () => true, systemAdmin: true }).setup, id).toBe(false);
+    }
+  });
+
+  it("shows the Reports steps once and points the second empty section at them", () => {
+    const first = renderToStaticMarkup(createElement(EventSetupHelp, { id: "reports-no-attendees", setupKey: "reports-no-attendees", viewer: viewer(["VIEW_REPORTS"]) }));
+    const second = renderToStaticMarkup(createElement(EventSetupHelp, { id: "reports-no-attendees", sameAs: "reports-no-attendees", viewer: viewer(["VIEW_REPORTS"]) }));
+    expect(first).toContain('id="setup-help-reports-no-attendees"');
+    expect(second).toContain('href="#setup-help-reports-no-attendees"');
+    expect(second).toContain("Same steps as the first one above.");
+    expect(second).not.toContain("<ol");
+  });
+
+  it("keeps one Import clubs link on the empty club invites list", () => {
+    const source = read("components/club-invites-workspace.tsx");
+    expect(source).not.toContain('<a href="/admin/clubs/import">');
+  });
+
+  it("narrows Who's missing what by the Overview search while every count stays whole", () => {
+    const a = club("a", { directors: [] });
+    const b = club("b", { directors: [] });
+    const overview = buildCoordinatorOverview([a, b], "2026-2027", now);
+    const html = renderToStaticMarkup(createElement(OverviewBodyForSearch, { data: { status: "ready", clubs: [a, b], overview }, now, query: "Synthetic Club a" }));
+    const section = html.slice(html.indexOf("Who&#x27;s missing what"), html.indexOf("Who&#x27;s missing what") + 4000);
+    expect(section).toContain("2 of 2 clubs are missing something");
+    expect(section).toContain("1 listed below match");
+    expect(section).toContain("Synthetic Club a");
+    expect(section).not.toContain("Synthetic Club b");
   });
 });

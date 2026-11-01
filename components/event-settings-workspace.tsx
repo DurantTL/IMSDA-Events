@@ -1,6 +1,6 @@
 "use client";
 
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import type { EventSetupId } from "@/modules/setup-help/event-setup-steps";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";

@@ -1,6 +1,6 @@
 "use client";
 
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";

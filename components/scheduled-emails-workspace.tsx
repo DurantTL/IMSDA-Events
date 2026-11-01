@@ -1,6 +1,6 @@
 "use client";
 
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";

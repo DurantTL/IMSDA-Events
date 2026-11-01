@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import Link from "next/link";
 import { KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";

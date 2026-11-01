@@ -1,6 +1,6 @@
 "use client";
 
-import { EventSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useState } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
