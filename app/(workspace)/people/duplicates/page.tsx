@@ -17,6 +17,7 @@ import {
   type DuplicateMatchConfidence,
 } from "@/modules/registrations/duplicate-detection";
 import { listRegistrations } from "@/modules/registrations/repository";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const metadata: Metadata = { title: "Duplicate finder" };
 
@@ -128,7 +129,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.name}</strong>
                       <small>
-                        {member.confirmationCode} · {member.registrationStatus.toLowerCase()} · {member.attendeeType.toLowerCase()}
+                        {member.confirmationCode} · {registrationStatusWordOrRaw(member.registrationStatus)} · {member.attendeeType.toLowerCase()}
                         {member.checkedIn ? " · checked in" : ""}
                         {member.balanceCents > 0 ? ` · ${formatCents(member.balanceCents)} due` : ""}
                       </small>
@@ -176,7 +177,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.confirmationCode}</strong>
                       <small>
-                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {formatCents(member.totalAmountCents)} total · {formatCents(member.balanceCents)} due
+                        {registrationStatusWordOrRaw(member.status)} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {formatCents(member.totalAmountCents)} total · {formatCents(member.balanceCents)} due
                       </small>
                       <small className="duplicate-contact">
                         {member.email && <span><Mail aria-hidden="true" size={12} /> {member.email}</span>}

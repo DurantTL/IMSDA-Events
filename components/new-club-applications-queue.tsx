@@ -16,7 +16,7 @@ import type { NewClubApplicationRecord, NewClubInviteRecord } from "@/modules/cl
 
 const sterlingTone: Record<DirectorBackgroundState, string> = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "neutral" };
 const statusTone = { PENDING: "gold", APPROVED: "green", DECLINED: "coral" } as const;
-const inviteStateLabels = { OPEN: "Not used yet", USED: "Used", CANCELLED: "Withdrawn", EXPIRED: "Expired" } as const;
+const inviteStateLabels = { OPEN: "Not used yet", USED: "Used", CANCELLED: "Cancelled", EXPIRED: "Expired" } as const;
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", { dateStyle: "medium" });
@@ -305,7 +305,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
       )}
 
       <div className="panel">
-        <div className="section-heading"><div><h2>Waiting for a decision ({waiting.length})</h2></div></div>
+        <div className="section-heading"><div><h2>Pending approval ({waiting.length})</h2></div></div>
         {waiting.length === 0 ? <p className="report-empty">No applications are waiting.</p> : <div className="nca-list">{waiting.map(renderApplication)}</div>}
       </div>
 

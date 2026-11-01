@@ -119,7 +119,7 @@ describe("Women’s Retreat registration visibility", () => {
       canEmail: true,
     }));
 
-    expect(markup).toContain("Not submitted");
+    expect(markup).toContain("Draft");
   });
 
   it("offers account creation after registration without making it required", () => {

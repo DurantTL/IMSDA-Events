@@ -50,10 +50,10 @@ describe("club member transfer rules (#489)", () => {
     expect(sameTransferName({ firstName: "Ada", lastName: "Test" }, { firstName: "Ada", lastName: "Testperson" })).toBe(false);
   });
 
-  it("tells the receiving club only 'Pending' for every open state, so a request can't probe a roster", () => {
-    expect(receivingClubStatusLabel("PENDING")).toBe("Pending");
-    expect(receivingClubStatusLabel("UNMATCHED")).toBe("Pending");
-    expect(receivingClubStatusLabel("DECLINED")).toBe("Pending");
+  it("tells the receiving club only 'Pending approval' for every open state, so a request can't probe a roster", () => {
+    expect(receivingClubStatusLabel("PENDING")).toBe("Pending approval");
+    expect(receivingClubStatusLabel("UNMATCHED")).toBe("Pending approval");
+    expect(receivingClubStatusLabel("DECLINED")).toBe("Pending approval");
     expect(receivingClubStatusLabel("COMPLETED")).toBe("Completed");
     expect(receivingClubStatusLabel("CANCELLED")).toBe("Cancelled");
     expect(sendingClubStatusLabel("DECLINED")).toMatch(/conference staff/);

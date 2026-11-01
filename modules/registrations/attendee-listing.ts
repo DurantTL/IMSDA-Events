@@ -3,6 +3,8 @@ import { attendeeAnswerRecord } from "@/modules/registrations/choice-answer-filt
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
 import { formatPersonName } from "@/lib/person-name";
+import { registrationAwaitingApproval, registrationStatusWord } from "@/modules/registrations/status-words";
+import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 
 /**
  * The attendee listing (#784): one row per attendee, with meal, dietary,
@@ -38,6 +40,8 @@ export type AttendeeListingRow = {
   attendeeId: string;
   confirmationCode: string;
   status: string;
+  /** The shared status word for this registration (#1453): Pending payment while a balance is due, etc. */
+  statusLabel: string;
   name: string;
   attendeeType: string;
   /** Staff, Pastor or Volunteer for a registration made through a personal invitation (#804); blank for everyone else. */
@@ -197,6 +201,12 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
         attendeeId: attendee.id,
         confirmationCode: registration.confirmationCode,
         status: registration.status,
+        statusLabel: registrationStatusWord({
+          status: registration.status,
+          awaitingApproval: registrationAwaitingApproval(registration),
+          attendeeBalanceCents: attendeeBalanceCents(registration),
+          deferredBilling: registration.isDeferredOrganizationBilling,
+        }),
         name: formatPersonName(attendee),
         attendeeType: attendee.attendeeType,
         group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
@@ -216,7 +226,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
   return rows;
 }
 
-export type ListingSortKey = Exclude<keyof AttendeeListingRow, "registrationId" | "attendeeId" | "mealCategory" | "hasDietaryNeeds">;
+export type ListingSortKey = Exclude<keyof AttendeeListingRow, "registrationId" | "attendeeId" | "statusLabel" | "mealCategory" | "hasDietaryNeeds">;
 export const LISTING_COLUMNS: ReadonlyArray<{ key: ListingSortKey; label: string }> = [
   { key: "confirmationCode", label: "Confirmation code" },
   { key: "status", label: "Status" },
@@ -356,6 +366,6 @@ export const ATTENDEE_LISTING_BOM = "﻿";
 /** The CSV for exactly the rows shown, UTF-8 with a BOM so Excel opens it correctly. Cells are formula-escaped by `toCsv`. */
 export function attendeeListingCsv(rows: readonly AttendeeListingRow[]): string {
   const table: Array<Array<string | number>> = [LISTING_COLUMNS.map((column) => column.label)];
-  for (const row of rows) table.push(LISTING_COLUMNS.map((column) => row[column.key]));
+  for (const row of rows) table.push(LISTING_COLUMNS.map((column) => (column.key === "status" ? row.statusLabel : row[column.key])));
   return ATTENDEE_LISTING_BOM + toCsv(table);
 }

@@ -29,7 +29,7 @@ export const newClubTypeLabels: Record<NewClubTypeValue, string> = {
 };
 
 export const newClubApplicationStatusLabels: Record<NewClubApplicationStatusValue, string> = {
-  PENDING: "Waiting for a decision",
+  PENDING: "Pending approval",
   APPROVED: "Approved",
   DECLINED: "Declined",
 };

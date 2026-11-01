@@ -1,4 +1,5 @@
 import { formatCents } from "@/modules/payments/format-cents";
+import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord } from "@/modules/registrations/status-words";
 import { NeedsAttention } from "@/components/needs-attention";
 import { EventSetupChecklist } from "@/components/event-setup-checklist";
 import type { Metadata } from "next";
@@ -37,14 +38,31 @@ function formatEventDates(start: Date, end: Date, timeZone: string) {
 }
 
 function registrationSummary(registration: Awaited<ReturnType<typeof listRegistrations>>[number]) {
-  if (registration.status === "CANCELLED") return { label: "Cancelled", tone: "purple" };
-  if (registration.status === "WAITLISTED") return { label: "Waitlisted", tone: "purple" };
-  if (registration.status === "DRAFT") return { label: "Draft", tone: "purple" };
+  const word = registrationStatusWord({
+    status: registration.status,
+    awaitingApproval: registrationAwaitingApproval(registration),
+    attendeeBalanceCents: registration.balanceCents,
+    deferredBilling: registration.isDeferredOrganizationBilling,
+  });
+  // The status chip says the shared status word (#1453); the money state stays beside it as secondary text.
+  const money = registration.status === "SUBMITTED" || registration.status === "CONFIRMED"
+    ? registrationMoneyStatus({
+      totalCents: registration.totalAmountCents,
+      balanceCents: registration.balanceCents,
+      deferredBilling: registration.isDeferredOrganizationBilling,
+      isGroup: registration.isGroup,
+      audience: "staff",
+      formatAmount: (cents) => formatCents(cents, { wholeDollars: true }),
+    })
+    : null;
+  if (registration.status === "CANCELLED" || registration.status === "WAITLISTED") return { label: word, money, tone: "purple" };
+  if (word === "Pending approval") return { label: word, money, tone: "gold" };
+  if (registration.status === "DRAFT") return { label: word, money, tone: "purple" };
   // A church-billed registration (#409) is never an attendee balance due.
-  if (registration.isDeferredOrganizationBilling) return { label: registration.isGroup ? "Billed to group contact" : "Billed to church", tone: "purple" };
-  if (registration.balanceCents > 0) return { label: `${formatCents(registration.balanceCents, { wholeDollars: true })} due`, tone: "gold" };
-  if (registration.totalAmountCents === 0) return { label: "No charge", tone: "purple" };
-  return { label: "Paid", tone: "green" };
+  if (registration.isDeferredOrganizationBilling) return { label: word, money, tone: "purple" };
+  if (registration.balanceCents > 0) return { label: word, money, tone: "gold" };
+  if (registration.totalAmountCents === 0) return { label: word, money, tone: "purple" };
+  return { label: word, money, tone: "green" };
 }
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
@@ -138,7 +156,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             <div className="person-list">
               {recent.map((registration) => {
                 const summary = registrationSummary(registration);
-                return <Link className="person-row linked-row" href={`/people${query}&registration=${registration.id}`} key={registration.id}><span className={`person-avatar ${summary.tone}`}>{registration.accountHolder.firstName[0]}{registration.accountHolder.lastName[0]}</span><span><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}</small></span><span className={`status-chip ${summary.tone}`}>{summary.label}</span></Link>;
+                return <Link className="person-row linked-row" href={`/people${query}&registration=${registration.id}`} key={registration.id}><span className={`person-avatar ${summary.tone}`}>{registration.accountHolder.firstName[0]}{registration.accountHolder.lastName[0]}</span><span><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{summary.money ? ` · ${summary.money}` : ""}</small></span><span className={`status-chip ${summary.tone}`}>{summary.label}</span></Link>;
               })}
               {recent.length === 0 && <p className="quiet-copy">No registrations have been added to this event yet.</p>}
             </div>
