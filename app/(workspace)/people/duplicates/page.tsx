@@ -45,6 +45,7 @@ export default async function DuplicateFinderPage({
       <AccessRestricted
         title="The duplicate finder is restricted"
         detail="Reviewing possible duplicates means reading attendee names and contact details, which your event role does not include."
+        whoToAsk="your event administrator"
       />
     );
   }

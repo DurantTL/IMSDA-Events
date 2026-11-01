@@ -3,6 +3,7 @@ import { ClubHonorsWorkspace } from "@/components/club-honors-workspace";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Honors" };
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubHonorsPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const clubYear = clubYearFor(new Date());
   const [rows, honors] = await Promise.all([
     listClubHonorsPage(organizationId, clubYear),

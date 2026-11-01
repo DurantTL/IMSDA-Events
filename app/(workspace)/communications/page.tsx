@@ -91,7 +91,7 @@ export default async function CommunicationsPage({
   const { event, permissions } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." />;
+    return <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />;
   }
   const canManage = permissions.includes("MANAGE_COMMUNICATIONS");
   const [announcements, messaging, optOuts] = await Promise.all([

@@ -10,6 +10,7 @@ import {
   reportYearSpanLabel,
 } from "@/modules/club-reports/year-end-domain";
 import { getYearEndView } from "@/modules/club-reports/year-end-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Year-End Report" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubYearEndReportPage({ params }: { params: Promise<{ organizationId: string; year: string }> }) {
   const { organizationId, year } = await params;
   const access = await getClubRoleAccessForPage(organizationId);
-  if (access.state !== "OK") return null;
+  if (access.state !== "OK") return clubAccessClosed(access);
   const backHref = `/account/clubs/${organizationId}/records`;
   if (!access.capabilities.submitReports) {
     return (

@@ -30,7 +30,7 @@ export default async function EventSettingsPage({
   const { event: requested, calendarDates } = await searchParams;
   const { event, membership, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." />;
+    return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." whoToAsk="your event administrator" />;
   }
   const { user } = await getCurrentSession();
   const [settings, locations, coordinators, teamSettings, generalLink, linkNotice, platform, emailSettings] = await Promise.all([getEventSettings(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id), getPlatformSettings(), loadEventEmailSettings(getPrisma(), event.id)]);

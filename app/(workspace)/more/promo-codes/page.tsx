@@ -19,7 +19,8 @@ export default async function PromoCodesPage({
     return (
       <AccessRestricted
         title="Promo codes are restricted"
-        detail="Ask an event administrator for finance access before creating or changing registration discounts."
+        detail="Creating or changing registration discounts needs finance access."
+        whoToAsk="your event administrator"
       />
     );
   }

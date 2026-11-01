@@ -20,7 +20,7 @@ export default async function ScannerImportPage({ searchParams }: { searchParams
   const params = await searchParams;
   const { event, permissions } = await resolveEventContext(firstParam(params.event), { allowWithoutEventView: true });
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." />;
+    return <AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." whoToAsk="your event administrator" />;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const service = firstParam(params.service);

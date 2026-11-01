@@ -30,6 +30,7 @@ import { activeRegistrationStatuses, calendarDateInEventTimeZone, registrationCl
 import { getClassSelectionWorkspaceIfRegistered, getRegistrationHonorsCatalog } from "@/modules/honors/enrollment-repository";
 import { TEAM_LEVELS, teamLevelLabels, draftKeySchema, singleSearchParam } from "@/modules/club-teams/domain";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club registration" };
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function ClubEventRegistrationPage({
   if (requestedTeam === null || requestedDraft === null) notFound();
   const access = await getRosterAccessStateForPage(organizationId);
   // The club layout shows the sign-in and authenticator steps.
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
 
   // A club that registers several teams (#809) has a page for each team and one for each team being started; the
   // address says which. An event without teams ignores both and shows the one registration it has always had.

@@ -23,7 +23,7 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   const { event: requested, form: formId } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
-    return <AccessRestricted title="Information form access is restricted" detail="Event administrators and registration managers can create, preview, and publish information forms for an event." />;
+    return <AccessRestricted title="Information form access is restricted" detail="Event administrators and registration managers can create, preview, and publish information forms for an event." whoToAsk="your event administrator" />;
   }
   const { user } = await getCurrentSession();
   const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");

@@ -12,7 +12,7 @@ export default async function BillingResponsibilityPage({ searchParams }: { sear
   const { event: requested, location: requestedLocation } = await searchParams;
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view who each registration is billed to." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view who each registration is billed to." whoToAsk="your event administrator" />;
   }
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);
   const view = await getBillingResponsibilityView(event.id, { locationId });

@@ -69,6 +69,7 @@ export default async function PrintableNameBadgesPage({
       <AccessRestricted
         title="Name badge printing is restricted"
         detail="Only event administrators and check-in staff can print attendee name badges."
+        whoToAsk="your event administrator"
       />
     );
   }

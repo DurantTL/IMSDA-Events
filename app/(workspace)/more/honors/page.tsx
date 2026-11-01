@@ -17,7 +17,7 @@ export default async function HonorsSetupPage({ searchParams }: { searchParams: 
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
       <>
-        <AccessRestricted title="Honors setup is restricted" detail="Event administrators set up the sessions and honor classes each Honors Weekend site offers." />
+        <AccessRestricted title="Honors setup is restricted" detail="Event administrators set up the sessions and honor classes each Honors Weekend site offers." whoToAsk="your event administrator" />
       </>
     );
   }

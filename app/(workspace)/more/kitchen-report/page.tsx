@@ -25,7 +25,7 @@ export default async function KitchenReportPage({ searchParams }: { searchParams
     redirect(`/more/kitchen-report/counts?event=${encodeURIComponent(event.id)}`);
   }
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="The kitchen report is restricted" detail="Your event role does not include access to reports." />;
+    return <AccessRestricted title="The kitchen report is restricted" detail="Your event role does not include access to reports." whoToAsk="your event administrator" />;
   }
   const [report, served, counts] = await Promise.all([loadKitchenReport(event.id), loadServedReport(event.id), loadKitchenCountsReport(event.id)]);
   const eventQuery = `event=${encodeURIComponent(event.id)}`;

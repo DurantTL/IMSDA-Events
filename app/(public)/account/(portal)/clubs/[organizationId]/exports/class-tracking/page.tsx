@@ -6,6 +6,7 @@ import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { CLASS_TRACKING_EXPORT_HEADERS } from "@/modules/reporting/director-exports";
 import { loadClassTrackingExport } from "@/modules/reporting/director-exports-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Class tracking report" };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function ClubClassTrackingReportPage({
 }) {
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const { clubYear, choices } = rosterYearView(query.year);
   const { rows } = await loadClassTrackingExport(organizationId, clubYear);
   return (

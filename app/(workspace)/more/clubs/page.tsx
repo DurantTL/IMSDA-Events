@@ -25,6 +25,7 @@ export default async function EventClubsPage({ searchParams }: { searchParams: P
       <AccessRestricted
         title="Club oversight is restricted"
         detail="Event administrators of this Pathfinder event can view its clubs."
+        whoToAsk="your event administrator"
       />
     );
   }

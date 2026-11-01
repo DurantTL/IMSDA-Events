@@ -22,6 +22,7 @@ export default async function SquarePaymentsPage({
       <AccessRestricted
         title="Finance is restricted"
         detail="Only event administrators and finance managers can match Square payments to registrations."
+        whoToAsk="your event administrator"
       />
     );
   }

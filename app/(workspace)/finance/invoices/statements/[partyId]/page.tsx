@@ -16,7 +16,7 @@ export default async function StatementPage({ params, searchParams }: { params: 
   const [{ partyId }, { event: requested }] = await Promise.all([params, searchParams]);
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view statements." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view statements." whoToAsk="your event administrator" />;
   }
   const statement = await getPartyStatement(event.id, partyId);
   if (!statement) notFound();
