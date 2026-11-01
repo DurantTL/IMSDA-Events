@@ -23,9 +23,11 @@ you to review the current branch against `origin/main`.
    - human-only gates in `AGENTS.md` that the change might cross;
    - tests that actually exercise the new behavior, including denial cases.
 3. When the change touches any page, do the site rules browser check from the
-   imsda-review workflow: open each changed page with Playwright at 1280 px and
-   390 px (app on port 3000, seeded synthetic data; start it with `npm run dev`
-   if it is not running), and try each rule in `docs/SITE-RULES.md` that
+   imsda-review workflow: open each changed page with Playwright through Bash
+   (for example a short Node script using `require('playwright')`) at 1280 px
+   and 390 px (app on port 3000, seeded synthetic data). Starting the app with
+   `npm run dev` if it is not running is allowed; it only writes build output,
+   never source files. and try each rule in `docs/SITE-RULES.md` that
    applies by using the page. Keep screenshots in a temporary folder; never
    commit them. If no page changed, say so.
 4. Report only actionable findings, most severe first, each with `path:line`,
