@@ -117,7 +117,8 @@ change, and after you re-check a guide, update its `lastReviewed`.
 
 Step-by-step guides with a picture of the real screen for every step (#1482, site rule H6). Each walkthrough is its own portal
 guide (ids start `walkthrough-`, titles start "Step by step: "), so the hub, Help search and the Getting started links reach it
-like any other guide. Today: the 10 club director walkthroughs. A written guide that has a step-by-step version shows
+like any other guide. Today: the 10 club director walkthroughs and the 6 area coordinator walkthroughs (sign-in; their clubs
+and Who's missing what; Monthly Records; Points; following up with a club that is behind; a club with no director). A written guide that has a step-by-step version shows
 "See it step by step" links near its Steps (`walkthroughsForGuide` in `modules/help/walkthroughs.ts`), and the Getting started
 checklists and the setup-help "Help guide" links point at the walkthrough where it is the same task.
 
@@ -126,7 +127,7 @@ checklists and the setup-help "Help guide" links point at the walkthrough where 
 - `modules/help/walkthroughs.ts`: the data, no Playwright. Per walkthrough: guide id, audience, the guide's own text, the
   app source files its pictures depend on (`sourceFiles`, repo paths) and the steps `{ id, text, alt }`. Step text is one or
   two plain sentences in the screen's exact words. Alt text is plain data so it can be translated later (#1445).
-- `tests/browser/walkthroughs/`: the browser actions. `club-director.ts` has, for every walkthrough and step id, an `async`
+- `tests/browser/walkthroughs/`: the browser actions. `club-director.ts` and `coordinator.ts` have, for every walkthrough and step id, an `async`
   action that drives the page to the state the picture shows (including the tap that leads there from the step before) and
   returns the control to mark. `steps.ts` exports `runWalkthrough(walkthroughId, context, onStep?)`; the club browser tests
   (#1439) can import it with their own `WalkthroughContext` (`types.ts`).
@@ -140,8 +141,10 @@ checklists and the setup-help "Help guide" links point at the walkthrough where 
 
 **Adding or changing a walkthrough**
 
-1. Add the entry to `directorWalkthroughs` (or the coordinator list) in `modules/help/walkthroughs.ts`, and list its
-   `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data.
+1. Add the entry to `directorWalkthroughs` or `coordinatorWalkthroughs` in `modules/help/walkthroughs.ts`, and list its
+   `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
+   `signed-out`, `signed-in` (the sample club director, two-step sign-in done) or `signed-in-coordinator` (the sample area
+   coordinator).
 2. Add one action per step id in `tests/browser/walkthroughs/`. Use roles and the exact labels.
 3. `HELP_SHOTS_ONLY=<walkthrough id> npm run help:screenshots`, then open the pictures and check that nothing looks like a real
    person and that each mark sits on the right control.
@@ -154,6 +157,11 @@ playwright-core@1.56.1` unless Playwright is already installed; `HELP_SHOTS_BROW
   contains the text. `HELP_SHOTS_BASE_URL` defaults to `http://localhost:3000`.
 - `npm run test:walkthroughs` runs every step at phone and desktop width and fails when an action or the control it marks is
   missing. It saves nothing. CI runs it in `.github/workflows/help-walkthroughs.yml`.
+
+The area coordinator walkthroughs use a sample area: a coordinator account with an authenticator app (its secret is made fresh each
+run and only the script knows it, so the coordinator sign-in walkthrough types a real six-digit code), and four sample clubs:
+one up to date, one behind, one with no director, and the director's own club. A coordinator sees every active club, so the
+script hides the clubs already in the local database while it runs and shows them again afterwards.
 
 Both refuse `NODE_ENV=production`, a database or app URL that is not on this machine, and a database that is not a seeded dev
 or CI one. The first-sign-in and passkey walkthroughs sign in for real: the emailed code is the one the local app returns

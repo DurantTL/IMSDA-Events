@@ -69,8 +69,8 @@ export const newDirectorGuides: readonly PortalGuide[] = [
     changes: ["An invite lets the person sign in and work in this club with the role you choose."],
     steps: [
       "Open Club settings, then Club admins.",
-      "Choose Add, enter the person's name and email, and pick Registrar or Reporter.",
-      "Send the invite. They open the link, sign in and set up two-step sign-in.",
+      "Choose Add club admin, type their email, and pick Registrar or Reporter.",
+      "Choose Add club admin again in the window. If they already have a verified account, they get the role right away. If not, we email them an invite: they open the link, sign in and set up two-step sign-in.",
       "Come back to Club admins to see who has access. You can end a role there.",
       "If you need another director or deputy, ask the conference office. Only they can add one.",
     ],
