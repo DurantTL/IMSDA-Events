@@ -7,7 +7,6 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { completeAttendeePasswordReset } from "@/modules/attendee-accounts/account-service";
 import {
   ATTENDEE_PENDING_COOKIE_NAME,
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -15,6 +14,7 @@ import {
   type RateLimitOutcome,
 } from "@/modules/rate-limit/domain";
 import { checkAttendeeVerificationRateLimit } from "@/modules/rate-limit/service";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Spends a reset code and sets the new password.
@@ -78,15 +78,7 @@ async function postHandler(request: Request) {
       }, { status: 400 }), rateLimit);
     }
 
-    cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     cookieStore.delete(ATTENDEE_PENDING_COOKIE_NAME);
 
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);

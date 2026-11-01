@@ -22,7 +22,6 @@ import { attendeePublicUrl } from "@/modules/attendee-accounts/public-navigation
 import {
   ATTENDEE_OAUTH_COOKIE_NAME,
   ATTENDEE_PENDING_COOKIE_NAME,
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -30,6 +29,7 @@ import {
   type RateLimitOutcome,
 } from "@/modules/rate-limit/domain";
 import { checkAttendeeOAuthCallbackRateLimit } from "@/modules/rate-limit/service";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Where Google sends the registrant back.
@@ -101,15 +101,7 @@ async function getHandler(request: Request) {
       return applyRateLimitHeaders(back(`google-${result.reason}`), rateLimit);
     }
 
-    cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     // A password sign-up that was mid-flight in this browser is over.
     cookieStore.delete(ATTENDEE_PENDING_COOKIE_NAME);
 

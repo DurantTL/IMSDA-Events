@@ -3,8 +3,6 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import { createOpaqueToken, hashOpaqueToken, hashUserAgent } from "@/modules/access/tokens";
 
-export const SESSION_COOKIE_NAME = "imsda_session";
-
 /** Hard ceiling: a session cannot outlive this however active it is. */
 export const SESSION_LIFETIME_SECONDS = 8 * 60 * 60;
 

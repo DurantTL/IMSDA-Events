@@ -8,13 +8,12 @@ import { issueMfaChallenge } from "@/modules/access/mfa-service";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
+import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { unifiedPasswordSignIn } from "@/modules/account-merge/unified-sign-in";
 import { attendeeReturnDestination, signInCodePathFor } from "@/modules/attendee-accounts/return-destination";
 import { startSignInCodeIfRequired } from "@/modules/attendee-accounts/sign-in-code-issue";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -27,6 +26,7 @@ import {
   checkLoginAccountRateLimit,
   checkLoginClientRateLimit,
 } from "@/modules/rate-limit/service";
+import { staffSessionCookie, attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * The single sign-in (#554, ADR 0013, slice (c)): one email, one password, one
@@ -126,26 +126,10 @@ async function postHandler(request: Request) {
 
     const cookieStore = await cookies();
     if (outcome.staff) {
-      cookieStore.set(SESSION_COOKIE_NAME, outcome.staff.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: outcome.staff.session.expiresAt,
-        maxAge: SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      staffSessionCookie.set(cookieStore, outcome.staff.session.token, { expires: outcome.staff.session.expiresAt, maxAge: SESSION_LIFETIME_SECONDS });
     }
     if (outcome.attendee) {
-      cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, outcome.attendee.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: outcome.attendee.session.expiresAt,
-        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      attendeeSessionCookie.set(cookieStore, outcome.attendee.session.token, { expires: outcome.attendee.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     }
     countPublicMetric(request, "LOGIN_SUCCESS", "unified-password");
     // An attendee session for a club role without two-step sign-in owes the emailed code (#1410), including the

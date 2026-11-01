@@ -17,7 +17,8 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 import { matchableName } from "../modules/background-checks/domain";
-import { ATTENDEE_SESSION_COOKIE_NAME, createAttendeeSession } from "../modules/attendee-accounts/session-store";
+import { createAttendeeSession } from "../modules/attendee-accounts/session-store";
+import { attendeeSessionCookie } from "../modules/security/session-cookies";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run the honor instructor HTTP check");
@@ -83,7 +84,7 @@ async function main() {
     data: { uploadId: `${P}_upload`, line: 1, firstName: "Ina", lastName: `Instructor${key}`, normalizedName: matchableName(`Ina Instructor${key}`), email: a.email, identityKey: `${P}-key-1`, checkedOn: "2025-01-01", expiresOn: future },
   });
 
-  const cookieFor = async (accountId: string) => `${ATTENDEE_SESSION_COOKIE_NAME}=${(await createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() })).token}`;
+  const cookieFor = async (accountId: string) => `${attendeeSessionCookie.legacyName}=${(await createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() })).token}`;
   const ina = await cookieFor(a.id);
   const ben = await cookieFor(b.id);
   const other = await cookieFor(nobody.id);

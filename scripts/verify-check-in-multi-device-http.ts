@@ -65,8 +65,16 @@ async function call(device: Device, method: string, path: string, body?: unknown
   return { response, status: response.status, json, text };
 }
 
+// A production `next start` writes the `__Host-` name even over http on localhost (#1402),
+// plus an empty Max-Age=0 line for the plain name, which is skipped here.
+const SESSION_COOKIE_PATTERN = /^((?:__Host-)?imsda_session=)[^;]/;
+
+function sessionCookiePrefix(cookie: string) {
+  return SESSION_COOKIE_PATTERN.exec(cookie)?.[1] ?? "imsda_session=";
+}
+
 function sessionCookie(response: Response) {
-  const cookie = response.headers.getSetCookie().find((line) => line.startsWith("imsda_session="));
+  const cookie = response.headers.getSetCookie().find((line) => SESSION_COOKIE_PATTERN.test(line));
   assert.ok(cookie, "a session cookie was set");
   return cookie.split(";")[0];
 }
@@ -251,7 +259,7 @@ async function main() {
   assert.equal(await prisma.userSession.count({ where: { userId, revokedAt: null } }), 4, "no session was revoked by another sign-in");
   // 10. Polling is not activity: it never advances the idle clock, and an idle tablet's poll is refused.
   const tablet = devices[3];
-  const tabletHash = hashOpaqueToken(tablet.cookie.slice("imsda_session=".length));
+  const tabletHash = hashOpaqueToken(tablet.cookie.slice(sessionCookiePrefix(tablet.cookie).length));
   const twoMinutesAgo = new Date(Date.now() - 120_000);
   await prisma.userSession.update({ where: { tokenHash: tabletHash }, data: { lastSeenAt: twoMinutesAgo } });
   const polled = await call(tablet, "GET", `/api/events/${eventId}/check-ins?since=${encodeURIComponent(startedAt)}`);

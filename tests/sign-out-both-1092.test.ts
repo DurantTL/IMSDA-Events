@@ -52,6 +52,10 @@ import { POST as staffLogout } from "@/app/api/auth/logout/route";
 import { POST as attendeeSignOut } from "@/app/api/attendee/sign-out/route";
 import { isStaffSessionTimedOutForLinkedAttendee } from "@/modules/account-merge/staff-timeout";
 
+// Sign-out clears the plain and the `__Host-` name of every session cookie it ends (#1402).
+const STAFF_ONLY = ["__Host-imsda_session", "imsda_session"];
+const ATTENDEE_ONLY = ["__Host-imsda_attendee_session", "imsda_attendee_pending", "imsda_attendee_session"];
+const BOTH_STAFF_AND_ATTENDEE = [...STAFF_ONLY, ...ATTENDEE_ONLY].sort();
 const post = (path: string) => new Request(`https://events.imsda.test${path}`, { method: "POST" });
 const clearedNames = () => mocks.cookieSet.mock.calls.filter(([, value, options]) => value === "" && options?.maxAge === 0).map(([name]) => name).sort();
 
@@ -73,7 +77,7 @@ describe("sign-out with one sign-in ON", () => {
     expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
     expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
     expect(mocks.order).toEqual(["act-as", "revoke-staff"]);
-    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
   });
 
   it("attendee sign-out revokes both sessions, clears both cookie sets, and ends act-as first", async () => {
@@ -82,7 +86,7 @@ describe("sign-out with one sign-in ON", () => {
     expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
     expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
     expect(mocks.order).toEqual(["act-as", "revoke-staff"]);
-    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
   });
 
   it("revokes only the tokens this browser holds, never by user or account", async () => {
@@ -101,7 +105,7 @@ describe("sign-out with one sign-in ON", () => {
     expect(response.status).toBe(200);
     expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
     expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
-    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
   });
 
   it("a failed staff revoke still revokes the attendee side, clears every cookie, then answers 500", async () => {
@@ -109,7 +113,7 @@ describe("sign-out with one sign-in ON", () => {
     const response = await attendeeSignOut(post("/api/attendee/sign-out"));
     expect(response.status).toBe(500);
     expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
-    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
   });
 
   it("with no staff cookie it still ends the attendee side and does not touch act-as", async () => {
@@ -129,7 +133,7 @@ describe("sign-out with one sign-in OFF", () => {
     expect(mocks.endActAs).toHaveBeenCalledWith("staff-session-1");
     expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
     expect(mocks.revokeAttendee).not.toHaveBeenCalled();
-    expect(clearedNames()).toEqual(["imsda_session"]);
+    expect(clearedNames()).toEqual(STAFF_ONLY);
   });
 
   it("attendee sign-out ends only the attendee session", async () => {
@@ -138,7 +142,7 @@ describe("sign-out with one sign-in OFF", () => {
     expect(mocks.revokeStaff).not.toHaveBeenCalled();
     expect(mocks.endActAs).not.toHaveBeenCalled();
     expect(mocks.getCurrentSession).not.toHaveBeenCalled();
-    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session"]);
+    expect(clearedNames()).toEqual(ATTENDEE_ONLY);
   });
 
   it("an unreadable switch counts as off", async () => {
@@ -207,5 +211,28 @@ describe("source pins", () => {
   it("both routes use the shared helper", () => {
     expect(readFileSync("app/api/auth/logout/route.ts", "utf8")).toContain('signOutThisBrowser("staff")');
     expect(readFileSync("app/api/attendee/sign-out/route.ts", "utf8")).toContain('signOutThisBrowser("attendee")');
+  });
+});
+
+describe("sign-out in production (#1402)", () => {
+  it("reads a legacy-only cookie to revoke it, and clears the new and the legacy names", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mocks.enabled.mockResolvedValue(false);
+    mocks.cookies = new Map([["imsda_session", "legacy-staff-token"]]);
+    await staffLogout(post("/api/auth/logout"));
+    expect(mocks.revokeStaff).toHaveBeenCalledWith("legacy-staff-token");
+    expect(clearedNames()).toEqual(STAFF_ONLY);
+    vi.unstubAllEnvs();
+  });
+
+  it("revokes __Host- tokens and clears both names for both sessions", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mocks.enabled.mockResolvedValue(true);
+    mocks.cookies = new Map([["__Host-imsda_session", "host-staff"], ["__Host-imsda_attendee_session", "host-attendee"]]);
+    await staffLogout(post("/api/auth/logout"));
+    expect(mocks.revokeStaff).toHaveBeenCalledWith("host-staff");
+    expect(mocks.revokeAttendee).toHaveBeenCalledWith("host-attendee");
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
+    vi.unstubAllEnvs();
   });
 });

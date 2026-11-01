@@ -3,13 +3,13 @@ import "server-only";
 import { cookies } from "next/headers";
 import { logError } from "@/lib/logger";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { revokeDatabaseSession, SESSION_COOKIE_NAME } from "@/modules/access/session-store";
+import { revokeDatabaseSession } from "@/modules/access/session-store";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import {
   ATTENDEE_PENDING_COOKIE_NAME,
-  ATTENDEE_SESSION_COOKIE_NAME,
   revokeAttendeeSession,
 } from "@/modules/attendee-accounts/session-store";
+import { attendeeSessionCookie, staffSessionCookie } from "@/modules/security/session-cookies";
 import { endActiveActAsOnSignOut } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -67,7 +67,7 @@ export async function signOutThisBrowser(side: SignOutSide): Promise<boolean> {
         logError("Ending act-as at sign-out failed", error);
       }
       try {
-        await revokeDatabaseSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+        await revokeDatabaseSession(staffSessionCookie.read(cookieStore));
       } catch (error) {
         revokeFailed = true;
         logError("The staff session could not be revoked at sign-out", error);
@@ -75,15 +75,18 @@ export async function signOutThisBrowser(side: SignOutSide): Promise<boolean> {
     }
     if (endAttendee) {
       try {
-        await revokeAttendeeSession(cookieStore.get(ATTENDEE_SESSION_COOKIE_NAME)?.value);
+        await revokeAttendeeSession(attendeeSessionCookie.read(cookieStore));
       } catch (error) {
         revokeFailed = true;
         logError("The attendee session could not be revoked at sign-out", error);
       }
     }
   } finally {
-    if (endStaff) expire(cookieStore, SESSION_COOKIE_NAME);
-    if (endAttendee) for (const name of [ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_PENDING_COOKIE_NAME]) expire(cookieStore, name);
+    if (endStaff) staffSessionCookie.clear(cookieStore);
+    if (endAttendee) {
+      attendeeSessionCookie.clear(cookieStore);
+      expire(cookieStore, ATTENDEE_PENDING_COOKIE_NAME);
+    }
   }
   return !revokeFailed;
 }

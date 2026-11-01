@@ -10,15 +10,16 @@ import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { passkeyApiError } from "@/modules/access/passkey-api";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
+import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { finishCombinedPasskeySignIn } from "@/modules/account-merge/combined-passkey-sign-in";
 import { COMBINED_PASSKEY_SIGN_IN_COOKIE } from "@/modules/account-merge/combined-passkey-sign-in-cookie";
 import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
-import { ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
+import { ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
 import { passkeyVerificationSchema } from "@/modules/passkeys/schemas";
 import { applyRateLimitHeaders, mergeRateLimitOutcomes } from "@/modules/rate-limit/domain";
 import { checkAttendeePasskeySignInRateLimit, checkStaffPasskeySignInRateLimit } from "@/modules/rate-limit/service";
+import { staffSessionCookie, attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 const bodySchema = passkeyVerificationSchema.extend({
   // Where a deep link bounced from before landing on /sign-in. Validated against
@@ -72,42 +73,18 @@ async function postHandler(request: Request) {
     });
 
     if (result.kind === "attendee") {
-      cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: result.session.expiresAt,
-        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      attendeeSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
       countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
       return applyRateLimitHeaders(Response.json({ ok: true, attendee: true, redirectTo: attendeeReturnDestination(next, "/account") }), rateLimit);
     }
 
-    cookieStore.set(SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    staffSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: SESSION_LIFETIME_SECONDS });
     countPublicMetric(request, "LOGIN_SUCCESS", "unified-passkey");
     // A user-verified staff passkey also earns the linked attendee session, marked as having
     // passed the second step (one account per person, #554). Null with no usable link.
     const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });
     if (attendeeSession) {
-      cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, attendeeSession.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: attendeeSession.session.expiresAt,
-        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      attendeeSessionCookie.set(cookieStore, attendeeSession.session.token, { expires: attendeeSession.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     }
     const redirectTo = await staffDestinationOrDefault({ id: result.userId, globalRole: result.globalRole }, next);
     return applyRateLimitHeaders(Response.json({ ok: true, redirectTo }), rateLimit);

@@ -6,7 +6,6 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { verifyAttendeeEmail } from "@/modules/attendee-accounts/account-service";
 import {
   ATTENDEE_PENDING_COOKIE_NAME,
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -14,6 +13,7 @@ import {
   type RateLimitOutcome,
 } from "@/modules/rate-limit/domain";
 import { checkAttendeeVerificationRateLimit } from "@/modules/rate-limit/service";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Spends an emailed verification code and signs the account in.
@@ -69,15 +69,7 @@ async function postHandler(request: Request) {
       }, { status: 400 }), rateLimit);
     }
 
-    cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, verification.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: verification.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set(cookieStore, verification.session.token, { expires: verification.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     cookieStore.delete(ATTENDEE_PENDING_COOKIE_NAME);
 
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);

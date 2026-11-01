@@ -24,6 +24,13 @@ const privateRegistrationHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
 ];
 
+// The staff session cookie under its plain and its production `__Host-` name
+// (#1402). A redirect with several `missing` entries applies only when all are absent.
+const SESSION_COOKIE_MISSING = [
+  { type: "cookie" as const, key: "imsda_session" },
+  { type: "cookie" as const, key: "__Host-imsda_session" },
+];
+
 const nextConfig: NextConfig = {
   // No "X-Powered-By: Next.js" (#1401).
   poweredByHeader: false,
@@ -50,19 +57,21 @@ const nextConfig: NextConfig = {
       // signed-out requests to a bare "/login" and, since layouts render in
       // parallel with pages, wins over the page's own redirect; this rule
       // runs before rendering. It only checks that the session cookie is
-      // absent (the name matches SESSION_COOKIE_NAME, asserted in
+      // absent under both the plain and the production `__Host-` name (every
+      // `missing` entry must be absent for the rule to fire; the names match
+      // modules/security/session-cookies, asserted in
       // tests/route-fallbacks.test.ts); the page and layout still verify
       // any session that is present. Not permanent: it depends on a cookie.
       {
         source: "/check-in",
         has: [{ type: "query", key: "event", value: "(?<event>[A-Za-z0-9_-]{1,64})" }],
-        missing: [{ type: "cookie", key: "imsda_session" }],
+        missing: SESSION_COOKIE_MISSING,
         destination: "/login?next=/check-in%3Fevent%3D:event",
         permanent: false,
       },
       {
         source: "/check-in",
-        missing: [{ type: "cookie", key: "imsda_session" }],
+        missing: SESSION_COOKIE_MISSING,
         destination: "/login?next=/check-in",
         permanent: false,
       },

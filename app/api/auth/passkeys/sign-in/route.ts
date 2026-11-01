@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import { withRequestContext } from "@/lib/request-context";
@@ -16,9 +15,10 @@ import { finishPasskeySignIn, PasskeyError } from "@/modules/access/passkeys";
 import { passkeyVerificationSchema } from "@/modules/passkeys/schemas";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
-import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
+import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
 import { checkStaffPasskeySignInRateLimit } from "@/modules/rate-limit/service";
+import { staffSessionCookie, attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 const bodySchema = passkeyVerificationSchema.extend({
   // Where a deep link bounced from before landing on /login (#108 queue 1).
@@ -73,30 +73,14 @@ async function postHandler(request: Request) {
       if (error instanceof PasskeyError && error.code === "PASSKEY_NOT_VERIFIED") countPublicMetric(request, "LOGIN_FAILURE", "staff-passkey");
       throw error;
     });
-    cookieStore.set(SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    staffSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: SESSION_LIFETIME_SECONDS });
     countPublicMetric(request, "LOGIN_SUCCESS", "staff-passkey");
     // One account per person (#554): with the one-sign-in switch on, a staff person who just
     // passed the staff second factor also gets their linked attendee session, marked as having
     // passed the second step. Does nothing (null) with the switch off or with no usable link.
     const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });
     if (attendeeSession) {
-      cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, attendeeSession.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: attendeeSession.session.expiresAt,
-        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      attendeeSessionCookie.set(cookieStore, attendeeSession.session.token, { expires: attendeeSession.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     }
     const redirectTo = await postLoginDestinationOrDefault(
       { id: result.userId, globalRole: result.globalRole },

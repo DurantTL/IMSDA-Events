@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { REQUEST_TARGET_HEADER } from "@/modules/access/login-routing";
 import { wantsRequestTarget } from "@/modules/access/request-target";
+import { attendeeSessionCookie, staffSessionCookie } from "@/modules/security/session-cookies";
 import {
   buildContentSecurityPolicy,
   DEFAULT_EMBED_ALLOWED_ORIGINS,
@@ -40,7 +41,25 @@ export function proxy(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", policy);
+  migrateLegacySessionCookies(request, response);
   return response;
+}
+
+/**
+ * One release of `__Host-` migration (#1402). A plain-named session cookie is
+ * never promoted to the `__Host-` name: any sibling subdomain can plant a plain
+ * cookie with `Domain=`, and promoting it would turn it into a real host-only
+ * cookie (session fixation). Legacy-only browsers keep working through the
+ * readers' fallback and pick up a `__Host-` cookie at their next sign-in. Once a
+ * `__Host-` cookie is present, the plain one is expired here (server components
+ * cannot set cookies). Remove with the fallback after that release.
+ */
+function migrateLegacySessionCookies(request: NextRequest, response: NextResponse) {
+  if (process.env.NODE_ENV !== "production") return;
+  for (const cookie of [staffSessionCookie, attendeeSessionCookie]) {
+    if (request.cookies.get(cookie.legacyName) === undefined) continue;
+    if (request.cookies.get(cookie.hostName)?.value) cookie.clearLegacy(response.cookies);
+  }
 }
 
 export const config = {

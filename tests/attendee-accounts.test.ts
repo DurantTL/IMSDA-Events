@@ -56,9 +56,8 @@ import {
 } from "@/modules/attendee-accounts/codes";
 import {
   ATTENDEE_PENDING_COOKIE_NAME,
-  ATTENDEE_SESSION_COOKIE_NAME,
 } from "@/modules/attendee-accounts/session-store";
-import { SESSION_COOKIE_NAME } from "@/modules/access/session-store";
+import { attendeeSessionCookie, staffSessionCookie } from "@/modules/security/session-cookies";
 import { listRegistrationsForVerifiedEmail } from "@/modules/attendee-accounts/registrations-repository";
 import { lockableRowStub, type LockableRow } from "./lockable-row-stub";
 
@@ -465,9 +464,14 @@ describe("the two populations never share a session", () => {
     // token would be handed to the attendee lookup and an attendee token to the
     // staff lookup — and the tables being distinct would be the only thing left
     // standing between a registrant and a roster.
-    expect(ATTENDEE_SESSION_COOKIE_NAME).not.toBe(SESSION_COOKIE_NAME);
-    expect(ATTENDEE_PENDING_COOKIE_NAME).not.toBe(SESSION_COOKIE_NAME);
-    expect(ATTENDEE_PENDING_COOKIE_NAME).not.toBe(ATTENDEE_SESSION_COOKIE_NAME);
+    for (const [staff, attendee] of [
+      [staffSessionCookie.legacyName, attendeeSessionCookie.legacyName],
+      [staffSessionCookie.hostName, attendeeSessionCookie.hostName],
+    ]) {
+      expect(attendee).not.toBe(staff);
+      expect(ATTENDEE_PENDING_COOKIE_NAME).not.toBe(staff);
+      expect(ATTENDEE_PENDING_COOKIE_NAME).not.toBe(attendee);
+    }
   });
 });
 

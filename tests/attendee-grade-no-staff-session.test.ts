@@ -38,7 +38,7 @@ describe("attendee-side sign-in code cannot create a staff session", () => {
       const text = readFileSync(file, "utf8").split("\n")
         .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
         .join("\n");
-      const hit = text.match(/createDatabaseSession|userSession\.|[^_A-Z]SESSION_COOKIE_NAME\b|completeMfaChallenge|from "@\/modules\/access\/(session-store|mfa-service)"/);
+      const hit = text.match(/createDatabaseSession|userSession\.|staffSessionCookie|completeMfaChallenge|from "@\/modules\/access\/(session-store|mfa-service)"/);
       expect(hit, `${file} must not touch the staff session`).toBeNull();
     }
   });
@@ -57,8 +57,8 @@ describe("attendee-side sign-in code cannot create a staff session", () => {
     expect(passkeySignIn).toContain("createAttendeeSession");
     expect(passkeySignIn).not.toContain("createDatabaseSession");
     const route = readFileSync("app/api/attendee/passkeys/sign-in/route.ts", "utf8");
-    expect(route).toContain("ATTENDEE_SESSION_COOKIE_NAME");
-    expect(route).not.toMatch(/[^_A-Z]SESSION_COOKIE_NAME\b/);
+    expect(route).toContain("attendeeSessionCookie");
+    expect(route).not.toContain("staffSessionCookie");
   });
 });
 

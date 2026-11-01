@@ -6,11 +6,11 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findSwitchableAttendeeAccountForStaff } from "@/modules/attendee-accounts/current-attendee";
 import { attendeePublicUrl } from "@/modules/attendee-accounts/public-navigation";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
   createAttendeeSession,
   revokeAttendeeSession,
 } from "@/modules/attendee-accounts/session-store";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
@@ -37,20 +37,12 @@ async function postHandler(request: Request) {
     }
 
     const cookieStore = await cookies();
-    await revokeAttendeeSession(cookieStore.get(ATTENDEE_SESSION_COOKIE_NAME)?.value);
+    await revokeAttendeeSession(attendeeSessionCookie.read(cookieStore));
     const attendeeSession = await createAttendeeSession(
       account.id,
       request.headers.get("user-agent"),
     );
-    cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, attendeeSession.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: attendeeSession.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set(cookieStore, attendeeSession.token, { expires: attendeeSession.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     logInfo("Staff switched to their matching attendee account.", {
       actorUserId: user.id,
       attendeeAccountId: account.id,

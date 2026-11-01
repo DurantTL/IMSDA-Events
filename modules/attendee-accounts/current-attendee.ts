@@ -7,11 +7,11 @@ import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   isAttendeeSessionIdle,
   shouldTouchAttendeeSession,
   touchAttendeeSession,
 } from "@/modules/attendee-accounts/session-store";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Resolves the signed-in registrant, and only ever a registrant.
@@ -128,7 +128,7 @@ async function attendeeAccountForStaff(): Promise<AttendeeSession> {
 }
 
 export const getCurrentAttendee = cache(async (): Promise<AttendeeSession> => {
-  const token = (await cookies()).get(ATTENDEE_SESSION_COOKIE_NAME)?.value;
+  const token = attendeeSessionCookie.read(await cookies());
   if (!token) return attendeeAccountForStaff();
 
   const tokenHash = hashOpaqueToken(token);

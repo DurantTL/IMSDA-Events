@@ -9,11 +9,11 @@ import { logError } from "@/lib/logger";
 import {
   listUserSessions,
   revokeOtherUserSessions,
-  SESSION_COOKIE_NAME,
   SESSION_IDLE_TIMEOUT_SECONDS,
   SESSION_LIFETIME_SECONDS,
 } from "@/modules/access/session-store";
 import { withRequestContext } from "@/lib/request-context";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 function apiError(error: unknown, action: string) {
   if (error instanceof AccessDeniedError) {
@@ -30,7 +30,7 @@ function apiError(error: unknown, action: string) {
 async function getHandler() {
   try {
     const user = requireAuthenticatedUser(await getCurrentSession());
-    const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+    const token = staffSessionCookie.read(await cookies());
     return Response.json({
       sessions: await listUserSessions(user.id, token),
       absoluteLifetimeSeconds: SESSION_LIFETIME_SECONDS,
@@ -52,7 +52,7 @@ async function deleteHandler(request: Request) {
 
   try {
     const user = requireAuthenticatedUser(await getCurrentSession());
-    const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+    const token = staffSessionCookie.read(await cookies());
     const revoked = await revokeOtherUserSessions(user.id, token);
     return Response.json({ revoked, sessions: await listUserSessions(user.id, token) });
   } catch (error) {

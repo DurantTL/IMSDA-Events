@@ -7,7 +7,6 @@ import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstil
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { authenticateAttendee } from "@/modules/attendee-accounts/account-service";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -16,6 +15,7 @@ import {
 } from "@/modules/rate-limit/domain";
 import { checkAttendeeSignInRateLimit } from "@/modules/rate-limit/service";
 import { startSignInCodeIfRequired } from "@/modules/attendee-accounts/sign-in-code-issue";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Password sign-in for a registrant. Separate from `/api/auth/login` by
@@ -65,15 +65,7 @@ async function postHandler(request: Request) {
       return applyRateLimitHeaders(Response.json(REFUSAL, { status: 401 }), rateLimit);
     }
 
-    (await cookies()).set(ATTENDEE_SESSION_COOKIE_NAME, authentication.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: authentication.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set((await cookies()), authentication.session.token, { expires: authentication.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     countPublicMetric(request, "LOGIN_SUCCESS", "attendee-password");
     // A club role without two-step sign-in is never let in on a password alone (#1410): the code is sent now and
     // the form moves to step 2. Everyone else gets the same body as before. Only reached once the password was right.
