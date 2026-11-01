@@ -12,6 +12,7 @@ import {
   summarizeSponsoredLines,
   type ChurchSponsoredPromoLine,
 } from "@/modules/promo-codes/church-sponsored";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * What each church owes for this event (#409): an estimate from the pricing
@@ -123,7 +124,7 @@ export function ChurchAmountsOwed({
         <div className="finance-row finance-head"><span>{hasIndividuals ? "Registrant or club / church or organization" : "Club / church"}</span><span>Confirmation</span><span>Attendees</span><span>Estimated amount owed</span></div>
         {billed.map((row) => (
           <div className="finance-row" key={`${row.organizationId}-${row.confirmationCode}`}>
-            <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {row.status.toLowerCase()}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
+            <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {registrationStatusWordOrRaw(row.status)}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
             <span>{row.confirmationCode}</span>
             <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
             <span>{formatCents(row.amountOwedCents)}</span>
@@ -147,7 +148,7 @@ export function ChurchAmountsOwed({
               <span>
                 <strong>{row.billingContact?.name ?? row.organizationName}</strong>
                 <small>
-                  Group · billed to the contact after the event · {row.isBilled ? row.status.toLowerCase() : notBilledLabel(row.status)}
+                  Group · billed to the contact after the event · {row.isBilled ? registrationStatusWordOrRaw(row.status) : notBilledLabel(row.status)}
                   {row.billingContact?.email ? ` · ${row.billingContact.email}` : ""}
                   {row.locationName ? ` · ${row.locationName}` : ""}
                 </small>
@@ -174,7 +175,7 @@ export function ChurchAmountsOwed({
                 <div className="finance-row" key={line.lineId}>
                   <span><small>Promo code {line.promoCode}</small></span>
                   <span>{line.confirmationCode}</span>
-                  <span>{line.status.toLowerCase()}</span>
+                  <span>{registrationStatusWordOrRaw(line.status)}</span>
                   <span>{formatCents(line.amountCents)}</span>
                 </div>
               ))}

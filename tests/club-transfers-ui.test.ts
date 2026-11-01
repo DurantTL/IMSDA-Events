@@ -18,7 +18,7 @@ describe("club member transfer screens (#489)", () => {
   it("shows the sending club accept, decline and cancel on a request waiting on it", () => {
     const transfer = {
       id: "t1", direction: "OUTGOING", memberName: "Ada Testperson", otherClubName: "Club B", reason: "Family moved.",
-      status: "PENDING", statusLabel: "Waiting on your answer", initiatedAt: iso, acknowledgeDueAt: iso, resolvedAt: null,
+      status: "PENDING", statusLabel: "Pending approval", initiatedAt: iso, acknowledgeDueAt: iso, resolvedAt: null,
       canAccept: true, canDecline: true, canCancel: true, events: [{ id: "e1", type: "REQUESTED", createdAt: iso }],
     } as ClubTransferRecord;
     const html = renderToStaticMarkup(createElement(ClubTransferCard, { transfer, onAction: noop }));
@@ -28,10 +28,10 @@ describe("club member transfer screens (#489)", () => {
     expect(html).toContain("answer by");
   });
 
-  it("shows the receiving club only 'Pending' and cancel, with no accept", () => {
+  it("shows the receiving club only 'Pending approval' and cancel, with no accept", () => {
     const transfer = {
       id: "t2", direction: "INCOMING", memberName: "Ada Testperson", otherClubName: "Club A", reason: "Family moved.",
-      status: "PENDING", statusLabel: "Pending", initiatedAt: iso, resolvedAt: null,
+      status: "PENDING", statusLabel: "Pending approval", initiatedAt: iso, resolvedAt: null,
       canAccept: false, canDecline: false, canCancel: true, events: [],
     } as ClubTransferRecord;
     const html = renderToStaticMarkup(createElement(ClubTransferCard, { transfer, onAction: noop }));

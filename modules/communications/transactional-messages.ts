@@ -31,6 +31,7 @@ import { buildRegistrationSeminarPreferences } from "@/modules/communications/se
 import { linkQueuedMessageFiles } from "@/modules/communications/message-files";
 import { messageFileIdsInHtml } from "@/modules/communications/message-file-rules";
 import { formatPersonName } from "@/lib/person-name";
+import { registrationStatusWord } from "@/modules/registrations/status-words";
 
 type TransactionalTemplateKey =
   | "REGISTRATION_CONFIRMATION_PAID"
@@ -567,7 +568,11 @@ async function enqueueTransactionalMessage(
       .map((attendee, index) => `${index + 1}. ${attendeeName(attendee)}`)
       .join("\n") || "No attendee names are recorded.",
     total_amount: perPersonNotice ?? formatMessageMoney(totalCents),
-    restored_status: registration.status,
+    restored_status: registrationStatusWord({
+      status: registration.status,
+      attendeeBalanceCents: balanceCents,
+      deferredBilling: isDeferredOrganizationBilling,
+    }),
     balance_amount: perPersonNotice || billedToGroup ? "Nothing is due online." : formatMessageMoney(balanceCents),
     payment_instructions: instructions,
     portal_url: REGISTRATION_MANAGE_LINK_SENTINEL,
@@ -576,7 +581,7 @@ async function enqueueTransactionalMessage(
       || settings.senderEmail
       || registration.event.supportContact
       || "the IMSDA event office",
-    waitlist_position: waitlistPosition > 0 ? String(waitlistPosition) : "Pending",
+    waitlist_position: waitlistPosition > 0 ? String(waitlistPosition) : "Not assigned yet",
     waitlist_removal_reason: safeWaitlistRemovalReason(input.waitlistRemovalReason),
     contact_email: eventContactEmail,
     registration_contact_email: recipientEmail,
@@ -623,7 +628,7 @@ async function enqueueTransactionalMessage(
       ? registrationUpdateCategoryLabels[input.changeCategory]
       : "Registration details",
     seminar_preferences: seminarPreferences,
-    request_status: input.requestStatus?.label ?? "Received",
+    request_status: input.requestStatus?.label ?? "Submitted",
     request_status_detail: input.requestStatus?.detail ?? "",
   };
   const rendered = renderMessageTemplate(

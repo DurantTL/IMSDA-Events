@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Club portal fixes from the owner's iPad review (#918). Items: roster name prominence, Emergency contact
@@ -26,6 +26,7 @@ vi.mock("react", async (importOriginal) => {
     useMemo: (factory: () => unknown) => factory(),
     // A ref is a fresh object per render and effects never run (no DOM), enough for the orders focus handling (#1330).
     useRef: (initial: unknown) => ({ current: initial }),
+    useCallback: (fn: unknown) => fn,
     useEffect: () => {},
     useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
   };
@@ -37,6 +38,7 @@ import { ClubOrderWorkspace, type ClubOrderWorkspaceData } from "@/components/cl
 import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import rosterStyles from "@/components/club-roster-sections.module.css";
+import { SEARCH_DEBOUNCE_MS } from "@/components/search-as-you-type";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import { searchResultSummary } from "@/lib/search-match";
 import { isAdultRosterPerson } from "@/modules/club-rosters/domain";
@@ -62,7 +64,13 @@ const byId = (tree: ReactNode, id: string) => walk(tree).find((el) => el.props.i
 const optionLabels = (select: ReactElement<Props>) => walk(select).filter((el) => el.type === "option").map((el) => text(el.props.children));
 const type = (input: ReactElement<Props>, value: string) => (input.props.onChange as (event: unknown) => void)({ target: { value } });
 
-beforeEach(() => { runtime.slots = []; runtime.index = 0; });
+/** A search box settles a short pause after the last keystroke (#1431), so typing waits for it. */
+const typeSearch = (input: ReactElement<Props>, value: string) => {
+  type(input, value);
+  vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+};
+beforeEach(() => { runtime.slots = []; runtime.index = 0; vi.useFakeTimers(); });
+afterEach(() => { vi.useRealTimers(); });
 
 describe("1. roster: the name is the most prominent thing in the row", () => {
   const member: RosterMemberRecord = {
@@ -224,18 +232,21 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     let tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toHaveLength(names.length + 1);
     expect(text(byId(tree, "earned-item-results"))).toBe("");
+    // Nothing narrows until typing pauses.
     type(byId(tree, "earned-item-search"), "patch");
+    expect(optionLabels(byId(earned(), "earned-item"))).toHaveLength(names.length + 1);
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
     tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toEqual(["Choose an item", "Camp Patch", "Fall Patch", "Spring Patch", "Winter Patch", "Summer Patch"]);
     expect(text(byId(tree, "earned-item-results"))).toBe("5 items match “patch”.");
     expect(byId(tree, "earned-item").props.size).toBeUndefined();
     expect(byId(tree, "earned-item-search").props["aria-describedby"]).toBe("earned-item-results");
-    type(byId(tree, "earned-item-search"), "tlt rib");
+    typeSearch(byId(tree, "earned-item-search"), "tlt rib");
     tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toEqual(["Choose an item", "TLT Ribbon"]);
     expect(byId(tree, "earned-item").props.value).toBe("item-3");
     expect(byId(tree, "earned-item").props.size).toBeUndefined();
-    type(byId(tree, "earned-item-search"), "zzz");
+    typeSearch(byId(tree, "earned-item-search"), "zzz");
     tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toEqual(["Choose an item"]);
     expect(text(byId(tree, "earned-item-results"))).toContain("No items match");
@@ -255,24 +266,24 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
   it("Orders, Search the catalog: typing narrows the list by name or item number, and says so", () => {
     let tree = orders();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(4);
-    type(byId(tree, "club-order-picker-search"), "polo");
+    typeSearch(byId(tree, "club-order-picker-search"), "polo");
     tree = orders();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(3);
     expect(text(byId(tree, "club-order-picker-results"))).toBe("2 items match “polo”.");
     expect(byId(tree, "club-order-picker-item").props.size).toBeUndefined();
     expect(byId(tree, "club-order-picker-search").props["aria-describedby"]).toBe("club-order-picker-results");
-    type(byId(tree, "club-order-picker-search"), "nk 1");
+    typeSearch(byId(tree, "club-order-picker-search"), "nk 1");
     tree = orders();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toEqual(["Choose an item", "Neckerchief · NK-1"]);
     expect(byId(tree, "club-order-picker-item").props.value).toBe("c");
-    type(byId(tree, "club-order-picker-search"), "zzz");
+    typeSearch(byId(tree, "club-order-picker-search"), "zzz");
     tree = orders();
     expect(text(byId(tree, "club-order-picker-results"))).toContain("No items match");
   });
   it("Orders: a long match list is paged (no \"type more\" cap), with the shared pager and the match count", () => {
     const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({ itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0 }));
     const capped = () => { runtime.index = 0; return ClubOrderWorkspace({ organizationId: "club-1", initial, stock: many }) as ReactElement<Props>; };
-    type(byId(capped(), "club-order-picker-search"), "patch");
+    typeSearch(byId(capped(), "club-order-picker-search"), "patch");
     const tree = capped();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(101);
     expect(text(byId(tree, "club-order-picker-results"))).toContain("250 items match");
@@ -318,7 +329,7 @@ describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
     expect(teamPermissionsIntro.ageRuleLead).toContain("maximum age");
     expect(teamPermissionsIntro.coaches).toContain("registered as coaches");
     expect(teamPermissionsIntro.coaches).toContain("don't need approval");
-    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Waiting for a decision", "Approved", "Declined"]);
+    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Pending approval", "Approved", "Declined"]);
     for (const level of teamPermissionsIntro.levels) expect(level.detail.length).toBeGreaterThan(30);
     expect(teamPermissionsIntro.levels[0]!.detail).toContain("The team is registered while you decide");
     expect(teamPermissionsIntro.levels[2]!.detail).toContain("coach");
@@ -360,7 +371,7 @@ describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
     }
     expect(html).toContain('aria-labelledby="team-approval-rules-heading"');
     expect(html).toContain('id="team-approval-rules-heading"');
-    expect(html.indexOf("Waiting for a decision")).toBeLessThan(html.indexOf("Team members 18 and over"));
+    expect(html.indexOf("Pending approval")).toBeLessThan(html.indexOf("Team members 18 and over"));
   });
   it("with no rows shows the plain age rule and no per-event list", async () => {
     const html = await renderPage([], {});

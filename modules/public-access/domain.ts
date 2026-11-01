@@ -2,6 +2,7 @@ import type { RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { emailAddressSchema } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
+import { registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1_000;
 const recoveryAccessLifetimeMilliseconds = 30 * 60 * 1_000;
@@ -74,37 +75,40 @@ export function registrationRecoveryAccessExpiry(now: Date) {
 export function describePublicRegistrationStatus(
   status: RegistrationStatus,
   waitlistPosition: number | null,
+  /** What the person could owe online. Above zero on a submitted registration reads Pending payment (#1453). */
+  context: { attendeeBalanceCents?: number; deferredBilling?: boolean } = {},
 ): PublicRegistrationStatusSummary {
+  const word = registrationStatusWord({ status, ...context });
   switch (status) {
     case "CONFIRMED":
       return {
-        label: "Confirmed",
+        label: word,
         detail: "Your place at this event is confirmed.",
         tone: "positive",
       };
     case "WAITLISTED":
       return {
-        label: waitlistPosition
-          ? `Waitlisted · position ${waitlistPosition}`
-          : "Waitlisted",
+        label: waitlistStatusText({ position: waitlistPosition }),
         detail: "Your registration is on the waitlist. A place is not confirmed, and no payment is due while you wait.",
         tone: "waiting",
       };
     case "CANCELLED":
       return {
-        label: "Cancelled",
+        label: word,
         detail: "This registration has been cancelled. Contact the event team if this does not look right.",
         tone: "cancelled",
       };
     case "SUBMITTED":
       return {
-        label: "Submitted",
-        detail: "Your registration was received and is awaiting final confirmation.",
+        label: word,
+        detail: word === "Pending payment"
+          ? "Your registration was received. A payment is still due before it is final."
+          : "Your registration was received and is awaiting final confirmation.",
         tone: "neutral",
       };
     case "DRAFT":
       return {
-        label: "Not submitted",
+        label: word,
         detail: "This registration has not been submitted to the event team.",
         tone: "neutral",
       };

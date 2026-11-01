@@ -2,7 +2,7 @@
 
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
@@ -10,6 +10,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { suppressionExplanation, suppressionLabel } from "@/modules/communications/suppression-labels";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { closeRegistrationUrlAction, followRegistrationParam, withoutRegistrationParam, type ParamOpened } from "@/lib/registration-param";
 import {
@@ -47,6 +48,7 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
@@ -122,7 +124,7 @@ function dateTime(value: string | null, timeZone: string) {
 }
 
 function submittedDateTime(value: string | null, timeZone: string) {
-  return value ? dateTime(value, timeZone) : "Not submitted";
+  return value ? dateTime(value, timeZone) : "Not yet";
 }
 
 function paymentMethodLabel(value: string) {
@@ -172,7 +174,7 @@ function messageDelivery(record: RegistrationRecord["messages"][number]) {
     return { label: "Captured locally", tone: "purple", date: record.capturedAt };
   }
   return {
-    label: record.status === "PROCESSING" ? "Processing" : "Pending",
+    label: record.status === "PROCESSING" ? "Processing" : "Queued",
     tone: "gold",
     date: record.createdAt,
   };
@@ -218,9 +220,8 @@ function pricingSnapshotSummary(snapshot: Record<string, unknown>) {
   };
 }
 
-/** A registration made through a personal staff, pastor or volunteer link that the office has not approved yet (#804). */
 function waitingForApproval(record: RegistrationRecord) {
-  return record.status === "DRAFT" && record.staffInvitation?.approval === "WAITING";
+  return registrationAwaitingApproval(record);
 }
 
 const staffGroupLabel = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunteer" } as const;
@@ -232,20 +233,32 @@ function statusTone(record: RegistrationRecord) {
   return "green";
 }
 
-function statusLabel(record: RegistrationRecord) {
-  if (record.status === "CANCELLED") return "Cancelled";
-  if (record.status === "WAITLISTED") {
-    // A club waitlisted at a location: "Waitlisted at <location> (#N)" (#599).
-    return record.location
-      ? `Waitlisted at ${record.location.name}${record.locationWaitlistPlace ? ` (#${record.locationWaitlistPlace})` : ""}`
-      : "Waitlisted";
-  }
-  if (waitingForApproval(record)) return "Waiting for office approval";
-  if (record.status === "DRAFT") return "Draft";
-  if (record.isDeferredOrganizationBilling) return record.isGroup ? "Billed to group contact" : "Billed to church";
-  if (record.totalAmountCents === 0) return "No charge";
-  if (attendeeBalanceCents(record) > 0) return "Balance due";
-  return "Paid";
+function statusContext(record: RegistrationRecord) {
+  return {
+    status: record.status,
+    awaitingApproval: waitingForApproval(record),
+    attendeeBalanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+  };
+}
+
+/** The shared status word (#1453). A club waitlisted at a location adds "at <location>, position N" (#599). */
+export function statusLabel(record: RegistrationRecord) {
+  if (record.status === "WAITLISTED") return waitlistStatusText({ position: record.locationWaitlistPlace, place: record.location?.name });
+  return registrationStatusWord(statusContext(record));
+}
+
+/** The money state beside the status word, for registrations that can owe or hold money; null for the rest. */
+function moneyLabel(record: RegistrationRecord) {
+  if (record.status !== "SUBMITTED" && record.status !== "CONFIRMED") return null;
+  return registrationMoneyStatus({
+    totalCents: record.totalAmountCents,
+    balanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+    isGroup: record.isGroup,
+    audience: "staff",
+    formatAmount: (cents) => formatCents(cents, { wholeDollars: true }),
+  });
 }
 
 /** The plain list: the server lists registrations by when they were submitted (modules/registrations/repository.ts), newest first. */
@@ -273,6 +286,8 @@ export function PeopleWorkspace({
   openOnlyRegistration = null,
   resultOrderText,
   pendingTeamCount = 0,
+  serverFiltered = false,
+  serverQuery = "",
 }: {
   eventId: string;
   eventSlug: string;
@@ -307,11 +322,16 @@ export function PeopleWorkspace({
   resultOrderText?: string | null;
   /** Teams from the general registration link waiting for staff to confirm a club (#931): not registrations, so not in any count here. */
   pendingTeamCount?: number;
+  /** The server already narrowed `initialRegistrations` (search, location or a choice answer), so an empty list may be "nothing matches", and Clear filters must reload the page. */
+  serverFiltered?: boolean;
+  /** The text of the server-side search, for the "nothing matches" heading. */
+  serverQuery?: string;
 }) {
   const orderText = resultOrderText === undefined ? registrationListOrderText : resultOrderText;
   const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [filter, setFilter] = useState(initialFilter);
   const [modal, setModal] = useState<"detail" | "edit" | null>(initialSelected ? "detail" : null);
   const [selected, setSelected] = useState<RegistrationRecord | null>(initialSelected);
@@ -366,6 +386,15 @@ export function PeopleWorkspace({
     dialogRef.current?.scrollIntoView({ block: "start" });
   }, [modal, selected?.id, dialogRef]);
 
+  const filtersActive = query.trim() !== "" || filter !== "ALL" || serverFiltered;
+  // Server-side narrowing needs a reload to undo; the client search and status filter are cleared either way.
+  const clearHref = serverFiltered ? `/people?event=${encodeURIComponent(eventId)}` : undefined;
+  // Nothing matches only when something narrowed a list that has rows; an empty event with a stray filter is just empty.
+  const nothingYet = !filtersActive || (!serverFiltered && registrations.length === 0);
+  const clearFilters = () => { search.setValue(""); setFilter("ALL"); };
+  // In server mode the link reloads the page and the key remounts this component, so only the client mode runs the setters.
+  const clearAction = clearHref ? { href: clearHref } : { onClick: clearFilters };
+
   const visible = useMemo(() => registrations.filter((registration) => {
     const matchesQuery = registrationMatchesSearch(registration, query);
     const isActive = registration.status === "SUBMITTED" || registration.status === "CONFIRMED";
@@ -376,6 +405,8 @@ export function PeopleWorkspace({
       || registration.status === filter;
     return matchesQuery && matchesFilter;
   }), [registrations, query, filter]);
+  // The toolbar control is for the client search and status filter while rows show; a server filter has the search bar's own Clear filters.
+  const showToolbarClear = (query.trim() !== "" || filter !== "ALL") && !serverFiltered && visible.length > 0;
   // Selection is by identifier, not by row, so narrowing the search does not
   // silently drop people already chosen — and "select all" means the list in
   // front of you, which is the only set you actually reviewed.
@@ -800,9 +831,10 @@ export function PeopleWorkspace({
       <PendingTeamsNotice canManage={canEdit} count={pendingTeamCount} eventId={eventId} />
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
-        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
-        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
+        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
+      {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
@@ -828,6 +860,7 @@ export function PeopleWorkspace({
         </div>
       </div>
       <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (
@@ -880,12 +913,13 @@ export function PeopleWorkspace({
               )}
               {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
               <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
+              {moneyLabel(registration) && <span className="status-chip neutral">{moneyLabel(registration)}</span>}
             </span>
           </button>
           </div>
         ))}
       </div>
-      {visible.length === 0 && (registrations.length === 0
+      {visible.length === 0 && (nothingYet
         ? <EmptyState
             action={{ label: "Start registration", href: `/events/${eventSlug}` }}
             actionClass="secondary-button"
@@ -899,7 +933,12 @@ export function PeopleWorkspace({
               ? `No team is registered yet, but ${pendingTeamsLabel(pendingTeamCount)}. Use the Review them link above to confirm the club; a team becomes a registration then.`
               : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>
-        : <div className="empty-state panel"><Search aria-hidden="true" size={24} /><h3>No matching registrations</h3><p>Nothing matches this search or filter. Clear it to see all {registrations.length} registrations.</p><button className="secondary-button" onClick={() => { setQuery(""); setFilter("ALL"); }} type="button">Clear search and filter</button></div>)}
+        : <NoMatchesState
+            clear={clearAction}
+            known={serverFiltered ? undefined : `The event has ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"}.`}
+            noun="registrations"
+            query={query.trim() || serverQuery}
+          />)}
 
       {emailingSelection && (
         <SelectedAudienceDialog
@@ -1007,7 +1046,7 @@ export function PeopleWorkspace({
                         <p className="eyebrow">What stays exactly the same</p>
                         {operationDraft.kind === "transfer" ? (
                           <ul>
-                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {selected.status.toLowerCase()} status.</li>
+                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {registrationStatusWord(statusContext(selected)).toLowerCase()} status.</li>
                             <li>All {selected.attendeeCount} attendees, their positions, types, and form choices.</li>
                             <li>The immutable submitted form and order snapshot, {formatCents(selected.totalAmountCents)} total, payments, refunds, and {formatCents(selected.balanceCents)} balance.</li>
                             <li>Promo redemption, capacity reservations, and waitlist position.</li>
@@ -1030,7 +1069,7 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong className="status-word-value">{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>

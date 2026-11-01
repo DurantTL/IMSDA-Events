@@ -205,7 +205,7 @@ export function staffPendingDigestNotice(input: { eventName: string; waitingCoun
 }
 
 export const GENERAL_LINK_STATUS_LABEL = {
-  PENDING: "Waiting for staff",
+  PENDING: "Pending approval",
   CONFIRMED: "Attached to a club",
   REJECTED: "Rejected",
   EXPIRED: "Expired",

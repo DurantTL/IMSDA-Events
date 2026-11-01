@@ -2,6 +2,7 @@ import { clubYearMonths, isLockedForClub, monthNotDueForClub, reportMonthLabel, 
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { toCsv } from "@/modules/reporting/csv";
 import { firstParam } from "@/lib/search-params";
+import { registrationStatusWords } from "@/modules/registrations/status-words";
 
 /**
  * Cross-club monthly report summary for Area Coordinators and the conference
@@ -247,10 +248,10 @@ export type AreaEventClubRow = {
 
 export const eventStatusLabels: Record<AreaEventClubRow["status"], string> = {
   NOT_REGISTERED: "Not registered",
-  DRAFT: "Draft",
+  DRAFT: registrationStatusWords.DRAFT,
   REGISTERED: "Registered",
-  WAITLISTED: "Waitlisted",
-  CANCELLED: "Cancelled",
+  WAITLISTED: registrationStatusWords.WAITLISTED,
+  CANCELLED: registrationStatusWords.CANCELLED,
 };
 
 /** Headcount across registered clubs only (waitlisted and cancelled clubs don't count). */

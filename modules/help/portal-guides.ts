@@ -212,7 +212,7 @@ export const portalGuides: readonly PortalGuide[] = [
       "Open Team approvals in Club coordination.",
       "Read Rules to check. A team member 18 or older must still qualify: an inducted Pathfinder or TLT, active and in good standing, not graduated from high school, and no older than the event's maximum age on its age date. The page shows the event's own limit.",
       "Each person who needs a decision from you is listed. Choose Approve or Decline beside a name.",
-      "Waiting for a decision means the club has asked. The team is registered while you decide. Approved can be changed later to declined.",
+      "Pending approval means the club has asked. The team is registered while you decide. Approved can be changed later to declined.",
       "Adults who are coaching should be registered as coaches. Coaches do not need approval.",
       "A staff member viewing as an Area Coordinator can read this page but cannot approve or decline.",
     ],

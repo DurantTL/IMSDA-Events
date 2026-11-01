@@ -7,6 +7,7 @@ import {
   type ChurchCodeReportRow,
 } from "@/modules/promo-codes/church-invoice";
 import type { ChurchCodeReport } from "@/modules/promo-codes/church-invoice-repository";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * The church promo code report and invoices (#399). For each church that sponsors a code: who used it (the registrant,
@@ -108,7 +109,7 @@ function ChurchRow({ eventId, row, canFinalize }: { eventId: string; row: Church
         ? <div className="finance-row"><span><small>No active registration has used this church&apos;s codes yet.</small></span><span /><span /><span /></div>
         : row.lines.map((line) => (
           <div className="finance-row" key={line.lineId}>
-            <span><small>Used by {line.usedByName || "a person with no name on file"}, registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
+            <span><small>Used by {line.usedByName || "a person with no name on file"}, registration {line.confirmationCode} · code {line.promoCode} · {registrationStatusWordOrRaw(line.status)}</small></span>
             <span>{formatCents(line.amountCents)}</span>
             <span />
             <span />

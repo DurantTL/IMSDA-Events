@@ -64,7 +64,7 @@ function submittedLabel(
   submittedAt: string | null,
   timeZone: string,
 ) {
-  if (!submittedAt) return "Not submitted";
+  if (!submittedAt) return "Not yet";
   return formatInTimeZone(submittedAt, timeZone, { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 

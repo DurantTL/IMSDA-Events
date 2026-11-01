@@ -38,7 +38,7 @@ export function isOpenTransfer(status: MemberTransferStatus) {
 
 /** Staff's own labels: the full truth, for the conference queue only. */
 export const memberTransferStaffStatusLabels: Record<MemberTransferStatus, string> = {
-  PENDING: "Waiting on the sending club",
+  PENDING: "Pending approval",
   UNMATCHED: "No match: needs staff",
   DECLINED: "Declined by the sending club",
   COMPLETED: "Completed",
@@ -60,22 +60,22 @@ export const memberTransferResolutionLabels: Record<MemberTransferResolution, st
 
 /**
  * What the receiving club is told about its own request. Every open state
- * reads the same ("Pending"): telling a club its request was unmatched, or
+ * reads the same ("Pending approval"): telling a club its request was unmatched, or
  * declined, would tell it whether the name it typed is on that roster.
  */
 export function receivingClubStatusLabel(status: MemberTransferStatus) {
   if (status === "COMPLETED") return "Completed";
   if (status === "CANCELLED") return "Cancelled";
-  return "Pending";
+  return "Pending approval";
 }
 
 /** What the sending club sees: it only ever sees matched requests. */
 export function sendingClubStatusLabel(status: MemberTransferStatus) {
-  if (status === "PENDING") return "Waiting on your answer";
+  if (status === "PENDING") return "Pending approval";
   if (status === "DECLINED") return "Declined: with conference staff";
   if (status === "COMPLETED") return "Completed";
   if (status === "CANCELLED") return "Cancelled";
-  return "Pending";
+  return "Pending approval";
 }
 
 /**

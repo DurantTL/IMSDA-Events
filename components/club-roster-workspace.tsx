@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -75,16 +76,6 @@ function complianceLabel({ state, note }: RosterComplianceInfo) {
 type SectionKey = "STAFF" | "MEMBERS";
 
 const complianceTone = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "gold" } as const;
-
-/** A value that follows `value` after it has stopped changing for `delay` ms, so a polite status is not re-read on every keystroke. */
-function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
 
 /** Takes the named filter parameters out of the address (and nothing else, so `?year=` stays), without adding a history entry. */
 function dropFilterParams(...names: string[]) {
@@ -217,7 +208,8 @@ export function ClubRosterWorkspace({
   const [showInactive, setShowInactive] = useState(false);
   const [complianceFilter, setComplianceFilter] = useState(initialComplianceFilter);
   /** Name search, the "Details needed" list and the optional extra columns (#1167). None of them is saved or sent anywhere. */
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [detailsOnly, setDetailsOnly] = useState(detailsNeededFirst);
   const [showGender, setShowGender] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -348,10 +340,9 @@ export function ClubRosterWorkspace({
   });
   const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
   const resultText = `${visible.length} of ${population.length} ${population.length === 1 ? "person" : "people"} shown${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
-  const announcedResult = useDebouncedValue(resultText, 300);
   function clearFilters() {
     const cleared = clearedRosterFilters();
-    setQuery(cleared.query);
+    search.setValue(cleared.query);
     setDetailsOnly(cleared.detailsOnly);
     setComplianceFilter(cleared.complianceFilter);
     // The address no longer says what the page is not showing.
@@ -700,12 +691,11 @@ export function ClubRosterWorkspace({
                 <input
                   autoComplete="off"
                   id="roster-search"
-                  onChange={(event) => setQuery(event.target.value)}
+                  {...search.inputProps}
                   placeholder="Find a person by name"
                   type="search"
-                  value={query}
                 />
-                <SearchClearButton onClear={() => setQuery("")} visible={query !== ""} />
+                <SearchClearButton onClear={() => search.setValue("")} visible={search.value !== ""} />
               </span>
             </div>
             <div className={styles.rosterFilterButtons}>
@@ -739,8 +729,8 @@ export function ClubRosterWorkspace({
               <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
-            {/* The same result for screen readers, announced once typing pauses rather than on every key. */}
-            <p aria-live="polite" className="sr-only" role="status">{announcedResult}</p>
+            {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
+            <p aria-live="polite" className="sr-only" role="status">{resultText}</p>
             {filtersActive && (
               <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
             )}
