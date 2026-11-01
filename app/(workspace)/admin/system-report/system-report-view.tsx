@@ -9,6 +9,7 @@ import {
   type SignalState,
   type SystemReport,
 } from "@/modules/system-admin/system-report/model";
+import type { OwnConnection } from "@/modules/system-admin/system-report/own-connection";
 import styles from "./page.module.css";
 import { SystemReportTesters } from "./system-report-testers";
 import { TestConnectionsButton } from "./test-connections-button";
@@ -61,7 +62,27 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
   );
 }
 
-function Section({ section, now }: { section: ReportSection; now: Date }) {
+function OwnConnectionCard({ connection }: { connection: OwnConnection }) {
+  const warned = connection.state !== "ok";
+  return (
+    <div className={`${styles.ownConnection} ${warned ? styles.isWatch : ""}`} data-testid="own-connection" data-state={connection.state}>
+      <h3>Your connection as the app sees it</h3>
+      <p className={styles.ownConnectionNote}>Only you see this, and only for your own visit. It is not saved, and it is not counted toward the overall status.</p>
+      <dl className={styles.ownConnectionFacts}>
+        <div><dt>Your address</dt><dd>{connection.state === "invalid" ? "settings invalid" : connection.resolvedIp ?? "not resolved"}</dd></div>
+        <div><dt>Header</dt><dd>{connection.header ?? "settings invalid"}</dd></div>
+        <div><dt>Proxy hops</dt><dd>{connection.hops ?? "settings invalid"}</dd></div>
+      </dl>
+      {connection.warnings.length > 0 && (
+        <ul className={styles.ownConnectionWarnings} aria-label="Connection warnings">
+          {connection.warnings.map((warning) => <li key={warning}><TriangleAlert aria-hidden="true" size={16} />{warning}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Section({ section, now, ownConnection }: { section: ReportSection; now: Date; ownConnection?: OwnConnection }) {
   const headingId = `h-${section.key}`;
   return (
     <section className={styles.section} id={`s-${section.key}`} aria-labelledby={headingId} data-section={section.key} data-state={section.state}>
@@ -75,13 +96,14 @@ function Section({ section, now }: { section: ReportSection; now: Date }) {
       <ul className={styles.rows}>
         {section.signals.map((signal) => <SignalRow key={signal.key} signal={signal} now={now} />)}
       </ul>
+      {section.key === "setup" && ownConnection && <OwnConnectionCard connection={ownConnection} />}
       {!section.counted && <p className={styles.noteLine}>Ticks record that a person checked something. They are not live readings and do not count toward the overall status.</p>}
     </section>
   );
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report, testerDefaultEmail = "" }: { report: SystemReport; testerDefaultEmail?: string }) {
+export function SystemReportView({ report, testerDefaultEmail = "", ownConnection }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection }) {
   const now = new Date(report.generatedAt);
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
@@ -129,10 +151,10 @@ export function SystemReportView({ report, testerDefaultEmail = "" }: { report: 
 
       <SystemReportTesters defaultEmail={testerDefaultEmail} />
 
-      {report.sections.map((section) => <Section key={section.key} section={section} now={now} />)}
+      {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} />)}
 
       <p className={styles.footerLine}>
-        Counts and states only: no settings values, names or attendee details.{" "}
+        Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}
         {report.releaseSha ? <>Release <code>{report.releaseSha.slice(0, 7)}</code>.</> : "Release not recorded."}
       </p>
     </section>
