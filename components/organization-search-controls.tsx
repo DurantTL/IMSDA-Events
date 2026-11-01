@@ -73,7 +73,7 @@ export function OrganizationSearchControls({
       </label>
       <label className="org-filter-field">
         <span>Status</span>
-        <select defaultValue={state.status} name="status">
+        <select data-default-value="ALL" defaultValue={state.status} name="status">
           {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>

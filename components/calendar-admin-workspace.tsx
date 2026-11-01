@@ -17,6 +17,7 @@ import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import {
   bulkConfirmMessage,
   defaultEntryDropdownFilters,
+  type EntryDropdownFilters,
   defaultEntryFilters,
   describeEntryCount,
   describeEntrySort,
@@ -148,7 +149,7 @@ export function CalendarAdminWorkspace({
   const summaryRef = useRef<HTMLParagraphElement>(null);
   // Entries list (#796): search, filters, sort, and the rows ticked for a bulk action.
   // The filters live in the address (`?q=`, `?category=`, ...), so reload, Back and shared links keep them (rule B2, #1456).
-  const [dropdownFilters, setFilters] = useAddressParams(defaultEntryDropdownFilters, parseEntryDropdownFilters);
+  const [dropdownFilters, setFilters] = useAddressParams(defaultEntryDropdownFilters, parseEntryDropdownFilters, () => startNewView());
   const search = useClientSearch(defaultEntryFilters.search, undefined, "q");
   // The list filters on the settled search term, not on every keystroke.
   const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
@@ -175,7 +176,7 @@ export function CalendarAdminWorkspace({
     startNewView();
   }
 
-  function changeFilters(patch: Partial<EntryFilters>) {
+  function changeFilters(patch: Partial<EntryDropdownFilters>) {
     setFilters(patch);
     startNewView();
   }

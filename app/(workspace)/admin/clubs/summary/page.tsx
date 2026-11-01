@@ -94,7 +94,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         <label>Club year<select data-default-value={resolveAreaClubYear(undefined, now)} defaultValue={clubYear} name="year">{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
         {view === "directory" ? <>
           <label className={styles.search}>Search by club or church name<input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" /></label>
-          <label>Show<select name="attention" defaultValue={attention ? "needs-attention" : "all"} aria-describedby="club-attention-help"><option value="all">All clubs</option><option value="needs-attention">Needs attention</option></select></label>
+          <label>Show<select data-default-value="all" name="attention" defaultValue={attention ? "needs-attention" : "all"} aria-describedby="club-attention-help"><option value="all">All clubs</option><option value="needs-attention">Needs attention</option></select></label>
         </> : <>
           {view === "points" && <>
             <input type="hidden" name="sort" value={sort} />

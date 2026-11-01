@@ -181,15 +181,21 @@ export function useAddressParam(name: string, initial: string, fallback = "") {
  * Several client-list filters (selects) kept in the address, for a list that filters in the browser (rule B2, #1456).
  * `parse` reads a whole address into valid values (use a module-level function); a value equal to its default is left out
  * of the address. `set` updates the list and the address together (default push), and a shared link, reload or Back
- * puts the values back.
+ * puts the values back (and calls `onRestore` after Back or Forward).
  */
-export function useAddressParams<T extends Record<string, string>>(defaults: T, parse: (params: URLSearchParams) => T) {
+export function useAddressParams<T extends Record<string, string>>(defaults: T, parse: (params: URLSearchParams) => T, onRestore?: () => void) {
   const [values, setValues] = useState(defaults);
+  const restored = useRef(onRestore);
+  useEffect(() => {
+    restored.current = onRestore;
+  });
   useEffect(() => {
     const restore = () => setValues(parse(new URLSearchParams(window.location.search)));
     restore();
-    window.addEventListener("popstate", restore);
-    return () => window.removeEventListener("popstate", restore);
+    // Back or Forward is a new view of the list too (`onRestore`), as a changed filter is.
+    const onPop = () => { restore(); restored.current?.(); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, [parse]);
   const set = useCallback((patch: Partial<T>, mode: AddressMode = "push") => {
     setValues((current) => ({ ...current, ...patch }));
@@ -303,7 +309,8 @@ export function useDebouncedCallback(fn: () => void, delayMs: number = SEARCH_DE
     latest.current();
   }, [cancel]);
   useEffect(() => cancel, [cancel]);
-  return useMemo(() => ({ schedule, cancel, flush }), [schedule, cancel, flush]);
+  const isPending = useCallback(() => timer.current !== null, []);
+  return useMemo(() => ({ schedule, cancel, flush, isPending }), [schedule, cancel, flush, isPending]);
 }
 
 const TYPED_INPUT_TYPES = new Set(["search", "text", "email", "tel", "url", "number", ""]);
@@ -371,6 +378,8 @@ export function useSearchAsYouType({
       applyNow("replace");
     },
     cancel: () => debouncer.cancel(),
+    /** True while typed text is waiting for its pause: the box then belongs to the typist, not to the address. */
+    typing: () => debouncer.isPending(),
   };
 }
 
@@ -402,8 +411,15 @@ export function SearchAsYouTypeForm({
   delayMs?: number;
   resetParams?: string[];
 }) {
-  const { formProps, cancel } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
+  const { formProps, cancel, typing } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
   const lastSearch = useRef<string | null>(null);
+  // Back or Forward: the address wins, even over the focused box, unless its owner is mid-typing.
+  const fromHistory = useRef(false);
+  useEffect(() => {
+    const mark = () => { fromHistory.current = true; };
+    window.addEventListener("popstate", mark);
+    return () => window.removeEventListener("popstate", mark);
+  }, []);
 
   // After navigation (Back, a link) show the URL's values (text, selects, checkboxes), except in the control being used.
   useEffect(() => {
@@ -417,7 +433,8 @@ export function SearchAsYouTypeForm({
     const form = formProps.ref.current;
     if (!form) return;
     const params = new URLSearchParams(search);
-    const active = document.activeElement;
+    const active = fromHistory.current && !typing() ? null : document.activeElement;
+    fromHistory.current = false;
     for (const element of Array.from(form.elements)) {
       if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement) || !element.name) continue;
       if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {

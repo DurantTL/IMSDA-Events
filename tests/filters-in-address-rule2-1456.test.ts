@@ -64,19 +64,30 @@ describe("filters change the address with push, not replace (rule B2)", () => {
     "components/communications-workspace.tsx": "replace switches between the Messages, Templates and Drafts views (`?view=`); that is tab navigation, not a list filter",
   };
 
-  it("has no router.replace( in a file that renders a <select>, except the reviewed list", () => {
+  /** Any way a file can write a replace-mode history entry itself: the router, the native API, or the shared helper's replace mode. */
+  const replaceCall = /router\.replace\(|history\.replaceState\(|["']replace["']\s*\)/;
+  replaceAllowed["components/people-quick-filters.tsx"] = "replace is for the typed search only; its select change calls go(..., \"push\") (asserted below)";
+
+  it("has no replace-mode call in a file that renders a <select>, except the reviewed list and the shared module", () => {
     const offenders = sources
-      .filter(({ text }) => /<select\b/.test(text) && text.includes("router.replace("))
+      .filter(({ file, text }) => file !== "components/search-as-you-type.tsx" && /<select\b/.test(text) && replaceCall.test(text))
       .map(({ file }) => file)
       .filter((file) => !(file in replaceAllowed));
     expect(offenders).toEqual([]);
   });
 
-  it("keeps the allowlist honest: each entry still renders a <select> and calls router.replace(", () => {
+  it("keeps the allowlist honest: each entry still renders a <select> and makes a replace-mode call", () => {
     for (const file of Object.keys(replaceAllowed)) {
       const text = sources.find((source) => source.file === file)?.text ?? "";
-      expect(text.includes("router.replace(") && /<select\b/.test(text), file).toBe(true);
+      expect(replaceCall.test(text) && /<select\b/.test(text), file).toBe(true);
     }
+  });
+
+  it("the quick filters' select change pushes", () => {
+    const text = sources.find(({ file }) => file === "components/people-quick-filters.tsx")!.text;
+    const change = text.slice(text.indexOf("const change ="), text.indexOf("const formRef"));
+    expect(change).toContain('"push")');
+    expect(change).not.toContain('"replace")');
   });
 
   it("the shared hook module is where replace is chosen, for typed text only", () => {
@@ -91,13 +102,11 @@ describe("filters change the address with push, not replace (rule B2)", () => {
 describe("every filter clear control says exactly Clear filters (rule B2)", () => {
   /** Buttons that clear a picked selection or a text box, not a list filter, so they keep their own wording. */
   const selectionClears: Record<string, string> = {
-    "components/search-clear-button.tsx": "the X inside a search box (its accessible name), which empties the box",
     "components/club-earned-awards-workspace.tsx": "unticks the selected members",
     "components/club-honors-workspace.tsx": "unticks the selected members",
     "components/club-uniform-section.tsx": "unticks the selected members",
     "components/club-registration-workspace.tsx": "unticks every person in the registration",
     "components/club-order-workspace.tsx": "unticks the visible rows' checkboxes (select all / clear all)",
-    "components/club-meeting-notes.tsx": "clears attendance marks",
     "components/asset-return-panel.tsx": "clears the scanned codes",
     "components/instructor-roster.tsx": "clears one person's attendance mark",
   };
@@ -110,10 +119,10 @@ describe("every filter clear control says exactly Clear filters (rule B2)", () =
     expect(offenders).toEqual([]);
   });
 
-  it("keeps the allowlist honest: each entry still has the wording it excuses", () => {
+  it("keeps the allowlist honest: each entry still matches the old wording it excuses", () => {
     for (const file of Object.keys(selectionClears)) {
       const text = sources.find((source) => source.file === file)?.text ?? "";
-      expect(/Clear|Reset/.test(text), file).toBe(true);
+      expect(oldWording.test(text), file).toBe(true);
     }
   });
 });

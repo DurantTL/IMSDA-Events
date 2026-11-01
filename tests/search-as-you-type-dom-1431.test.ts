@@ -124,6 +124,19 @@ describe("SearchAsYouTypeForm in a DOM", () => {
     expect(q().value).toBe("other");
     expect(select.value).toBe("all");
   });
+
+  it("on Back (popstate) the address wins even in the focused box, unless its owner is mid-typing", async () => {
+    mounted = await mount(form());
+    q().focus();
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=fromback");
+    await act(async () => { window.dispatchEvent(new PopStateEvent("popstate")); mounted.root.render(form()); });
+    expect(q().value).toBe("fromback");
+
+    await typeInto(q(), "typing");
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=again");
+    await act(async () => { window.dispatchEvent(new PopStateEvent("popstate")); mounted.root.render(form()); });
+    expect(q().value).toBe("typing");
+  });
 });
 
 describe("addressModeFor (rule B2, #1456)", () => {

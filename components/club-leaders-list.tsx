@@ -23,7 +23,8 @@ export function ClubLeadersList({
       <p className={styles.addLeader}>
         <Link className="secondary-button" href={addHref}>Add a leader</Link>
       </p>
-      <form action="/admin/clubs/leaders" className={styles.search} method="get">
+      {/* Keyed by the address's filters: Clear filters or Back remounts the uncontrolled selects at what the address says. There is no text box here to lose. */}
+      <form action="/admin/clubs/leaders" className={styles.search} key={`${filters.clubId ?? ""}|${filters.role ?? ""}`} method="get">
         <label className={styles.searchField}>
           Club
           <select defaultValue={filters.clubId ?? ""} name="club">
