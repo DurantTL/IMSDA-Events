@@ -6,7 +6,9 @@ const nav = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: vi.fn() }) }));
 
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
-import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure } from "@/components/search-as-you-type";
+import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
+import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure, useClientSearch } from "@/components/search-as-you-type";
+import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { mount, typeInto, type Mounted } from "./helpers/dom-render";
 
 /** The shared hook in a real DOM, with fake timers and a mocked router (#1431). Synthetic data only. */
@@ -186,5 +188,111 @@ describe("SearchDisclosure (#1431)", () => {
     expect(details().open).toBe(false);
     await act(async () => { mounted.root.render(panel(true)); });
     expect(details().open).toBe(true);
+  });
+});
+
+describe("useClientSearch (#1431)", () => {
+  /** A box and a list filtered on the settled `term`, as the converted workspaces do. */
+  function Box({ names }: { names: string[] }) {
+    const search = useClientSearch();
+    const shown = names.filter((name) => name.toLowerCase().includes(search.term.trim().toLowerCase()));
+    return createElement(
+      "div",
+      null,
+      createElement("input", { ...search.inputProps, "aria-label": "Find", type: "search" }),
+      createElement("button", { onClick: () => search.setValue(""), type: "button" }, "Reset"),
+      createElement("ul", null, shown.map((name) => createElement("li", { key: name }, name))),
+    );
+  }
+  const names = ["Eagle Patch", "Eagle Ribbon", "Bear Patch"];
+  const box = () => mounted.container.querySelector<HTMLInputElement>("input")!;
+  const items = () => [...mounted.container.querySelectorAll("li")].map((item) => item.textContent);
+  const enter = () => act(async () => { box().dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" })); });
+
+  it("shows every keystroke at once but filters the list only after the pause", async () => {
+    mounted = await mount(createElement(Box, { names }));
+    await typeInto(box(), "eag");
+    expect(box().value).toBe("eag");
+    expect(items()).toEqual(names);
+    await pause(SEARCH_DEBOUNCE_MS - 1);
+    expect(items()).toEqual(names);
+    await typeInto(box(), "eagle r");
+    await pause(SEARCH_DEBOUNCE_MS - 1);
+    expect(items()).toEqual(names);
+    await pause(1);
+    expect(items()).toEqual(["Eagle Ribbon"]);
+  });
+
+  it("applies at once on Enter, and swallows Enter when the box is not in a form", async () => {
+    mounted = await mount(createElement(Box, { names }));
+    await typeInto(box(), "bear");
+    expect(items()).toEqual(names);
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" });
+    await act(async () => { box().dispatchEvent(event); });
+    expect(items()).toEqual(["Bear Patch"]);
+    expect(event.defaultPrevented).toBe(true);
+    // The pause that was waiting is gone: nothing changes later.
+    await pause(SEARCH_DEBOUNCE_MS * 2);
+    expect(items()).toEqual(["Bear Patch"]);
+  });
+
+  it("leaves Enter to the form when the box is inside one, and still applies", async () => {
+    const submitted = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    function InForm() {
+      const search = useClientSearch();
+      return createElement("form", { onSubmit: submitted }, createElement("input", { ...search.inputProps, "aria-label": "Find", type: "search" }), createElement("p", { id: "term" }, search.term));
+    }
+    mounted = await mount(createElement(InForm));
+    await typeInto(box(), "bear");
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" });
+    await act(async () => { box().dispatchEvent(event); });
+    expect(event.defaultPrevented).toBe(false);
+    expect(mounted.container.querySelector("#term")!.textContent).toBe("bear");
+  });
+
+  it("shows the full list at once when the box is cleared, by hand or by a Reset", async () => {
+    mounted = await mount(createElement(Box, { names }));
+    await typeInto(box(), "bear");
+    await enter();
+    expect(items()).toEqual(["Bear Patch"]);
+    await typeInto(box(), "");
+    expect(items()).toEqual(names);
+    await typeInto(box(), "bear");
+    await enter();
+    await act(async () => { mounted.container.querySelector("button")!.click(); });
+    expect(box().value).toBe("");
+    expect(items()).toEqual(names);
+  });
+
+  it("keeps focus on the same input while the list changes", async () => {
+    mounted = await mount(createElement(Box, { names }));
+    const input = box();
+    input.focus();
+    await typeInto(input, "patch");
+    await pause(SEARCH_DEBOUNCE_MS);
+    expect(items()).toEqual(["Eagle Patch", "Bear Patch"]);
+    expect(box()).toBe(input);
+    expect(document.activeElement).toBe(input);
+  });
+});
+
+describe("a converted club-portal list searches as you type, no Enter (#1431)", () => {
+  const row = (itemId: string, name: string, catalogNumber: string): ClubStockRow => ({
+    itemId, section: "MISCELLANEOUS", name, catalogNumber, sizeLabel: null, isActive: true, quantityOnHand: 0,
+  });
+  const stock = [row("a", "Polo Shirt", "UN-204"), row("b", "Neckerchief", "NK-1"), row("c", "Polo Hat", "UN-310")];
+  const box = () => mounted.container.querySelector<HTMLInputElement>('input[type="search"]')!;
+  const names = () => [...mounted.container.querySelectorAll("li strong")].map((node) => node.textContent);
+
+  it("narrows the supply stock list after the pause, announces the count, and clears at once", async () => {
+    mounted = await mount(createElement(ClubSupplyStockWorkspace, { organizationId: "club-1", initialStock: stock }));
+    expect(names()).toHaveLength(3);
+    await typeInto(box(), "polo");
+    expect(names()).toHaveLength(3);
+    await pause(SEARCH_DEBOUNCE_MS);
+    expect(names()).toHaveLength(2);
+    expect(mounted.container.querySelector('p.sr-only[role="status"]')!.textContent).toBe("2 items shown.");
+    await typeInto(box(), "");
+    expect(names()).toHaveLength(3);
   });
 });

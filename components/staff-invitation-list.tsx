@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Ban, Copy, MailPlus, RefreshCw, UserPlus } from "lucide-react";
 import {
   INVITATION_STATUSES,
@@ -57,7 +58,8 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
   const router = useRouter();
   const [status, setStatus] = useState<InvitationStatus | "ALL">("ALL");
   const [group, setGroup] = useState<StaffInvitationGroupValue | "ALL">("ALL");
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -186,9 +188,10 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
         </label>
         <label>
           Search
-          <input onChange={(changeEvent) => setQuery(changeEvent.target.value)} placeholder="Name or email" type="search" value={query} />
+          <input {...search.inputProps} placeholder="Name or email" type="search" />
         </label>
       </div>
+      <SearchResultStatus message={`${visible.length} ${visible.length === 1 ? "invitation" : "invitations"} shown.`} />
 
       <div className="panel selection-bar">
         <span role="status">
