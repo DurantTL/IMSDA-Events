@@ -115,6 +115,8 @@
     "test:operations-search": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-operations-search.ts",
     "test:check-in-concurrency": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-check-in-concurrency.ts",
     "test:check-in-multi-device-http": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-check-in-multi-device-http.ts",
+    "help:screenshots": "tsx --require ./scripts/support/allow-server-only.cjs scripts/capture-help-screenshots.ts",
+    "test:walkthroughs": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-help-walkthroughs.ts",
     "help:check": "tsx --require ./scripts/support/allow-server-only.cjs scripts/check-help-guides.ts",
     "imports:build": "tsx scripts/build-import-files.ts",
     "test:watch": "vitest",

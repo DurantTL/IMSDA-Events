@@ -1,0 +1,110 @@
+name: Help walkthroughs
+
+# Step-by-step Help guides with a picture of the real screen for each step (#1482, site rule H6).
+# See docs/HELP-AND-LEARNING.md ("Walkthroughs").
+#
+# On a pull request to main this does two things:
+#  1. the stale-picture check (`npm run help:check`): warns, with ::warning:: annotations, when a walkthrough's pages
+#     changed since its pictures were captured. It never fails the pull request: run `npm run help:screenshots` to refresh them;
+#  2. the walkthrough browser check (`npm run test:walkthroughs`): runs every walkthrough's shared steps against the app in a
+#     real browser at phone and desktop width. A step whose page or control is gone FAILS: fix the page or the step.
+#
+# It is its own workflow (not part of ci.yml) because it needs a browser and a package that is deliberately not a
+# dependency (playwright-core). The app runs in development mode with no account email set up, because that is the
+# only mode where the emailed sign-in code is returned to the script instead of being sent; no real email is ever sent.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "modules/**"
+      - "prisma/**"
+      - "public/help/walkthroughs/**"
+      - "tests/browser/walkthroughs/**"
+      - "scripts/capture-help-screenshots.ts"
+      - "scripts/verify-help-walkthroughs.ts"
+      - "scripts/support/help-walkthrough-fixtures.ts"
+      - "scripts/support/walkthrough-*.ts"
+      - ".github/workflows/help-walkthroughs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: help-walkthroughs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  help-walkthroughs:
+    name: Help walkthroughs (real browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      NODE_OPTIONS: --max-old-space-size=6144
+      # Fictitious CI-only values. No ACCOUNT_EMAIL_* or RESEND_API_KEY on purpose (see the note at the top).
+      MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+      ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+      RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+      OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+      SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      - run: npm run lodging:sync
+      - run: npm run form-templates:sync
+      - run: npm run event-content:sync
+      # Warnings only: a changed page should prompt a refresh of its pictures, not fail an unrelated pull request.
+      - name: Check for stale walkthrough pictures
+        continue-on-error: true
+        run: npm run help:check
+      - run: npm i --no-save playwright-core@1.56.1
+      - name: Start the app (development mode)
+        run: |
+          nohup npm run dev -- -p 3000 > app.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl -fsS -o /dev/null http://localhost:3000/; then exit 0; fi
+            sleep 2
+          done
+          echo "The app did not start:" && cat app.log && exit 1
+      - name: Run every walkthrough's steps
+        env:
+          HELP_SHOTS_BROWSER: /usr/bin/google-chrome
+          HELP_SHOTS_FAILURE_DIR: ${{ runner.temp }}/walkthrough-failures
+        run: |
+          mkdir -p "$HELP_SHOTS_FAILURE_DIR"
+          npm run test:walkthroughs
+      - name: Keep the picture of a failed step
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-failures
+          path: ${{ runner.temp }}/walkthrough-failures
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Show the app log when a step failed
+        if: failure()
+        run: cat app.log || true
