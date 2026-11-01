@@ -20,7 +20,7 @@ export default async function HonorsSchedulePage({ searchParams }: { searchParam
     return (
       <>
         {back}
-        <AccessRestricted title="The schedule board is restricted" detail="Event administrators arrange the Honors Weekend classes into rooms and sessions." />
+        <AccessRestricted title="The schedule board is restricted" detail="Event administrators arrange the Honors Weekend classes into rooms and sessions." whoToAsk="your event administrator" />
       </>
     );
   }

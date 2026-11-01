@@ -515,7 +515,7 @@ describe("private registration access repository", () => {
       },
       registration: {
         confirmationCode: "REG-PRIVATE",
-        statusLabel: "Submitted",
+        statusLabel: "Pending payment",
       },
       contact: {
         firstName: "Caleb",

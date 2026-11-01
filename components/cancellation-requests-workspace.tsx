@@ -11,6 +11,7 @@ import type { CarryOutPanel } from "@/modules/cancellation-execution/views";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { requestStatuses, requestStatusLabels, type RequestStatus } from "@/modules/cancellation-requests/domain";
 import type { StaffQueueRow, StaffRequestDetail } from "@/modules/cancellation-requests/views";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * Staff queue for cancellation requests (#170). It shows what the registrant was shown, what has changed since, and the
@@ -151,7 +152,7 @@ function RequestDetail({ detail, eventId, timezone, carryOut }: { detail: StaffR
         <div><dt>Asked</dt><dd>{when(detail.createdAt, timezone)} via {detail.requestedVia === "MANAGE_LINK" ? "the private link" : "the attendee portal"}</dd></div>
         <div><dt>Scope</dt><dd>{scopeWords[detail.scope]}{detail.attendeeNames.length > 0 ? `: ${detail.attendeeNames.join(", ")}` : ""}{detail.chargeLabels.length > 0 ? `: ${detail.chargeLabels.join(", ")}` : ""}</dd></div>
         <div><dt>Prefers contact by</dt><dd>{detail.contactMethod === "PHONE" ? "Phone" : "Email"}</dd></div>
-        <div><dt>Registration now</dt><dd>{detail.registrationStatus.toLowerCase()}</dd></div>
+        <div><dt>Registration now</dt><dd>{registrationStatusWordOrRaw(detail.registrationStatus)}</dd></div>
       </dl>
       <p><strong>Registrant&apos;s reason</strong></p>
       <blockquote className="cancel-request-reason">{detail.reason}</blockquote>

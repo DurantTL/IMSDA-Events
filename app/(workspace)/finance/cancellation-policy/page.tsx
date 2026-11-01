@@ -11,7 +11,7 @@ export default async function CancellationPolicyPage({ searchParams }: { searchP
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view or change cancellation rules." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view or change cancellation rules." whoToAsk="your event administrator" />;
   }
   const { versions, inEffectVersionId } = await listPolicyVersions(event.id);
   const presets = await listCancellationPresetOptions();

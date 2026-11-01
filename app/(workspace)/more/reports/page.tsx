@@ -139,7 +139,8 @@ export default async function OperationalReportsPage({
     return (
       <AccessRestricted
         title="Reports are restricted"
-        detail="Ask an event administrator for report access before viewing attendee or event-choice totals."
+        detail="Viewing attendee or event-choice totals needs report access."
+        whoToAsk="your event administrator"
       />
     );
   }

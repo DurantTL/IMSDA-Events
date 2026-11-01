@@ -68,7 +68,7 @@ import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/re
 type Lifecycle = AttendeeRegistrationSummary["lifecycle"];
 
 const STATUS: Record<Lifecycle, AttendeeRegistrationSummary["status"]> = {
-  DRAFT: { label: "Not submitted", detail: "", tone: "neutral" },
+  DRAFT: { label: "Draft", detail: "", tone: "neutral" },
   SUBMITTED: { label: "Submitted", detail: "", tone: "neutral" },
   CONFIRMED: { label: "Confirmed", detail: "", tone: "positive" },
   WAITLISTED: { label: "Waitlisted", detail: "", tone: "waiting" },
@@ -220,7 +220,7 @@ describe("My registrations page (#1176)", () => {
     expect(html.indexOf("Family Retreat 2099")).toBeLessThan(html.indexOf("Old Camp Meeting"));
     // Folded by default while there is something upcoming; the summary (with its counts) is always visible.
     expect(html).toMatch(/<details class="attendee-reg-history">\s*<summary>/);
-    expect(html).toContain("Registration received");
+    expect(html).toContain("Submitted");
     expect(html).toContain("Jordan Lane");
   });
 

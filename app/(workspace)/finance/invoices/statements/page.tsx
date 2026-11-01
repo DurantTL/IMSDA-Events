@@ -16,7 +16,7 @@ export default async function StatementsPage({ searchParams }: { searchParams: P
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view statements." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view statements." whoToAsk="your event administrator" />;
   }
   const statements = await listEventStatements(event.id);
   return <StatementsList eventId={event.id} eventName={statements.eventName} parties={statements.parties} totals={statements.totals} />;

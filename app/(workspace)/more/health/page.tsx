@@ -125,7 +125,8 @@ export default async function OperationalHealthPage({
     return (
       <AccessRestricted
         title="Operational health is restricted"
-        detail="This page only shows staff the event areas their role can resolve. Ask an event administrator if you need operational access."
+        detail="This page only shows staff the event areas their role can resolve."
+        whoToAsk="your event administrator"
       />
     );
   }

@@ -17,7 +17,7 @@ export default async function SendInvoicePage({ params, searchParams }: { params
   const [{ invoiceId }, { event: requested, version }] = await Promise.all([params, searchParams]);
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can send invoices." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can send invoices." whoToAsk="your event administrator" />;
   }
   if (!version) notFound();
   let preview;

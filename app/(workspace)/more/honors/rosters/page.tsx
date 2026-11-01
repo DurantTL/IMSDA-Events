@@ -20,6 +20,7 @@ import {
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = {
   title: staffPageTitles.honorsRosters,
@@ -42,7 +43,7 @@ export default async function HonorRostersPage({
   // Placing a youth in a full class by hand, and removing a pick, are for system administrators only (#962); the server checks too.
   const canOverrideSeats = user.globalRole === "SYSTEM_ADMIN";
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Honors rosters are restricted" detail="Ask an event administrator for report access." />;
+    return <AccessRestricted title="Honors rosters are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
   }
   const includeDietary = permissions.includes("VIEW_SENSITIVE_DATA");
   // "All sites" plus each location, from the filter the other staff views share (#413).
@@ -52,7 +53,7 @@ export default async function HonorRostersPage({
     getHonorRosterData(event.id, { includeDietary, includeAdminPlacementReasons: canOverrideSeats, ...(locationId ? { locationId } : {}) }),
     backgroundFlaggedAttendeeIds(event.id),
   ]);
-  if (!data) return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+  if (!data) return <NotAvailableForEvent reason="The selected event could not be loaded." />;
 
   const view: View = query.view === "site" || query.view === "clubs" ? query.view : "classes";
   const eventQuery = `event=${encodeURIComponent(event.id)}${site ? `&location=${encodeURIComponent(site.id)}` : ""}`;

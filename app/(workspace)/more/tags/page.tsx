@@ -11,7 +11,7 @@ export default async function TagConfigurationPage({ searchParams }: { searchPar
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Tag configuration is restricted" detail="Event administrators can configure the tag vocabulary staff apply to registrations and attendees." />;
+    return <AccessRestricted title="Tag configuration is restricted" detail="Event administrators can configure the tag vocabulary staff apply to registrations and attendees." whoToAsk="your event administrator" />;
   }
   const tags = await listTags(event.id);
   return <TagConfigurationWorkspace eventId={event.id} eventName={event.name} initialTags={tags} canCreate={permissions.includes("CONFIGURE_EVENT")} />;

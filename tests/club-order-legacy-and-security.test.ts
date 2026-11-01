@@ -116,7 +116,8 @@ describe("the printable order list (#654)", () => {
     for (const state of ["LOCKED", "NO_ROSTER", "NONE"]) {
       mocks.getRosterAccessStateForPage.mockResolvedValue({ state });
       const page = await ClubOrderListPrintPage({ params: Promise.resolve({ organizationId: "club-1" }) });
-      expect(page).toBeNull();
+      // Never a blank page (rule 14): a closed gate says who to ask, and loads no data.
+      expect(page).toMatchObject({ props: { whoToAsk: "your club director" } });
     }
     expect(mocks.listHelperLines).not.toHaveBeenCalled();
     expect(mocks.loadOrderExportHeader).not.toHaveBeenCalled();

@@ -10,7 +10,7 @@ export default async function ScholarshipFundPage({ searchParams }: { searchPara
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view or change the scholarship fund." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view or change the scholarship fund." whoToAsk="your event administrator" />;
   }
   const [fund, directory] = await Promise.all([getFundView(event.id), listSponsorDirectory()]);
   return <ScholarshipFundWorkspace key={event.id} eventId={event.id} eventName={event.name} initialFund={fund} directory={directory} />;

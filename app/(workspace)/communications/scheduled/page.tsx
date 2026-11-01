@@ -23,7 +23,8 @@ export default async function ScheduledEmailsPage({
     return (
       <AccessRestricted
         title="Scheduled emails are restricted"
-        detail="Ask an event administrator for communications access before scheduling or approving email."
+        detail="Scheduling or approving email needs communications access."
+        whoToAsk="your event administrator"
       />
     );
   }

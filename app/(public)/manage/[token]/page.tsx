@@ -63,7 +63,7 @@ function submittedLabel(
   submittedAt: string | null,
   timeZone: string,
 ) {
-  if (!submittedAt) return "Not submitted";
+  if (!submittedAt) return "Not yet";
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",

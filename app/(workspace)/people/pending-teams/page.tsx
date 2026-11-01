@@ -16,6 +16,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
       <AccessRestricted
         title="Teams waiting for a club are restricted"
         detail="Only event administrators and registration managers can confirm which club a team belongs to."
+        whoToAsk="your event administrator"
       />
     );
   }

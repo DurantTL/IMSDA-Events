@@ -27,7 +27,7 @@ const filterLabels: Record<StaffQueueFilter, string> = {
   overdue: "Overdue (14+ days)",
   declined: "Declined",
   unmatched: "Unmatched",
-  pending: "Pending",
+  pending: "Pending approval",
 };
 
 const API = "/api/admin/club-transfers";

@@ -39,6 +39,7 @@ import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { getClubReportYear } from "@/modules/club-reports/repository";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels, clubRoleDescriptions } from "@/modules/organizations/director-grants-domain";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Home" };
 export const dynamic = "force-dynamic";
@@ -129,7 +130,7 @@ export default async function ClubHomePage({
       </>
     );
   }
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
 
   const base = `/account/clubs/${organizationId}`;
   const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(query.year, now);

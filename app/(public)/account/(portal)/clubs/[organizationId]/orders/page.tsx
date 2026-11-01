@@ -5,6 +5,7 @@ import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { listClubStock } from "@/modules/club-supplies/repository";
 import { syncHonorOrderNeeds } from "@/modules/honors/order-source";
 import { loadUniformWorkspace } from "@/modules/uniforms/order-source";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Orders" };
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubOrdersPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   // An editor's visit records new completions as needs (ones on file are
   // skipped); a registrar's view-only visit reads what's on file and never writes.
   if (access.capabilities.manageTeam) await syncHonorOrderNeeds(organizationId);

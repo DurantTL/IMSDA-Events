@@ -48,6 +48,7 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
@@ -123,7 +124,7 @@ function dateTime(value: string | null, timeZone: string) {
 }
 
 function submittedDateTime(value: string | null, timeZone: string) {
-  return value ? dateTime(value, timeZone) : "Not submitted";
+  return value ? dateTime(value, timeZone) : "Not yet";
 }
 
 function paymentMethodLabel(value: string) {
@@ -173,7 +174,7 @@ function messageDelivery(record: RegistrationRecord["messages"][number]) {
     return { label: "Captured locally", tone: "purple", date: record.capturedAt };
   }
   return {
-    label: record.status === "PROCESSING" ? "Processing" : "Pending",
+    label: record.status === "PROCESSING" ? "Processing" : "Queued",
     tone: "gold",
     date: record.createdAt,
   };
@@ -219,9 +220,8 @@ function pricingSnapshotSummary(snapshot: Record<string, unknown>) {
   };
 }
 
-/** A registration made through a personal staff, pastor or volunteer link that the office has not approved yet (#804). */
 function waitingForApproval(record: RegistrationRecord) {
-  return record.status === "DRAFT" && record.staffInvitation?.approval === "WAITING";
+  return registrationAwaitingApproval(record);
 }
 
 const staffGroupLabel = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunteer" } as const;
@@ -233,20 +233,32 @@ function statusTone(record: RegistrationRecord) {
   return "green";
 }
 
-function statusLabel(record: RegistrationRecord) {
-  if (record.status === "CANCELLED") return "Cancelled";
-  if (record.status === "WAITLISTED") {
-    // A club waitlisted at a location: "Waitlisted at <location> (#N)" (#599).
-    return record.location
-      ? `Waitlisted at ${record.location.name}${record.locationWaitlistPlace ? ` (#${record.locationWaitlistPlace})` : ""}`
-      : "Waitlisted";
-  }
-  if (waitingForApproval(record)) return "Waiting for office approval";
-  if (record.status === "DRAFT") return "Draft";
-  if (record.isDeferredOrganizationBilling) return record.isGroup ? "Billed to group contact" : "Billed to church";
-  if (record.totalAmountCents === 0) return "No charge";
-  if (attendeeBalanceCents(record) > 0) return "Balance due";
-  return "Paid";
+function statusContext(record: RegistrationRecord) {
+  return {
+    status: record.status,
+    awaitingApproval: waitingForApproval(record),
+    attendeeBalanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+  };
+}
+
+/** The shared status word (#1453). A club waitlisted at a location adds "at <location>, position N" (#599). */
+export function statusLabel(record: RegistrationRecord) {
+  if (record.status === "WAITLISTED") return waitlistStatusText({ position: record.locationWaitlistPlace, place: record.location?.name });
+  return registrationStatusWord(statusContext(record));
+}
+
+/** The money state beside the status word, for registrations that can owe or hold money; null for the rest. */
+function moneyLabel(record: RegistrationRecord) {
+  if (record.status !== "SUBMITTED" && record.status !== "CONFIRMED") return null;
+  return registrationMoneyStatus({
+    totalCents: record.totalAmountCents,
+    balanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+    isGroup: record.isGroup,
+    audience: "staff",
+    formatAmount: (cents) => formatCents(cents, { wholeDollars: true }),
+  });
 }
 
 /** The plain list: the server lists registrations by when they were submitted (modules/registrations/repository.ts), newest first. */
@@ -820,7 +832,7 @@ export function PeopleWorkspace({
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
-        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
       <div className="page-intro people-intro">
@@ -901,6 +913,7 @@ export function PeopleWorkspace({
               )}
               {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
               <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
+              {moneyLabel(registration) && <span className="status-chip neutral">{moneyLabel(registration)}</span>}
             </span>
           </button>
           </div>
@@ -1033,7 +1046,7 @@ export function PeopleWorkspace({
                         <p className="eyebrow">What stays exactly the same</p>
                         {operationDraft.kind === "transfer" ? (
                           <ul>
-                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {selected.status.toLowerCase()} status.</li>
+                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {registrationStatusWord(statusContext(selected)).toLowerCase()} status.</li>
                             <li>All {selected.attendeeCount} attendees, their positions, types, and form choices.</li>
                             <li>The immutable submitted form and order snapshot, <Money cents={selected.totalAmountCents} /> total, payments, refunds, and <Money cents={selected.balanceCents} /> balance.</li>
                             <li>Promo redemption, capacity reservations, and waitlist position.</li>
@@ -1056,7 +1069,7 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong translate="no">{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong><Money cents={selected.totalAmountCents} /></strong></span><span><small>Balance</small><strong><Money cents={selected.balanceCents} /></strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong translate="no">{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong className="status-word-value">{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong><Money cents={selected.totalAmountCents} /></strong></span><span><small>Balance</small><strong><Money cents={selected.balanceCents} /></strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>

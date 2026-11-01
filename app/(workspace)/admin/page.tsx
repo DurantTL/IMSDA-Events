@@ -172,7 +172,7 @@ export default async function SystemAdminPage({
       <AdminSectionHeaderFor path="/admin" section="system" />
       {unavailable && (
         <div className="inline-notice error" role="status">
-          <span>That event isn&rsquo;t available. It may not exist, or this account may not have access to it. Choose an event below to continue.</span>
+          <span>You can&rsquo;t open that event with this account. Ask a system administrator if you need access, or choose an event below to continue.</span>
         </div>
       )}
       <section className={styles.hero} aria-labelledby="system-home-heading">

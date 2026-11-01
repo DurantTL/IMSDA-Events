@@ -35,7 +35,8 @@ export default async function LedgerCheckPage({
     return (
       <AccessRestricted
         title="Ledger check is restricted"
-        detail="Only event administrators and finance managers can compare registration totals with the ledger. Ask an event administrator if you need finance access."
+        detail="Only event administrators and finance managers can compare registration totals with the ledger."
+        whoToAsk="your event administrator"
       />
     );
   }

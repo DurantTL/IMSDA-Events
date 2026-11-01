@@ -30,10 +30,9 @@ import {
   type AttendeeListingQuery,
 } from "@/modules/registrations/attendee-listing";
 import { firstParam } from "@/lib/search-params";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const metadata: Metadata = { title: staffPageTitles.attendeeList };
-
-const STATUS_LABELS: Record<string, string> = { CONFIRMED: "Confirmed", SUBMITTED: "Submitted", CANCELLED: "Cancelled" };
 
 export default async function AttendeeListingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -41,7 +40,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const { event, permissions } = await resolveEventContext(requestedEvent);
   // Same gate as the registrations list.
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
-    return <AccessRestricted title="The attendee list is restricted" detail="Your event role does not include access to attendee names, meal and dietary answers, or contact details." />;
+    return <AccessRestricted title="The attendee list is restricted" detail="Your event role does not include access to attendee names, meal and dietary answers, or contact details." whoToAsk="your event administrator" />;
   }
   const query = parseAttendeeListingQuery(params);
   const registrations = await listRegistrations(event.id, { statuses: query.statuses });
@@ -128,7 +127,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <fieldset className="filter-group">
           <legend>Registration status</legend>
           {LISTING_STATUSES.map((status) => (
-            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={DEFAULT_LISTING_STATUSES.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
+            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={DEFAULT_LISTING_STATUSES.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {registrationStatusWordOrRaw(status)}</label>
           ))}
         </fieldset>
         <div className="filter-bar-actions">
@@ -165,7 +164,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                 {columns.map((column) => {
                   const value = column.key === "confirmationCode"
                     ? <Link href={`/people?event=${encodeURIComponent(event.id)}&registration=${encodeURIComponent(row.registrationId)}`}>{row.confirmationCode}</Link>
-                    : row[column.key];
+                    : column.key === "status" ? row.statusLabel : row[column.key];
                   // The attendee's name is the card's title on a phone (table-cards).
                   return column.key === "name"
                     ? <th key={column.key} data-col={column.key} role="rowheader" scope="row">{value}</th>
