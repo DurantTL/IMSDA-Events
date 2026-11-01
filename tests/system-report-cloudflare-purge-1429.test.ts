@@ -205,6 +205,8 @@ describe("the purge route", () => {
     await POST(request());
     fetchMock.mockResolvedValue(new Response("", { status: 500 }));
     await POST(request());
+    // The logger really ran: the audit failure was logged, so the redaction was exercised.
+    expect(mocks.logError).toHaveBeenCalled();
     const written = everythingWritten();
     expect(written).not.toContain(SECRET_TOKEN);
     expect(written).not.toContain("purge.example.test");

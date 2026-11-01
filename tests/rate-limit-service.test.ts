@@ -12,6 +12,7 @@ import {
   checkInformationFormClientRateLimit,
   checkInformationFormRateLimit,
   checkLoginAccountRateLimit,
+  checkSystemCloudflarePurgeRateLimit,
   checkPublicManageRateLimit,
   checkRegistrationCodeAccessRateLimit,
   checkRegistrationRecoveryRateLimit,
@@ -174,5 +175,25 @@ describe("information form budgets (#1150)", () => {
     expect((repositoryMocks.enforceRateLimitRules.mock.calls[1]![0] as Array<{ policy: string }>).map((rule) => rule.policy)).toEqual(["information-form.read.client"]);
     expect(JSON.stringify(rules)).not.toContain("camp-survey");
     expect(JSON.stringify(rules)).not.toContain("192.0.2.90");
+  });
+});
+
+describe("System report Cloudflare purge budget (#1429)", () => {
+  it("charges one rule per administrator and one site-wide, passing only digests", async () => {
+    await checkSystemCloudflarePurgeRateLimit("user_admin_alpha");
+    await checkSystemCloudflarePurgeRateLimit("user_admin_beta");
+    const [first, second] = repositoryMocks.enforceRateLimitRules.mock.calls.map(([rules]) => rules as Array<{ policy: string; limit: number; windowSeconds: number; subjectHash: string }>);
+    for (const rules of [first, second]) {
+      expect(rules.map((rule) => rule.policy)).toEqual(["system-report.cloudflare-purge.account", "system-report.cloudflare-purge.site"]);
+      for (const rule of rules) {
+        expect(rule.limit).toBe(3);
+        expect(rule.windowSeconds).toBe(3600);
+      }
+    }
+    expect(first[0].subjectHash).not.toBe(second[0].subjectHash);
+    expect(first[1].subjectHash).toBe(second[1].subjectHash);
+    const text = JSON.stringify([first, second]);
+    expect(text).not.toContain("user_admin_alpha");
+    expect(text).not.toContain("user_admin_beta");
   });
 });

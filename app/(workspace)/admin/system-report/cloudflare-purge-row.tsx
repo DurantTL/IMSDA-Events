@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CloudOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { clockTime, useLimitExpiry } from "./tester-format";
@@ -19,7 +19,17 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState<Message | null>(null);
   const [limitedUntil, setLimitedUntil] = useState<string | null>(null);
-  useLimitExpiry(limitedUntil, () => { setLimitedUntil(null); setError(""); });
+  useLimitExpiry(limitedUntil, () => setLimitedUntil(null));
+
+  // The limit text shows whenever the limit holds, including when the dialog is reopened, so a disabled Confirm always has a reason.
+  const limitText = limitedUntil ? `Limit reached: 3 cache clears an hour. You can try again at ${clockTime(limitedUntil, false)}.` : "";
+
+  // After a limit answer Confirm is disabled, so move focus to Cancel (the dialog's other button) rather than leave it on a dead control.
+  useEffect(() => {
+    if (!open || !limitedUntil || busy) return;
+    const cancel = document.querySelector<HTMLElement>('[role="dialog"] .form-actions .secondary-button');
+    cancel?.focus();
+  }, [open, limitedUntil, busy]);
 
   async function confirm() {
     setBusy(true);
@@ -31,9 +41,8 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
         setMessage({ tone: "ok", text: body.message ?? "Cloudflare cache cleared." });
         setOpen(false);
       } else if (response.status === 429 && body.nextAllowedAt) {
-        // Keep the dialog open and say it there, so focus stays in the dialog and returns to a live button on Cancel.
+        // Keep the dialog open; the limit text is shown by `limitText` and focus moves to Cancel (effect above).
         setLimitedUntil(body.nextAllowedAt);
-        setError(`${body.message ?? "Limit reached."} You can try again at ${clockTime(body.nextAllowedAt, false)}.`);
       } else {
         setError(body.message ?? "The cache could not be cleared. Try again.");
       }
@@ -66,7 +75,7 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
         busyLabel="Clearing…"
         confirmDisabled={limitedUntil !== null}
         confirmLabel="Clear cache"
-        error={error}
+        error={error || limitText}
         onCancel={() => setOpen(false)}
         onConfirm={confirm}
         open={open}
