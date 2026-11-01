@@ -52,7 +52,8 @@ export function CoordinatorUnavailable({ what = "The club overview" }: { what?: 
       <h3 id="coordinator-unavailable-title">{what} is unavailable</h3>
       <p>This information could not be read just now, so no counts, statuses or empty lists are shown. Nothing here means a club has no records or that nothing needs attention.</p>
       <CoordinatorRetryButton />
-      <CoordinatorSetupHelp context="the overview" id="unavailable" />
+      {/* Plain text on purpose: a failed read shows no numbers or icons, only the retry and who to ask (#1435). */}
+      <p className="field-help">If it stays unavailable, ask the conference office.</p>
     </section>
   );
 }
@@ -223,6 +224,9 @@ export function CoordinatorOverviewBody({ data, query, now = new Date() }: { dat
   const { clubs, overview } = data;
   // Both come from the club rows above, so neither can show a club the table does not (#1435).
   const missing = whosMissingWhat(clubs, overview.month, now);
+  // Like Follow-up beside it, the names follow the search while every count speaks about all clubs.
+  const shownIds = new Set(overviewTableClubs(clubs, query).map((club) => club.id));
+  const shownMissing = missing.filter((row) => shownIds.has(row.clubId));
   const checklist = buildCoordinatorChecklist({
     clubYear: overview.clubYear,
     clubCount: clubs.length,
@@ -242,8 +246,9 @@ export function CoordinatorOverviewBody({ data, query, now = new Date() }: { dat
         storageKey="imsda-events:getting-started-collapsed:coordinator"
         title="Getting started as an area coordinator"
       />
+      {checklist.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={COORDINATOR_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
       <CoordinatorSummary overview={overview} />
-      <CoordinatorWhosMissing clubCount={clubs.length} monthLabel={overview.monthLabel} rows={missing} />
+      <CoordinatorWhosMissing clubCount={clubs.length} monthLabel={overview.monthLabel} query={query} rows={shownMissing} totalMissing={missing.length} />
       <div className="coordinator-overview-layout">
         <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} />
         <div className="coordinator-overview-side">

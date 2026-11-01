@@ -416,7 +416,7 @@ describe("links on the overview resolve to real routes (#1186)", () => {
     const matchers = routeMatchers();
     const hrefs = (html: string) => [...html.matchAll(/href="(\/[^"#?]*)/g)].map((match) => match[1]!);
     const out = render(ready(six)) + render(ready([]));
-    expect(out).not.toContain("/account/help");
+    // Help guide links (#1435) are real pages: the loop below checks every in-app href resolves.
     for (const href of hrefs(out).filter((path) => !path.startsWith("/api/"))) {
       expect(matchers.some((matcher) => matcher.test(href)), href).toBe(true);
     }

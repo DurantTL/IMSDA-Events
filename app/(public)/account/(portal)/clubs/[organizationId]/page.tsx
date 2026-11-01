@@ -125,6 +125,7 @@ export default async function ClubHomePage({
           storageKey={`imsda-events:getting-started-collapsed:club:${organizationId}`}
           title="Get set up"
         />
+        {reporterChecklist.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={CLUB_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
         <section className="public-manage-card" aria-labelledby="club-role-heading">
           <div className="public-manage-card-heading">
             <p className="public-registration-eyebrow">Your role: {clubDirectorRoleLabels[access.club.role]}</p>
@@ -245,6 +246,7 @@ export default async function ClubHomePage({
           title="Get your club set up"
         />
       )}
+      {checklist?.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={CLUB_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
       {!readOnly && (
         <ClubHomeTasks
           deadlines={deadlines}

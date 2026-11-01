@@ -4,7 +4,8 @@ import { SetupHelpPanel } from "@/components/setup-help";
 import { clubSetupFor, type ClubSetupId } from "@/modules/setup-help/club-setup-steps";
 import { coordinatorSetupFor, type CoordinatorSetupId } from "@/modules/setup-help/coordinator-setup-steps";
 import styles from "./role-setup-help.module.css";
-import { portalGuideHref, type RoleSetupEntry } from "@/modules/setup-help/role-setup";
+import { eventSetupFor, type EventSetupContext, type EventSetupId } from "@/modules/setup-help/event-setup-steps";
+import { guideHrefFor, type RoleSetupEntry } from "@/modules/setup-help/role-setup";
 
 /**
  * The setup help under a club director's or area coordinator's "not set up / missing / blocked" state (#1435): the
@@ -15,7 +16,7 @@ function RoleSetupHelp({ entry, context }: { entry: RoleSetupEntry; context?: st
   return (
     <div className={styles.help} data-role-setup-help="">
       <SetupHelpPanel context={context} heading="How to do this" setup={entry.setup} whoToAsk={entry.whoToAsk} />
-      <Link className="text-button" href={portalGuideHref(entry.guideId)}>
+      <Link className="text-button" href={guideHrefFor(entry)}>
         <BookOpen aria-hidden="true" size={14} /> Help guide{context && <span className="sr-only"> for {context}</span>}
       </Link>
     </div>
@@ -28,4 +29,9 @@ export function ClubSetupHelp({ id, base, context }: { id: ClubSetupId; base: st
 
 export function CoordinatorSetupHelp({ id, context }: { id: CoordinatorSetupId; context?: string }) {
   return <RoleSetupHelp context={context} entry={coordinatorSetupFor(id)} />;
+}
+
+/** The same help for an event admin or other event staff in the Event workspace (#1435, round B). */
+export function EventSetupHelp({ id, context, ...ctx }: { id: EventSetupId; context?: string } & EventSetupContext) {
+  return <RoleSetupHelp context={context} entry={eventSetupFor(id, ctx)} />;
 }

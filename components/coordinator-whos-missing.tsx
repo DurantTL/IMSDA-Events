@@ -10,17 +10,19 @@ import { WHOS_MISSING_ANCHOR } from "@/modules/setup-help/coordinator-checklist"
  * step. It only draws rows `whosMissingWhat` made from the Overview's own club list. Status chips are the shared
  * `.status-chip` (Missing and Late are coral). Read only: it sends nothing.
  */
-export function CoordinatorWhosMissing({ rows, clubCount, monthLabel }: { rows: readonly WhosMissingRow[]; clubCount: number; monthLabel: string }) {
+export function CoordinatorWhosMissing({ rows, clubCount, monthLabel, query = "", totalMissing = rows.length }: { rows: readonly WhosMissingRow[]; clubCount: number; monthLabel: string; query?: string; totalMissing?: number }) {
   return (
     <section aria-labelledby="coordinator-whos-missing-title" className="coordinator-panel" id={WHOS_MISSING_ANCHOR}>
       <h3 id="coordinator-whos-missing-title">Who&apos;s missing what</h3>
       {clubCount === 0 ? (
         <p>There are no clubs to follow up on.</p>
-      ) : rows.length === 0 ? (
+      ) : totalMissing === 0 ? (
         <p>Every club has a director, a roster and its {monthLabel} record.</p>
+      ) : rows.length === 0 ? (
+        <p>{totalMissing} of {clubCount} {clubCount === 1 ? "club is" : "clubs are"} missing something. None of them match “{query}”.</p>
       ) : (
         <>
-          <p className="coordinator-count">{rows.length} of {clubCount} {clubCount === 1 ? "club is" : "clubs are"} missing something. Each has one next step.</p>
+          <p className="coordinator-count">{totalMissing} of {clubCount} {clubCount === 1 ? "club is" : "clubs are"} missing something. Each has one next step.{query && ` ${rows.length} listed below match “${query}”.`}</p>
           <div className="report-table-wrap card-box">
             <table className="report-table table-cards table-cards-tablet" role="table">
               <caption className="sr-only">Clubs that are missing something, with the next step for each</caption>

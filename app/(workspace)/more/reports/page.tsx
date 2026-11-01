@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EventSetupHelp } from "@/components/role-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import {
@@ -48,18 +49,20 @@ function displayCount(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-function EmptyReport({ children }: { children: React.ReactNode }) {
-  return <p className="report-empty">{children}</p>;
+function EmptyReport({ children, help }: { children: React.ReactNode; help?: React.ReactNode }) {
+  return <><p className="report-empty">{children}</p>{help}</>;
 }
 
 function CountFields({
   fields,
   emptyCopy,
+  help,
 }: {
   fields: OperationalCountField[];
   emptyCopy: string;
+  help?: React.ReactNode;
 }) {
-  if (fields.length === 0) return <EmptyReport>{emptyCopy}</EmptyReport>;
+  if (fields.length === 0) return <EmptyReport help={help}>{emptyCopy}</EmptyReport>;
   return (
     <div className="report-field-list">
       {fields.map((field) => (
@@ -273,7 +276,7 @@ export default async function OperationalReportsPage({
           <a className="secondary-button report-download" href={reportDownloadHref(event.id, "roster")}><Download aria-hidden="true" size={15} /> Download roster CSV</a>
         </div>
         {report.rosterGroups.length === 0
-          ? <EmptyReport>No active attendees are available yet.</EmptyReport>
+          ? <EmptyReport help={<EventSetupHelp context="reports" id="reports-no-attendees" eventId={event.id} can={(permission) => permissions.includes(permission)} />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
               {report.rosterGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
@@ -311,7 +314,7 @@ export default async function OperationalReportsPage({
           <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendee-types")}><Download aria-hidden="true" size={15} /> Download CSV</a>
         </div>
         {report.attendeeTypeGroups.length === 0
-          ? <EmptyReport>No active attendees are available yet.</EmptyReport>
+          ? <EmptyReport help={<EventSetupHelp context="reports" id="reports-no-attendees" eventId={event.id} can={(permission) => permissions.includes(permission)} />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
               {report.attendeeTypeGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
@@ -362,7 +365,7 @@ export default async function OperationalReportsPage({
             </div>
             <a className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</a>
           </div>
-          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." />
+          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp context="this report section" id="reports-no-fields" eventId={event.id} can={(permission) => permissions.includes(permission)} />} />
         </section>
       )}
 
@@ -388,7 +391,7 @@ export default async function OperationalReportsPage({
             </div>
             <a className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</a>
           </div>
-          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." />
+          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp context="this report section" id="reports-no-fields" eventId={event.id} can={(permission) => permissions.includes(permission)} />} />
         </section>
       )}
 
@@ -447,7 +450,7 @@ export default async function OperationalReportsPage({
             </div>
             <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</a>
           </div>
-          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." />
+          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp context="this report section" id="reports-no-fields" eventId={event.id} can={(permission) => permissions.includes(permission)} />} />
         </section>
       )}
       {emptyCountSections.length > 0 && (

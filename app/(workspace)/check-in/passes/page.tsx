@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EventSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -159,6 +160,7 @@ export default async function PrintableAttendeePassesPage({
           <QrCode aria-hidden="true" size={26} />
           <h3>No passes to print yet</h3>
           <p>Active submitted or confirmed attendees will appear here automatically.</p>
+          <EventSetupHelp context="passes" id="passes-none" />
         </div>
       )}
     </section>

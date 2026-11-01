@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/role-setup-help";
 import { formatCents } from "@/modules/payments/format-cents";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
@@ -1578,7 +1579,7 @@ export function CommunicationsWorkspace({
               </article>
             ))}
             {announcements.length === 0 && (
-              <div className="empty-state panel"><Megaphone aria-hidden="true" size={24} /><h3>No announcements yet</h3><p>Create a draft when attendees need an event-feed update.</p></div>
+              <div className="empty-state panel"><Megaphone aria-hidden="true" size={24} /><h3>No announcements yet</h3><p>Create a draft when attendees need an event-feed update.</p><EventSetupHelp context="announcements" id="announcements-none" /></div>
             )}
           </section>
           <aside className="panel audience-panel">
@@ -2421,6 +2422,7 @@ export function CommunicationsWorkspace({
             <h2>{messaging.settings.providerConfigured ? "Email provider is configured" : "Real email is locked"}</h2>
             <p>{messaging.settings.providerConfigured ? "Real delivery is on for every event unless a system administrator pauses it. Local template tests remain previews." : "Local preview exercises rendering, outbox idempotency, attempts, and staff review without transmitting attendee data."}</p>
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
+            {(!messaging.settings.providerConfigured || !messaging.settings.webhookConfigured) && <EventSetupHelp context="email delivery" id="email-provider-locked" />}
           </aside>
         </div>
         </ViewPanel>

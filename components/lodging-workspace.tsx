@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/role-setup-help";
 import { useState } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import {
@@ -69,7 +70,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
         void run(() => call(base, "POST", { propertyKey: key }), "Property chosen.");
       }}>
         {view.availableProperties.length === 0
-          ? <p>No properties are set up yet. Ask a system administrator to load the lodging properties.</p>
+          ? <><p>No properties are set up yet. Ask a system administrator to load the lodging properties.</p><EventSetupHelp context="lodging properties" id="lodging-no-properties" /></>
           : <>
             <label>Property <select name="propertyKey" required>{view.availableProperties.map((property) => <option key={property.key} value={property.key}>{property.name}</option>)}</select></label>
             <div className="filter-bar-actions"><button className="primary-button" type="submit" disabled={busy}>Use this property</button></div>

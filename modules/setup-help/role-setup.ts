@@ -9,8 +9,9 @@ export type RoleSetupEntry = {
   setup: SetupHelp;
   /** Said when only someone else can fix it, such as "Ask the conference office to add a director." */
   whoToAsk?: string;
-  /** A portal guide id (`modules/help/portal-guides.ts`): the panel links to `/account/help/<id>`. */
+  /** A guide id: a portal guide (`modules/help/portal-guides.ts`, `/account/help/<id>`), or a staff guide with `guideScope: "staff"` (`modules/help/guides.ts`, `/help/<id>`). */
   guideId: string;
+  guideScope?: "portal" | "staff";
 };
 
 /** What the panel needs to show an entry. An entry with neither a Set up link nor steps nor who to ask is a dead end. */
@@ -30,3 +31,9 @@ export const askDirector = (what: string) => `Ask your club's director or deputy
 
 /** The Help guide's address in the account portal. */
 export const portalGuideHref = (guideId: string) => `/account/help/${guideId}`;
+
+/** Where an entry's Help guide opens. */
+export const guideHrefFor = (entry: Pick<RoleSetupEntry, "guideId" | "guideScope">) =>
+  entry.guideScope === "staff" ? `/help/${entry.guideId}` : portalGuideHref(entry.guideId);
+
+export const askSystemAdmin = (what: string) => `Only a system administrator can ${what}. Ask a system administrator.`;

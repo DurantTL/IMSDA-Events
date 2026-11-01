@@ -14,12 +14,15 @@ vi.mock("next/navigation", () => ({
 import { ClubHomeEvents, ClubHomeRoster } from "@/components/club-home";
 import { CoordinatorOverviewBody } from "@/components/coordinator-overview";
 import { CoordinatorWhosMissing } from "@/components/coordinator-whos-missing";
-import { ClubSetupHelp, CoordinatorSetupHelp } from "@/components/role-setup-help";
+import { ClubSetupHelp, CoordinatorSetupHelp, EventSetupHelp } from "@/components/role-setup-help";
 import { EventSetupChecklist } from "@/components/event-setup-checklist";
 import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
 import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
 import { buildCoordinatorOverview } from "@/modules/club-reports/coordinator-overview-domain";
 import { whosMissingWhat } from "@/modules/club-reports/whos-missing-what";
+import { helpGuides, helpDestinations } from "@/modules/help/guides";
+import { EVENT_SETUP_IDS, eventSetupFor } from "@/modules/setup-help/event-setup-steps";
+import { guideHrefFor } from "@/modules/setup-help/role-setup";
 import { filterGuides } from "@/modules/help/visibility";
 import { portalDestinations, portalGuides } from "@/modules/help/portal-guides";
 import { portalGuideLinksForViewer, visiblePortalGuides, type PortalHelpViewer } from "@/modules/help/portal-visibility";
@@ -84,7 +87,6 @@ const CLUB_SITES: Array<[file: string, id: (typeof CLUB_SETUP_IDS)[number]]> = [
 ];
 const COORDINATOR_SITES: Array<[file: string, id: (typeof COORDINATOR_SETUP_IDS)[number]]> = [
   ["components/coordinator-overview.tsx", "no-clubs"],
-  ["components/coordinator-overview.tsx", "unavailable"],
   ["components/coordinator-whos-missing.tsx", "whos-missing"],
   ["components/coordinator-destinations.tsx", "no-clubs"],
   ["components/coordinator-destinations.tsx", "events-none"],
@@ -417,5 +419,108 @@ describe("guides are findable and link to real pages", () => {
     expect(registrarLinks).not.toContain("Monthly Records");
     expect(portalGuideLinksForViewer(getting, director).links.map((link) => link.label)).toEqual(expect.arrayContaining(["Forms", "Club settings", "Monthly Records", "Orders"]));
     expect(Object.keys(portalDestinations)).toEqual(expect.arrayContaining(["club-forms", "club-events", "coordinator-points"]));
+  });
+});
+
+const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> = [
+  ["components/event-settings-workspace.tsx", "readiness-basics"],
+  ["components/event-settings-workspace.tsx", "readiness-location"],
+  ["components/event-settings-workspace.tsx", "readiness-support"],
+  ["components/event-settings-workspace.tsx", "readiness-club-billing"],
+  ["components/event-settings-workspace.tsx", "readiness-public-info"],
+  ["components/event-settings-workspace.tsx", "readiness-central-sender"],
+  ["components/communications-workspace.tsx", "email-provider-locked"],
+  ["components/communications-workspace.tsx", "announcements-none"],
+  ["components/scheduled-emails-workspace.tsx", "scheduled-emails-none"],
+  ["components/cancellation-policy-workspace.tsx", "cancellation-policy-none"],
+  ["components/meals-workspace.tsx", "meals-no-services"],
+  ["components/lodging-workspace.tsx", "lodging-no-properties"],
+  ["components/check-in-workspace.tsx", "check-in-no-arrivals"],
+  ["app/(workspace)/check-in/badges/page.tsx", "badges-none"],
+  ["app/(workspace)/check-in/passes/page.tsx", "passes-none"],
+  ["app/(workspace)/more/reports/page.tsx", "reports-no-attendees"],
+  ["app/(workspace)/more/reports/page.tsx", "reports-no-fields"],
+  ["components/square-payment-matching.tsx", "square-unavailable"],
+  ["components/club-invites-workspace.tsx", "club-invites-none"],
+  ["components/club-invites-workspace.tsx", "club-invites-email"],
+];
+
+describe("event admin states have a next step (round B: H3, H4)", () => {
+  const guideIds = new Set(helpGuides.map((guide) => guide.id));
+  const full = { eventId: "event_1", can: () => true, systemAdmin: true };
+  const none = { eventId: "event_1", can: () => false };
+
+  it("gives every event state a Set up link, steps or who to ask, and a real staff guide", () => {
+    for (const id of EVENT_SETUP_IDS) {
+      for (const ctx of [full, none, {}]) {
+        const entry = eventSetupFor(id, ctx);
+        expect(roleSetupHasNextStep(entry), id).toBe(true);
+        expect(guideIds.has(entry.guideId), `${id} -> ${entry.guideId}`).toBe(true);
+        expect(guideHrefFor(entry)).toBe(`/help/${entry.guideId}`);
+      }
+    }
+  });
+
+  it("offers a cross-page Set up link only when the viewer's permission opens it, else steps and who to ask", () => {
+    expect("href" in eventSetupFor("reports-no-fields", full).setup).toBe(true);
+    const blocked = eventSetupFor("reports-no-fields", none);
+    expect("href" in blocked.setup).toBe(false);
+    expect(blocked.whoToAsk).toMatch(/ask/i);
+    expect("href" in eventSetupFor("check-in-no-arrivals", {}).setup).toBe(false);
+    expect("href" in eventSetupFor("check-in-no-arrivals", full).setup).toBe(true);
+  });
+
+  it("names a system administrator for fixes only they can make", () => {
+    for (const id of ["readiness-central-sender", "lodging-no-properties", "square-unavailable"] as const) {
+      expect(eventSetupFor(id, none).whoToAsk, id).toMatch(/system administrator/i);
+    }
+    expect(eventSetupFor("email-provider-locked", none).whoToAsk).toMatch(/system administrator/i);
+    expect(eventSetupFor("club-invites-email", { systemAdmin: true }).setup).toEqual({ href: "/admin/system-report", label: "Open the System report" });
+  });
+
+  it("links only to pages that exist as help destinations the permission matches", () => {
+    const path = (id: string) => helpDestinations[id]!.path;
+    expect(path("event-reports")).toBe("/more/reports");
+    expect(helpDestinations["event-reports"]!.permission).toBe("VIEW_REPORTS");
+    expect(helpDestinations["cancellation-policy"]!.permission).toBe("MANAGE_FINANCE");
+  });
+
+  it("renders help at every inventoried event page and uses every id", () => {
+    for (const [file, id] of EVENT_SITES) expect(rendersHelp(read(file), "EventSetupHelp", id) || read(file).includes(`"${id}"`), `${file} ${id}`).toBe(true);
+    const used = new Set(EVENT_SITES.map(([, id]) => id));
+    for (const id of EVENT_SETUP_IDS) expect(used.has(id), `unused event id ${id}`).toBe(true);
+  });
+
+  it("renders the panel with a staff guide link", () => {
+    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "lodging-no-properties", context: "lodging properties" }));
+    expect(html).toContain("/help/finish-event-setup");
+    expect(html).toMatch(/Ask a system administrator/);
+  });
+
+  it("keeps readiness rows that already link to their fix free of a second help block", () => {
+    const source = read("components/event-settings-workspace.tsx");
+    expect(source).toContain("!item.complete && !item.href && readinessHelpId(");
+  });
+
+  it("finds the new staff guides through Help search", () => {
+    const setup = helpGuides.filter((guide) => ["finish-event-setup", "prepare-check-in-and-badges", "schedule-event-emails"].includes(guide.id));
+    expect(setup).toHaveLength(3);
+    expect(filterGuides(setup, "checklist").map((guide) => guide.id)).toContain("finish-event-setup");
+    expect(filterGuides(setup, "badges").map((guide) => guide.id)).toContain("prepare-check-in-and-badges");
+    expect(filterGuides(setup, "scheduled").map((guide) => guide.id)).toContain("schedule-event-emails");
+  });
+});
+
+describe("the role guide link stays when a checklist is done", () => {
+  it("shows a Getting started guide link on the club Home and the coordinator Overview once hidden", () => {
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).toContain("checklist?.hidden &&");
+    expect(read("components/coordinator-overview.tsx")).toContain("checklist.hidden &&");
+    const overview = buildCoordinatorOverview([], "2026-2027", now);
+    const club1 = club("a", { reports: [{ reportMonth: "2026-09", status: "SUBMITTED", totalPoints: 10, onTimePoints: 5 }, { reportMonth: "2026-10", status: "SUBMITTED", totalPoints: 10, onTimePoints: 5 }] });
+    const ready = buildCoordinatorOverview([club1], "2026-2027", now);
+    const html = renderToStaticMarkup(createElement(CoordinatorOverviewBody, { data: { status: "ready", clubs: [club1], overview: ready }, now, query: "" }));
+    expect(overview.activeClubs).toBe(0);
+    expect(html).toContain("Getting started guide");
+    expect(html).toContain("/account/help/coordinator-getting-started");
   });
 });

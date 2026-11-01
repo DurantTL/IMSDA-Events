@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/role-setup-help";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { Fragment, useId, useState } from "react";
@@ -160,7 +161,10 @@ function VersionHistory({ timezone, versions, inEffectVersionId }: { timezone: s
     <section className="panel" aria-labelledby="cancel-policy-versions">
       <div className="section-heading"><h3 id="cancel-policy-versions">Versions</h3></div>
       {versions.length === 0 ? (
-        <p>No rules have been saved for this event yet, so a cancellation proposes nothing. Save the first version below.</p>
+        <>
+          <p>No rules have been saved for this event yet, so a cancellation proposes nothing. Save the first version below.</p>
+          <EventSetupHelp context="the cancellation policy" id="cancellation-policy-none" />
+        </>
       ) : (
         <ul className="cancel-policy-versions">
           {versions.map((version) => (

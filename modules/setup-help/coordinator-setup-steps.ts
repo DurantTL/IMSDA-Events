@@ -14,7 +14,6 @@ export const COORDINATOR_SETUP_IDS = [
   "club-no-forms",
   "club-no-report",
   "club-no-emergency-contacts",
-  "unavailable",
 ] as const;
 export type CoordinatorSetupId = (typeof COORDINATOR_SETUP_IDS)[number];
 
@@ -54,7 +53,5 @@ export function coordinatorSetupFor(id: CoordinatorSetupId): RoleSetupEntry {
       return { setup: howTo(["The club has not submitted this month's Monthly Record.", "Contact the club's director. The app sends nothing for you."], "The submitted record can be read here."), whoToAsk: "Only the club's director, deputy or reporter files it. Ask them.", guideId: "coordinator-follow-up-clubs" };
     case "club-no-emergency-contacts":
       return { setup: howTo(["Emergency contacts are kept on the club's roster by its director or deputy.", "Ask the club's director to add them before the event."], "The club's emergency contacts are listed."), whoToAsk: "Only the club's director or deputy adds them. Ask them.", guideId: "coordinator-find-club" };
-    case "unavailable":
-      return { setup: howTo(["Choose Try again.", "If it is still unavailable, wait a few minutes and reload the page."], "The club overview loads."), whoToAsk: askOffice("fix a page that stays unavailable"), guideId: "coordinator-getting-started" };
   }
 }
