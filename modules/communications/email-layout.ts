@@ -109,6 +109,14 @@ export function emailHeaderContext(
   return rule ?? "general";
 }
 
+/**
+ * Whether a message is club mail beyond its template: a club registration, or an invoice sent to a club director (an
+ * invoice row has no registration). Delivery and the staff previews both decide it here, so they cannot disagree.
+ */
+export function emailIsClubLinked(input: { clubRegistration?: boolean; recipientKind?: string | null }) {
+  return Boolean(input.clubRegistration) || input.recipientKind === "CLUB_DIRECTOR";
+}
+
 /** The header name for a context from the platform settings. */
 export function emailHeaderName(settings: EmailLayoutSettings, context: EmailHeaderContext) {
   return context === "club" ? settings.clubHeaderName : settings.headerName;
@@ -228,6 +236,21 @@ export function emailLayoutContent(input: {
     whyLine: emailWhyLine(input.templateKey, input.recipientEmail),
     helpLine,
   };
+}
+
+/**
+ * The header name, why line and help line for a staff preview, decided by the same functions delivery uses
+ * (`emailIsClubLinked`, `emailLayoutContent`), so a preview shows the header that is sent.
+ */
+export function emailPreviewLayout(
+  settings: EmailLayoutSettings,
+  templateKey: string,
+  replyToEmail: string | null,
+  recipientEmail: string,
+  clubLinked = false,
+) {
+  const layout = emailLayoutContent({ templateKey, settings, clubRegistration: clubLinked, replyToEmail, recipientEmail, eventScoped: true });
+  return { headerName: layout.headerName, whyLine: layout.whyLine, helpLine: layout.helpLine };
 }
 
 /** `Sent by <name> for the Iowa-Missouri Conference of Seventh-day Adventists.` */
@@ -440,9 +463,9 @@ export type PlainBodyOptions = {
 };
 
 const CODE_BOX_PATTERN = /^[0-9A-Za-z ]{1,16}$/;
-const URL_PATTERN = /https?:\/\/[^\s<>"'()]+/g;
+const URL_PATTERN = /https?:\/\/[^\s<>"'()]+/gi;
 const TRAILING_URL_PUNCTUATION = /[.,;:!?]+$/;
-const LABELLED_URL_LINE = /^(.{1,80}?):\s+(https?:\/\/[^\s<>"']+)$/;
+const LABELLED_URL_LINE = /^(.{1,80}?):\s+(https?:\/\/[^\s<>"']+)$/i;
 const SIGNATURE_LINES = new Set(["IMSDA Events"]);
 
 /** A line with the site's own web addresses turned into links. Plain text only: no Markdown, nothing else is linked. */
@@ -453,17 +476,26 @@ function linkifyLine(line: string, origins: readonly string[] = []) {
     const trimmed = match[0].replace(TRAILING_URL_PUNCTUATION, "");
     const start = match.index ?? 0;
     // Only the site's own addresses are links; any other address stays plain text.
-    if (!originOf(trimmed) || !origins.includes(originOf(trimmed) as string)) continue;
+    const href = ownUrl(trimmed, origins);
+    if (!href) continue;
     html += escapeHtml(line.slice(last, start));
-    html += `<a href="${escapeHtml(trimmed)}" class="em-link" style="color:#0f6f8c;text-decoration:underline;">${escapeHtml(trimmed)}</a>`;
+    html += `<a href="${escapeHtml(href)}" class="em-link" style="color:#0f6f8c;text-decoration:underline;">${escapeHtml(href)}</a>`;
     last = start + trimmed.length;
   }
   return html + escapeHtml(line.slice(last));
 }
 
-function originOf(url: string) {
+/**
+ * The normalized address when `raw` is an http(s) address on exactly one of the site's origins, else null. The address is
+ * parsed once and the parsed `href` is what is written, so what is checked is what is linked. A backslash (which the URL
+ * parser reads as a slash), a user name or a password (`https://site@evil/`) is refused.
+ */
+function ownUrl(raw: string, origins: readonly string[]) {
+  if (raw.includes("\\")) return null;
   try {
-    return new URL(url).origin;
+    const url = new URL(raw);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) return null;
+    return origins.includes(url.origin) ? url.href : null;
   } catch {
     return null;
   }
@@ -524,17 +556,15 @@ export function plainTextToEmailBodyHtml(text: string, options: PlainBodyOptions
     }
     if (lines.length === 1) {
       const labelled = LABELLED_URL_LINE.exec(lines[0]);
-      const origin = labelled ? originOf(labelled[2].replace(TRAILING_URL_PUNCTUATION, "")) : null;
-      if (labelled && origin && origins.includes(origin)) {
-        return renderBulletproofButton(escapeHtml(labelled[1]), escapeHtml(labelled[2].replace(TRAILING_URL_PUNCTUATION, "")));
-      }
+      const href = labelled ? ownUrl(labelled[2].replace(TRAILING_URL_PUNCTUATION, ""), origins) : null;
+      if (labelled && href) return renderBulletproofButton(escapeHtml(labelled[1]), escapeHtml(href));
       const first = index === 0 && paragraphs.length > 1;
       if (first && lines[0].length <= 80 && !/[.,;!]$/.test(lines[0]) && !lines[0].includes("http")) {
         return `<h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:#0b2b3a;font-weight:700;">${escapeHtml(lines[0].replace(/:$/, ""))}</h1>`;
       }
     }
     if (lines.length >= 2 && lines.every((line) => /^[-*•]\s+/.test(line))) {
-      const items = lines.map((line) => `<li style="margin:0 0 4px;">${linkifyLine(line.replace(/^[-*•]\s+/, ""))}</li>`).join("");
+      const items = lines.map((line) => `<li style="margin:0 0 4px;">${linkifyLine(line.replace(/^[-*•]\s+/, ""), origins)}</li>`).join("");
       return `<ul style="margin:0 0 14px;padding-left:22px;font-size:15px;line-height:1.6;color:#22333b;">${items}</ul>`;
     }
     if (lines.length >= 2 && isNoteTitle(lines[0])) {

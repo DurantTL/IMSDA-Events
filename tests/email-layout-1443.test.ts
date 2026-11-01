@@ -210,3 +210,34 @@ describe("a body written as plain text (#1443)", () => {
     expect(html).not.toContain(">IMSDA Events<");
   });
 });
+
+describe("which addresses a text-only body may link (#1443)", () => {
+  const origins = ["https://events.example.org"];
+  const button = (text: string) => plainTextToEmailBodyHtml(`Hi.\n\n${text}`, { buttonOrigins: origins });
+
+  it("refuses a backslash, user info and another scheme, even when the host looks right", () => {
+    for (const text of [
+      "Go: https://events.example.org\\@evil.com/x",
+      "Go: https://user:pw@events.example.org/x",
+      "Go: https://events.example.org@evil.com/x",
+      "Go: http://events.example.org/x",
+    ]) {
+      const html = button(text);
+      expect(html, text).not.toContain("Button not working?");
+      expect(html, text).not.toContain("<a ");
+    }
+  });
+
+  it("writes the normalized address into both the link and its text, and accepts an uppercase scheme", () => {
+    const ok = button("Go: HTTPS://EVENTS.EXAMPLE.ORG/Path?x=1&y=2");
+    expect(ok).toContain('href="https://events.example.org/Path?x=1&amp;y=2"');
+    expect(ok).toContain(">https://events.example.org/Path?x=1&amp;y=2</a>");
+  });
+
+  it("links the site's address in a bullet item and leaves another one as text", () => {
+    const html = plainTextToEmailBodyHtml("Intro.\n\n- Open https://events.example.org/a\n- See https://evil.example/b", { buttonOrigins: origins });
+    expect(html).toContain('href="https://events.example.org/a"');
+    expect(html).not.toContain('href="https://evil.example/b"');
+    expect(html).toContain("https://evil.example/b");
+  });
+});

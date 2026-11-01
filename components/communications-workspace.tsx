@@ -53,7 +53,8 @@ import {
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { PREHEADER_MAX_LENGTH, renderEmailHtmlDocument } from "@/modules/communications/email-html";
-import { emailLayoutContent } from "@/modules/communications/email-layout";
+import { emailPreviewLayout, plainTextToEmailBodyHtml } from "@/modules/communications/email-layout";
+import { DEFAULT_EMAIL_LAYOUT_SETTINGS, type EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
 import { SendCheckPanel, jumpToSendCheckField } from "@/components/send-check-panel";
 import {
   ANNOUNCEMENT_CHECK_ANCHORS,
@@ -108,6 +109,8 @@ type CommunicationsWorkspaceProps = {
   announcementOptOuts?: EventAnnouncementOptOutRow[];
   initialView: CommunicationsView;
   openNew?: boolean;
+  /** The header names and help contact from Platform settings, so a preview shows what delivery sends (#1443). */
+  emailLayoutSettings?: EmailLayoutSettings;
 };
 
 type ApiResult = {
@@ -248,12 +251,6 @@ function statusTone(status: MessageOutboxStatusValue) {
   return "purple";
 }
 
-/** The header name, why line and help line a message gets, so a preview matches what is sent (the platform names default here). */
-function previewLayout(templateKey: string, replyToEmail: string | null, recipientEmail: string) {
-  const layout = emailLayoutContent({ templateKey, replyToEmail, recipientEmail, eventScoped: true });
-  return { headerName: layout.headerName, whyLine: layout.whyLine, helpLine: layout.helpLine };
-}
-
 function messageTypeLabel(message: Pick<MessageOutboxRecord, "templateKey" | "recipientKind">) {
   if (message.recipientKind === "TEST") return `Test · ${templateLabels[message.templateKey]}`;
   return templateLabels[message.templateKey] ?? message.templateKey.toLowerCase().replaceAll("_", " ");
@@ -296,6 +293,7 @@ export function CommunicationsWorkspace({
   announcementOptOuts = [],
   initialView,
   openNew = false,
+  emailLayoutSettings = DEFAULT_EMAIL_LAYOUT_SETTINGS,
 }: CommunicationsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -2020,7 +2018,7 @@ export function CommunicationsWorkspace({
                     title: preview.subject || "Template preview",
                     preheader: preview.preheader,
                     bodyHtml: withPreviewImages(preview.bodyHtml),
-                    ...previewLayout(selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
+                    ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
                   })}
                 />
                 <div className="message-preview-attachments">
@@ -2266,13 +2264,21 @@ export function CommunicationsWorkspace({
                           // the text here would re-parse registrant values as Markdown
                           // long after the safe render already decided they were not.
                           bodyHtml: withPreviewImages(withPreviewLinks(selectedMessage.bodyHtml)),
-                          ...previewLayout(selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail),
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
                         })}
                       />
                     ) : (
-                      <p className="message-body-note">
-                        This message was captured before formatted bodies existed, so it has a plain-text body only.
-                      </p>
+                      <iframe
+                        className="message-body-html"
+                        title="Captured message"
+                        sandbox=""
+                        // Written from the text as plain paragraphs, as delivery does; no origins, so nothing is linked.
+                        srcDoc={renderEmailHtmlDocument({
+                          title: selectedMessage.subject,
+                          bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText)),
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                        })}
+                      />
                     )}
                     <details className="message-body-plain">
                       <summary>Plain-text fallback</summary>

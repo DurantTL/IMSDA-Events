@@ -35,6 +35,7 @@ import {
 import { markdownToPlainText } from "@/modules/communications/email-html";
 import {
   appendEmailPlainTextFooter,
+  emailIsClubLinked,
   emailLayoutContent,
   plainTextToEmailBodyHtml,
   renderEmailLayoutDocument,
@@ -1393,7 +1394,7 @@ async function runDeliveryLoop(
         templateKey: message.templateKey,
         settings: layoutSettings,
         // A club registration, or an invoice sent to a club director (an invoice row has no registration).
-        clubRegistration: Boolean(message.registration?.clubRegistration) || message.recipientKind === "CLUB_DIRECTOR",
+        clubRegistration: emailIsClubLinked({ clubRegistration: Boolean(message.registration?.clubRegistration), recipientKind: message.recipientKind }),
         recipientEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         eventScoped: message.eventId !== null,

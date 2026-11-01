@@ -10,7 +10,9 @@ import {
   EMAIL_HEADER_RULES,
   EMAIL_WHY_LINES,
   emailHeaderContext,
+  emailIsClubLinked,
   emailHeaderName,
+  emailPreviewLayout,
   emailWhyLine,
 } from "@/modules/communications/email-layout";
 
@@ -278,5 +280,33 @@ describe("club invoices and every scope get the layout (#1443)", () => {
       expect(message.html).toBeTruthy();
       expect(message.text).toContain("\n--\nSent by ");
     }
+  });
+});
+
+describe("the staff preview picks the header delivery sends (#1443)", () => {
+  it("agrees for a club-registration confirmation and a club-director invoice, and for their general twins", async () => {
+    const settings = { headerName: "IMSDA Events", clubHeaderName: "IMSDA Club Ministry", helpEmail: "help@example.org", helpPhone: null };
+    const store = multiStore(
+      [
+        { id: "m1", templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: { id: "c1" } } },
+        { id: "m2", templateKey: "INVOICE_DELIVERY", recipientKind: "CLUB_DIRECTOR" },
+        { id: "m3", templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: null } },
+        { id: "m4", templateKey: "INVOICE_DELIVERY", recipientKind: "BILLING_CONTACT" },
+      ],
+      SETTINGS_ROW,
+    );
+    const sent: Array<{ html: string | null | undefined; text: string }> = [];
+    await processExternalEmailQueue("event-1", { dependencies: deps(store, sent, { emailLayoutSettings: settings }) });
+    const previews = [
+      emailPreviewLayout(settings, "REGISTRATION_CONFIRMATION_PAID", "events@example.org", "a@example.org", emailIsClubLinked({ clubRegistration: true })),
+      emailPreviewLayout(settings, "INVOICE_DELIVERY", "events@example.org", "b@example.org", emailIsClubLinked({ recipientKind: "CLUB_DIRECTOR" })),
+      emailPreviewLayout(settings, "REGISTRATION_CONFIRMATION_PAID", "events@example.org", "c@example.org", emailIsClubLinked({ clubRegistration: false })),
+      emailPreviewLayout(settings, "INVOICE_DELIVERY", "events@example.org", "d@example.org", emailIsClubLinked({ recipientKind: "BILLING_CONTACT" })),
+    ];
+    expect(sent).toHaveLength(4);
+    previews.forEach((preview, index) => {
+      expect(sent[index].html, String(index)).toMatch(new RegExp(`class="em-bar-name"[^>]*>${preview.headerName}<`));
+    });
+    expect(previews.map((preview) => preview.headerName)).toEqual(["IMSDA Club Ministry", "IMSDA Club Ministry", "IMSDA Events", "IMSDA Events"]);
   });
 });
