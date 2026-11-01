@@ -100,14 +100,12 @@ const clientLists = [
   return { file: file!, count: Number(count), reason: "round 2: filters the list on every keystroke, not yet on the shared hook" };
 });
 
-/** Server and fetch boxes still to convert. Remove each entry when it moves onto the shared module. */
-const converting: Allowed[] = [
-  "app/(public)/events/events-search-field.tsx",
-  "components/attendee-community-board.tsx",
-  "components/area-club-search-form.tsx",
-].map((file) => ({ file, count: 1, reason: "round 1431b: converting next" }));
+/** A field component the page renders inside `SearchAsYouTypeForm`, which does the searching. */
+const wrapped: Allowed[] = [
+  { file: "app/(public)/events/events-search-field.tsx", count: 1, reason: "wrapped: rendered inside SearchAsYouTypeForm by app/(public)/events/page.tsx" },
+];
 
-const allowlist: Allowed[] = [...pickers, ...clientLists, ...converting];
+const allowlist: Allowed[] = [...pickers, ...clientLists, ...wrapped];
 
 describe("search boxes search as you type (#1431)", () => {
   const files = [...walk(path.join(root, "app")), ...walk(path.join(root, "components"))]
@@ -149,7 +147,12 @@ describe("search boxes search as you type (#1431)", () => {
     expect(searchInputs('<input name="email" type="email" />')).toHaveLength(0);
   });
 
-  it("round 1 converted boxes are not on the allowlist", () => {
+  it("the wrapped events field really sits inside the shared form", () => {
+    const page = fs.readFileSync(path.join(root, "app/(public)/events/page.tsx"), "utf8");
+    expect(page).toMatch(/<SearchAsYouTypeForm[^>]*action="\/events"[\s\S]*<EventsSearchField[\s\S]*<\/SearchAsYouTypeForm>/);
+  });
+
+  it("converted boxes are not on the allowlist", () => {
     for (const file of [
       "app/(workspace)/admin/clubs/page.tsx",
       "app/(workspace)/admin/clubs/summary/page.tsx",
@@ -160,6 +163,9 @@ describe("search boxes search as you type (#1431)", () => {
       "components/operations-search-bar.tsx",
       "components/background-check-review-panel.tsx",
       "components/organization-search-controls.tsx",
+      "components/area-club-search-form.tsx",
+      "components/attendee-community-board.tsx",
+      "app/(public)/events/page.tsx",
     ]) {
       expect(allowlist.some((entry) => entry.file === file)).toBe(false);
       expect(usesShared(fs.readFileSync(path.join(root, file), "utf8")), file).toBe(true);

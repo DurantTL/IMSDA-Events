@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/calendar/repository", () => ({
   conferenceToday: () => "2026-10-27",
   listPublicCalendarItems: mocks.listPublicCalendarItems,

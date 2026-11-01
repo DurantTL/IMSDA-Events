@@ -83,10 +83,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </ul>
       </section>
 
-      {/* Keyed on the filters but never on the search text (#1431): a header sort link or Reset is a client navigation
-          that keeps this form mounted, and uncontrolled selects would otherwise submit the previous values, while
-          the search box must stay mounted so typing keeps its focus. */}
-      <SearchAsYouTypeForm key={JSON.stringify([query.view, query.sort, query.direction, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
+      {/* Never keyed (#1431): a header sort link or Reset keeps this form mounted, and SearchAsYouTypeForm
+          refreshes its text, selects (`data-default-value` when left out of the URL) and checkboxes from the URL, so
+          typing and select changes keep their focus. */}
+      <SearchAsYouTypeForm action="/people/attendees" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -99,14 +99,14 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </select>
           </label>
           <label>Direction
-            <select name="dir" defaultValue={query.direction === "desc" ? "desc" : "asc"}>
+            <select name="dir" data-default-value="asc" defaultValue={query.direction === "desc" ? "desc" : "asc"}>
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
             </select>
           </label>
         </div>
         <label>View
-          <select name="view" defaultValue={query.view}>
+          <select name="view" data-default-value={DEFAULT_LISTING_VIEW} defaultValue={query.view}>
             {LISTING_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
           </select>
         </label>

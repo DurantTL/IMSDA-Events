@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
-import { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/organization-search-controls";
+import { useSearchAsYouType, useSyncSearchField } from "@/components/search-as-you-type";
 
 /**
  * The address for an Area Coordinator club search (#1013): the base path with
@@ -50,44 +49,16 @@ export function AreaClubSearchForm({
   sort?: string;
   total: number;
 }) {
-  const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { formProps, formRef, apply, cancel } = useSearchAsYouType({ pathname: basePath });
   const [hasText, setHasText] = useState(query !== "");
+  useSyncSearchField(formRef, "q", query);
 
   useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
-    syncFieldValue(form.elements.namedItem("q") as HTMLInputElement | null, query, document.activeElement);
-    setHasText((form.elements.namedItem("q") as HTMLInputElement | null)?.value !== "");
-  }, [query]);
-
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
-
-  function apply() {
-    if (timer.current) clearTimeout(timer.current);
-    const form = formRef.current;
-    if (!form) return;
-    const q = String(new FormData(form).get("q") ?? "");
-    startTransition(() => router.replace(areaClubSearchHref(basePath, { q, year: clubYear, sort, month }), { scroll: false }));
-  }
+    setHasText((formRef.current?.elements.namedItem("q") as HTMLInputElement | null)?.value !== "");
+  }, [formRef, query]);
 
   return (
-    <form
-      action={basePath}
-      aria-busy={pending}
-      className="area-club-search"
-      method="get"
-      onSubmit={(event) => {
-        event.preventDefault();
-        apply();
-      }}
-      ref={formRef}
-      role="search"
-    >
+    <form {...formProps} action={basePath} className="area-club-search" method="get" role="search">
       {clubYear && <input name="year" type="hidden" value={clubYear} />}
       {sort && <input name="sort" type="hidden" value={sort} />}
       {month && <input name="month" type="hidden" value={month} />}
@@ -100,11 +71,7 @@ export function AreaClubSearchForm({
           id="area-club-search"
           maxLength={80}
           name="q"
-          onChange={(event) => {
-            setHasText(event.target.value !== "");
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(apply, SEARCH_DEBOUNCE_MS);
-          }}
+          onChange={(event) => setHasText(event.target.value !== "")}
           placeholder={label}
           type="search"
         />
@@ -120,7 +87,7 @@ export function AreaClubSearchForm({
       </div>
       <button className="secondary-button" type="submit">Search</button>
       {/* Clearing cancels a search still waiting on its pause, so it cannot put the old filter back. */}
-      {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={() => { if (timer.current) clearTimeout(timer.current); }}>Clear</Link>}
+      {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={cancel}>Clear</Link>}
       <small aria-live="polite" role="status">{query ? `${shown} of ${total} clubs match` : ""}</small>
     </form>
   );

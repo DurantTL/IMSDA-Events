@@ -92,15 +92,10 @@ describe("search-as-you-type markup", () => {
   it("SearchAsYouTypeForm is still a plain GET form with q and a submit button", () => {
     const html = renderToStaticMarkup(createElement(
       SearchAsYouTypeForm,
-      {
-        action: "/admin/clubs",
-        className: "x",
-        children: [
-          createElement("input", { key: "y", name: "year", type: "hidden", value: "2026" }),
-          createElement("input", { key: "q", defaultValue: "eag", name: "q", type: "search" }),
-          createElement("button", { key: "b", type: "submit" }, "Search"),
-        ],
-      },
+      { action: "/admin/clubs", className: "x" },
+      createElement("input", { name: "year", type: "hidden", value: "2026" }),
+      createElement("input", { defaultValue: "eag", name: "q", type: "search" }),
+      createElement("button", { type: "submit" }, "Search"),
     ));
     expect(html).toContain('method="get"');
     expect(html).toContain('action="/admin/clubs"');

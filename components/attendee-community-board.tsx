@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDebouncedCallback, useSearchTicket } from "@/components/search-as-you-type";
 import {
   Bell,
   BellOff,
@@ -240,13 +241,19 @@ export function AttendeeCommunityBoard({
     });
   }
 
-  async function submitSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const query = searchQuery.trim();
+  // Search as you type (#1431): a short pause after the last keystroke, and each search takes a ticket so an older
+  // answer never replaces a newer one. Enter or Search goes at once.
+  const searchTicket = useSearchTicket();
+  const searchSoon = useDebouncedCallback(() => void runSearch(searchQuery));
+
+  async function runSearch(text: string) {
+    const query = text.trim();
+    const ticket = searchTicket.next();
     if (query === "") {
-      // An empty search shows the board as usual.
+      // An empty search shows the board as usual, with no fetch.
       setError("");
       setSearchResults(null);
+      setSearching(false);
       return;
     }
     setSearching(true);
@@ -255,12 +262,26 @@ export function AttendeeCommunityBoard({
       const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`, { cache: "no-store" });
       const result = await response.json() as { message?: string; results?: CommunitySearchResult[] };
       if (!response.ok) throw new Error(result.message ?? "The community search failed.");
-      setSearchResults(result.results ?? []);
+      if (searchTicket.isCurrent(ticket)) setSearchResults(result.results ?? []);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The community search failed.");
+      if (searchTicket.isCurrent(ticket)) setError(caught instanceof Error ? caught.message : "The community search failed.");
     } finally {
-      setSearching(false);
+      if (searchTicket.isCurrent(ticket)) setSearching(false);
     }
+  }
+
+  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    searchSoon.cancel();
+    void runSearch(searchQuery);
+  }
+
+  function clearSearch() {
+    searchSoon.cancel();
+    searchTicket.invalidate();
+    setSearchQuery("");
+    setSearchResults(null);
+    setSearching(false);
   }
 
   async function loadMorePosts() {
@@ -365,13 +386,19 @@ export function AttendeeCommunityBoard({
               <input
                 id="community-search"
                 maxLength={80}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  if (event.target.value.trim() === "") {
+                    searchSoon.cancel();
+                    void runSearch("");
+                  } else searchSoon.schedule();
+                }}
                 placeholder="Search questions, rides, or updates"
                 type="search"
                 value={searchQuery}
               />
               <button className="secondary-button" disabled={searching} type="submit">{searching ? "Searching…" : "Search"}</button>
-              {searchResults && <button className="text-button" onClick={() => { setSearchQuery(""); setSearchResults(null); }} type="button">Clear</button>}
+              {searchResults && <button className="text-button" onClick={clearSearch} type="button">Clear</button>}
             </div>
             <small>Searches only visible posts and replies from this event.</small>
           </form>

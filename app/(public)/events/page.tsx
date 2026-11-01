@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import { EventsSearchField } from "./events-search-field";
+import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
@@ -135,7 +136,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
           ))}
         </nav>
 
-        <form action="/events" className={styles.eventsDirectoryForm} method="get" role="search" aria-label="Search and filter events">
+        <SearchAsYouTypeForm action="/events" className={styles.eventsDirectoryForm} role="search" aria-label="Search and filter events">
           {filter !== "all" && <input name="for" type="hidden" value={filter} />}
           <div className={`${styles.eventsDirectoryField} ${styles.eventsDirectorySearch}`}>
             <label htmlFor="events-q">Search events</label>
@@ -167,7 +168,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
             <button className="primary-button" type="submit">Show events</button>
             {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
           </div>
-        </form>
+        </SearchAsYouTypeForm>
         <p className={styles.eventsDirectoryCount} role="status">{calendarCountLabel(items.length)}</p>
 
         <section aria-labelledby="open-events-heading" className="calendar-agenda">

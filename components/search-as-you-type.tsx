@@ -232,14 +232,14 @@ export function SearchAsYouTypeForm({
   ...rest
 }: Omit<FormHTMLAttributes<HTMLFormElement>, "method" | "action" | "onSubmit" | "onChange" | "onClick"> & {
   action: string;
-  children: ReactNode;
+  children?: ReactNode;
   delayMs?: number;
   resetParams?: string[];
 }) {
   const { formProps, cancel } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
   const lastSearch = useRef<string | null>(null);
 
-  // After navigation (Back, a link) show the URL's values, except in the box being typed in.
+  // After navigation (Back, a link) show the URL's values (text, selects, checkboxes), except in the control being used.
   useEffect(() => {
     const search = window.location.search;
     if (lastSearch.current === null) {
@@ -253,10 +253,16 @@ export function SearchAsYouTypeForm({
     const params = new URLSearchParams(search);
     const active = document.activeElement;
     for (const element of Array.from(form.elements)) {
-      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) continue;
-      if (!element.name || (element instanceof HTMLInputElement && !TYPED_INPUT_TYPES.has(element.type))) continue;
-      if (element instanceof HTMLSelectElement && !params.has(element.name)) continue;
-      syncFieldValue(element, params.get(element.name) ?? "", active);
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement) || !element.name) continue;
+      if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+        if (element !== active) element.checked = params.getAll(element.name).includes(element.value);
+      } else if (element instanceof HTMLSelectElement && !params.has(element.name)) {
+        // Left out of the URL means the select's default: `data-default-value`, else its "" option.
+        const fallback = element.dataset.defaultValue ?? "";
+        if (Array.from(element.options).some((option) => option.value === fallback)) syncFieldValue(element, fallback, active);
+      } else if (element instanceof HTMLSelectElement || TYPED_INPUT_TYPES.has((element as HTMLInputElement).type)) {
+        syncFieldValue(element, params.get(element.name) ?? "", active);
+      }
     }
   });
 
