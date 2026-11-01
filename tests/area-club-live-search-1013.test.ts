@@ -60,6 +60,6 @@ describe("one announcement per search (#1013 review)", () => {
     const { readFileSync } = await import("node:fs");
     const form = readFileSync("components/area-club-search-form.tsx", "utf8");
     expect(form).toMatch(/>Clear<\/Link>/);
-    expect(form).toMatch(/onClick=\{\(\) => \{ if \(timer\.current\) clearTimeout\(timer\.current\); \}\}>Clear<\/Link>/);
+    expect(form).toMatch(/onClick=\{cancel\}>Clear<\/Link>/);
   });
 });

@@ -8,6 +8,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { loadFormsHub } from "@/modules/forms-hub/load";
 import { filterFormsHubRows, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "All forms" };
@@ -35,7 +36,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
       <AdminSectionHeaderFor path="/admin/forms" section="system" />
       <StaffPageHeader description="Club forms, general forms and every event's information forms in one place. Registration forms are built inside each event." />
       <section className="panel">
-        <form action="/admin/forms" className="club-form-filter forms-hub-filter" method="get">
+        <SearchAsYouTypeForm action="/admin/forms" className="club-form-filter forms-hub-filter">
           <label>Kind
             <select defaultValue={filters.kind ?? ""} name="kind">
               <option value="">All</option>
@@ -56,8 +57,8 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
             <input autoComplete="off" defaultValue={filters.q} maxLength={100} name="q" type="search" />
           </label>
           <button className="secondary-button" type="submit">Filter</button>
-        </form>
-        <p className="quiet-copy" role="status">{rows.length} of {all.length} form{all.length === 1 ? "" : "s"}</p>
+        </SearchAsYouTypeForm>
+        <p aria-live="polite" className="quiet-copy" role="status">{rows.length} of {all.length} form{all.length === 1 ? "" : "s"}</p>
         {rows.length === 0 ? (
           <p className="quiet-copy">No forms match.</p>
         ) : (

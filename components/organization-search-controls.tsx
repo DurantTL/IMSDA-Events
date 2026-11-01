@@ -1,34 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useTransition } from "react";
 import { ListPager } from "@/components/list-pager";
+import { useSearchAsYouType, useSyncSearchField } from "@/components/search-as-you-type";
 import { listSearchParams, ORGANIZATION_SEARCH_MAX_LENGTH } from "@/modules/organizations/search";
 
 type Option = { value: string; label: string };
 
 export type OrganizationListState = { q: string; kind: string; status: string };
 
-/** Pause after the last keystroke before the list updates (#723). */
-export const SEARCH_DEBOUNCE_MS = 350;
+// Kept here so existing importers keep working; the one implementation is components/search-as-you-type.tsx (#1431).
+export { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/search-as-you-type";
 
 export function organizationListHref(basePath: string, state: OrganizationListState, page = 1) {
   const query = listSearchParams({ q: state.q, kind: state.kind, status: state.status, page }).toString();
   return query ? `${basePath}?${query}` : basePath;
-}
-
-/**
- * Set a field to the URL's value unless its owner is typing in it (#723). The
- * fields are uncontrolled, so after same-page navigation (a nav link, Back)
- * they would otherwise keep showing the old query.
- */
-export function syncFieldValue(
-  field: { value: string } | null,
-  value: string,
-  activeElement: unknown,
-) {
-  if (!field || field === activeElement || field.value === value) return;
-  field.value = value;
 }
 
 /**
@@ -53,48 +39,17 @@ export function OrganizationSearchControls({
   state: OrganizationListState;
   statusOptions: Option[];
 }) {
-  const router = useRouter();
-  const formRef = useRef<HTMLFormElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form) return;
-    const active = document.activeElement;
-    syncFieldValue(form.elements.namedItem("q") as HTMLInputElement | null, state.q, active);
-    syncFieldValue(form.elements.namedItem("kind") as HTMLSelectElement | null, state.kind, active);
-    syncFieldValue(form.elements.namedItem("status") as HTMLSelectElement | null, state.status, active);
-  }, [state.q, state.kind, state.status]);
-
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
-
-  function apply() {
-    if (timer.current) clearTimeout(timer.current);
-    const form = formRef.current;
-    if (!form) return;
-    const data = new FormData(form);
-    const next = organizationListHref(basePath, {
-      q: String(data.get("q") ?? ""),
-      kind: String(data.get("kind") ?? ""),
-      status: String(data.get("status") ?? "ALL"),
-    });
-    startTransition(() => router.replace(next, { scroll: false }));
-  }
+  const { formProps, formRef } = useSearchAsYouType({ ignoreValues: { status: "ALL" }, pathname: basePath });
+  useSyncSearchField(formRef, "q", state.q);
+  useSyncSearchField(formRef, "kind", state.kind);
+  useSyncSearchField(formRef, "status", state.status);
 
   return (
     <form
+      {...formProps}
       action={basePath}
-      aria-busy={pending}
       className="org-filter-bar"
       method="get"
-      onSubmit={(event) => {
-        event.preventDefault();
-        apply();
-      }}
-      ref={formRef}
       role="search"
     >
       <label className="org-filter-field org-filter-search">
@@ -104,23 +59,19 @@ export function OrganizationSearchControls({
           defaultValue={state.q}
           maxLength={ORGANIZATION_SEARCH_MAX_LENGTH}
           name="q"
-          onChange={() => {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(apply, SEARCH_DEBOUNCE_MS);
-          }}
           placeholder={placeholder}
           type="search"
         />
       </label>
       <label className="org-filter-field">
         <span>Kind</span>
-        <select defaultValue={state.kind} name="kind" onChange={apply}>
+        <select defaultValue={state.kind} name="kind">
           {kindOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>
       <label className="org-filter-field">
         <span>Status</span>
-        <select defaultValue={state.status} name="status" onChange={apply}>
+        <select defaultValue={state.status} name="status">
           {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>

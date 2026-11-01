@@ -10,6 +10,7 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 // The section header (#1274) is async and has its own tests; these pages are tested without it.
 vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));

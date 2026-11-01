@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
+import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { AccessRestricted } from "@/components/access-restricted";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -11,6 +12,7 @@ import { sortOrderText } from "@/lib/list-sort";
 import { isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
+  DEFAULT_LISTING_STATUSES,
   DEFAULT_LISTING_VIEW,
   LISTING_COLUMNS,
   LISTING_STATUSES,
@@ -82,9 +84,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </ul>
       </section>
 
-      {/* Keyed on the current query: a header sort link or Reset is a client navigation that keeps this
-          form mounted, and uncontrolled fields would otherwise submit the previous values. */}
-      <form key={JSON.stringify([query.view, query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
+      {/* Never keyed (#1431): a header sort link or Reset keeps this form mounted, and SearchAsYouTypeForm
+          refreshes its text, selects (`data-default-value` when left out of the URL) and checkboxes from the URL, so
+          typing and select changes keep their focus. */}
+      <SearchAsYouTypeForm action="/people/attendees" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -97,14 +100,14 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </select>
           </label>
           <label>Direction
-            <select name="dir" defaultValue={query.direction === "desc" ? "desc" : "asc"}>
+            <select name="dir" data-default-value="asc" defaultValue={query.direction === "desc" ? "desc" : "asc"}>
               <option value="asc">Ascending</option>
               <option value="desc">Descending</option>
             </select>
           </label>
         </div>
         <label>View
-          <select name="view" defaultValue={query.view}>
+          <select name="view" data-default-value={DEFAULT_LISTING_VIEW} defaultValue={query.view}>
             {LISTING_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
           </select>
         </label>
@@ -119,14 +122,14 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <fieldset className="filter-group">
           <legend>Registration status</legend>
           {LISTING_STATUSES.map((status) => (
-            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
+            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={DEFAULT_LISTING_STATUSES.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
           ))}
         </fieldset>
         <div className="filter-bar-actions">
           <button className="secondary-button" type="submit">Apply</button>
           <Link className="text-button" href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Reset</Link>
         </div>
-      </form>
+      </SearchAsYouTypeForm>
 
       <div className="table-scroll scroll-cue" data-scroll-cue>
         {query.sort && <SortOrderNote>{sortOrderText(LISTING_COLUMNS.find((column) => column.key === query.sort)?.label.toLowerCase() ?? "default order", query.direction)}</SortOrderNote>}

@@ -136,7 +136,8 @@ describe("the query stays in the URL (#723)", () => {
     expect(typing.value).toBe("alb");
     expect(() => syncFieldValue(null, "x", null)).not.toThrow();
     const source = read("components/organization-search-controls.tsx");
-    expect(source).toContain("[state.q, state.kind, state.status]");
+    expect(source).toContain('useSyncSearchField(formRef, "q", state.q)');
+    expect(source).toContain('useSyncSearchField(formRef, "status", state.status)');
   });
 
   it("reads a page number defensively", () => {
@@ -148,9 +149,11 @@ describe("the query stays in the URL (#723)", () => {
 
   it("the filter bar writes the query to the URL and submits on Enter", () => {
     const source = read("components/organization-search-controls.tsx");
-    expect(source).toContain("router.replace(next");
+    // The debounce, router.replace and Enter handling are the one shared hook (#1431).
+    expect(source).toContain("useSearchAsYouType(");
+    expect(source).toContain("{...formProps}");
     expect(source).toContain('method="get"');
-    expect(source).toContain("event.preventDefault();\n        apply();");
+    expect(read("components/search-as-you-type.tsx")).toContain("router.replace(href, { scroll: false })");
     expect(source).toContain("SEARCH_DEBOUNCE_MS");
     expect(source).toContain('name="q"');
   });
