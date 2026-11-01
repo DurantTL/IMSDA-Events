@@ -12,6 +12,7 @@ import {
 import type { OwnConnection } from "@/modules/system-admin/system-report/own-connection";
 import styles from "./page.module.css";
 import { SystemReportTesters } from "./system-report-testers";
+import { CloudflarePurgeRow } from "./cloudflare-purge-row";
 import { TestConnectionsButton } from "./test-connections-button";
 
 /** The shared status chip colors. "Count only" has no verdict, so it is drawn plain, never green. */
@@ -82,7 +83,7 @@ function OwnConnectionCard({ connection }: { connection: OwnConnection }) {
   );
 }
 
-function Section({ section, now, ownConnection }: { section: ReportSection; now: Date; ownConnection?: OwnConnection }) {
+function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { section: ReportSection; now: Date; ownConnection?: OwnConnection; cloudflarePurgeConfigured: boolean }) {
   const headingId = `h-${section.key}`;
   return (
     <section className={styles.section} id={`s-${section.key}`} aria-labelledby={headingId} data-section={section.key} data-state={section.state}>
@@ -96,6 +97,7 @@ function Section({ section, now, ownConnection }: { section: ReportSection; now:
       <ul className={styles.rows}>
         {section.signals.map((signal) => <SignalRow key={signal.key} signal={signal} now={now} />)}
       </ul>
+      {section.key === "setup" && <CloudflarePurgeRow configured={cloudflarePurgeConfigured} />}
       {section.key === "setup" && ownConnection && <OwnConnectionCard connection={ownConnection} />}
       {!section.counted && <p className={styles.noteLine}>Ticks record that a person checked something. They are not live readings and do not count toward the overall status.</p>}
     </section>
@@ -103,7 +105,7 @@ function Section({ section, now, ownConnection }: { section: ReportSection; now:
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report, testerDefaultEmail = "", ownConnection }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection }) {
+export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean }) {
   const now = new Date(report.generatedAt);
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
@@ -151,7 +153,7 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
 
       <SystemReportTesters defaultEmail={testerDefaultEmail} />
 
-      {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} />)}
+      {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} />)}
 
       <p className={styles.footerLine}>
         Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}

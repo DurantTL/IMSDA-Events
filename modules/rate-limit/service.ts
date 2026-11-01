@@ -1167,3 +1167,17 @@ export async function checkSystemSquareTestRateLimit(userId: string) {
     identifierHashes: [account],
   }], configuration);
 }
+
+/** The System report's "Clear Cloudflare cache" action (#1429): three clears an hour per system administrator. */
+export const systemCloudflarePurgeBudget = { limit: 3, windowSeconds: oneHour } as const;
+
+export async function checkSystemCloudflarePurgeRateLimit(userId: string) {
+  const configuration = getRateLimitConfiguration();
+  const account = hashRateLimitIdentifier("system-report-cloudflare-purge", userId, configuration);
+  return evaluate([{
+    policy: "system-report.cloudflare-purge.account",
+    limit: systemCloudflarePurgeBudget.limit,
+    windowSeconds: systemCloudflarePurgeBudget.windowSeconds,
+    identifierHashes: [account],
+  }], configuration);
+}

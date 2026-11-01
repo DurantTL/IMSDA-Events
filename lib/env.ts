@@ -133,6 +133,11 @@ export const serverEnvSchema = z
     BACKUP_R2_READ_DATABASE_PATTERNS: optionalTrimmed,
     BACKUP_R2_READ_FILES_PATTERNS: optionalTrimmed,
 
+    // The private "Automatic Cache Purge" webhook from the host panel (#1429). A SECRET: only the server-side adapter in
+    // integrations/cloudflare reads it; it is never logged, shown or sent to the browser. Optional: unset, the System
+    // report's "Clear Cloudflare cache" row says "Not set up".
+    CLOUDFLARE_PURGE_WEBHOOK_URL: optionalTrimmed,
+
     // Message files (#845). The quota is the most one event may keep, in whole megabytes. The grace period is how old an
     // unreferenced upload must be before the sweep may remove it (never less than 24 hours: the reader clamps it). The
     // sweep only reports what it would remove unless MESSAGE_FILE_SWEEP_DELETE is exactly "true".
@@ -444,6 +449,7 @@ export const SERVER_ENV_KEYS = [
     "BACKUP_R2_READ_PREFIX",
     "BACKUP_R2_READ_DATABASE_PATTERNS",
     "BACKUP_R2_READ_FILES_PATTERNS",
+    "CLOUDFLARE_PURGE_WEBHOOK_URL",
     "MESSAGE_FILE_EVENT_QUOTA_MB",
     "MESSAGE_FILE_SWEEP_GRACE_HOURS",
     "MESSAGE_FILE_SWEEP_DELETE",

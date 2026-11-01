@@ -18,11 +18,11 @@ export async function requireTesterAdmin(): Promise<{ user: { id: string } } | {
 }
 
 /** The fixed 429 answer: the time the next run is allowed, so the card can say it. */
-export function testerRateLimited(nextAllowedAt: string, what: "email" | "square") {
+export function testerRateLimited(nextAllowedAt: string, what: "email" | "square" | "cloudflare") {
   const seconds = Math.max(1, Math.ceil((new Date(nextAllowedAt).getTime() - Date.now()) / 1000));
   return testerJson({
     error: "RATE_LIMITED",
-    message: what === "email" ? "Limit reached: 3 test emails an hour." : "Limit reached: 5 Square runs an hour.",
+    message: what === "email" ? "Limit reached: 3 test emails an hour." : what === "square" ? "Limit reached: 5 Square runs an hour." : "Limit reached: 3 cache clears an hour.",
     nextAllowedAt,
   }, 429, { "Retry-After": String(seconds) });
 }
