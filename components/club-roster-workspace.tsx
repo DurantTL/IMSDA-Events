@@ -1198,11 +1198,11 @@ function ClubRosterWorkspaceInner({
           <button className="secondary-button" disabled={saving} onClick={() => void requestClose()} type="button">Cancel</button>
           <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? (contactsOnlyDialog ? "Save contacts" : "Save") : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
-        {error && (
-          // The dialog's one message slot. A blocked save scrolls it into view and focuses it, with Reload (#1445).
+        {error && <FormMessage message={error} tone="error" />}
+        {/* A blocked save: Reload sits right under the dialog's message, scrolled into view and focused (#1445). */}
+        {error && connectionLost && (
           <div ref={dialogNoticeRef} tabIndex={-1}>
-            <FormMessage message={error} tone="error" />
-            {connectionLost && <ReloadButton />}
+            <ReloadButton />
           </div>
         )}
       </form>
