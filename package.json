@@ -90,6 +90,7 @@
     "test:event-archive": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-archive.ts",
     "test:event-lifecycle": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-lifecycle.ts",
     "test:badge-print": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-badge-print.ts",
+    "test:privacy-browsers": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-privacy-browsers.ts",
     "test:mobile-layout": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-mobile-layout.ts",
     "test:translation-sim": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-translation-simulation.ts",
     "test:live-roster": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-live-roster.ts",

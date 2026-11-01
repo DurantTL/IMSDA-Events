@@ -258,6 +258,44 @@ describe("card fee only when card payment is possible (#1405)", () => {
     );
   });
 
+  // #1445 (rule P1): the stored amount is the server's, whatever totals, prices or quantities the browser's answers carry.
+  it("refuses answers that carry a fake total, price, fee or discount, and writes nothing", async () => {
+    configureSquare(true);
+    const { prisma, tx } = transactionFixture();
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await expect(submitPublicRegistration(
+      "summer-retreat",
+      "attendee",
+      { ...input, responses: { ...input.responses, totalCents: 1, subtotalCents: 1, priceCents: 1, processingFeeCents: 0, discountAmountCents: 99_999 } },
+      new Date("2026-08-10T12:00:00.000Z"),
+    )).rejects.toMatchObject({ code: "INVALID_SUBMISSION" });
+    expect(tx.registration.create).not.toHaveBeenCalled();
+    expect(tx.registrationLedgerEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("stores the server's total on the honest submission next to it (the control for the tamper tests)", async () => {
+    configureSquare(true);
+    const { prisma, tx } = transactionFixture();
+    dependencies.getPrisma.mockReturnValue(prisma);
+    await submitPublicRegistration("summer-retreat", "attendee", input, new Date("2026-08-10T12:00:00.000Z"));
+    expect(tx.registration.create).toHaveBeenCalledWith({ data: expect.objectContaining({ totalAmount: 100 }) });
+  });
+
+  it("never lets an answer for the calculated registration-fee line change the amount: refused, or priced by the form", async () => {
+    configureSquare(true);
+    const { prisma, tx } = transactionFixture();
+    dependencies.getPrisma.mockReturnValue(prisma);
+    const outcome = await submitPublicRegistration(
+      "summer-retreat",
+      "attendee",
+      { ...input, responses: { ...input.responses, registration_fee: 1 } },
+      new Date("2026-08-10T12:00:00.000Z"),
+    ).then(() => "saved" as const, () => "refused" as const);
+    if (outcome === "saved") expect(tx.registration.create).toHaveBeenCalledWith({ data: expect.objectContaining({ totalAmount: 100 }) });
+    else expect(tx.registration.create).not.toHaveBeenCalled();
+  });
+
   describe("a form whose only payment choices are online", () => {
     const onlineOnly = (options: string[], deposit = false) => registrationFormDefinitionSchema.parse({
       ...definition,
