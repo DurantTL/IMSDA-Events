@@ -105,7 +105,7 @@ function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { s
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean }) {
+export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false, emailBackupConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean; emailBackupConfigured?: boolean }) {
   const now = new Date(report.generatedAt);
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
@@ -151,7 +151,7 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
         </ul>
       </section>
 
-      <SystemReportTesters defaultEmail={testerDefaultEmail} />
+      <SystemReportTesters defaultEmail={testerDefaultEmail} emailBackupConfigured={emailBackupConfigured} />
 
       {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} />)}
 

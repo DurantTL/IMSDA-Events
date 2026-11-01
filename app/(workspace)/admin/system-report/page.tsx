@@ -1,3 +1,4 @@
+import { getEmailBackupStatus } from "@/integrations/email/provider";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -23,7 +24,7 @@ export default async function SystemReportPage() {
   return (
     <>
       <AdminSectionHeaderFor path="/admin/system-report" section="system" />
-      <SystemReportView report={await loadSystemReport()} testerDefaultEmail={user.email} ownConnection={ownConnection} cloudflarePurgeConfigured={isCloudflarePurgeConfigured()} />
+      <SystemReportView report={await loadSystemReport()} testerDefaultEmail={user.email} ownConnection={ownConnection} cloudflarePurgeConfigured={isCloudflarePurgeConfigured()} emailBackupConfigured={getEmailBackupStatus().active} />
     </>
   );
 }

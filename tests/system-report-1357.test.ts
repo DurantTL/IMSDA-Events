@@ -264,11 +264,11 @@ describe("providers", () => {
       for (const row of selfTests) expect(row.state, row.key).toBe("ok");
       const rows = report.sections.filter((section) => section.key !== "self-tests").flatMap((section) => section.signals);
       // The release identity and the environment's set-up facts (including whether alert delivery, Google sign-in and the breach check are on) are read from the process, not from a failing source.
-      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test", "refund-self-test", "alert-delivery", "backup-r2-database", "backup-r2-files", "google-keys-reachable", "breach-service-reachable", "security-check"].includes(row.key));
+      const unreadable = rows.filter((row) => !["release-version", "release-deployed", "payment-setup", "connected-services", "pricing-self-test", "refund-self-test", "alert-delivery", "backup-r2-database", "backup-r2-files", "google-keys-reachable", "breach-service-reachable", "security-check", "email-backup-setup"].includes(row.key));
       expect(unreadable.length).toBeGreaterThan(15);
       for (const row of unreadable) expect(row.state, row.key).toBe("unavailable");
       expect(report.overall.tally.ok).toBe(10); // only the eight self-tests and the pricing and refund self-tests, which read no source; the release identity and start time are information
-      expect(report.overall.tally.info).toBe(5); // plus the two R2 backup rows, which read no source when R2 is not connected, and the Security check row, which reads only the environment (skipped outside production)
+      expect(report.overall.tally.info).toBe(5); // plus the two R2 backup rows, which read no source when R2 is not connected, and the Security check row, which reads only the environment (skipped outside production). The backup setup panel (#1444) is fixed text and is excluded from the count
       expect(report.overall.state).toBe("unavailable");
       expect(report.sections.find((section) => section.key === "email")?.state).toBe("unavailable");
     });
