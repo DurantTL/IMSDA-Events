@@ -2833,7 +2833,7 @@ export function PublicRegistrationForm({
           {answers.map(({ field, answer }) => (
             <div key={field.id}>
               <dt>{field.label}</dt>
-              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined} translate={field.type === "EMAIL" || field.type === "PHONE" || isCodeLikeAnswer(answer) ? "no" : undefined}>{answer}</dd>
+              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined} translate={field.type === "EMAIL" || field.type === "PHONE" || (isCodeLikeAnswer(answer) && /^\S+$/.test(answer)) ? "no" : undefined}>{answer}</dd>
             </div>
           ))}
         </dl>
