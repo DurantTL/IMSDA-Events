@@ -22,11 +22,12 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | G2 | Mockups first: a new design (borders, outlines, spacing, colors, layout, new shared components) needs a mockup Caleb approves before it's built. Consistency fixes that only make something match the existing shared design can be built without waiting for mockup approval; send screenshots for review. | none (review step) | none (review step) | #1342; Caleb, Nov 1 (#1438) |
 | G3 | Everything that's the same kind of thing looks and works the same and is styled from one shared place (tokens, shared components), so one change updates it everywhere. Color variations are allowed only as named token variants, never as one-off styles. | planned (#1440) | planned (#1439) | Caleb, Nov 1 (#1438) |
 
-## Calculations
+## Calculations and live data
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
 | P1 | Every calculation that matters (prices, fees, discounts, deposits, balances, capacity, eligibility) is done on the server from one shared function. The browser only shows a preview from that same function; the server never trusts a total the browser sends, and if the browser's scripts fail or are blocked, the amount charged and recorded is still correct. | planned (#1445) | planned (#1445) | Caleb, Nov 1 (#1445) |
+| P2 | Live lists (the club roster above all, plus registrations, attendee lists, orders and monthly records) always show current data from the server, update right away after a change, are never cached by the browser, Cloudflare or the app, and still work with blockers and translation on. | planned (#1445) | planned (#1439, #1445) | Caleb, Nov 1 (#1445) |
 
 ## Search
 
