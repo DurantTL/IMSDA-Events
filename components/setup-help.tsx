@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ChevronDown } from "lucide-react";
+import { setupHelpAnchor, type SetupHelpRegistry } from "@/modules/setup-help/registry";
 import { isInAppSetup, type SetupHelp } from "@/modules/setup-help/types";
 import styles from "./setup-help.module.css";
 
@@ -20,12 +21,20 @@ export function SetupHelpPanel({
   context,
   whoToAsk,
   heading = "How to set this up",
+  registry,
+  setupKey,
 }: {
   setup: SetupHelp;
   /** What this is for ("Security check"), read out after the link or summary so several of them are told apart. */
   context?: string;
   whoToAsk?: string;
   heading?: string;
+  /**
+   * With a registry and a key, the full panel shows once per page (the first one in render order) and any later one
+   * for the same key is a short link to it, so the same steps are not repeated down a long page.
+   */
+  registry?: SetupHelpRegistry;
+  setupKey?: string;
 }) {
   if (isInAppSetup(setup)) {
     return (
@@ -38,6 +47,17 @@ export function SetupHelpPanel({
       </div>
     );
   }
+  const first = registry && setupKey ? registry.claim(setupKey) : true;
+  if (!first && setupKey) {
+    return (
+      <div className={styles.setup} data-setup-help="again">
+        <a className="text-button" href={`#${setupHelpAnchor(setupKey)}`}>
+          {heading}{context && <span className="sr-only"> for {context}</span>} <ArrowRight aria-hidden="true" size={14} />
+        </a>
+        <span className={styles.again}> Same steps as the first one above.</span>
+      </div>
+    );
+  }
   return (
     <div className={styles.setup} data-setup-help="steps">
       <details className={`attendee-reg-action ${styles.disclosure}`}>
@@ -46,7 +66,7 @@ export function SetupHelpPanel({
           <ChevronDown aria-hidden="true" size={16} />
         </summary>
         <div className={`attendee-reg-action-panel ${styles.panel}`}>
-          <ol className={styles.steps}>
+          <ol className={styles.steps} id={setupKey ? setupHelpAnchor(setupKey) : undefined}>
             {setup.steps.map((step, index) => <li key={index}>{step}</li>)}
           </ol>
           {setup.settingNames.length > 0 && (

@@ -31,6 +31,7 @@ import { SystemReportView } from "@/app/(workspace)/admin/system-report/system-r
 import { buildEnvironmentStatus } from "@/modules/system-admin/environment-status";
 import { ENVIRONMENT_SERVICE_SETUP, SYSTEM_SETUP_STEPS, systemSetupFor } from "@/modules/setup-help/system-setup-steps";
 import { isInAppSetup } from "@/modules/setup-help/types";
+import { createSetupHelpRegistry } from "@/modules/setup-help/registry";
 import { assessSweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import { offsiteBackupFields } from "@/modules/system-admin/system-report/backup-signals";
 import {
@@ -75,6 +76,19 @@ const nothingSet = () => buildEnvironmentStatus({}, {
   encryptionKey: () => ({ configured: false }),
 });
 
+const never = () => ({ ...assessSweepHeartbeat(null, now), summary: null });
+const notSetUpReadings = {
+  r2: () => [...offsiteBackupFields({ state: "not_connected" }, now), ...offsiteBackupFields({ state: "misconfigured", missing: ["BACKUP_R2_READ_BUCKET"], invalid: [] }, now)],
+  security: () => [securityCheckFields({ mode: "skip", missing: ["TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"], production: true }, now), securityCheckFields({ mode: "skip", missing: ["TURNSTILE_SECRET_KEY"], production: true }, now)],
+  alert: () => [alertDeliveryFields("alert-delivery", { configured: false, run: null }, now)],
+  digest: () => [locationWaitlistDigestFields("location-waitlist-digest", { ...assessSweepHeartbeat({ lastSucceededAt: now, lastFailedAt: null }, now), summary: { status: "EMAIL_NOT_CONFIGURED" } }, now)],
+  heartbeat: () => [autodeployFields("server-autodeploy", never(), now), dockerCleanupFields("server-docker-cleanup", never(), now), runtimeGuardFields("server-runtime-guard", never(), now)],
+  square: () => [squareNoticeFields("square-notices", { configured: false, lastNoticeAt: null, newestPaymentAt: null, ignoredCount: 0, now })],
+  email: () => [emailNoticeFields("resend-notices", "RESEND", { active: "RESEND", webhookConfigured: false, lastNoticeAt: null, newestSentAt: null, now })],
+  tests: () => REACHABILITY_KINDS.filter((kind) => kind !== "calendar-feed").map((kind) => reachabilityFields(kind, `${kind}-reachable`, { configured: false, run: null }, now)),
+  services: () => [summarizeServices("connected-services", nothingSet().services, now), summarizeServices("payment-setup", nothingSet().services.filter((service) => service.id === "payments" || service.id === "payment-webhook"), now)],
+};
+
 describe("environment services", () => {
   it("has a setup entry for every service the environment status can report as not configured", () => {
     const { services } = nothingSet();
@@ -95,31 +109,29 @@ describe("environment services", () => {
       const row = summarizeServices(key, listed, now);
       expect(row).toMatchObject({ needsSetup: true, state: "watch" });
       expect(row.serviceSetup?.map((service) => service.id)).toEqual(listed.map((service) => service.id));
-      for (const service of row.serviceSetup ?? []) expect(service.setup).toBe(systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id]));
+      for (const service of row.serviceSetup ?? []) expect(service.setup).toBe(systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id as keyof typeof ENVIRONMENT_SERVICE_SETUP]));
     }
   });
 
   it("does not flag a set-up or unreadable summary", () => {
-    const ok = summarizeServices("connected-services", [{ id: "x", label: "X", status: "configured", missing: [], note: null }], now);
+    const ok = summarizeServices("connected-services", [{ id: "alert-webhook", label: "X", status: "configured", missing: [], note: null }], now);
     expect(ok).toMatchObject({ state: "ok" });
     expect(ok).not.toHaveProperty("needsSetup");
-    const unknown = summarizeServices("connected-services", [{ id: "x", label: "X", status: "unknown", missing: [], note: null }], now);
+    const unknown = summarizeServices("connected-services", [{ id: "alert-webhook", label: "X", status: "unknown", missing: [], note: null }], now);
     expect(unknown).toMatchObject({ state: "unavailable" });
     expect(unknown).not.toHaveProperty("needsSetup");
   });
 });
 
 describe("each not-configured reading is flagged and its row declares setup help", () => {
-  const never = (job: string) => ({ ...assessSweepHeartbeat(null, now), summary: null, job });
-
   const cases: Array<[string[], { needsSetup?: boolean }[]]> = [
     [["backup-r2-database", "backup-r2-files"], [...offsiteBackupFields({ state: "not_connected" }, now), ...offsiteBackupFields({ state: "misconfigured", missing: ["BACKUP_R2_READ_BUCKET"], invalid: [] }, now)]],
     [["security-check"], [securityCheckFields({ mode: "skip", missing: ["TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"], production: true }, now), securityCheckFields({ mode: "skip", missing: ["TURNSTILE_SECRET_KEY"], production: true }, now)]],
     [["alert-delivery"], [alertDeliveryFields("alert-delivery", { configured: false, run: null }, now)]],
     [["location-waitlist-digest"], [locationWaitlistDigestFields("location-waitlist-digest", { ...assessSweepHeartbeat({ lastSucceededAt: now, lastFailedAt: null }, now), summary: { status: "EMAIL_NOT_CONFIGURED" } }, now)]],
-    [["server-autodeploy"], [autodeployFields("server-autodeploy", never("x"), now)]],
-    [["server-docker-cleanup"], [dockerCleanupFields("server-docker-cleanup", never("x"), now)]],
-    [["server-runtime-guard"], [runtimeGuardFields("server-runtime-guard", never("x"), now)]],
+    [["server-autodeploy"], [autodeployFields("server-autodeploy", never(), now)]],
+    [["server-docker-cleanup"], [dockerCleanupFields("server-docker-cleanup", never(), now)]],
+    [["server-runtime-guard"], [runtimeGuardFields("server-runtime-guard", never(), now)]],
     [["square-notices"], [squareNoticeFields("square-notices", { configured: false, lastNoticeAt: null, newestPaymentAt: null, ignoredCount: 0, now })]],
     [["resend-notices", "ses-notices"], [emailNoticeFields("resend-notices", "RESEND", { active: "RESEND", webhookConfigured: false, lastNoticeAt: null, newestSentAt: null, now })]],
   ];
@@ -210,20 +222,20 @@ describe("each not-configured reading is flagged and its row declares setup help
 
 describe("a source scan fails on 'not set up' wording nobody covered", () => {
   const WORDING = /not set up|not configured|not connected|isn['’]t set up|aren['’]t set up|is not set\b|connect read-only|not reporting|settings are incomplete/i;
-  type Entry = { file: string; snippet: string; rows: string[] };
+  type Entry = { file: string; snippet: string; rows: string[]; read: () => Array<{ needsSetup?: boolean }> };
   const dir = "modules/system-admin/system-report";
   const registry: Entry[] = [
-    { file: `${dir}/job-signals.ts`, snippet: "Not set up, so alerts are only written", rows: ["alert-delivery"] },
-    { file: `${dir}/job-signals.ts`, snippet: "account email is not set up", rows: ["location-waitlist-digest"] },
-    { file: `${dir}/job-signals.ts`, snippet: "Not set up, so it was not tested", rows: ["google-keys-reachable", "breach-service-reachable", "email-reachable", "square-reachable", "apple-pay-file-reachable"] },
-    { file: `${dir}/job-signals.ts`, snippet: "Not reporting yet", rows: ["server-autodeploy", "server-docker-cleanup", "server-runtime-guard"] },
-    { file: `${dir}/backup-signals.ts`, snippet: "connect read-only R2", rows: ["backup-r2-database", "backup-r2-files"] },
-    { file: `${dir}/backup-signals.ts`, snippet: "settings are incomplete", rows: ["backup-r2-database", "backup-r2-files"] },
-    { file: `${dir}/security-check-signal.ts`, snippet: "Security check not configured", rows: ["security-check"] },
-    { file: `${dir}/security-check-signal.ts`, snippet: "is not set.", rows: ["security-check"] },
-    { file: `${dir}/notice-signals.ts`, snippet: "Square is not set up", rows: ["square-notices"] },
-    { file: `${dir}/notice-signals.ts`, snippet: "notices aren't set up", rows: ["resend-notices", "ses-notices"] },
-    { file: `${dir}/service-setup.ts`, snippet: "Not set up:", rows: ["connected-services", "payment-setup"] },
+    { file: `${dir}/job-signals.ts`, snippet: "Not set up, so alerts are only written", rows: ["alert-delivery"], read: notSetUpReadings.alert },
+    { file: `${dir}/job-signals.ts`, snippet: "account email is not set up", rows: ["location-waitlist-digest"], read: notSetUpReadings.digest },
+    { file: `${dir}/job-signals.ts`, snippet: "Not set up, so it was not tested", rows: ["google-keys-reachable", "breach-service-reachable", "email-reachable", "square-reachable", "apple-pay-file-reachable"], read: notSetUpReadings.tests },
+    { file: `${dir}/job-signals.ts`, snippet: "Not reporting yet", rows: ["server-autodeploy", "server-docker-cleanup", "server-runtime-guard"], read: notSetUpReadings.heartbeat },
+    { file: `${dir}/backup-signals.ts`, snippet: "connect read-only R2", rows: ["backup-r2-database", "backup-r2-files"], read: () => offsiteBackupFields({ state: "not_connected" }, now) },
+    { file: `${dir}/backup-signals.ts`, snippet: "settings are incomplete", rows: ["backup-r2-database", "backup-r2-files"], read: () => offsiteBackupFields({ state: "misconfigured", missing: ["BACKUP_R2_READ_BUCKET"], invalid: [] }, now) },
+    { file: `${dir}/security-check-signal.ts`, snippet: "Security check not configured", rows: ["security-check"], read: notSetUpReadings.security },
+    { file: `${dir}/security-check-signal.ts`, snippet: "is not set.", rows: ["security-check"], read: notSetUpReadings.security },
+    { file: `${dir}/notice-signals.ts`, snippet: "Square is not set up", rows: ["square-notices"], read: notSetUpReadings.square },
+    { file: `${dir}/notice-signals.ts`, snippet: "notices aren't set up", rows: ["resend-notices", "ses-notices"], read: notSetUpReadings.email },
+    { file: `${dir}/service-setup.ts`, snippet: "Not set up:", rows: ["connected-services", "payment-setup"], read: notSetUpReadings.services },
   ];
   const serviceRows = new Set(["connected-services", "payment-setup"]);
 
@@ -244,6 +256,14 @@ describe("a source scan fails on 'not set up' wording nobody covered", () => {
   it("has no stale entries", () => {
     for (const entry of registry) {
       expect(matches.some(({ file, line }) => file === entry.file && line.includes(entry.snippet)), `${entry.file} no longer has "${entry.snippet}"`).toBe(true);
+    }
+  });
+
+  it("flags the not-configured reading behind every registered entry", () => {
+    for (const entry of registry) {
+      const readings = entry.read();
+      expect(readings.length, entry.snippet).toBeGreaterThan(0);
+      for (const reading of readings) expect(reading.needsSetup, `"${entry.snippet}" is not flagged needsSetup`).toBe(true);
     }
   });
 
@@ -372,5 +392,93 @@ describe("the System report page", () => {
     const summary = summarizeServices("connected-services", nothingSet().services.slice(0, 3), now);
     const markup = render({ ...base, key: "connected-services", name: "Connected services", needsSetup: true, serviceSetup: summary.serviceSetup });
     expect(markup.match(/data-setup-help="/g)?.length).toBe(3);
+  });
+});
+
+describe("the report catalog", () => {
+  /** Rows that never read "not set up", each with the reason. A new row must declare `setup` or be added here. */
+  const NEVER_NEEDS_SETUP: Array<{ reason: string; keys: string[] }> = [
+    { reason: "Reads the running release or the database, which are always there", keys: ["release-version", "release-deployed", "database-connection", "database-migrations"] },
+    { reason: "Sweep, queue and alert readings: they say a job is late or failing, which is a fault, not a missing setting", keys: ["email-sweep", "email-delivery", "email-queue", "calendar-feed-refresh", "message-file-cleanup", "alert-scan", "deadline-reminders", "class-waitlists", "instructor-class-emails", "honor-watch-summaries", "health-snapshots", "retention-cleanups", "open-alerts"] },
+    { reason: "The app's own backup helper is optional; production backups are made by xCloud and read by the R2 rows", keys: ["backup-last", "backup-restore-test"] },
+    { reason: "Money, registration and event readings are counts of things that need a person, not settings", keys: ["payment-attempts", "square-environment", "ledger-check", "balances-due", "pricing-self-test", "capacity-holds-released", "open-without-form", "registrations-received", "general-link-expiry", "cancellations-stuck", "refunds-stuck", "duplicate-charges", "pay-on-square-sweep", "church-share-drift", "refund-self-test", "import-review", "capacity", "imports-stuck", "checkin-stations", "honors-offers-overdue", "lodging-offers-lapsed", "lodging-change-requests", "meal-tickets-missing", "scholarship-pledges-unsettled", "club-orders-open"] },
+    { reason: "Storage, communications and notice counts say what is stuck or how many, never that something is unset", keys: ["message-file-storage", "server-disk-space", "scheduled-emails-stuck", "delivery-locks-stale", "deadline-reminders-waiting", "calendar-feeds-failing", "file-removals-retrying", "rejected-notices", "bounces-complaints"] },
+    { reason: "Public-site readings are counts, and our own calendar feed needs no setting", keys: ["broken-links", "page-speed", "calendar-feed-reachable"] },
+    { reason: "Checked by people on the readiness page, and the administrator list is read from accounts", keys: ["checklist-server", "checklist-go-live", "admin-protection"] },
+    { reason: "Pure built-in self-tests with fixed data", keys: ["lodging-quote", "meal-price", "invoice-figures", "ledger-split", "badge-csv", "roster-export", "ics-parsing", "scheduled-email"] },
+    { reason: "Summary rows: each service that is not set up gets its own panel through serviceSetup", keys: ["connected-services", "payment-setup"] },
+  ];
+  const allowed = NEVER_NEEDS_SETUP.flatMap((group) => group.keys);
+
+  it("makes every declared row either declare setup help or sit on the never-needs-setup list", () => {
+    const missing = providerMetas.filter((meta) => !meta.setup && !allowed.includes(meta.key)).map((meta) => meta.key);
+    expect(missing, "a new row needs `setup` (or a reason on NEVER_NEEDS_SETUP)").toEqual([]);
+  });
+
+  it("keeps the list honest: no unknown keys, no duplicates, no row that declares setup", () => {
+    expect(new Set(allowed).size).toBe(allowed.length);
+    for (const key of allowed) {
+      const meta = providerMetas.find((candidate) => candidate.key === key);
+      expect(meta, `${key} is not a declared row`).toBeDefined();
+      expect(meta?.setup, `${key} declares setup, so remove it from the list`).toBeUndefined();
+    }
+    for (const group of NEVER_NEEDS_SETUP) expect(group.reason.length).toBeGreaterThan(20);
+  });
+});
+
+describe("a service with no setup entry", () => {
+  it("gets no panel, never another service's steps", () => {
+    const unknown = { id: "synthetic-new-service", label: "A new service", status: "not-configured", missing: [], note: null } as unknown as ReturnType<typeof nothingSet>["services"][number];
+    const row = summarizeServices("connected-services", [unknown], now);
+    expect(row.needsSetup).toBe(true);
+    expect(row.serviceSetup).toEqual([]);
+  });
+});
+
+describe("the numbered steps", () => {
+  it("are drawn as a numbered list", () => {
+    const css = readFileSync(path.join(root, "components/setup-help.module.css"), "utf8");
+    const rule = css.match(/\.steps\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/list-style:\s*decimal/);
+    expect(rule).toMatch(/padding-left:\s*(1\.[5-9]|[2-9])/);
+  });
+});
+
+describe("one full panel per page", () => {
+  const row = (key: string, setup: Signal["setup"]): Signal => ({
+    key, section: "email", name: key, description: "Checks.", checkedAt: now.toISOString(), whenLabel: "Checked", state: "watch",
+    resultText: "Not set up.", fixHref: null, fixLabel: null, setup, needsSetup: true,
+  });
+  const render = (signals: Signal[]) => renderToStaticMarkup(createElement(SystemReportView, { report: buildSystemReport(signals, now), cloudflarePurgeConfigured: true }));
+
+  it("shows the registry's first claim once", () => {
+    const registry = createSetupHelpRegistry();
+    expect([registry.claim("a"), registry.claim("a"), registry.claim("b")]).toEqual([true, false, true]);
+    expect(createSetupHelpRegistry().claim("a")).toBe(true);
+  });
+
+  it("shows the steps once and a short link to them for the same setup elsewhere", () => {
+    const markup = render([row("email-provider", SYSTEM_SETUP_STEPS["email-provider"]), row("email-reachable", SYSTEM_SETUP_STEPS["email-provider"]), row("security-check", SYSTEM_SETUP_STEPS.turnstile)]);
+    expect(markup.match(/data-setup-help="steps"/g)).toHaveLength(2);
+    expect(markup.match(/data-setup-help="again"/g)).toHaveLength(1);
+    expect(markup.match(/id="setup-help-email-provider"/g)).toHaveLength(1);
+    expect(markup).toContain('href="#setup-help-email-provider"');
+    expect(markup.match(/<code>RESEND_API_KEY<\/code>/g)).toHaveLength(1);
+  });
+
+  it("repeats a service's steps as a link when a summary row lists what a row above already showed", () => {
+    const services = summarizeServices("connected-services", nothingSet().services.filter((service) => service.id === "payments"), now);
+    const markup = render([row("square-reachable", SYSTEM_SETUP_STEPS["square-payments"]), { ...row("connected-services", undefined), serviceSetup: services.serviceSetup }]);
+    expect(markup.match(/data-setup-help="steps"/g)).toHaveLength(1);
+    expect(markup.match(/data-setup-help="again"/g)).toHaveLength(1);
+  });
+
+  it("with all settings blank, no setup's full steps appear twice", () => {
+    const markup = render([
+      row("payment-setup", undefined), row("connected-services", undefined),
+    ].map((signal, index) => ({ ...signal, serviceSetup: summarizeServices("x", index === 0 ? nothingSet().services.filter((service) => service.id.startsWith("payment")) : nothingSet().services, now).serviceSetup })));
+    const ids = [...markup.matchAll(/<ol class="[^"]*" id="(setup-help-[a-z-]+)"/g)].map((match) => match[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

@@ -1,3 +1,4 @@
+import type { EnvironmentServiceId } from "@/modules/system-admin/environment-status";
 import type { SetupHelp } from "./types";
 
 /**
@@ -233,8 +234,14 @@ export function systemSetupFor(id: SystemSetupId): SetupHelp {
   return SYSTEM_SETUP_STEPS[id];
 }
 
+/** The id of a setup from this file, found by identity, or `null` for any other. Lets a page show each full panel once. */
+export function systemSetupIdOf(setup: SetupHelp): SystemSetupId | null {
+  const found = (Object.keys(SYSTEM_SETUP_STEPS) as SystemSetupId[]).find((id) => SYSTEM_SETUP_STEPS[id] === setup);
+  return found ?? null;
+}
+
 /** The `setup` for each EnvironmentStatus service id (`environment-status.ts`). A new service there needs an entry here. */
-export const ENVIRONMENT_SERVICE_SETUP: Record<string, SystemSetupId> = {
+export const ENVIRONMENT_SERVICE_SETUP: Record<EnvironmentServiceId, SystemSetupId> = {
   "email-provider": "email-provider",
   "email-reports": "email-reports",
   "account-email": "account-email",

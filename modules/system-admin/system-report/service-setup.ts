@@ -7,9 +7,10 @@ type EnvService = EnvironmentStatus["services"][number];
 
 /** The setup help for each service that is not set up, found by the EnvironmentStatus service id (#1434). Fixed words and setting names only. */
 export function serviceSetupFor(services: readonly EnvService[]): ServiceSetup[] {
+  // A service with no entry gets no panel, never another service's steps. The guard test fails for any unmapped id.
   return services
-    .filter((service) => service.status === "not-configured")
-    .map((service) => ({ id: service.id, label: service.label, setup: systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id] ?? "email-provider") }));
+    .filter((service) => service.status === "not-configured" && service.id in ENVIRONMENT_SERVICE_SETUP)
+    .map((service) => ({ id: service.id, label: service.label, setup: systemSetupFor(ENVIRONMENT_SERVICE_SETUP[service.id]) }));
 }
 
 /** "Set up" is a configuration fact, never proof the service works: the labels are fixed names, never values. */

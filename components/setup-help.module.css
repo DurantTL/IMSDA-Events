@@ -19,7 +19,8 @@
   display: grid;
   gap: 8px;
   margin: 0;
-  padding-left: 1.4rem;
+  padding-left: 1.75rem;
+  list-style: decimal;
 }
 
 .subhead {
@@ -52,6 +53,11 @@
   overflow-wrap: anywhere;
 }
 
-.ask {
+.ask,
+.again {
   color: var(--muted);
+}
+
+.again {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
