@@ -10,6 +10,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { suppressionExplanation, suppressionLabel } from "@/modules/communications/suppression-labels";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { closeRegistrationUrlAction, followRegistrationParam, withoutRegistrationParam, type ParamOpened } from "@/lib/registration-param";
 import {
@@ -311,7 +312,8 @@ export function PeopleWorkspace({
   const orderText = resultOrderText === undefined ? registrationListOrderText : resultOrderText;
   const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [filter, setFilter] = useState(initialFilter);
   const [modal, setModal] = useState<"detail" | "edit" | null>(initialSelected ? "detail" : null);
   const [selected, setSelected] = useState<RegistrationRecord | null>(initialSelected);
@@ -800,7 +802,7 @@ export function PeopleWorkspace({
       <PendingTeamsNotice canManage={canEdit} count={pendingTeamCount} eventId={eventId} />
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
-        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
+        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       <div className="page-intro people-intro">
@@ -828,6 +830,7 @@ export function PeopleWorkspace({
         </div>
       </div>
       <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (
@@ -899,7 +902,7 @@ export function PeopleWorkspace({
               ? `No team is registered yet, but ${pendingTeamsLabel(pendingTeamCount)}. Use the Review them link above to confirm the club; a team becomes a registration then.`
               : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>
-        : <div className="empty-state panel"><Search aria-hidden="true" size={24} /><h3>No matching registrations</h3><p>Nothing matches this search or filter. Clear it to see all {registrations.length} registrations.</p><button className="secondary-button" onClick={() => { setQuery(""); setFilter("ALL"); }} type="button">Clear search and filter</button></div>)}
+        : <div className="empty-state panel"><Search aria-hidden="true" size={24} /><h3>No matching registrations</h3><p>Nothing matches this search or filter. Clear it to see all {registrations.length} registrations.</p><button className="secondary-button" onClick={() => { search.setValue(""); setFilter("ALL"); }} type="button">Clear search and filter</button></div>)}
 
       {emailingSelection && (
         <SelectedAudienceDialog

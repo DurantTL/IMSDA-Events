@@ -4,6 +4,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
@@ -144,7 +145,10 @@ export function CalendarAdminWorkspace({
   // Focus lands here when the edited row is no longer in the list (#869).
   const summaryRef = useRef<HTMLParagraphElement>(null);
   // Entries list (#796): search, filters, sort, and the rows ticked for a bulk action.
-  const [filters, setFilters] = useState<EntryFilters>(defaultEntryFilters);
+  const [dropdownFilters, setFilters] = useState<EntryFilters>(defaultEntryFilters);
+  const search = useClientSearch(defaultEntryFilters.search);
+  // The list filters on the settled search term, not on every keystroke.
+  const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
   const [sort, setSort] = useState<EntrySort>("date");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(pageSize);
@@ -159,6 +163,13 @@ export function CalendarAdminWorkspace({
   function startNewView() {
     setSelected(new Set());
     setVisibleCount(pageSize);
+  }
+
+  // A changed search term starts a new view too, once the list has changed.
+  const [searchTermSeen, setSearchTermSeen] = useState(search.term);
+  if (searchTermSeen !== search.term) {
+    setSearchTermSeen(search.term);
+    startNewView();
   }
 
   function changeFilters(patch: Partial<EntryFilters>) {
@@ -353,7 +364,8 @@ export function CalendarAdminWorkspace({
                 feeds={initialFeeds}
                 filters={filters}
                 onChange={changeFilters}
-                onReset={() => { setFilters(defaultEntryFilters); startNewView(); }}
+                onReset={() => { setFilters(defaultEntryFilters); search.setValue(defaultEntryFilters.search); startNewView(); }}
+                search={search}
                 onSort={(next) => { setSort(next); startNewView(); }}
                 sort={sort}
               />
@@ -946,6 +958,7 @@ function EntryFiltersBar({
   onChange,
   onReset,
   onSort,
+  search,
   sort,
 }: {
   categories: string[];
@@ -954,6 +967,7 @@ function EntryFiltersBar({
   onChange: (patch: Partial<EntryFilters>) => void;
   onReset: () => void;
   onSort: (sort: EntrySort) => void;
+  search: ReturnType<typeof useClientSearch>;
   sort: EntrySort;
 }) {
   return (
@@ -962,10 +976,9 @@ function EntryFiltersBar({
         <span className="calendar-search-label">Search entries</span>
         <input
           maxLength={100}
-          onChange={(event) => onChange({ search: event.target.value })}
+          {...search.inputProps}
           placeholder="Title, location or description"
           type="search"
-          value={filters.search}
         />
       </label>
       <div className="calendar-filter-row filter-bar">

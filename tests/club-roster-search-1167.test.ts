@@ -425,7 +425,7 @@ describe("filters combine and reset together (#1167 review)", () => {
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
     const start = source.indexOf("function clearFilters()");
     const body = source.slice(start, source.indexOf("\n  }\n", start));
-    expect(body).toContain("setQuery(cleared.query)");
+    expect(body).toContain("search.setValue(cleared.query)");
     expect(body).toContain("setDetailsOnly(cleared.detailsOnly)");
     expect(body).toContain("setComplianceFilter(cleared.complianceFilter)");
     expect(body).toContain('dropFilterParams("filter", "compliance")');
@@ -454,7 +454,10 @@ describe("focus, announcements and labels after the review (#1167)", () => {
   });
 
   it("announces the result politely and only after typing pauses", () => {
-    expect(source).toContain("useDebouncedValue(resultText, 300)");
+    // The announced text follows the shared search term, which settles once typing pauses (#1431).
+    expect(source).toContain("useClientSearch()");
+    expect(source).toContain("const query = search.term;");
+    expect(source).not.toContain("useDebouncedValue");
     const out = html();
     expect(out).toMatch(/<p aria-live="polite" class="sr-only" role="status">2 of 2 people shown<\/p>/);
     // The visible count is not itself a live region, so each key does not re-announce it.

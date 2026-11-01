@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { KeyRound, Plus, Search, ShieldCheck, UserCog, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { eventRoles, rolePermissions, type EventRole } from "@/modules/access/permissions";
@@ -35,7 +36,8 @@ type StaffMembership = {
 
 export function StaffWorkspace({ eventId, eventName, initialMemberships, currentUserId, currentUserIsSystemAdmin, canAddStaff = false, canOpenPeople = false }: { eventId: string; eventName: string; initialMemberships: StaffMembership[]; currentUserId: string; currentUserIsSystemAdmin: boolean; /** Whether the viewer may add staff: the button and the empty-state action show only then (#743). The server decides again. */ canAddStaff?: boolean; /** Whether the viewer may open People & access (a system administrator or Clubs Administrator); the link to a person's page shows only then. */ canOpenPeople?: boolean }) {
   const [memberships, setMemberships] = useState(initialMemberships);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [selected, setSelected] = useState<StaffMembership | null>(null);
   const [modal, setModal] = useState<"add" | "edit" | null>(null);
   const [saving, setSaving] = useState(false);
@@ -132,7 +134,7 @@ export function StaffWorkspace({ eventId, eventName, initialMemberships, current
 
   return <section className="page-stack">
     <div className="page-intro"><div><p className="eyebrow">Event access</p><h2 className="duplicate-page-title">{staffPageTitles.team}</h2><p>Control who can work in {eventName} and which operational role each account receives.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> {activeCount} active</span>{canAddStaff && <button className="primary-button" type="button" onClick={openAdd}><Plus size={17} /> Add staff</button>}</div></div>
-    <div className="toolbar panel"><label className="search-field"><Search size={18} /><span className="sr-only">Search staff</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search staff name, email, or role" /></label></div>
+    <div className="toolbar panel"><label className="search-field"><Search size={18} /><span className="sr-only">Search staff</span><input {...search.inputProps} placeholder="Search staff name, email, or role" /></label><SearchResultStatus message={`${visible.length} staff ${visible.length === 1 ? "member" : "members"} shown.`} /></div>
     <div className="staff-list panel"><div className="staff-row staff-head"><span>Staff member</span><span>Event role</span><span>Status</span><span>Access</span></div>{visible.map((membership) => {
       const pendingActivation = membership.user.accountStatus === "PENDING_ACTIVATION";
       const hasAccess = membership.status === "ACTIVE" && !membership.user.accountDisabled && !pendingActivation;
