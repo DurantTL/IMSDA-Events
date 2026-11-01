@@ -36,6 +36,7 @@ import {
 } from "@/modules/club-rosters/guardians-domain";
 import { RosterGuardianFields, guardianErrorItems } from "@/components/roster-guardian-fields";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import {
   applyRosterFilters,
@@ -228,6 +229,8 @@ export function ClubRosterWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Offered with the "Deactivated …" message; reactivating is the existing reverse action (#1455).
+  const [undoDeactivate, setUndoDeactivate] = useState<RosterMemberRecord | null>(null);
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
@@ -501,6 +504,7 @@ export function ClubRosterWorkspace({
     setSaving(true);
     setError("");
     setNotice("");
+    setUndoDeactivate(null);
     try {
       const response = await fetch(url, {
         method,
@@ -516,7 +520,7 @@ export function ClubRosterWorkspace({
       if (success) setNotice(success);
       return result;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The roster could not be updated.");
+      setError(notSavedMessage(caught instanceof Error ? caught.message : "The roster could not be updated."));
       return null;
     } finally {
       setSaving(false);
@@ -583,9 +587,9 @@ export function ClubRosterWorkspace({
       ? await call(`${base}/${encodeURIComponent(editing.id)}`, "PATCH", {
         ...details,
         ...(birthDate ? { birthDate } : {}),
-      }, "Saved.")
+      }, savedMessage())
       : await call(base, "POST", { ...details, birthDate }, "Added to the roster. Next: they can be chosen when the club registers for an event.");
-    if (editing) rowChanged(editing, result?.members, "Saved.", true);
+    if (editing) rowChanged(editing, result?.members, savedMessage(), true);
     if (result) {
       setBirthDates(null);
       formElement.reset();
@@ -616,13 +620,20 @@ export function ClubRosterWorkspace({
       return;
     }
     clearMember();
-    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, "Saved.");
+    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, savedMessage());
     if (result) closeDialog();
   }
 
   async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE") {
     return call(`${base}/${encodeURIComponent(member.id)}`, "PATCH", { status },
-      status === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.");
+      status === "INACTIVE" ? `Deactivated ${member.firstName} ${member.lastName}.` : `Reactivated ${member.firstName} ${member.lastName}.`);
+  }
+
+  /** Undo for a deactivation: the same reactivate call the dialog already makes. */
+  async function undoStatusChange(member: RosterMemberRecord) {
+    const result = await setStatus(member, "ACTIVE");
+    if (!result) return;
+    window.requestAnimationFrame(() => document.getElementById(`roster-edit-${member.id}`)?.focus());
   }
 
   /** Deactivate/reactivate lives in the edit dialog now (#424), with a confirmation there. */
@@ -644,7 +655,8 @@ export function ClubRosterWorkspace({
     });
     if (!confirmed) return;
     const result = await setStatus(member, next);
-    rowChanged(member, result?.members, next === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.", true);
+    rowChanged(member, result?.members, next === "INACTIVE" ? "Deactivated." : "Reactivated.", true);
+    if (result && next === "INACTIVE") setUndoDeactivate(member);
     if (result) closeDialog();
   }
 
@@ -670,8 +682,12 @@ export function ClubRosterWorkspace({
   return (
     <div className="club-roster-stack">
       {confirmDialog}
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
+      {/* The page's one message slot; while the dialog is open its own slot (inside the dialog) shows errors. */}
+      {error && !dialogOpen
+        ? <FormMessage message={error} tone="error" />
+        : notice
+          ? <FormMessage message={notice} tone="success" undo={undoDeactivate ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+          : null}
 
       <section className="public-manage-card">
         <div className="public-manage-card-heading club-roster-heading">

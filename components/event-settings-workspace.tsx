@@ -74,6 +74,7 @@ import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage } from "@/components/form-error-summary";
+import { notSavedMessage, savedMessage } from "@/components/form-message";
 import { SettingsBlock } from "@/components/settings-block";
 import {
   blockForControlId,
@@ -461,7 +462,7 @@ export function EventSettingsWorkspace({
           const errors = fieldErrorsFromIssues(result.issues);
           if (Object.keys(errors).length > 0) showFieldErrors(errors);
         }
-        setSaveMessage({ kind: failure.kind === "conflict" ? "conflict" : "error", text: failure.message });
+        setSaveMessage({ kind: failure.kind === "conflict" ? "conflict" : "error", text: notSavedMessage(failure.message) });
         return;
       }
       if (mode === "create") {
@@ -489,9 +490,9 @@ export function EventSettingsWorkspace({
         : nextReadiness.items.find((item) => !item.complete)
           ? `Next: ${nextReadiness.items.find((item) => !item.complete)!.label.toLowerCase()} before you publish.`
           : "Next: publish the event when you are ready.";
-      setSaveMessage({ kind: "success", text: `Event settings saved. ${nextStep}` });
+      setSaveMessage({ kind: "success", text: savedMessage(nextStep) });
     } catch (caught) {
-      setSaveMessage({ kind: "error", text: caught instanceof Error ? caught.message : "The event could not be saved." });
+      setSaveMessage({ kind: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "The event could not be saved.") });
     } finally {
       setSaving(false);
     }
@@ -916,7 +917,7 @@ export function EventSettingsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       <nav aria-label="Jump to a settings section" className="settings-jump-bar">
-        <span aria-live="polite" className={`settings-save-status ${saveStatusNeedsAttention ? "is-dirty" : "is-clean"}`} data-save-state={saveState.state} role="status">
+        <span className={`settings-save-status ${saveStatusNeedsAttention ? "is-dirty" : "is-clean"}`} data-save-state={saveState.state}>
           {saveStatusNeedsAttention ? <AlertTriangle aria-hidden="true" size={14} /> : <CheckCircle2 aria-hidden="true" size={14} />}
           <strong>{saveStatus}</strong>
         </span>
@@ -1410,7 +1411,7 @@ export function EventSettingsWorkspace({
         <div className={`event-savebar${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
           <p className="event-savebar-status" aria-live={saveMessage && saveMessage.kind !== "success" ? "assertive" : "polite"}>
             {saveMessage
-              ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.kind === "conflict" ? "Conflict: not saved. " : saveMessage.kind === "error" ? "Failed: not saved. " : ""}{saveMessage.text}</span>
+              ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.text}</span>
               : saving
                 ? "Saving…"
                 : dirty

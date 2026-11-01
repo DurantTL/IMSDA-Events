@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
-import { AlertCircle, CheckCircle2, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -54,7 +56,7 @@ export function AttendeeProfileForm({
     }
     clearSummary();
     setState("saving");
-    setMessage("Saving profile…");
+    setMessage("");
     setNeedsSecondStep(false);
     try {
       const response = await submitJson("/api/attendee/profile", profile, { method: "PATCH", init: { cache: "no-store" } });
@@ -76,10 +78,10 @@ export function AttendeeProfileForm({
       setProfile(payload.profile);
       setSavedProfile(payload.profile);
       setState("saved");
-      setMessage("Profile saved. New registration forms can use these details.");
+      setMessage(savedMessage("New registration forms can use these details."));
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Your profile could not be saved.");
+      setMessage(notSavedMessage(error instanceof Error ? error.message : "Your profile could not be saved."));
     }
   }
 
@@ -181,21 +183,11 @@ export function AttendeeProfileForm({
         </div>
       </fieldset>
       <div className="public-manage-contact-actions">
-        <button disabled={state === "saving"} type="submit">
-          <Save size={17} aria-hidden="true" />
-          {state === "saving" ? "Saving…" : "Save profile"}
-        </button>
-        <p className={state === "error" ? "is-error" : state === "saved" ? "is-saved" : ""} role={state === "error" ? "alert" : "status"} aria-live="polite">
-          {state === "error" && <AlertCircle size={16} aria-hidden="true" />}
-          {state === "saved" && <CheckCircle2 size={16} aria-hidden="true" />}
-          {message}
-          {state === "error" && needsSecondStep && (
-            <>
-              {" "}
-              <Link href="/account/two-step">Finish two-step sign-in</Link>
-            </>
-          )}
-        </p>
+        <SubmitButton className="" icon={<Save size={17} aria-hidden="true" />} label="Save profile" submitting={state === "saving"} submittingLabel="Saving…" />
+        {message && state !== "idle" && state !== "saving" && (
+          <FormMessage tone={state === "error" ? "error" : "success"} message={message} />
+        )}
+        {state === "error" && needsSecondStep && <Link href="/account/two-step">Finish two-step sign-in</Link>}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={state === "saving"} onRetry={() => void save()} />}
       </div>
     </form>
