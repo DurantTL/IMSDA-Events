@@ -16,7 +16,11 @@ const contact = { email: "help@example.test", phone: "(515) 555-0100" };
 let mounted: Mounted | null = null;
 
 beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get() { return this.parentNode; } });
+  Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get() {
+    // jsdom has no layout: say everything takes up room, except content inside a closed <details> (as in a browser).
+    const details = this.closest("details");
+    return details && !details.open && this.tagName !== "SUMMARY" ? null : this.parentNode;
+  } });
   HTMLElement.prototype.getClientRects = function getClientRects() { return [{}] as unknown as DOMRectList; };
 });
 afterEach(async () => {
@@ -60,6 +64,26 @@ describe("Forms help dialog", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
+  it("Tab and Shift+Tab wrap inside the collapsed dialog (summaries are focusable)", async () => {
+    mounted = await mount(createElement(FormsHelp, { contact }));
+    await click(document.querySelector("[data-forms-help-trigger]")!);
+    await flush(40);
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    const stops = Array.from(dialog.querySelectorAll<HTMLElement>("button, summary"));
+    expect(stops.map((el) => el.tagName)).toEqual(["BUTTON", "SUMMARY", "SUMMARY", "SUMMARY"]);
+    stops[stops.length - 1]!.focus();
+    const forward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    stops[stops.length - 1]!.dispatchEvent(forward);
+    await flush(40);
+    expect(document.activeElement).toBe(stops[0]);
+    const back = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    stops[0]!.dispatchEvent(back);
+    await flush(40);
+    expect(document.activeElement).toBe(stops[stops.length - 1]);
+  });
+  it("close button uses the shared style", () => {
+    expect(readFileSync("components/forms-help.tsx", "utf8")).toContain("modal-close-button");
+  });
   it("uses the shared dialog hook", () => {
     expect(readFileSync("components/forms-help.tsx", "utf8")).toContain("useAccessibleDialog");
   });
@@ -72,8 +96,8 @@ describe("Forms help placements", () => {
     expect(renderToStaticMarkup(createElement(ClubPortalMastheadView, { model, role: "DIRECTOR" }))).not.toContain("Forms help");
   });
   it("is wired into the registration page, form, sign-in and login", () => {
-    expect(readFileSync("app/(public)/register/[eventSlug]/[formSlug]/page.tsx", "utf8")).toContain("<FormsHelp");
-    expect(readFileSync("components/public-registration-form.tsx", "utf8")).toContain("<FormsHelp");
+    expect(readFileSync("app/(public)/register/[eventSlug]/[formSlug]/page.tsx", "utf8")).toContain("formsHelpContact={formsHelpContact}");
+    expect(readFileSync("components/public-registration-form.tsx", "utf8").match(/<FormsHelpRow/g)).toHaveLength(2);
     expect(readFileSync("app/sign-in/page.tsx", "utf8")).toContain("<FormsHelp");
     expect(readFileSync("app/login/page.tsx", "utf8")).toContain("<FormsHelp");
   });

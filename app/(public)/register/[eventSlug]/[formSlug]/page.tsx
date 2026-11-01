@@ -7,7 +7,6 @@ import { clubDirectorSignInNotice } from "@/modules/club-registrations/club-noti
 import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-notice";
 import { EventInfoCards } from "@/components/event-info-cards";
 import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-content-blocks";
-import { FormsHelp } from "@/components/forms-help";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { listPublishedRegistrationInfoCards } from "@/modules/events/content-repository";
@@ -114,7 +113,6 @@ export default async function PublicRegistrationPage({
   return (
     <>
     <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
-    <FormsHelp contact={formsHelpContact} />
     <PublicRegistrationForm
       formsHelpContact={formsHelpContact}
       event={{

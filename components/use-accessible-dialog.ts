@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 const focusableSelector = [
   "a[href]",
+  "summary",
   "button:not([disabled])",
   "input:not([disabled])",
   "select:not([disabled])",

@@ -13,7 +13,7 @@ import { telHref, type FormsHelpContact } from "@/modules/system-admin/forms-hel
  * short bottom sheet on a phone. Every section starts collapsed (native details), so only headings show until tapped.
  * Dialog behavior (focus trap, Escape, focus back to the button) comes from the shared useAccessibleDialog hook.
  */
-export function FormsHelp({ contact, appearance = "link" }: { contact: FormsHelpContact; appearance?: "link" | "action" }) {
+export function FormsHelp({ contact, className }: { contact: FormsHelpContact; className?: string }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const dialogRef = useAccessibleDialog<HTMLElement>(open, close);
@@ -22,7 +22,7 @@ export function FormsHelp({ contact, appearance = "link" }: { contact: FormsHelp
     <>
       <button
         aria-haspopup="dialog"
-        className={appearance === "action" ? `${styles.trigger} ${styles.triggerAction}` : styles.trigger}
+        className={className ?? styles.trigger}
         data-forms-help-trigger=""
         onClick={() => setOpen(true)}
         type="button"
@@ -39,7 +39,7 @@ export function FormsHelp({ contact, appearance = "link" }: { contact: FormsHelp
           <section aria-labelledby="forms-help-title" aria-modal="true" className={`modal-card ${styles.card}`} ref={dialogRef} role="dialog" tabIndex={-1}>
             <div className={styles.head}>
               <h2 id="forms-help-title">Forms help</h2>
-              <button aria-label="Close" className={styles.close} onClick={close} type="button">
+              <button aria-label="Close" className={`icon-button modal-close-button ${styles.close}`} onClick={close} type="button">
                 <X aria-hidden="true" size={18} />
               </button>
             </div>
@@ -49,6 +49,15 @@ export function FormsHelp({ contact, appearance = "link" }: { contact: FormsHelp
         document.body,
       )}
     </>
+  );
+}
+
+/** A row in page flow that holds the link, so it is never a bare child of a layout that hides buttons (the phone submit card). */
+export function FormsHelpRow({ contact, align = "start" }: { contact: FormsHelpContact; align?: "start" | "end" }) {
+  return (
+    <div className={align === "end" ? `${styles.row} ${styles.rowEnd}` : styles.row}>
+      <FormsHelp contact={contact} />
+    </div>
   );
 }
 

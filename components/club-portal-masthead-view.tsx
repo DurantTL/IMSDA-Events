@@ -62,7 +62,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
             </span>
           )}
           {model.showSwitchClub && <Link className={styles.action} href="/account/clubs"><Repeat2 aria-hidden="true" size={16} />Switch club</Link>}
-          {formsHelpContact && <FormsHelp appearance="action" contact={formsHelpContact} />}
+          {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} />}
           {model.showMyAccount && <Link className={styles.action} href="/account"><UserRound aria-hidden="true" size={16} />My account</Link>}
           {model.signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={model.signOut === "both"} />}
         </div>

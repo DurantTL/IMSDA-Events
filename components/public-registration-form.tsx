@@ -40,7 +40,7 @@ import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
 import { SearchableSelect } from "@/components/searchable-select";
-import { FormsHelp } from "@/components/forms-help";
+import { FormsHelpRow } from "@/components/forms-help";
 import { SubmitButton } from "@/components/submit-button";
 import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -3518,6 +3518,7 @@ export function PublicRegistrationForm({
 
       <form className="public-registration-layout" noValidate onSubmit={submit}>
         <div className="public-registration-form-column">
+          {formsHelpContact && !club && <FormsHelpRow align="end" contact={formsHelpContact} />}
           {topContent}
           {joiningWaitlist && (
             <section className="public-registration-waitlist-banner" role="status">
@@ -3720,7 +3721,7 @@ export function PublicRegistrationForm({
                 submitting={submitting || submitQueued}
                 submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
-              {formsHelpContact && <FormsHelp contact={formsHelpContact} />}
+              {formsHelpContact && <FormsHelpRow contact={formsHelpContact} />}
             </section>
           )}
         </div>
