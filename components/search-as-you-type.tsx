@@ -388,11 +388,24 @@ export function useSearchAsYouType({
  * is typing in.
  */
 export function useSyncSearchField(formRef: RefObject<HTMLFormElement | null>, name: string, value: string) {
+  const previous = useRef(value);
   useEffect(() => {
+    const before = previous.current;
+    previous.current = value;
     const form = formRef.current;
     if (!form) return;
-    syncFieldValue(form.elements.namedItem(name) as HTMLInputElement | null, value, document.activeElement);
+    const field = form.elements.namedItem(name) as HTMLInputElement | null;
+    syncFieldValue(field, value, ownsFocusedField(field, before) ? null : document.activeElement);
   }, [formRef, name, value]);
+}
+
+/**
+ * True when the focused field still shows the address's previous value, so it holds no unsaved typing and may follow a
+ * new address (Back, Forward, a link) even though it has focus (rule B2, #1456). Typing that has not settled yet always
+ * differs from the previous address, so it is never overwritten. Compared on the trimmed value, as the address is.
+ */
+export function ownsFocusedField(field: { value: string } | null, previousValue: string) {
+  return field !== null && field.value.trim() === previousValue.trim();
 }
 
 /**
@@ -413,13 +426,6 @@ export function SearchAsYouTypeForm({
 }) {
   const { formProps, cancel, typing } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
   const lastSearch = useRef<string | null>(null);
-  // Back or Forward: the address wins, even over the focused box, unless its owner is mid-typing.
-  const fromHistory = useRef(false);
-  useEffect(() => {
-    const mark = () => { fromHistory.current = true; };
-    window.addEventListener("popstate", mark);
-    return () => window.removeEventListener("popstate", mark);
-  }, []);
 
   // After navigation (Back, a link) show the URL's values (text, selects, checkboxes), except in the control being used.
   useEffect(() => {
@@ -429,12 +435,19 @@ export function SearchAsYouTypeForm({
       return;
     }
     if (lastSearch.current === search) return;
+    const before = new URLSearchParams(lastSearch.current);
     lastSearch.current = search;
     const form = formProps.ref.current;
     if (!form) return;
     const params = new URLSearchParams(search);
-    const active = fromHistory.current && !typing() ? null : document.activeElement;
-    fromHistory.current = false;
+    // Back, Forward or a link: the focused box follows the address too when it still shows the previous address's
+    // value (no unsaved typing), so the words never outlive the filter. Text waiting for its pause is always kept.
+    const focused = document.activeElement;
+    const ownsFocus = !typing()
+      && (focused instanceof HTMLInputElement || focused instanceof HTMLSelectElement)
+      && focused.form === form
+      && ownsFocusedField(focused, before.get(focused.name) ?? "");
+    const active = ownsFocus ? null : focused;
     for (const element of Array.from(form.elements)) {
       if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement) || !element.name) continue;
       if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {

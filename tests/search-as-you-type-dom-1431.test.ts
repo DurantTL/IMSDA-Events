@@ -125,17 +125,33 @@ describe("SearchAsYouTypeForm in a DOM", () => {
     expect(select.value).toBe("all");
   });
 
-  it("on Back (popstate) the address wins even in the focused box, unless its owner is mid-typing", async () => {
+  it("on Back or a link the focused box follows the address when it holds no unsaved typing, whatever order events run in", async () => {
     mounted = await mount(form());
     q().focus();
+    // The box shows the previous address (no q), so it follows the new one: no popstate listener is involved.
     window.history.replaceState(null, "", "/admin/clubs?year=2026&q=fromback");
-    await act(async () => { window.dispatchEvent(new PopStateEvent("popstate")); mounted.root.render(form()); });
+    await act(async () => { mounted.root.render(form()); });
     expect(q().value).toBe("fromback");
+    window.history.replaceState(null, "", "/admin/clubs?year=2026");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("");
 
+    // Typing still waiting for its pause is never overwritten.
     await typeInto(q(), "typing");
     window.history.replaceState(null, "", "/admin/clubs?year=2026&q=again");
-    await act(async () => { window.dispatchEvent(new PopStateEvent("popstate")); mounted.root.render(form()); });
+    await act(async () => { mounted.root.render(form()); });
     expect(q().value).toBe("typing");
+  });
+
+  it("the typist's own settled search never rewrites the box (a trailing space survives)", async () => {
+    mounted = await mount(form());
+    q().focus();
+    await typeInto(q(), "ma ");
+    await pause(SEARCH_DEBOUNCE_MS * 2);
+    // The settled search lands in the address trimmed, as the router would put it.
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=ma");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("ma ");
   });
 });
 
