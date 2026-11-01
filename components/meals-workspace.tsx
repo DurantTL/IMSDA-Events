@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useState } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
@@ -87,7 +88,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
     <section className="panel">
       <h3>Meal services</h3>
-      {view.services.length === 0 ? <p>No meal services yet. Add one below.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.services.length === 0 ? <><p>No meal services yet. Add one below.</p><EventSetupHelp context="meal services" id="meals-no-services" /></> : <div className="table-wrap"><table className="report-table report-table-auto">
         <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
         <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
       </table></div>}

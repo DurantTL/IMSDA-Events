@@ -1,4 +1,5 @@
 import { ExactValue } from "@/components/exact-value";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
 import type { DirectorSterlingPerson } from "@/modules/background-checks/director-follow-up";
 
@@ -7,7 +8,7 @@ import type { DirectorSterlingPerson } from "@/modules/background-checks/directo
  * children's event (#874): who still needs a current check before they can be
  * checked in. Status only: no dates, contact details or staff-only notes.
  */
-export function DirectorSterlingFollowUp({ people }: { people: DirectorSterlingPerson[] }) {
+export function DirectorSterlingFollowUp({ people, base }: { people: DirectorSterlingPerson[]; /** The club's portal path: shows how to clear the follow-up (#1435). */ base?: string }) {
   return (
     <section className="public-manage-card" id="sterling-follow-up">
       <h3>Sterling Volunteers follow-up</h3>
@@ -41,6 +42,7 @@ export function DirectorSterlingFollowUp({ people }: { people: DirectorSterlingP
           </table>
         </div>
       )}
+      {people.length > 0 && base && <ClubSetupHelp base={base} context="the Sterling Volunteers follow-up" id="sterling-follow-up" />}
     </section>
   );
 }

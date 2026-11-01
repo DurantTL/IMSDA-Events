@@ -1,6 +1,7 @@
 "use client";
 
 import { ExactValue, Money } from "@/components/exact-value";
+import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";

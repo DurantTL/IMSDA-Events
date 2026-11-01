@@ -1,6 +1,7 @@
 "use client";
 
 import { Money } from "@/components/exact-value";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useMemo, useState } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
@@ -297,6 +298,7 @@ export function SquarePaymentMatching({
               Events, including in the Square app at check-in, are still
               unknown until Square can be reached.
             </p>
+            <EventSetupHelp context="Square payments" id={/not configured/i.test(unavailable ?? "") ? "square-not-configured" : "square-unavailable"} />
           </div>
         )}
         {outstanding.length === 0 && !unavailable && (

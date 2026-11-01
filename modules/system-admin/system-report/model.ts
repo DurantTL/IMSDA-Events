@@ -12,6 +12,8 @@
  * - Counts, states and times only: a signal carries no secret, setting value, address or person's name.
  */
 
+import type { ServiceSetup, SetupHelp } from "@/modules/setup-help/types";
+
 export type SignalState = "ok" | "watch" | "attention" | "unavailable" | "info";
 
 export type SectionKey =
@@ -59,6 +61,12 @@ export type Signal = {
   noTimeLabel?: string;
   /** Replaces the section's status chip text when the section is not counted (for example "11 of 13 ticked"). */
   sectionLabel?: string;
+  /** How to set this row up (#1434): declared with the row, shown only while `needsSetup` is true. */
+  setup?: SetupHelp;
+  /** The reading says this is not set up, not configured or not connected, so the row shows its `setup` help. A row that only could not be read never sets it. */
+  needsSetup?: boolean;
+  /** For a row that lists several services: the setup help for each one that is not set up. */
+  serviceSetup?: ServiceSetup[];
 };
 
 export type SectionDefinition = {
@@ -92,7 +100,7 @@ export const SECTION_DEFINITIONS: readonly SectionDefinition[] = [
   { key: "checklist", title: "Readiness checklist", fixHref: "/admin/readiness", fixLabel: "Open readiness" },
 ];
 
-export type SignalMeta = Pick<Signal, "key" | "name" | "description" | "fixHref" | "fixLabel">;
+export type SignalMeta = Pick<Signal, "key" | "name" | "description" | "fixHref" | "fixLabel"> & Partial<Pick<Signal, "setup">>;
 
 export type ReportSection = SectionDefinition & {
   state: SignalState;

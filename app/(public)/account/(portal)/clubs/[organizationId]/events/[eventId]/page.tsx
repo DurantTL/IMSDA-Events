@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, CalendarDays, CheckCircle2, FileDown, MapPin, Plus, Printer, QrCode, UsersRound } from "lucide-react";
@@ -158,7 +159,10 @@ export default async function ClubEventRegistrationPage({
             Your club can enter more than one team. Each team has its own name, its own people, and its own registration.
           </p>
           {workspace.teams.registered.length === 0 && workspace.teams.drafts.length === 0 && (
-            <p className="public-manage-empty">Your club has not registered a team yet.</p>
+            <>
+              <p className="public-manage-empty">Your club has not registered a team yet.</p>
+              <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="team registration" id="event-team-none" />
+            </>
           )}
           <ul className="public-manage-club-list">
             {workspace.teams.registered.map((team) => (
@@ -198,11 +202,17 @@ export default async function ClubEventRegistrationPage({
               <Plus size={14} aria-hidden="true" /> Register {workspace.teams.registered.length > 0 ? "another" : "a"} team
             </Link>
           ) : workspace.problem ? (
-            <p className="public-manage-empty">{workspace.problem} Let the event team know so they can fix the form.</p>
+            <>
+              <p className="public-manage-empty">{workspace.problem} Let the event team know so they can fix the form.</p>
+              <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the registration form" id="event-form-problem" />
+            </>
           ) : (
-            <p className="public-manage-empty">
-              {workspace.event.phase === "CLOSED" ? "Registration has closed, so no more teams can be added." : "Registration isn't open yet."}
-            </p>
+            <>
+              <p className="public-manage-empty">
+                {workspace.event.phase === "CLOSED" ? "Registration has closed, so no more teams can be added." : "Registration isn't open yet."}
+              </p>
+              <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="registration" id="event-registration-closed" />
+            </>
           )}
         </section>
       )}
@@ -379,7 +389,7 @@ export default async function ClubEventRegistrationPage({
             )}
         </section>
       )}
-      {classes && <ClubClassPicker canOverrideRequirements={access.actor.kind === "STAFF_ACTING"} eventId={eventId} initialWorkspace={classes} organizationId={organizationId} />}
+      {classes && <ClubClassPicker setupBase={`/account/clubs/${organizationId}`} canOverrideRequirements={access.actor.kind === "STAFF_ACTING"} eventId={eventId} initialWorkspace={classes} organizationId={organizationId} />}
       {classes && classes.offerings.length > 0 && (
         <section className="public-manage-card club-schedule-link">
           <p>
@@ -390,10 +400,11 @@ export default async function ClubEventRegistrationPage({
           </Link>
         </section>
       )}
-      {sterlingFollowUp && <DirectorSterlingFollowUp people={sterlingFollowUp} />}
+      {sterlingFollowUp && <DirectorSterlingFollowUp base={`/account/clubs/${organizationId}`} people={sterlingFollowUp} />}
       {showingTeam && !workspace.registration && workspace.problem && (
         <section className="public-manage-card">
           <p className="public-manage-empty">{workspace.problem} Let the event team know so they can fix the form.</p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the registration form" id="event-form-problem" />
         </section>
       )}
       {showingTeam && !workspace.registration && !workspace.problem && workspace.event.phase !== "OPEN" && (

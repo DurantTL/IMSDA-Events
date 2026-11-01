@@ -21,6 +21,8 @@ type Fields = {
   resultText: string;
   checkedAt: string;
   whenLabel: string;
+  /** The reading says the R2 read-only settings are not set (or incomplete), so the row shows its setup help (#1434). */
+  needsSetup?: boolean;
 };
 
 const CUT_SHORT = " The listing was cut short, so a newer file may exist.";
@@ -46,14 +48,14 @@ export function offsiteBackupFields(result: OffsiteBackupResult | null, now: Dat
   }
 
   if (result.state === "not_connected") {
-    const neutral = (key: string): Fields => ({ key, state: "info", resultText: OFFSITE_NOT_CONNECTED_TEXT, checkedAt: readAt, whenLabel: "Checked" });
+    const neutral = (key: string): Fields => ({ key, state: "info", resultText: OFFSITE_NOT_CONNECTED_TEXT, checkedAt: readAt, whenLabel: "Checked", needsSetup: true });
     return [neutral(databaseKey), neutral(filesKey)];
   }
 
   if (result.state === "misconfigured") {
     const names = [...result.missing.map((name) => `${name} is missing`), ...result.invalid.map((name) => `${name} is not valid`)];
     const text = `The read-only R2 settings are incomplete: ${names.join("; ")}.`;
-    const row = (key: string): Fields => ({ key, state: "unavailable", resultText: text, checkedAt: readAt, whenLabel: "Tried" });
+    const row = (key: string): Fields => ({ key, state: "unavailable", resultText: text, checkedAt: readAt, whenLabel: "Tried", needsSetup: true });
     return [row(databaseKey), row(filesKey)];
   }
 

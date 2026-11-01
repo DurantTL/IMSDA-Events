@@ -8,7 +8,7 @@ import type { SignalState } from "./model";
 
 export const SECURITY_CHECK_NOT_CONFIGURED_TEXT = "Security check not configured";
 
-type Fields = { key: string; state: SignalState; resultText: string; checkedAt: string; whenLabel: string };
+type Fields = { key: string; state: SignalState; resultText: string; checkedAt: string; whenLabel: string; needsSetup?: boolean };
 
 export function securityCheckFields(
   configuration: TurnstileConfiguration = getTurnstileConfiguration(),
@@ -25,6 +25,7 @@ export function securityCheckFields(
   return {
     ...common,
     state: "watch",
+    needsSetup: true,
     resultText: `${SECURITY_CHECK_NOT_CONFIGURED_TEXT}. Forms are open to bots until both keys are set.${names}`,
   };
 }

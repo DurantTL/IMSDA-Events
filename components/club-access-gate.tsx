@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ShieldCheck } from "lucide-react";
 import { PasskeyUnlockButton } from "@/components/passkey-unlock-button";
 import { RosterUnlockForm } from "@/components/roster-unlock-form";
@@ -32,9 +32,10 @@ export function ClubAccessGate({ access }: { access: RosterAccessState }) {
     return (
       <Gate title="Set up two-step sign-in first">
         <p>
-          Rosters hold birth dates for young people, so they need two-step sign-in.{" "}
-          <Link href="/account/profile">Set up an authenticator app or a passkey</Link>, then come back.
+          Two-step sign-in protects youth and medical records, and rosters hold birth dates for young people, so club pages need it.
+          Add a passkey first (it is the Easiest), or an authenticator app, then come back.
         </p>
+        <ClubSetupHelp base="/account/clubs" context="two-step sign-in" id="two-step-needed" />
       </Gate>
     );
   }

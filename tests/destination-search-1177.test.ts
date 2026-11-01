@@ -118,7 +118,8 @@ describe("destination registry per role", () => {
   it("does not offer event pages the viewer lacks the permission for", () => {
     const results = find(limitedStaff, "payments finance team imports promo settings");
     expect(results).toEqual([]);
-    expect(find(limitedStaff, "check-in").map((result) => result.label)).toEqual(["Check-in"]);
+    // The Help guide for check-in (#1435) is also a result for this viewer; the event pages are only Check-in.
+    expect(find(limitedStaff, "check-in").filter((result) => result.scope === "Event").map((result) => result.label)).toEqual(["Check-in"]);
   });
 
   it("follows the module rules: a card hidden for the event is not a result, and nothing is offered without an event", () => {

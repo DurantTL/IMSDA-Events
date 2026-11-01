@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { BackLink } from "@/components/back-link";
 import { ClubRosterCarryForward } from "@/components/club-roster-carry-forward";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
@@ -23,6 +24,7 @@ export default async function ClubRosterNextYearPage({ params }: { params: Promi
       <>
         <BackLink href={rosterHref}>Back to roster</BackLink>
         <p className="inline-notice" role="status">Your club role doesn&apos;t include starting a new year. Ask your club director.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="starting a new year" id="next-year-role" />
       </>
     );
   }

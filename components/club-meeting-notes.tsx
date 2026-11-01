@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
@@ -305,7 +306,12 @@ export function ClubMeetingNotes({
           </span>
         </div>
 
-        {notes.length === 0 && !formOpen && <p className="public-manage-empty">{`No meetings recorded for ${monthLabel} yet.`}</p>}
+        {notes.length === 0 && !formOpen && (
+          <>
+            <p className="public-manage-empty">{`No meetings recorded for ${monthLabel} yet.`}</p>
+            <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="meeting notes" id="meetings-none" />
+          </>
+        )}
 
         <ul className="public-manage-club-list">
           {notes.map((note) => (
