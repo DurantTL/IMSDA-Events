@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { EmailInput } from "@/components/email-input";
+import { PhoneInput } from "@/components/phone-input";
 import { inlineFieldProblem, inlinePhoneProblem } from "@/lib/field-validation";
 import type { PastorContactEntry } from "@/modules/organizations/contacts-repository";
 
@@ -75,11 +77,9 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
         <label htmlFor={`${base}-name`}>Name</label>
         <input autoComplete="off" id={`${base}-name`} maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} />
         <label htmlFor={`${base}-email`}>Email (optional)</label>
-        <input aria-describedby={emailProblem.message ? `${base}-email-error` : undefined} aria-invalid={emailProblem.message ? true : undefined} autoComplete="off" id={`${base}-email`} inputMode="email" maxLength={254} onBlur={() => setEmailTouched(true)} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
-        {emailProblem.message && <small className="field-error" id={`${base}-email-error`} role="alert">{emailProblem.message}</small>}
+        <EmailInput autoComplete="off" id={`${base}-email`} label="Email" maxLength={254} onBlur={() => setEmailTouched(true)} onValueChange={setEmail} showNow={emailTouched} value={email} />
         <label htmlFor={`${base}-phone`}>Phone (optional)</label>
-        <input aria-describedby={phoneProblem.message ? `${base}-phone-error` : undefined} aria-invalid={phoneProblem.message ? true : undefined} autoComplete="off" id={`${base}-phone`} inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} onChange={(event) => setPhone(event.target.value)} type="tel" value={phone} />
-        {phoneProblem.message && <small className="field-error" id={`${base}-phone-error`} role="alert">{phoneProblem.message}</small>}
+        <PhoneInput autoComplete="off" id={`${base}-phone`} label="Phone" onBlur={() => setPhoneTouched(true)} onValueChange={setPhone} showNow={phoneTouched} value={phone} />
         {active && <small>The current pastor is ended and kept in the history.</small>}
         <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save pastor"}</button>
       </form>

@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneInput } from "@/components/phone-input";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -559,7 +560,7 @@ export function AccountActions({ staff, account, isSelf, linkedEmailChangesToget
           <>
             <label>Display name<input maxLength={100} minLength={2} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} value={profile.displayName} /></label>
             <label>Title or responsibility<input maxLength={120} onChange={(event) => setProfile({ ...profile, jobTitle: event.target.value })} value={profile.jobTitle} /></label>
-            <label>Phone<input autoComplete="tel" maxLength={40} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} value={profile.phone} /></label>
+            <label>Phone<PhoneInput label="Phone" onValueChange={(value) => setProfile({ ...profile, phone: value })} stored={staff?.phone} value={profile.phone} /></label>
             <label>Profile notes<textarea maxLength={1000} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} rows={4} value={profile.bio} /></label>
           </>
         ) : null}

@@ -8,6 +8,7 @@ import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
@@ -15,7 +16,8 @@ import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
-import { isLooseEmail } from "@/lib/field-validation";
+import { EmailInput } from "@/components/email-input";
+import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, isEmail } from "@/lib/field-validation";
 
 const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs" } as const;
 
@@ -65,6 +67,9 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const [failure, setFailure] = useState("");
   const [result, setResult] = useState<InviteResult | null>(null);
   const titleId = useId();
+  // Anything typed or chosen in the open invitation form, until it has been sent (#1452).
+  const dirty = open && !result && (name.trim() !== "" || email.trim() !== "" || systemAdmin || clubsAdministrator || areaCoordinator || events.length > 0 || clubs.length > 0);
+  useUnsavedChangesGuard(dirty, "This invitation has not been sent. Leave this page and discard it?");
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
 
   function close() {
@@ -84,7 +89,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   function validate(): FieldErrors {
     const found: FieldErrors = {};
     if (name.trim().length < 2) found.name = "Enter the person's name.";
-    if (!isLooseEmail(email.trim())) found.email = "Enter a valid email address.";
+    if (!isEmail(email.trim())) found.email = EMAIL_FIELD_MESSAGE;
     if (events.some((row) => !row.eventId)) found.events = "Choose an event for each event row, or remove the row.";
     else if (new Set(events.map((row) => row.eventId)).size !== events.length) found.events = "Each event can be chosen once.";
     if (clubs.some((row) => !row.organizationId)) found.clubs = "Choose a club for each club row, or remove the row.";
@@ -191,8 +196,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </label>
                 <label className={styles.field}>
                   <span>Email</span>
-                  <input {...fieldErrorProps("invite-email-error", errors.email)} autoComplete="off" id="invite-email" inputMode="email" maxLength={254} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
-                  <FieldError id="invite-email-error">{errors.email}</FieldError>
+                  <EmailInput autoComplete="off" error={errors.email} errorId="invite-email-error" id="invite-email" label="Email" maxLength={MAX_EMAIL_LENGTH} onValueChange={setEmail} value={email} />
                 </label>
 
                 <fieldset {...fieldErrorProps("invite-access-error", errors.access)} id="invite-access">

@@ -3,6 +3,8 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { EmailInput } from "@/components/email-input";
+import { PhoneInput } from "@/components/phone-input";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { guardianErrorItems } from "@/components/roster-guardian-fields";
 import { BirthDateField } from "@/components/birth-date-field";
@@ -230,12 +232,10 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
                       <input autoComplete="off" defaultValue={value.relationship} maxLength={60} name={`g${slot}Relationship`} placeholder="e.g. Spouse or parent" />
                     </label>
                     <label>{guardianFieldLabels.email}
-                      <input {...fieldErrorProps(`roster-g${slot}Email-error`, guardianErrors[`g${slot}Email`])} autoComplete="email" id={`roster-g${slot}Email`} defaultValue={value.email} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
-                      <FieldError id={`roster-g${slot}Email-error`}>{guardianErrors[`g${slot}Email`]}</FieldError>
+                      <EmailInput autoComplete="email" defaultValue={value.email} error={guardianErrors[`g${slot}Email`]} errorId={`roster-g${slot}Email-error`} id={`roster-g${slot}Email`} label={guardianFieldLabels.email} maxLength={160} name={`g${slot}Email`} />
                     </label>
                     <label>{guardianFieldLabels.phone}
-                      <input {...fieldErrorProps(`roster-g${slot}Phone-error`, guardianErrors[`g${slot}Phone`])} autoComplete="tel" id={`roster-g${slot}Phone`} defaultValue={value.phone} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="tel" />
-                      <FieldError id={`roster-g${slot}Phone-error`}>{guardianErrors[`g${slot}Phone`]}</FieldError>
+                      <PhoneInput defaultValue={value.phone} error={guardianErrors[`g${slot}Phone`]} errorId={`roster-g${slot}Phone-error`} id={`roster-g${slot}Phone`} label={guardianFieldLabels.phone} name={`g${slot}Phone`} />
                     </label>
                   </div>
                 </div>

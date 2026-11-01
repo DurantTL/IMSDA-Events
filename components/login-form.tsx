@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
+import { EmailInput } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { EMAIL_FIELD_MESSAGE, isEmail } from "@/lib/field-validation";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
@@ -92,7 +94,7 @@ export function LoginForm({
   securityCheck?: SecurityCheckConfig;
 }) {
   const check = useRef<SecurityCheckHandle>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
+  const [email, setEmail] = useState(demoCredentials?.email ?? "");
   useEffect(() => {
     // The post-registration offer links here with the address and return path in the fragment,
     // which keeps them out of server logs. Same handling as the attendee form it replaces.
@@ -100,7 +102,12 @@ export function LoginForm({
     attendeeAuthReturnPathFromHash(window.location.hash);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const prefill = attendeeSignUpEmailPrefill(fragment.get("email") ?? undefined);
-    if (prefill && emailRef.current) emailRef.current.value = prefill;
+    const input = document.getElementById("sign-in-email") as HTMLInputElement | null;
+    if (prefill && input) {
+      // Through the input's own setter and an input event, so the controlled email field keeps what was prefilled.
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, prefill);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     removeAttendeeAuthFragment();
   }, [unified]);
   const router = useRouter();
@@ -143,10 +150,10 @@ export function LoginForm({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     // What the browser's required and email checks enforced before noValidate. Wrong-password answers stay general.
-    const email = String(form.get("email") ?? "").trim();
+    const typedEmail = String(form.get("email") ?? "").trim();
     const found: { email?: string; password?: string } = {};
-    if (!email) found.email = "Enter your email address.";
-    else if (!/^[^\s@]+@[^\s@]+$/.test(email)) found.email = "Enter a valid email address.";
+    if (!typedEmail) found.email = "Enter your email address.";
+    else if (!isEmail(typedEmail)) found.email = EMAIL_FIELD_MESSAGE;
     if (!String(form.get("password") ?? "")) found.password = "Enter your password.";
     setFieldErrors(found);
     const items = [
@@ -330,7 +337,7 @@ export function LoginForm({
   return (
     <form className="auth-form" noValidate onChange={fieldChanged} onSubmit={submit}>
       {summaryItems.length > 0 && <FormErrorSummary action="signing in" items={summaryItems} ref={summaryRef} />}
-      <label>Email address<input id="sign-in-email" name="email" type="email" autoComplete="username" required defaultValue={demoCredentials?.email} ref={emailRef} {...fieldErrorProps("sign-in-email_error", fieldErrors.email)} /><FieldError id="sign-in-email_error">{fieldErrors.email}</FieldError></label>
+      <label>Email address<EmailInput autoComplete="username" error={fieldErrors.email} errorId="sign-in-email_error" id="sign-in-email" label="Email address" maxLength={254} name="email" onValueChange={setEmail} required value={email} /></label>
       <label>Password<span className="password-field"><input id="sign-in-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} {...fieldErrorProps("sign-in-password_error", fieldErrors.password)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span><FieldError id="sign-in-password_error">{fieldErrors.password}</FieldError></label>
       <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label>{unified ? <Link href="/account/forgot-password">Forgot password?</Link> : <Link href="/forgot-password">Forgot password?</Link>}</div>
       {unified && <p className="field-help">Team member who cannot sign in? <Link href="/forgot-password">Reset a team password</Link>.</p>}

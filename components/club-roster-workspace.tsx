@@ -1,6 +1,7 @@
 "use client";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
@@ -224,12 +225,17 @@ export function ClubRosterWorkspace({
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/roster`;
   /** Reads and contact saves name the year on next year's roster, so the server answers for that year (#959). */
   const yearQuery = contactsOnlyDialog ? `?year=${encodeURIComponent(clubYear)}` : "";
+  /** The editor's values differ from the loaded ones (#1452); read from the form on each edit, since its fields are not controlled. */
+  const [dialogDirty, setDialogDirty] = useState(false);
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
+    setDialogDirty(false);
     setEditing(null);
     clearMember();
   }, [clearMember]);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
+  // Escape and Close keep their own "Discard unsaved changes?"; this adds the warning for links, Back and reload while the editor is open and changed.
+  useUnsavedChangesGuard(dialogOpen && dialogDirty, "You have unsaved changes to this roster member. Leave this page and discard them?");
   const formRef = useRef<HTMLFormElement>(null);
   const baselineRef = useRef<RosterFormSnapshot | null>(null);
   const savingRef = useRef(false);
@@ -247,6 +253,7 @@ export function ClubRosterWorkspace({
     const form = formRef.current;
     if (!dialogOpen || !form || !baselineRef.current) return;
     baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
+    setDialogDirty(rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form))));
   }, [guardianRev, dialogOpen]);
   const editorIsDirty = useCallback(() => {
     const form = formRef.current;
@@ -286,6 +293,7 @@ export function ClubRosterWorkspace({
     setError("");
     setFieldErrors({});
     setGuardianErrors({});
+    setDialogDirty(false);
     setDialogOpen(true);
     // Re-read this member's guardians as the dialog opens, so a page left open
     // can't save over a co-leader's newer edit (#510). Until the answer is
@@ -996,7 +1004,10 @@ export function ClubRosterWorkspace({
         className="form-stack"
         key={editing?.id ?? "new"}
         noValidate
+        // Adding or removing a contact changes the form without an input event, so look again after any click once it has rendered.
+        onClick={() => window.requestAnimationFrame(() => setDialogDirty(editorIsDirty()))}
         onInput={(event) => {
+          setDialogDirty(editorIsDirty());
           const name = (event.target as HTMLInputElement).name;
           const field = (name === "birthDateText" ? "birthDate" : name) as RosterFormField;
           setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
