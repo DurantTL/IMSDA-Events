@@ -20,6 +20,7 @@ const NOT_IN_CI = new Set([
   "test:watch", // vitest in watch mode, for local use
   "test:badge-print", // badge-print.yml
   "test:mobile-layout", // mobile-layout.yml
+  "test:privacy-browsers", // browser-privacy.yml (#1445)
   "test:club-form-roster-add", // not in ci.yml before the shards (#1233)
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);
