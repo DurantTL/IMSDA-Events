@@ -32,6 +32,7 @@ export function backupServiceFields(
       checkedAt: input.now.toISOString(),
       whenLabel: "Checked",
       resultText: OFF_REASON[status.reason ?? "not_set"],
+      // Every off reading says "Not set up", so the row shows its setup help (#1434, #1481).
       needsSetup: true,
     };
   }
