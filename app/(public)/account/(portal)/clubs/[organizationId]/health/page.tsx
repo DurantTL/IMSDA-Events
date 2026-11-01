@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { HeartPulse } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -31,7 +32,7 @@ export default async function ClubHealthPage({
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state !== "OPEN") return clubAccessClosed(access);
   const viewer = clubLeaderHealthViewerFromAccess(access);
-  if (!viewer) return <p className="public-manage-empty">Health information is kept by the club&apos;s director and deputy.</p>;
+  if (!viewer) return <><p className="public-manage-empty">Health information is kept by the club&apos;s director and deputy.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="health information" id="health-role" /></>;
   const base = `/account/clubs/${organizationId}/health`;
   // The one-time privacy notice (#923) comes before anything is listed or opened.
   if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as={viewer.actor.kind === "ATTENDEE" ? "ATTENDEE" : "STAFF"} />;
@@ -41,7 +42,8 @@ export default async function ClubHealthPage({
     return (
       <>
         <p className="inline-notice" role="status">Confidential. Each event is available through its last day, and every time you open or print one it is recorded.</p>
-        {events.length === 0 ? <EmptyState className="empty-state panel" headingLevel={2} icon={<HeartPulse aria-hidden="true" size={26} />} title="No health information is open">No event your club registered for is open for health information.</EmptyState> : (
+        {events.length === 0 ? <EmptyState className="empty-state panel" headingLevel={2} icon={<HeartPulse aria-hidden="true" size={26} />} title="No health information is open">No event your club registered for is open for health information.</EmptyState> : null}
+        {events.length === 0 ? <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="health information" id="health-none" /> : (
           <ul className="account-overview-list">
             {events.map((event) => (
               <li key={event.id}>

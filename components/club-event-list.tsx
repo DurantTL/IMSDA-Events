@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import type { ClubEventSummary } from "@/modules/club-registrations/repository";
 
@@ -33,9 +34,12 @@ export function ClubEventList({ events, organizationId }: { events: ClubEventSum
         <h2 id="club-events-heading">Club events</h2>
       </div>
       {events.length === 0 ? (
-        <p className="public-manage-empty">
-          <CalendarDays size={17} aria-hidden="true" /> No club events yet. Club events billed to your church appear here once the conference publishes registration. If you expected one, contact the conference office.
-        </p>
+        <>
+          <p className="public-manage-empty">
+            <CalendarDays size={17} aria-hidden="true" /> No club events yet. Club events billed to your church appear here once the conference publishes registration. If you expected one, contact the conference office.
+          </p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club events" id="events-none-published" />
+        </>
       ) : (
         <ul className="public-manage-club-list">
           {events.map((event) => {

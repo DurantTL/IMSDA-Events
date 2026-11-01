@@ -1,5 +1,7 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
+import type { EventSetupId } from "@/modules/setup-help/event-setup-steps";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -145,6 +147,19 @@ function readinessInputsFrom(event: EventSettingsRecord | null | undefined): Pic
 /** The platform email settings (System management > Email), where the central sender is saved. */
 const CENTRAL_SENDER_SETTINGS_HREF = "/admin/email";
 
+/** The setup help for a readiness row that has no fix link of its own. The registration form has the button below the list. */
+function readinessHelpId(itemId: string, canOpenPlatformSettings: boolean): EventSetupId | null {
+  switch (itemId) {
+    case "basics": return "readiness-basics";
+    case "location": return "readiness-location";
+    case "support": return "readiness-support";
+    case "club-billing": return "readiness-club-billing";
+    case "public-info": return "readiness-public-info";
+    case "central-sender": return canOpenPlatformSettings ? null : "readiness-central-sender";
+    default: return null;
+  }
+}
+
 /** One group of the readiness panel. Each row keeps its status as text for screen readers (the icon is decorative). */
 function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: ReadonlyArray<EventReadinessItem | EventReadinessRecommendedItem>; canOpenPlatformSettings: boolean; "aria-labelledby": string }) {
   return (
@@ -157,6 +172,8 @@ function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: Rea
             <small>{item.detail}</small>
             {!item.complete && item.href && item.actionLabel && <small><Link className={readinessStyles.action} href={item.href}>{item.actionLabel}</Link></small>}
             {!item.complete && item.id === "central-sender" && canOpenPlatformSettings && <small><Link className={readinessStyles.action} href={CENTRAL_SENDER_SETTINGS_HREF}>Open email settings</Link></small>}
+            {/* Items that already link to their fix keep that link; the rest say where or how, or who to ask (#1435). */}
+            {!item.complete && !item.href && readinessHelpId(item.id, canOpenPlatformSettings) && <EventSetupHelp context={item.label} id={readinessHelpId(item.id, canOpenPlatformSettings)!} />}
           </span>
         </li>
       ))}

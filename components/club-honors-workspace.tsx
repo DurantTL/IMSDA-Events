@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { SubmitButton } from "@/components/submit-button";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
@@ -368,7 +369,10 @@ export function ClubHonorsWorkspace({
 
         <SearchResultStatus message={nameSearch.trim() === "" || visible.length === 0 ? "" : `${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
-          <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+          <>
+            <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+            {emptyState === "NO_MEMBERS" && !readOnly && !staff && <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="honors" id="honors-no-members" />}
+          </>
         ) : (
           <div className="report-table-wrap card-box">
             <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>

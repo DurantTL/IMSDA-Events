@@ -90,7 +90,9 @@ export type PortalDestination = {
   path: string;
   audience: PortalAudience;
   /** Club pages: the club capability the page needs (see `clubCapabilities`). */
-  capability?: "roster" | "submitReports" | "manageTeam";
+  capability?: "roster" | "submitReports" | "manageTeam" | "registerForEvents";
+  /** Club pages only the club's director and deputy open (club forms, health): `isClubFormsRole`. */
+  formsRole?: boolean;
 };
 
 export type PortalGuide = Omit<HelpGuide, "workspace" | "audience"> & { audience: PortalAudience };

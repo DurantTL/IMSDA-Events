@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ClubProfileForm } from "@/components/club-profile-form";
 import { ClubTeamWorkspace } from "@/components/club-team-workspace";
 import { listPendingClubTeamInvites } from "@/modules/club-imports/invites";
@@ -26,6 +27,7 @@ export default async function ClubInfoPage({ params }: { params: Promise<{ organ
     return (
       <>
         <p className="public-manage-empty">Only the club&apos;s director or deputy can change the club&apos;s settings.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club settings" id="club-settings-role" />
       </>
     );
   }
