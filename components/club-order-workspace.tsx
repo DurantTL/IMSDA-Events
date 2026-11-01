@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
+import { savedMessage } from "@/components/form-message";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
 import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, hasStockTracking, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
@@ -323,7 +324,7 @@ export function ClubOrderWorkspace({
       setError("Enter a whole number, 0 or more.");
       return;
     }
-    return setQuantity(lineKey(line), Number(draft), "Quantity saved.");
+    return setQuantity(lineKey(line), Number(draft), savedMessage());
   }
 
   /** "Honors to order separately": adds the honor with the number of members who completed it (#1330). */

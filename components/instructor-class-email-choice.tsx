@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bell } from "lucide-react";
 import { classChangeEmailChoices, classChangeEmailLabels, type ClassChangeEmailChoice } from "@/modules/honors/class-change-domain";
+import { savedMessage } from "@/components/form-message";
 
 type Preference = { instructorId: string; eventName: string; classChangeEmails: ClassChangeEmailChoice };
 
@@ -30,7 +31,7 @@ export function InstructorClassEmailChoice({ preferences }: { preferences: Prefe
       });
       const result = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "Your choice could not be saved.");
-      setNotice("Saved.");
+      setNotice(savedMessage());
     } catch (caught) {
       if (before) setChoices((current) => ({ ...current, [instructorId]: before }));
       setError(caught instanceof Error ? caught.message : "Your choice could not be saved.");

@@ -225,29 +225,11 @@ describe("one set of success words", () => {
   const allowlist: Record<string, string> = {
     "components/form-message.tsx": "the shared helper",
     "components/settings-save-state.ts": "the shared status vocabulary",
-    "components/asset-closeout-workspace.tsx": "round 2 (#1455 5.7)",
-    "components/background-check-import.tsx": "round 2 (#1455 5.7)",
-    "components/calendar-admin-workspace.tsx": "round 2 (#1455 5.7)",
-    "components/calendar-feeds-panel.tsx": "round 2 (#1455 5.7)",
-    "components/cancellation-requests-workspace.tsx": "round 2 (#1455 5.7)",
-    "components/club-event-list.tsx": "round 2 (#1455 5.7)",
-    "components/club-form-fill-in.tsx": "round 2 (#1455 5.7)",
-    "components/club-form-requirement.tsx": "round 2 (#1455 5.7)",
-    "components/club-registration-workspace.tsx": "round 2 (#1455 5.7)",
-    "components/club-report-form.tsx": "round 2 (#1455 5.7)",
-    "components/club-year-end-report-form.tsx": "round 2 (#1455 5.7)",
-    "components/csv-import-dialog.tsx": "round 2 (#1455 5.7)",
-    "components/event-locations-panel.tsx": "round 2 (#1455 5.7)",
-    "components/event-template-editor.tsx": "round 2 (#1455 5.7)",
-    "components/health-record-form.tsx": "round 2 (#1455 5.7)",
-    "components/honor-waitlist-settings.tsx": "round 2 (#1455 5.7)",
-    "components/instructor-class-email-choice.tsx": "round 2 (#1455 5.7)",
-    "components/instructor-roster.tsx": "round 2 (#1455 5.7)",
-    "components/invoice-controls.tsx": "round 2 (#1455 5.7)",
-    "components/invoice-ledger-controls.tsx": "round 2 (#1455 5.7)",
-    "components/lodging-assignments-panels.tsx": "round 2 (#1455 5.7)",
-    "components/public-responsible-adult.tsx": "round 2 (#1455 5.7)",
-    "components/team-results-workspace.tsx": "round 2 (#1455 5.7)",
+    "components/meals-workspace.tsx": "follow-up: PR #1461 is rewriting its confirm flows",
+    "components/people-workspace.tsx": "follow-up: PR #1461 is rewriting its confirm flows",
+    "components/csv-import-dialog.tsx": "dialog heading once an import finished; the import result, not a form save",
+    "components/background-check-import.tsx": "dialog heading once an import finished; the sentence under it uses savedMessage()",
+    "components/club-event-list.tsx": "status chip on a club's event list (a saved registration draft), not a save result",
   };
 
   function files(dir: string): string[] {
@@ -265,6 +247,7 @@ describe("one set of success words", () => {
     /["'`]Draft saved\.?["'`]/,
     /["'`]Draft saved locally\.?["'`]/,
     /Saving profile…/,
+    /["'`][A-Z][A-Za-z ]*(?<!\bbe|\bnot|\bwas|\bis) saved\.["'`]/,
   ];
 
   it("no component sets its own success string", () => {

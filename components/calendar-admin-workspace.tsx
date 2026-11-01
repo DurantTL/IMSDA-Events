@@ -34,6 +34,7 @@ import {
 import { calendarDateIn, calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
+import { savedMessage } from "@/components/form-message";
 
 type ApiResponse = {
   entries?: CalendarAdminEntry[];
@@ -249,7 +250,7 @@ export function CalendarAdminWorkspace({
 
   async function saveEdit(body: EntryBody) {
     if (!editing) return false;
-    const ok = await call(`/api/admin/calendar/entries/${encodeURIComponent(editing.id)}`, "PATCH", body, "Saved.");
+    const ok = await call(`/api/admin/calendar/entries/${encodeURIComponent(editing.id)}`, "PATCH", body, savedMessage());
     if (ok) closeEdit();
     return ok;
   }
@@ -537,7 +538,7 @@ export function CalendarAdminWorkspace({
                       onSubmit={(submitEvent) => {
                         submitEvent.preventDefault();
                         const category = String(new FormData(submitEvent.currentTarget).get("category") ?? "");
-                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, "Category saved.");
+                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, savedMessage());
                       }}
                     >
                       <label>

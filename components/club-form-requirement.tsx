@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { savedMessage } from "@/components/form-message";
 import {
   CLUB_FORM_REQUIREMENTS,
   REQUIRED_ROLE_TYPES,
@@ -49,7 +50,7 @@ export function ClubFormRequirement({
         setError(result.message ?? "The change could not be saved.");
         return;
       }
-      setNotice("Saved.");
+      setNotice(savedMessage());
       router.refresh();
     } catch {
       setError("The change could not be saved. Check your connection and try again.");

@@ -104,7 +104,7 @@ export function useInformationActions(
       const saved = await saveInformationSettingsRequest(information, selectedForm.id, settings);
       if (!saved.ok) { setError(saved.message); return false; }
       applySettingsForm(informationFormToView(saved.value));
-      setNotice("Form settings saved.");
+      setNotice(savedMessage());
       return true;
     } finally { setBusy(null); }
   }

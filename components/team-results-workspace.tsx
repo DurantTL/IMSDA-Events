@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Download, Mail, Printer, RefreshCw, Trophy } from "lucide-react";
 import { TEAM_LEVELS, teamLabel, teamLevelLabels, type TeamLevel, type TeamLevelInfo } from "@/modules/club-teams/domain";
+import { savedMessage } from "@/components/form-message";
 import {
   levelInfoFor,
   levelWhenWhere,
@@ -80,7 +81,7 @@ function LevelEditor({
       }
       onSaved(result.result ?? null);
       setDraft(draftOf(result.result ?? null));
-      setMessage({ kind: "ok", text: result.result ? "Saved." : "Cleared." });
+      setMessage({ kind: "ok", text: result.result ? savedMessage() : "Cleared." });
     } catch {
       setMessage({ kind: "error", text: "We couldn't reach the server. Nothing was changed." });
     } finally {

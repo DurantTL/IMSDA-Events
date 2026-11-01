@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { PhoneInput } from "@/components/phone-input";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -217,7 +218,7 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
             <option value="INACTIVE">Removed (keeps the record)</option>
           </select>
         </label>
-        <button className="secondary-button" disabled={busy || !dirty} type="submit">Save</button>
+        <SubmitButton className="secondary-button" disabled={!dirty} label="Save" submitting={busy} submittingLabel="Saving…" />
       </form>
       {targetIsSystemAdministrator ? (
         <p className={styles.note}>A system administrator has every permission on every event.</p>
