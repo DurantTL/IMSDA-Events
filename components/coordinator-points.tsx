@@ -31,7 +31,7 @@ export function CoordinatorPointsRanking({ allClubs, basePath, clubYear, query, 
         {" · "}
         {sort === "name" ? <strong>club name</strong> : <Link href={sortHref("name")}>club name</Link>}
       </p>
-      <CoordinatorScrollRegion label={`Points by club for ${clubYear}. Scroll sideways to see every column.`}>
+      <CoordinatorScrollRegion label={`Points by club for ${clubYear}`}>
         <table className="report-table table-cards" role="table">
           <caption className="sr-only">Total points per club for {clubYear}, with each club&apos;s submitted records</caption>
           <thead role="rowgroup">

@@ -46,22 +46,5 @@
 :global(.actions-menu-list) .actionsMenuNote { padding: 8px 10px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); max-width: 15rem; }
 .rosterEditButton { min-height: 44px; min-width: 44px; white-space: nowrap; }
 .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
-/* Phone and narrow cards: the name takes the full card width and the labelled actions sit on the card's last row, at 44px. */
-@media (max-width: 720px) {
-  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
-  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) { flex: 1 1 8rem; }
-  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; justify-content: center; }
-  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button) { justify-content: center; }
-  :global(.roster-card-table) .rosterRowActionSet { width: 100%; }
-  :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
-  :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { min-height: 44px; min-width: 44px; }
-  .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
-}
-@media (min-width: 721px) {
-  @container (max-width: 640px) {
-    :global(.roster-card-table) .rosterRowActionSet > :global(.secondary-button),
-    :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu) > summary:global(.actions-menu-trigger) { min-height: 44px; min-width: 44px; }
-    .rosterRowActionSet :global(.actions-menu-list) :is(a, button) { min-height: 44px; }
-    }
-}
+/* In a card the action row sits at the card's foot (the shared table-cards action cell); every target is 44px. */
 :global(.roster-card-table) .rosterRowActionSet :global(.actions-menu)[open] { flex: 1 1 100%; }

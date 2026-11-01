@@ -7,6 +7,7 @@ import { focusSearchInput, SearchClearButton } from "@/components/search-clear-b
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
+import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import { BirthDateField } from "@/components/birth-date-field";
@@ -822,26 +823,26 @@ export function ClubRosterWorkspace({
                 {section.people.length === 0 ? (
                   <p className={styles.empty}>{section.empty}</p>
                 ) : (
-                  <div className="report-table-wrap scroll-cue card-box" data-scroll-cue>
-                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table roster-card-table">
-                      <thead>
-                        <tr>
+                  <div className="report-table-wrap">
+                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table table-cards table-cards-xwide roster-card-table" role="table">
+                      <thead role="rowgroup">
+                        <tr role="row">
                           {columns.map((column) => {
                             switch (column) {
                               case "name": return <SortableHeader active direction={nameDirection} key={column} hiddenLabel={section.title} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
-                              case "age": return <th key={column}>Age</th>;
-                              case "birthDate": return <th key={column}>Birth date</th>;
-                              case "type": return <th key={column}>Type</th>;
-                              case "class": return <th key={column}>Current class</th>;
-                              case "details": return <th key={column}>Details</th>;
-                              case "gender": return <th key={column}>Gender</th>;
-                              case "screening": return <th key={column}>Sterling Volunteers</th>;
-                              case "actions": return <th key={column}>Actions</th>;
+                              case "age": return <th key={column} role="columnheader" scope="col">Age</th>;
+                              case "birthDate": return <th key={column} role="columnheader" scope="col">Birth date</th>;
+                              case "type": return <th key={column} role="columnheader" scope="col">Type</th>;
+                              case "class": return <th key={column} role="columnheader" scope="col">Current class</th>;
+                              case "details": return <th key={column} role="columnheader" scope="col">Details</th>;
+                              case "gender": return <th key={column} role="columnheader" scope="col">Gender</th>;
+                              case "screening": return <th key={column} role="columnheader" scope="col">Sterling Volunteers</th>;
+                              case "actions": return <th key={column} role="columnheader" scope="col">Actions</th>;
                             }
                           })}
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody role="rowgroup">
                         {section.people.map((member) => {
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
                         // names only what else is missing (#1004); the Details needed list follows the same rule.
@@ -880,11 +881,11 @@ export function ClubRosterWorkspace({
                           </>
                         );
                         return (
-                          <tr id={`member-${member.id}`} key={member.id}>
+                          <tr id={`member-${member.id}`} key={member.id} role="row">
                             {columns.map((column) => {
                               switch (column) {
                                 case "name": return (
-                                  <td className="roster-card-name" data-label="Name" key={column}>
+                                  <th className="roster-card-name" key={column} role="rowheader" scope="row">
                                     <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
                                     {member.role && <span className={styles.rosterMemberRole} translate="no">{`Role: ${member.role}`}</span>}
                                     {classHistoryBase && member.personId && (
@@ -892,18 +893,18 @@ export function ClubRosterWorkspace({
                                         Class history<span className="sr-only"> for {label}</span>
                                       </Link>
                                     )}
-                                  </td>
+                                  </th>
                                 );
                                 case "age": return (
-                                  <td data-label="Age" key={column} translate="no">
+                                  <td {...cardCell("Age")} key={column} translate="no">
                                     {member.age ?? (member.reportedAge !== null ? `${member.reportedAge} (reported)` : "—")}
                                   </td>
                                 );
-                                case "birthDate": return <td data-label="Birth date" key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
-                                case "type": return <td data-label="Type" key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
-                                case "class": return <td data-label="Current class" key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
+                                case "birthDate": return <td {...cardCell("Birth date")} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
+                                case "type": return <td {...cardCell("Type")} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
+                                case "class": return <td {...cardCell("Current class")} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
                                 case "details": return (
-                                  <td className="roster-card-flags" data-label="Details" key={column}>
+                                  <td {...cardCell("Details")} className="roster-card-flags" key={column}>
                                     {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
                                     <div className="roster-flag-list">
                                       {member.status === "INACTIVE" && (
@@ -924,9 +925,9 @@ export function ClubRosterWorkspace({
                                     </div>
                                   </td>
                                 );
-                                case "gender": return <td data-label="Gender" key={column}>{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>;
+                                case "gender": return <td {...cardCell("Gender")} key={column}>{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>;
                                 case "screening": return (
-                                  <td data-label="Sterling Volunteers" key={column}>
+                                  <td {...cardCell("Sterling Volunteers")} key={column}>
                                     {complianceStatuses?.[member.id] ? (
                                       <>
                                         <span className={`status-chip ${complianceTone[complianceStatuses[member.id]!.state]}`}>
@@ -945,7 +946,7 @@ export function ClubRosterWorkspace({
                                   </td>
                                 );
                                 case "actions": return (
-                                  <td className="roster-card-actions roster-row-actions" data-label="Actions" key={column}>
+                                  <td {...cardCell(null)} className="roster-card-actions roster-row-actions" key={column}>
                                     <div className={`${styles.rosterRowActionSet} roster-row-action-set`}>
                                       {tools.primary === "edit" && (
                                         <button aria-label={`Edit ${label}`} className={`secondary-button ${styles.rosterEditButton}`} disabled={saving} id={`roster-edit-${member.id}`} onClick={() => openDialog(member)} type="button">

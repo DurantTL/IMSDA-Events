@@ -89,8 +89,8 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clu
   if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
   const months = clubs[0]!.months.map((cell) => cell.month);
   return (
-    <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue>
-      <table role="table" className="report-table table-cards">
+    <div className="report-table-wrap club-reports-grid">
+      <table role="table" className="report-table table-cards table-cards-xwide">
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
@@ -171,10 +171,10 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
               ))}
             </ul>
           </figure>
-          {/* With `links` (the coordinator's view, #1187) each row also lists the submitted records the points rest on, and the grid sits in a labelled scroll region. */}
+          {/* With `links` (the coordinator's view, #1187) each row also lists the submitted records the points rest on, and the grid sits in a labelled region. */}
           <div
-            {...(links ? { "aria-label": `Points by club for ${clubYear}. Scroll sideways to see every column.`, role: "region", tabIndex: 0, "data-scroll-cue": true } : {})}
-            className={links ? "report-table-wrap scroll-cue coordinator-scroll" : "report-table-wrap"}
+            {...(links ? { "aria-label": `Points by club for ${clubYear}`, role: "region" } : {})}
+            className={links ? "report-table-wrap coordinator-scroll" : "report-table-wrap"}
           >
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Total points per club for {clubYear}, in chart order</caption>

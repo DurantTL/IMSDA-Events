@@ -116,11 +116,12 @@ describe("Monthly Records (#1187)", () => {
     expect(html).not.toMatch(/background check/i);
   });
 
-  it("puts the wide grid in a labelled, focusable scroll region with semantic headers", () => {
+  it("puts the wide grid in a labelled region (cards when narrow, never a sideways scroll) with semantic headers", () => {
     const html = monthly(clubs);
     expect(html).toContain('role="region"');
-    expect(html).toContain('aria-label="Monthly Records by club and month, 2026-27. Scroll sideways to see every month."');
-    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('aria-label="Monthly Records by club and month, 2026-27"');
+    expect(html).not.toContain('tabindex="0"');
+    expect(html).not.toContain("scroll-cue");
     expect(html).toContain('scope="row"');
     expect(html).toContain('scope="col"');
     expect(html).toContain("Monthly Record status by club for 2026-27");
@@ -206,8 +207,8 @@ describe("Points (#1187)", () => {
     expect(html).toContain("1,500");
   });
 
-  it("sits the table in a labelled scroll region only in the coordinator's view", () => {
-    expect(points(clubs)).toContain('aria-label="Points by club for 2026-27. Scroll sideways to see every column."');
+  it("sits the table in a labelled region only in the coordinator's view", () => {
+    expect(points(clubs)).toContain('aria-label="Points by club for 2026-27"');
     const admin = renderToStaticMarkup(createElement(AreaPointsChart, { basePath: "/x", clubYear, clubs, sort: "points" }));
     expect(admin).not.toContain("Supporting records");
     expect(admin).not.toContain('role="region"');
@@ -260,7 +261,7 @@ describe("Club events (#1187)", () => {
     expect(html).not.toContain("March 6, 2027");
   });
 
-  it("puts each event's grid in a labelled scroll region", () => {
+  it("puts each event's grid in a labelled region", () => {
     expect(render()).toContain('aria-label="Club registrations for Synthetic Camporee"');
   });
 

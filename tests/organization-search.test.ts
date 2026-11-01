@@ -181,10 +181,10 @@ describe("directory layout (#723)", () => {
     expect(css).toMatch(/\.org-filter-field input,\s*\.org-filter-field select \{[^}]*border: 1px solid/);
   });
 
-  it("uses card cells up to 1100px and a non-wrapping 44px actions control", () => {
+  it("uses card cells up to an 860px box and a non-wrapping 44px actions control", () => {
     expect(page).toContain('table-cards table-cards-wide');
     expect(page).toContain('cardCell("Place")');
-    expect(css).toMatch(/@media screen and \(max-width: 1100px\) \{\s*\.report-table-wrap:has\(> table\.table-cards-wide\)/);
+    expect(css).toMatch(/@container table-box \(max-width: 860px\) \{\s*table\.table-cards-wide\.table-cards-wide,/);
     expect(css).toMatch(/\.org-status-button \{[^}]*white-space: nowrap/);
     expect(css).toMatch(/@media \(pointer: coarse\) \{\s*\.org-status-button \{ min-height: 44px; \}/);
     expect(css).toMatch(/\.org-directory-table td\.org-cell-actions \{[^}]*text-align: right/);

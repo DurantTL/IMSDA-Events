@@ -49,13 +49,13 @@ describe("the registration step bar and focus (bug 3), and the club event bar (b
 });
 
 describe("the Honors Classes table (bug 7)", () => {
-  it("is cards up to 1180px, keeps the actions inside a cell, and names a combined class by its count", () => {
+  it("is the shared table-cards cards (by its box's width), keeps the actions inside a cell, and names a combined class by its count", () => {
     const source = read("components/honors-setup-workspace.tsx");
-    expect(source).toContain('<table className="report-table roster-card-table roster-card-table-wide">');
-    expect(source).toContain('<td className="roster-card-actions">');
+    expect(source).toContain('<table className="report-table table-cards table-cards-xwide" role="table">');
+    expect(source).toContain('<td {...cardCell(null)} className="roster-card-actions">');
     expect(source).toContain('<div className="honor-row-actions">');
     expect(source).toContain("`Edit class with ${editing.honors.length} honors`");
-    expect(css).toMatch(/@media \(min-width: 721px\) and \(max-width: 1180px\) \{\s*\.roster-card-table\.roster-card-table-wide,/);
+    expect(css).toMatch(/@container table-box \(max-width: 1100px\) \{\s*table\.table-cards-xwide\.table-cards-xwide,/);
     expect(css).toMatch(/\.honor-inline-form > \.eyebrow \{ flex: 1 0 100%; margin: 0; \}/);
   });
 });

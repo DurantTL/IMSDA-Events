@@ -134,15 +134,15 @@ describe("columns per role (#1167)", () => {
     const out = html();
     expect(out).not.toContain(">Birth date<");
     expect(out).not.toContain("Sterling Volunteers");
-    expect(out).not.toContain("<th>Gender</th>");
-    expect(out).toContain("<th>Details</th>");
-    expect(out).toContain("<th>Actions</th>");
+    expect(out).not.toContain(">Gender</th>");
+    expect(out).toContain(">Details</th>");
+    expect(out).toContain(">Actions</th>");
   });
 
   it("shows screening for a role that is given it, and still no birth date until revealed", () => {
     const complianceStatuses: Record<string, RosterComplianceInfo> = { a: { state: "CLEAR", note: null }, b: { state: "NO_RECORD", note: null } };
     const out = html({ complianceStatuses });
-    expect(out).toContain("<th>Sterling Volunteers</th>");
+    expect(out).toContain(">Sterling Volunteers</th>");
     expect(out).not.toContain(">Birth date<");
   });
 });
@@ -183,7 +183,7 @@ describe("row tools per role (#1167)", () => {
     expect(out).not.toContain("Actions for");
     expect(out).not.toContain("actions-menu");
     expect(out).not.toContain("Add to roster");
-    expect(out).not.toContain("<th>Actions</th>");
+    expect(out).not.toContain(">Actions</th>");
   });
 
   it("offers the read-only staff view Honors as a plain button, not an Actions menu", () => {
@@ -484,8 +484,8 @@ describe("focus, announcements and labels after the review (#1167)", () => {
     expect(css).toMatch(/\.rosterRowActionSet :global\(\.actions-menu-list\) \{ position: static; width: 100%; min-width: 0;/);
     expect(css).toContain(".rosterRowActionSet :global(.actions-menu)[open] { flex-basis: 100%; }");
     expect(css).not.toContain("padding-bottom: 12rem");
-    // The table-wrap rule is shared with other tables, so it stays global, hooked on the stable class.
-    expect(globalCss).toContain(".report-table-wrap:has(.roster-row-action-set .actions-menu[open])");
+    // The roster is the shared table-cards pattern (#1457): its wrap never scrolls or clips, so an open menu is never cut off.
+    expect(globalCss).toMatch(/\.report-table-wrap:has\(> table\.table-cards\),[^{]*\{ overflow: visible; \}/);
   });
 
   it("explains in the page what the Home link and count mean", () => {

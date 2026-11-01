@@ -28,7 +28,8 @@ describe("coordinator pages at 200% text (#1113)", () => {
     const tableRules = block.split("\n").filter((line) => line.includes("table.table-cards"));
     expect(tableRules.length).toBeGreaterThan(0);
     for (const rule of tableRules) expect(rule).toContain(":is(.coordinator-overview, .coordinator-destination)");
-    expect(block).toContain(".report-table-wrap:not(.club-reports-grid) { container-type: inline-size; }");
+    // The wrap is a size container through the shared table-box rule (#1457), so this block no longer declares it.
+    expect(css).toContain(".reminder-recipient-table-wrap:has(> table.table-cards),");
   });
 
   it("puts an Open club button under its card label", () => {
