@@ -65,7 +65,7 @@ export function RegistrationSignaturesPanel({
             <p>Signed by <strong translate="no">{signature.signerName}</strong> on {formatSignedAt(signature.signedAt, timeZone)}</p>
             {isFullRecord(signature) ? (
               <>
-                <p className="quiet-copy">IP address: {signature.ipAddress ?? "not recorded"}</p>
+                <p className="quiet-copy">{`IP address: ${signature.ipAddress ?? "not recorded"}`}</p>
                 <details>
                   <summary>Text that was signed</summary>
                   <p className={styles.registrationSignatureText}>{signature.signedText}</p>

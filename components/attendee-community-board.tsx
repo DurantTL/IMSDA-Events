@@ -308,7 +308,7 @@ export function AttendeeCommunityBoard({
           <MessagesSquare size={21} aria-hidden="true" />
           <div>
             <p className="public-registration-eyebrow">Event updates</p>
-            <h2>{community.eventName} Timeline</h2>
+            <h2>{`${community.eventName} Timeline`}</h2>
           </div>
         </div>
         <span>{timelineItems.length} {timelineItems.length === 1 ? "update" : "updates"}</span>
@@ -324,7 +324,7 @@ export function AttendeeCommunityBoard({
           <div>
             <h3>Community conduct agreement</h3>
             <p>{community.settings.conductText}</p>
-            <small>Posts are retained for {community.settings.retentionDays} days after the event ends.</small>
+            <small>{`Posts are retained for ${community.settings.retentionDays} days after the event ends.`}</small>
           </div>
           <button
             className="primary-button"
@@ -368,7 +368,7 @@ export function AttendeeCommunityBoard({
 
           {unread.length > 0 && (
             <details className="attendee-community-notifications">
-              <summary>{unread.length} new community {unread.length === 1 ? "notification" : "notifications"}</summary>
+              <summary>{`${unread.length} new community ${unread.length === 1 ? "notification" : "notifications"}`}</summary>
               <ul>
                 {unread.map((notification) => (
                   <li key={notification.id}>
@@ -454,7 +454,7 @@ export function AttendeeCommunityBoard({
                   <time dateTime={post.createdAt}>{dateTime(post.createdAt)}</time>
                 </header>
                 <p>{post.body}</p>
-                {post.editedAt && !post.authorDeleted && <small className="community-edited-note">Edited {dateTime(post.editedAt)}</small>}
+                {post.editedAt && !post.authorDeleted && <small className="community-edited-note">{`Edited ${dateTime(post.editedAt)}`}</small>}
                 {post.status === "PUBLISHED" && !post.authorDeleted && (
                   <div className="attendee-community-post-actions">
                     {post.isOwn && (
@@ -517,7 +517,7 @@ export function AttendeeCommunityBoard({
                           <time dateTime={reply.createdAt}>{dateTime(reply.createdAt)}</time>
                         </header>
                         <p>{reply.body}</p>
-                        {reply.editedAt && !reply.authorDeleted && <small className="community-edited-note">Edited {dateTime(reply.editedAt)}</small>}
+                        {reply.editedAt && !reply.authorDeleted && <small className="community-edited-note">{`Edited ${dateTime(reply.editedAt)}`}</small>}
                         {reply.status === "PUBLISHED" && !reply.authorDeleted && reply.isOwn && (
                           <div className="attendee-community-post-actions">
                             <details>

@@ -72,7 +72,7 @@ export function ClubLocationPicker({
   return (
     <fieldset className="club-location-picker">
       <legend><MapPin aria-hidden="true" size={15} /> Choose a location</legend>
-      <p className="field-help">Your {noun} registers at one location. Its own dates and space limit apply.</p>
+      <p className="field-help">{`Your ${noun} registers at one location. Its own dates and space limit apply.`}</p>
       <ul className="club-going-list">
         {locations.map((location) => {
           const unavailable = locationUnavailableLabel(location, currentId, location.id, allowWaitlist);

@@ -85,7 +85,7 @@ export function AttendeePasswordResetForm({ securityCheck = null }: { securityCh
     return (
       <form className="auth-form" onSubmit={completeReset}>
         <div className="auth-success">
-          <strong>Check {sentTo}</strong>
+          <strong>{`Check ${sentTo}`}</strong>
           <p>
             If that address has an account with a password, a six-digit code is on its way. Enter
             it here with your new password — the code only works in this browser, and it expires in

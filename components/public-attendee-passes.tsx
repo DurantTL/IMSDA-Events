@@ -33,7 +33,7 @@ export function PublicAttendeePasses({
               <div className="public-attendee-pass-heading">
                 <span><QrCode size={19} aria-hidden="true" /></span>
                 <div>
-                  <small>Attendee {index + 1}</small>
+                  <small>{`Attendee ${index + 1}`}</small>
                   <strong translate="no">{attendee.name}</strong>
                 </div>
               </div>

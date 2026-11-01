@@ -61,7 +61,7 @@ export function ClubFormFillMode({
   return (
     <div className="club-form-fill-mode">
       <label htmlFor={selectId}>
-        <span className="sr-only">Who fills in {name}</span>
+        <span className="sr-only">{`Who fills in ${name}`}</span>
         <select
           disabled={saving}
           id={selectId}

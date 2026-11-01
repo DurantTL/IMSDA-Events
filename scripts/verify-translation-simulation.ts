@@ -137,8 +137,12 @@ async function publicRegistration(context: J.BrowserContext) {
     await page.getByRole("button", { name: /Add another attendee/ }).click();
     await expectText(page, /2 of 3/, `${label}: roster count after adding`);
     await expectText(page, /Attendee 2/i, `${label}: second attendee card`);
+    await expectText(page, /2 attendees/, `${label}: order summary count after adding`);
+    await expectText(page, "$250.00", `${label}: order summary subtotal after adding`);
     await page.getByRole("button", { name: /Remove/ }).last().click();
     await expectText(page, /1 of 3/, `${label}: roster count after removing`);
+    await expectText(page, /1 attendee\b/, `${label}: order summary count after removing`);
+    await expectGone(page, /2 attendees/, `${label}: order summary count is no longer 2`);
   });
   await step(`${label}: edit the first attendee`, page, async () => {
     await page.getByRole("button", { name: /^(\[es\] )?Edit/ }).first().click();

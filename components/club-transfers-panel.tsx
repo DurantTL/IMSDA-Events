@@ -136,7 +136,7 @@ export function ClubTransferCard({ transfer, onAction }: { transfer: ClubTransfe
         {incoming ? "From " : "To "}<span translate="no">{transfer.otherClubName}</span> · requested <TransferDate iso={transfer.initiatedAt} />
         {"acknowledgeDueAt" in transfer && transfer.status === "PENDING" && <> · answer by <TransferDate iso={transfer.acknowledgeDueAt} /></>}
       </p>
-      <p>Reason: {transfer.reason}</p>
+      <p>{`Reason: ${transfer.reason}`}</p>
       {transfer.events.length > 0 && (
         <ul className="transfer-history" aria-label="History">
           {transfer.events.map((event) => <li key={event.id}>{transferEventLabel(event.type)}, <TransferDate iso={event.createdAt} /></li>)}

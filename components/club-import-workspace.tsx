@@ -176,7 +176,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club`}>Open the club</a>.</>
                   )}
                   {result.organizationId && result.status !== "FAILED" && result.kind !== "CLUB_LIST" && (
-                    <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club?year=${encodeURIComponent(result.clubYear)}`}>View the {result.clubYear} roster</a>.</>
+                    <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club?year=${encodeURIComponent(result.clubYear)}`}>{`View the ${result.clubYear} roster`}</a>.</>
                   )}
                   {result.skipped.length > 0 && (
                     <ul className="club-import-skipped" aria-label={`Skipped from ${result.clubName}`}>
@@ -273,7 +273,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                         Tick the box only if this is a new club.
                       </small>
                     )}
-                    {isList && draft.checkNote && <small className="club-import-year-note">Note: {draft.checkNote}</small>}
+                    {isList && draft.checkNote && <small className="club-import-year-note">{`Note: ${draft.checkNote}`}</small>}
                     {isList && !draft.existingClub && !draft.churchId && draft.include && <small className="club-import-year-note">No church chosen: this club will not be created.</small>}
                     {submissionYearNote(draft) && <small className="club-import-year-note">{submissionYearNote(draft)}</small>}
                   </span>
@@ -409,7 +409,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                   </div>
                 )}
 
-                <h3 className="club-import-subhead">Roster for {draft.clubYear}</h3>
+                <h3 className="club-import-subhead">{`Roster for ${draft.clubYear}`}</h3>
                 {unkeptDuplicates > 0 && (
                   <p className="field-help">
                     {unkeptDuplicates === 1 ? "1 person has" : `${unkeptDuplicates} people have`} the same name and section as

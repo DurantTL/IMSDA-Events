@@ -369,7 +369,7 @@ export function AttendeeRegistrationAnswersForm({
                     )}
                   />}
                   {missingIds.includes(`${attendee.attendeeId}_${field.id}`) && value === "" && (
-                    <small className="form-error" id={`${attendee.attendeeId}_${field.id}_missing`}>Choose an option for {field.label}.</small>
+                    <small className="form-error" id={`${attendee.attendeeId}_${field.id}_missing`}>{`Choose an option for ${field.label}.`}</small>
                   )}
                   {field.helpText && <small>{field.helpText}</small>}
                   {locked && <small>Contact the event team to change this selection.</small>}

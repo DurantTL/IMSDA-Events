@@ -3712,7 +3712,7 @@ export function PublicRegistrationForm({
             </p>
           )}
           {group?.waitlistNote && <p className="public-registration-summary-empty">{group.waitlistNote}</p>}
-          {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> {attendees.length} {pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}</p>}
+          {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> <span>{`${attendees.length} ${pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}`}</span></p>}
           {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
             <div className="public-registration-summary-lines">
               {calculation.lineItems.map((item) => (

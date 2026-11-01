@@ -656,7 +656,7 @@ export function RegistrationAmendmentEditor({
       </section>
       <section className="amendment-attendees">
         <div className="inline-heading">
-          <div><p className="eyebrow">Attendee roster</p><h4>{attendees.length} attendee{attendees.length === 1 ? "" : "s"}</h4></div>
+          <div><p className="eyebrow">Attendee roster</p><h4>{`${attendees.length} attendee${attendees.length === 1 ? "" : "s"}`}</h4></div>
           <button className="secondary-button" type="button" disabled={attendees.length >= 50} onClick={addAttendee}>
             <Plus aria-hidden="true" size={15} /> Add person
           </button>
@@ -678,7 +678,7 @@ export function RegistrationAmendmentEditor({
           return (
             <article className="amendment-attendee-card" data-attendee-client-id={attendee.clientId} key={attendee.clientId}>
               <header>
-                <div><small>Attendee {attendeeIndex + 1}</small><h4>{`${firstName} ${lastName}`.trim() || "New attendee"}</h4></div>
+                <div><small>{`Attendee ${attendeeIndex + 1}`}</small><h4>{`${firstName} ${lastName}`.trim() || "New attendee"}</h4></div>
                 <div>
                   <button type="button" disabled={attendeeIndex === 0} aria-label="Move attendee up" onClick={() => moveAttendee(attendeeIndex, -1)}><ArrowUp aria-hidden="true" size={15} /></button>
                   <button type="button" disabled={attendeeIndex === attendees.length - 1} aria-label="Move attendee down" onClick={() => moveAttendee(attendeeIndex, 1)}><ArrowDown aria-hidden="true" size={15} /></button>

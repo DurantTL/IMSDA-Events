@@ -41,7 +41,7 @@ export async function ClubGuardiansPanel({
             <thead>
               <tr>
                 <th scope="col">Member</th>
-                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">Contact {index + 1}</th>)}
+                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">{`Contact ${index + 1}`}</th>)}
               </tr>
             </thead>
             <tbody>

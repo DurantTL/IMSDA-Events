@@ -162,7 +162,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
         </div>
         {application.duplicates.length > 0 && (
           <ul className="nca-duplicates" aria-label="Possible duplicates">
-            {application.duplicates.map((flag) => <li key={flag.kind}>Possible duplicate: {flag.message}</li>)}
+            {application.duplicates.map((flag) => <li key={flag.kind}>{`Possible duplicate: ${flag.message}`}</li>)}
           </ul>
         )}
 
@@ -183,7 +183,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
             <div><dt>Other church board members</dt><dd translate="no">{application.otherBoardMembers.join(", ")}</dd></div>
           )}
           {application.note && <div><dt>Note</dt><dd translate="no">{application.note}</dd></div>}
-          <div><dt>Submitted</dt><dd>{formatDate(application.submittedAt)} (application dated {application.applicationDate})</dd></div>
+          <div><dt>Submitted</dt><dd>{`${formatDate(application.submittedAt)} (application dated ${application.applicationDate})`}</dd></div>
           {application.attachment && (
             <div>
               <dt>Attachment</dt>
@@ -306,7 +306,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
       )}
 
       <div className="panel">
-        <div className="section-heading"><div><h2>Waiting for a decision ({waiting.length})</h2></div></div>
+        <div className="section-heading"><div><h2>{`Waiting for a decision (${waiting.length})`}</h2></div></div>
         {waiting.length === 0 ? <p className="report-empty">No applications are waiting.</p> : <div className="nca-list">{waiting.map(renderApplication)}</div>}
       </div>
 

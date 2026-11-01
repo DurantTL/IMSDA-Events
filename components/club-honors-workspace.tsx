@@ -304,7 +304,7 @@ export function ClubHonorsWorkspace({
       <section className="public-manage-card" aria-labelledby="club-honors-heading">
         <div className="public-manage-card-heading club-roster-heading">
           <div>
-            <p className="public-registration-eyebrow">Club year {clubYear}</p>
+            <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
             <h2 id="club-honors-heading">Honors</h2>
           </div>
           {!staff && (

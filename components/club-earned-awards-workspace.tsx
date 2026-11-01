@@ -348,7 +348,7 @@ export function ClubEarnedAwardsWorkspace({
           <h2 id="class-tracking-heading">Class tracking</h2>
         </div>
         <div className="club-roster-heading-actions">
-          <span className="count-badge">{data.needs.length} open</span>
+          <span className="count-badge">{`${data.needs.length} open`}</span>
           {(exportCsvHref || exportPrintHref) && (
             <div className="report-actions" role="group" aria-label="Export class tracking">
               {exportCsvHref && <a className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Export CSV</a>}
@@ -456,7 +456,7 @@ export function ClubEarnedAwardsWorkspace({
                             <td {...cardCell(null)}>
                               {classHistoryBase && (
                                 <Link className="secondary-button class-history-button" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
-                                  Class history<span className="sr-only"> for {member.firstName} {member.lastName}</span>
+                                  Class history<span className="sr-only">{` for ${member.firstName} ${member.lastName}`}</span>
                                 </Link>
                               )}
                             </td>
@@ -568,7 +568,7 @@ export function ClubEarnedAwardsWorkspace({
               <div className={styles.group} key={entry.completionId}>
                 <div className={styles.groupHead}>
                   <strong><span translate="no">{entry.firstName} {entry.lastName}</span> · {entry.classLabel} insignia</strong>
-                  <small className={styles.muted}>Completed {entry.completedOn}</small>
+                  <small className={styles.muted}>{`Completed ${entry.completedOn}`}</small>
                 </div>
                 <ul className={styles.people}>
                   {entry.items.map((item) => (
@@ -641,7 +641,7 @@ export function ClubEarnedAwardsWorkspace({
 
       <section aria-labelledby="earned-open" className={styles.block}>
         <h3 id="earned-open"><Award aria-hidden="true" size={14} /> Open earned items ({data.needs.length})</h3>
-        {data.awardedCount > 0 && <small className={styles.muted}>{data.awardedCount} awarded so far</small>}
+        {data.awardedCount > 0 && <small className={styles.muted}>{`${data.awardedCount} awarded so far`}</small>}
         {data.needs.length === 0 ? (
           <p className="quiet-copy">No open earned items.</p>
         ) : (
@@ -666,7 +666,7 @@ export function ClubEarnedAwardsWorkspace({
                   )}
                   {classHistoryBase && firstForPerson && !need.classHistoryHidden && (
                     <Link className="text-button" href={`${classHistoryBase}/${encodeURIComponent(need.personId)}`}>
-                      Class history<span className="sr-only"> for {need.firstName} {need.lastName}</span>
+                      Class history<span className="sr-only">{` for ${need.firstName} ${need.lastName}`}</span>
                     </Link>
                   )}
                 </li>
@@ -697,14 +697,14 @@ export function ClubEarnedAwardsWorkspace({
               <div className={styles.group} key={rule.ruleId}>
                 <div className={styles.groupHead}>
                   <strong translate="no">{rule.name}</strong>
-                  <small className={styles.muted}>Needs {rule.requirement}</small>
+                  <small className={styles.muted}>{`Needs ${rule.requirement}`}</small>
                 </div>
                 {rule.missingItem && (
                   <p className={styles.flag} role="status">
                     <AlertTriangle aria-hidden="true" size={14} /> Not linked to a catalog item yet, so it can&apos;t be added to an order.
                   </p>
                 )}
-                <strong className={styles.muted}>Eligible, not yet awarded ({rule.eligible.length})</strong>
+                <strong className={styles.muted}>{`Eligible, not yet awarded (${rule.eligible.length})`}</strong>
                 {rule.eligible.length === 0 ? <p className="quiet-copy">No one right now.</p> : (
                   <ul className={styles.people}>
                     {rule.eligible.map((person) => (
@@ -731,12 +731,12 @@ export function ClubEarnedAwardsWorkspace({
                   </div>
                 )}
                 {rule.onOrder.length > 0 && (
-                  <small className={styles.muted}>On the order list: {rule.onOrder.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}</small>
+                  <small className={styles.muted}>{`On the order list: ${rule.onOrder.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}`}</small>
                 )}
                 {rule.givenElsewhere.length > 0 && (
-                  <small className={styles.muted}>Already given (another club): {rule.givenElsewhere.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}</small>
+                  <small className={styles.muted}>{`Already given (another club): ${rule.givenElsewhere.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}`}</small>
                 )}
-                {rule.awardedCount > 0 && <small className={styles.muted}>{rule.awardedCount} awarded</small>}
+                {rule.awardedCount > 0 && <small className={styles.muted}>{`${rule.awardedCount} awarded`}</small>}
                 {rule.closest.length > 0 && (
                   <>
                     <strong className={styles.muted}>Closest</strong>

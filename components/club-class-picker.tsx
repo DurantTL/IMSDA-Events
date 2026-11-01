@@ -261,7 +261,7 @@ export function ClubClassPicker({
       )}
       {workspace.open && (
         <div className={`club-sticky-bar${barPinned ? " is-pinned" : ""}`}>
-          <span className="field-help">{Object.values(selections).reduce((total, ids) => total + ids.length, 0)} classes chosen</span>
+          <span className="field-help">{`${Object.values(selections).reduce((total, ids) => total + ids.length, 0)} classes chosen`}</span>
           <button className="primary-button" disabled={saving} onClick={save} type="button">
             <Save aria-hidden="true" size={16} /> {saving ? "Saving…" : "Save classes"}
           </button>

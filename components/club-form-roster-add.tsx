@@ -205,7 +205,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         </div>
 
         <fieldset className="roster-guardians">
-            <legend>{term.plural} (optional)</legend>
+            <legend>{`${term.plural} (optional)`}</legend>
             <p className="field-help">Up to two emergency contacts, from the contact details on the form. Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
             {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
               const slot = (index + 1) as 1 | 2;

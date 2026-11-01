@@ -30,7 +30,7 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
   return (
     <article className="club-form-sheet">
       <header className="club-form-sheet-header">
-        <p className="public-registration-eyebrow">{submission.organization.name} · Club year {submission.clubYear}</p>
+        <p className="public-registration-eyebrow">{`${submission.organization.name} · Club year ${submission.clubYear}`}</p>
         <h2>{definition.title}</h2>
         {definition.description && <p>{definition.description}</p>}
         <p className="club-form-sheet-meta">

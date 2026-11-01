@@ -21,7 +21,7 @@ export function ClubHomeSummary({ clubYear, summary }: { clubYear: string; summa
   return (
     <section aria-labelledby="club-home-heading" className="public-manage-card club-home-summary">
       <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">Club year {yearLabel(clubYear)}</p>
+        <p className="public-registration-eyebrow">{`Club year ${yearLabel(clubYear)}`}</p>
         <h2 id="club-home-heading">Your club this year</h2>
       </div>
       <dl className="club-home-counts">
@@ -55,7 +55,7 @@ export function ClubHomeReadOnlyNotice({
     <p className="inline-notice club-home-readonly">
       <Info size={16} aria-hidden="true" /> Showing {yearLabel(clubYear)} read-only. Tasks and event registrations are for the current year.{" "}
       {contactsEditable && "A director or deputy can still edit emergency contacts on the roster. "}
-      <Link href={currentHref}>Back to {yearLabel(currentClubYear)}</Link>
+      <Link href={currentHref}>{`Back to ${yearLabel(currentClubYear)}`}</Link>
     </p>
   );
 }
@@ -143,7 +143,7 @@ export function ClubHomeRoster({
   return (
     <section aria-labelledby="club-home-roster-heading" className="public-manage-card club-home-roster">
       <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">{yearLabel(clubYear)} roster</p>
+        <p className="public-registration-eyebrow">{`${yearLabel(clubYear)} roster`}</p>
         <h2 id="club-home-roster-heading">Roster</h2>
       </div>
       {unavailable ? (
@@ -215,7 +215,7 @@ export function ClubHomeEvents({
                 <div><dt>Billing</dt><dd>{card.billing}</dd></div>
               </dl>
               <Link className="secondary-button club-event-action club-home-link" href={card.href}>
-                View club registration<span className="sr-only"> for {card.name}</span> <ArrowRight size={14} aria-hidden="true" />
+                View club registration<span className="sr-only">{` for ${card.name}`}</span> <ArrowRight size={14} aria-hidden="true" />
               </Link>
             </li>
           ))}

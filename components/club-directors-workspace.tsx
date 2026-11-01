@@ -213,7 +213,7 @@ export function ClubDirectorsWorkspace({
             <p className="eyebrow">Access history</p>
             <h2>Grants</h2>
           </div>
-          <span className="count-badge">{grants.length} total</span>
+          <span className="count-badge">{`${grants.length} total`}</span>
         </div>
         {grants.length === 0 ? (
           <div className="empty-state">
@@ -268,7 +268,7 @@ export function ClubDirectorsWorkspace({
                     {grant.revokeReason && (
                       <>
                         <br />
-                        <small>Revoked: {grant.revokeReason}</small>
+                        <small>{`Revoked: ${grant.revokeReason}`}</small>
                       </>
                     )}
                   </td>

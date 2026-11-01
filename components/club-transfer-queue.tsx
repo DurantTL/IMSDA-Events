@@ -51,8 +51,8 @@ export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTrans
       {transfer.matchedMemberName && transfer.matchedMemberName !== transfer.requestedName && (
         <p>Typed as: <span translate="no">{transfer.requestedName}</span></p>
       )}
-      {transfer.staffReason && <p>Needs staff: {memberTransferStaffReasonLabels[transfer.staffReason as MemberTransferStaffReason]}</p>}
-      <p>Reason: {transfer.reason}</p>
+      {transfer.staffReason && <p>{`Needs staff: ${memberTransferStaffReasonLabels[transfer.staffReason as MemberTransferStaffReason]}`}</p>}
+      <p>{`Reason: ${transfer.reason}`}</p>
       {transfer.events.length > 0 && (
         <ul className="transfer-history" aria-label="History">
           {transfer.events.filter((event) => event.type !== "NOTIFIED").map((event) => (

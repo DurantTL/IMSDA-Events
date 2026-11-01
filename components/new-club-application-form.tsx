@@ -246,7 +246,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
             )}
           </div>
         </div>
-        <p className="field-help">Date: {todayLabel}</p>
+        <p className="field-help">{`Date: ${todayLabel}`}</p>
       </fieldset>
 
       <fieldset className="public-manage-card form-stack" disabled={saving}>

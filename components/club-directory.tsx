@@ -17,7 +17,7 @@ export function ClubDirectoryCards({ clubs, clubYear, monthLabel }: { clubs: rea
             </div>
             <p className={styles.roster}><UsersRound size={18} aria-hidden="true" /><strong>{club.rosterSize}</strong> roster {club.rosterSize === 1 ? "member" : "members"}</p>
             <div className={styles.record}>
-              <p>{monthLabel} record</p>
+              <p>{`${monthLabel} record`}</p>
               <span className={styles.status} data-state={club.recordState ?? "UNAVAILABLE"}>{club.recordLabel}</span>
             </div>
             <Link className={`primary-button ${styles.open}`} href={href} prefetch={false}>

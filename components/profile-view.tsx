@@ -43,7 +43,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
             {data.linkedAttendee && (
               <div>
                 <dt>Registration account</dt>
-                <dd>Linked to {data.linkedAttendee.verifiedEmail}</dd>
+                <dd>{`Linked to ${data.linkedAttendee.verifiedEmail}`}</dd>
               </div>
             )}
           </dl>

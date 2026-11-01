@@ -917,7 +917,7 @@ function ClubRosterWorkspaceInner({
                                     {member.role && <span className={styles.rosterMemberRole}>Role: <ExactValue>{member.role}</ExactValue></span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
-                                        Class history<span className="sr-only"> {` for ${label}`}</span>
+                                        Class history<span className="sr-only">{` for ${label}`}</span>
                                       </Link>
                                     )}
                                   </td>

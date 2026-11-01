@@ -285,10 +285,10 @@ export function ClubAssignmentsWorkspace({
                         </div>
                       ) : (
                         <ul className="quiet-copy compact-list">
-                          {row.fields.campsiteLocation && <li>Campsite: {row.fields.campsiteLocation}</li>}
-                          {row.fields.dutyLabel && <li>Duty: {row.fields.dutyLabel}{row.fields.dutyDay ? ` — ${row.fields.dutyDay}` : ""}{row.fields.dutyTime ? ` ${row.fields.dutyTime}` : ""}</li>}
-                          {row.fields.activityLabel && <li>Activity: {row.fields.activityLabel}</li>}
-                          {row.fields.notes && <li>Notes: {row.fields.notes}</li>}
+                          {row.fields.campsiteLocation && <li>{`Campsite: ${row.fields.campsiteLocation}`}</li>}
+                          {row.fields.dutyLabel && <li>{`Duty: ${row.fields.dutyLabel}${row.fields.dutyDay ? ` — ${row.fields.dutyDay}` : ""}${row.fields.dutyTime ? ` ${row.fields.dutyTime}` : ""}`}</li>}
+                          {row.fields.activityLabel && <li>{`Activity: ${row.fields.activityLabel}`}</li>}
+                          {row.fields.notes && <li>{`Notes: ${row.fields.notes}`}</li>}
                         </ul>
                       )}
                     </td>
@@ -406,7 +406,7 @@ export function ClubAssignmentsWorkspace({
                       onChange={(event) => setConfirmed(event.target.checked)}
                     />
                     <span>
-                      <strong>I reviewed all {preview.includedCount} club{preview.includedCount === 1 ? "" : "s"} and the sample message above.</strong>
+                      <strong>{`I reviewed all ${preview.includedCount} club${preview.includedCount === 1 ? "" : "s"} and the sample message above.`}</strong>
                       <small>If an assignment, contact, template, or sender setting changes before this is created, IMSDA Events will stop and require a new review.</small>
                     </span>
                   </label>

@@ -370,7 +370,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
             Re-tick who&apos;s going. Next you can check and change their answers.
           </p>
         </div>
-        <span className="count-badge">{goingCount} chosen</span>
+        <span className="count-badge">{`${goingCount} chosen`}</span>
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ClubLocationPicker currentId={currentLocationId} locations={locationChoices} onChange={setLocationId} value={locationId} />

@@ -152,7 +152,7 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent, securityCh
           </div>
         </header>
         <section className="public-manage-card public-group-flow-card">
-          <p className="public-registration-eyebrow">{GROUP_LABEL} registration · {ready.event.name}</p>
+          <p className="public-registration-eyebrow">{`${GROUP_LABEL} registration · ${ready.event.name}`}</p>
           <h1><UsersRound aria-hidden="true" size={22} /> Register as a group or individual</h1>
           <p>
             One contact can register several people. Each person gets their own details and classes, and the
