@@ -1,6 +1,7 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { SubmitButton } from "@/components/submit-button";
 import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
 import { sortByName, sortOrderText, sortRows, type SortKind, type SortState } from "@/lib/list-sort";
@@ -211,7 +212,7 @@ export function ClubHonorsWorkspace({
     setHistory(null);
     setHistoryError("");
     try {
-      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`);
+      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as HistoryResponse;
       if (request !== historyRequest.current) return;
       if (!response.ok) {
@@ -260,7 +261,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       formElement.reset();
@@ -301,7 +302,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       setNotice("Entry voided. It is kept in the audit record.");
@@ -320,7 +321,7 @@ export function ClubHonorsWorkspace({
       <section className="public-manage-card" aria-labelledby="club-honors-heading">
         <div className="public-manage-card-heading club-roster-heading">
           <div>
-            <p className="public-registration-eyebrow">Club year {clubYear}</p>
+            <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
             <h2 id="club-honors-heading">Honors</h2>
           </div>
           {!staff && (
@@ -381,7 +382,10 @@ export function ClubHonorsWorkspace({
 
         <SearchResultStatus message={nameSearch.trim() === "" || visible.length === 0 ? "" : `${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
-          <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+          <>
+            <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+            {emptyState === "NO_MEMBERS" && !readOnly && !staff && <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="honors" id="honors-no-members" />}
+          </>
         ) : (
           <div className="report-table-wrap card-box">
             <SortOrderNote>{sortOrderText(honorsSortLabels[honorsSort.key ?? "name"].label, honorsSort.dir, honorsSortLabels[honorsSort.key ?? "name"].kind)}</SortOrderNote>

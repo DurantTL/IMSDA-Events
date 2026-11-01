@@ -9,6 +9,7 @@ import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole
 import { guardianSetEmailProblem, guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club roster storage (#356). Birth dates are sealed on write and opened only
@@ -116,7 +117,7 @@ function audit(
 }
 
 function nameKey(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+  return formatPersonName({ firstName, lastName }).replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
 /** Everyone on the club's roster for the year except removed rows, sorted by name. */

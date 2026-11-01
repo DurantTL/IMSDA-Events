@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { Download, FileUp, Upload, X } from "lucide-react";
 import { isCsvFile } from "@/components/csv-import-dialog";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { savedMessage } from "@/components/form-message";
 
 type RowProblem = { line: number; name: string; problems: string[] };
 type ImportResponse = {
@@ -176,7 +177,7 @@ export function BackgroundCheckImport({ onImported }: { onImported: (result: Imp
             {preview && (
               <>
                 <p className="field-help">
-                  {done ? "Saved." : "Nothing is saved yet."} {preview.format === "ROSTER" ? "Roster" : "Sterling Volunteers"} format detected,{" "}
+                  {done ? savedMessage() : "Nothing is saved yet."} {preview.format === "ROSTER" ? "Roster" : "Sterling Volunteers"} format detected,{" "}
                   {preview.total ?? 0} valid row{(preview.total ?? 0) === 1 ? "" : "s"}.
                 </p>
                 {!done && preview.replacesMigratedList && preview.format === "STERLING" && (

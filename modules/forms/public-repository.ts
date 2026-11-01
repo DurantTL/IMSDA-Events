@@ -89,6 +89,7 @@ import { eventStartDate, planPublicResponsibleAdults } from "@/modules/guardian-
 import { teamNameTakenMessage } from "@/modules/club-teams/domain";
 import { appendSubmissionCharge } from "@/modules/ledger/entries";
 import { moneyOnlyPricingSnapshot } from "@/modules/ledger/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 export type PublicRegistrationErrorCode =
   | "FORM_NOT_FOUND"
@@ -1080,7 +1081,7 @@ async function createPublicRegistrationTransaction(
         ageOfMajority: form.event.ageOfMajority,
         attendees: prepared.attendees.map((attendee) => ({
           clientId: attendee.clientId,
-          name: attendee.identity ? `${attendee.identity.firstName} ${attendee.identity.lastName}`.trim() : "",
+          name: attendee.identity ? formatPersonName(attendee.identity) : "",
           // The attendee's own answers only: the same inputs the stored record is classified from later.
           responses: attendee.responses,
         })),
@@ -1496,7 +1497,7 @@ async function createPublicRegistrationTransaction(
     && createdAttendees.every((attendee) => attendee.attendeeType === "WORKER")
     ? "WORKER"
     : "ATTENDEE";
-  const attendeeNames = createdAttendees.map((attendee) => `${attendee.identity.firstName} ${attendee.identity.lastName}`.trim());
+  const attendeeNames = createdAttendees.map((attendee) => formatPersonName(attendee.identity));
   let waitlistPosition: number | null = null;
   if (isWaitlisted) {
     const highestPosition = await tx.registrationWaitlistEntry.aggregate({
@@ -1663,7 +1664,7 @@ async function createPublicRegistrationTransaction(
         correlationId: submissionCorrelationId,
         transitionKey: `public-registration:${version.id}:${input.idempotencyKey}:waitlisted`,
         recipientEmail: identity.email,
-        recipientName: `${identity.firstName} ${identity.lastName}`.trim(),
+        recipientName: formatPersonName(identity),
         waitlistPosition,
         ...(club?.confirmationNote ? { leadNote: club.confirmationNote({ waitlisted: true }) } : {}),
         metadata: {
@@ -1712,7 +1713,7 @@ async function createPublicRegistrationTransaction(
         existingClubIds: notifications.existingClubIds,
         locationName: registrationLocation?.name ?? null,
         eventName: form.event.name,
-        registrantName: `${identity.firstName} ${identity.lastName}`.trim(),
+        registrantName: formatPersonName(identity),
       });
   await tx.auditLog.create({
     data: {

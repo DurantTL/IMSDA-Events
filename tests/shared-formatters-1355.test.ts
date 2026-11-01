@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatInConferenceTime, shortZoneName } from "@/modules/calendar/conference-format";
 import { createAttendeeRosterCsvTemplate } from "@/modules/forms/attendee-roster-csv";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { formatCents, formatCentsPlain } from "@/modules/payments/format-cents";
@@ -82,8 +82,10 @@ describe("formatInConferenceTime (#1355)", () => {
         { dateStyle: "medium", timeStyle: "short" },
         { dateStyle: "full", timeStyle: "short" },
       ] as const) {
-        expect(formatInConferenceTime(iso, options)).toBe(new Date(iso).toLocaleString("en-US", { ...options, timeZone: zone }));
-        expect(formatInConferenceTime(new Date(iso), options)).toBe(new Intl.DateTimeFormat("en-US", { ...options, timeZone: zone }).format(new Date(iso)));
+        // Times of day are labeled by default (#1454); the opt-out gives the bare Intl text.
+        expect(formatInConferenceTime(iso, { ...options, zoneLabel: false })).toBe(new Date(iso).toLocaleString("en-US", { ...options, timeZone: zone }));
+        expect(formatInConferenceTime(new Date(iso), { ...options, zoneLabel: false })).toBe(new Intl.DateTimeFormat("en-US", { ...options, timeZone: zone }).format(new Date(iso)));
+        expect(formatInConferenceTime(iso, options)).toBe(`${new Date(iso).toLocaleString("en-US", { ...options, timeZone: zone })} ${shortZoneName(iso)}`);
       }
       expect(formatInConferenceTime(iso, { dateStyle: "medium" }))
         .toBe(new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: zone }).format(new Date(iso)));
@@ -94,8 +96,11 @@ describe("formatInConferenceTime (#1355)", () => {
     const options = { hour: "numeric", minute: "2-digit", timeZoneName: "short" } as const;
     for (const iso of instants) {
       expect(formatInConferenceTime(new Date(iso), options)).toBe(new Date(iso).toLocaleTimeString("en-US", { ...options, timeZone: zone }));
-      expect(formatInConferenceTime(iso, { hour: "numeric", minute: "2-digit" }))
+      expect(formatInConferenceTime(iso, { hour: "numeric", minute: "2-digit", zoneLabel: false }))
         .toBe(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit" }).format(new Date(iso)));
+      // Labeled by default (#1454): the same text with the short zone name.
+      expect(formatInConferenceTime(iso, { hour: "numeric", minute: "2-digit" }))
+        .toBe(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(iso)));
     }
     expect(formatInConferenceTime("2026-03-08T07:59:59Z", options)).toMatch(/^1:59\sAM CST$/);
     expect(formatInConferenceTime("2026-03-08T08:00:00Z", options)).toMatch(/^3:00\sAM CDT$/);

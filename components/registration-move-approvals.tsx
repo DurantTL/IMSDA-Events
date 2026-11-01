@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue, Money } from "@/components/exact-value";
 import { useCallback, useEffect, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -44,12 +45,12 @@ export function RegistrationMoveCard({ move, onDecide }: { move: RegistrationMov
         </div>
         <div>
           <dt>This person&apos;s adjustment lines</dt>
-          <dd>{formatCents(move.adjustmentCents)}</dd>
+          <dd><Money cents={move.adjustmentCents} /></dd>
         </div>
       </dl>
       {move.fromRegistration?.locationName !== move.toRegistration?.locationName && (move.fromRegistration?.locationName || move.toRegistration?.locationName) && (
         <p className="quiet-copy">
-          Moves between locations: <span translate="no">{move.fromRegistration?.locationName ?? "no location"}</span> to <span translate="no">{move.toRegistration?.locationName ?? "no location"}</span>.
+          Moves between locations: <span translate={move.fromRegistration?.locationName ? "no" : undefined}>{move.fromRegistration?.locationName ?? "no location"}</span> to <span translate={move.toRegistration?.locationName ? "no" : undefined}>{move.toRegistration?.locationName ?? "no location"}</span>.
         </p>
       )}
       {blocker && <p className="form-error">{registrationMoveBlockerLabels[blocker]}</p>}
@@ -82,7 +83,7 @@ export function RegistrationMoveApprovals() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`${API}${showDecided ? "?status=decided" : ""}`);
+      const response = await fetch(`${API}${showDecided ? "?status=decided" : ""}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { moves?: RegistrationMoveRecord[]; message?: string };
       if (!response.ok) throw new Error(result.message ?? "Registration moves could not be loaded.");
       setMoves(result.moves ?? []);
@@ -166,19 +167,19 @@ export function RegistrationMoveApprovals() {
           <div className="form-stack">
             {decision.kind === "approve" && move.fromRegistration && move.toRegistration ? (
               <>
-                <p translate="no">
-                  {move.memberName} moves from {move.fromRegistration.confirmationCode} ({move.fromClubName}) to{" "}
-                  {move.toRegistration.confirmationCode} ({move.toClubName}) for {move.eventName}, with their adjustments,
+                <p>
+                  <ExactValue>{move.memberName}</ExactValue> moves from <ExactValue>{move.fromRegistration.confirmationCode}</ExactValue> (<ExactValue>{move.fromClubName}</ExactValue>) to{" "}
+                  <ExactValue>{move.toRegistration.confirmationCode}</ExactValue> (<ExactValue>{move.toClubName}</ExactValue>) for <ExactValue>{move.eventName}</ExactValue>, with their adjustments,
                   honor class seats, capacity choices and history.
                 </p>
                 <dl className="transfer-totals">
-                  <div><dt>{move.fromClubName} total</dt><dd>{formatCents(move.fromRegistration.totalCents)} → {formatCents(move.fromRegistration.totalCents - shift)}</dd></div>
-                  <div><dt>{move.toClubName} total</dt><dd>{formatCents(move.toRegistration.totalCents)} → {formatCents(move.toRegistration.totalCents + shift)}</dd></div>
+                  <div><dt><ExactValue>{move.fromClubName}</ExactValue> total</dt><dd><Money cents={move.fromRegistration.totalCents} /> → <Money cents={move.fromRegistration.totalCents - shift} /></dd></div>
+                  <div><dt><ExactValue>{move.toClubName}</ExactValue> total</dt><dd><Money cents={move.toRegistration.totalCents} /> → <Money cents={move.toRegistration.totalCents + shift} /></dd></div>
                 </dl>
                 <p>
                   <strong>Nothing is repriced.</strong> {move.fromClubName}&apos;s registration still carries this
                   person&apos;s base price, and {move.toClubName}&apos;s doesn&apos;t, until you adjust both with the
-                  registration&apos;s own tools. Only this person&apos;s adjustment lines ({formatCents(shift)}) move with them,
+                  registration&apos;s own tools. Only this person&apos;s adjustment lines (<Money cents={shift} />) move with them,
                   which is the only change to the totals above. Payments stay where they were made.
                 </p>
               </>

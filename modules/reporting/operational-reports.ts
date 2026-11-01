@@ -6,6 +6,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 export const operationalReportKinds = [
   "roster",
@@ -598,7 +599,7 @@ export function buildOperationalReport(
     }
 
     const accountHolderName = normalizeWords(
-      `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`,
+      formatPersonName(registration.accountHolder),
     );
     registration.attendees.forEach((attendee, index) => {
       const currentResponses = Object.keys(attendee.responses ?? {}).length > 0

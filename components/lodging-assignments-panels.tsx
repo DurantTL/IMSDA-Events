@@ -13,6 +13,7 @@ import { lodgingCategoryLabels } from "@/modules/lodging/domain";
 import type { PlanPreview } from "@/modules/lodging/assignment-service";
 import type { AssignmentWorkspaceView, RoomingReports } from "@/modules/lodging/assignment-view";
 import type { OfferPreviewRow } from "@/modules/lodging/waitlist-service";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * The panels of the staff assignment workspace that are not the room board (#200): exceptions, the waitlist, the
@@ -258,7 +259,7 @@ export function ReportsPanel({ eventId }: { eventId: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch(`/api/events/${eventId}/lodging/assignments/reports`);
+        const response = await fetch(`/api/events/${eventId}/lodging/assignments/reports`, { cache: "no-store" });
         const json = await response.json();
         if (!response.ok) throw new Error(json.message ?? "The reports could not be loaded.");
         if (!cancelled) setReports(json.reports as RoomingReports);
@@ -332,7 +333,7 @@ export function DisplayPanel({ view, base, run, busy, canConfigure }: { view: As
           showAssignmentsToAttendees: form.get("show") === "on",
           showRoommateFirstNames: form.get("mates") === "on",
           attendeeInstructions: String(form.get("instructions") ?? "").trim() || null,
-        }), "Saved.");
+        }), savedMessage());
       }}>
         <label><input type="checkbox" name="show" defaultChecked={view.settings.showAssignmentsToAttendees} /> Show room assignments to attendees</label>
         <label><input type="checkbox" name="mates" defaultChecked={view.settings.showRoommateFirstNames} /> Show roommates by first name</label>

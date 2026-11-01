@@ -75,8 +75,8 @@ describe("History rows (#1140)", () => {
     expect(versionStateLabel(row(2), [versions[2]!])).toBe("Withdrawn");
   });
   it("shows who and when, in text", () => {
-    expect(versionWhoWhen({ status: "PUBLISHED", versionNumber: 2, publishedAt: t2.toISOString(), updatedAt: t2.toISOString(), createdBy: "Synthetic Staff" })).toBe("Published Sep 1, 2026, 12:00 AM UTC, last saved by Synthetic Staff");
-    expect(versionWhoWhen({ status: "DRAFT", versionNumber: 3, publishedAt: null, updatedAt: t3.toISOString(), createdBy: "Synthetic Staff" })).toBe("Saved Oct 1, 2026, 12:00 AM UTC by Synthetic Staff");
+    expect(versionWhoWhen({ status: "PUBLISHED", versionNumber: 2, publishedAt: t2.toISOString(), updatedAt: t2.toISOString(), createdBy: "Synthetic Staff" })).toBe("Published Aug 31, 2026, 7:00 PM CDT, last saved by Synthetic Staff");
+    expect(versionWhoWhen({ status: "DRAFT", versionNumber: 3, publishedAt: null, updatedAt: t3.toISOString(), createdBy: "Synthetic Staff" })).toBe("Saved Sep 30, 2026, 7:00 PM CDT by Synthetic Staff");
   });
 });
 

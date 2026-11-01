@@ -40,7 +40,7 @@ function Notice({ eyebrow, title, children }: { eyebrow: string; title: string; 
 }
 
 function when(date: Date) {
-  return `${formatInConferenceTime(date, { dateStyle: "full", timeStyle: "short" })} Central time`;
+  return `${formatInConferenceTime(date, { dateStyle: "full", timeStyle: "short" })}`;
 }
 
 /**
@@ -60,7 +60,7 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
   if (view.state === "NOT_YET_OPEN") {
     return (
       <Notice eyebrow={view.eventName ?? "Not open yet"} title={view.name}>
-        <p>This form is not open yet. It opens {when(view.opensAt)}.</p>
+        <p>{`This form is not open yet. It opens ${when(view.opensAt)}.`}</p>
       </Notice>
     );
   }
@@ -106,7 +106,7 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
           {view.eventName && <p className="public-registration-eyebrow">{view.eventName}</p>}
           <h1>{form.definition.title || form.name}</h1>
           {form.definition.description && <p>{form.definition.description}</p>}
-          {form.closesAt && <p>Open until {when(form.closesAt)}.</p>}
+          {form.closesAt && <p>{`Open until ${when(form.closesAt)}.`}</p>}
         </div>
       </section>
       <div className="public-manage-layout club-form-public">

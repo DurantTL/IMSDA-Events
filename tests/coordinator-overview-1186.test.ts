@@ -190,7 +190,7 @@ describe("overview markup (#1186)", () => {
     expect(out).toContain("3 of 6 September records");
     expect(out).toContain("Active clubs");
     for (const column of ["Club / church", "Roster", "Adults &amp; staff", "September 2026 record", "Sterling Volunteers", "Open club"]) expect(out).toContain(column);
-    expect(out).toContain("Director: Dana Sample");
+    expect(out).toContain("Director: <span translate=\"no\">Dana Sample</span>");
     expect(out).toContain("Director: none listed");
     expect(out).toContain("0 not in compliance");
     expect(out).toContain('href="/account/area/c1"');
@@ -416,7 +416,7 @@ describe("links on the overview resolve to real routes (#1186)", () => {
     const matchers = routeMatchers();
     const hrefs = (html: string) => [...html.matchAll(/href="(\/[^"#?]*)/g)].map((match) => match[1]!);
     const out = render(ready(six)) + render(ready([]));
-    expect(out).not.toContain("/account/help");
+    // Help guide links (#1435) are real pages: the loop below checks every in-app href resolves.
     for (const href of hrefs(out).filter((path) => !path.startsWith("/api/"))) {
       expect(matchers.some((matcher) => matcher.test(href)), href).toBe(true);
     }

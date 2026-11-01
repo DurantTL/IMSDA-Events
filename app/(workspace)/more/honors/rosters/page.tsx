@@ -1,4 +1,5 @@
 import { ExportLink } from "@/components/export-link";
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Award, Download, ShieldCheck, UsersRound } from "lucide-react";
@@ -20,6 +21,7 @@ import {
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = {
   title: staffPageTitles.honorsRosters,
@@ -42,7 +44,7 @@ export default async function HonorRostersPage({
   // Placing a youth in a full class by hand, and removing a pick, are for system administrators only (#962); the server checks too.
   const canOverrideSeats = user.globalRole === "SYSTEM_ADMIN";
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Honors rosters are restricted" detail="Ask an event administrator for report access." />;
+    return <AccessRestricted title="Honors rosters are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
   }
   const includeDietary = permissions.includes("VIEW_SENSITIVE_DATA");
   // "All sites" plus each location, from the filter the other staff views share (#413).
@@ -52,7 +54,7 @@ export default async function HonorRostersPage({
     getHonorRosterData(event.id, { includeDietary, includeAdminPlacementReasons: canOverrideSeats, ...(locationId ? { locationId } : {}) }),
     backgroundFlaggedAttendeeIds(event.id),
   ]);
-  if (!data) return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+  if (!data) return <NotAvailableForEvent reason="The selected event could not be loaded." />;
 
   const view: View = query.view === "site" || query.view === "clubs" ? query.view : "classes";
   const eventQuery = `event=${encodeURIComponent(event.id)}${site ? `&location=${encodeURIComponent(site.id)}` : ""}`;
@@ -171,8 +173,8 @@ export default async function HonorRostersPage({
                         const pick = roster.picks.find((candidate) => candidate.attendeeId === person.id);
                         return (
                           <tr key={person.id}>
-                            <th scope="row" translate="no">
-                              {person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
+                            <th scope="row">
+                              <ExactValue>{person.lastName}, {person.firstName}</ExactValue>{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
                               {/* Only system administrators are sent the reason, and it never prints on a class sheet (#962). */}
                               {pick?.adminPlacementReason && <small className="field-help honor-seat-override"> Placed by a system administrator: {pick.adminPlacementReason}</small>}
                             </th>
@@ -242,7 +244,7 @@ export default async function HonorRostersPage({
                   {siteRoster.people.map((person) => (
                     <tr key={person.id}>
                       <td className="honor-roster-box">{person.checkedIn ? "✓" : ""}</td>
-                      <th scope="row" translate="no">{person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
+                      <th scope="row"><ExactValue>{person.lastName}, {person.firstName}</ExactValue>{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
                       <td translate="no">{person.clubName}</td>
                       {data.hasLocations && <td translate="no">{person.locationName ?? "—"}</td>}
                       <td>{ageText(person.ageOnEventDate)}</td>
@@ -293,7 +295,7 @@ export default async function HonorRostersPage({
                     <tbody>
                       {schedule.people.map((row) => (
                         <tr key={row.person.id}>
-                          <th scope="row" translate="no">{row.person.lastName}, {row.person.firstName}{flagged.has(row.person.id) && <> <BackgroundCheckBadge /></>}</th>
+                          <th scope="row"><ExactValue>{row.person.lastName}, {row.person.firstName}</ExactValue>{flagged.has(row.person.id) && <> <BackgroundCheckBadge /></>}</th>
                           <td>{ageText(row.person.ageOnEventDate)}</td>
                           {schedule.sessions.map((session) => {
                             const offering = row.bySession[session.id];

@@ -30,7 +30,8 @@ export default async function ClubEventReportsPage({
     return (
       <AccessRestricted
         title="Club event reports are restricted"
-        detail="Ask an event administrator for report access, or for Pathfinder event-manager oversight of this club event."
+        detail="This needs report access or Pathfinder event-manager oversight of this club event."
+        whoToAsk="your event administrator"
       />
     );
   }

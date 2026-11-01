@@ -48,6 +48,7 @@ import type {
   StaffQueueRow,
   StaffRequestDetail,
 } from "@/modules/cancellation-requests/views";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The cancellation request workflow (#170): a registrant asks, staff review.
@@ -544,7 +545,7 @@ function contactName(contact: unknown) {
   const record = contact && typeof contact === "object" && !Array.isArray(contact) ? contact as Record<string, unknown> : {};
   const first = typeof record.firstName === "string" ? record.firstName : "";
   const last = typeof record.lastName === "string" ? record.lastName : "";
-  return `${first} ${last}`.trim() || "Registrant";
+  return formatPersonName({ firstName: first, lastName: last }) || "Registrant";
 }
 
 function proposalOfCalculation(row: { result: unknown }): RegistrantProposal {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { getSafeStorage, safeGetItem, safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
 
 /**
  * A Content-Security-Policy belongs to the document, and a client-side
@@ -20,7 +21,7 @@ export function EventEmbedFullLoad() {
       if (trim(new URL(entry.name).pathname) === trim(window.location.pathname)) {
         // A normal load of this page: nothing to do, and the next client-side
         // arrival may reload once again.
-        window.sessionStorage.removeItem(key);
+        safeRemoveItem("session", key);
         return;
       }
       // Arrived by client-side navigation. Reload once for this navigation. The
@@ -28,9 +29,11 @@ export function EventEmbedFullLoad() {
       // loop; the timestamp is a second guard in case the browser reports a
       // different address for the loaded document, and expires so a later
       // navigation to this page in the same tab still reloads.
-      const last = Number(window.sessionStorage.getItem(key) ?? 0);
+      // Without session storage the timestamp guard cannot work, so never reload: the frames may need a manual refresh.
+      if (!getSafeStorage("session")) return;
+      const last = Number(safeGetItem("session", key) ?? 0);
       if (Date.now() - last < 30_000) return;
-      window.sessionStorage.setItem(key, String(Date.now()));
+      if (!safeSetItem("session", key, String(Date.now()))) return;
       window.location.reload();
     } catch {
       // Without these APIs the page still works; the frames may need a refresh.

@@ -4,13 +4,14 @@ import { CreateDraftsControl, InvoiceClubTypeForm, InvoiceCodeForm } from "@/com
 import { blockerReasonLabel } from "@/modules/attendance-reconciliation/domain";
 import { versionStatusLabel, type InvoiceVersionStatus } from "@/modules/invoices/domain";
 import type { InvoiceListRow, InvoicesView } from "@/modules/invoices/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export function invoiceMoney(cents: number) {
   return formatCents(cents);
 }
 
 export function invoiceWhen(value: string) {
-  return new Date(value).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+  return formatInConferenceTime(value, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export function StatusBadge({ status }: { status: InvoiceVersionStatus }) {

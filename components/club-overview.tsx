@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { CalendarDays, CheckCircle2, FileText, UserCog } from "lucide-react";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { ClubYearTiles } from "@/components/club-year-tiles";
@@ -131,7 +132,10 @@ export async function ClubOverview({
           <h2 id="open-club-team">Who runs this club</h2>
         </div>
         {team.length === 0 ? (
-          <p className="public-manage-empty"><UserCog size={17} aria-hidden="true" /> No club director is assigned yet.{portalView ? " Contact the conference office to have one added." : ""}</p>
+          <>
+            <p className="public-manage-empty"><UserCog size={17} aria-hidden="true" /> No club director is assigned yet.{portalView ? " Contact the conference office to have one added." : ""}</p>
+            {portalView && <CoordinatorSetupHelp context="this club" id="club-no-director" />}
+          </>
         ) : (
           <ul className="public-manage-club-list">
             {team.map((member) => (
@@ -170,7 +174,10 @@ export async function ClubOverview({
           <h2 id="open-club-events">Upcoming club events</h2>
         </div>
         {events.length === 0 ? (
-          <p className="public-manage-empty"><CalendarDays size={17} aria-hidden="true" /> No upcoming club events are published. Check back when the conference opens registration.</p>
+          <>
+            <p className="public-manage-empty"><CalendarDays size={17} aria-hidden="true" /> No upcoming club events are published. Check back when the conference opens registration.</p>
+            {portalView && <CoordinatorSetupHelp context="club events" id="events-none" />}
+          </>
         ) : (
           <ul className="public-manage-club-list">
             {events.map((event) => (
@@ -198,11 +205,14 @@ export async function ClubOverview({
 
       <section className="public-manage-card" aria-labelledby="open-club-reports">
         <div className="public-manage-card-heading">
-          <p className="public-registration-eyebrow">Club year {clubYear}</p>
+          <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
           <h2 id="open-club-reports">Monthly Records</h2>
         </div>
         {months.length === 0 ? (
-          <p className="public-manage-empty"><FileText size={17} aria-hidden="true" /> No reports are due yet this club year. Check back when the first month opens.</p>
+          <>
+            <p className="public-manage-empty"><FileText size={17} aria-hidden="true" /> No reports are due yet this club year. Check back when the first month opens.</p>
+            {portalView && <CoordinatorSetupHelp context="Monthly Records" id="club-reports-none-due" />}
+          </>
         ) : (
           <ul className="public-manage-club-list">
             {months.map((month) => {

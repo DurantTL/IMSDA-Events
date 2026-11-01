@@ -13,6 +13,7 @@ import {
   teamsAtLevel,
   type LevelTeamRow,
 } from "@/modules/club-teams/results-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -25,7 +26,7 @@ export function splitTeamPeople(attendees: ReadonlyArray<{ profileSnapshot: unkn
   let alternate = "";
   for (const attendee of attendees) {
     const snapshot = (attendee.profileSnapshot ?? {}) as Record<string, unknown>;
-    const name = `${text(snapshot.firstName)} ${text(snapshot.lastName)}`.trim();
+    const name = formatPersonName({ firstName: text(snapshot.firstName), lastName: text(snapshot.lastName) });
     if (!name) continue;
     if (snapshot.teamRole === "COACH") { coaches.push(name); continue; }
     const flagged = isAlternateAnswer(((attendee.formResponses ?? {}) as Record<string, unknown>)[ALTERNATE_FIELD_KEY]);

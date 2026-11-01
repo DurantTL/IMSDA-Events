@@ -14,7 +14,10 @@ export async function ClubGuardiansPanel({
   organizationId,
   viewer,
   headingLevel = 2,
+  emptyHelp,
 }: {
+  /** Setup help under the empty state: who can add the contacts (#1435). Given where the viewer is not the club's own leader. */
+  emptyHelp?: React.ReactNode;
   organizationId: string;
   viewer: GuardianViewer;
   headingLevel?: 2 | 3;
@@ -34,14 +37,17 @@ export async function ClubGuardiansPanel({
         <Heading id="open-club-guardians">Emergency contacts</Heading>
       </div>
       {contacts.length === 0 ? (
-        <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No emergency contacts are on file for this club yet.</p>
+        <>
+          <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No emergency contacts are on file for this club yet.</p>
+          {emptyHelp}
+        </>
       ) : (
         <div className="club-guardians-table-wrap report-table-wrap">
           <table className="report-table">
             <thead>
               <tr>
                 <th scope="col">Member</th>
-                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">Contact {index + 1}</th>)}
+                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">{`Contact ${index + 1}`}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -69,7 +75,7 @@ function GuardianCell({ guardian }: { guardian: GuardianRecord | undefined }) {
   return (
     <span className="club-guardian-cell">
       <small className="club-guardian-term">{EMERGENCY_CONTACT_TERM.singular}</small>
-      <strong translate="no">{guardian.name || "Name not given"}</strong>
+      <strong translate={guardian.name ? "no" : undefined}>{guardian.name || "Name not given"}</strong>
       {guardian.relationship && <small>{guardian.relationship}</small>}
       {guardian.phone && <a href={`tel:${guardian.phone.replace(/[^0-9+]/g, "")}`} translate="no"><Phone aria-hidden="true" size={12} /> {guardian.phone}</a>}
       {guardian.email && <a href={`mailto:${guardian.email}`} translate="no">{guardian.email}</a>}

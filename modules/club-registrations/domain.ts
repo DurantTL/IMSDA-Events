@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { EMAIL_FIELD_MESSAGE } from "@/lib/field-validation";
 import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, notListedCompanions, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club registration (#358): how roster people map onto an event's published
@@ -35,7 +37,7 @@ export const clubGuestSchema = z.object({
   firstName: z.string().trim().min(1, "Enter a first name.").max(80),
   lastName: z.string().trim().min(1, "Enter a last name.").max(80),
   age: z.number().int("Enter the age in whole years.").min(0, "Enter an age from 0 to 120.").max(120, "Enter an age from 0 to 120."),
-  email: z.string().trim().toLowerCase().email("Enter a valid email, or leave it blank.").max(254).nullable()
+  email: z.string().trim().toLowerCase().email(EMAIL_FIELD_MESSAGE).max(254).nullable()
     .or(z.literal("").transform(() => null)),
 }).strict();
 
@@ -499,7 +501,7 @@ export function rosterOwnedResponses(definition: RegistrationFormDefinition, per
     responses[names.first] = person.firstName;
     responses[names.last] = person.lastName;
   } else if (names) {
-    responses[names.key] = `${person.firstName} ${person.lastName}`.trim();
+    responses[names.key] = formatPersonName(person);
   }
   const age = attendeeAgeKey(definition);
   if (age && person.ageOnEventDate !== null) responses[age] = String(person.ageOnEventDate);

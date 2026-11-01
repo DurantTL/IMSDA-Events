@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import styles from "@/components/club-forms-lists.module.css";
@@ -20,6 +21,7 @@ import { listRosterChoices, listSubmissionsForViewer } from "@/modules/club-form
 import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Forms" };
 export const dynamic = "force-dynamic";
@@ -38,11 +40,12 @@ export default async function ClubFormsPage({
 }) {
   const [{ organizationId }, { member }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   if (!isClubFormsRole(access.club.role)) {
     return (
       <>
         <p className="public-manage-empty">Club forms are kept by the club&apos;s director and deputy.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-role" />
       </>
     );
   }
@@ -149,6 +152,9 @@ export default async function ClubFormsPage({
 
       {templates.length === 0 ? (
         <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>
+      ) : null}
+      {templates.length === 0 ? (
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-none" />
       ) : null}
 
       {(families.length > 0 || links.length > 0) && (

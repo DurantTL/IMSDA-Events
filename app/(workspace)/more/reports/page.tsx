@@ -1,5 +1,7 @@
 import { ExportLink } from "@/components/export-link";
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import {
@@ -49,18 +51,20 @@ function displayCount(value: number) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-function EmptyReport({ children }: { children: React.ReactNode }) {
-  return <p className="report-empty">{children}</p>;
+function EmptyReport({ children, help }: { children: React.ReactNode; help?: React.ReactNode }) {
+  return <><p className="report-empty">{children}</p>{help}</>;
 }
 
 function CountFields({
   fields,
   emptyCopy,
+  help,
 }: {
   fields: OperationalCountField[];
   emptyCopy: string;
+  help?: React.ReactNode;
 }) {
-  if (fields.length === 0) return <EmptyReport>{emptyCopy}</EmptyReport>;
+  if (fields.length === 0) return <EmptyReport help={help}>{emptyCopy}</EmptyReport>;
   return (
     <div className="report-field-list">
       {fields.map((field) => (
@@ -139,7 +143,8 @@ export default async function OperationalReportsPage({
     return (
       <AccessRestricted
         title="Reports are restricted"
-        detail="Ask an event administrator for report access before viewing attendee or event-choice totals."
+        detail="Viewing attendee or event-choice totals needs report access."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -274,7 +279,7 @@ export default async function OperationalReportsPage({
           <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "roster")}><Download aria-hidden="true" size={15} /> Download roster CSV</ExportLink>
         </div>
         {report.rosterGroups.length === 0
-          ? <EmptyReport>No active attendees are available yet.</EmptyReport>
+          ? <EmptyReport help={<EventSetupHelp eventId={event.id} context="reports" id="reports-no-attendees" setupKey="reports-no-attendees" />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
               {report.rosterGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
@@ -312,7 +317,7 @@ export default async function OperationalReportsPage({
           <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendee-types")}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {report.attendeeTypeGroups.length === 0
-          ? <EmptyReport>No active attendees are available yet.</EmptyReport>
+          ? <EmptyReport help={<EventSetupHelp eventId={event.id} context="reports" id="reports-no-attendees" sameAs="reports-no-attendees" />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
               {report.attendeeTypeGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
@@ -363,7 +368,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</ExportLink>
           </div>
-          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." />
+          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -389,7 +394,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</ExportLink>
           </div>
-          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." />
+          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -426,7 +431,7 @@ export default async function OperationalReportsPage({
                   <tbody role="rowgroup">
                     {report.volunteerRoster.map((volunteer) => (
                       <tr role="row" key={`${volunteer.attendeeId}-${volunteer.question}`}>
-                        <th role="rowheader" scope="row" translate="no">{volunteer.lastName}, {volunteer.firstName}<small className="quiet-copy"> · {volunteer.attendeeType}</small></th>
+                        <th role="rowheader" scope="row"><ExactValue>{volunteer.lastName}, {volunteer.firstName}</ExactValue><small className="quiet-copy"> · {volunteer.attendeeType}</small></th>
                         <td {...cardCell("Answer")}>{volunteer.answer}{report.volunteers.length > 1 && <small className="quiet-copy"> · {volunteer.question}</small>}</td>
                         <td {...cardCell("Phone")} translate="no">{volunteer.phone || "—"}</td>
                         <td {...cardCell("Group")}>{volunteer.groupLabel ?? "—"}</td>
@@ -448,7 +453,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</ExportLink>
           </div>
-          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." />
+          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
       {emptyCountSections.length > 0 && (

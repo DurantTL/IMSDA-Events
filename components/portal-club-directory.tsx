@@ -18,7 +18,7 @@ export function PortalClubDirectory({ slice, query, total, searchLabel = "Search
               <li className={styles.card} key={club.organizationId}>
                 <div className={styles.identity}>
                   <h2 translate="no">{club.name}</h2>
-                  <p translate="no">{club.sponsoringChurch || "No church listed"}</p>
+                  <p translate={club.sponsoringChurch ? "no" : undefined}>{club.sponsoringChurch || "No church listed"}</p>
                   {club.city && <p translate="no">{club.city}</p>}
                 </div>
                 <p><span className={styles.status}>{club.roleLabel}</span></p>

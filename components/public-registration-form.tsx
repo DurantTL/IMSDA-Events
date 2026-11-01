@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
@@ -9,9 +10,9 @@ import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { validateRosterResponses as validateRosterResponsesShared } from "@/modules/forms/roster-validation";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowDown,
   ArrowRight,
@@ -40,7 +41,9 @@ import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormsHelpRow } from "@/components/forms-help";
 import { SubmitButton } from "@/components/submit-button";
+import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
@@ -138,7 +141,8 @@ import { rosterAnsweredFieldKeys, rosterAnsweredSummary } from "@/modules/club-r
 import { carryoverAttention, missingAnswersAttention, type AttentionItem } from "@/modules/club-registrations/attention";
 import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { FieldError } from "@/components/field-error";
-import { errorSummaryHeading } from "@/components/form-error-summary";
+import { labelledFieldMessage } from "@/lib/field-validation";
+import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -248,7 +252,15 @@ type Confirmation = {
 };
 
 /** What the browser prices a form with. A church-billed event carries the lines only, never a sum (#621). */
-type DisplayedCalculation = Pick<FormCalculation, "lineItems"> & Partial<Omit<FormCalculation, "lineItems">>;
+type DisplayedCalculation = Pick<FormCalculation, "lineItems"> & Partial<Omit<FormCalculation, "lineItems">> & {
+  /** The browser's own preview threw (#1445). The server still prices the submission; the page says so instead of a total. */
+  previewFailed?: boolean;
+};
+
+/** Shown where the preview total would be when the browser could not work it out. The server prices the submission either way. */
+export const PROMO_AMOUNT_ON_SUBMIT_TEXT = "Promo code applied. Your discount is calculated when you submit.";
+export const PREVIEW_UNAVAILABLE_TEXT =
+  "We couldn't show your total on this page. Your total will be calculated when you submit, and shown on your confirmation.";
 
 type PromoCodeQuote = Partial<FormCalculation> & {
   /** Absent on a church-billed event (#621). */
@@ -296,6 +308,8 @@ export type PublicRegistrationFormProps = {
    * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
    */
   securityCheck?: SecurityCheckConfig;
+  /** The help contact for the small "Forms help" link under Submit (#1445); absent (the embed) leaves the link off. */
+  formsHelpContact?: FormsHelpContact;
   /**
    * Club registration (#358): the people come from the club roster, so the
    * party is fixed (no add, remove, or CSV) and their roster-owned fields are
@@ -503,6 +517,7 @@ export function PublicRegistrationForm({
   club,
   group,
   securityCheck = null,
+  formsHelpContact,
 }: PublicRegistrationFormProps) {
   const securityCheckRef = useRef<SecurityCheckHandle>(null);
   // Same action the route expects: the general link's team flow and the individual form share "registration".
@@ -744,6 +759,12 @@ export function PublicRegistrationForm({
   const [draftNotice, setDraftNotice] = useState<"restored" | "version-changed" | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
+  // A real edit since the page opened (prefill alone does not count) warns before leaving; a sent registration
+  // does not. A club's registration keeps its own server-side draft, so it is not warned here (#1452).
+  useUnsavedChangesGuard(
+    draftDirty && !confirmation && !club,
+    "Your registration answers have not been sent. Leave this page and discard them?",
+  );
   useEffect(() => {
     if (!draftsEnabled) {
       // Signed in or prefilled: also drop any older signed-out draft.
@@ -815,26 +836,32 @@ export function PublicRegistrationForm({
   );
   const baseCalculation = useMemo<DisplayedCalculation>(
     () => {
-      // A church-billed registrant is never shown a total, so the browser prices the lines only (#621).
-      if (deferredOrganizationBilling) {
-        return {
-          lineItems: rosterEnabled
-            ? calculateRosterLineItems(definition, registrationResponses, attendees.map((attendee) => attendee.responses), pricingDate)
-            : calculateFormLineItems(definition, responses, pricingDate),
-        };
+      try {
+        // A church-billed registrant is never shown a total, so the browser prices the lines only (#621).
+        if (deferredOrganizationBilling) {
+          return {
+            lineItems: rosterEnabled
+              ? calculateRosterLineItems(definition, registrationResponses, attendees.map((attendee) => attendee.responses), pricingDate)
+              : calculateFormLineItems(definition, responses, pricingDate),
+          };
+        }
+        const priced = rosterEnabled
+          ? calculateRosterTotal(
+            definition,
+            registrationResponses,
+            attendees.map((attendee) => attendee.responses),
+            pricingDate,
+          )
+          : calculateFormTotal(definition, responses, pricingDate);
+        // The lodging charge is its own line of the total, ahead of promo codes and fees (#199).
+        return lodgingLine
+          ? calculationWithLine(definition, rosterEnabled ? registrationResponses : responses, priced, lodgingLine.key, lodgingLine)
+          : priced;
+      } catch {
+        // The total shown here is only a preview from the shared function. If it cannot run in this browser, say so:
+        // the server recalculates from the answers on submit and never uses a number from this page.
+        return { lineItems: [], previewFailed: true };
       }
-      const priced = rosterEnabled
-        ? calculateRosterTotal(
-          definition,
-          registrationResponses,
-          attendees.map((attendee) => attendee.responses),
-          pricingDate,
-        )
-        : calculateFormTotal(definition, responses, pricingDate);
-      // The lodging charge is its own line of the total, ahead of promo codes and fees (#199).
-      return lodgingLine
-        ? calculationWithLine(definition, rosterEnabled ? registrationResponses : responses, priced, lodgingLine.key, lodgingLine)
-        : priced;
     },
     [attendees, definition, deferredOrganizationBilling, lodgingLine, pricingDate, registrationResponses, responses, rosterEnabled],
   );
@@ -1267,6 +1294,8 @@ export function PublicRegistrationForm({
     if (issue) return { ok: false, text: issue.message };
     const applied = activeAttendeePromo.attendeeDiscounts.find((candidate) => candidate.attendeeIndex === attendeeIndex);
     const sponsor = applied ? activeAttendeePromo.sponsors?.[applied.code.normalize("NFKC").trim().toUpperCase()] : undefined;
+    // With the preview broken the quote's amount may not match the answers: no dollar amount, the server decides on submit.
+    if (applied && baseCalculation.previewFailed) return { ok: true, text: `${applied.code} applied. Your discount is calculated when you submit.` };
     return applied ? { ok: true, text: `${applied.code} applied — ${formatCents(applied.discountAmountCents)} off for this person.${sponsor ? ` Sponsored by ${sponsor}.` : ""}` } : null;
   }
 
@@ -1493,12 +1522,14 @@ export function PublicRegistrationForm({
 
   // The summary names whose field a message is about (#738).
   function issueSummaryMessage(issue: FormIssue) {
-    if (!rosterEnabled) return issue.message;
     const field = allFields.find((candidate) => (
       candidate.id === issue.fieldId || candidate.key === issue.key
     ));
+    // The one phone and email message does not name its field, so the summary adds the label (#1451).
+    const message = labelledFieldMessage(field?.label ?? "", issue.message);
+    if (!rosterEnabled) return message;
     return namedIssueMessage(
-      issue.message,
+      message,
       issueAttendeeIndex(issue, field?.scope ?? null),
       attendees.map((attendee, index) => attendeeName(attendee, index, roster.attendeeLabel)),
       roster.attendeeLabel,
@@ -1832,9 +1863,9 @@ export function PublicRegistrationForm({
                 aria-describedby={hintId}
                 onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked ? promoSharedCode : "")}
               />
-              <span>Covered by the code {promoSharedCode}: {personName}</span>
+              <span>Covered by the code <ExactValue>{promoSharedCode}</ExactValue>: <ExactValue>{personName}</ExactValue></span>
             </label>
-            <small id={hintId}>Leave this unticked if {personName} pays for themselves.</small>
+            <small id={hintId}>{`Leave this unticked if ${personName} pays for themselves.`}</small>
             {notice && (
               <small className={notice.ok ? "public-registration-promo-success" : "field-error"} role={notice.ok ? "status" : "alert"} aria-live="polite">
                 {notice.ok && <BadgePercent size={15} aria-hidden="true" />} {notice.text}
@@ -1947,7 +1978,8 @@ export function PublicRegistrationForm({
               aria-live="polite"
             >
               {promoCodeApplied && <BadgePercent size={15} aria-hidden="true" />}
-              {promoCodeNotice}
+              {/* With the preview broken the quote's amount may no longer match the answers: never show it. */}
+              {promoCodeApplied && baseCalculation.previewFailed ? PROMO_AMOUNT_ON_SUBMIT_TEXT : promoCodeNotice}
             </small>
           )}
         </div>
@@ -1970,7 +2002,7 @@ export function PublicRegistrationForm({
       return (
         <div className={`${wrapperClass} public-registration-calculated`} key={field.id}>
           <span><strong>{field.label}</strong><small>Automatically included in your order.</small></span>
-          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
+          <strong>{baseCalculation.previewFailed ? "Calculated on submit" : lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
         </div>
       );
     }
@@ -2024,7 +2056,7 @@ export function PublicRegistrationForm({
       return (
         <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused} aria-describedby={description}>
           <legend>{fieldLabel(field, context)}</legend>
-          <small>Choose {minimum > 0 ? `at least ${minimum} and ` : ""}up to {maximum}.</small>
+          <small>{`Choose ${minimum > 0 ? `at least ${minimum} and ` : ""}up to ${maximum}.`}</small>
           <div className="public-registration-choice-list">
             {field.options.map((option, index) => {
               const { full } = choiceState(field, option);
@@ -2383,6 +2415,13 @@ export function PublicRegistrationForm({
     return attendee ? controlId(field, `attendee_${attendee.clientId}`) : null;
   }
 
+  // The linked summary (#1450): one item per problem, each linking to its control. A server message that is not
+  // already one of the problems (and not the generic "review the fields" line) is listed once, unlinked.
+  const summaryItems: ErrorSummaryItem[] = issues.map((issue) => ({ targetId: issueTargetId(issue), message: issueSummaryMessage(issue) }));
+  if (issues.length > 0 && error && !/^(Complete .* before continuing\.|Review the highlighted fields)/.test(error) && !issues.some((issue) => issue.message === error)) {
+    summaryItems.push({ targetId: null, message: error });
+  }
+
   function renderRoster(
     sectionNumber: number,
     allowedFieldKeys: ReadonlySet<string>,
@@ -2433,7 +2472,7 @@ export function PublicRegistrationForm({
                 : "Review the event options that apply separately to each attendee."}
             </p>
           </div>
-          <strong>{attendees.length} of {roster.maxAttendees}</strong>
+          <strong>{`${attendees.length} of ${roster.maxAttendees}`}</strong>
         </header>
 
         <p className="sr-only" aria-live="polite">{rosterAnnouncement}</p>
@@ -2640,7 +2679,7 @@ export function PublicRegistrationForm({
                     {(group ?? club)?.renderAttendeeExtras?.(attendee, attendeeIndex)}
                     {inSheet && (
                       <div className="public-registration-attendee-sheet-footer">
-                        <button type="button" onClick={closeAttendee}>Done with {displayName}</button>
+                        <button type="button" onClick={closeAttendee}>Done with <ExactValue>{displayName}</ExactValue></button>
                       </div>
                     )}
                 </div>
@@ -2832,7 +2871,7 @@ export function PublicRegistrationForm({
           {answers.map(({ field, answer }) => (
             <div key={field.id}>
               <dt>{field.label}</dt>
-              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined}>{answer}</dd>
+              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined} translate={field.type === "EMAIL" || field.type === "PHONE" || (isCodeLikeAnswer(answer) && /^\S+$/.test(answer)) ? "no" : undefined}>{answer}</dd>
             </div>
           ))}
         </dl>
@@ -2856,7 +2895,7 @@ export function PublicRegistrationForm({
               </div>
               {rosterSummary.byRole.map((row) => (
                 <div key={row.role}>
-                  <dt translate="no">{row.role}</dt>
+                  <dt>{row.role}</dt>
                   <dd>{row.count}</dd>
                 </div>
               ))}
@@ -2909,7 +2948,7 @@ export function PublicRegistrationForm({
                 {lodgingLine ? `. Lodging charge ${formatCents(lodgingLine.amountCents, { grouping: false })} is part of your total below.` : joiningWaitlist ? ". Saved with your waitlist request; nothing is charged for lodging now." : ". Included in your registration."}
               </p>
             )}
-            {lodgingSubmission && ((lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)) > 0 && <p>Roommate requests: {(lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)}. Each stays private until the other person asks for you too, or the event team approves it.</p>}
+            {lodgingSubmission && ((lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)) > 0 && <p>{`Roommate requests: ${(lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)}. Each stays private until the other person asks for you too, or the event team approves it.`}</p>}
           </section>
         )}
 
@@ -2957,8 +2996,10 @@ export function PublicRegistrationForm({
           {deferredOrganizationBilling ? (
             <>
               <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-review-lines" />
-              {displayedPromoCode && <p>Promo code {displayedPromoCode} applied.</p>}
+              {displayedPromoCode && <p>Promo code <ExactValue>{displayedPromoCode}</ExactValue> applied.</p>}
             </>
+          ) : baseCalculation.previewFailed ? (
+            <p className="public-registration-review-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p>
           ) : calculation.lineItems.length > 0 ? (
             <div className="public-registration-review-lines">
               {calculation.lineItems.map((item) => (
@@ -2974,7 +3015,7 @@ export function PublicRegistrationForm({
               {displayedDiscountCents > 0 && (
                 <>
                   <div className="is-discount">
-                    <span>Promo code {displayedPromoCode}</span>
+                    <span>Promo code <ExactValue>{displayedPromoCode}</ExactValue></span>
                     <strong translate="no">−{formatCents(displayedDiscountCents)}</strong>
                   </div>
                   <div>
@@ -3412,7 +3453,7 @@ export function PublicRegistrationForm({
                 <div><span>Subtotal</span><strong translate="no">{formatCents(confirmation.preDiscountSubtotalCents ?? 0)}</strong></div>
                 {(confirmation.discountAmountCents ?? 0) > 0 && (
                   <>
-                    <div className="is-discount"><span>Promo code {confirmation.promoCode}</span><strong translate="no">−{formatCents(confirmation.discountAmountCents ?? 0)}</strong></div>
+                    <div className="is-discount"><span>Promo code <ExactValue>{confirmation.promoCode}</ExactValue></span><strong translate="no">−{formatCents(confirmation.discountAmountCents ?? 0)}</strong></div>
                     <div><span>Discounted subtotal</span><strong translate="no">{formatCents(confirmation.subtotalCents ?? 0)}</strong></div>
                   </>
                 )}
@@ -3497,6 +3538,7 @@ export function PublicRegistrationForm({
 
       <form className="public-registration-layout" noValidate onSubmit={submit}>
         <div className="public-registration-form-column">
+          {formsHelpContact && !club && <FormsHelpRow align="end" contact={formsHelpContact} />}
           {topContent}
           {joiningWaitlist && (
             <section className="public-registration-waitlist-banner" role="status">
@@ -3586,16 +3628,18 @@ export function PublicRegistrationForm({
           <p className="sr-only" role="status" aria-live="polite">{submitQueued ? "Updating total…" : ""}</p>
           {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
-            <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
-              <strong><AlertTriangle aria-hidden="true" size={16} /> {error || "Review the highlighted fields."}</strong>
-              {issues.length > 0 && <p className="public-registration-error-count">{errorSummaryHeading(issues.length)}</p>}
-              {issues.length > 0 && (
-                <ul>{issues.map((issue, index) => {
-                  const targetId = issueTargetId(issue);
-                  return <li key={`${issue.path ?? issue.key}_${index}`}>{targetId ? <a href={`#${targetId}`} onClick={(clickEvent) => followIssueLink(clickEvent, issue, targetId)}>{issueSummaryMessage(issue)}</a> : issueSummaryMessage(issue)}</li>;
-                })}</ul>
-              )}
-            </div>
+            <FormErrorSummary
+              action={currentStepIndex >= registrationSteps.length - 1 ? "submitting" : "continuing"}
+              className="form-error-summary public-registration-error-summary"
+              heading={issues.length > 0 ? undefined : error || "Review the highlighted fields."}
+              items={summaryItems}
+              onFollow={(clickEvent, _item, index) => {
+                const issue = issues[index];
+                const targetId = issue ? issueTargetId(issue) : null;
+                if (issue && targetId) followIssueLink(clickEvent, issue, targetId);
+              }}
+              ref={errorSummaryRef}
+            />
           )}
 
           <section
@@ -3684,7 +3728,7 @@ export function PublicRegistrationForm({
             <EventRefundPolicy policy={event.refundPolicy} headingLevel={3} />
           )}
 
-          {currentStep.isReview && (
+          {currentStep.isReview && (<>
             <section className="public-registration-submit-card">
               <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
@@ -3698,7 +3742,8 @@ export function PublicRegistrationForm({
                 submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
             </section>
-          )}
+            {formsHelpContact && <FormsHelpRow contact={formsHelpContact} />}
+          </>)}
         </div>
 
         <aside className="public-registration-summary" aria-label="Order summary">
@@ -3711,8 +3756,8 @@ export function PublicRegistrationForm({
             </p>
           )}
           {group?.waitlistNote && <p className="public-registration-summary-empty">{group.waitlistNote}</p>}
-          {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> {attendees.length} {pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}</p>}
-          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
+          {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> <span>{`${attendees.length} ${pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}`}</span></p>}
+          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : baseCalculation.previewFailed ? <p className="public-registration-summary-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
             <div className="public-registration-summary-lines">
               {calculation.lineItems.map((item) => (
                 <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{formatCents(item.amountCents)}</strong></div>
@@ -3720,7 +3765,7 @@ export function PublicRegistrationForm({
               <div><span>Subtotal</span><strong translate="no">{formatCents(displayedPreDiscountSubtotalCents)}</strong></div>
               {displayedDiscountCents > 0 && (
                 <>
-                  <div className="is-discount"><span>Promo code {displayedPromoCode}</span><strong translate="no">−{formatCents(displayedDiscountCents)}</strong></div>
+                  <div className="is-discount"><span>Promo code <ExactValue>{displayedPromoCode}</ExactValue></span><strong translate="no">−{formatCents(displayedDiscountCents)}</strong></div>
                   <div><span>Discounted subtotal</span><strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong></div>
                 </>
               )}
@@ -3728,7 +3773,7 @@ export function PublicRegistrationForm({
               <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{formatCents((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
             </div>
           )}
-          <small className="public-registration-pricing-date">Pricing verified for {formatPricingDate(pricingDate)}</small>
+          <small className="public-registration-pricing-date">{`Pricing verified for ${formatPricingDate(pricingDate)}`}</small>
           <div className="public-registration-summary-note">{joiningWaitlist ? <Clock3 size={15} aria-hidden="true" /> : <LockKeyhole size={15} aria-hidden="true" />}<span>{joiningWaitlist ? "This estimate is not charged while you are on the waitlist." : group ? `${group.billingNotice}${group.noCost ? "" : " No payment is due online."}` : deferredOrganizationBilling ? "No payment is due online." : "Final pricing and availability are confirmed securely on submission."}</span></div>
         </aside>
       </form>
@@ -3748,7 +3793,7 @@ export function PublicRegistrationForm({
             open={pendingIndex >= 0}
             title={`Remove ${pendingName} and their answers?`}
           >
-            <p>Everything entered for {pendingName} will be cleared. Cancel keeps every answer.</p>
+            <p>{`Everything entered for ${pendingName} will be cleared. Cancel keeps every answer.`}</p>
           </ConfirmDialog>
         );
       })()}

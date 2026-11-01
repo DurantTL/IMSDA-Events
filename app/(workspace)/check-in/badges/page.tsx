@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import type { CSSProperties } from "react";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactRound, Shirt, Tags } from "lucide-react";
@@ -70,6 +71,7 @@ export default async function PrintableNameBadgesPage({
       <AccessRestricted
         title="Name badge printing is restricted"
         detail="Only event administrators and check-in staff can print attendee name badges."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -240,6 +242,7 @@ export default async function PrintableNameBadgesPage({
           <ContactRound aria-hidden="true" size={26} />
           <h3>No badges to print yet</h3>
           <p>Active submitted or confirmed attendees will appear here automatically.</p>
+          <EventSetupHelp eventId={event.id} context="badges" id="badges-none" />
         </div>
       ) : (
         <div className="badge-sheet-stack">

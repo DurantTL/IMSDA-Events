@@ -110,7 +110,7 @@ export function FilledFormsTable({ submissions, base, caption = "Filled forms", 
           {rows.map((row) => (
             <tr key={row.id}>
               <th scope="row">{row.templateName}</th>
-              <td translate="no">{row.subjectName || "Not named"}</td>
+              <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
               <td>{row.status === "DRAFT" ? "Draft" : "Submitted"}{row.enteredVia === "LINK" ? " · private link" : row.enteredVia === "OPEN_APPLICATION" ? " · open application" : ""}</td>
               <td>{formatDate(row.submittedAt ?? row.updatedAt)}</td>
               <td>

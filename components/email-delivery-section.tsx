@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Mail, Pause, Play, Save } from "lucide-react";
+import { savedMessage } from "@/components/form-message";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cardCell } from "@/components/table-card-labels";
 import type { EventEmailState } from "@/modules/communications/event-email-pause";
@@ -92,7 +93,7 @@ export function EmailDeliverySection({
       setDraft(saved);
       setSavedSenderEmail(saved.email);
       router.refresh();
-      setNotice("Central sender saved.");
+      setNotice(savedMessage());
     } catch (caught) {
       setSenderError(caught instanceof Error ? caught.message : failedMessage);
     } finally {

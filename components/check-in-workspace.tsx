@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
@@ -841,6 +842,7 @@ export function CheckInWorkspace({
             <p>{arrivals.length === 0
               ? "Nobody is registered for this event, so there is no one to check in. Registrations appear here once people submit the public form."
               : "Check the name or confirmation code and try again."}</p>
+            {arrivals.length === 0 && <EventSetupHelp context="check-in" id="check-in-no-arrivals" />}
           </div>
         )}
       </section>

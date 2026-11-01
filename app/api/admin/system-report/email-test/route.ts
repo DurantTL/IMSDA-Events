@@ -18,6 +18,7 @@ async function postHandler(request: Request) {
     const run = await runEmailTest({ user: admin.user, body: await request.json().catch(() => null) });
     if (run.kind === "invalid") return testerJson({ error: "INVALID_EMAIL", message: "Enter one valid email address." }, 400);
     if (run.kind === "rate-limited") return testerRateLimited(run.nextAllowedAt, "email");
+    if (run.kind === "backup-not-configured") return testerJson({ error: "BACKUP_NOT_CONFIGURED", message: "The backup email service is not set up on this server." }, 409);
     if (run.kind === "not-configured") return testerJson({ error: "EMAIL_NOT_CONFIGURED", message: "Email sending is not set up on this server." }, 503);
     return testerJson({ status: run.status }, 201);
   } catch (error) {

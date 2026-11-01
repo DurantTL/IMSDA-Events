@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { serverSort } from "@/lib/list-sort";
 import { COORDINATOR_RANKING_DEFAULT_SORT, COORDINATOR_RANKING_SORT_COLUMNS, rankingFirstDirection } from "@/modules/club-reports/area-table-sort";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { PointsBars, ReportSummaryBand } from "@/components/club-report-charts";
@@ -54,7 +55,7 @@ export default async function AreaPointsPage({ searchParams }: { searchParams: P
           </div>
           <ReportSummaryBand label={`Points summary for ${clubYear}, all ${allClubs.length} clubs`} tiles={pointsSummaryTiles(allClubs)} />
           {clubs.length === 0 ? (
-            query ? <CoordinatorNoMatch clearHref={pointsPageHref(BASE_PATH, { year: clubYear, sort })} query={query} /> : <p className="report-empty">No active clubs yet.</p>
+            query ? <CoordinatorNoMatch clearHref={pointsPageHref(BASE_PATH, { year: clubYear, sort })} query={query} /> : <><p className="report-empty">No active clubs yet.</p><CoordinatorSetupHelp context="points" id="points-none" /></>
           ) : (
             <>
               <PointsBars

@@ -27,7 +27,7 @@ const filterLabels: Record<StaffQueueFilter, string> = {
   overdue: "Overdue (14+ days)",
   declined: "Declined",
   unmatched: "Unmatched",
-  pending: "Pending",
+  pending: "Pending approval",
 };
 
 const API = "/api/admin/club-transfers";
@@ -51,8 +51,8 @@ export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTrans
       {transfer.matchedMemberName && transfer.matchedMemberName !== transfer.requestedName && (
         <p>Typed as: <span translate="no">{transfer.requestedName}</span></p>
       )}
-      {transfer.staffReason && <p>Needs staff: {memberTransferStaffReasonLabels[transfer.staffReason as MemberTransferStaffReason]}</p>}
-      <p>Reason: {transfer.reason}</p>
+      {transfer.staffReason && <p>{`Needs staff: ${memberTransferStaffReasonLabels[transfer.staffReason as MemberTransferStaffReason]}`}</p>}
+      <p>{`Reason: ${transfer.reason}`}</p>
       {transfer.events.length > 0 && (
         <ul className="transfer-history" aria-label="History">
           {transfer.events.filter((event) => event.type !== "NOTIFIED").map((event) => (
@@ -88,7 +88,7 @@ export function ClubTransferQueue() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`);
+      const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { transfers?: StaffTransferRecord[]; message?: string };
       if (!response.ok) throw new Error(result.message ?? "The transfer queue could not be loaded.");
       setTransfers(result.transfers ?? []);
@@ -111,7 +111,7 @@ export function ClubTransferQueue() {
     setCandidates(null);
     if (next.kind === "override" && next.transfer.needsMemberChoice) {
       try {
-        const response = await fetch(`${API}/${encodeURIComponent(next.transfer.id)}/candidates`);
+        const response = await fetch(`${API}/${encodeURIComponent(next.transfer.id)}/candidates`, { cache: "no-store" });
         const result = await response.json().catch(() => ({})) as { candidates?: Candidate[]; message?: string };
         if (!response.ok) throw new Error(result.message ?? "The sending club's roster could not be loaded.");
         setCandidates(result.candidates ?? []);

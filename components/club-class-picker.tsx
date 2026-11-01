@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useMemo, useRef, useState } from "react";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { Award, Save } from "lucide-react";
@@ -28,6 +29,7 @@ export function ClubClassPicker({
   initialWorkspace,
   noun = "club",
   organizationId,
+  setupBase,
 }: {
   /** True for staff acting as the club's director (#832): they may place someone below a class's level or prerequisites, with a reason. */
   canOverrideRequirements?: boolean;
@@ -38,6 +40,8 @@ export function ClubClassPicker({
   /** Who holds the seats, in the words the page uses. */
   noun?: "club" | "group";
   organizationId?: string;
+  /** The club's portal path, given on the director's own page so a blocked class step says what to do (#1435). */
+  setupBase?: string;
 }) {
   const saveUrl = endpoint ?? `/api/attendee/clubs/${encodeURIComponent(organizationId ?? "")}/events/${encodeURIComponent(eventId ?? "")}/classes`;
   const [workspace, setWorkspace] = useState(initialWorkspace);
@@ -82,6 +86,7 @@ export function ClubClassPicker({
           </div>
         </div>
         <p className="public-manage-empty" role="status">{workspace.locationMessage ?? "Choose your location first."}</p>
+        {setupBase && <ClubSetupHelp base={setupBase} context="class choices" id="classes-location-needed" />}
       </section>
     );
   }
@@ -197,6 +202,7 @@ export function ClubClassPicker({
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {!workspace.open && <p className="public-manage-empty">Class choices are closed.</p>}
+      {!workspace.open && setupBase && <ClubSetupHelp base={setupBase} context="class choices" id="classes-closed" />}
       <div className="club-class-grid">
         {workspace.attendees.map((attendee) => {
           const chosen = selections[attendee.id] ?? [];
@@ -261,7 +267,7 @@ export function ClubClassPicker({
       )}
       {workspace.open && (
         <div className={`club-sticky-bar${barPinned ? " is-pinned" : ""}`}>
-          <span className="field-help">{Object.values(selections).reduce((total, ids) => total + ids.length, 0)} classes chosen</span>
+          <span className="field-help">{`${Object.values(selections).reduce((total, ids) => total + ids.length, 0)} classes chosen`}</span>
           <button className="primary-button" disabled={saving} onClick={save} type="button">
             <Save aria-hidden="true" size={16} /> {saving ? "Saving…" : "Save classes"}
           </button>

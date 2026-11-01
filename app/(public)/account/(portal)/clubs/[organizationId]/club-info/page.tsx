@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ClubProfileForm } from "@/components/club-profile-form";
 import { ClubTeamWorkspace } from "@/components/club-team-workspace";
 import { listPendingClubTeamInvites } from "@/modules/club-imports/invites";
@@ -7,6 +8,7 @@ import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
 import { listClubTeam } from "@/modules/organizations/director-grants-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club settings" };
 export const dynamic = "force-dynamic";
@@ -19,12 +21,13 @@ export const dynamic = "force-dynamic";
 export default async function ClubInfoPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const { editProfile, manageTeam } = access.capabilities;
   if (!editProfile && !manageTeam) {
     return (
       <>
         <p className="public-manage-empty">Only the club&apos;s director or deputy can change the club&apos;s settings.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club settings" id="club-settings-role" />
       </>
     );
   }

@@ -95,6 +95,8 @@ describe("the request workflow never reaches money, registrations or capacity (#
       for (const specifier of imports) {
         // The shared money formatter (#1355) only turns cents into text; it moves nothing.
         if (specifier === "@/modules/payments/format-cents") continue;
+        // The shared status words (#1453) only turn a stored status into display text; they move nothing.
+        if (specifier === "@/modules/registrations/status-words") continue;
         expect(specifier, `${file} imports ${specifier}`).not.toMatch(/payments|refund|credit|capacity|waitlist|lifecycle|registrations\/(?!$)|invoices|square/);
       }
     }

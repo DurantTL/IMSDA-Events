@@ -1,6 +1,7 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { Money } from "@/components/exact-value";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, HandCoins, WalletCards } from "lucide-react";
@@ -110,16 +111,16 @@ export function ScholarshipFundWorkspace({
       </div>
 
       <section className="finance-summary" aria-label="Scholarship fund balance">
-        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Received</small><strong>{formatCents(summary.receivedCents)}</strong></article>
-        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Awarded from received money</small><strong>{formatCents(summary.fundedCents)}</strong></article>
-        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Fund balance</small><strong data-testid="fund-balance">{formatCents(summary.balanceCents)}</strong></article>
+        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Received</small><strong><Money cents={summary.receivedCents} /></strong></article>
+        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Awarded from received money</small><strong><Money cents={summary.fundedCents} /></strong></article>
+        <article className="finance-stat"><span><HandCoins aria-hidden="true" size={18} /></span><small>Fund balance</small><strong data-testid="fund-balance"><Money cents={summary.balanceCents} /></strong></article>
         <article className={`finance-stat${summary.pledgedCents > 0 ? " warning" : ""}`}>
-          <span><HandCoins aria-hidden="true" size={18} /></span><small>Pledged, not yet received</small><strong data-testid="fund-pledged">{formatCents(summary.pledgedCents)}</strong>
+          <span><HandCoins aria-hidden="true" size={18} /></span><small>Pledged, not yet received</small><strong data-testid="fund-pledged"><Money cents={summary.pledgedCents} /></strong>
         </article>
       </section>
       {summary.afterPledgesCents < 0 && (
         <p className="inline-notice" role="note">
-          Awards marked pledged add up to more than the fund holds. The fund is {formatCents(-summary.afterPledgesCents)} short until those pledges arrive.
+          Awards marked pledged add up to more than the fund holds. The fund is <Money cents={-summary.afterPledgesCents} /> short until those pledges arrive.
         </p>
       )}
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -129,15 +130,15 @@ export function ScholarshipFundWorkspace({
         <div className="finance-row finance-head"><span>Sponsor or church</span><span>Received</span><span>Awarded</span><span>Still outstanding (pledged)</span></div>
         {summary.sponsors.map((sponsor) => (
           <div className="finance-row" key={sponsor.key}>
-            <span><strong>{sponsor.name}</strong>{sponsor.unallocatedCents > 0 ? <small>{formatCents(sponsor.unallocatedCents)} received, not yet awarded</small> : null}</span>
-            <span>{formatCents(sponsor.receivedCents)}</span>
-            <span>{formatCents(sponsor.awardedCents)}</span>
-            <span>{sponsor.outstandingCents > 0 ? <strong>{formatCents(sponsor.outstandingCents)}</strong> : formatCents(0)}</span>
+            <span><strong>{sponsor.name}</strong>{sponsor.unallocatedCents > 0 ? <small><Money cents={sponsor.unallocatedCents} /> received, not yet awarded</small> : null}</span>
+            <span><Money cents={sponsor.receivedCents} /></span>
+            <span><Money cents={sponsor.awardedCents} /></span>
+            <span>{sponsor.outstandingCents > 0 ? <strong><Money cents={sponsor.outstandingCents} /></strong> : <Money cents={0} />}</span>
           </div>
         ))}
         {summary.generalAwardedCents > 0 && (
           <div className="finance-row">
-            <span><strong>Fund in general (no one sponsor)</strong></span><span /><span>{formatCents(summary.generalAwardedCents)}</span><span />
+            <span><strong>Fund in general (no one sponsor)</strong></span><span /><span><Money cents={summary.generalAwardedCents} /></span><span />
           </div>
         )}
         {summary.sponsors.length === 0 && <p className="quiet-copy">No contributions or sponsored awards yet.</p>}
@@ -175,7 +176,7 @@ export function ScholarshipFundWorkspace({
             <div className="finance-row" key={award.id}>
               <span><strong>{award.sponsorName}</strong><small>Awarded {award.createdOn}</small></span>
               <span><a className="text-link scholarship-fund-code-link" href={`/finance?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(award.registrationId)}`}>{award.confirmationCode}</a></span>
-              <span>{formatCents(award.amountCents)}</span>
+              <span><Money cents={award.amountCents} /></span>
               <span>
                 <button className="secondary-button" type="button" disabled={saving || settleBlock(award) !== null} onClick={() => settle(award.id)}>Mark received</button>
                 {settleBlock(award) && <small>{settleBlock(award)}</small>}
@@ -208,7 +209,7 @@ export function ScholarshipFundWorkspace({
             </span>
             <span>{line.receivedOn}</span>
             <span>{contributionMethodLabels[line.method]}</span>
-            <span>{line.amountCents < 0 ? "−" : ""}{formatCents(Math.abs(line.amountCents))}</span>
+            <span>{line.amountCents < 0 ? "−" : ""}<Money cents={Math.abs(line.amountCents)} /></span>
           </div>
         ))}
         {fund.contributions.length === 0 && <p className="quiet-copy">No contributions recorded.</p>}
@@ -224,7 +225,7 @@ export function ScholarshipFundWorkspace({
               {!award.active ? "Reversed" : award.pledged ? (award.settled ? "Pledge received" : "Pledged, not yet received") : "Funded"}
               {award.registrationCancelled && <small className="form-error">Registration cancelled — reverse to return to fund</small>}
             </span>
-            <span>{formatCents(award.amountCents)}</span>
+            <span><Money cents={award.amountCents} /></span>
           </div>
         ))}
         {fund.awards.length === 0 && <p className="quiet-copy">No awards from the fund yet.</p>}

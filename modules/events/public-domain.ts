@@ -8,6 +8,7 @@ import { closesRegistration, effectiveLifecycleState, type EventLifecycleStateNa
 import { publicStatusLine, resolvePublicCapacityStatus, resolvePublicRegistrationStatus } from "@/modules/events/public-registration-status";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
+import { formatInTimeZone, shortZoneName } from "@/modules/calendar/conference-format";
 
 export type PublicEventRegistrationState =
   | "UPCOMING"
@@ -115,15 +116,9 @@ export function buildPublicEventAnnouncementFeed(
   timeZone: string,
   now = new Date(),
 ): PublicEventAnnouncement[] {
-  const publishedFormatter = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-    timeZoneName: "short",
-  });
+  const publishedFormatter = {
+    format: (date: Date) => formatInTimeZone(date, timeZone, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+  };
 
   return candidates
     .filter((candidate) => (
@@ -370,9 +365,9 @@ export function formatPublicEventSchedule(
     timeZone,
   });
   const dayKey = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone });
-  const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone });
-  const zoneOf = (date: Date) => new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
-    .formatToParts(date).find((part) => part.type === "timeZoneName")?.value ?? "";
+  // The range is labeled once below, so the clock itself is not.
+  const clock = { format: (date: Date) => formatInTimeZone(date, timeZone, { hour: "numeric", minute: "2-digit", zoneLabel: false }) };
+  const zoneOf = (date: Date) => shortZoneName(date, timeZone);
   const weekday = (date: Date, style: "long" | "short") => new Intl.DateTimeFormat("en-US", { weekday: style, timeZone }).format(date);
 
   // One day: "Saturday, 9:00 AM \u2013 5:00 PM CST". Several days: "Fri 9:00 AM \u2013 Sun 12:00 PM CST", so the days

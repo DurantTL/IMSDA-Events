@@ -150,7 +150,7 @@ export function LinkOrganizationForm({
     setSearchError("");
     const ticket = (searchTicket.current += 1);
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/billing-responsibility/organizations?q=${encodeURIComponent(value)}&page=${page}`);
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/billing-responsibility/organizations?q=${encodeURIComponent(value)}&page=${page}`, { cache: "no-store" });
       if (!response.ok) throw new Error();
       const result = await response.json();
       if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer

@@ -57,7 +57,7 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
     <section className="page-stack information-forms-home">
       <section className="panel">
         <div className="section-heading">
-          <div><p className="eyebrow">{config.scope === "EVENT" ? config.ownerLabel : "General forms"}</p><h2>{forms.length} information form{forms.length === 1 ? "" : "s"}</h2></div>
+          <div><p className="eyebrow">{config.scope === "EVENT" ? config.ownerLabel : "General forms"}</p><h2>{`${forms.length} information form${forms.length === 1 ? "" : "s"}`}</h2></div>
           <button className="secondary-button" type="button" aria-expanded={creating} onClick={() => setCreating((open) => !open)}><Plus size={16} aria-hidden="true" /> New form</button>
         </div>
         <p className="quiet-copy">Surveys, interest forms and post-event forms that gather answers only. They never register anyone, and they cannot take payment or ask for health or other sensitive answers.</p>

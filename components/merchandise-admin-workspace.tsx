@@ -2,6 +2,7 @@
 
 /* The asset API returns already-authorized event URLs; next/image cannot optimize these event-scoped responses. */
 /* eslint-disable @next/next/no-img-element */
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -160,6 +161,8 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [variantEditing, setVariantEditing] = useState<Variant | "new" | null>(null);
+  // Closing asks its own discard question; this adds the warning for links, Back and reload while an editor is open and changed (#1452).
+  useUnsavedChangesGuard(editorDirty && (editing !== null || variantEditing !== null), "You have unsaved changes to this catalog item. Leave this page and discard them?");
   // Review before archiving (#471): archiving is the merchandise "removal"
   // action — never deleted, always reachable in history — so it gets the
   // same confirm dialog before it takes effect.

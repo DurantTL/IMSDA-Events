@@ -224,7 +224,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
             Removing someone also removes their classes.
           </p>
         </div>
-        <span className="count-badge">{goingCount} going</span>
+        <span className="count-badge">{`${goingCount} going`}</span>
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ClubLocationPicker currentId={currentLocationId} locations={locationChoices} noun="group" onChange={setLocationId} value={locationId} />

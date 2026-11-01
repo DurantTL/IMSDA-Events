@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import type { RecipientCandidate } from "@/modules/invoices/delivery-domain";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * Staff controls for sending an invoice, marking it posted to AR, and recording payments (#168). Each posts to an
@@ -60,7 +61,7 @@ export function PostToArForm({ eventId, versionId, posted }: { eventId: string; 
           correcting
             ? { action: "correct-ar", versionId, postedOn: date, reference: reference.trim() || null, reason }
             : { action: "post-to-ar", versionId, postedOn: date, reference: reference.trim() || null },
-          () => (correcting ? "Correction saved." : "Marked as posted to AR."),
+          () => (correcting ? savedMessage() : "Marked as posted to AR."),
         );
       }}
     >
@@ -175,7 +176,7 @@ export function PaymentInstructionsForm({ eventId, value, defaultText }: { event
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-payment-instructions", instructions: text.trim() === "" ? null : text }, () => "Saved.");
+        void run({ action: "set-payment-instructions", instructions: text.trim() === "" ? null : text }, () => savedMessage());
       }}
     >
       <label>

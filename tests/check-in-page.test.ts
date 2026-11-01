@@ -165,7 +165,7 @@ describe("check-in entry routing (#470)", () => {
     expect(dependencies.redirect).not.toHaveBeenCalled();
     expect(markup).toContain("Staff access required");
     expect(markup).toContain("event administrators and check-in staff");
-    expect(markup).toContain("ask the event administrator to add check-in access");
+    expect(markup).toContain("Ask your event administrator if you need access.");
     expect(dependencies.listRegistrations).not.toHaveBeenCalled();
   });
 });

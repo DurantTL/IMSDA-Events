@@ -5,6 +5,9 @@ import { MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { isValidRelyingPartyId } from "@/modules/attendee-accounts/passkey-domain";
+import { checkEmailHeaderName } from "@/modules/communications/email-layout-domain";
+import { loadEmailLayoutSettings } from "@/modules/communications/email-layout-settings";
+import { resolveFormsHelpContact, type FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 
 export const PLATFORM_SETTINGS_ID = "platform";
 
@@ -31,6 +34,16 @@ export const optionalEmail = optionalField(
 );
 
 const optionalUrl = optionalField(z.url().max(500));
+
+/** An email header name (#1443): 1 to 40 characters on one line. Absent means "leave as it is", never "reset". */
+const emailHeaderNameField = z.string().transform((value, ctx) => {
+  const check = checkEmailHeaderName(value);
+  if (!check.ok) {
+    ctx.addIssue({ code: "custom", message: check.message });
+    return z.NEVER;
+  }
+  return check.value;
+}).optional();
 
 export const platformSettingsInputSchema = z.object({
   organizationName: z.string().trim().min(2).max(120),
@@ -64,6 +77,15 @@ export const platformSettingsInputSchema = z.object({
    */
   publicHelpPhone: optionalField(z.string().max(MAX_PHONE_LENGTH)),
   publicHelpEmail: optionalEmail,
+  /**
+   * The shared email layout (#1443): the header name for event and general email, the one for club email, and the
+   * footer help contact. A blank contact is left out of the footer. The phone is judged in `updatePlatformSettings`.
+   */
+  emailHeaderName: emailHeaderNameField,
+  emailClubHeaderName: emailHeaderNameField,
+  // Absent means "leave as it is" (a client from before this setting), not "clear": a blank string clears.
+  emailHelpEmail: z.union([z.undefined(), optionalEmail]),
+  emailHelpPhone: z.union([z.undefined(), optionalField(z.string().max(MAX_PHONE_LENGTH))]),
 }).strict();
 
 export type PlatformSettingsInput = z.infer<typeof platformSettingsInputSchema>;
@@ -101,6 +123,9 @@ export type PlatformSettingsRecord = PlatformSettingsInput & PlatformAddressesIn
   defaultSenderName: string;
   defaultSenderEmail: string | null;
   defaultReplyToEmail: string | null;
+  /** Never blank: the form always shows, and the layout always has, a name (#1443). */
+  emailHeaderName: string;
+  emailClubHeaderName: string;
   updatedAt: string;
   updatedByName: string | null;
 };
@@ -139,6 +164,10 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
     invoiceHeaderPhone: row.invoiceHeaderPhone,
     publicHelpPhone: row.publicHelpPhone,
     publicHelpEmail: row.publicHelpEmail,
+    emailHeaderName: row.emailHeaderName,
+    emailClubHeaderName: row.emailClubHeaderName,
+    emailHelpEmail: row.emailHelpEmail,
+    emailHelpPhone: row.emailHelpPhone,
     updatedAt: row.updatedAt.toISOString(),
     updatedByName: row.updatedBy?.displayName ?? null,
   };
@@ -158,6 +187,22 @@ export async function getPublicHelpContact(): Promise<{ phone: string | null; em
   } catch (error) {
     logError("Reading the homepage help contact failed", error);
     return { phone: null, email: null };
+  }
+}
+
+/**
+ * The contact the "Forms help" popup shows (#1445): Platform settings → Email header and footer → footer help email and
+ * phone (#1443), the same contact every email's footer shows. A field left blank still shows the IMSDA support default
+ * here, because the popup always needs a way to reach someone. Never throws: any failure shows the defaults.
+ */
+export async function getFormsHelpContact(): Promise<FormsHelpContact> {
+  try {
+    const settings = await loadEmailLayoutSettings(getPrisma());
+    return resolveFormsHelpContact({ email: settings.helpEmail, phone: settings.helpPhone });
+  } catch (error) {
+    // Getting the database client itself can fail (bad environment); the page still loads with the defaults.
+    logError("Reading the Forms help contact failed", error);
+    return resolveFormsHelpContact({});
   }
 }
 
@@ -209,6 +254,10 @@ const BASELINE_FIELDS = [
   "invoiceHeaderPhone",
   "publicHelpPhone",
   "publicHelpEmail",
+  "emailHeaderName",
+  "emailClubHeaderName",
+  "emailHelpEmail",
+  "emailHelpPhone",
 ] as const;
 
 export async function updatePlatformSettings(
@@ -228,7 +277,7 @@ export async function updatePlatformSettings(
     // meanwhile is neither reported as a conflict nor written back stale (#1076).
     const normalize = (key: string, value: unknown) => {
       const text = String(value ?? "").trim();
-      return key === "passkeyRpId" || key === "publicHelpEmail" ? text.toLowerCase() : text;
+      return key === "passkeyRpId" || key === "publicHelpEmail" || key === "emailHelpEmail" ? text.toLowerCase() : text;
     };
     let edited: readonly (typeof BASELINE_FIELDS)[number][] = BASELINE_FIELDS;
     if (baseline && before) {
@@ -257,6 +306,11 @@ export async function updatePlatformSettings(
       const phone = resolvePhoneChange(input.publicHelpPhone, before?.publicHelpPhone);
       if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Help phone: ${phone.message}`);
       input = { ...input, publicHelpPhone: phone.value };
+    }
+    if (input.emailHelpPhone && edited.includes("emailHelpPhone")) {
+      const phone = resolvePhoneChange(input.emailHelpPhone, before?.emailHelpPhone);
+      if (!phone.ok) throw new PlatformSettingsError("INVALID_SETTING", `Email help phone: ${phone.message}`);
+      input = { ...input, emailHelpPhone: phone.value };
     }
     // Any change, not only clearing: a passkey is bound to the domain it was
     // made for, so a new domain strands existing passkeys just the same.
@@ -301,6 +355,10 @@ export async function updatePlatformSettings(
               invoiceHeaderPhone: before.invoiceHeaderPhone,
               publicHelpPhone: before.publicHelpPhone,
               publicHelpEmail: before.publicHelpEmail,
+              emailHeaderName: before.emailHeaderName,
+              emailClubHeaderName: before.emailClubHeaderName,
+              emailHelpEmail: before.emailHelpEmail,
+              emailHelpPhone: before.emailHelpPhone,
             }
             : null,
           after: {
@@ -314,6 +372,10 @@ export async function updatePlatformSettings(
             invoiceHeaderPhone: input.invoiceHeaderPhone ?? null,
             publicHelpPhone: input.publicHelpPhone ?? null,
             publicHelpEmail: input.publicHelpEmail ?? null,
+            emailHeaderName: input.emailHeaderName ?? before?.emailHeaderName ?? null,
+            emailClubHeaderName: input.emailClubHeaderName ?? before?.emailClubHeaderName ?? null,
+            emailHelpEmail: input.emailHelpEmail === undefined ? before?.emailHelpEmail ?? null : input.emailHelpEmail,
+            emailHelpPhone: input.emailHelpPhone === undefined ? before?.emailHelpPhone ?? null : input.emailHelpPhone,
           },
         },
       },

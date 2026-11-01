@@ -1,4 +1,5 @@
 import type { RegistrationRecord } from "@/modules/registrations/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Every name, email, and code a staff member might type when hunting for one
@@ -47,7 +48,7 @@ export function attendeeSummaryLabel(
   limit = 3,
 ) {
   const names = registration.attendees.map(
-    (attendee) => `${attendee.firstName} ${attendee.lastName}`.trim(),
+    (attendee) => formatPersonName(attendee),
   ).filter((name) => name.length > 0);
   if (names.length === 0) return "";
   const shown = names.slice(0, limit).join(", ");

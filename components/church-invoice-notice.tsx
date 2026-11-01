@@ -27,7 +27,7 @@ export function ChurchInvoiceNotice({
   if (!terms || !termsMatchPrice(terms, price)) return <PerPersonPriceNotice price={price} className={className} />;
   return (
     <div className={`church-invoice-notice${className ? ` ${className}` : ""}`} data-testid="church-invoice-terms">
-      <p className="church-invoice-rate"><strong translate="no">{terms.rateSentence}</strong></p>
+      <p className="church-invoice-rate"><strong>{terms.rateSentence}</strong></p>
       <p className="church-invoice-terms">
         No payment is collected with this form — your church will be invoiced after the event based on confirmed attendance.
       </p>
@@ -44,7 +44,7 @@ export function ChurchInvoiceReviewFacts({ recipient }: { recipient: string | nu
   return (
     <dl className="church-invoice-facts" data-testid="church-invoice-facts">
       <div><dt>Payment</dt><dd>{NO_PAYMENT_ONLINE}</dd></div>
-      <div><dt>Invoice recipient</dt><dd translate="no">{recipient ?? "Your church"}</dd></div>
+      <div><dt>Invoice recipient</dt><dd translate={recipient ? "no" : undefined}>{recipient ?? "Your church"}</dd></div>
       <div><dt>Invoice timing</dt><dd>{CHURCH_INVOICE_TIMING}</dd></div>
     </dl>
   );

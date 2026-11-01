@@ -8,6 +8,7 @@ import { isSensitiveField, sensitiveFieldPattern } from "@/modules/forms/sensiti
 import { isLinkedToBlockedField } from "@/modules/forms/field-dependency-walk";
 import { isFieldSensitive, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The paper check-in book (#600): one printable page per club, or per
@@ -260,7 +261,7 @@ export function buildCheckInBook(input: BuildCheckInBookInput): CheckInBook {
           id: attendee.id,
           firstName: attendee.firstName,
           lastName: attendee.lastName,
-          name: `${attendee.firstName} ${attendee.lastName}`.trim(),
+          name: formatPersonName(attendee),
           role: attendee.role ?? "",
           age: attendee.ageOnEventDate,
           extra: extraValue(extraField, responsesById.get(attendee.id) ?? {}),
@@ -270,7 +271,7 @@ export function buildCheckInBook(input: BuildCheckInBookInput): CheckInBook {
   } else {
     for (const registration of input.registrations) {
       const holder = registration.accountHolder;
-      const holderName = `${holder.firstName} ${holder.lastName}`.trim();
+      const holderName = formatPersonName(holder);
       pages.push({
         id: registration.id,
         kind: "REGISTRATION",
@@ -289,7 +290,7 @@ export function buildCheckInBook(input: BuildCheckInBookInput): CheckInBook {
             id: attendee.id,
             firstName: attendee.firstName,
             lastName: attendee.lastName,
-            name: `${attendee.firstName} ${attendee.lastName}`.trim(),
+            name: formatPersonName(attendee),
             role,
             age: ageOf(attendee.responses, ageKeys.get(registration.id)),
             extra: extraValue(extraField, attendee.responses),

@@ -150,7 +150,7 @@ describe("staff points page (#1314)", () => {
   it("announces whole-year ranks on the bars while searching", async () => {
     const html = await render({ q: "cedar" });
     // Cedar clubs are 00-11; Club 10 is 7th in the whole year, not 1st of the results.
-    expect(html).toContain("Rank 7, </span>Synthetic Club 10");
+    expect(html).toContain("Rank 7, </span><span translate=\"no\">Synthetic Club 10</span>");
     expect(html).not.toContain("Rank 1, </span>");
   });
 

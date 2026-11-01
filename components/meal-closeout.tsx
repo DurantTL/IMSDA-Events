@@ -1,4 +1,5 @@
 import { ExportLink } from "@/components/export-link";
+import { Money } from "@/components/exact-value";
 import { Download } from "lucide-react";
 import { MealCloseoutReviewForm } from "@/components/meal-closeout-review-form";
 import {
@@ -35,14 +36,14 @@ function MoneyRow({ name, row, header }: { name: string; row: CloseoutTotals; he
     <tr role="row" className={header ? "served-total" : undefined}>
       <th role="rowheader" scope="row">{name}</th>
       <td role="cell" data-label="Charges and credits">
-        <strong>{formatCents(row.net)}</strong>
-        <span className="field-help served-split">{formatCents(row.charges)} charged · {formatCents(row.credits)} credited</span>
+        <strong><Money cents={row.net} /></strong>
+        <span className="field-help served-split"><Money cents={row.charges} /> charged · <Money cents={row.credits} /> credited</span>
       </td>
       <td role="cell" data-label="Where the net went">
-        <span className="served-split">In registration price {formatCents(row.settlement.inRegistration)}</span>
-        <span className="served-split">Posted to registration {formatCents(row.settlement.registrationAdjustment)}</span>
-        <span className="served-split">Walk-up at counter {formatCents(row.settlement.counter)}</span>
-        <span className="served-split">Registration not live {formatCents(row.settlement.registrationNotLive)}</span>
+        <span className="served-split">In registration price <Money cents={row.settlement.inRegistration} /></span>
+        <span className="served-split">Posted to registration <Money cents={row.settlement.registrationAdjustment} /></span>
+        <span className="served-split">Walk-up at counter <Money cents={row.settlement.counter} /></span>
+        <span className="served-split">Registration not live <Money cents={row.settlement.registrationNotLive} /></span>
       </td>
       <td role="cell" data-label="Ordered">
         <strong>{totalMeals(row.ordered)}</strong>
@@ -54,7 +55,7 @@ function MoneyRow({ name, row, header }: { name: string; row: CloseoutTotals; he
         {row.servedOnCancelled > 0 && <span className="field-help served-split">{row.servedOnCancelled} on cancelled tickets</span>}
       </td>
       <td role="cell" data-label="Billed to conference">
-        <strong>{formatCents(row.conferenceBilled)}</strong>
+        <strong><Money cents={row.conferenceBilled} /></strong>
         <span className="field-help served-split">{row.conferenceServed} served{row.conferenceRateMissing > 0 ? ` · ${row.conferenceRateMissing} with no rate` : ""}</span>
       </td>
       <td role="cell" data-label="Kitchen counts">

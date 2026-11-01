@@ -1,0 +1,23 @@
+/* Layout for the setup help under a club or coordinator "not set up" state (#1435). The panel itself is the shared #1434 one. */
+.help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 16px;
+  margin-top: 8px;
+}
+
+/* The book icon sits inline with the words, on one line. */
+.guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+/* Links here keep their arrow with the last word (an svg is block by default and would wrap alone). */
+.help a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

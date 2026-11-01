@@ -12,6 +12,7 @@ import {
   type RosterOffering,
   type RosterSession,
 } from "@/modules/honors/roster-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" };
 
@@ -113,7 +114,7 @@ export async function getHonorRosterData(
     ...clubRegistrationRows.map((club) => ({ organizationId: club.organizationId, name: club.organization.name, registration: club.registration })),
     ...groupRegistrationRows.map((group) => ({
       organizationId: `group:${group.registrationId}`,
-      name: `Group: ${`${group.billingPerson.firstName} ${group.billingPerson.lastName}`.trim() || "contact"}`,
+      name: `Group: ${formatPersonName(group.billingPerson) || "contact"}`,
       registration: group.registration,
     })),
   ];

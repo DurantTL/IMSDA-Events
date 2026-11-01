@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { useDebouncedCallback, useSearchTicket } from "@/components/search-as-you-type";
 import {
   Bell,
@@ -124,6 +125,7 @@ export function AttendeeCommunityBoard({
   announcements?: AttendeeTimelineAnnouncement[];
 }) {
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,6 +191,16 @@ export function AttendeeCommunityBoard({
     } catch {
       // See draft-recovery note above.
     }
+  }
+
+  async function deleteOwn(id: string, kind: "post" | "reply") {
+    if (!(await confirm({
+      title: `Delete your ${kind}?`,
+      body: <p>{`Your ${kind} is removed from the board.`}</p>,
+      confirmLabel: `Delete ${kind}`,
+      destructive: true,
+    }))) return;
+    void action({ action: "DELETE_POST", postId: id });
   }
 
   async function action(body: Record<string, unknown>, onSuccess?: () => void) {
@@ -303,12 +315,13 @@ export function AttendeeCommunityBoard({
 
   return (
     <section className="public-manage-card attendee-community-board" id="timeline">
+      {confirmDialog}
       <header className="attendee-community-heading">
         <div className="public-manage-card-heading">
           <MessagesSquare size={21} aria-hidden="true" />
           <div>
             <p className="public-registration-eyebrow">Event updates</p>
-            <h2>{community.eventName} Timeline</h2>
+            <h2>{`${community.eventName} Timeline`}</h2>
           </div>
         </div>
         <span>{timelineItems.length} {timelineItems.length === 1 ? "update" : "updates"}</span>
@@ -324,7 +337,7 @@ export function AttendeeCommunityBoard({
           <div>
             <h3>Community conduct agreement</h3>
             <p>{community.settings.conductText}</p>
-            <small>Posts are retained for {community.settings.retentionDays} days after the event ends.</small>
+            <small>{`Posts are retained for ${community.settings.retentionDays} days after the event ends.`}</small>
           </div>
           <button
             className="primary-button"
@@ -368,7 +381,7 @@ export function AttendeeCommunityBoard({
 
           {unread.length > 0 && (
             <details className="attendee-community-notifications">
-              <summary>{unread.length} new community {unread.length === 1 ? "notification" : "notifications"}</summary>
+              <summary>{`${unread.length} new community ${unread.length === 1 ? "notification" : "notifications"}`}</summary>
               <ul>
                 {unread.map((notification) => (
                   <li key={notification.id}>
@@ -454,7 +467,7 @@ export function AttendeeCommunityBoard({
                   <time dateTime={post.createdAt}>{dateTime(post.createdAt)}</time>
                 </header>
                 <p>{post.body}</p>
-                {post.editedAt && !post.authorDeleted && <small className="community-edited-note">Edited {dateTime(post.editedAt)}</small>}
+                {post.editedAt && !post.authorDeleted && <small className="community-edited-note">{`Edited ${dateTime(post.editedAt)}`}</small>}
                 {post.status === "PUBLISHED" && !post.authorDeleted && (
                   <div className="attendee-community-post-actions">
                     {post.isOwn && (
@@ -466,7 +479,7 @@ export function AttendeeCommunityBoard({
                             <button className="secondary-button" disabled={busy} type="submit">Save changes</button>
                           </form>
                         </details>
-                        <button className="text-button" disabled={busy} onClick={() => void action({ action: "DELETE_POST", postId: post.id })} type="button">
+                        <button className="text-button" disabled={busy} onClick={() => void deleteOwn(post.id, "post")} type="button">
                           <Trash2 size={14} aria-hidden="true" /> Delete
                         </button>
                       </>
@@ -517,7 +530,7 @@ export function AttendeeCommunityBoard({
                           <time dateTime={reply.createdAt}>{dateTime(reply.createdAt)}</time>
                         </header>
                         <p>{reply.body}</p>
-                        {reply.editedAt && !reply.authorDeleted && <small className="community-edited-note">Edited {dateTime(reply.editedAt)}</small>}
+                        {reply.editedAt && !reply.authorDeleted && <small className="community-edited-note">{`Edited ${dateTime(reply.editedAt)}`}</small>}
                         {reply.status === "PUBLISHED" && !reply.authorDeleted && reply.isOwn && (
                           <div className="attendee-community-post-actions">
                             <details>
@@ -527,7 +540,7 @@ export function AttendeeCommunityBoard({
                                 <button className="secondary-button" disabled={busy} type="submit">Save changes</button>
                               </form>
                             </details>
-                            <button className="text-button" disabled={busy} onClick={() => void action({ action: "DELETE_POST", postId: reply.id })} type="button"><Trash2 size={13} aria-hidden="true" /> Delete</button>
+                            <button className="text-button" disabled={busy} onClick={() => void deleteOwn(reply.id, "reply")} type="button"><Trash2 size={13} aria-hidden="true" /> Delete</button>
                           </div>
                         )}
                         {reply.status === "PUBLISHED" && !reply.authorDeleted && !reply.isOwn && !reply.isReported && (

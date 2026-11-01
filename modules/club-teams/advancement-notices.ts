@@ -16,6 +16,7 @@ import {
   advancementNoticeKey,
   levelInfoFor,
 } from "@/modules/club-teams/results-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Director notices for teams that advanced (#945). One email per team and level, to the team's director, with the next
@@ -47,7 +48,7 @@ function contactOf(registration: {
     ? registration.contactSnapshot as Record<string, unknown> : {};
   const text = (key: string) => (typeof contact[key] === "string" ? (contact[key] as string).trim() : "");
   const email = (text("email") || registration.accountHolderPerson.normalizedEmail || "").trim().toLowerCase();
-  const name = `${text("firstName") || registration.accountHolderPerson.firstName} ${text("lastName") || registration.accountHolderPerson.lastName}`.trim();
+  const name = formatPersonName({ firstName: text("firstName") || registration.accountHolderPerson.firstName, lastName: text("lastName") || registration.accountHolderPerson.lastName });
   return { email, name };
 }
 

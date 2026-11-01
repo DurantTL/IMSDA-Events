@@ -256,7 +256,7 @@ export function parseWr26Bundle(
   requireColumns(registrations, "Registrations", ["Registration ID", "First Name", "Last Name", "Email", "Final Amount", "Status"]);
   requireColumns(attendees, "Attendees", ["Attendee ID", "Registration ID", "First Name", "Last Name"]);
   if (registrations.rows.length > maxRegistrations) {
-    throw new CsvImportError("TOO_MANY_ROWS", `This WR26 bundle contains more than ${maxRegistrations.toLocaleString()} registrations.`);
+    throw new CsvImportError("TOO_MANY_ROWS", `This WR26 bundle contains more than ${maxRegistrations.toLocaleString("en-US")} registrations.`);
   }
 
   const seminarPreferenceRows = tables.get("seminarpreferences")?.rows ?? [];

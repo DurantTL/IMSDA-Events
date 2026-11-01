@@ -1,6 +1,7 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { PhoneInput } from "@/components/phone-input";
 import { useEffect, useId, useRef, useState } from "react";
 import { Download, Plus, Printer, Trash2 } from "lucide-react";
 import styles from "@/components/emergency-plan-workspace.module.css";
@@ -244,9 +245,8 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
                 </label>
                 {err(`con-name-${index}`)}
                 <label htmlFor={field(`con-phone-${index}`)}>Phone
-                  <input id={field(`con-phone-${index}`)} {...fp(`con-phone-${index}`)} inputMode="tel" maxLength={40} placeholder="(515) 555-0100" value={contact.phone} onChange={(e) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, phone: e.target.value } : row) }))} />
+                  <PhoneInput error={messageFor(`con-phone-${index}`).join(" ")} errorId={`${uid}-con-phone-${index}-error`} id={field(`con-phone-${index}`)} label="Phone" maxLength={40} onValueChange={(value) => change((d) => ({ ...d, contacts: d.contacts.map((row, i) => i === index ? { ...row, phone: value } : row) }))} placeholder="(515) 555-0100" value={contact.phone} />
                 </label>
-                {err(`con-phone-${index}`)}
                 <button className="secondary-button" type="button" onClick={() => change((d) => ({ ...d, contacts: d.contacts.filter((_, i) => i !== index) }))}><Trash2 aria-hidden="true" size={15} /> Remove contact {index + 1}</button>
               </fieldset>
             ))}

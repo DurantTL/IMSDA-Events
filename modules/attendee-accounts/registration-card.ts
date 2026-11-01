@@ -1,4 +1,5 @@
 import { formatCents } from "@/modules/payments/format-cents";
+import { registrationMoneyStatus } from "@/modules/registrations/status-words";
 import type { AttendeeRegistrationSummary } from "@/modules/attendee-accounts/registrations-repository";
 
 type CardRegistration = Pick<
@@ -7,11 +8,11 @@ type CardRegistration = Pick<
 >;
 
 /**
- * The state wording on an Overview card (#1175). A submitted registration reads "Registration received": it arrived,
- * and nothing says it is confirmed. Every other state keeps the shared wording from describePublicRegistrationStatus.
+ * The state wording on an Overview card (#1175). It is the shared status word (#1453): a submitted registration reads
+ * "Submitted" (or "Pending payment" while a balance is due) here as it does for staff. The words come from describePublicRegistrationStatus.
  */
 export function registrationStateLabel(registration: Pick<CardRegistration, "lifecycle" | "status">) {
-  return registration.lifecycle === "SUBMITTED" ? "Registration received" : registration.status.label;
+  return registration.status.label;
 }
 
 export type RegistrationMoneySummary = {
@@ -38,7 +39,7 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
 
   if (registration.churchBilling) {
     return registration.churchBilling.billed
-      ? { headline: "Billed to your church", detail: "Nothing to pay online. Your church is billed after the event.", tone: "calm" }
+      ? { headline: registrationMoneyStatus({ totalCents: total, balanceCents: 0, deferredBilling: true, audience: "attendee" }), detail: "Nothing to pay online. Your church is billed after the event.", tone: "calm" }
       : { headline: sentence(registration.churchBilling.label), detail: null, tone: "calm" };
   }
   if (registration.groupBilling) {
@@ -72,7 +73,7 @@ export function registrationMoneySummary(registration: CardRegistration): Regist
     };
   }
   if (registration.payment.state === "PAID") {
-    return { headline: "Paid in full", detail: `${formatCents(total)} registration.`, tone: "calm" };
+    return { headline: registrationMoneyStatus({ totalCents: total, balanceCents: 0 }), detail: `${formatCents(total)} registration.`, tone: "calm" };
   }
   return { headline: registration.payment.label, detail: null, tone: "calm" };
 }

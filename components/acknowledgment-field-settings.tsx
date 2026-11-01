@@ -37,7 +37,7 @@ export function useAcknowledgmentPolicyVersions(eventId: string | null, needed: 
     if (!needed || !eventId || started.current) return;
     started.current = true;
     setState({ status: "loading", versions: [] });
-    fetch(`/api/events/${eventId}/consent-policy-versions`)
+    fetch(`/api/events/${eventId}/consent-policy-versions`, { cache: "no-store" })
       .then(async (response) => {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(typeof body.message === "string" ? body.message : "Policy versions could not be loaded.");

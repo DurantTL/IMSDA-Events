@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -16,7 +17,7 @@ import type { NewClubApplicationRecord, NewClubInviteRecord } from "@/modules/cl
 
 const sterlingTone: Record<DirectorBackgroundState, string> = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "neutral" };
 const statusTone = { PENDING: "gold", APPROVED: "green", DECLINED: "coral" } as const;
-const inviteStateLabels = { OPEN: "Not used yet", USED: "Used", CANCELLED: "Withdrawn", EXPIRED: "Expired" } as const;
+const inviteStateLabels = { OPEN: "Not used yet", USED: "Used", CANCELLED: "Cancelled", EXPIRED: "Expired" } as const;
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", { dateStyle: "medium" });
@@ -161,7 +162,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
         </div>
         {application.duplicates.length > 0 && (
           <ul className="nca-duplicates" aria-label="Possible duplicates">
-            {application.duplicates.map((flag) => <li key={flag.kind}>Possible duplicate: {flag.message}</li>)}
+            {application.duplicates.map((flag) => <li key={flag.kind}>{`Possible duplicate: ${flag.message}`}</li>)}
           </ul>
         )}
 
@@ -169,20 +170,20 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
           <div><dt>Director</dt><dd translate="no">{application.director.name}</dd></div>
           <div><dt>Email</dt><dd translate="no">{application.director.email}</dd></div>
           <div><dt>Mailing address</dt><dd translate="no">{application.director.address}</dd></div>
-          <div><dt>Home phone</dt><dd translate="no">{application.director.homePhone ?? "Not given"}</dd></div>
-          <div><dt>Work phone</dt><dd translate="no">{application.director.workPhone ?? "Not given"}</dd></div>
+          <div><dt>Home phone</dt><dd translate={application.director.homePhone ? "no" : undefined}>{application.director.homePhone ?? "Not given"}</dd></div>
+          <div><dt>Work phone</dt><dd translate={application.director.workPhone ? "no" : undefined}>{application.director.workPhone ?? "Not given"}</dd></div>
           <div><dt>Pastor</dt><dd translate="no">{application.pastorName}</dd></div>
           <div>
             <dt>Typed signatures</dt>
-            <dd translate="no">
-              Pastor {application.signatures.pastor}; Head elder {application.signatures.headElder}; Clerk {application.signatures.clerk}; Director {application.signatures.director}
+            <dd>
+              Pastor <ExactValue>{application.signatures.pastor}</ExactValue>; Head elder <ExactValue>{application.signatures.headElder}</ExactValue>; Clerk <ExactValue>{application.signatures.clerk}</ExactValue>; Director <ExactValue>{application.signatures.director}</ExactValue>
             </dd>
           </div>
           {application.otherBoardMembers.length > 0 && (
             <div><dt>Other church board members</dt><dd translate="no">{application.otherBoardMembers.join(", ")}</dd></div>
           )}
           {application.note && <div><dt>Note</dt><dd translate="no">{application.note}</dd></div>}
-          <div><dt>Submitted</dt><dd>{formatDate(application.submittedAt)} (application dated {application.applicationDate})</dd></div>
+          <div><dt>Submitted</dt><dd>{`${formatDate(application.submittedAt)} (application dated ${application.applicationDate})`}</dd></div>
           {application.attachment && (
             <div>
               <dt>Attachment</dt>
@@ -305,7 +306,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
       )}
 
       <div className="panel">
-        <div className="section-heading"><div><h2>Waiting for a decision ({waiting.length})</h2></div></div>
+        <div className="section-heading"><div><h2>{`Pending approval (${waiting.length})`}</h2></div></div>
         {waiting.length === 0 ? <p className="report-empty">No applications are waiting.</p> : <div className="nca-list">{waiting.map(renderApplication)}</div>}
       </div>
 

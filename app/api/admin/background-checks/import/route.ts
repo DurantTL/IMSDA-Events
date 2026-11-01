@@ -16,6 +16,7 @@ import {
 } from "@/modules/background-checks/domain";
 import { applyBackgroundCheckUpload, planBackgroundCheckUpload } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
+import { formatPersonName } from "@/lib/person-name";
 
 const importSchema = z.object({
   csv: z.string().max(Math.max(MAX_ROSTER_CSV_BYTES, MAX_STERLING_CSV_BYTES), "That file is too large."),
@@ -78,7 +79,7 @@ async function postHandler(request: Request) {
         if (error instanceof RosterBackgroundCsvError) return Response.json({ error: "INVALID_ROSTER_CSV", message: error.message }, { status: 400 });
         throw error;
       }
-      const problems = rows.filter((row) => row.problems.length > 0).map((row) => ({ line: row.line, name: `${row.firstName} ${row.lastName}`.trim(), problems: row.problems }));
+      const problems = rows.filter((row) => row.problems.length > 0).map((row) => ({ line: row.line, name: formatPersonName(row), problems: row.problems }));
       const listRows = rows.filter((row) => row.problems.length === 0).map(rosterRowToListRow);
       return await previewOrApply(format, listRows, problems, { confirm, fingerprint }, actor.id);
     }
@@ -90,7 +91,7 @@ async function postHandler(request: Request) {
       if (error instanceof SterlingCsvError) return Response.json({ error: "INVALID_STERLING_CSV", message: error.message }, { status: 400 });
       throw error;
     }
-    const problems = rows.filter((row) => row.problems.length > 0).map((row) => ({ line: row.line, name: `${row.firstName} ${row.lastName}`.trim(), problems: row.problems }));
+    const problems = rows.filter((row) => row.problems.length > 0).map((row) => ({ line: row.line, name: formatPersonName(row), problems: row.problems }));
     const listRows = rows.filter((row) => row.problems.length === 0).map(sterlingRowToListRow);
     return await previewOrApply(format, listRows, problems, { confirm, fingerprint }, actor.id);
   } catch (error) {

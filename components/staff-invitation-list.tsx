@@ -14,6 +14,7 @@ import {
   type StaffInvitationGroupValue,
 } from "@/modules/staff-invitations/domain";
 import type { InvitationListRow } from "@/modules/staff-invitations/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 type SendPreview = {
   willSend: number;
@@ -74,7 +75,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
     return rows.filter((row) => (
       (status === "ALL" || row.status === status)
       && (group === "ALL" || row.group === group)
-      && (!needle || `${row.email} ${row.firstName} ${row.lastName}`.toLowerCase().includes(needle))
+      && (!needle || `${row.email} ${formatPersonName(row)}`.toLowerCase().includes(needle))
     ));
   }, [rows, status, group, query]);
   const visibleSelected = visible.filter((row) => selected.has(row.id));
@@ -309,7 +310,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
                 <tr key={row.id}>
                   <td><label className="staff-invite-select"><input aria-label={`Select ${row.email}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label></td>
                   <td data-label="Person">
-                    <strong>{`${row.firstName} ${row.lastName}`.trim() || row.email}</strong>
+                    <strong>{formatPersonName(row) || row.email}</strong>
                     {(row.firstName || row.lastName) && <><br /><span className="field-help">{row.email}</span></>}
                   </td>
                   <td data-label="Group">{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>

@@ -11,7 +11,7 @@ export function useQuestionLibraryRegistry(base: PaletteRegistry, eventId: strin
   useEffect(() => {
     let cancelled = false;
     const query = eventId ? `?eventId=${encodeURIComponent(eventId)}` : "";
-    fetch(`/api/question-library${query}`, { headers: { Accept: "application/json" } })
+    fetch(`/api/question-library${query}`, { headers: { Accept: "application/json" }, cache: "no-store" })
       .then(async (response) => (response.ok ? ((await response.json()) as { items?: QuestionLibraryItemView[] }).items ?? [] : []))
       .catch(() => [] as QuestionLibraryItemView[])
       .then((loaded) => { if (!cancelled) setItems(loaded); });

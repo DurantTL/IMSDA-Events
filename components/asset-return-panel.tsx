@@ -8,6 +8,7 @@ import { chargeCategoryLabels, facilitySeverities, holdKindLabels, returnOutcome
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
 import type { DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
 import type { DeskMoney } from "@/modules/issued-assets/returns-view";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Check-out at the issue desk (#214): return each key or item, record a loss or damage (with a replacement in the same
@@ -217,8 +218,8 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
     {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents }, `Recorded a ${formatCentsPlain(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
     {money.deposits.length === 0 && uncoveredByType.length === 0 ? <p>No deposit has been taken for this person.</p> : null}
     {money.deposits.map((deposit) => <div key={deposit.entryId} className="panel form-stack">
-      <p><strong>{formatCentsPlain(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {new Date(deposit.takenAt).toLocaleString()}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
-      {deposit.settled ? <p role="status">Settled: {formatCentsPlain(deposit.settled.refundCents)} handed back, {formatCentsPlain(deposit.settled.keepCents)} kept{deposit.settled.lateHandedBackCents > 0 ? ` (${formatCentsPlain(deposit.settled.lateHandedBackCents)} of that handed back later after a found item; ${formatCentsPlain(deposit.keptRemainingCents)} still held)` : ""} ({new Date(deposit.settled.at).toLocaleString()}, {deposit.settled.byName}).</p>
+      <p><strong>{formatCentsPlain(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {formatInConferenceTime(deposit.takenAt, { dateStyle: "medium", timeStyle: "short" })}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
+      {deposit.settled ? <p role="status">Settled: {formatCentsPlain(deposit.settled.refundCents)} handed back, {formatCentsPlain(deposit.settled.keepCents)} kept{deposit.settled.lateHandedBackCents > 0 ? ` (${formatCentsPlain(deposit.settled.lateHandedBackCents)} of that handed back later after a found item; ${formatCentsPlain(deposit.keptRemainingCents)} still held)` : ""} ({formatInConferenceTime(deposit.settled.at, { dateStyle: "medium", timeStyle: "short" })}, {deposit.settled.byName}).</p>
         : deposit.outcome && deposit.outcome.ok ? <div>
           <p role="status">{deposit.outcome.message}</p>
           <button className="primary-button" type="button" disabled={busy} onClick={() => void post("deposits", { action: "settle", depositEntryId: deposit.entryId }, deposit.outcome && deposit.outcome.ok && deposit.outcome.refundCents > 0 ? `Recorded: ${formatCentsPlain(deposit.outcome.refundCents)} handed back${deposit.outcome.keepCents > 0 ? `, ${formatCentsPlain(deposit.outcome.keepCents)} kept` : ""}.` : `Recorded: the ${formatCentsPlain(deposit.outcome?.ok ? deposit.outcome.keepCents : 0)} deposit is kept.`)}>

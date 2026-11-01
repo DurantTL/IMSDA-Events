@@ -1,3 +1,4 @@
+import { liveJson } from "@/lib/live-list-response";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { readRosterJson, rosterApiError } from "@/modules/club-rosters/api-errors";
@@ -32,7 +33,7 @@ async function patchHandler(request: Request, context: RouteContext) {
     // #527: a name change or other edit is matched against the background
     // check list right away, without waiting on the next upload.
     await refreshBackgroundCheckMatchesSafely([personId]);
-    return Response.json(await roster(access, organizationId, request));
+    return liveJson(await roster(access, organizationId, request));
   } catch (error) {
     return rosterApiError(error, "Updating a roster entry");
   }
@@ -48,7 +49,7 @@ async function deleteHandler(request: Request, context: RouteContext) {
     const removed = await removeRosterMember(organizationId, memberId, actorAttribution(access.actor));
     // #527: leaving a roster can change who a Sterling Volunteers entry matches.
     await refreshBackgroundCheckMatchesSafely([removed?.personId]);
-    return Response.json({ ...(await roster(access, organizationId, request)), nameKept: removed?.nameKept ?? false });
+    return liveJson({ ...(await roster(access, organizationId, request)), nameKept: removed?.nameKept ?? false });
   } catch (error) {
     return rosterApiError(error, "Removing a person from the roster");
   }

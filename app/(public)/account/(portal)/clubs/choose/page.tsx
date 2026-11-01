@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight, UsersRound } from "lucide-react";
@@ -53,10 +54,13 @@ export default async function ChooseClubPage({ searchParams }: { searchParams: P
       <div className="account-page-body">
         <section className="public-manage-card">
           {clubs.length === 0 ? (
+            <>
             <p className="public-manage-empty">
               <UsersRound size={17} aria-hidden="true" /> You aren&apos;t a director of a club right now. The conference
               office adds club directors.
             </p>
+            <ClubSetupHelp base="/account/clubs" context="your clubs" id="no-clubs" />
+            </>
           ) : (
             <ul className="public-manage-club-list">
               {clubs.map((club) => (

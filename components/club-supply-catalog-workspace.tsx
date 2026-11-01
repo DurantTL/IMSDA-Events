@@ -196,7 +196,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
               <p className="eyebrow">Dry run · nothing saved yet</p>
               <h2 id="club-supply-preview-title">Preview</h2>
             </div>
-            <span className="count-badge">{preview.summary.rows} rows</span>
+            <span className="count-badge">{`${preview.summary.rows} rows`}</span>
           </div>
           <ul className={styles.counts}>
             {counts.map(([label, value]) => <li key={label}><strong>{value}</strong><span>{label}</span></li>)}
@@ -255,7 +255,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
             <p className="eyebrow">Catalog</p>
             <h2>Items</h2>
           </div>
-          <span className="count-badge">{items.length} items</span>
+          <span className="count-badge">{`${items.length} items`}</span>
         </div>
         {items.length === 0 ? (
           <div className="empty-state">
@@ -278,7 +278,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
                 <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
               </label>
             </div>
-            <p className="quiet-copy">{visible.length} shown</p>
+            <p className="quiet-copy">{`${visible.length} shown`}</p>
             <SearchResultStatus message={`${visible.length} shown.`} />
             <ul className={styles.itemList}>
               {visible.map((item) => (

@@ -10,16 +10,12 @@ import { checkInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporti
 import { getCheckInBookData } from "@/modules/reporting/check-in-book-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { registrationStatusWords } from "@/modules/registrations/status-words";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.checkInBook };
 export const dynamic = "force-dynamic";
 
-const statusLabels: Record<(typeof checkInBookStatuses)[number], string> = {
-  SUBMITTED: "Submitted",
-  CONFIRMED: "Confirmed",
-  WAITLISTED: "Waitlisted",
-  CANCELLED: "Cancelled",
-};
 
 /** Staff's paper check-in book (#600): every club (or registration) on its own printed page. */
 export default async function CheckInBookPage({
@@ -33,13 +29,14 @@ export default async function CheckInBookPage({
     return (
       <AccessRestricted
         title="The check-in book is restricted"
-        detail="Ask an event administrator for report access, or for Pathfinder event-manager oversight of this club event."
+        detail="This needs report access or Pathfinder event-manager oversight of this club event."
+        whoToAsk="your event administrator"
       />
     );
   }
   const statuses = parseCheckInBookStatuses(status);
   const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location });
-  if (!data) return <AccessRestricted title="Event not found" detail="This event could not be loaded." />;
+  if (!data) return <NotAvailableForEvent reason="This event could not be loaded." />;
 
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const downloadParams = new URLSearchParams();
@@ -78,7 +75,7 @@ export default async function CheckInBookPage({
           <legend>Registration status</legend>
           {checkInBookStatuses.map((value) => (
             <label key={value}>
-              <input type="checkbox" name="status" value={value} defaultChecked={statuses.includes(value)} /> {statusLabels[value]}
+              <input type="checkbox" name="status" value={value} defaultChecked={statuses.includes(value)} /> {registrationStatusWords[value]}
             </label>
           ))}
         </fieldset>

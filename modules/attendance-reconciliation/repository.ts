@@ -34,6 +34,7 @@ import { getBillingResponsibilityView } from "@/modules/billing-responsibility/r
 import { lineLabel } from "@/modules/billing-responsibility/domain";
 import { moneyToCents } from "@/modules/payments/square-domain";
 import { storedRegistrationResponses } from "@/modules/registrations/amendments-repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Reviewed attendance and billable-unit reconciliation (#166). Every function takes the event the
@@ -94,13 +95,13 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-const personName = (person: { firstName: string; lastName: string }) => `${person.firstName} ${person.lastName}`.trim();
+const personName = (person: { firstName: string; lastName: string }) => formatPersonName(person);
 
 function attendeeName(attendee: { profileSnapshot: unknown; person: { firstName: string; lastName: string } }) {
   const profile = record(attendee.profileSnapshot);
   const first = typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName;
   const last = typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName;
-  return `${first} ${last}`.trim() || "Attendee";
+  return formatPersonName({ firstName: first, lastName: last }) || "Attendee";
 }
 
 /** The credit fields of a form definition, by field key (#409's per-unit credit, such as a meal sponsorship). */

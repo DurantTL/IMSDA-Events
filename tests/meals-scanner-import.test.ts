@@ -115,7 +115,7 @@ describe("reading the scanner's files", () => {
 
   it("takes the event-local date, not the UTC date", () => {
     expect(eventLocalDate(new Date("2026-10-16T01:30:00.000Z"), TZ)).toBe("2026-10-15");
-    expect(eventLocalDateTime(new Date("2026-10-16T01:30:00.000Z"), TZ)).toBe("Oct 15, 2026, 8:30 PM");
+    expect(eventLocalDateTime(new Date("2026-10-16T01:30:00.000Z"), TZ)).toBe("Oct 15, 2026, 8:30 PM CDT");
   });
 });
 

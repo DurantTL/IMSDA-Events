@@ -83,7 +83,7 @@ export function AccountRegistrationCard({
           </div>
           {view && (
             <Link className={`${primary ? "primary-button" : "secondary-button"} attendee-ov-action`} href={view.href}>
-              {view.label}<span className="sr-only"> for {registration.event.name}</span> <ArrowRight size={16} aria-hidden="true" />
+              {view.label}<span className="sr-only">{` for ${registration.event.name}`}</span> <ArrowRight size={16} aria-hidden="true" />
             </Link>
           )}
         </div>

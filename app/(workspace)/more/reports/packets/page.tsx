@@ -7,6 +7,9 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getEventPackets } from "@/modules/reporting/event-packets-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = {
   title: staffPageTitles.groupedPackets,
@@ -34,11 +37,11 @@ export default async function EventPacketsPage({
   const query = await searchParams;
   const { event, permissions } = await resolveEventContext(query.event);
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Event packets are restricted" detail="Ask an event administrator for report access." />;
+    return <AccessRestricted title="Event packets are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
   }
   const packets = await getEventPackets(event.id);
   if (!packets) {
-    return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+    return <NotAvailableForEvent reason="The selected event could not be loaded." />;
   }
   const selectedGroups = query.group
     ? packets.groups.filter((group) => group.id === query.group)
@@ -122,7 +125,7 @@ export default async function EventPacketsPage({
               <tbody role="rowgroup">{group.attendees.map((attendee) => (
                 <tr key={attendee.id} role="row">
                   <td {...cardCell("Arrived")}>{attendee.checkedIn ? <CheckCircle2 size={16} aria-label="Checked in" /> : <Circle size={16} aria-label="Not checked in" />}</td>
-                  <th role="rowheader" scope="row"><strong>{attendee.lastName}, {attendee.firstName}</strong><br /><small>{attendee.confirmationCode}</small></th>
+                  <th role="rowheader" scope="row"><strong>{formatPersonName(attendee, "sorted")}</strong><br /><small>{attendee.confirmationCode}</small></th>
                   <td {...cardCell("Type")}>{attendee.attendeeType}</td>
                   {sections.shirtSize && <td {...cardCell("Shirt")}>{attendee.shirtSize ?? "Needed"}</td>}
                   {sections.assignedSessions && <td {...cardCell("Assigned sessions")}>{attendee.assignments.length > 0
@@ -143,7 +146,7 @@ export default async function EventPacketsPage({
             </section>
           )}
 
-          <footer>Printed {new Date().toLocaleString()} · Protect this operational packet and shred it after use.</footer>
+          <footer>Printed {formatInConferenceTime(new Date(), { dateStyle: "medium", timeStyle: "short" })} · Protect this operational packet and shred it after use.</footer>
         </article>
       ))}
 

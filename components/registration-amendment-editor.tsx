@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -370,7 +371,7 @@ export function RegistrationAmendmentEditor({
   useEffect(() => {
     if (!hasAcknowledgments) return;
     let live = true;
-    fetch(`/api/events/${eventId}/registrations/${registration.id}/acknowledgments`)
+    fetch(`/api/events/${eventId}/registrations/${registration.id}/acknowledgments`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((body: { acknowledgments?: Array<{ fieldKey: string; status: string; subject: { kind: string; attendeeId?: string } }> } | null) => {
         if (!live || !body?.acknowledgments) return;
@@ -593,9 +594,9 @@ export function RegistrationAmendmentEditor({
         </div>
         <div className="amendment-quote-grid">
           <span><small>Attendees</small><strong>{preview.previousAttendeeCount} → {preview.attendeeCount}</strong></span>
-          <span><small>Previous total</small><strong>{formatCents(preview.previousTotalCents)}</strong></span>
-          <span><small>New total</small><strong>{formatCents(preview.totalCents)}</strong></span>
-          <span><small>New balance</small><strong>{formatCents(preview.balanceCents)}</strong></span>
+          <span><small>Previous total</small><strong><Money cents={preview.previousTotalCents} /></strong></span>
+          <span><small>New total</small><strong><Money cents={preview.totalCents} /></strong></span>
+          <span><small>New balance</small><strong><Money cents={preview.balanceCents} /></strong></span>
         </div>
         {(preview.addedAttendeeCount > 0 || preview.removedAttendeeCount > 0) && (
           <div className="inline-notice">
@@ -607,10 +608,10 @@ export function RegistrationAmendmentEditor({
           {preview.lineItems.map((item) => (
             <div key={item.key}>
               <span>{item.label}{item.attendeeLabel ? ` · ${item.attendeeLabel}` : ""}</span>
-              <strong>{formatCents(item.amountCents)}</strong>
+              <strong><Money cents={item.amountCents} /></strong>
             </div>
           ))}
-          <div className="total"><span>Total</span><strong>{formatCents(preview.totalCents)}</strong></div>
+          <div className="total"><span>Total</span><strong><Money cents={preview.totalCents} /></strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void confirmAmendment()} />}
@@ -655,7 +656,7 @@ export function RegistrationAmendmentEditor({
       </section>
       <section className="amendment-attendees">
         <div className="inline-heading">
-          <div><p className="eyebrow">Attendee roster</p><h4>{attendees.length} attendee{attendees.length === 1 ? "" : "s"}</h4></div>
+          <div><p className="eyebrow">Attendee roster</p><h4>{`${attendees.length} attendee${attendees.length === 1 ? "" : "s"}`}</h4></div>
           <button className="secondary-button" type="button" disabled={attendees.length >= 50} onClick={addAttendee}>
             <Plus aria-hidden="true" size={15} /> Add person
           </button>
@@ -677,7 +678,7 @@ export function RegistrationAmendmentEditor({
           return (
             <article className="amendment-attendee-card" data-attendee-client-id={attendee.clientId} key={attendee.clientId}>
               <header>
-                <div><small>Attendee {attendeeIndex + 1}</small><h4>{`${firstName} ${lastName}`.trim() || "New attendee"}</h4></div>
+                <div><small>{`Attendee ${attendeeIndex + 1}`}</small><h4>{`${firstName} ${lastName}`.trim() || "New attendee"}</h4></div>
                 <div>
                   <button type="button" disabled={attendeeIndex === 0} aria-label="Move attendee up" onClick={() => moveAttendee(attendeeIndex, -1)}><ArrowUp aria-hidden="true" size={15} /></button>
                   <button type="button" disabled={attendeeIndex === attendees.length - 1} aria-label="Move attendee down" onClick={() => moveAttendee(attendeeIndex, 1)}><ArrowDown aria-hidden="true" size={15} /></button>

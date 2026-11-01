@@ -15,6 +15,7 @@ import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { DateInput } from "@/components/club-form-date-input";
 import { inputAttributesFor } from "@/lib/field-validation";
 import { addressComponentKeys, addressComponentLabels } from "@/modules/forms/address";
+import { savedMessage } from "@/components/form-message";
 import {
   dateFieldBounds,
   fieldRuns,
@@ -224,7 +225,7 @@ export function ClubFormFillIn(props: Props) {
         return;
       }
       setSavedId(result.submission?.id);
-      setNotice("Draft saved.");
+      setNotice(savedMessage("Submit it when you are ready."));
     } catch {
       if (props.mode === "open") check.current?.settle();
       setError("The form could not be saved. Check your connection and try again.");

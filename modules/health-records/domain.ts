@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, PHONE_FIELD_MESSAGE, isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
 import { clubYearFor, parseCalendarDate } from "@/modules/club-rosters/domain";
 import { overLimitFields, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
 
@@ -132,14 +132,14 @@ type TypedHealthCheck = (value: string) => FieldCheck;
 
 const typedChecks: Array<{ key: "zip" | "phone" | "email" | "insurancePhone" | "guardianPhone" | "guardianEmail"; check: TypedHealthCheck; message: string }> = [
   { key: "zip", check: validateZip, message: "Enter a 5-digit ZIP code, like 50010." },
-  { key: "phone", check: validatePhone, message: "Enter a 10-digit US number, like (515) 555-0134, or an international number starting with +." },
-  { key: "email", check: validateEmail, message: "Enter a valid email address." },
-  { key: "insurancePhone", check: validatePhone, message: "Enter a 10-digit US number, like (515) 555-0134, or an international number starting with +." },
-  { key: "guardianPhone", check: validatePhone, message: "Enter a 10-digit US number, like (515) 555-0134, or an international number starting with +." },
-  { key: "guardianEmail", check: validateEmail, message: "Enter a valid email address." },
+  { key: "phone", check: validatePhone, message: PHONE_FIELD_MESSAGE },
+  { key: "email", check: validateEmail, message: EMAIL_FIELD_MESSAGE },
+  { key: "insurancePhone", check: validatePhone, message: PHONE_FIELD_MESSAGE },
+  { key: "guardianPhone", check: validatePhone, message: PHONE_FIELD_MESSAGE },
+  { key: "guardianEmail", check: validateEmail, message: EMAIL_FIELD_MESSAGE },
 ];
 
-const CONTACT_PHONE_MESSAGE = "Enter a 10-digit US number, like (515) 555-0134, or an international number starting with +.";
+const CONTACT_PHONE_MESSAGE = PHONE_FIELD_MESSAGE;
 
 /**
  * The input schema (#855). Phones, emails and ZIP codes are checked by type

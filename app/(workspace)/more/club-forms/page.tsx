@@ -40,7 +40,7 @@ export default async function StaffClubFormsPage({
   const { event, form, club } = params;
   const viewer = await resolveStaffViewer();
   if (!viewer) {
-    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" />;
+    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />;
   }
   // The sort and the page run in the query, with the viewer's own scoping, so the count is the whole filtered list (#1458).
   const sorting = serverSort<ClubFormSortColumn>("/more/club-forms", params, CLUB_FORM_SORT_COLUMNS, { key: null, dir: "asc" });
@@ -123,7 +123,7 @@ export default async function StaffClubFormsPage({
                   <tr key={row.id}>
                     <th scope="row" translate="no">{row.organizationName}</th>
                     <td>{row.templateName}</td>
-                    <td translate="no">{row.subjectName || "Not named"}</td>
+                    <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
                     <td>{formatDate(row.submittedAt)}</td>
                     <td>{row.enteredVia === "LINK" ? "Private link" : "Club director"}</td>
                     <td><Link className="secondary-button" href={`/more/club-forms/${row.id}${eventQuery}`}>Open</Link></td>

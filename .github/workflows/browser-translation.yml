@@ -1,0 +1,98 @@
+name: Browser translation and live lists
+
+# Real-browser checks for #1445, split out of ci.yml like mobile-layout.yml:
+#  - test:translation-sim: a Google-Translate-like rewriter (every text node
+#    wrapped in <font>) runs while the key journeys are used (dialogs, filters,
+#    search, validation errors, list re-renders, public registration with a
+#    promo code). No crash, no blank page, and values marked translate="no"
+#    stay exact (rule T1).
+#  - test:live-roster: a club director adds a member and sees it at once; a
+#    second browser context sees it after a reload; the same with the translator
+#    on (rule P2).
+# Both run on Chromium, Firefox and WebKit.
+on:
+  pull_request:
+    paths:
+      - "components/**"
+      - "app/**"
+      - "lib/translation-safety.ts"
+      - "lib/live-list-response.ts"
+      - "instrumentation-client.ts"
+      - "scripts/verify-translation-simulation.ts"
+      - "scripts/verify-live-roster.ts"
+      - "scripts/support/browser-journeys.ts"
+      - ".github/workflows/browser-translation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-translation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-translation:
+    name: Translation simulation and live roster (Chromium, Firefox, WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      - run: npm run lodging:sync
+      - run: npm run form-templates:sync
+      - run: npm run event-content:sync
+      - run: npm run build
+      # Playwright is deliberately not a dependency; `--no-save` keeps the lockfile untouched.
+      - run: npm i --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium firefox webkit
+      # Fictitious CI-only values for production mode. Keep this block identical
+      # to the one in ci.yml ("verify").
+      - name: Start the built app
+        env:
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+          ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+          RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+          OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+          SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+          ACCOUNT_EMAIL_SENDER_ADDRESS: events@ci.example.test
+          RESEND_API_KEY: ci-placeholder-never-sent
+        run: |
+          nohup npm run start > app.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/; then exit 0; fi
+            sleep 2
+          done
+          echo "The app did not start:" && cat app.log && exit 1
+      - name: Translation simulation
+        run: npm run test:translation-sim
+      - name: Live roster
+        run: npm run test:live-roster
+      - name: Show the app log when a check failed
+        if: failure()
+        run: cat app.log || true

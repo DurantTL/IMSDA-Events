@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { useEffect, useState } from "react";
 import { formatCents } from "@/modules/payments/format-cents";
 import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-funds/repository";
@@ -21,7 +22,7 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
   useEffect(() => {
     if (!useFund || info) return;
     let cancelled = false;
-    fetch(`/api/events/${encodeURIComponent(eventId)}/scholarship-fund`)
+    fetch(`/api/events/${encodeURIComponent(eventId)}/scholarship-fund`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("The fund could not be loaded.");
         return response.json() as Promise<{ fund: FundView; directory: SponsorDirectoryEntry[] }>;
@@ -42,7 +43,7 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
           {loadError && <p className="form-error" role="alert">{loadError}</p>}
           {info && (
             <p className="quiet-copy">
-              Fund balance {formatCents(info.fund.summary.balanceCents)}
+              Fund balance <Money cents={info.fund.summary.balanceCents} />
               {info.fund.summary.pledgedCents > 0 ? ` · ${formatCents(info.fund.summary.pledgedCents)} pledged, not yet received` : ""}.
               {" "}An award can&apos;t take the balance below $0, or use more than its sponsor has given, unless it is marked pledged.
             </p>

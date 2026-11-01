@@ -1,5 +1,6 @@
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { calendarDateInEventTimeZone, type EventRegistrationPhase } from "@/modules/events/lifecycle";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * The one public answer to "can someone register for this event right now?" (#1201).
@@ -64,7 +65,7 @@ export const eventWaitlistLabel = "Event full \u00b7 waitlist open";
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function conferenceYear(now: Date) {
-  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric" }).format(now));
+  return Number(formatInConferenceTime(now, { year: "numeric" }));
 }
 
 /** Up to this many days away the status line counts days; further out it names the month. */

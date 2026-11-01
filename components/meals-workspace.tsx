@@ -1,7 +1,9 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
 import {
@@ -54,7 +56,9 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
   const activeServices = view.services.filter((service) => service.status === "ACTIVE" && service.ticketing === "TICKETED");
 
+  const { ask, confirmDialog } = useConfirm();
   return <div className="settings-stack">
+    {confirmDialog}
     <div className="page-intro"><div>
       <p className="eyebrow">Event configuration</p>
       <h2 className="duplicate-page-title">{staffPageTitles.meals}</h2>
@@ -88,7 +92,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
     <section className="panel">
       <h3>Meal services</h3>
-      {view.services.length === 0 ? <p>No meal services yet. Add one below.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.services.length === 0 ? <><p>No meal services yet. Add one below.</p><EventSetupHelp context="meal services" id="meals-no-services" /></> : <div className="table-wrap"><table className="report-table report-table-auto">
         <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
         <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
       </table></div>}
@@ -131,8 +135,14 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
           <th scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
           <td>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td>{order.quantity}</td>
           <td>{order.payer === "CONFERENCE" ? "Conference" : formatCents(order.unitPriceCents)}</td><td>{order.source.toLowerCase().replace("_", " ")}</td><td>{order.status.toLowerCase()}</td>
-          <td>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={() => {
-            const reason = window.prompt(`Why is this order being cancelled? ${reasonHint}`);
+          <td>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={async () => {
+            const reason = await ask({
+              title: "Cancel this order?",
+              body: <p>The order is cancelled and credited.</p>,
+              confirmLabel: "Cancel order",
+              destructive: true,
+              input: { label: "Why is this order being cancelled?", required: true, minLength: 3, maxLength: 500, hint: `At least 3 characters. ${reasonHint}` },
+            });
             if (reason) void run(() => call(`${base}/selections/${order.id}`, "POST", { action: "cancel", reason }), "Order cancelled and credited.");
           }}>Cancel</button> : null}</td>
         </tr>)}</tbody>
@@ -146,6 +156,7 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
   run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const { ask, confirmDialog } = useConfirm();
   const cancelled = service.status === "CANCELLED";
   return <>
     <tr>
@@ -154,13 +165,25 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
       <td>{service.capacity === null ? "No limit" : `${service.pinnedQuantity} of ${service.capacity}`}</td>
       <td>{cancelled ? `Cancelled${service.cancelReason ? `: ${service.cancelReason}` : ""}` : "Active"}</td>
       <td>
+        {confirmDialog}
         {!cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "Close" : "Edit"}</button> : null}
-        {!cancelled && canConfigure && canManageFinance ? <button type="button" disabled={busy} onClick={() => {
-          const reason = window.prompt(`Why is this meal cancelled? Orders pinned to it are credited. ${reasonHint}`);
+        {!cancelled && canConfigure && canManageFinance ? <button type="button" disabled={busy} onClick={async () => {
+          const reason = await ask({
+            title: `Cancel ${service.name}?`,
+            body: <p>Orders pinned to this meal are credited.</p>,
+            confirmLabel: `Cancel ${service.name}`,
+            destructive: true,
+            input: { label: "Why is this meal cancelled?", required: true, minLength: 3, maxLength: 500, hint: `At least 3 characters. ${reasonHint}` },
+          });
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "cancel", reason }), "Meal service cancelled.");
         }}>Cancel meal</button> : null}
-        {cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => {
-          const reason = window.prompt(`Why is this meal being reinstated? ${reasonHint}`);
+        {cancelled && canConfigure ? <button type="button" disabled={busy} onClick={async () => {
+          const reason = await ask({
+            title: `Reinstate ${service.name}?`,
+            body: <p>The meal is offered again.</p>,
+            confirmLabel: `Reinstate ${service.name}`,
+            input: { label: "Why is this meal being reinstated?", required: true, minLength: 3, maxLength: 500, hint: `At least 3 characters. ${reasonHint}` },
+          });
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "reinstate", reason }), "Meal service reinstated.");
         }}>Reinstate</button> : null}
       </td>

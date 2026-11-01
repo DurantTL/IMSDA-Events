@@ -156,9 +156,9 @@ beforeEach(() => {
 });
 
 describe("registration state wording (#1175)", () => {
-  it("reads a submitted registration as Registration received, never confirmed", () => {
+  it("reads a submitted registration as Submitted, never confirmed", () => {
     const label = registrationStateLabel(registration("a", "SUBMITTED"));
-    expect(label).toBe("Registration received");
+    expect(label).toBe("Submitted");
     expect(label).not.toMatch(/confirmed/i);
   });
 
@@ -234,7 +234,7 @@ describe("registration card (#1175)", () => {
     expect(html).toContain("Synthetic Campground");
     expect(html).toContain("#SYN-FR1");
     expect(html).toContain("2 people registered");
-    expect(html).toContain("Registration received");
+    expect(html).toContain("Submitted");
     expect(html).toContain("$40.00 remaining");
     expect(html).toContain('href="/account/events/synthetic-event-fr1"');
     expect(html).toContain("View registration");

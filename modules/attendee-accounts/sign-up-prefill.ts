@@ -1,4 +1,5 @@
 import { isLooseEmail } from "@/lib/field-validation";
+import { safeGetItem, safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
 /**
  * A convenience only: query text may populate the sign-up form, but it never
  * proves identity. The account flow still sends and verifies its own code.
@@ -27,7 +28,8 @@ export function rememberAttendeeAuthReturnPath(
 ) {
   const path = attendeeAuthReturnPath(value);
   if (!path) return null;
-  window.sessionStorage.setItem(ATTENDEE_AUTH_RETURN_KEY, JSON.stringify({
+  // Storage can be blocked (privacy browsers): the person then lands on the default page after signing in.
+  safeSetItem("session", ATTENDEE_AUTH_RETURN_KEY, JSON.stringify({
     path,
     expiresAt: Date.now() + ATTENDEE_AUTH_RETURN_LIFETIME_MS,
   }));
@@ -48,8 +50,8 @@ export function removeAttendeeAuthFragment() {
 }
 
 export function takeAttendeeAuthReturnPath() {
-  const raw = window.sessionStorage.getItem(ATTENDEE_AUTH_RETURN_KEY);
-  window.sessionStorage.removeItem(ATTENDEE_AUTH_RETURN_KEY);
+  const raw = safeGetItem("session", ATTENDEE_AUTH_RETURN_KEY);
+  safeRemoveItem("session", ATTENDEE_AUTH_RETURN_KEY);
   if (!raw) return null;
   try {
     const stored = JSON.parse(raw) as { path?: unknown; expiresAt?: unknown };

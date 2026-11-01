@@ -13,9 +13,10 @@ import {
   type RegistrationResult,
 } from "@/modules/attendance-reconciliation/domain";
 import type { AttendanceReconciliationView, VersionSummary } from "@/modules/attendance-reconciliation/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 function when(value: string) {
-  return new Date(value).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+  return formatInConferenceTime(value, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function CountCells({ counts }: { counts: Counts }) {

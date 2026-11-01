@@ -118,7 +118,7 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
           <label>Last night
             <select value={lastNight} onChange={(event) => setLastNight(event.target.value)}>{view.nights.map((night) => <option key={night} value={night}>{night}</option>)}</select>
           </label>
-          {nightCount < 1 ? <p role="alert">The last night cannot be before the first night.</p> : <p>{nightCount} night{nightCount === 1 ? "" : "s"}.</p>}
+          {nightCount < 1 ? <p role="alert">The last night cannot be before the first night.</p> : <p>{`${nightCount} night${nightCount === 1 ? "" : "s"}.`}</p>}
         </fieldset>
 
         <fieldset disabled={disabled}>
@@ -167,7 +167,7 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
 
         {view.canEdit && view.pricedChangeNeedsStaff && view.offered.some((option) => option.rate) ? <p>Your lodging charge was set when you registered. A change that alters it is sent to the event team instead of applying at once; nothing is charged or refunded automatically.</p> : null}
         {view.canEdit ? <button className="primary-button" type="submit" disabled={disabled || nightCount < 1}><BedDouble size={18} aria-hidden="true" /> Save lodging</button> : null}
-        {request ? <p>Saved version {request.version}{view.earlierVersions > 0 ? `, ${view.earlierVersions} earlier version${view.earlierVersions === 1 ? "" : "s"} kept by the event team` : ""}.</p> : null}
+        {request ? <p>{`Saved version ${request.version}${view.earlierVersions > 0 ? `, ${view.earlierVersions} earlier version${view.earlierVersions === 1 ? "" : "s"} kept by the event team` : ""}.`}</p> : null}
       </form>
 
       <Roommates token={token} view={view} base={base} run={run} disabled={disabled} />

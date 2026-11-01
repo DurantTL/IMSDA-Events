@@ -12,6 +12,7 @@ import {
 } from "@/modules/club-teams/rules";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { parseGroupAge } from "@/modules/group-registrations/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The people typed into a general-link team (#931), read the same way for the director's submission, for a staff
@@ -76,7 +77,7 @@ export function readTypedInTeam(
   // A missing or unreadable age is the form check's to name, at the field; the rules wait until every age is known.
   if (!settings || people.some((person) => person.age === null)) return { people, problems: [] };
   const rulePeople: TeamPerson[] = people.map((person) => ({
-    name: `${person.firstName} ${person.lastName}`.trim(),
+    name: formatPersonName(person),
     role: person.role,
     alternate: person.alternate,
     age: person.age,

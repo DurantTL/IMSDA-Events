@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FieldError } from "@/components/field-error";
 import { parseRosterBirthDateInput } from "@/modules/club-rosters/domain";
 
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -67,6 +68,7 @@ export function BirthDateField({
       <input
         aria-describedby={error ? `${name}-parsed ${name}-error` : `${name}-parsed`}
         aria-invalid={invalid || Boolean(error)}
+        id={`${name}-input`}
         autoComplete="off"
         inputMode="numeric"
         name={`${name}Text`}
@@ -79,7 +81,7 @@ export function BirthDateField({
       <span className="field-help birth-date-parsed" id={`${name}-parsed`}>
         {parsed ? `Reads as ${describe(parsed)}.` : invalid ? "Enter a date like 4/17/2014, or 4/17/14." : "Month/day/year, e.g. 4/17/2014."}
       </span>
-      {error && <span className="roster-field-error" id={`${name}-error`} role="alert">{error}</span>}
+      <FieldError id={`${name}-error`}>{error}</FieldError>
       <input name={name} type="hidden" value={parsed ?? ""} />
     </label>
   );

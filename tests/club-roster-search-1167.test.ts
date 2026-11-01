@@ -221,7 +221,7 @@ describe("what a row says (#1167)", () => {
 
   it("keeps a person's role under their name, so a phone card shows name, role, age and Edit", () => {
     const out = html();
-    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}" translate="no">Role: Pathfinder</span>`);
+    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}">Role: Pathfinder</span>`);
     expect(out).toContain('data-label="Age"');
     expect(out).toContain('aria-label="Edit Sam Fixture-a"');
   });
@@ -446,7 +446,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
     expect(source).toContain("id={`roster-edit-${member.id}`}");
     expect(source).toContain('document.getElementById(`roster-edit-${id}`)');
     expect(source).toContain('document.getElementById("roster-result-text")?.focus()');
-    expect(source).toContain('rowChanged(editing, result?.members, "Saved.", true)');
+    expect(source).toContain('rowChanged(editing, result?.members, savedMessage(), true)');
     expect(source).toContain('rowChanged(member, result?.members, "Removed and erased.", false)');
     expect(source).toContain("no longer needs details.");
     expect(source).toContain("no longer matches the current search or filters.");

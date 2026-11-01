@@ -68,6 +68,10 @@ describe("guide registry", () => {
       "understand-system-readiness",
       "review-new-club-application",
       "inspect-system-health",
+      // Event setup guides (#1435).
+      "finish-event-setup",
+      "prepare-check-in-and-badges",
+      "schedule-event-emails",
     ]);
     expect(new Set(all).size).toBe(all.length);
     for (const id of all) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
@@ -155,11 +159,12 @@ describe("who sees which guide", () => {
   });
 
   it("shows an event guide only to staff with the permission its working page needs", () => {
-    expect(ids(eventStaff(["MANAGE_CHECK_IN"]))).toEqual(["choose-workspace"]);
+    expect(ids(eventStaff(["MANAGE_CHECK_IN"]))).toEqual(["choose-workspace", "prepare-check-in-and-badges"]);
+    expect(ids(eventStaff(["CONFIGURE_EVENT"]))).toEqual(["choose-workspace", "finish-event-setup"]);
     expect(ids(eventStaff(["MANAGE_STAFF"]))).toEqual(["choose-workspace", "invite-staff", "choose-staff-role"]);
     expect(ids(eventStaff(["MANAGE_FORMS"]))).toEqual(["choose-workspace", "publish-registration-form"]);
     expect(ids(eventStaff(["MANAGE_IMPORTS"]))).toEqual(["choose-workspace", "import-with-preview"]);
-    expect(ids(eventStaff(["MANAGE_COMMUNICATIONS"]))).toEqual(["choose-workspace", "resolve-email-problem"]);
+    expect(ids(eventStaff(["MANAGE_COMMUNICATIONS"]))).toEqual(["choose-workspace", "resolve-email-problem", "schedule-event-emails"]);
     expect(ids(admin)).toEqual(helpGuides.map((guide) => guide.id));
   });
 
@@ -254,7 +259,7 @@ describe("shell search hook", () => {
   });
 
   it("never lists a hidden guide for a narrow viewer", () => {
-    const narrow = buildSearchDestinations({ ...base, permissions: ["MANAGE_CHECK_IN"] });
+    const narrow = buildSearchDestinations({ ...base, permissions: ["VIEW_REPORTS"] });
     const helpHrefs = narrow.filter((destination) => destination.scope === "Help").map((destination) => destination.href);
     expect(helpHrefs).toEqual(["/help?event=evt_synthetic", "/help/choose-workspace?event=evt_synthetic", "/help/glossary?event=evt_synthetic"]);
     const everything = JSON.stringify(narrow);

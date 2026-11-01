@@ -2,11 +2,16 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { EmailInput } from "@/components/email-input";
+import { PhoneInput } from "@/components/phone-input";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
+import { guardianErrorItems } from "@/components/roster-guardian-fields";
 import { BirthDateField } from "@/components/birth-date-field";
 import { RosterTypeDefinitions } from "@/components/roster-type-definitions";
 import type { RosterAddReview } from "@/modules/club-forms/roster-add";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
-import { rosterFormFieldOrder, validateRosterForm, type RosterFormErrors } from "@/modules/club-rosters/form-validation";
+import { rosterFormFieldOrder, validateRosterForm, type RosterFormErrors, type RosterFormField } from "@/modules/club-rosters/form-validation";
 import {
   attendeeTypeAgeHint,
   clubClassLevelLabels,
@@ -31,10 +36,13 @@ import {
 
 type Duplicate = RosterAddReview["duplicates"][number];
 
+const fieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
+
 export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddReview; formHref: string }) {
   const { prefill } = review;
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [formType, setFormType] = useState<string>(prefill.attendeeType);
@@ -74,8 +82,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
 
   function confirm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
+    const form = new FormData(event.currentTarget);
     const errors = validateRosterForm({
       firstName: String(form.get("firstName") ?? ""),
       lastName: String(form.get("lastName") ?? ""),
@@ -93,16 +100,18 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
     }));
     const guardianProblems = validateGuardianForm(guardians);
     setGuardianErrors(guardianProblems);
-    const firstInvalid = rosterFormFieldOrder.find((field) => errors[field]);
-    if (firstInvalid) {
-      (formElement.elements.namedItem(firstInvalid === "birthDate" ? "birthDateText" : firstInvalid) as HTMLElement | null)?.focus();
+    const problems = [
+      ...rosterFormFieldOrder.filter((field) => errors[field]).map((field) => ({
+        targetId: field === "birthDate" ? "birthDate-input" : `roster-${field}`,
+        message: summaryMessage(fieldLabels[field], errors[field] as string),
+      })),
+      ...guardianErrorItems(guardianProblems),
+    ];
+    if (problems.length > 0) {
+      showSummary(problems);
       return;
     }
-    const firstGuardianProblem = Object.keys(guardianProblems)[0];
-    if (firstGuardianProblem) {
-      (formElement.elements.namedItem(firstGuardianProblem) as HTMLElement | null)?.focus();
-      return;
-    }
+    clearSummary();
     void send({
       action: "ADD",
       member: {
@@ -158,19 +167,22 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
           const name = (event.target as HTMLInputElement).name;
           const field = name === "birthDateText" ? "birthDate" : name;
           setFieldErrors((current) => (field in current ? { ...current, [field]: undefined } : current));
+          clearSummaryField((event.target as HTMLElement).id);
+          if (name in guardianErrors) setGuardianErrors((current) => ({ ...current, [name]: undefined }));
         }}
         onSubmit={confirm}
       >
+        {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
         <div className="form-grid two-column">
           <label>
             First name
-            <input aria-invalid={fieldErrors.firstName ? true : undefined} autoComplete="off" defaultValue={prefill.firstName} maxLength={80} name="firstName" required />
-            {fieldErrors.firstName && <span className="roster-field-error" role="alert">{fieldErrors.firstName}</span>}
+            <input {...fieldErrorProps("roster-firstName-error", fieldErrors.firstName)} autoComplete="off" defaultValue={prefill.firstName} id="roster-firstName" maxLength={80} name="firstName" required />
+            <FieldError id="roster-firstName-error">{fieldErrors.firstName}</FieldError>
           </label>
           <label>
             Last name
-            <input aria-invalid={fieldErrors.lastName ? true : undefined} autoComplete="off" defaultValue={prefill.lastName} maxLength={80} name="lastName" required />
-            {fieldErrors.lastName && <span className="roster-field-error" role="alert">{fieldErrors.lastName}</span>}
+            <input {...fieldErrorProps("roster-lastName-error", fieldErrors.lastName)} autoComplete="off" defaultValue={prefill.lastName} id="roster-lastName" maxLength={80} name="lastName" required />
+            <FieldError id="roster-lastName-error">{fieldErrors.lastName}</FieldError>
           </label>
           <BirthDateField defaultValue={prefill.birthDate} error={fieldErrors.birthDate} label="Birth date" name="birthDate" onParsedChange={setFormBirthDate} required />
           <label>
@@ -196,16 +208,16 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
           </label>
           <label>
             Gender
-            <select aria-invalid={fieldErrors.gender ? true : undefined} defaultValue={prefill.gender ?? ""} name="gender" required>
+            <select {...fieldErrorProps("roster-gender-error", fieldErrors.gender)} defaultValue={prefill.gender ?? ""} id="roster-gender" name="gender" required>
               <option disabled value="">Choose one</option>
               {Object.entries(clubRosterGenderLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            {fieldErrors.gender && <span className="roster-field-error" role="alert">{fieldErrors.gender}</span>}
+            <FieldError id="roster-gender-error">{fieldErrors.gender}</FieldError>
           </label>
         </div>
 
         <fieldset className="roster-guardians">
-            <legend>{term.plural} (optional)</legend>
+            <legend>{`${term.plural} (optional)`}</legend>
             <p className="field-help">Up to two emergency contacts, from the contact details on the form. Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
             {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
               const slot = (index + 1) as 1 | 2;
@@ -220,12 +232,10 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
                       <input autoComplete="off" defaultValue={value.relationship} maxLength={60} name={`g${slot}Relationship`} placeholder="e.g. Spouse or parent" />
                     </label>
                     <label>{guardianFieldLabels.email}
-                      <input aria-invalid={guardianErrors[`g${slot}Email`] ? true : undefined} autoComplete="email" defaultValue={value.email} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
-                      {guardianErrors[`g${slot}Email`] && <span className="roster-field-error" role="alert">{guardianErrors[`g${slot}Email`]}</span>}
+                      <EmailInput autoComplete="email" defaultValue={value.email} error={guardianErrors[`g${slot}Email`]} errorId={`roster-g${slot}Email-error`} id={`roster-g${slot}Email`} label={guardianFieldLabels.email} maxLength={160} name={`g${slot}Email`} />
                     </label>
                     <label>{guardianFieldLabels.phone}
-                      <input aria-invalid={guardianErrors[`g${slot}Phone`] ? true : undefined} autoComplete="tel" defaultValue={value.phone} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="tel" />
-                      {guardianErrors[`g${slot}Phone`] && <span className="roster-field-error" role="alert">{guardianErrors[`g${slot}Phone`]}</span>}
+                      <PhoneInput defaultValue={value.phone} error={guardianErrors[`g${slot}Phone`]} errorId={`roster-g${slot}Phone-error`} id={`roster-g${slot}Phone`} label={guardianFieldLabels.phone} name={`g${slot}Phone`} />
                     </label>
                   </div>
                 </div>

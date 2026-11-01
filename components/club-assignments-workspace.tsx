@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import { CircleAlert, Mail, Pencil, Send } from "lucide-react";
 import type { ClubAssignmentRow } from "@/modules/club-registrations/assignments-repository";
@@ -179,7 +180,7 @@ export function ClubAssignmentsWorkspace({
         search.set("organizationId", scope.organizationId);
         if (scope.teamKey) search.set("teamKey", scope.teamKey);
       }
-      const response = await fetch(`/api/events/${eventId}/club-assignment-messages?${search.toString()}`);
+      const response = await fetch(`/api/events/${eventId}/club-assignment-messages?${search.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message ?? "Could not load the preview.");
       showPreview(data.clubAssignmentPreview);
@@ -257,10 +258,10 @@ export function ClubAssignmentsWorkspace({
               <tbody>
                 {assignments.map((row) => (
                   <tr key={row.clubEventRegistrationId}>
-                    <th scope="row" translate="no">
-                      {row.organizationName}
-                      {row.sponsoringChurch && <small> · {row.sponsoringChurch}</small>}
-                      <br /><small>{row.confirmationCode} · {row.attendeeCount} going</small>
+                    <th scope="row">
+                      <ExactValue>{row.organizationName}</ExactValue>
+                      {row.sponsoringChurch && <small> · <ExactValue>{row.sponsoringChurch}</ExactValue></small>}
+                      <br /><small><ExactValue>{row.confirmationCode}</ExactValue> · {row.attendeeCount} going</small>
                     </th>
                     <td>
                       {preferenceLines(row.preferences).length === 0
@@ -284,10 +285,10 @@ export function ClubAssignmentsWorkspace({
                         </div>
                       ) : (
                         <ul className="quiet-copy compact-list">
-                          {row.fields.campsiteLocation && <li>Campsite: {row.fields.campsiteLocation}</li>}
-                          {row.fields.dutyLabel && <li>Duty: {row.fields.dutyLabel}{row.fields.dutyDay ? ` — ${row.fields.dutyDay}` : ""}{row.fields.dutyTime ? ` ${row.fields.dutyTime}` : ""}</li>}
-                          {row.fields.activityLabel && <li>Activity: {row.fields.activityLabel}</li>}
-                          {row.fields.notes && <li>Notes: {row.fields.notes}</li>}
+                          {row.fields.campsiteLocation && <li>{`Campsite: ${row.fields.campsiteLocation}`}</li>}
+                          {row.fields.dutyLabel && <li>{`Duty: ${row.fields.dutyLabel}${row.fields.dutyDay ? ` — ${row.fields.dutyDay}` : ""}${row.fields.dutyTime ? ` ${row.fields.dutyTime}` : ""}`}</li>}
+                          {row.fields.activityLabel && <li>{`Activity: ${row.fields.activityLabel}`}</li>}
+                          {row.fields.notes && <li>{`Notes: ${row.fields.notes}`}</li>}
                         </ul>
                       )}
                     </td>
@@ -359,9 +360,9 @@ export function ClubAssignmentsWorkspace({
                     <tbody>
                       {preview.recipients.map((recipient) => (
                         <tr key={`${recipient.organizationId}:${recipient.teamKey ?? ""}`}>
-                          <th scope="row" translate="no">
-                            {recipient.organizationName}
-                            <br /><small>{recipient.confirmationCode}</small>
+                          <th scope="row">
+                            <ExactValue>{recipient.organizationName}</ExactValue>
+                            <br /><small><ExactValue>{recipient.confirmationCode}</ExactValue></small>
                             {recipient.alreadySentThisVersion && <><br /><span className="status-chip gold">Already sent this version</span></>}
                           </th>
                           <td translate="no">{recipient.recipientName}</td>
@@ -405,7 +406,7 @@ export function ClubAssignmentsWorkspace({
                       onChange={(event) => setConfirmed(event.target.checked)}
                     />
                     <span>
-                      <strong>I reviewed all {preview.includedCount} club{preview.includedCount === 1 ? "" : "s"} and the sample message above.</strong>
+                      <strong>{`I reviewed all ${preview.includedCount} club${preview.includedCount === 1 ? "" : "s"} and the sample message above.`}</strong>
                       <small>If an assignment, contact, template, or sender setting changes before this is created, IMSDA Events will stop and require a new review.</small>
                     </span>
                   </label>

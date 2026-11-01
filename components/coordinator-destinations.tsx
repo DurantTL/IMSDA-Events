@@ -1,6 +1,7 @@
 import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
@@ -102,7 +103,7 @@ export function CoordinatorMonthlyRecords({
   /** `club`, `submitted`, `notSubmitted` and one `month-YYYY-MM` per month (sorted by that month's record state). */
   sorting?: ServerSort<RecordsGridColumn>;
 }) {
-  if (allClubsCount === 0) return <p className="report-empty">No active clubs are available to this role yet.</p>;
+  if (allClubsCount === 0) return <><p className="report-empty">No active clubs are available to this role yet.</p><CoordinatorSetupHelp context="the club list" id="no-clubs" /></>;
   if (clubs.length === 0) return <CoordinatorNoMatch clearHref={clearHref} query={query} />;
   const months = monthlyRecordCells(clubs[0]!, now).map(({ month, short }) => ({ month, short }));
   const key = sorting?.order.key ?? null;
@@ -182,7 +183,7 @@ export function CoordinatorClubEvents({
 }) {
   // A search narrows each event's club rows and hides events with no match; an event's own totals stay whole.
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
-  if (events.length === 0) return <p className="report-empty">No club events are published for this club year.</p>;
+  if (events.length === 0) return <><p className="report-empty">No club events are published for this club year.</p><CoordinatorSetupHelp context="club events" id="events-none" /></>;
   if (shownEvents.length === 0) return <CoordinatorNoMatch clearHref={clearHref} query={query} />;
   return (
     <>

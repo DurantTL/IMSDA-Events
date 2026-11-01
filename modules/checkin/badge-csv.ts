@@ -6,6 +6,7 @@ import { buildBadgeLabels } from "@/modules/checkin/badge-labels";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { sectionTitleLookup } from "@/modules/forms/field-flags";
 import { isCheckInBookExtraField } from "@/modules/reporting/check-in-book";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * CSV for a mail merge in Avery Design & Print. The header matches the
@@ -135,7 +136,7 @@ export function buildBadgeCsvRows(
     [...badgeCsvHeader],
     ...buildBadgeLabels(registrations).map((label) => [
       label.confirmationCode,
-      `${label.firstName} ${label.lastName}`.trim(),
+      formatPersonName(label),
       positionByAttendee.get(label.attendeeId) ?? "",
       showAttendeeType ? label.attendeeTypeLabel : "",
     ]),

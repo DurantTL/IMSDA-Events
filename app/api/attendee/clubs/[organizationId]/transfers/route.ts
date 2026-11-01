@@ -1,3 +1,4 @@
+import { liveJson } from "@/lib/live-list-response";
 import { after } from "next/server";
 import { logError } from "@/lib/logger";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
@@ -18,7 +19,7 @@ async function getHandler(_request: Request, context: RouteContext) {
     const { organizationId } = await context.params;
     const access = await requireClubTransferAccess(organizationId);
     const transfers = await listClubTransfers(organizationId, access.actor);
-    return Response.json(transfers);
+    return liveJson(transfers);
   } catch (error) {
     return memberTransferApiError(error, "Loading club transfers");
   }

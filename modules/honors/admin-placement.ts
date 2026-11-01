@@ -22,6 +22,7 @@ import {
   type SeatOwner,
 } from "@/modules/honors/enrollment-repository";
 import { classChangesOpen, sessionVisibleAtLocation } from "@/modules/honors/locations";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * A system administrator placing a youth in a class by hand, or removing a pick (#962, from #880). It is the one way past a
@@ -182,7 +183,7 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
     });
     const heldIds = new Set(held.map((row) => row.offeringId).filter((id) => offeringsById.has(id)));
     if (held.some((row) => row.offeringId === input.offeringId)) {
-      throw new SeatOverrideError("ALREADY_IN_CLASS", `${person.firstName} ${person.lastName} already has a seat in ${offering.honorName}.`.trim());
+      throw new SeatOverrideError("ALREADY_IN_CLASS", `${formatPersonName(person)} already has a seat in ${offering.honorName}.`.trim());
     }
     // Level and prerequisites can be waived with a reason, exactly as staff do on a pick save (#832); age, one class per session and
     // the site never can.
@@ -191,7 +192,7 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
       overrides: requirementReason ? new Map([[offering.id, requirementReason]]) : new Map<string, string>(),
     };
     const problem = selectionProblem(person, [...heldIds, input.offeringId], offeringsById, heldIds, waivers);
-    if (problem) throw new SeatOverrideError("SELECTION_INVALID", `${person.firstName} ${person.lastName}: ${problem}`.trim());
+    if (problem) throw new SeatOverrideError("SELECTION_INVALID", `${formatPersonName(person)}: ${problem}`.trim());
     const resolution = requirementResolution(person, offering, waivers);
 
     const changesOpen = classChangesOpen(registration.event, registration.location, now);

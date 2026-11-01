@@ -11,7 +11,7 @@ import type { RecordToReview } from "@/modules/club-reports/review-domain";
 export function ClubRecordsToReview({ rows, month, clubYear }: { rows: RecordToReview[]; month: string; clubYear: string }) {
   return (
     <section className="panel" aria-labelledby="records-to-review-heading" data-testid="records-to-review">
-      <p className="eyebrow">Clubs · {clubYear}</p>
+      <p className="eyebrow">{`Clubs · ${clubYear}`}</p>
       <h2 id="records-to-review-heading">Monthly records to review</h2>
       <p className="field-help" data-testid="records-to-review-count">
         {rows.length} {rows.length === 1 ? "record" : "records"} for {reportMonthLabel(month)} submitted and not reviewed yet.
@@ -21,7 +21,7 @@ export function ClubRecordsToReview({ rows, month, clubYear }: { rows: RecordToR
       ) : (
         <div className="report-table-wrap">
           <table role="table" className="report-table table-cards">
-            <caption className="sr-only">Monthly records to review for {reportMonthLabel(month)}</caption>
+            <caption className="sr-only">{`Monthly records to review for ${reportMonthLabel(month)}`}</caption>
             <thead role="rowgroup">
               <tr role="row">
                 <th role="columnheader" scope="col">Club</th>
@@ -36,7 +36,7 @@ export function ClubRecordsToReview({ rows, month, clubYear }: { rows: RecordToR
                   <th role="rowheader" scope="row" translate="no">{row.name}{row.church && <small> ({row.church})</small>}</th>
                   <td {...cardCell("Points")}>{row.points}{row.late && <small> late</small>}</td>
                   <td {...cardCell("Open")}>
-                    <Link className="secondary-button" href={`/admin/clubs/reports/${encodeURIComponent(row.id)}/${row.month}`}>Open<span className="sr-only"> {row.name} record</span></Link>
+                    <Link className="secondary-button" href={`/admin/clubs/reports/${encodeURIComponent(row.id)}/${row.month}`}>Open<span className="sr-only">{` ${row.name} record`}</span></Link>
                   </td>
                   <td {...cardCell("Review")}><ClubReportReview clubName={row.name} compact month={row.month} organizationId={row.id} reviewed={false} /></td>
                 </tr>

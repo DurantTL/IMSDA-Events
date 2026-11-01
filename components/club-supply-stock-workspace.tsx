@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useMemo, useState } from "react";
 import { Eye, Package, Save } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
@@ -99,7 +100,7 @@ export function ClubSupplyStockWorkspace({
           {!embedded && <p className="public-registration-eyebrow">Club supplies</p>}
           {embedded ? <h3>Inventory: supplies on hand</h3> : <h2>Supplies on hand</h2>}
         </div>
-        <span className="count-badge">{stock.filter((row) => row.quantityOnHand > 0).length} in stock</span>
+        <span className="count-badge">{`${stock.filter((row) => row.quantityOnHand > 0).length} in stock`}</span>
       </div>
       {readOnly ? (
         <p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only. The club director or deputy records stock.</p>
@@ -111,6 +112,7 @@ export function ClubSupplyStockWorkspace({
           <Package aria-hidden="true" size={27} />
           <h3>No catalog items yet</h3>
           <p>Conference staff haven&apos;t loaded the supply catalog yet. Check back later, or ask the conference office.</p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the supply catalog" id="supplies-no-catalog" />
         </div>
       ) : (
         <>
@@ -156,7 +158,7 @@ export function ClubSupplyStockWorkspace({
                           className={styles.itemControls}
                           onSubmit={(event) => { event.preventDefault(); void save(row); }}
                         >
-                          <label className="sr-only" htmlFor={inputId}>Quantity on hand: {row.name}</label>
+                          <label className="sr-only" htmlFor={inputId}>{`Quantity on hand: ${row.name}`}</label>
                           <input
                             className={styles.quantity}
                             id={inputId}

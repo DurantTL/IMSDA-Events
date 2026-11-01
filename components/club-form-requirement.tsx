@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { savedMessage } from "@/components/form-message";
 import {
   CLUB_FORM_REQUIREMENTS,
   REQUIRED_ROLE_TYPES,
@@ -49,7 +50,7 @@ export function ClubFormRequirement({
         setError(result.message ?? "The change could not be saved.");
         return;
       }
-      setNotice("Saved.");
+      setNotice(savedMessage());
       router.refresh();
     } catch {
       setError("The change could not be saved. Check your connection and try again.");
@@ -66,14 +67,14 @@ export function ClubFormRequirement({
   return (
     <div className="club-form-requirement">
       <label htmlFor={selectId}>
-        <span className="sr-only">Whether {name} is required</span>
+        <span className="sr-only">{`Whether ${name} is required`}</span>
         <select disabled={saving} id={selectId} onChange={(event) => setMode(event.target.value as ClubFormRequirementValue)} value={mode}>
           {CLUB_FORM_REQUIREMENTS.map((value) => <option key={value} value={value}>{requirementLabels[value]}</option>)}
         </select>
       </label>
       {mode === "PER_ROLE_MEMBER_YEAR" && (
         <fieldset className="club-form-requirement-roles">
-          <legend className="sr-only">Roles that must each have {name}</legend>
+          <legend className="sr-only">{`Roles that must each have ${name}`}</legend>
           {REQUIRED_ROLE_TYPES.map((role) => (
             <label className="checkbox-hit" key={role}>
               <input checked={roles.includes(role)} disabled={saving} onChange={(event) => toggle(role, event.target.checked)} type="checkbox" />

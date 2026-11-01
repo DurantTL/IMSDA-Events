@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -35,7 +36,7 @@ export default async function StaffHealthRecordPage({
     throw error;
   });
   if (!viewer) {
-    return <AccessRestricted detail="Health records need the health information permission, granted by a system administrator." title="Health records are restricted" />;
+    return <AccessRestricted detail="Health records need the health information permission." title="Health records are restricted" whoToAsk="a system administrator" />;
   }
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId: event }).catch((error: unknown) => {
     // The one-time privacy notice (#923) comes before any record opens.
@@ -46,13 +47,13 @@ export default async function StaffHealthRecordPage({
     throw error;
   });
   if (health === "BREAK_GLASS") {
-    return <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" />;
+    return <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" whoToAsk="a system administrator" />;
   }
   if (!health) return <HealthPrivacyAcknowledgment as="STAFF" />;
   return (
     <section className="page-stack club-form-page">
       <header>
-        <h2 translate="no">Health record: {`${health.member.firstName} ${health.member.lastName}`.trim()}</h2>
+        <h2>Health record: <ExactValue>{`${health.member.firstName} ${health.member.lastName}`.trim()}</ExactValue></h2>
         <p translate="no">{health.club.name}</p>
         <p><HealthStatusChip status={health.status} /></p>
         <p className="quiet-copy">View only. Opening this page is recorded.</p>

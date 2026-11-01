@@ -82,7 +82,7 @@ describe("live check-in changes (#825)", () => {
 
   it("words the already-checked-in message with the time and the staff name when known", () => {
     const withName = alreadyCheckedInMessage("2026-10-09T14:04:00.000Z", "Dana Staff", "en-US");
-    expect(withName).toMatch(/^Already checked in at \d{1,2}:\d{2}\s?(AM|PM) by Dana Staff\.$/);
-    expect(alreadyCheckedInMessage("2026-10-09T14:04:00.000Z", null, "en-US")).toMatch(/^Already checked in at \d{1,2}:\d{2}\s?(AM|PM)\.$/);
+    expect(withName).toMatch(/^Already checked in at \d{1,2}:\d{2}\s?(AM|PM) CDT by Dana Staff\.$/);
+    expect(alreadyCheckedInMessage("2026-10-09T14:04:00.000Z", null, "en-US")).toMatch(/^Already checked in at \d{1,2}:\d{2}\s?(AM|PM) CDT\.$/);
   });
 });

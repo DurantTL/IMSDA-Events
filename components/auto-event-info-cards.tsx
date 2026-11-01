@@ -180,7 +180,7 @@ export function AutoEventInfoCards({ cards }: { cards: EventInfoCards }) {
       {help && (
         <section className="auto-info-card" aria-labelledby="auto-info-help-title">
           <h2 id="auto-info-help-title">Need help?</h2>
-          <p>Questions about classes, fees, or registering your club? Email <a href={`mailto:${help.email}`}>{help.email}</a>.</p>
+          <p>Questions about classes, fees, or registering your club? Email <a href={`mailto:${help.email}`} translate="no">{help.email}</a>.</p>
         </section>
       )}
     </div>

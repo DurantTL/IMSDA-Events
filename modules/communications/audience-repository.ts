@@ -35,6 +35,7 @@ import {
   enumerateOperationsRegistrationIds,
   loadOperationsSearchCatalog,
 } from "@/modules/registrations/operations-search-repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The reviewed event audience builder's loader and snapshot (#176). It extends the WR26 messaging services: it reads
@@ -68,7 +69,7 @@ function moneyToCents(value: { toString(): string } | number) {
 }
 
 function personName(person: { firstName: string; lastName: string }) {
-  return `${person.firstName} ${person.lastName}`.trim();
+  return formatPersonName(person);
 }
 
 export async function loadAudienceDomains(eventId: string, client: Client = getPrisma()): Promise<Set<AudienceDomain>> {
@@ -287,7 +288,7 @@ async function loadRegistrationBatch(
       totalCents: moneyToCents(registration.totalAmount),
       netPaidCents,
       contact: {
-        name: `${text("firstName") || holder.firstName} ${text("lastName") || holder.lastName}`.trim(),
+        name: formatPersonName({ firstName: text("firstName") || holder.firstName, lastName: text("lastName") || holder.lastName }),
         email: text("email") || holder.normalizedEmail,
       },
       hasPublicSubmission: Boolean(registration.publicFormSubmission),

@@ -493,8 +493,8 @@ describe("the bell with the feed (#1033)", () => {
   });
 
   it("formats the time label the same everywhere, without locale-dependent spacing", () => {
-    expect(formatFeedTime("2026-11-30T12:05:00.000Z")).toBe("Nov 30, 2026, 6:05 AM CT");
-    expect(formatFeedTime("2026-07-04T01:00:00.000Z")).toBe("Jul 3, 2026, 8:00 PM CT");
+    expect(formatFeedTime("2026-11-30T12:05:00.000Z")).toBe("Nov 30, 2026, 6:05 AM CST");
+    expect(formatFeedTime("2026-07-04T01:00:00.000Z")).toBe("Jul 3, 2026, 8:00 PM CDT");
   });
 
   it("says so when the feed is empty, and shows no mark-all button", () => {

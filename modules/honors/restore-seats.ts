@@ -16,6 +16,7 @@ import {
   planRestore,
   type NotRestoredPick,
 } from "@/modules/honors/restore-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Re-takes a registration's Honors Weekend class seats when it becomes active again (#880): a staff reactivation of a
@@ -162,7 +163,7 @@ async function restoreClassSeatsCore(tx: Prisma.TransactionClient, input: Restor
     const offering = offeringsById.get(entry.offeringId);
     const snapshot = pick.registrationAttendee.profileSnapshot as Snapshot;
     items.push({
-      youthName: `${snapshot.firstName ?? ""} ${snapshot.lastName ?? ""}`.trim() || "A youth",
+      youthName: formatPersonName({ firstName: snapshot.firstName ?? "", lastName: snapshot.lastName ?? "" }) || "A youth",
       className: offering?.honorName ?? "A class",
       sessionName: offering?.sessionName ?? null,
       reason: entry.reason,

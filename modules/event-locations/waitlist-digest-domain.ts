@@ -103,7 +103,7 @@ function changeLine(change: DigestChange) {
     : change.kind === "JOINED"
       ? `, place #${change.place} in line`
       : `, was place #${change.place} in line`;
-  return `  - ${kindLabels[change.kind]}: ${change.clubName} (${people(change.attendeeCount)}${place}) at ${time} Central`;
+  return `  - ${kindLabels[change.kind]}: ${change.clubName} (${people(change.attendeeCount)}${place}) at ${time}`;
 }
 
 export function digestCount(sections: readonly DigestEventSection[]) {

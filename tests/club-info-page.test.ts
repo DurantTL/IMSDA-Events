@@ -96,9 +96,9 @@ describe("Club info page (#644)", () => {
     expect(mocks.listClubTeam).not.toHaveBeenCalled();
   });
 
-  it("renders nothing when the club isn't open to the viewer", async () => {
+  it("says who to ask when the club isn't open to the viewer", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "NO_ROSTER", club: { name: "Test Pathfinders", role: "REPORTER" } });
-    expect(await ClubInfoPage(params)).toBeNull();
+    expect(await ClubInfoPage(params)).toMatchObject({ props: { whoToAsk: "your club director" } });
   });
 });
 

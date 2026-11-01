@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ColumnHeader } from "@/components/column-header";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {
@@ -45,6 +46,16 @@ export type AreaLinks = {
 /** What an empty club list says: nothing matched the search, or there are no clubs at all. */
 const noClubsText = (query?: string) => (query ? `No club name matches “${query}”.` : "No active clubs yet.");
 
+/** The empty club list, with what to do about it when there are no clubs at all (#1435). A no-match search has its own way back. */
+function NoClubs({ query }: { query?: string }) {
+  return (
+    <>
+      <p className="report-empty">{noClubsText(query)}</p>
+      {query ? null : <EventSetupHelp context="the club list" id="staff-no-clubs" />}
+    </>
+  );
+}
+
 /**
  * A club-name search for the area-coordinator tabs (#791). A plain GET form, so
  * it works without scripts and the address keeps the search; the year and sort
@@ -58,7 +69,7 @@ export function AreaClubSearch({ label = "Search clubs by name", ...props }: { b
 const overviewLabels: Record<OverviewSortColumn, string> = { club: "club", director: "director", church: "church", roster: "roster", reports: "reports submitted", points: "total points", lastReport: "last report", sterling: "Sterling Volunteers" };
 
 export function AreaClubsOverview({ clubs, clubYear, links, query, sorting }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string; sorting?: ServerSort<OverviewSortColumn> }) {
-  if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
+  if (clubs.length === 0) return <NoClubs query={query} />;
   const rows = sorting?.order.key ? sortRows(clubs, sorting.order.key, sorting.order.dir, overviewAccessors) : clubs;
   return (
     <div className="report-table-wrap card-box" id="club-overview">
@@ -100,7 +111,7 @@ export function AreaClubsOverview({ clubs, clubYear, links, query, sorting }: { 
 }
 
 export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string; sorting?: ServerSort<GridSortColumn> }) {
-  if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
+  if (clubs.length === 0) return <NoClubs query={query} />;
   const months = clubs[0]!.months.map((cell) => cell.month);
   const key = sorting?.order.key ?? null;
   const rows = key ? sortRows(clubs, key, sorting!.order.dir, gridAccessors(clubYear)) : clubs;
@@ -173,7 +184,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
         {" · "}
         {sort === "name" ? <strong>club name</strong> : <Link href={sortHref("name")}>club name</Link>}
       </p>
-      {sorted.length === 0 ? <p className="report-empty">{noClubsText(query)}</p> : (
+      {sorted.length === 0 ? <NoClubs query={query} /> : (
         <>
           <figure className="area-points-chart">
             <figcaption>Total points per club, {clubYear}</figcaption>
@@ -241,7 +252,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
 export function AreaClubEvents({ events, clubHref, query, sorting }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string; sorting?: ServerSort<EventClubSortColumn> }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
-  if (shownEvents.length === 0) return <p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>;
+  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" />}</>;
   return (
     <>
       {sorting?.order.key && <SortOrderNote>{sortOrderText({ club: "club", status: "status", headcount: "headcount" }[sorting.order.key], sorting.order.dir, sorting.order.key === "headcount" ? "number" : "text")}</SortOrderNote>}

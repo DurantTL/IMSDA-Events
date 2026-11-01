@@ -220,8 +220,8 @@ export function ClubUniformSection({
 
       <div className={styles.group}>
         <div className={styles.groupHead}>
-          <strong>Open uniform needs ({openCount})</strong>
-          {data.issuedCount > 0 && <small className={styles.muted}>{data.issuedCount} issued so far</small>}
+          <strong>{`Open uniform needs (${openCount})`}</strong>
+          {data.issuedCount > 0 && <small className={styles.muted}>{`${data.issuedCount} issued so far`}</small>}
         </div>
         {openCount === 0 ? (
           <p className="quiet-copy">No open uniform needs.</p>

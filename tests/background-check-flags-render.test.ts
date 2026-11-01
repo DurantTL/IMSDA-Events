@@ -33,7 +33,7 @@ const render = (people: BackgroundFlag[]) => renderToStaticMarkup(createElement(
 describe("the background-check-needed list renders the issues text and reasons only when given them (#544)", () => {
   it("shows the text as written and each reason for an administrator", () => {
     const html = render([flag({ issuesNote: "Synthetic issue, Non-Driver, BGC", issueReasons: ["Marked Non-Driver", "Background screening expired"] })]);
-    expect(html).toContain("Issues: Synthetic issue, Non-Driver, BGC");
+    expect(html).toContain("Issues: <span translate=\"no\">Synthetic issue, Non-Driver, BGC</span>");
     expect(html).toContain("Marked Non-Driver; Background screening expired");
   });
 

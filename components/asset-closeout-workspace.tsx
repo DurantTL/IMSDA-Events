@@ -10,6 +10,8 @@ import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { chargeCategoryLabels, facilitySeverities, facilityStatuses, holdKindLabels } from "@/modules/issued-assets/returns-domain";
 import type { FacilityIssueRow } from "@/modules/issued-assets/returns-view";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * The issued-asset closeout (#214): what is still out, lost, damaged, charged, waived and held, the facility issues that
@@ -19,7 +21,7 @@ import { lodgingHoldKinds } from "@/modules/lodging/domain";
  */
 
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(16).slice(2)}`);
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "");
+const when = (iso: string | null) => (iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "");
 
 
 export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility }: {
@@ -236,7 +238,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
       void post("facility", {
         action: "update", issueId: issue.id, ...(status !== issue.status ? { status } : {}), ...(severity !== issue.severity ? { severity } : {}),
         ...(assignee !== (issue.assigneeUserId ?? "") ? { assigneeUserId: assignee } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(finishing ? { resolution: resolution.trim() } : {}),
-      }, "Saved.");
+      }, savedMessage());
     }}>
       <label>Status <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>{facilityStatuses.map((value) => <option key={value} value={value}>{value.toLowerCase().replace("_", " ")}</option>)}</select></label>
       <label>Severity <select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>{facilitySeverities.map((value) => <option key={value} value={value}>{value.toLowerCase()}</option>)}</select></label>

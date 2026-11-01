@@ -96,6 +96,7 @@ import {
   individualOwedRows,
   type ChurchAmountOwedRow,
 } from "@/modules/club-registrations/church-owed";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club registration (#358): a director picks who's going from the roster and
@@ -448,7 +449,7 @@ export async function listChurchAmountsOwed(eventId: string, options: { location
     });
     const groupRows = groupOwedRows(groupLinks.map(({ registration }) => {
       const contact = recordFromJson(registration.contactSnapshot);
-      const name = `${typeof contact.firstName === "string" ? contact.firstName : registration.accountHolderPerson.firstName} ${typeof contact.lastName === "string" ? contact.lastName : registration.accountHolderPerson.lastName}`.trim();
+      const name = formatPersonName({ firstName: typeof contact.firstName === "string" ? contact.firstName : registration.accountHolderPerson.firstName, lastName: typeof contact.lastName === "string" ? contact.lastName : registration.accountHolderPerson.lastName });
       return {
         registrationId: registration.id,
         confirmationCode: registration.confirmationCode,
@@ -489,7 +490,7 @@ export async function listChurchAmountsOwed(eventId: string, options: { location
     status: registration.status,
     totalAmountCents: moneyToCents(registration.totalAmount),
     attendeeCount: registration._count.attendees,
-    registrantName: `${registration.accountHolderPerson.firstName} ${registration.accountHolderPerson.lastName}`.trim(),
+    registrantName: formatPersonName(registration.accountHolderPerson),
     responses: storedRegistrationResponses(registration),
     locationName: registration.location?.name ?? null,
   })))]);
@@ -933,7 +934,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
           true,
           clubRegistration.registration.attendees.map(({ profileSnapshot }) => {
             const snapshot = recordFromJson(profileSnapshot);
-            return `${typeof snapshot.firstName === "string" ? snapshot.firstName : ""} ${typeof snapshot.lastName === "string" ? snapshot.lastName : ""}`.trim();
+            return formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" });
           }),
         ),
         // The registration-scope answers as they stand now, so a reopened
@@ -1218,9 +1219,9 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           guest: { email: guest.email, attendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH", guestId: guest.id },
         });
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
-        teamMemberPersons.push({ personId: null, name: `${guest.firstName} ${guest.lastName}`.trim(), onRoster: false });
+        teamMemberPersons.push({ personId: null, name: formatPersonName(guest), onRoster: false });
         teamPeople.push({
-          name: `${guest.firstName} ${guest.lastName}`.trim(),
+          name: formatPersonName(guest),
           role,
           alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
           age: guest.age,
@@ -1246,17 +1247,17 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
         if (needsAge) {
           throw new PublicRegistrationError(
             "CLUB_ATTENDEES_INVALID",
-            `Enter ${`${rosterOnly.firstName} ${rosterOnly.lastName}`.trim() || "everyone going"}'s age on the event date. Go back to Who's going and add it.`,
+            `Enter ${formatPersonName(rosterOnly) || "everyone going"}'s age on the event date. Go back to Who's going and add it.`,
           );
         }
       }
       const person = effectiveAge === undefined ? rosterOnly : { ...rosterOnly, ageOnEventDate: effectiveAge };
       if (typedAge !== undefined && typedAge !== (member.reportedAge ?? undefined) && actor && !teamSettings?.ageAsOf && !saveOff.has(member.id)) saveBack.push({ memberId: member.id, age: typedAge });
       const memberRole = teamRoleFor({ responses: attendee.responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
-      teamMemberPersons.push({ personId: member.personId, name: `${person.firstName} ${person.lastName}`.trim(), onRoster: true });
+      teamMemberPersons.push({ personId: member.personId, name: formatPersonName(person), onRoster: true });
       resolved.set(attendee.clientId, { personId: member.personId, rosterMemberId: member.id, ageOnEventDate: person.ageOnEventDate, ...(teamSettings ? { teamRole: memberRole } : {}) });
       teamPeople.push({
-        name: `${person.firstName} ${person.lastName}`.trim(),
+        name: formatPersonName(person),
         role: memberRole,
         alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
         age: person.ageOnEventDate,
@@ -1348,7 +1349,7 @@ function withRegisteredIdentity(
 }
 
 function snapshotName(snapshot: Record<string, unknown>) {
-  return `${typeof snapshot.firstName === "string" ? snapshot.firstName : ""} ${typeof snapshot.lastName === "string" ? snapshot.lastName : ""}`.trim()
+  return formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" })
     || "Someone";
 }
 
@@ -1544,7 +1545,7 @@ export async function amendClubRegistration(
   if (alreadyRegistered) {
     throw new ClubRegistrationError(
       "ATTENDEES_INVALID",
-      `${alreadyRegistered.person?.firstName ?? ""} ${alreadyRegistered.person?.lastName ?? ""}`.trim() + " is already on this registration. Untick their other entry before adding them from the roster.",
+      formatPersonName({ firstName: alreadyRegistered.person?.firstName ?? "", lastName: alreadyRegistered.person?.lastName ?? "" }) + " is already on this registration. Untick their other entry before adding them from the roster.",
     );
   }
 
@@ -1602,7 +1603,7 @@ export async function amendClubRegistration(
         if (attendeeAgeKey(definition) !== null) {
           throw new ClubRegistrationError(
             "ATTENDEES_INVALID",
-            `Enter ${`${rosterOnly.firstName} ${rosterOnly.lastName}`.trim() || "everyone going"}'s age on the event date.`,
+            `Enter ${formatPersonName(rosterOnly) || "everyone going"}'s age on the event date.`,
           );
         }
       } else {

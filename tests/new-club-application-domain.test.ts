@@ -24,7 +24,7 @@ function valid(overrides: Record<string, unknown> = {}) {
     directorName: "Dana Director",
     directorAddress: "100 Example Road, Sampletown, ZZ 00000",
     directorEmail: "  Dana.Director@Example.TEST ",
-    directorHomePhone: "555-0100",
+    directorHomePhone: "(515) 555-0100",
     directorWorkPhone: "",
     philosophyAgreed: true,
     pastorSignature: "Pat Pastor",
@@ -76,7 +76,7 @@ describe("new club application input", () => {
   it("needs the director's email and at least one phone", () => {
     expect(newClubApplicationInputSchema.safeParse(valid({ directorEmail: "not-an-address" })).success).toBe(false);
     expect(newClubApplicationInputSchema.safeParse(valid({ directorHomePhone: "", directorWorkPhone: "" })).success).toBe(false);
-    expect(newClubApplicationInputSchema.safeParse(valid({ directorHomePhone: "", directorWorkPhone: "555-0101" })).success).toBe(true);
+    expect(newClubApplicationInputSchema.safeParse(valid({ directorHomePhone: "", directorWorkPhone: "(515) 555-0101" })).success).toBe(true);
   });
 
   it("only takes the application with the church agreement ticked", () => {

@@ -11,6 +11,7 @@ import { ClubFormError } from "@/modules/club-forms/errors";
 import { getSubmissionForViewer, listRosterChoices } from "@/modules/club-forms/submissions";
 import { withLiveDirectory } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club form", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function ClubFormSubmissionPage({
 }) {
   const [{ organizationId, submissionId }, { edit }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   if (!isClubFormsRole(access.club.role)) notFound();
   const viewer = clubLeaderViewerFromAccess(access);
   const submission = await getSubmissionForViewer(viewer, submissionId, edit ? "EDIT" : "VIEW", organizationId).catch((error: unknown) => {

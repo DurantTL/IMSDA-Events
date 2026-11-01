@@ -244,7 +244,7 @@ const pages: PageSpec[] = [
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   // The plain attendee with registrations in every lifecycle state (#1111): see seedHistoryAccount.
-  { name: "account-overview-history", path: "/account", role: "attendee-history", expectText: /(?=[\s\S]*Registration received)(?=[\s\S]*\$40\.00 remaining)/ },
+  { name: "account-overview-history", path: "/account", role: "attendee-history", expectText: /(?=[\s\S]*Pending payment)(?=[\s\S]*\$40\.00 remaining)/ },
   { name: "account-registrations-history", path: "/account/registrations", role: "attendee-history", expectText: /(?=[\s\S]*No payment due while waitlisted)(?=[\s\S]*\$40\.00 remaining)(?=[\s\S]*places requested)/ },
   { name: "account-registrations-history-past", path: "/account/registrations?show=past", role: "attendee-history", expectText: /Mobilecheck Spring Reunion/ },
   { name: "account-registrations-history-cancelled", path: "/account/registrations?show=cancelled", role: "attendee-history", expectText: /(?=[\s\S]*Nothing due now)(?=[\s\S]*\$100\.00 refunded)(?=[\s\S]*No payment is due on a cancelled registration)/ },
@@ -1639,7 +1639,7 @@ async function seedSynthetic(prisma: PrismaClient) {
         pastorName: "Pat Mobilecheck-Pastorsson", directorName: "Dana Mobilecheck-Directorsson-Applicant",
         directorAddress: "1234 Mobilecheck Boulevard of the Extremely Long Street Name, Testville, ZZ 00000",
         directorEmail: `${P}.applicant.with-a-very-long-address-for-wrapping@example.test`,
-        directorHomePhone: "555-0100", directorWorkPhone: "555-0101", philosophyAgreed: true,
+        directorHomePhone: "(515) 555-0100", directorWorkPhone: "(515) 555-0101", philosophyAgreed: true,
         pastorSignature: "Pat Mobilecheck-Pastorsson", headElderSignature: "Hal Mobilecheck-Elder", clerkSignature: "Cleo Mobilecheck-Clerk", directorSignature: "Dana Mobilecheck-Directorsson-Applicant",
         otherBoardMembers: ["Ben Mobilecheck-Board", "Bea Mobilecheck-Board"], applicationDate: new Date("2026-10-07T00:00:00Z"),
         note: "A synthetic note long enough to wrap on a narrow phone screen without causing the page to scroll sideways.",

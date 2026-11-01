@@ -95,7 +95,7 @@ export function ClubFormRosterMapping({ spec, edit, issues }: { spec: ClubFormDr
           </div>
           {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => (
             <fieldset className="form-stack" key={index}>
-              <legend>Emergency contact {index + 1} (optional)</legend>
+              <legend>{`Emergency contact ${index + 1} (optional)`}</legend>
               <div className="form-grid two-column">
                 {(["name", "email", "phone"] as const).map((part) => select(
                   partLabels[part],

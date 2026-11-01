@@ -2,6 +2,7 @@
 
 import { ExportLink } from "@/components/export-link";
 import { ListPager } from "@/components/list-pager";
+import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
@@ -44,12 +45,13 @@ import { RegistrationNotesTagsPanel } from "@/components/registration-notes-tags
 import { RegistrationSignaturesPanel } from "@/components/registration-signatures-panel";
 import { SelectedAudienceDialog } from "@/components/selected-audience-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
-import { SubmitButton } from "@/components/submit-button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { attendeeCountPhrase, lifecycleActionButtonClass, registrationLifecycleLabel } from "@/lib/confirmation-copy";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
+import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
@@ -125,7 +127,7 @@ function dateTime(value: string | null, timeZone: string) {
 }
 
 function submittedDateTime(value: string | null, timeZone: string) {
-  return value ? dateTime(value, timeZone) : "Not submitted";
+  return value ? dateTime(value, timeZone) : "Not yet";
 }
 
 function paymentMethodLabel(value: string) {
@@ -175,7 +177,7 @@ function messageDelivery(record: RegistrationRecord["messages"][number]) {
     return { label: "Captured locally", tone: "purple", date: record.capturedAt };
   }
   return {
-    label: record.status === "PROCESSING" ? "Processing" : "Pending",
+    label: record.status === "PROCESSING" ? "Processing" : "Queued",
     tone: "gold",
     date: record.createdAt,
   };
@@ -221,9 +223,8 @@ function pricingSnapshotSummary(snapshot: Record<string, unknown>) {
   };
 }
 
-/** A registration made through a personal staff, pastor or volunteer link that the office has not approved yet (#804). */
 function waitingForApproval(record: RegistrationRecord) {
-  return record.status === "DRAFT" && record.staffInvitation?.approval === "WAITING";
+  return registrationAwaitingApproval(record);
 }
 
 const staffGroupLabel = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunteer" } as const;
@@ -235,20 +236,32 @@ function statusTone(record: RegistrationRecord) {
   return "green";
 }
 
-function statusLabel(record: RegistrationRecord) {
-  if (record.status === "CANCELLED") return "Cancelled";
-  if (record.status === "WAITLISTED") {
-    // A club waitlisted at a location: "Waitlisted at <location> (#N)" (#599).
-    return record.location
-      ? `Waitlisted at ${record.location.name}${record.locationWaitlistPlace ? ` (#${record.locationWaitlistPlace})` : ""}`
-      : "Waitlisted";
-  }
-  if (waitingForApproval(record)) return "Waiting for office approval";
-  if (record.status === "DRAFT") return "Draft";
-  if (record.isDeferredOrganizationBilling) return record.isGroup ? "Billed to group contact" : "Billed to church";
-  if (record.totalAmountCents === 0) return "No charge";
-  if (attendeeBalanceCents(record) > 0) return "Balance due";
-  return "Paid";
+function statusContext(record: RegistrationRecord) {
+  return {
+    status: record.status,
+    awaitingApproval: waitingForApproval(record),
+    attendeeBalanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+  };
+}
+
+/** The shared status word (#1453). A club waitlisted at a location adds "at <location>, position N" (#599). */
+export function statusLabel(record: RegistrationRecord) {
+  if (record.status === "WAITLISTED") return waitlistStatusText({ position: record.locationWaitlistPlace, place: record.location?.name });
+  return registrationStatusWord(statusContext(record));
+}
+
+/** The money state beside the status word, for registrations that can owe or hold money; null for the rest. */
+function moneyLabel(record: RegistrationRecord) {
+  if (record.status !== "SUBMITTED" && record.status !== "CONFIRMED") return null;
+  return registrationMoneyStatus({
+    totalCents: record.totalAmountCents,
+    balanceCents: attendeeBalanceCents(record),
+    deferredBilling: record.isDeferredOrganizationBilling,
+    isGroup: record.isGroup,
+    audience: "staff",
+    formatAmount: (cents) => formatCents(cents, { wholeDollars: true }),
+  });
 }
 
 /** The plain list: the server lists registrations by when they were submitted (modules/registrations/repository.ts), newest first. */
@@ -335,6 +348,9 @@ export function PeopleWorkspace({
   const [savingAttendeeEmail, setSavingAttendeeEmail] = useState(false);
   const [amending, setAmending] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
+  // The optional staff note in the lifecycle dialog; the dialog's field is uncontrolled, so each opening starts blank.
+  const lifecycleReasonRef = useRef("");
+  useEffect(() => { lifecycleReasonRef.current = ""; }, [lifecycleAction]);
   const [operationDraft, setOperationDraft] = useState<RegistrationOperationDraft | null>(null);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [emailingSelection, setEmailingSelection] = useState(false);
@@ -524,20 +540,18 @@ export function PeopleWorkspace({
     }
   }
 
-  async function updateLifecycle(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function updateLifecycle() {
     if (!selected || !lifecycleAction) return;
     setSaving(true);
     setError("");
     setNotice("");
-    const form = new FormData(event.currentTarget);
     try {
       const response = await fetch(
         `/api/events/${eventId}/registrations/${selected.id}/lifecycle/${lifecycleAction}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: String(form.get("reason") ?? "") }),
+          body: JSON.stringify({ reason: lifecycleReasonRef.current }),
         },
       );
       const result = await response.json();
@@ -658,7 +672,7 @@ export function PeopleWorkspace({
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "Unable to resend the confirmation email.");
-      const refreshed = await fetch(`/api/events/${eventId}/registrations/${selected.id}`);
+      const refreshed = await fetch(`/api/events/${eventId}/registrations/${selected.id}`, { cache: "no-store" });
       const refreshedResult = await refreshed.json().catch(() => ({}));
       if (refreshed.ok && refreshedResult.registration) {
         const updated = refreshedResult.registration as RegistrationRecord;
@@ -822,7 +836,7 @@ export function PeopleWorkspace({
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
-        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
       <div className="page-intro people-intro">
@@ -894,7 +908,7 @@ export function PeopleWorkspace({
           )}
           <button className="record-card interactive-record" type="button" onClick={() => openDetail(registration)}>
             <span className={`person-avatar large ${statusTone(registration)}`}>{initials(registration)}</span>
-            <span className="record-copy"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small><small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"}</small><small className="record-date">{submittedDateTime(registration.submittedAt, eventTimezone)}</small></span>
+            <span className="record-copy"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small><ExactValue>{registration.confirmationCode}</ExactValue> · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small><small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"}</small><small className="record-date">{submittedDateTime(registration.submittedAt, eventTimezone)}</small></span>
             <span className="record-badges">
               {registration.attendees.some((attendee) => backgroundFlaggedAttendeeIds.includes(attendee.id)) && <BackgroundCheckBadge />}
               {emailSuppressions.registrations[registration.id] && (
@@ -909,6 +923,7 @@ export function PeopleWorkspace({
               )}
               {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
               <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
+              {moneyLabel(registration) && <span className="status-chip neutral">{moneyLabel(registration)}</span>}
             </span>
           </button>
           </div>
@@ -1041,9 +1056,9 @@ export function PeopleWorkspace({
                         <p className="eyebrow">What stays exactly the same</p>
                         {operationDraft.kind === "transfer" ? (
                           <ul>
-                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {selected.status.toLowerCase()} status.</li>
+                            <li>Registration ID, confirmation code {selected.confirmationCode}, and {registrationStatusWord(statusContext(selected)).toLowerCase()} status.</li>
                             <li>All {selected.attendeeCount} attendees, their positions, types, and form choices.</li>
-                            <li>The immutable submitted form and order snapshot, {formatCents(selected.totalAmountCents)} total, payments, refunds, and {formatCents(selected.balanceCents)} balance.</li>
+                            <li>The immutable submitted form and order snapshot, <Money cents={selected.totalAmountCents} /> total, payments, refunds, and <Money cents={selected.balanceCents} /> balance.</li>
                             <li>Promo redemption, capacity reservations, and waitlist position.</li>
                           </ul>
                         ) : (
@@ -1064,18 +1079,18 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong translate="no">{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong className="status-word-value">{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong><Money cents={selected.totalAmountCents} /></strong></span><span><small>Balance</small><strong><Money cents={selected.balanceCents} /></strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>
                   {selectedPricing && <details open>
                     <summary>Saved promo discount</summary>
                     <dl>
-                      <div><dt>Subtotal before discount</dt><dd>{formatCents(selectedPricing.preDiscountSubtotalCents)}</dd></div>
-                      <div><dt>Promo code</dt><dd>{selectedPricing.promoCode} · −{formatCents(selectedPricing.discountAmountCents)}</dd></div>
-                      <div><dt>Discounted subtotal</dt><dd>{formatCents(selectedPricing.subtotalCents)}</dd></div>
-                      {selectedPricing.processingFeeCents > 0 && <div><dt>Card processing</dt><dd>{formatCents(selectedPricing.processingFeeCents)}</dd></div>}
-                      <div><dt>Recorded total</dt><dd>{formatCents(selectedPricing.totalCents)}</dd></div>
+                      <div><dt>Subtotal before discount</dt><dd><Money cents={selectedPricing.preDiscountSubtotalCents} /></dd></div>
+                      <div><dt>Promo code</dt><dd>{selectedPricing.promoCode} · −<Money cents={selectedPricing.discountAmountCents} /></dd></div>
+                      <div><dt>Discounted subtotal</dt><dd><Money cents={selectedPricing.subtotalCents} /></dd></div>
+                      {selectedPricing.processingFeeCents > 0 && <div><dt>Card processing</dt><dd><Money cents={selectedPricing.processingFeeCents} /></dd></div>}
+                      <div><dt>Recorded total</dt><dd><Money cents={selectedPricing.totalCents} /></dd></div>
                     </dl>
                   </details>}
                   <details open>
@@ -1145,13 +1160,13 @@ export function PeopleWorkspace({
                   <div className="registration-related-list">
                     {selected.payments.map((payment) => <article key={payment.id}>
                       <div>
-                        <strong>{formatCents(payment.amountCents)} · {paymentMethodLabel(payment.method)}</strong>
+                        <strong><Money cents={payment.amountCents} /> · {paymentMethodLabel(payment.method)}</strong>
                         <small>{dateTime(payment.receivedAt, eventTimezone)}{payment.externalReference ? ` · ${payment.externalReference}` : ""}</small>
                       </div>
-                      {payment.refundedCents > 0 && <span className="status-chip gold">{formatCents(payment.refundedCents)} refunded</span>}
+                      {payment.refundedCents > 0 && <span className="status-chip gold"><Money cents={payment.refundedCents} /> refunded</span>}
                       {payment.refunds.length > 0 && <details>
                         <summary>Refund details</summary>
-                        <dl>{payment.refunds.map((refund) => <div key={refund.id}><dt>{dateTime(refund.createdAt, eventTimezone)}</dt><dd>−{formatCents(refund.amountCents)}{refund.reason ? ` · ${refund.reason}` : ""}</dd></div>)}</dl>
+                        <dl>{payment.refunds.map((refund) => <div key={refund.id}><dt>{dateTime(refund.createdAt, eventTimezone)}</dt><dd>−<Money cents={refund.amountCents} />{refund.reason ? ` · ${refund.reason}` : ""}</dd></div>)}</dl>
                       </details>}
                     </article>)}
                     {selected.payments.length === 0 && <p className="quiet-copy">No successful payments have been recorded.</p>}
@@ -1196,7 +1211,7 @@ export function PeopleWorkspace({
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
                 {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
-                {canEdit && !addingAttendee && !lifecycleAction && (
+                {canEdit && !addingAttendee && (
                   <>
                     <div className="registration-management-actions">
                       {selected.publicSubmission?.rosterEnabled && <button className="primary-button" type="button" onClick={() => { setError(""); setNotice(""); setAmending(true); }}><PencilLine aria-hidden="true" size={17} /> Edit choices & attendees</button>}
@@ -1219,15 +1234,26 @@ export function PeopleWorkspace({
                   </>
                 )}
                 {lifecycleAction && (
-                  <form className="form-stack lifecycle-confirmation" onSubmit={updateLifecycle}>
-                    <div><p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p><h3>{lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}</h3><p>{lifecycleCopy[lifecycleAction].detail}</p>{lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}{lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <div className="inline-notice" role="note">Already checked in. Cancelling does not undo the check-in.</div>}</div>
-                    <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" /></label>
-                    {error && <p className="form-error" role="alert">{error}</p>}
-                    <div className="form-actions">
-                      <button className="secondary-button" type="button" disabled={saving} onClick={() => { setLifecycleAction(null); setError(""); }}>Keep as is</button>
-                      <SubmitButton className={lifecycleAction === "cancel" ? "primary-button lifecycle-danger-button" : "primary-button"} label={registrationLifecycleLabel(lifecycleAction, `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)} submitting={saving} submittingLabel="Updating…" />
+                  <ConfirmDialog
+                    busy={saving}
+                    busyLabel="Updating…"
+                    cancelLabel="Keep as is"
+                    confirmLabel={registrationLifecycleLabel(lifecycleAction, `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}
+                    destructive={lifecycleAction === "cancel"}
+                    error={error}
+                    onCancel={() => { setLifecycleAction(null); setError(""); }}
+                    onConfirm={() => void updateLifecycle()}
+                    open
+                    title={lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}
+                  >
+                    <div className="form-stack">
+                      <p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p>
+                      <p>{lifecycleCopy[lifecycleAction].detail}</p>
+                      {lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}
+                      {lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <div className="inline-notice" role="note">Already checked in. Cancelling does not undo the check-in.</div>}
+                      <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" onChange={(event) => { lifecycleReasonRef.current = event.target.value; }} /></label>
                     </div>
-                  </form>
+                  </ConfirmDialog>
                 )}
                   </>
                 )}

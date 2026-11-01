@@ -46,7 +46,7 @@ export function ClubYearEndConference({ reportYear, initialRows }: { reportYear:
     <section className="page-stack">
       <div className="page-intro">
         <div>
-          <p className="eyebrow">Clubs · Pathfinder year {reportYear}</p>
+          <p className="eyebrow">{`Clubs · Pathfinder year ${reportYear}`}</p>
           <h2>Year-End Reports</h2>
           <p>
             Due {formatReportYearDueDate(reportYear)}. <strong>{progress.submitted}</strong> submitted,{" "}

@@ -54,6 +54,7 @@ import { LODGING_LINE_KEY, currentLodgingChargeCents, lodgingCharge, lodgingChar
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { isChurchBilledBillingMode } from "@/modules/club-registrations/per-person-price";
 import { lockEventLodgingUnits, lodgingTransactionTimeoutMs, nightsFor, touchEventLodgingCapacity } from "@/modules/lodging/service";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Lodging preferences, roommate requests, household rules and the staff review (#199, slice 2).
@@ -391,7 +392,7 @@ export function attendeeName(attendee: { profileSnapshot: unknown; person: { fir
   const profile = record(attendee.profileSnapshot);
   const first = typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName;
   const last = typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName;
-  return `${first} ${last}`.trim() || "Attendee";
+  return formatPersonName({ firstName: first, lastName: last }) || "Attendee";
 }
 
 async function loadRegistration(tx: Client, eventId: string, registrationId: string) {
@@ -861,7 +862,7 @@ export async function findRoommateTarget(tx: Client, eventId: string, name: stri
   if (!target) throw notFound;
   const wanted = normalizeName(name);
   const matched = target.attendees.find((attendee) => normalizeName(attendeeName(attendee)) === wanted);
-  const holderMatches = normalizeName(`${target.accountHolderPerson.firstName} ${target.accountHolderPerson.lastName}`) === wanted;
+  const holderMatches = normalizeName(formatPersonName(target.accountHolderPerson)) === wanted;
   if (!matched && !holderMatches) throw notFound;
   return { registrationId: target.id, personId: matched?.personId ?? null };
 }
@@ -1218,7 +1219,7 @@ async function loadReviewFacts(client: Client, context: Context) {
   const { capacity, unitIdsByCategory } = await loadCategoryCapacity(client, context);
   const registrationFacts = new Map<string, RegistrationFact>(registrations.map((registration) => [registration.id, {
     confirmationCode: registration.confirmationCode,
-    label: `${registration.confirmationCode} (${registration.accountHolderPerson.firstName} ${registration.accountHolderPerson.lastName})`.replace(/\s+\)/, ")"),
+    label: `${registration.confirmationCode} (${formatPersonName(registration.accountHolderPerson)})`.replace(/\s+\)/, ")"),
     active: (lodgingActiveRegistrationStatuses as readonly string[]).includes(registration.status),
   }]));
   const people = registrations
@@ -1586,7 +1587,7 @@ export async function getRegistrantLodgingView(input: { eventId: string; registr
     .map((row) => {
       const target = targetById.get(row.targetRegistrationId);
       const person = target?.attendees.find((attendee) => attendee.personId === row.targetPersonId);
-      const who = person ? attendeeName(person) : target ? `${target.accountHolderPerson.firstName} ${target.accountHolderPerson.lastName}`.trim() : "Someone";
+      const who = person ? attendeeName(person) : target ? formatPersonName(target.accountHolderPerson) : "Someone";
       const standing = roommateStatus(toRoommateRow(row), allRows);
       return {
         id: row.id,

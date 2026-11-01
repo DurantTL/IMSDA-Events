@@ -1,6 +1,8 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { ClubSetupHelp } from "@/components/role-setup-help";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
@@ -114,6 +116,8 @@ export function ClubMeetingNotes({
   const [baseline, setBaseline] = useState(() => JSON.stringify(emptyDraft(newMeetingDate)));
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const dirty = JSON.stringify(draft) !== baseline;
+  // Close and Cancel have their own discard question; this adds the warning for links, Back and reload while the editor is open and changed (#1452).
+  useUnsavedChangesGuard(editorOpen && dirty, "You have unsaved changes to these meeting notes. Leave this page and discard them?");
   // The green "Saved" banner pinned to the top of the popup (#810): it appears after a save and goes away when the draft changes again.
   const [justSaved, setJustSaved] = useState(false);
   // Whether the note being edited has a check-off on file. Kept from the note itself and from each save response, never looked up in `notes`, which only holds this month's meetings.
@@ -284,7 +288,7 @@ export function ClubMeetingNotes({
         <div className="public-manage-card-heading club-roster-heading">
           <div>
             <p className="public-registration-eyebrow">Head counts, with an optional attendance check-off</p>
-            <h2 id="club-notes-heading">Meetings in {monthLabel}</h2>
+            <h2 id="club-notes-heading">{`Meetings in ${monthLabel}`}</h2>
           </div>
           <span className="club-team-invite-actions">
             {exportMonthHref && attendanceAvailable && (
@@ -303,7 +307,12 @@ export function ClubMeetingNotes({
           </span>
         </div>
 
-        {notes.length === 0 && !formOpen && <p className="public-manage-empty">No meetings recorded for {monthLabel} yet.</p>}
+        {notes.length === 0 && !formOpen && (
+          <>
+            <p className="public-manage-empty">{`No meetings recorded for ${monthLabel} yet.`}</p>
+            <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="meeting notes" id="meetings-none" />
+          </>
+        )}
 
         <ul className="public-manage-club-list">
           {notes.map((note) => (
@@ -351,7 +360,7 @@ export function ClubMeetingNotes({
           <div className="modal-head">
             <div>
               <p className="public-registration-eyebrow">{editingId ? "Edit meeting note" : "New meeting note"}</p>
-              <h2 id="meeting-note-dialog-title">{editingId ? "Edit" : "Add"} meeting note</h2>
+              <h2 id="meeting-note-dialog-title">{`${editingId ? "Edit" : "Add"} meeting note`}</h2>
             </div>
             <button aria-label="Close" className="icon-button modal-close-button" disabled={saving} onClick={requestClose} type="button">
               <X aria-hidden="true" size={18} />
@@ -509,7 +518,7 @@ function AttendanceSection({
         </>
       ) : (
         <>
-          <p className="field-help" role="status">{presentCount} of {totalCount} present. The counts above update as you check people off, and you can still change them.</p>
+          <p className="field-help" role="status">{`${presentCount} of ${totalCount} present. The counts above update as you check people off, and you can still change them.`}</p>
           <div className="intro-actions">
             <button className="secondary-button club-event-action" onClick={() => onMarkAll(true)} type="button">Mark all present</button>
             <button className="secondary-button club-event-action" onClick={() => onMarkAll(false)} type="button">Clear all</button>

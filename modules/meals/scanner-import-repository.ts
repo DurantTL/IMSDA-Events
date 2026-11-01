@@ -12,6 +12,7 @@ import {
   type ImportTicket, type ParsedScannerFile, type PlanInput, type ReviewReason, type ReviewRow, type ScannerPlan, type ScannerSource,
 } from "@/modules/meals/scanner-import";
 import { buildServedReport, servedDrillDown, type ServedTicket } from "@/modules/meals/served-report";
+import { formatPersonName } from "@/lib/person-name";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -52,7 +53,7 @@ async function loadActiveTickets(db: Db, eventId: string): Promise<ImportTicket[
     const first = typeof profile.firstName === "string" ? profile.firstName : row.attendee?.person.firstName ?? (typeof contact.firstName === "string" ? contact.firstName : "");
     const last = typeof profile.lastName === "string" ? profile.lastName : row.attendee?.person.lastName ?? (typeof contact.lastName === "string" ? contact.lastName : "");
     return {
-      id, number, confirmationCode: row.registration?.confirmationCode ?? "", guestName: `${first} ${last}`.trim(), mealType: row.mealType,
+      id, number, confirmationCode: row.registration?.confirmationCode ?? "", guestName: formatPersonName({ firstName: first, lastName: last }), mealType: row.mealType,
       serviceDate: row.service?.serviceDate ?? "", payer: row.payer, ageGroup: row.ageGroup,
     } satisfies ImportTicket;
   });

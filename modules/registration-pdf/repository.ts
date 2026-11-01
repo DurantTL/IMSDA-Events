@@ -22,6 +22,7 @@ import {
   type RegistrationPdfSource,
 } from "@/modules/registration-pdf/model";
 import { renderRegistrationPdf } from "@/modules/registration-pdf/render";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The registration PDF (#1082): made from the saved answers and the published form version the registration is on,
@@ -139,10 +140,10 @@ export async function loadRegistrationPdfSource(
     ?? (Object.keys(latestResponses).length > 0 ? latestResponses : record(submission.responses));
   const snapshot = overrides.pricingSnapshot ?? currentPricingSnapshot(registration);
   const contact = record(registration.contactSnapshot);
-  const registrantName = `${text(contact.firstName) || registration.accountHolderPerson.firstName} ${text(contact.lastName) || registration.accountHolderPerson.lastName}`.trim();
+  const registrantName = formatPersonName({ firstName: text(contact.firstName) || registration.accountHolderPerson.firstName, lastName: text(contact.lastName) || registration.accountHolderPerson.lastName });
   const attendees = registration.attendees.map((attendee) => {
     const profile = record(attendee.profileSnapshot);
-    const name = `${text(profile.firstName) || attendee.person.firstName} ${text(profile.lastName) || attendee.person.lastName}`.trim();
+    const name = formatPersonName({ firstName: text(profile.firstName) || attendee.person.firstName, lastName: text(profile.lastName) || attendee.person.lastName });
     return {
       name,
       ageOnEventDate: typeof profile.ageOnEventDate === "number" && Number.isFinite(profile.ageOnEventDate) ? profile.ageOnEventDate : null,

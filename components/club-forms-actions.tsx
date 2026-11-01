@@ -195,7 +195,7 @@ export function DeleteClubFormLinkButton({ organizationId, linkId, formName }: {
     <>
       {confirmDialog}
       <button className="text-button" disabled={saving} onClick={remove} type="button">
-        Delete<span className="sr-only"> the {formName} link</span>
+        Delete<span className="sr-only">{` the ${formName} link`}</span>
       </button>
       {error && <small className="club-report-problem" role="alert">{error}</small>}
     </>

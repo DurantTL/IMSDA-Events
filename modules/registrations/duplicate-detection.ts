@@ -1,4 +1,5 @@
 import type { RegistrationRecord } from "@/modules/registrations/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Finds people and registrations that look like the same person twice.
@@ -114,7 +115,7 @@ export function normalizeNameKey(firstName: string, lastName: string) {
 }
 
 function displayName(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim();
+  return formatPersonName({ firstName, lastName }).replace(/\s+/g, " ").trim();
 }
 
 function groupBy<T>(items: T[], key: (item: T) => string) {

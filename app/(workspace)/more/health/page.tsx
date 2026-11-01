@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -125,7 +125,8 @@ export default async function OperationalHealthPage({
     return (
       <AccessRestricted
         title="Operational health is restricted"
-        detail="This page only shows staff the event areas their role can resolve. Ask an event administrator if you need operational access."
+        detail="This page only shows staff the event areas their role can resolve."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -220,7 +221,7 @@ export default async function OperationalHealthPage({
                 <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
-                      <strong>{issue.confirmationCode} · {formatCents(issue.amountCents)}</strong>
+                      <strong>{issue.confirmationCode} · <Money cents={issue.amountCents} /></strong>
                       <SeverityBadge severity={issue.severity} />
                     </div>
                     <p>
@@ -249,10 +250,10 @@ export default async function OperationalHealthPage({
                 <li className={styles.issue} key={issue.registrationId}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
-                      <strong>{issue.confirmationCode} · {formatCents(issue.balanceCents)} due</strong>
+                      <strong>{issue.confirmationCode} · <Money cents={issue.balanceCents} /> due</strong>
                       <SeverityBadge severity={issue.severity} />
                     </div>
-                    <p>{formatCents(issue.paidCents)} received toward {formatCents(issue.totalAmountCents)}.</p>
+                    <p><Money cents={issue.paidCents} /> received toward <Money cents={issue.totalAmountCents} />.</p>
                     {issue.submittedAt && <time dateTime={issue.submittedAt}>Registered {timeLabel(issue.submittedAt, event.timezone)}</time>}
                   </div>
                   <ResolveLink href={`${financeHref}&filter=BALANCE&registration=${encodeURIComponent(issue.registrationId)}`}>Open balance</ResolveLink>

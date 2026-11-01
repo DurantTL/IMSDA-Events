@@ -1,8 +1,10 @@
 "use client";
+import { LiveListBoundary, ReloadButton } from "@/components/live-list-boundary";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ComponentProps, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { useAddressParam, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
@@ -34,7 +36,10 @@ import {
   type GuardianFormErrors,
   type GuardianRecord,
 } from "@/modules/club-rosters/guardians-domain";
-import { RosterGuardianFields } from "@/components/roster-guardian-fields";
+import { RosterGuardianFields, guardianErrorItems } from "@/components/roster-guardian-fields";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import {
   applyRosterFilters,
   clearedRosterFilters,
@@ -115,7 +120,9 @@ function subscribeSectionChoices(listener: () => void) {
   };
 }
 
-export function ClubRosterWorkspace({
+const rosterFieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
+
+function ClubRosterWorkspaceInner({
   canSeeBirthDates,
   clubYear,
   initialMembers,
@@ -204,6 +211,13 @@ export function ClubRosterWorkspace({
   sectionsStartClosed?: boolean;
 }) {
   const [members, setMembers] = useState(initialMembers);
+  // A page refresh (a transfer was accepted, the year rolled over) hands this component a fresh list from the server;
+  // show it instead of the copy from first load (#1445, rule P2).
+  const [membersFrom, setMembersFrom] = useState(initialMembers);
+  if (membersFrom !== initialMembers) {
+    setMembersFrom(initialMembers);
+    setMembers(initialMembers);
+  }
   const showHonors = Boolean(honorsPopup || honorsHref);
   const [honorsFor, setHonorsFor] = useState<RosterMemberRecord | null>(null);
   const [editing, setEditing] = useState<RosterMemberRecord | null>(null);
@@ -223,10 +237,29 @@ export function ClubRosterWorkspace({
   const [showGender, setShowGender] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  /** The request never reached the server (blocked, offline): the list on screen may be out of date, so offer Reload (#1445). */
+  const [connectionLost, setConnectionLost] = useState(false);
+  /** The dialog's own notice: a blocked save scrolls it into view and focuses it, so it is seen on a phone (#1445). */
+  const dialogNoticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (connectionLost && dialogNoticeRef.current) {
+      dialogNoticeRef.current.scrollIntoView({ block: "nearest" });
+      dialogNoticeRef.current.focus();
+    }
+  }, [connectionLost, error]);
   const [notice, setNotice] = useState("");
+  // Offered with the "Deactivated …" message; reactivating is the existing reverse action (#1455).
+  const [undoDeactivate, setUndoDeactivate] = useState<RosterMemberRecord | null>(null);
+  const [undoFailed, setUndoFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
+  const [guardiansFrom, setGuardiansFrom] = useState(initialGuardians);
+  if (guardiansFrom !== initialGuardians) {
+    setGuardiansFrom(initialGuardians);
+    setGuardianMap(initialGuardians);
+  }
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
+  const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember, clearField: clearMemberField } = useFormErrorSummary();
   const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
   const contactsOnlyDialog = guardiansOnly && readOnly;
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
@@ -236,11 +269,17 @@ export function ClubRosterWorkspace({
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/roster`;
   /** Reads and contact saves name the year on next year's roster, so the server answers for that year (#959). */
   const yearQuery = contactsOnlyDialog ? `?year=${encodeURIComponent(clubYear)}` : "";
+  /** The editor's values differ from the loaded ones (#1452); read from the form on each edit, since its fields are not controlled. */
+  const [dialogDirty, setDialogDirty] = useState(false);
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
+    setDialogDirty(false);
     setEditing(null);
-  }, []);
+    clearMember();
+  }, [clearMember]);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
+  // Escape and Close keep their own "Discard unsaved changes?"; this adds the warning for links, Back and reload while the editor is open and changed.
+  useUnsavedChangesGuard(dialogOpen && dialogDirty, "You have unsaved changes to this roster member. Leave this page and discard them?");
   const formRef = useRef<HTMLFormElement>(null);
   const baselineRef = useRef<RosterFormSnapshot | null>(null);
   const savingRef = useRef(false);
@@ -258,6 +297,7 @@ export function ClubRosterWorkspace({
     const form = formRef.current;
     if (!dialogOpen || !form || !baselineRef.current) return;
     baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
+    setDialogDirty(rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form))));
   }, [guardianRev, dialogOpen]);
   const editorIsDirty = useCallback(() => {
     const form = formRef.current;
@@ -290,6 +330,8 @@ export function ClubRosterWorkspace({
 
   /** Add and edit happen in a pop-up (#383), so the list never scrolls away. */
   function openDialog(member: RosterMemberRecord | null) {
+    setUndoDeactivate(null);
+    setUndoFailed(false);
     setEditing(member);
     setFormType(member?.attendeeType ?? "YOUTH");
     setFormBirthDate("");
@@ -297,6 +339,7 @@ export function ClubRosterWorkspace({
     setError("");
     setFieldErrors({});
     setGuardianErrors({});
+    setDialogDirty(false);
     setDialogOpen(true);
     // Re-read this member's guardians as the dialog opens, so a page left open
     // can't save over a co-leader's newer edit (#510). Until the answer is
@@ -304,7 +347,7 @@ export function ClubRosterWorkspace({
     const token = ++guardianLoadToken.current;
     if (canEditGuardians && member) {
       setGuardianState("loading");
-      fetch(`${base}${yearQuery}`)
+      fetch(`${base}${yearQuery}`, { cache: "no-store" })
         .then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) as RosterResponse }))
         .then(({ ok, body }) => {
           if (token !== guardianLoadToken.current) return;
@@ -463,9 +506,27 @@ export function ClubRosterWorkspace({
   /** Where focus goes when the row it was on leaves the list (saved out of the filter, removed): the next row's Edit, else the result line. */
   const focusRequest = useRef<{ id: string; order: string[] } | null>(null);
   const [focusTick, setFocusTick] = useState(0);
+  // After a result message, the message (or its Undo) takes focus and scrolls into view; a row Edit button only when there is none.
+  const messageWanted = useRef(false);
+  const messageSlot = useRef<HTMLDivElement>(null);
+  const [messageTick, setMessageTick] = useState(0);
   useEffect(() => {
+    if (dialogOpen) return;
+    if (messageWanted.current) {
+      messageWanted.current = false;
+      focusRequest.current = null;
+      window.requestAnimationFrame(() => {
+        const slot = messageSlot.current;
+        if (!slot) return;
+        const target = slot.querySelector<HTMLElement>("button") ?? slot;
+        // Scrolls only as far as needed, with no smooth motion, so reduced-motion settings are respected.
+        target.focus();
+        slot.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+      });
+      return;
+    }
     const request = focusRequest.current;
-    if (!request || dialogOpen) return;
+    if (!request) return;
     focusRequest.current = null;
     window.requestAnimationFrame(() => {
       const at = request.order.indexOf(request.id);
@@ -480,7 +541,7 @@ export function ClubRosterWorkspace({
       }
       document.getElementById("roster-result-text")?.focus();
     });
-  }, [focusTick, dialogOpen]);
+  }, [focusTick, messageTick, dialogOpen]);
   /** After a change to one person: if they no longer belong in the filtered list, say so and keep focus on the page, not on a row that is gone. */
   function rowChanged(member: RosterMemberRecord, updated: RosterMemberRecord[] | undefined, lead: string, explain: boolean) {
     if (!updated) return;
@@ -502,10 +563,16 @@ export function ClubRosterWorkspace({
     setNotice(`${lead} ${name} ${reason}`);
   }
 
-  async function call(url: string, method: string, body: unknown, success: string) {
+  async function call(url: string, method: string, body: unknown, success: string, keepMessage = false) {
     setSaving(true);
     setError("");
-    setNotice("");
+    setConnectionLost(false);
+    // Undo keeps its message on screen (showing "Undoing…") until the answer comes back.
+    if (!keepMessage) {
+      setNotice("");
+      setUndoDeactivate(null);
+      setUndoFailed(false);
+    }
     try {
       const response = await fetch(url, {
         method,
@@ -518,10 +585,18 @@ export function ClubRosterWorkspace({
       }
       if (result.members) setMembers(result.members);
       if (result.guardians) setGuardianMap(result.guardians);
-      if (success) setNotice(success);
+      if (success) {
+        setNotice(success);
+      }
       return result;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The roster could not be updated.");
+      if (caught instanceof TypeError) {
+        // fetch rejects with a TypeError when the request is blocked or the connection drops (#1445).
+        setConnectionLost(true);
+        setError(notSavedMessage("the connection was lost or blocked. Reload to see the current list, then try again."));
+      } else {
+        setError(notSavedMessage(caught instanceof Error ? caught.message : "The roster could not be updated."));
+      }
       return null;
     } finally {
       setSaving(false);
@@ -563,17 +638,18 @@ export function ClubRosterWorkspace({
       : null;
     const guardianProblems = guardianSlots ? validateGuardianForm(guardianSlots, (editing ? guardianMap?.[editing.id] : undefined) ?? []) : {};
     setGuardianErrors(guardianProblems);
-    const firstInvalid = rosterFormFieldOrder.find((field) => errors[field]);
-    if (firstInvalid) {
-      const target = firstInvalid === "birthDate" ? "birthDateText" : firstInvalid;
-      (formElement.elements.namedItem(target) as HTMLElement | null)?.focus();
+    const memberProblems = [
+      ...rosterFormFieldOrder.filter((field) => errors[field]).map((field) => ({
+        targetId: field === "birthDate" ? "birthDate-input" : `roster-${field}`,
+        message: summaryMessage(rosterFieldLabels[field], errors[field] as string),
+      })),
+      ...guardianErrorItems(guardianProblems),
+    ];
+    if (memberProblems.length > 0) {
+      showMember(memberProblems);
       return;
     }
-    const firstGuardianProblem = Object.keys(guardianProblems)[0];
-    if (firstGuardianProblem) {
-      (formElement.elements.namedItem(firstGuardianProblem) as HTMLElement | null)?.focus();
-      return;
-    }
+    clearMember();
     const details = {
       firstName: String(form.get("firstName") ?? ""),
       lastName: String(form.get("lastName") ?? ""),
@@ -587,9 +663,9 @@ export function ClubRosterWorkspace({
       ? await call(`${base}/${encodeURIComponent(editing.id)}`, "PATCH", {
         ...details,
         ...(birthDate ? { birthDate } : {}),
-      }, "Saved.")
+      }, savedMessage())
       : await call(base, "POST", { ...details, birthDate }, "Added to the roster. Next: they can be chosen when the club registers for an event.");
-    if (editing) rowChanged(editing, result?.members, "Saved.", true);
+    if (editing) rowChanged(editing, result?.members, savedMessage(), true);
     if (result) {
       setBirthDates(null);
       formElement.reset();
@@ -614,18 +690,29 @@ export function ClubRosterWorkspace({
     }));
     const problems = validateGuardianForm(slots, guardianMap?.[editing.id] ?? []);
     setGuardianErrors(problems);
-    const firstProblem = Object.keys(problems)[0];
-    if (firstProblem) {
-      (formElement.elements.namedItem(firstProblem) as HTMLElement | null)?.focus();
+    const contactProblems = guardianErrorItems(problems);
+    if (contactProblems.length > 0) {
+      showMember(contactProblems);
       return;
     }
-    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, "Saved.");
+    clearMember();
+    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, savedMessage());
     if (result) closeDialog();
   }
 
-  async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE") {
+  async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE", keepMessage = false) {
     return call(`${base}/${encodeURIComponent(member.id)}`, "PATCH", { status },
-      status === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.");
+      status === "INACTIVE" ? `Deactivated ${member.firstName} ${member.lastName}.` : `Reactivated ${member.firstName} ${member.lastName}.`, keepMessage);
+  }
+
+  /** Undo for a deactivation: the same reactivate call the dialog already makes. */
+  async function undoStatusChange(member: RosterMemberRecord) {
+    const result = await setStatus(member, "ACTIVE", true);
+    if (result) setUndoDeactivate(null);
+    // A failure keeps Undo on offer (next to this error only) so it can be tried again; either way the message takes focus.
+    setUndoFailed(!result);
+    messageWanted.current = true;
+    setMessageTick((tick) => tick + 1);
   }
 
   /** Deactivate/reactivate lives in the edit dialog now (#424), with a confirmation there. */
@@ -647,7 +734,13 @@ export function ClubRosterWorkspace({
     });
     if (!confirmed) return;
     const result = await setStatus(member, next);
-    rowChanged(member, result?.members, next === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.", true);
+    rowChanged(member, result?.members, next === "INACTIVE" ? "Deactivated." : "Reactivated.", true);
+    if (result && next === "INACTIVE") {
+      setUndoDeactivate(member);
+      // Undo is on offer, so the message takes focus and scrolls into view; other saves keep the Edit-button focus path.
+      messageWanted.current = true;
+      setMessageTick((tick) => tick + 1);
+    }
     if (result) closeDialog();
   }
 
@@ -673,17 +766,25 @@ export function ClubRosterWorkspace({
   return (
     <div className="club-roster-stack">
       {confirmDialog}
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
+      {/* The page's one message slot; while the dialog is open its own slot (inside the dialog) shows errors. */}
+      <div id="roster-message-slot" ref={messageSlot} tabIndex={-1}>
+        {error && !dialogOpen
+          ? <FormMessage message={error} tone="error" undo={undoDeactivate && undoFailed ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+          : notice
+            ? <FormMessage message={notice} tone="success" undo={undoDeactivate ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+            : null}
+        {/* A blocked or dropped request: the list on screen may be out of date, so offer Reload in the same slot (#1445). */}
+        {error && !dialogOpen && connectionLost && <ReloadButton />}
+      </div>
 
       <section className="public-manage-card">
         <div className="public-manage-card-heading club-roster-heading">
           <div>
-            <p className="public-registration-eyebrow">Club year {clubYear}</p>
+            <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
             <h2 id="club-roster-heading">Roster</h2>
           </div>
           <div className="club-roster-heading-actions">
-            <span className="count-badge">{active.length} active</span>
+            <span className="count-badge">{`${active.length} active`}</span>
             {!readOnly && (
               <button className="primary-button" disabled={saving} onClick={() => openDialog(null)} type="button">
                 <Plus aria-hidden="true" size={16} /> Add to roster
@@ -751,7 +852,7 @@ export function ClubRosterWorkspace({
           </p>
           <div className={styles.rosterResultLine}>
             <p id="roster-result-text" tabIndex={-1}>
-              <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
+              <strong>{`${visible.length} of ${population.length}`}</strong> {population.length === 1 ? "person" : "people"} shown
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
             {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
@@ -901,16 +1002,16 @@ export function ClubRosterWorkspace({
                                 case "name": return (
                                   <td className="roster-card-name" data-label="Name" key={column}>
                                     <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className={styles.rosterMemberRole} translate="no">{`Role: ${member.role}`}</span>}
+                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${member.role}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
-                                        Class history<span className="sr-only"> for {label}</span>
+                                        Class history<span className="sr-only">{` for ${label}`}</span>
                                       </Link>
                                     )}
                                   </td>
                                 );
                                 case "age": return (
-                                  <td data-label="Age" key={column} translate="no">
+                                  <td data-label="Age" key={column}>
                                     {member.age ?? (member.reportedAge !== null ? `${member.reportedAge} (reported)` : "—")}
                                   </td>
                                 );
@@ -1024,10 +1125,16 @@ export function ClubRosterWorkspace({
         className="form-stack"
         key={editing?.id ?? "new"}
         noValidate
+        // Adding or removing a contact changes the form without an input event, so look again after any click once it has rendered.
+        onClick={() => window.requestAnimationFrame(() => setDialogDirty(editorIsDirty()))}
         onInput={(event) => {
+          setDialogDirty(editorIsDirty());
           const name = (event.target as HTMLInputElement).name;
           const field = (name === "birthDateText" ? "birthDate" : name) as RosterFormField;
           setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+          // The changed field's summary item goes with its message (the summary hides when it empties).
+          clearMemberField((event.target as HTMLElement).id);
+          if (name in guardianErrors) setGuardianErrors((current) => ({ ...current, [name]: undefined }));
         }}
         onSubmit={save}
       >
@@ -1040,20 +1147,20 @@ export function ClubRosterWorkspace({
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        {memberItems.length > 0 && <FormErrorSummary items={memberItems} ref={memberRef} />}
         {contactsOnlyDialog ? (
           <p className="field-help">Next year&apos;s roster. Only emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
         ) : (
         <div className="form-grid two-column">
           <label>
             First name
-            <input aria-describedby={fieldErrors.firstName ? "roster-firstName-error" : undefined} aria-invalid={fieldErrors.firstName ? true : undefined} autoComplete="off" defaultValue={editing?.firstName ?? ""} maxLength={80} name="firstName" required />
-            {fieldErrors.firstName && <span className="roster-field-error" id="roster-firstName-error" role="alert">{fieldErrors.firstName}</span>}
+            <input {...fieldErrorProps("roster-firstName-error", fieldErrors.firstName)} autoComplete="off" defaultValue={editing?.firstName ?? ""} id="roster-firstName" maxLength={80} name="firstName" required />
+            <FieldError id="roster-firstName-error">{fieldErrors.firstName}</FieldError>
           </label>
           <label>
             Last name
-            <input aria-describedby={fieldErrors.lastName ? "roster-lastName-error" : undefined} aria-invalid={fieldErrors.lastName ? true : undefined} autoComplete="off" defaultValue={editing?.lastName ?? ""} maxLength={80} name="lastName" required />
-            {fieldErrors.lastName && <span className="roster-field-error" id="roster-lastName-error" role="alert">{fieldErrors.lastName}</span>}
+            <input {...fieldErrorProps("roster-lastName-error", fieldErrors.lastName)} autoComplete="off" defaultValue={editing?.lastName ?? ""} id="roster-lastName" maxLength={80} name="lastName" required />
+            <FieldError id="roster-lastName-error">{fieldErrors.lastName}</FieldError>
           </label>
           <BirthDateField
             defaultValue={editing && birthDates ? birthDates[editing.id] ?? "" : ""}
@@ -1091,13 +1198,13 @@ export function ClubRosterWorkspace({
           </label>
           <label>
             Gender
-            <select aria-describedby={fieldErrors.gender ? "roster-gender-error" : undefined} aria-invalid={fieldErrors.gender ? true : undefined} defaultValue={editing?.gender ?? ""} name="gender" required>
+            <select {...fieldErrorProps("roster-gender-error", fieldErrors.gender)} defaultValue={editing?.gender ?? ""} id="roster-gender" name="gender" required>
               <option disabled value="">Choose one</option>
               {Object.entries(clubRosterGenderLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            {fieldErrors.gender && <span className="roster-field-error" id="roster-gender-error" role="alert">{fieldErrors.gender}</span>}
+            <FieldError id="roster-gender-error">{fieldErrors.gender}</FieldError>
           </label>
         </div>
         )}
@@ -1127,6 +1234,13 @@ export function ClubRosterWorkspace({
           <button className="secondary-button" disabled={saving} onClick={() => void requestClose()} type="button">Cancel</button>
           <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? (contactsOnlyDialog ? "Save contacts" : "Save") : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
+        {error && <FormMessage message={error} tone="error" />}
+        {/* A blocked save: Reload sits right under the dialog's message, scrolled into view and focused (#1445). */}
+        {error && connectionLost && (
+          <div ref={dialogNoticeRef} tabIndex={-1}>
+            <ReloadButton />
+          </div>
+        )}
       </form>
       </section>
         </div>
@@ -1140,5 +1254,14 @@ export function ClubRosterWorkspace({
         />
       )}
     </div>
+  );
+}
+
+/** The roster is a live list (rule P2, #1445): if it breaks, a message and a Reload button replace it, never a blank or stale list. */
+export function ClubRosterWorkspace(props: ComponentProps<typeof ClubRosterWorkspaceInner>) {
+  return (
+    <LiveListBoundary listName="roster">
+      <ClubRosterWorkspaceInner {...props} />
+    </LiveListBoundary>
   );
 }

@@ -4,6 +4,7 @@ import {
 } from "@/modules/forms/definition";
 import { resolveFieldOffer, sectionTitleLookup } from "@/modules/forms/field-flags";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Find and list registrations by the answer to a structured choice question
@@ -242,11 +243,11 @@ function answersOf(registration: RegistrationRecord, question: ChoiceQuestion): 
     return { attendeeId, personName, known, hasOther: values.some((value) => !offered.has(value)) };
   };
   if (question.scope === "REGISTRATION") {
-    const name = `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`.trim();
+    const name = formatPersonName(registration.accountHolder);
     return [read(null, name, registration.publicSubmission?.responses?.[question.key])];
   }
   return registration.attendees.map((attendee, index) => (
-    read(attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim(), attendeeAnswerRecord(registration, index)[question.key])
+    read(attendee.id, formatPersonName(attendee), attendeeAnswerRecord(registration, index)[question.key])
   ));
 }
 
@@ -363,7 +364,7 @@ export function choiceExportRows(
     rows.push([
       match.confirmationCode,
       match.personName,
-      `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`.trim(),
+      formatPersonName(registration.accountHolder),
       registration.accountHolder.email,
       registration.status,
       filter.question.label,
