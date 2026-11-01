@@ -15,12 +15,18 @@ export const SECURITY_CHECK_LABEL = "Security check";
 export const SECURITY_CHECK_FAILED_TEXT =
   "The security check didn't go through. Press Try again in the box. If it keeps failing, turn off a VPN or ad blocker, or contact the conference office.";
 
+/** The words when the check's script is blocked or the check can't start (#1445): a blocker, VPN or privacy setting. */
+export const SECURITY_CHECK_BLOCKED_TEXT =
+  "The security check could not load. A browser privacy setting, ad blocker or VPN may be blocking it. Turn it off for this site, then press Try again. Your answers are still here.";
+export const SECURITY_CHECK_RETRY_LABEL = "Try again";
+
 /** The words under the box when Submit was pressed before a token existed. `buttonWord` is the form's own button. */
 export function securityCheckMissingText(buttonWord: string) {
   return `Finish the security check above, then press ${buttonWord} again. Your answers are still here.`;
 }
 
 const SCRIPT_ID = "cf-turnstile-api";
+const SCRIPT_TIMEOUT_MS = 15_000;
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
 /** Any response body: only `code` and `error` are read. */
@@ -68,8 +74,23 @@ function loadTurnstile(nonce: string | undefined): Promise<TurnstileApi> {
   scriptPromise = new Promise<TurnstileApi>((resolve, reject) => {
     const existing = document.getElementById(SCRIPT_ID);
     const script = existing ?? document.createElement("script");
-    const onLoad = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error("Turnstile did not load")));
+    // Some blockers hold the request open instead of refusing it: give up after a while so the person sees the message.
+    const giveUp = window.setTimeout(() => {
+      if (window.turnstile) return;
+      scriptPromise = null;
+      script.remove();
+      reject(new Error("Turnstile took too long to load"));
+    }, SCRIPT_TIMEOUT_MS);
+    const onLoad = () => {
+      window.clearTimeout(giveUp);
+      if (window.turnstile) resolve(window.turnstile);
+      else {
+        scriptPromise = null;
+        reject(new Error("Turnstile did not load"));
+      }
+    };
     const onError = () => {
+      window.clearTimeout(giveUp);
       scriptPromise = null;
       script.remove();
       reject(new Error("Turnstile could not be loaded"));
@@ -111,6 +132,8 @@ export function SecurityCheck({
   const widgetId = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
+  // Bumped by Try again: the effect below tears the widget down and loads the script and the box again.
+  const [attempt, setAttempt] = useState(0);
   const siteKey = config?.siteKey ?? null;
   const nonce = config?.nonce;
 
@@ -151,6 +174,10 @@ export function SecurityCheck({
           tokenRef.current = null;
           setMessage(SECURITY_CHECK_FAILED_TEXT);
         },
+        "unsupported-callback": () => {
+          tokenRef.current = null;
+          setMessage(SECURITY_CHECK_BLOCKED_TEXT);
+        },
         "expired-callback": () => {
           tokenRef.current = null;
         },
@@ -159,7 +186,7 @@ export function SecurityCheck({
         },
       });
     }).catch(() => {
-      if (!cancelled) setMessage(SECURITY_CHECK_FAILED_TEXT);
+      if (!cancelled) setMessage(SECURITY_CHECK_BLOCKED_TEXT);
     });
     return () => {
       cancelled = true;
@@ -167,15 +194,30 @@ export function SecurityCheck({
       if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current);
       widgetId.current = null;
     };
-  }, [siteKey, nonce, action]);
+  }, [siteKey, nonce, action, attempt]);
 
   if (!siteKey) return null;
+
+  const failed = message === SECURITY_CHECK_FAILED_TEXT || message === SECURITY_CHECK_BLOCKED_TEXT;
 
   return (
     <section className={styles.securityCheck} ref={groupRef} role="group" aria-labelledby={labelId} data-testid="security-check">
       <p className={styles.label} id={labelId}>{SECURITY_CHECK_LABEL}</p>
       <div className={styles.box} ref={containerRef} />
       <div className={styles.message} role="alert">{message}</div>
+      {failed && (
+        <button
+          className={`secondary-button ${styles.retry}`}
+          data-testid="security-check-retry"
+          onClick={() => {
+            setMessage("");
+            setAttempt((current) => current + 1);
+          }}
+          type="button"
+        >
+          {SECURITY_CHECK_RETRY_LABEL}
+        </button>
+      )}
     </section>
   );
 }

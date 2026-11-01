@@ -33,3 +33,8 @@
   color: #8f3a30;
   font-weight: 600;
 }
+
+.retry {
+  justify-self: start;
+  margin-top: 8px;
+}
