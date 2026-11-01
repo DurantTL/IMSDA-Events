@@ -190,3 +190,27 @@ Amazon SES reports deliveries, bounces and complaints through an SNS topic that 
 - **Suppression (Caleb's decision).** A hard (permanent) bounce or a complaint writes an `EmailAddressSuppression` row (normalized address) and stops ALL email to it. A soft bounce is recorded only. `effective-delivery.ts` owns the decision (`checkRecipientDeliverable`); the one delivery worker applies it right before the provider call (and again after the body is prepared), fails closed, and ends the message `SUPPRESSED` with a reason and an audit row (ids and the reason, never the address). Only a system administrator can re-enable an address (`reenableSuppressedAddress`, audited, same-origin only); an event that happened before the re-enable can never switch it back on.
 - **What staff see.** "Not sending: bounced" or "Not sending: complaint" on the registration (contact and attendee), and the list with Re-enable under System management > Email > Email health.
 - **Privacy.** Stored payloads, logs and audit entries hold ids and counts only. The address lives only on the suppression row.
+
+## The shared email layout (#1443)
+
+Every email the site sends is wrapped by `email-layout.ts`: a navy header bar with the gold mark and a header name, a white
+message card, and a footer (who sent it, why the person got it, how to get help). `renderEmailHtmlDocument` in `email-html.ts`
+only delegates to it, and `tests/email-layout-guard-1443.test.ts` fails if a second place writes an email document. The layout
+wraps the body fragment as it is and never touches the escaping in `email-html.ts`; every value it adds is escaped by it.
+
+- **Header context.** `EMAIL_HEADER_RULES` maps every `MessageTemplateKey` to `club`, `general` or `registration-dependent`
+  (club when the registration belongs to a club). TypeScript fails when a key is added without a decision, and so does the
+  guard test. `EMAIL_WHY_LINES` is the same for the "why you got this" sentence.
+- **Settings.** Platform settings -> "Email header and footer" holds the two header names and the footer help contact
+  (`PlatformSettings.emailHeaderName`, `emailClubHeaderName`, `emailHelpEmail`, `emailHelpPhone`). A delivery run reads them
+  once. Event and registration email keep the event's own contact (its reply-to); a cleared help contact says "Reply to this
+  email for help" only when a reply-to is set, and otherwise leaves the line out.
+- **Text-only messages.** A row with no stored HTML (account email, club role notices and the like) gets its formatted part
+  from `plainTextToEmailBodyHtml`, which reads plain text only (never Markdown) and makes a button only for an address on the
+  site's own origin.
+- **The sign-in code box.** `prepareSignInCodeForDelivery` returns the minted code as `codeBox`; the layout draws it in place
+  of the paragraph that is exactly that code, and refuses anything but letters, digits and spaces. The code is never stored
+  and never in the subject.
+- **Dark mode.** Colors are inline (light); a `<style>` block in the head restyles through classes for clients that honor
+  `prefers-color-scheme`. The mockup's palettes are in `EMAIL_PALETTE`. Saved HTML for the four mockup emails is in
+  `tests/__snapshots__/email-layout-1443/`.

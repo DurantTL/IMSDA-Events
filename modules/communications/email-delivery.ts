@@ -32,7 +32,16 @@ import {
   REGISTRATION_MANAGE_API_SENTINEL,
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
-import { markdownToPlainText, renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { markdownToPlainText } from "@/modules/communications/email-html";
+import {
+  appendEmailPlainTextFooter,
+  emailIsClubLinked,
+  emailLayoutContent,
+  plainTextToEmailBodyHtml,
+  renderEmailLayoutDocument,
+} from "@/modules/communications/email-layout";
+import type { EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
+import { loadEmailLayoutSettings } from "@/modules/communications/email-layout-settings";
 import { checkRecipientDeliverable, loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import {
   AccountEmailNotConfiguredError,
@@ -127,6 +136,8 @@ export type ExternalEmailDeliveryDependencies = {
   /** The opaque unsubscribe token for an announcement's recipient (#838); the default records it in the database. */
   issueUnsubscribeToken?: (email: string, eventId: string) => Promise<string>;
   prepareBodyText?: (input: EmailBodyPreparationInput) => Promise<PreparedEmailBody>;
+  /** The header names and footer help contact (#1443). The default reads Platform settings once per run. */
+  emailLayoutSettings?: EmailLayoutSettings;
   /** How stored files and pass images are read for embedding (#824); the defaults read private storage and render in-process. */
   emailParts?: Partial<EmailPartDependencies>;
 };
@@ -153,6 +164,7 @@ type ClaimedMessage = {
   accountAttendeeId: string | null;
   templateKey: string;
   registrationId: string | null;
+  recipientKind?: string;
   recipientEmail: string;
   senderNameSnapshot: string;
   senderEmailSnapshot: string | null;
@@ -168,6 +180,8 @@ type ClaimedMessage = {
   attachment?: { filename: string; contentType: string; sha256: string; content: Uint8Array } | null;
   /** The files staff attached and the images embedded in the body (#824), from the outbox row's own references. */
   files?: DeliveryFileLink[];
+  /** Only to tell a club registration (which gets the club header, #1443) from any other registration. */
+  registration?: { clubRegistration?: { id: string } | null } | null;
   attemptCount: number;
   lockToken: string;
   startedAt: Date;
@@ -176,6 +190,11 @@ type ClaimedMessage = {
 export type PreparedEmailBody = {
   bodyText: string;
   bodyHtml?: string | null;
+  /**
+   * A server-generated code to show large in a box (the sign-in code, #1443). `code` must also be the paragraph in
+   * `bodyText` that holds it; the layout swaps that paragraph for the box. Never read from stored content.
+   */
+  codeBox?: { code: string; caption: string };
   revokeOnDefinitiveFailure?: () => Promise<void>;
 };
 
@@ -870,6 +889,7 @@ async function claimNextMessage(
           accountAttendeeId: true,
           templateKey: true,
           registrationId: true,
+          recipientKind: true,
           recipientEmail: true,
           senderNameSnapshot: true,
           senderEmailSnapshot: true,
@@ -880,6 +900,7 @@ async function claimNextMessage(
           preheaderSnapshot: true,
           metadata: true,
           attachment: { select: { filename: true, contentType: true, sha256: true, content: true } },
+          registration: { select: { clubRegistration: { select: { id: true } } } },
           files: {
             orderBy: [{ disposition: "asc" }, { position: "asc" }],
             select: {
@@ -1158,6 +1179,19 @@ async function retireUndeliveredLinks(prisma: DeliveryPrisma, message: ClaimedMe
   }
 }
 
+/**
+ * The site's own origin, the only one a plain-text link may become a button for (#1443). Read from the environment
+ * directly, as `getServerEnv` would, because that function caches the whole environment on first use and a delivery
+ * run must not be the thing that freezes it.
+ */
+function siteOrigins() {
+  try {
+    return [new URL(process.env.APP_BASE_URL || "http://localhost:3000").origin];
+  } catch {
+    return [];
+  }
+}
+
 async function runDeliveryLoop(
   scope: OutboxScope,
   options: {
@@ -1211,6 +1245,8 @@ async function runDeliveryLoop(
     ? (await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { defaultSenderEmail: true } }))
       ?.defaultSenderEmail?.trim() || null
     : null;
+  // The header names and help contact (#1443), read once for the whole run, not per message.
+  const layoutSettings = dependencies.emailLayoutSettings ?? await loadEmailLayoutSettings(prisma);
   const uniqueMessageIds = options.messageIds
     ? [...new Set(options.messageIds)]
     : undefined;
@@ -1354,32 +1390,49 @@ async function runDeliveryLoop(
       }
       // Announcements carry an unsubscribe link in the body and the one-click headers (#838).
       const unsubscribe = await announcementUnsubscribeLinks(message, announcementPolicy);
+      const layout = emailLayoutContent({
+        templateKey: message.templateKey,
+        settings: layoutSettings,
+        // A club registration, or an invoice sent to a club director (an invoice row has no registration).
+        clubRegistration: emailIsClubLinked({ clubRegistration: Boolean(message.registration?.clubRegistration), recipientKind: message.recipientKind }),
+        recipientEmail: message.recipientEmail,
+        replyToEmail: message.replyToEmailSnapshot,
+        eventScoped: message.eventId !== null,
+      });
+      // Only a row with an HTML snapshot is flattened; a pre-HTML text-only row goes out word for word. Every text part
+      // ends with the same footer block as the HTML (#1443), continuing the unsubscribe block when there is one.
+      const bodyTextForSend = appendEmailPlainTextFooter(
+        (parts.bodyHtml ? markdownToPlainText : (text: string) => text)(unsubscribe
+          ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
+          : preparedBody.bodyText),
+        layout,
+        { separator: !unsubscribe },
+      );
       const emailInput: EmailDeliveryInput = {
         fromName: message.senderNameSnapshot,
         fromEmail: centralFromEmail ?? message.senderEmailSnapshot ?? "",
         toEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         subject: message.subjectSnapshot,
-        // Only a row with an HTML snapshot is flattened; a pre-HTML text-only row goes out word for word.
-        bodyText: (parts.bodyHtml ? markdownToPlainText : (text: string) => text)(unsubscribe
-          ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
-          : preparedBody.bodyText),
+        bodyText: bodyTextForSend,
         listUnsubscribe: unsubscribe?.oneClickUrl ? { url: unsubscribe.oneClickUrl } : null,
-        // Wrapped, not rendered: the body fragment was rendered at enqueue from
-        // the same template and context as the text snapshot, where trusted and
-        // untrusted token spans were still distinguishable. A row queued before
-        // HTML bodies existed has none, and goes out as text only rather than
-        // being re-parsed as Markdown here.
-        bodyHtml: parts.bodyHtml
-          ? renderEmailHtmlDocument({
-            title: message.subjectSnapshot,
-            bodyHtml: parts.bodyHtml,
-            preheader: message.preheaderSnapshot,
-            footer: unsubscribe
-              ? `${message.senderNameSnapshot}\n\n[Unsubscribe or change your email preferences](${unsubscribe.pageUrl})`
-              : message.senderNameSnapshot,
-          })
-          : null,
+        // Wrapped in the one shared layout (#1443). A body fragment was rendered at enqueue from the same template and
+        // context as the text snapshot, where trusted and untrusted token spans were still distinguishable, so it is
+        // wrapped as it is. A row with no fragment (account email and other text-only messages) gets one made from its
+        // text as plain paragraphs, never as Markdown: nothing a person typed can become markup, and only the site's
+        // own addresses become links or buttons.
+        bodyHtml: renderEmailLayoutDocument({
+          title: message.subjectSnapshot,
+          bodyHtml: parts.bodyHtml ?? plainTextToEmailBodyHtml(preparedBody.bodyText, {
+            codeBox: preparedBody.codeBox,
+            buttonOrigins: siteOrigins(),
+          }),
+          preheader: message.preheaderSnapshot,
+          headerName: layout.headerName,
+          whyLine: layout.whyLine,
+          helpLine: layout.helpLine,
+          unsubscribeUrl: unsubscribe?.pageUrl ?? null,
+        }),
         attachments: message.attachment || parts.attachments.length > 0
           ? [
               ...(message.attachment

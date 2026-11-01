@@ -1602,6 +1602,12 @@ model PlatformSettings {
   /// Not `supportContact`, which is the internal alert inbox.
   publicHelpPhone           String?
   publicHelpEmail           String?
+  /// The header name in every email (#1443): one for event and general email, one for club email. Never blank.
+  emailHeaderName           String             @default("IMSDA Events")
+  emailClubHeaderName       String             @default("IMSDA Events")
+  /// The footer help contact of system and club email (#1443). Defaults are the conference office; cleared (null) leaves the help part out.
+  emailHelpEmail            String?            @default("support@imsda.org")
+  emailHelpPhone            String?            @default("(515) 223-1197")
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.

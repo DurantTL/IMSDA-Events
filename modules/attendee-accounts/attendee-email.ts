@@ -196,7 +196,11 @@ function signInCodeBody() {
       "",
       SIGN_IN_CODE_DISPLAY_SENTINEL,
       "",
-      `It works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes. If you didn't try to sign in, change your password. Someone may know it.`,
+      `It works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes. Don't share this code with anyone. IMSDA staff will never ask for it.`,
+      "",
+      // Two lines on purpose: the layout shows a short title over more text as a note box.
+      "Didn't try to sign in?",
+      "Change your password. Someone may know it. You can ignore this code; it stops working on its own.",
       "",
       "IMSDA Events",
     ].join("\n"),
@@ -296,7 +300,7 @@ async function prepareSignInCodeForDelivery(input: {
   accountAttendeeId: string | null;
   bodyText: string;
   now: Date;
-}): Promise<{ bodyText: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+}): Promise<{ bodyText: string; codeBox: { code: string; caption: string }; revokeOnDefinitiveFailure?: () => Promise<void> }> {
   if (!input.accountAttendeeId) {
     throw new Error("An attendee email cannot mint a code without an account.");
   }
@@ -322,8 +326,12 @@ async function prepareSignInCodeForDelivery(input: {
     // Superseded by a newer code, spent, or expired while queued: sending a code nothing will accept helps nobody.
     throw new Error("There is no live attendee code for this account to send.");
   }
+  const displayCode = spacedSignInCode(code);
   return {
-    bodyText: input.bodyText.replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, spacedSignInCode(code)),
+    bodyText: input.bodyText.replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, displayCode),
+    // The code shown large in a box (#1443): server-generated digits, so the layout can draw it without any escaping
+    // exception. The same spaced code is the paragraph of `bodyText` the box replaces.
+    codeBox: { code: displayCode, caption: `Works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes` },
     ...(reused
       ? {}
       : { revokeOnDefinitiveFailure: async () => { await revokeAttendeeSignInCode(hashOneTimeCode(code), input.now); } }),
@@ -342,7 +350,7 @@ export async function prepareAttendeeEmailBodyForDelivery(input: {
   templateKey: string;
   bodyText: string;
   now: Date;
-}): Promise<{ bodyText: string; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+}): Promise<{ bodyText: string; codeBox?: { code: string; caption: string }; revokeOnDefinitiveFailure?: () => Promise<void> }> {
   if (input.templateKey === "ATTENDEE_SIGN_IN_CODE") return prepareSignInCodeForDelivery(input);
   const reset = input.templateKey === "ATTENDEE_PASSWORD_RESET";
   const edit = input.templateKey === "ATTENDEE_EDIT_VERIFICATION";

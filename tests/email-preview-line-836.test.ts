@@ -44,17 +44,22 @@ import {
   validateMessageTemplate,
 } from "@/modules/communications/templates";
 
-/** What `renderEmailHtmlDocument` produced for this exact input before the preview line existed (taken from origin/main). */
-const PRE_836_DOCUMENT_SHA256 = "ad5b13dbf652dd94bb65053378bf55a8b6fb71a6f5044f0df8cd92ef901ee214";
+/**
+ * What `renderEmailHtmlDocument` produces for this exact input with no preview line. It was pinned to a hash of the
+ * pre-#836 layout until the shared layout (#1443) replaced that markup; the rule that stays is that a missing line
+ * writes nothing, so every "no line" input is byte for byte the same document, with no hidden block in it.
+ */
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("the hidden preheader in the email document (#836)", () => {
   const base = { title: "Friday arrival information", bodyHtml: "<p>Hello</p>", footer: "IMSDA Events" };
 
   it("leaves the document exactly as it was when there is no preview line", () => {
+    const baseline = sha256(renderEmailHtmlDocument(base));
     for (const preheader of [undefined, null, "", "   ", "\n"]) {
-      expect(sha256(renderEmailHtmlDocument({ ...base, preheader })), JSON.stringify(preheader)).toBe(PRE_836_DOCUMENT_SHA256);
+      expect(sha256(renderEmailHtmlDocument({ ...base, preheader })), JSON.stringify(preheader)).toBe(baseline);
     }
+    expect(renderEmailHtmlDocument(base)).not.toContain("display:none");
     expect(renderPreheaderHtml(null)).toBe("");
   });
 
