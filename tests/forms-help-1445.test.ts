@@ -17,9 +17,9 @@ let mounted: Mounted | null = null;
 
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get() {
-    // jsdom has no layout: say everything takes up room, except content inside a closed <details> (as in a browser).
-    const details = this.closest("details");
-    return details && !details.open && this.tagName !== "SUMMARY" ? null : this.parentNode;
+    // jsdom has no layout: say everything takes up room. Like Chromium, content inside a closed <details> still has an
+    // offsetParent, so the hook itself must skip it (#1445 review).
+    return this.parentNode;
   } });
   HTMLElement.prototype.getClientRects = function getClientRects() { return [{}] as unknown as DOMRectList; };
 });
@@ -98,6 +98,9 @@ describe("Forms help placements", () => {
   it("is wired into the registration page, form, sign-in and login", () => {
     expect(readFileSync("app/(public)/register/[eventSlug]/[formSlug]/page.tsx", "utf8")).toContain("formsHelpContact={formsHelpContact}");
     expect(readFileSync("components/public-registration-form.tsx", "utf8").match(/<FormsHelpRow/g)).toHaveLength(2);
+    // The link under Submit sits after the navy submit card, not inside it: navy text on navy is unreadable, and the card
+    // hides its own direct-child buttons on phones (#1445 review).
+    expect(readFileSync("components/public-registration-form.tsx", "utf8")).toMatch(/<\/section>\s*\{formsHelpContact && <FormsHelpRow contact=\{formsHelpContact\} \/>\}/);
     expect(readFileSync("app/sign-in/page.tsx", "utf8")).toContain("<FormsHelp");
     expect(readFileSync("app/login/page.tsx", "utf8")).toContain("<FormsHelp");
   });

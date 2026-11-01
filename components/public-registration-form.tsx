@@ -3708,7 +3708,7 @@ export function PublicRegistrationForm({
             <EventRefundPolicy policy={event.refundPolicy} headingLevel={3} />
           )}
 
-          {currentStep.isReview && (
+          {currentStep.isReview && (<>
             <section className="public-registration-submit-card">
               <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
@@ -3721,9 +3721,9 @@ export function PublicRegistrationForm({
                 submitting={submitting || submitQueued}
                 submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
-              {formsHelpContact && <FormsHelpRow contact={formsHelpContact} />}
             </section>
-          )}
+            {formsHelpContact && <FormsHelpRow contact={formsHelpContact} />}
+          </>)}
         </div>
 
         <aside className="public-registration-summary" aria-label="Order summary">
