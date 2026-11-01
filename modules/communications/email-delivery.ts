@@ -163,6 +163,7 @@ type ClaimedMessage = {
   accountAttendeeId: string | null;
   templateKey: string;
   registrationId: string | null;
+  recipientKind?: string;
   recipientEmail: string;
   senderNameSnapshot: string;
   senderEmailSnapshot: string | null;
@@ -887,6 +888,7 @@ async function claimNextMessage(
           accountAttendeeId: true,
           templateKey: true,
           registrationId: true,
+          recipientKind: true,
           recipientEmail: true,
           senderNameSnapshot: true,
           senderEmailSnapshot: true,
@@ -1390,7 +1392,8 @@ async function runDeliveryLoop(
       const layout = emailLayoutContent({
         templateKey: message.templateKey,
         settings: layoutSettings,
-        clubRegistration: Boolean(message.registration?.clubRegistration),
+        // A club registration, or an invoice sent to a club director (an invoice row has no registration).
+        clubRegistration: Boolean(message.registration?.clubRegistration) || message.recipientKind === "CLUB_DIRECTOR",
         recipientEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         eventScoped: message.eventId !== null,
@@ -1415,7 +1418,8 @@ async function runDeliveryLoop(
         // Wrapped in the one shared layout (#1443). A body fragment was rendered at enqueue from the same template and
         // context as the text snapshot, where trusted and untrusted token spans were still distinguishable, so it is
         // wrapped as it is. A row with no fragment (account email and other text-only messages) gets one made from its
-        // text as plain paragraphs, never as Markdown, so nothing a person typed can become a link or markup.
+        // text as plain paragraphs, never as Markdown: nothing a person typed can become markup, and only the site's
+        // own addresses become links or buttons.
         bodyHtml: renderEmailLayoutDocument({
           title: message.subjectSnapshot,
           bodyHtml: parts.bodyHtml ?? plainTextToEmailBodyHtml(preparedBody.bodyText, {

@@ -37,6 +37,7 @@ vi.mock("@/modules/attendee-accounts/sign-in-code-service", () => ({
 }));
 
 import { enqueueAttendeeEmail, prepareAttendeeEmailBodyForDelivery } from "@/modules/attendee-accounts/attendee-email";
+import { plainTextFromMessageSource } from "@/modules/communications/message-file-rules";
 import { markdownToPlainText, renderEmailBodyHtml } from "@/modules/communications/email-html";
 import {
   appendEmailPlainTextFooter,
@@ -45,6 +46,8 @@ import {
   renderEmailLayoutDocument,
 } from "@/modules/communications/email-layout";
 import { DEFAULT_EMAIL_LAYOUT_SETTINGS } from "@/modules/communications/email-layout-domain";
+import { CLUB_FORM_LINK_SENTINEL, clubFormLinkEmailContent } from "@/modules/club-forms/link-email";
+import { submittedEmailContent } from "@/modules/club-applications/email";
 import { clubRoleGivenEmail } from "@/modules/organizations/club-role-notice";
 
 const SITE = "https://events.example.org";
@@ -80,7 +83,7 @@ function build(input: {
       whyLine: layout.whyLine,
       helpLine: layout.helpLine,
     })}\n`,
-    text: appendEmailPlainTextFooter(input.bodyHtml ? markdownToPlainText(input.text) : input.text, layout),
+    text: appendEmailPlainTextFooter(input.bodyHtml ? markdownToPlainText(plainTextFromMessageSource(input.text)) : input.text, layout),
   };
 }
 
@@ -127,6 +130,24 @@ describe("saved snapshots of the four mockup emails (#1443)", () => {
     expect(built.html).toContain(`href="${SITE}/account/clubs/riverton"`);
     expect(built.text).toContain(`Open Riverton Pathfinders: ${SITE}/account/clubs/riverton`);
     await saveSnapshots("club-role-given", built);
+  });
+
+  it("club form link", async () => {
+    const content = clubFormLinkEmailContent({ clubName: "Riverton Pathfinders", formName: "Annual consent form", days: 7, expiresOn: "November 16, 2026" });
+    const text = content.bodyText.replace(CLUB_FORM_LINK_SENTINEL, `${SITE}/club-forms/synthetic-token`);
+    const built = build({ templateKey: "CLUB_FORM_LINK", subject: content.subject, text, recipientEmail: "director@example.org", replyToEmail: "help@example.org" });
+    expect(built.html).toContain("Button not working?");
+    expect(built.html).toContain(">Open your private link</a>");
+    await saveSnapshots("club-form-link", built);
+  });
+
+  it("new club application alert: the address on its own line becomes a button, not a note box", () => {
+    const content = submittedEmailContent({ applicationId: "app_1", clubName: "Riverton Pathfinders", churchName: "Riverton Church", directorName: "Morgan Reed" });
+    const built = build({ templateKey: "NEW_CLUB_APPLICATION_SUBMITTED", subject: content.subject, text: content.bodyText, recipientEmail: "office@example.org", replyToEmail: "help@example.org" });
+    expect(built.html).toContain("Button not working?");
+    expect(built.html).toContain(">Review it (sign-in required)</a>");
+    expect(built.html).toContain(`href="${SITE}/admin/clubs/applications"`);
+    expect(built.html).not.toContain('class="em-note"');
   });
 
   it("registration confirmation with a balance due", async () => {

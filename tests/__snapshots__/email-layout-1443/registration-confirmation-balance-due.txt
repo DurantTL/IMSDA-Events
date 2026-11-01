@@ -13,7 +13,7 @@ Your registration
 - Paid so far: $60.00 of $245.00
 - Balance due: $185.00
 
-View, pay, or edit your registration: https://events.example.org/r/WR27-4K8P{.button}
+View, pay, or edit your registration: https://events.example.org/r/WR27-4K8P
 
 Your balance is due by March 31, 2027. You can pay online any time from the link above.
 

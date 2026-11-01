@@ -180,7 +180,12 @@ describe("a body written as plain text (#1443)", () => {
     expect(own).toContain(">Open Riverton Pathfinders</a>");
     const foreign = plainTextToEmailBodyHtml("Hi.\n\nOpen the thing: https://evil.example/login", { buttonOrigins: origins });
     expect(foreign).not.toContain("Button not working?");
-    expect(foreign).toContain('href="https://evil.example/login"');
+    expect(foreign).not.toContain("<a ");
+    expect(foreign).toContain("https://evil.example/login");
+    // A label on one line and the address in the next paragraph is the same button.
+    const split = plainTextToEmailBodyHtml("Open your private link:\n\nhttps://events.example.org/club-forms/t", { buttonOrigins: origins });
+    expect(split).toContain(">Open your private link</a>");
+    expect(split).not.toContain('class="em-note"');
     expect(plainTextToEmailBodyHtml("Hi.\n\nOpen: https://events.example.org/x", { buttonOrigins: [] })).not.toContain("Button not working?");
   });
 

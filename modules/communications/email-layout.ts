@@ -445,13 +445,15 @@ const TRAILING_URL_PUNCTUATION = /[.,;:!?]+$/;
 const LABELLED_URL_LINE = /^(.{1,80}?):\s+(https?:\/\/[^\s<>"']+)$/;
 const SIGNATURE_LINES = new Set(["IMSDA Events"]);
 
-/** A line with web addresses turned into links. Plain text only: no Markdown, nothing but the address is linked. */
-function linkifyLine(line: string) {
+/** A line with the site's own web addresses turned into links. Plain text only: no Markdown, nothing else is linked. */
+function linkifyLine(line: string, origins: readonly string[] = []) {
   let html = "";
   let last = 0;
   for (const match of line.matchAll(URL_PATTERN)) {
     const trimmed = match[0].replace(TRAILING_URL_PUNCTUATION, "");
     const start = match.index ?? 0;
+    // Only the site's own addresses are links; any other address stays plain text.
+    if (!originOf(trimmed) || !origins.includes(originOf(trimmed) as string)) continue;
     html += escapeHtml(line.slice(last, start));
     html += `<a href="${escapeHtml(trimmed)}" class="em-link" style="color:#0f6f8c;text-decoration:underline;">${escapeHtml(trimmed)}</a>`;
     last = start + trimmed.length;
@@ -489,6 +491,24 @@ export function plainTextToEmailBodyHtml(text: string, options: PlainBodyOptions
     if (lastParagraph.length === 1 && SIGNATURE_LINES.has(lastParagraph[0])) paragraphs.pop();
     else break;
   }
+  // "Open your private link:" with the address on the next line or in the next paragraph is one labelled address.
+  for (let i = 0; i < paragraphs.length; i += 1) {
+    const lines = paragraphs[i];
+    const next = paragraphs[i + 1];
+    const last = lines[lines.length - 1];
+    if (last.endsWith(":") && next && /^https?:\/\/\S+$/.test(next[0])) {
+      const merged = `${last} ${next[0]}`;
+      const rest = next.slice(1);
+      const replacement = [...(lines.length > 1 ? [lines.slice(0, -1)] : []), [merged], ...(rest.length ? [rest] : [])];
+      paragraphs.splice(i, 2, ...replacement);
+    } else if (lines.length > 1) {
+      const at = lines.findIndex((line, j) => line.endsWith(":") && /^https?:\/\/\S+$/.test(lines[j + 1] ?? ""));
+      if (at >= 0) {
+        const replacement = [...(at > 0 ? [lines.slice(0, at)] : []), [`${lines[at]} ${lines[at + 1]}`], ...(lines.length > at + 2 ? [lines.slice(at + 2)] : [])];
+        paragraphs.splice(i, 1, ...replacement);
+      }
+    }
+  }
   const codeBox = options.codeBox && CODE_BOX_PATTERN.test(options.codeBox.code) ? options.codeBox : null;
   const origins = options.buttonOrigins ?? [];
   return paragraphs.map((lines, index) => {
@@ -522,10 +542,10 @@ export function plainTextToEmailBodyHtml(text: string, options: PlainBodyOptions
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;"><tr>`,
         `<td class="em-note" style="background:${L.noteBg};border:1px solid ${L.noteLine};border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.5;color:${L.ink};">`,
         `<b class="em-note-title" style="color:${L.head};">${escapeHtml(lines[0])}</b><br>`,
-        `<span style="color:${L.ink};">${lines.slice(1).map(linkifyLine).join("<br>")}</span>`,
+        `<span style="color:${L.ink};">${lines.slice(1).map((line) => linkifyLine(line, origins)).join("<br>")}</span>`,
         `</td></tr></table>`,
       ].join("");
     }
-    return `<p style="${BODY_PARAGRAPH_STYLE}">${lines.map(linkifyLine).join("<br />")}</p>`;
+    return `<p style="${BODY_PARAGRAPH_STYLE}">${lines.map((line) => linkifyLine(line, origins)).join("<br />")}</p>`;
   }).join("\n");
 }

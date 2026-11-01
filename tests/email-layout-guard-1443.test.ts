@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 vi.mock("server-only", () => ({}));
 
-import { processExternalEmailQueue } from "@/modules/communications/email-delivery";
+import { processAccountEmailQueue, processExternalEmailQueue } from "@/modules/communications/email-delivery";
 import {
   EMAIL_HEADER_RULES,
   EMAIL_WHY_LINES,
@@ -215,5 +215,68 @@ describe("delivery picks the header for the message's context (#1443)", () => {
       (call) => "emailHeaderName" in call[0].select,
     );
     expect(layoutReads).toHaveLength(1);
+  });
+});
+
+function deps(store: ReturnType<typeof multiStore>, sent: Array<{ html: string | null | undefined; text: string }>, extra: Record<string, unknown> = {}) {
+  return {
+    configuration: { apiKey: "re_test_only", apiUrl: "https://api.resend.test" },
+    now: () => new Date("2026-07-23T12:00:00.000Z"),
+    prisma: store.prisma as never,
+    sendEmail: vi.fn(async (input: { bodyHtml?: string | null; bodyText: string }) => {
+      sent.push({ html: input.bodyHtml, text: input.bodyText });
+      return { provider: "RESEND" as const, providerMessageId: `provider-${sent.length}` };
+    }) as never,
+    ...extra,
+  };
+}
+const SETTINGS_ROW = { emailHeaderName: "IMSDA Events", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: null, defaultSenderEmail: "registration@imsda.org" };
+
+describe("club invoices and every scope get the layout (#1443)", () => {
+  it("gives an invoice to a club director the club header, and a billing contact the general one", async () => {
+    const store = multiStore(
+      [
+        { id: "m1", templateKey: "INVOICE_DELIVERY", recipientKind: "CLUB_DIRECTOR" },
+        { id: "m2", templateKey: "INVOICE_DELIVERY", recipientKind: "BILLING_CONTACT" },
+      ],
+      SETTINGS_ROW,
+    );
+    const sent: Array<{ html: string | null | undefined; text: string }> = [];
+    await processExternalEmailQueue("event-1", { dependencies: deps(store, sent) });
+    expect(sent[0].html).toMatch(/class="em-bar-name"[^>]*>IMSDA Club Ministry</);
+    expect(sent[1].html).toMatch(/class="em-bar-name"[^>]*>IMSDA Events</);
+  });
+
+  it("sends the account queue's text-only rows and the sign-in code box as HTML, never null, in both scopes", async () => {
+    vi.stubEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "no-reply@imsda.org");
+    const store = multiStore(
+      [
+        { id: "a1", eventId: null, templateKey: "ATTENDEE_SIGN_IN_CODE", bodyHtmlSnapshot: null, bodyTextSnapshot: "Enter this code to finish signing in:\n\n482 913\n\nDidn't try to sign in?\nIgnore it." },
+        { id: "a2", eventId: null, templateKey: "ACCOUNT_PASSWORD_RESET", bodyHtmlSnapshot: null, bodyTextSnapshot: "Hello.\n\nOpen it: http://localhost:3000/reset" },
+      ],
+      SETTINGS_ROW,
+    );
+    const sent: Array<{ html: string | null | undefined; text: string }> = [];
+    await processAccountEmailQueue({
+      dependencies: deps(store, sent, {
+        prepareBodyText: async (input: { bodyText: string; templateKey?: string }) => (
+          input.templateKey === "ATTENDEE_SIGN_IN_CODE"
+            ? { bodyText: input.bodyText, codeBox: { code: "482 913", caption: "Works for 10 minutes" } }
+            : { bodyText: input.bodyText }
+        ),
+      }),
+    });
+    expect(sent).toHaveLength(2);
+    expect(sent[0].html).toContain(">482 913</div>");
+    expect(sent[0].html).toMatch(/class="em-bar-name"[^>]*>IMSDA Club Ministry</);
+    expect(sent[1].html).toContain("Button not working?");
+    // Event scope too: a text-only row is no longer sent without a formatted part.
+    const eventStore = multiStore([{ id: "e1", templateKey: "CUSTOM_MESSAGE", bodyHtmlSnapshot: null }], SETTINGS_ROW);
+    const eventSent: Array<{ html: string | null | undefined; text: string }> = [];
+    await processExternalEmailQueue("event-1", { dependencies: deps(eventStore, eventSent) });
+    for (const message of [...sent, ...eventSent]) {
+      expect(message.html).toBeTruthy();
+      expect(message.text).toContain("\n--\nSent by ");
+    }
   });
 });

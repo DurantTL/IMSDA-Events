@@ -420,6 +420,9 @@ describe("external email queue", () => {
     expect(payload!.bodyHtml).toContain("<!DOCTYPE html>");
     expect(payload!.bodyHtml).toContain("Hello [Avery](");
     expect(payload!.bodyHtml).not.toContain(">Avery</a>");
+    // No address outside the site's own origin is ever a link in a text-only body.
+    expect(payload!.bodyHtml).not.toContain("<a ");
+    expect(payload!.bodyHtml).toContain("https://malicious.example");
   });
 
   it("inserts a private link only in the in-memory provider payload", async () => {

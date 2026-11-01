@@ -23,8 +23,8 @@
   gap: 12px;
   min-height: 44px;
   padding: 16px 24px;
-  background: #003b5c;
-  border-bottom: 4px solid #f0b323;
+  background: var(--imsda-navy, #003b5c);
+  border-bottom: 4px solid var(--imsda-gold, #f0b323);
   border-radius: 12px 12px 0 0;
 }
 
@@ -36,8 +36,8 @@
   width: 34px;
   height: 34px;
   border-radius: 8px;
-  background: #f0b323;
-  color: #002c45;
+  background: var(--imsda-gold, #f0b323);
+  color: var(--imsda-navy-deep, #002c45);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 21px;
   font-style: italic;
