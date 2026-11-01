@@ -106,7 +106,7 @@ export function LoginForm({
   const router = useRouter();
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; code?: string }>({});
-  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary } = useFormErrorSummary();
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mfa, setMfa] = useState<MfaStep | null>(null);
@@ -118,6 +118,15 @@ export function LoginForm({
    * endpoint that served it would put the secret in another request.
    */
   const [qrDataUrl, setQrDataUrl] = useState("");
+
+  /** A changed field drops its own message and summary item (the summary hides when it empties). */
+  function fieldChanged(event: React.FormEvent<HTMLFormElement>) {
+    const id = (event.target as HTMLElement).id;
+    const key = id === "sign-in-email" ? "email" : id === "sign-in-password" ? "password" : id === "sign-in-code" ? "code" : null;
+    if (!key) return;
+    clearSummaryField(id);
+    setFieldErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+  }
 
   async function callChallenge(body: Record<string, unknown>) {
     const response = await fetch("/api/auth/mfa/challenge", {
@@ -266,7 +275,7 @@ export function LoginForm({
 
   if (mfa) {
     return (
-      <form className="auth-form" noValidate onSubmit={submitCode}>
+      <form className="auth-form" noValidate onChange={fieldChanged} onSubmit={submitCode}>
         {summaryItems.length > 0 && <FormErrorSummary action="signing in" items={summaryItems} ref={summaryRef} />}
         {mfa.offer && (
           <div className="auth-success">
@@ -319,7 +328,7 @@ export function LoginForm({
   }
 
   return (
-    <form className="auth-form" noValidate onSubmit={submit}>
+    <form className="auth-form" noValidate onChange={fieldChanged} onSubmit={submit}>
       {summaryItems.length > 0 && <FormErrorSummary action="signing in" items={summaryItems} ref={summaryRef} />}
       <label>Email address<input id="sign-in-email" name="email" type="email" autoComplete="username" required defaultValue={demoCredentials?.email} ref={emailRef} {...fieldErrorProps("sign-in-email_error", fieldErrors.email)} /><FieldError id="sign-in-email_error">{fieldErrors.email}</FieldError></label>
       <label>Password<span className="password-field"><input id="sign-in-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} {...fieldErrorProps("sign-in-password_error", fieldErrors.password)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span><FieldError id="sign-in-password_error">{fieldErrors.password}</FieldError></label>

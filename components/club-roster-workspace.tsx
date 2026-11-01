@@ -230,7 +230,7 @@ export function ClubRosterWorkspace({
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
-  const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember } = useFormErrorSummary();
+  const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember, clearField: clearMemberField } = useFormErrorSummary();
   const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
   const contactsOnlyDialog = guardiansOnly && readOnly;
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
@@ -1021,6 +1021,9 @@ export function ClubRosterWorkspace({
           const name = (event.target as HTMLInputElement).name;
           const field = (name === "birthDateText" ? "birthDate" : name) as RosterFormField;
           setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+          // The changed field's summary item goes with its message (the summary hides when it empties).
+          clearMemberField((event.target as HTMLElement).id);
+          if (name in guardianErrors) setGuardianErrors((current) => ({ ...current, [name]: undefined }));
         }}
         onSubmit={save}
       >

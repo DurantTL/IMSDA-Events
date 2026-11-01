@@ -195,8 +195,8 @@ describe("event settings: a field error or a Go to link opens its section (#743)
     // A failed save opens the first problem's block and focuses its field.
     expect(source).toContain("setBlockOpen(first.block, true)");
     expect(source).toContain("pendingFocusRef.current = settingsFieldDomId(first.key)");
-    // Native validation on a field inside a closed block opens that block.
-    expect(source).toContain("onInvalidCapture={openBlockForInvalidField}");
+    // Native validation is off (#1450), so nothing fires `invalid`; a summary link opens the block instead.
+    expect(source).not.toContain("onInvalidCapture");
   });
 
   it("labels a field error with an icon, aria-invalid and aria-describedby", () => {

@@ -10511,7 +10511,7 @@ button[aria-busy="true"] { cursor: progress; }
 .form-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .form-error-summary > strong { display: flex; align-items: center; gap: 8px; color: var(--danger, #8f3a30); }
 .form-error-summary ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
-.form-error-summary a { color: var(--danger, #8f3a30); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.form-error-summary a { display: inline-flex; align-items: center; min-height: 44px; color: var(--danger, #8f3a30); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 /* Beats ".event-settings-panel label > small" so a settings error reads as an error in every block, More settings included. */
 .settings-block .field-error-message,
 .event-settings-panel label > small.field-error-message { color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }

@@ -65,7 +65,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const [failure, setFailure] = useState("");
   const [result, setResult] = useState<InviteResult | null>(null);
   const titleId = useId();
-  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary } = useFormErrorSummary();
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
 
   function close() {
     if (busy) return;
@@ -91,6 +91,16 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
     else if (new Set(clubs.map((row) => `${row.organizationId}:${row.role}`)).size !== clubs.length) found.clubs = "Each club role can be chosen once.";
     if (!systemAdmin && !clubsAdministrator && !areaCoordinator && events.length === 0 && clubs.length === 0) found.access = "Choose at least one kind of access.";
     return found;
+  }
+
+  /** A changed field (or one inside an access group) drops its own message and summary item. */
+  function fieldChanged(event: FormEvent<HTMLFormElement>) {
+    const target = event.target as HTMLElement;
+    const id = target.closest<HTMLElement>("fieldset[id^='invite-']")?.id ?? target.id;
+    const key = id.replace(/^invite-/, "") as keyof FieldErrors;
+    if (!id.startsWith("invite-")) return;
+    clearSummaryField(id);
+    setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
   }
 
   async function submit(event: FormEvent) {
@@ -123,9 +133,14 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
       if (!response.ok) {
         const issue = body.issues?.[0];
         const field = issue?.path?.[0];
-        if (field === "name" || field === "email") setErrors({ [field]: issue?.message ?? "Check this field." });
-        else if (field === "access") setErrors({ access: issue?.message ?? "Check the access you chose." });
-        else setFailure(body.message ?? "The invite could not be sent.");
+        // A server problem with a field goes through the summary like a client one: focus and announcement.
+        const serverProblem: { key: "name" | "email" | "access"; message: string } | null = field === "name" || field === "email"
+          ? { key: field, message: issue?.message ?? "Check this field." }
+          : field === "access" ? { key: field, message: issue?.message ?? "Check the access you chose." } : null;
+        if (serverProblem) {
+          setErrors({ [serverProblem.key]: serverProblem.message });
+          showSummary([{ targetId: `invite-${serverProblem.key}`, message: summaryMessage(FIELD_LABELS[serverProblem.key], serverProblem.message) }]);
+        } else setFailure(body.message ?? "The invite could not be sent.");
         return;
       }
       const done = body as InviteResult;
@@ -167,7 +182,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </div>
               </div>
             ) : (
-              <form className={styles.inviteForm} noValidate onSubmit={(event) => void submit(event)}>
+              <form className={styles.inviteForm} noValidate onChange={fieldChanged} onSubmit={(event) => void submit(event)}>
                 {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
                 <label className={styles.field}>
                   <span>Name</span>

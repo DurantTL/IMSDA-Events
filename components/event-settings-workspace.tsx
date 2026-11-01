@@ -30,7 +30,7 @@ import {
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
 import { getEventPublishReadiness, getEventPublishWarnings, type EventReadinessItem, type EventReadinessRecommendedItem, type EventReadinessSource } from "@/modules/events/readiness";
-import { draftFromEvent, eventSettingsClientProblems, eventSettingsRequestBody } from "@/modules/events/settings-draft";
+import { draftFromEvent, eventSettingsBadInputProblems, eventSettingsClientProblems, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
 import {
@@ -408,7 +408,12 @@ export function EventSettingsWorkspace({
     if (saving) return;
     setSiteUpdating(false);
     // The browser's own checks are off (noValidate), so the same problems are found here and shown in the summary.
-    const problems = eventSettingsClientProblems(draft, mode);
+    // A half-typed number or date reaches the draft as blank, so look at what the browser holds (validity.badInput).
+    const form = event?.currentTarget ?? document.querySelector<HTMLFormElement>("form.event-settings-layout");
+    const problems = {
+      ...eventSettingsClientProblems(draft, mode),
+      ...eventSettingsBadInputProblems(form ? [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=date], input[type=time]")] : []),
+    };
     if (Object.keys(problems).length > 0) {
       setSaveMessage(null);
       setError("");
@@ -870,23 +875,6 @@ export function EventSettingsWorkspace({
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
     .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message: key in SUMMARY_LABELS ? summaryMessage(SUMMARY_LABELS[key], message) : message }));
 
-  // A field inside a closed block can fail native validation (a bad URL, say).
-  // The browser cannot show a message on a hidden field, so Save would do
-  // nothing; open the block and focus the field instead.
-  function openBlockForInvalidField(event: React.FormEvent<HTMLFormElement>) {
-    const target = event.target as HTMLElement;
-    let opened = false;
-    for (let node = target.closest("details"); node; node = node.parentElement?.closest("details") ?? null) {
-      if (!node.open) {
-        node.open = true;
-        opened = true;
-      }
-      const id = node.dataset.settingsBlock as SettingsBlockId | undefined;
-      if (id) setBlockOpen(id, true);
-    }
-    if (opened) target.focus();
-  }
-
   return (
     <section className="page-stack event-settings-workspace">
       {mode === "edit" && initialEvent && (
@@ -939,7 +927,7 @@ export function EventSettingsWorkspace({
         </ul>
       </nav>
 
-      <form className="event-settings-layout" noValidate onSubmit={save} onInvalidCapture={openBlockForInvalidField}>
+      <form className="event-settings-layout" noValidate onSubmit={save}>
         <div className="event-settings-main">
           {errorItems.length > 0 && (
             <FormErrorSummary

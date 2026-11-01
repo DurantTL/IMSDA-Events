@@ -12,13 +12,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AttendeeProfileForm } from "@/components/attendee-profile-form";
+import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { InvitePerson } from "@/components/invite-person";
 import { LoginForm } from "@/components/login-form";
 import { NewClubApplicationForm } from "@/components/new-club-application-form";
 import { errorSummaryHeading } from "@/components/form-error-summary";
-import { eventSettingsClientProblems } from "@/modules/events/settings-draft";
-import { draftFromEvent } from "@/modules/events/settings-draft";
+import { PublicRegistrationForm } from "@/components/public-registration-form";
+import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { draftFromEvent, eventSettingsBadInputProblems, eventSettingsClientProblems } from "@/modules/events/settings-draft";
 import { buttonByText, click, flush, mount, submitForm, typeInto, type Mounted } from "./helpers/dom-render";
 
 /**
@@ -46,14 +48,18 @@ function expectLinkedSummary(container: HTMLElement, expectedCount: number, head
     const id = link.getAttribute("href")!.slice(1);
     const target = document.getElementById(id);
     expect(target, `field #${id} exists`).not.toBeNull();
-    expect(target!.getAttribute("aria-invalid")).toBe("true");
-    const describedBy = (target!.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+    // A group (radios, an access fieldset) carries the state on the linked control or on its enclosing fieldset.
+    const carrier = [target!, target!.closest("fieldset")].find((node) => node?.getAttribute("aria-invalid") === "true") ?? target!;
+    expect(carrier.getAttribute("aria-invalid")).toBe("true");
+    const describedBy = (carrier.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
     const message = describedBy.map((ref) => document.getElementById(ref)).find((node) => node?.matches(".field-error-message"));
     expect(message, `field #${id} points at its message`).toBeTruthy();
     expect((message!.textContent ?? "").trim().length).toBeGreaterThan(0);
   }
   return { summary: summary!, links };
 }
+
+const summaryOf = (container: HTMLElement) => container.querySelector<HTMLElement>('.form-error-summary[role="alert"]');
 
 function expectNoValidate(container: HTMLElement) {
   expect(container.querySelector("form")!.noValidate).toBe(true);
@@ -101,6 +107,48 @@ describe("sign-in (/login)", () => {
   });
 });
 
+describe("a changed field drops its own message and summary item", () => {
+  it("sign-in: items go one by one, the summary hides when empty, focus never moves", async () => {
+    mounted = await mount(createElement(LoginForm, { unified: true }));
+    const { container } = mounted;
+    await submitForm(container.querySelector("form")!);
+    const summary = expectLinkedSummary(container, 2, /^2 things to fix before signing in$/).summary;
+    await typeInto(container.querySelector<HTMLInputElement>("#sign-in-email")!, "person@example.test");
+    expect(summary.querySelectorAll("li a")).toHaveLength(1);
+    expect(summary.querySelector("strong")!.textContent!.trim()).toBe("1 thing to fix before signing in");
+    const email = container.querySelector<HTMLInputElement>("#sign-in-email")!;
+    expect(email.getAttribute("aria-invalid")).toBeNull();
+    expect(container.querySelector("#sign-in-email_error")).toBeNull();
+    expect(document.activeElement).toBe(summary);
+    await typeInto(container.querySelector<HTMLInputElement>("#sign-in-password")!, "synthetic-password");
+    expect(summaryOf(container)).toBeNull();
+  });
+
+  it("club application: required stays on the controls, and fixing one field clears only that one", async () => {
+    mounted = await mount(createElement(NewClubApplicationForm, { churches: [{ id: "church-1", name: "Synthetic Church", type: "CHURCH" }], todayLabel: "November 1, 2026" }));
+    const { container } = mounted;
+    expect(container.querySelectorAll("[required]")).toHaveLength(11);
+    await submitForm(container.querySelector("form")!);
+    expectLinkedSummary(container, 11, /^11 things to fix before submitting$/);
+    await typeInto(container.querySelector<HTMLInputElement>("#club_clubName")!, "Synthetic Club");
+    expect(summaryOf(container)!.querySelectorAll("li a")).toHaveLength(10);
+    expect(container.querySelector("#club_clubName")!.getAttribute("aria-invalid")).toBeNull();
+    expect(container.querySelector("#club_clubName_error")).toBeNull();
+    expect(container.querySelector("#club_pastorName")!.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("profile: fixing the phone drops its item", async () => {
+    const profile = { firstName: "Test", lastName: "Person", phone: "", mailingLine1: "", mailingLine2: "", mailingCity: "", mailingRegion: "", mailingPostalCode: "", mailingCountry: "", emergencyContactName: "", emergencyContactRelationship: "", emergencyContactPhone: "", shirtSize: "", dietaryNeeds: "", accessibilityNeeds: "" };
+    mounted = await mount(createElement(AttendeeProfileForm, { initialProfile: profile as never }));
+    const { container } = mounted;
+    await typeInto(container.querySelector<HTMLInputElement>("#profile-phone")!, "123");
+    await submitForm(container.querySelector("form")!);
+    expectLinkedSummary(container, 1, /^1 thing to fix before saving$/);
+    await typeInto(container.querySelector<HTMLInputElement>("#profile-phone")!, "(515) 555-0100");
+    expect(summaryOf(container)).toBeNull();
+  });
+});
+
 describe("club application (/clubs/register)", () => {
   it("shows the app's own messages for what the browser used to enforce", async () => {
     mounted = await mount(createElement(NewClubApplicationForm, {
@@ -122,10 +170,51 @@ describe("invite a person", () => {
     mounted = await mount(createElement(InvitePerson, { scope: "clubs", eventOptions: [], clubOptions: [{ id: "club-1", name: "Synthetic Club" }] }));
     const { container } = mounted;
     await click(buttonByText(container, "Invite a person"));
+    await flush(50); // the dialog's own first-focus frame has run
     expectNoValidate(document.body);
     await submitForm(document.querySelector("form")!);
     const { links } = expectLinkedSummary(document.body, 3, /^3 things to fix before saving$/);
     expect(links.map((link) => link.getAttribute("href"))).toEqual(["#invite-name", "#invite-email", "#invite-access"]);
+  });
+});
+
+describe("invite: a server problem with a field", () => {
+  it("goes through the summary with focus, like a client problem", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "Check the form.", issues: [{ path: ["email"], message: "That address cannot be invited." }] }), { status: 400 })));
+    try {
+      mounted = await mount(createElement(InvitePerson, { scope: "clubs", eventOptions: [], clubOptions: [] }));
+      await click(buttonByText(mounted.container, "Invite a person"));
+      await flush(50);
+      const form = document.querySelector("form")!;
+      await typeInto(form.querySelector<HTMLInputElement>("#invite-name")!, "Test Person");
+      await typeInto(form.querySelector<HTMLInputElement>("#invite-email")!, "person@example.test");
+      await click(form.querySelector<HTMLInputElement>('input[type="checkbox"]')!);
+      await submitForm(form);
+      await flush(0);
+      const { links } = expectLinkedSummary(document.body, 1, /^1 thing to fix before saving$/);
+      expect(links[0]!.getAttribute("href")).toBe("#invite-email");
+      expect(document.body.textContent).toContain("That address cannot be invited.");
+      // And fixing the field drops it.
+      await typeInto(form.querySelector<HTMLInputElement>("#invite-email")!, "other@example.test");
+      expect(summaryOf(document.body)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("roster add review (club form)", () => {
+  it("uses the same summary pattern", async () => {
+    const review = {
+      organizationId: "club-1", submissionId: "sub-1", formName: "Synthetic form", clubYear: "2026-2027", canAdd: true, duplicates: [],
+      prefill: { firstName: "", lastName: "", birthDate: "", attendeeType: "YOUTH", role: "", classLevel: null, gender: null, guardians: [{ name: "", relationship: "", email: "", phone: "" }, { name: "", relationship: "", email: "", phone: "" }] },
+    };
+    mounted = await mount(createElement(ClubFormRosterAdd, { review: review as never, formHref: "/forms" }));
+    const form = mounted.container.querySelector("form")!;
+    expect(form.noValidate).toBe(true);
+    await submitForm(form);
+    const { links } = expectLinkedSummary(mounted.container, 4, /^4 things to fix before saving$/);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["#roster-firstName", "#roster-lastName", "#birthDate-input", "#roster-gender"]);
   });
 });
 
@@ -162,14 +251,87 @@ describe("event settings", () => {
     expect(eventSettingsClientProblems({ ...base, name: "Synthetic Retreat", slug: "synthetic-retreat", startsOn: "2027-10-08", endsOn: "2027-10-10" }, "edit")).toEqual({});
   });
 
+  it("names a half-typed number, date or time instead of saving it as blank", () => {
+    const control = (id: string, type: string, badInput: boolean) => ({ id, type, validity: { badInput } });
+    expect(eventSettingsBadInputProblems([
+      control("event-field-capacity", "number", true),
+      control("event-field-registration-closes-on", "date", true),
+      control("event-field-starts-on", "date", false),
+      control("not-a-settings-field", "date", true),
+    ])).toEqual({ capacity: "Enter a whole number.", registrationClosesOn: "Enter a full date." });
+  });
+
   it("turns the browser bubbles off and keeps the summary", () => {
     const source = read("components/event-settings-workspace.tsx");
     expect(source).toMatch(/<form className="event-settings-layout" noValidate/);
     expect(source).toContain("eventSettingsClientProblems(draft, mode)");
+    expect(source).toContain("eventSettingsBadInputProblems(");
+    expect(source).not.toContain("onInvalidCapture");
     expect(source).toContain("<FormErrorSummary");
     expect(source).toContain("onFollow=");
     // Rule 7: focus goes to the summary after a failed save.
     expect(source).toContain("if (targetId) errorSummaryRef.current?.focus();");
+  });
+});
+
+describe("every converted form file", () => {
+  it.each([
+    "components/attendee-profile-form.tsx",
+    "components/new-club-application-form.tsx",
+    "components/login-form.tsx",
+    "components/club-roster-workspace.tsx",
+    "components/public-registration-form.tsx",
+    "components/invite-person.tsx",
+    "components/event-settings-workspace.tsx",
+    "components/club-form-roster-add.tsx",
+  ])("%s has noValidate and the linked summary, and no per-field alert", (file) => {
+    const source = read(file);
+    expect(source).toMatch(/noValidate/);
+    expect(source).toContain("<FormErrorSummary");
+    expect(source).not.toContain("roster-field-error");
+  });
+});
+
+describe("public registration form (rendered)", () => {
+  const base = { helpText: "", options: [] as string[], scope: "REGISTRATION", required: false };
+  const definition = registrationFormDefinitionSchema.parse({
+    title: "Synthetic form", description: "Synthetic.", confirmationMessage: "Received.",
+    sections: [{ id: "details", title: "Details", description: "", fields: [
+      { ...base, id: "contact_field", key: "contact_name", label: "Contact name", type: "TEXT", required: true },
+      { ...base, id: "email_field", key: "email", label: "Email", type: "EMAIL", required: true },
+    ] }],
+  });
+  const props = {
+    event: { name: "Synthetic Retreat", slug: "synthetic-retreat", startsAt: "2026-10-09T00:00:00.000Z", endsAt: "2026-10-11T00:00:00.000Z", timezone: "America/Chicago", location: null, capacity: null, billingMode: "ATTENDEE_PAY" },
+    form: { slug: "main", versionId: "version-1", versionNumber: 1, definition },
+    choiceUsage: {},
+    pricingDate: "2026-09-29",
+    lifecycle: { phase: "OPEN" as const, capacityDecision: "REGISTER" as const, remainingSpots: null, waitingRegistrations: 0 },
+  };
+
+  it("lists each missing answer as a link and focuses the summary", async () => {
+    window.localStorage.clear();
+    vi.stubGlobal("scrollTo", vi.fn());
+    try {
+      mounted = await mount(createElement(PublicRegistrationForm, props as never));
+      const { container } = mounted;
+      expect(container.querySelector("form")!.noValidate).toBe(true);
+      await click(container.querySelector<HTMLButtonElement>("button.is-continue, button[type='submit']")!);
+      await flush(100);
+      const summary = container.querySelector<HTMLElement>('.form-error-summary[role="alert"]');
+      expect(summary, "summary shown").not.toBeNull();
+      expect(summary!.querySelector("strong")!.textContent!.trim()).toMatch(/^2 things to fix before (submitting|continuing)$/);
+      expect(document.activeElement).toBe(summary);
+      const links = [...summary!.querySelectorAll<HTMLAnchorElement>("li a")];
+      expect(links).toHaveLength(2);
+      for (const link of links) {
+        const target = document.getElementById(link.getAttribute("href")!.slice(1));
+        expect(target?.getAttribute("aria-invalid")).toBe("true");
+        expect(target?.getAttribute("aria-describedby")).toBeTruthy();
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

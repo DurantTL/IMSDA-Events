@@ -46,10 +46,17 @@ export function useFormErrorSummary() {
     setShown((count) => count + 1);
   }, []);
   const clear = useCallback(() => setItems([]), []);
+  /** A field changed: drop its item. The summary hides when it empties; focus never moves. */
+  const clearField = useCallback((targetId: string) => {
+    setItems((current) => {
+      const next = current.filter((item) => item.targetId !== targetId);
+      return next.length === current.length ? current : next;
+    });
+  }, []);
   useEffect(() => {
     if (shown > 0) ref.current?.focus();
   }, [shown]);
-  return { ref, items, show, clear };
+  return { ref, items, show, clear, clearField };
 }
 
 /**

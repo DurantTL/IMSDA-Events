@@ -25,7 +25,7 @@ export function AttendeeProfileForm({
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
-  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary } = useFormErrorSummary();
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
 
   function field(name: keyof AttendeeProfileInput, value: string) {
     setProfile((current) => ({ ...current, [name]: value }));
@@ -80,7 +80,7 @@ export function AttendeeProfileForm({
   }
 
   return (
-    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" noValidate onSubmit={save}>
+    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" noValidate onChange={(event) => clearSummaryField((event.target as HTMLElement).id)} onSubmit={save}>
       {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Reusable profile</p>

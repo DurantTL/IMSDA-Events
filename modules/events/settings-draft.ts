@@ -1,6 +1,6 @@
 import type { EventSettingsRecord } from "@/modules/events/repository";
 import { eventSettingsInputSchema, type EventSettingsInput } from "@/modules/events/schemas";
-import { fieldErrorsFromIssues } from "@/modules/events/settings-layout";
+import { fieldErrorsFromIssues, settingsFieldBlock, settingsFieldDomId } from "@/modules/events/settings-layout";
 
 /**
  * The event settings form's draft, and the request body a save sends (#965 moved
@@ -123,6 +123,23 @@ export function eventSettingsClientProblems(draft: EventSettingsInput, mode: "cr
     for (const [key, message] of Object.entries(fieldErrorsFromIssues(parsed.error.issues.map((issue) => ({ path: issue.path.filter((part): part is string | number => typeof part !== "symbol"), message: issue.message }))))) {
       if (!found[key]) found[key] = message;
     }
+  }
+  return found;
+}
+
+/**
+ * A half-typed number, date or time (the browser's `validity.badInput`) reaches the draft as blank, and would save as
+ * "no limit" or "open-ended". These controls are named in the problems instead, keyed like the server's field errors.
+ */
+export function eventSettingsBadInputProblems(
+  controls: Iterable<{ id: string; type: string; validity: { badInput: boolean } }>,
+): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const control of controls) {
+    if (!control.validity.badInput) continue;
+    const key = Object.keys(settingsFieldBlock).find((candidate) => settingsFieldDomId(candidate) === control.id);
+    if (!key) continue;
+    found[key] = control.type === "number" ? "Enter a whole number." : control.type === "time" ? "Enter a full time." : "Enter a full date.";
   }
   return found;
 }
