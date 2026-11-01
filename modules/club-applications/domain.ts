@@ -96,7 +96,7 @@ export const newClubApplicationInputSchema = z.strictObject({
   note: optionalText(1000),
   /** When the form was opened (ms since the epoch). A person takes longer than a few seconds to fill it in; a script doesn't. */
   formOpenedAt: z.number().int().positive(),
-  website: z.literal("").optional(),
+  website: z.literal("", { error: "We couldn't send this form. Clear your browser's autofill and try again." }).optional(),
 }).superRefine((value, context) => {
   if (!value.sponsoringChurchId && !value.sponsoringChurchOther) {
     context.addIssue({ code: "custom", path: ["sponsoringChurchId"], message: "Choose the sponsoring church or company, or choose Other and type its name." });

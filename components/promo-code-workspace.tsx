@@ -453,7 +453,7 @@ export function PromoCodeWorkspace({
                   required
                   minLength={3}
                   maxLength={32}
-                  pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,31}"
+                  pattern="[A-Za-z0-9][A-Za-z0-9_\-]{2,31}"
                   autoCapitalize="characters"
                   disabled={Boolean(editedPromo?.redeemedCount)}
                   defaultValue={editedPromo?.code ?? ""}

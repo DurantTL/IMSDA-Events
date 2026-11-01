@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default async function EventSetupPage({ searchParams }: { searchParams: Promise<{ fromCalendarEntry?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Opened from a calendar item's Add registration (#445): the form starts with the item's details, and the item
   // is linked when the event is created. Template choice works as usual.

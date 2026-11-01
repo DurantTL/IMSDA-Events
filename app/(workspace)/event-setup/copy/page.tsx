@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Copy from a past event", robots: { i
 export default async function CopyFromPastEventPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Newest first: the year you are most likely to copy is the last one.
   const events = (await listEventsForUser(user.id, true, { archived: "include" })).slice().reverse();

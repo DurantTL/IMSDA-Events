@@ -22,6 +22,10 @@ IMSDA Events is the new multi-event operations platform for the Iowa-Missouri Co
    cp .env.example .env
    ```
 
+   Then set `SECRET_ENCRYPTION_KEY` in `.env` to any 32 or more characters
+   (for example the output of `openssl rand -base64 32`). Admin sign-in needs it
+   to enrol two-factor authentication and fails without it.
+
 2. Start PostgreSQL:
 
    ```bash

@@ -17,7 +17,7 @@ export default async function EventTemplateEditorPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   const { templateId } = await params;
   const template = await loadTemplateOrNotFound(templateId);

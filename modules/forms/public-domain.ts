@@ -40,7 +40,7 @@ export const publicRegistrationInputSchema = z.object({
    * where the event collects lodging; decided on the server (full types refused, price added to the total).
    */
   lodging: registrationLodgingSchema.optional(),
-  website: z.literal("").optional(),
+  website: z.literal("", { error: "We couldn't send this form. Clear your browser's autofill and try again." }).optional(),
 }).strict().superRefine((input, context) => {
   const clientIds = new Set<string>();
   input.attendees?.forEach((attendee, index) => {

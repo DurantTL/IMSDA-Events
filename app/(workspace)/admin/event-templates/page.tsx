@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Event templates" };
 export default async function EventTemplatesPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // First visit to a fresh database: add the starters (#704). A failure must not hide the page;
   // "Add starter templates" is still there to retry by hand.

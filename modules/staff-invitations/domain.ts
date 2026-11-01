@@ -208,7 +208,7 @@ export const invitationRegistrationSchema = z.object({
    */
   answers: z.array(z.record(z.string().max(60), z.unknown())).max(2 + FAMILY_MAX_DEPENDANTS, "Too many answer sets.").default([]),
   /** A honeypot, like the public form's: a person leaves it empty. */
-  website: z.literal("").optional(),
+  website: z.literal("", { error: "We couldn't send this form. Clear your browser's autofill and try again." }).optional(),
 }).strict();
 
 export type InvitationRegistrationInput = z.infer<typeof invitationRegistrationSchema>;

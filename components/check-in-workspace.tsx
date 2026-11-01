@@ -25,6 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { formatCents } from "@/modules/payments/format-cents";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
@@ -335,8 +336,12 @@ export function CheckInWorkspace({
 
     if (!arrival.checkedIn) {
       const result = await requestCheckIn(arrival.id);
+      // A balance is not a reason to refuse a check-in, but staff should see it in the one line they read (#1411).
+      const owes = result.status === "CONFIRMED" && arrival.balanceCents > 0
+        ? ` This registration still owes ${formatCents(arrival.balanceCents)}.`
+        : "";
       setMessage(
-        `${arrival.firstName} ${arrival.lastName}: ${result.message}`,
+        `${arrival.firstName} ${arrival.lastName}: ${result.message}${owes}`,
       );
       return;
     }

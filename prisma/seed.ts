@@ -18,6 +18,7 @@ import {
   RegistrationFormStatus,
   RegistrationStatus,
 } from "@prisma/client";
+import { normalizeOrganizationName } from "../modules/organizations/domain";
 import { rolePermissions } from "../modules/access/permissions";
 import { hashPassword } from "../modules/access/passwords";
 import { formTemplates } from "../modules/forms/definition";
@@ -435,6 +436,53 @@ async function main() {
       versionNumber: 1,
       status: RegistrationFormStatus.DRAFT,
       definition: retreatDefinition,
+    },
+  });
+
+  // One fictional church and one club it sponsors (#1411), so a church question has an answer and "Find a club" and
+  // the club portal have something to show on a fresh copy. Fixed ids and upserts keep a re-seed from duplicating them.
+  const seededChurch = await prisma.organization.upsert({
+    where: { id: "org_seed_church_maple_grove" },
+    update: {},
+    create: {
+      id: "org_seed_church_maple_grove",
+      type: "CHURCH",
+      name: "Maple Grove Seventh-day Adventist Church (synthetic)",
+      normalizedName: normalizeOrganizationName("Maple Grove Seventh-day Adventist Church (synthetic)"),
+      streetAddress: "100 Example Street",
+      city: "Des Moines",
+      state: "IA",
+      postalCode: "50309",
+      officePhone: "(515) 555-0100",
+    },
+  });
+  await prisma.churchLocation.upsert({
+    where: { organizationId: seededChurch.id },
+    update: {},
+    create: { organizationId: seededChurch.id, city: "Des Moines", state: "IA", zip: "50309", source: "MANUAL" },
+  });
+  const seededClub = await prisma.organization.upsert({
+    where: { id: "org_seed_club_maple_grove_pathfinders" },
+    update: {},
+    create: {
+      id: "org_seed_club_maple_grove_pathfinders",
+      type: "CLUB",
+      name: "Maple Grove Pathfinders (synthetic)",
+      normalizedName: normalizeOrganizationName("Maple Grove Pathfinders (synthetic)"),
+      parentOrganizationId: seededChurch.id,
+    },
+  });
+  await prisma.clubProfile.upsert({
+    where: { organizationId: seededClub.id },
+    update: {},
+    create: {
+      organizationId: seededClub.id,
+      meetingPlace: "Maple Grove church hall",
+      meetingSchedule: "Sundays, 10:00 AM",
+      contactEmail: "pathfinders@example.test",
+      contactPhone: "(515) 555-0100",
+      publicDescription: "A fictional club for local development.",
+      listPublicly: true,
     },
   });
 
