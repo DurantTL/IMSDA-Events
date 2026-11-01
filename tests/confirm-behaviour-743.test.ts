@@ -133,3 +133,52 @@ describe("bulk uniform preview (#743)", () => {
     expect(new Set(preview.rows.map((row) => row.needId)).size).toBe(2);
   });
 });
+
+describe("useConfirm reason field (#1448)", () => {
+  const ask = { title: "Cancel this order?", body: "Credited.", confirmLabel: "Cancel order", destructive: true, input: { label: "Why?", required: true } };
+
+  it("ask resolves the trimmed text on confirm and null on cancel", async () => {
+    const { c, states } = controller();
+    const yes = c.ask(ask);
+    expect(states.at(-1)?.input?.label).toBe("Why?");
+    c.settle(true, "  duplicate order  ");
+    await expect(yes).resolves.toBe("duplicate order");
+    expect(states.at(-1)).toBeNull();
+
+    const no = c.ask(ask);
+    c.settle(false, "typed but cancelled");
+    await expect(no).resolves.toBeNull();
+  });
+
+  it("a required field cannot be confirmed empty or blank, and the dialog stays open", async () => {
+    const { c, states } = controller();
+    const answer = c.ask(ask);
+    c.settle(true, "");
+    c.settle(true, "   ");
+    c.settle(true);
+    expect(states.at(-1)).not.toBeNull();
+    c.settle(true, "ok");
+    await expect(answer).resolves.toBe("ok");
+  });
+
+  it("an optional field may be confirmed empty, giving an empty string", async () => {
+    const { c } = controller();
+    const answer = c.ask({ ...ask, input: { label: "Link", type: "url" } });
+    c.settle(true, "");
+    await expect(answer).resolves.toBe("");
+  });
+
+  it("a second request cancels an open ask with null", async () => {
+    const { c } = controller();
+    const first = c.ask(ask);
+    void c.request(request);
+    await expect(first).resolves.toBeNull();
+  });
+
+  it("confirm() on a plain request still resolves a boolean", async () => {
+    const { c } = controller();
+    const answer = c.request(request);
+    c.settle(true, "ignored");
+    await expect(answer).resolves.toBe(true);
+  });
+});
