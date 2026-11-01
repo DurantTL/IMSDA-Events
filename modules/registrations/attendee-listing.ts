@@ -279,6 +279,13 @@ const MEAL_VALUES: ReadonlySet<string> = new Set(MEAL_CATEGORIES.map((category) 
  * hand-edited URL cannot widen the list: statuses default to Confirmed only,
  * and Draft or Waitlisted can never be asked for.
  */
+/** Whether anything narrows the list beyond its defaults (view and sort only change columns and order): picks "nothing matches" over "nothing yet" (#1449). */
+export function attendeeFiltersSet(query: Pick<AttendeeListingQuery, "search" | "meal" | "dietaryOnly" | "statuses">): boolean {
+  return Boolean(query.search?.trim()) || Boolean(query.meal) || Boolean(query.dietaryOnly)
+    || query.statuses.length !== DEFAULT_LISTING_STATUSES.length
+    || query.statuses.some((status) => !DEFAULT_LISTING_STATUSES.includes(status));
+}
+
 export function parseAttendeeListingQuery(params: URLSearchParams | Record<string, string | string[] | undefined>): AttendeeListingQuery {
   const all = (key: string): string[] => {
     if (params instanceof URLSearchParams) return params.getAll(key);

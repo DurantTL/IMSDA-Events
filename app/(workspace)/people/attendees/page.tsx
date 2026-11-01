@@ -22,6 +22,7 @@ import {
   attendeeListingParams,
   canViewDietaryDetails,
   buildAttendeeListingRows,
+  attendeeFiltersSet,
   filterAttendeeListing,
   mealTotals,
   parseAttendeeListingQuery,
@@ -54,9 +55,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const canExport = permissions.includes("VIEW_REPORTS");
 
   // Anything narrowing the list beyond its defaults (view and sort only change columns and order).
-  const filtersSet = Boolean(query.search?.trim()) || Boolean(query.meal) || query.dietaryOnly
-    || query.statuses.length !== DEFAULT_LISTING_STATUSES.length
-    || query.statuses.some((status) => !DEFAULT_LISTING_STATUSES.includes(status));
+  const filtersSet = attendeeFiltersSet(query);
   const clearHref = `/people/attendees?event=${encodeURIComponent(event.id)}`;
 
   const href = (next: Partial<AttendeeListingQuery>) => {

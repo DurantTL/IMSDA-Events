@@ -381,6 +381,8 @@ export function PeopleWorkspace({
   // Nothing matches only when something narrowed a list that has rows; an empty event with a stray filter is just empty.
   const nothingYet = !filtersActive || (!serverFiltered && registrations.length === 0);
   const clearFilters = () => { search.setValue(""); setFilter("ALL"); };
+  // In server mode the link reloads the page and the key remounts this component, so only the client mode runs the setters.
+  const clearAction = clearHref ? { href: clearHref } : { onClick: clearFilters };
 
   const visible = useMemo(() => registrations.filter((registration) => {
     const matchesQuery = registrationMatchesSearch(registration, query);
@@ -392,6 +394,8 @@ export function PeopleWorkspace({
       || registration.status === filter;
     return matchesQuery && matchesFilter;
   }), [registrations, query, filter]);
+  // The toolbar control is for the client search and status filter while rows show; a server filter has the search bar's own Clear filters.
+  const showToolbarClear = (query.trim() !== "" || filter !== "ALL") && !serverFiltered && visible.length > 0;
   // Selection is by identifier, not by row, so narrowing the search does not
   // silently drop people already chosen — and "select all" means the list in
   // front of you, which is the only set you actually reviewed.
@@ -817,11 +821,9 @@ export function PeopleWorkspace({
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
-        {filtersActive && (clearHref
-          ? <Link className="secondary-button" href={clearHref} onClick={clearFilters}>Clear filters</Link>
-          : <button className="secondary-button" onClick={clearFilters} type="button">Clear filters</button>)}
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
+      {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
@@ -920,7 +922,7 @@ export function PeopleWorkspace({
               : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>
         : <NoMatchesState
-            clear={{ href: clearHref, onClick: clearFilters }}
+            clear={clearAction}
             known={serverFiltered ? undefined : `The event has ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"}.`}
             noun="registrations"
             query={query.trim() || serverQuery}
