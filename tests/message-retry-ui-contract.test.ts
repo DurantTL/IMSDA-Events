@@ -43,7 +43,7 @@ describe("registration recovery UI request contract", () => {
       "app/(public)/recover-registration/page.tsx",
     ), "utf8");
 
-    expect(pageSource).toContain("<PublicRegistrationRecoveryForm returnTo={returnTo} />");
+    expect(pageSource).toMatch(/<PublicRegistrationRecoveryForm returnTo=\{returnTo\}[^>]*\/>/);
     expect(formSource).toContain("...(returnTo ? { returnTo } : {})");
   });
 });

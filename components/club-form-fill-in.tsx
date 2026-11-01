@@ -191,6 +191,7 @@ export function ClubFormFillIn(props: Props) {
           }, { idempotent: true, init: { headers: check.current?.headers() } })
           : await submitJson(`/api/public/club-forms/${encodeURIComponent(props.token)}`, { answers });
       if (response.unavailable) {
+        if (props.mode === "open") check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         return;
       }

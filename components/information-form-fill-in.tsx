@@ -81,6 +81,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
         slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(),
       }, { idempotent: true, init: { headers: check.current?.headers() } });
       if (response.unavailable) {
+        check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         return;
       }

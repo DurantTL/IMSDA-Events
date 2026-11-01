@@ -13,7 +13,12 @@ import {
   type TurnstileConfiguration,
 } from "@/modules/security/turnstile";
 import { securityCheckFields } from "@/modules/system-admin/system-report/security-check-signal";
-import { TURNSTILE_TOKEN_HEADER as CLIENT_TOKEN_HEADER } from "@/components/security-check/security-check";
+import {
+  SECURITY_CHECK_FAILED_TEXT,
+  securityCheckMissingText,
+  TURNSTILE_TOKEN_HEADER as CLIENT_TOKEN_HEADER,
+} from "@/components/security-check/security-check";
+import { SECURITY_CHECK_FAILED_MESSAGE, SECURITY_CHECK_MISSING_MESSAGE } from "@/modules/security/turnstile";
 
 /** #1399: Siteverify is always mocked here; no test opens a connection. Synthetic keys and tokens only. */
 
@@ -116,6 +121,11 @@ describe("the check", () => {
     const names = Object.values(TURNSTILE_ACTIONS);
     expect(new Set(names).size).toBe(names.length);
     for (const name of names) expect(name).toMatch(/^[a-z0-9_-]{1,32}$/);
+  });
+
+  it("says the same words on the client and the server", () => {
+    expect(SECURITY_CHECK_FAILED_TEXT).toBe(SECURITY_CHECK_FAILED_MESSAGE);
+    expect(securityCheckMissingText("Submit")).toBe(SECURITY_CHECK_MISSING_MESSAGE);
   });
 
   it("keeps the client and server token header the same", () => {

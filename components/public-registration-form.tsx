@@ -3214,6 +3214,7 @@ export function PublicRegistrationForm({
         },
       );
       if (submission.unavailable) {
+        if (!club) securityCheckRef.current?.settle();
         // The site is restarting: keep every answer, the key and the draft; offer Try again.
         setSiteUpdating(unavailableMessage(submission));
         // The notice sits at the top of the form: bring the host page there too (a cross-origin iframe

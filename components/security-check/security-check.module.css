@@ -22,9 +22,14 @@
   margin: 0;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   line-height: 1.45;
-  color: var(--danger, #8f3a30);
+  color: #8f3a30;
 }
 
 .message:not(:empty) {
   margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fdf4f2;
+  color: #8f3a30;
+  font-weight: 600;
 }

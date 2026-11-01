@@ -15,6 +15,11 @@ export const SECURITY_CHECK_LABEL = "Security check";
 export const SECURITY_CHECK_FAILED_TEXT =
   "The security check didn't go through. Press Try again in the box. If it keeps failing, turn off a VPN or ad blocker, or contact the conference office.";
 
+/** The words under the box when Submit was pressed before a token existed. `buttonWord` is the form's own button. */
+export function securityCheckMissingText(buttonWord: string) {
+  return `Finish the security check above, then press ${buttonWord} again. Your answers are still here.`;
+}
+
 const SCRIPT_ID = "cf-turnstile-api";
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
@@ -114,7 +119,7 @@ export function SecurityCheck({
     headers: (): Record<string, string> => (tokenRef.current ? { [TURNSTILE_TOKEN_HEADER]: tokenRef.current } : {}),
     require: (buttonWord: string) => {
       if (!siteKey || tokenRef.current) return true;
-      setMessage(`Finish the security check above, then press ${buttonWord} again. Your answers are still here.`);
+      setMessage(securityCheckMissingText(buttonWord));
       // A sticky Submit can sit away from the box on a phone: bring the box and its message into view.
       groupRef.current?.scrollIntoView({ block: "center" });
       return false;
@@ -167,10 +172,10 @@ export function SecurityCheck({
   if (!siteKey) return null;
 
   return (
-    <div className={styles.securityCheck} ref={groupRef} role="group" aria-labelledby={labelId} data-testid="security-check">
+    <section className={styles.securityCheck} ref={groupRef} role="group" aria-labelledby={labelId} data-testid="security-check">
       <p className={styles.label} id={labelId}>{SECURITY_CHECK_LABEL}</p>
       <div className={styles.box} ref={containerRef} />
       <div className={styles.message} role="alert">{message}</div>
-    </div>
+    </section>
   );
 }

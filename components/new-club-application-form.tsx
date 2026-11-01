@@ -107,6 +107,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       if (file) body.set("attachment", file);
       const response = await submitJson("/api/public/club-applications", body, { init: { headers: check.current?.headers() } });
       if (response.unavailable) {
+        check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         return;
       }

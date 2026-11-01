@@ -33,7 +33,7 @@ export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_
 export const SECURITY_CHECK_FAILED_MESSAGE =
   "The security check didn't go through. Press Try again in the box. If it keeps failing, turn off a VPN or ad blocker, or contact the conference office.";
 export const SECURITY_CHECK_MISSING_MESSAGE =
-  "Finish the security check above, then submit again. Your answers are still here.";
+  "Finish the security check above, then press Submit again. Your answers are still here.";
 
 export type TurnstileConfiguration =
   | { mode: "enforce"; siteKey: string; secretKey: string; allowedHostnames: string[] }

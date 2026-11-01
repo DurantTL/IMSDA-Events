@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   issuePasswordReset: vi.fn(),
   sendAccountRecoveryEmail: vi.fn(),
   submitPublicRegistration: vi.fn(),
+  unifiedPasswordSignIn: vi.fn(),
+  submitGroupRegistration: vi.fn(),
   checkLoginClientRateLimit: vi.fn(),
   checkLoginAccountRateLimit: vi.fn(),
   checkPasswordResetClientRateLimit: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock("@/modules/rate-limit/service", () => ({
   checkPasswordResetAccountRateLimit: mocks.checkPasswordResetAccountRateLimit,
   checkPublicRegistrationRateLimit: mocks.checkPublicRegistrationRateLimit,
   checkPublicFormRoommateLookupRateLimit: vi.fn(),
+  checkAttendeeSignInRateLimit: vi.fn(async () => ({ allowed: true, decisions: [] })),
   publicRequestClientHash: () => "client-hash",
 }));
 vi.mock("@/modules/forms/public-repository", () => ({
@@ -43,11 +46,18 @@ vi.mock("@/modules/forms/public-repository", () => ({
   PublicRegistrationError: class extends Error {},
   submitPublicRegistration: mocks.submitPublicRegistration,
 }));
+vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: async () => true }));
+vi.mock("@/modules/account-merge/unified-sign-in", () => ({ unifiedPasswordSignIn: mocks.unifiedPasswordSignIn }));
+vi.mock("@/modules/attendee-accounts/sign-in-code-issue", () => ({ startSignInCodeIfRequired: async () => ({ required: false }) }));
+vi.mock("@/modules/attendee-accounts/session-store", () => ({ ATTENDEE_SESSION_COOKIE_NAME: "a", ATTENDEE_SESSION_LIFETIME_SECONDS: 1 }));
+vi.mock("@/modules/group-registrations/repository", () => ({ getGroupRegistrationExperience: vi.fn(), submitGroupRegistration: mocks.submitGroupRegistration }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/public-metrics/repository", () => ({ recordPublicMetric: vi.fn() }));
 
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as passwordResetRequest } from "@/app/api/auth/password-reset/request/route";
+import { POST as unifiedSignIn } from "@/app/api/sign-in/route";
+import { POST as groupRegister } from "@/app/api/public/events/[eventSlug]/group-registrations/route";
 import { POST as register } from "@/app/api/public/events/[eventSlug]/forms/[formSlug]/registrations/route";
 
 const ORIGIN = "https://events.imsda.test";
@@ -180,5 +190,25 @@ describe("with the keys set", () => {
     const response = await register(registrationRequest("good-token"), registrationContext);
     expect(response.status).toBe(201);
     expect(mocks.submitPublicRegistration).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("rejection means no write on more routes", () => {
+  it("/api/sign-in does not check the password on a rejected token", async () => {
+    enforceWith(rejected);
+    const response = await unifiedSignIn(post("/api/sign-in", { email: "person@example.test", password: "not-the-password" }, "bad-token"));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "security_check_failed" });
+    expect(mocks.unifiedPasswordSignIn).not.toHaveBeenCalled();
+  });
+
+  it("/group-registrations saves nothing on a rejected token", async () => {
+    enforceWith(rejected);
+    const response = await groupRegister(
+      post("/api/public/events/summer-retreat/group-registrations", { versionId: "v1", idempotencyKey: "f4f76d46-f7d6-443d-a030-cb9a8ca15066", responses: {}, website: "" }, "bad-token"),
+      { params: Promise.resolve({ eventSlug: "summer-retreat" }) },
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.submitGroupRegistration).not.toHaveBeenCalled();
   });
 });

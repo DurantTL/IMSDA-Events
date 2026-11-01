@@ -83,6 +83,7 @@ export function AttendeeSignUpForm({
         kind === "details" ? { init: { headers: check.current?.headers() } } : undefined,
       );
       if (response.unavailable) {
+        if (kind === "details") check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         setBusy(false);
         return;
