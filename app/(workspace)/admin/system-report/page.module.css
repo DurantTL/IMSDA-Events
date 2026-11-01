@@ -436,3 +436,18 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+
+.serviceSetup {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.serviceSetup li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

@@ -10,6 +10,7 @@ import {
   type SystemReport,
 } from "@/modules/system-admin/system-report/model";
 import type { OwnConnection } from "@/modules/system-admin/system-report/own-connection";
+import { SetupHelpPanel } from "@/components/setup-help";
 import styles from "./page.module.css";
 import { SystemReportTesters } from "./system-report-testers";
 import { CloudflarePurgeRow } from "./cloudflare-purge-row";
@@ -32,6 +33,23 @@ function StateChip({ state, label }: { state: SignalState; label?: string }) {
 
 const verdictIcon = { attention: ShieldAlert, unavailable: CircleHelp, watch: TriangleAlert, ok: ShieldCheck, info: ShieldCheck } as const;
 
+/** The next step for a row whose reading says it is not set up (#1434). Never shown on a healthy row or one that only could not be read. */
+function SignalSetup({ signal }: { signal: Signal }) {
+  if (signal.serviceSetup && signal.serviceSetup.length > 0) {
+    return (
+      <ul className={styles.serviceSetup} aria-label={`${signal.name}: how to set up what is missing`}>
+        {signal.serviceSetup.map((service) => (
+          <li key={service.id}>
+            <strong>{service.label}</strong>
+            <SetupHelpPanel setup={service.setup} context={service.label} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return signal.setup ? <SetupHelpPanel setup={signal.setup} context={signal.name} /> : null;
+}
+
 function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
   return (
     <li className={`${styles.row} ${rowClass[signal.state] ?? ""}`} data-signal={signal.key} data-state={signal.state}>
@@ -51,6 +69,7 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
             {signal.items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ul>
         )}
+        {signal.needsSetup && <SignalSetup signal={signal} />}
       </div>
       <div className={styles.rowFix}>
         {signal.fixHref ? (
