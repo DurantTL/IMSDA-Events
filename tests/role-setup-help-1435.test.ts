@@ -776,3 +776,12 @@ describe("round B re-review fixes", () => {
     expect(read("app/globals.css")).toMatch(/\.setup-checklist-guide \.text-button[^{]*\{[^}]*display: inline-flex/);
   });
 });
+
+describe("setup help inside a readiness row", () => {
+  it("scopes the readiness row rules to direct children so the panel's steps are not squeezed into rows", () => {
+    const css = read("app/globals.css");
+    const rules = [...css.matchAll(/^\.event-readiness-list ([^{]*)\{/gm)].map((match) => match[1]!.trim()).filter(Boolean);
+    expect(rules.length).toBeGreaterThan(0);
+    for (const selector of rules) expect(selector, selector).toMatch(/^>/);
+  });
+});

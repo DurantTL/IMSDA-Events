@@ -6372,7 +6372,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .event-readiness-panel > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.66rem); line-height: 1.55; }
 .event-readiness-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 
-.event-readiness-list li {
+/* Direct children only: setup help inside a row (#1435) has its own list items, which must not become readiness rows. */
+.event-readiness-list > li {
   display: grid;
   grid-template-columns: 20px 1fr;
   align-items: start;
@@ -6382,18 +6383,18 @@ body:has(.auth-page) { padding-bottom: 0; }
   padding: 9px;
 }
 
-.event-readiness-list li > span:first-child {
+.event-readiness-list > li > span:first-child {
   width: 17px;
   height: 17px;
   border: 2px solid #b8c5ca;
   border-radius: 50%;
 }
 
-.event-readiness-list li > svg { color: var(--green); }
-.event-readiness-list li > span:last-child { display: grid; gap: 2px; }
-.event-readiness-list strong { font-size: max(var(--type-floor, 0px), 0.64rem); }
-.event-readiness-list small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.54rem); line-height: 1.4; }
-.event-readiness-list li.complete { background: var(--green-soft); }
+.event-readiness-list > li > svg { color: var(--green); }
+.event-readiness-list > li > span:last-child { display: grid; gap: 2px; }
+.event-readiness-list > li > span:last-child > strong { font-size: max(var(--type-floor, 0px), 0.64rem); }
+.event-readiness-list > li > span:last-child > small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.54rem); line-height: 1.4; }
+.event-readiness-list > li.complete { background: var(--green-soft); }
 
 .event-publish-toggle {
   cursor: pointer;
