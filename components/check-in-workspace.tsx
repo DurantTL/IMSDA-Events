@@ -465,7 +465,7 @@ export function CheckInWorkspace({
           />
         </label>
       </div>
-      <SearchResultStatus message={`${visible.length} of ${arrivals.length} ${arrivals.length === 1 ? "arrival" : "arrivals"} shown.`} />
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${arrivals.length} ${arrivals.length === 1 ? "arrival" : "arrivals"} shown.`} />
 
       {/* Results and messages sit right under the search that produced them. */}
       {message && (

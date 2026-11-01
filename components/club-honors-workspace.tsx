@@ -366,7 +366,7 @@ export function ClubHonorsWorkspace({
           </label>
         </div>
 
-        <SearchResultStatus message={`${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
+        <SearchResultStatus message={nameSearch.trim() === "" || visible.length === 0 ? "" : `${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
           <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
         ) : (
@@ -465,7 +465,7 @@ export function ClubHonorsWorkspace({
                   <button className="text-button" disabled={bulkMembers.length === 0} onClick={selectAllListed} type="button">Select all</button>
                   <button className="text-button" disabled={selected.size === 0} onClick={() => setSelected(new Set())} type="button">Clear</button>
                 </div>
-                <SearchResultStatus message={`${bulkMembers.length} ${bulkMembers.length === 1 ? "member" : "members"} listed.`} />
+                <SearchResultStatus message={memberSearch.trim() === "" ? "" : `${bulkMembers.length} ${bulkMembers.length === 1 ? "member" : "members"} listed.`} />
                 <ul className="honor-bulk-member-list">
                   {bulkMembers.map((row) => (
                     <li key={row.memberId}>

@@ -91,19 +91,23 @@ function ClubPicker({ clubRemoved, clubs, label, onChoose, value }: {
   const shown = clubs.filter((club) => club.id === value || club.name.toLowerCase().includes(needle));
   return (
     <>
-      <input
-        aria-label={label}
-        autoComplete="off"
-        {...search.inputProps}
-        placeholder="Search clubs by name"
-        type="search"
-      />
-      <SearchResultStatus message={`${shown.length} ${shown.length === 1 ? "club" : "clubs"} listed.`} />
-      <select onChange={(event) => onChoose(event.target.value)} value={value}>
-        <option value="">Choose a club</option>
-        {clubRemoved && value && <option value={value}>(club removed)</option>}
-        {shown.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
-      </select>
+      <label>
+        <span>Value</span>
+        <input
+          aria-label={label}
+          autoComplete="off"
+          {...search.inputProps}
+          placeholder="Search clubs by name"
+          type="search"
+        />
+        <select onChange={(event) => onChoose(event.target.value)} value={value}>
+          <option value="">Choose a club</option>
+          {clubRemoved && value && <option value={value}>(club removed)</option>}
+          {shown.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+        </select>
+      </label>
+      {/* Outside the label, so it is not part of the field's name. */}
+      <SearchResultStatus message={needle === "" ? "" : `${shown.length} ${shown.length === 1 ? "club" : "clubs"} listed.`} />
     </>
   );
 }
@@ -250,6 +254,15 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                         <option value="NOT_EQUALS">is not</option>
                       </select>
                     </label>
+                    {draft.conditionFieldKey === CLUB_CONDITION_KEY ? (
+                      <ClubPicker
+                        clubRemoved={draft.clubRemoved}
+                        clubs={data.clubs}
+                        label={`Search clubs for notification ${index + 1}`}
+                        onChoose={(value) => update(draft.localKey, { conditionValue: value, clubRemoved: false })}
+                        value={draft.conditionValue}
+                      />
+                    ) : (
                     <label>
                       <span>Value</span>
                       {draft.conditionFieldKey === LOCATION_CONDITION_KEY ? (
@@ -257,14 +270,6 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                           <option value="">Choose a location</option>
                           {data.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                         </select>
-                      ) : draft.conditionFieldKey === CLUB_CONDITION_KEY ? (
-                        <ClubPicker
-                          clubRemoved={draft.clubRemoved}
-                          clubs={data.clubs}
-                          label={`Search clubs for notification ${index + 1}`}
-                          onChoose={(value) => update(draft.localKey, { conditionValue: value, clubRemoved: false })}
-                          value={draft.conditionValue}
-                        />
                       ) : field && field.options.length > 0 ? (
                         <select onChange={(event) => update(draft.localKey, { conditionValue: event.target.value })} value={draft.conditionValue}>
                           <option value="">Choose an answer</option>
@@ -274,6 +279,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                         <input autoComplete="off" maxLength={120} onChange={(event) => update(draft.localKey, { conditionValue: event.target.value })} value={draft.conditionValue} />
                       )}
                     </label>
+                    )}
                   </div>
                 )}
 

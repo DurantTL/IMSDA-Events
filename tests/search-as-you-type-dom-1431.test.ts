@@ -6,10 +6,11 @@ const nav = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: vi.fn() }) }));
 
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
+import { ClubOrderWorkspace } from "@/components/club-order-workspace";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure, useClientSearch } from "@/components/search-as-you-type";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
-import { mount, typeInto, type Mounted } from "./helpers/dom-render";
+import { buttonByText, mount, typeInto, type Mounted } from "./helpers/dom-render";
 
 /** The shared hook in a real DOM, with fake timers and a mocked router (#1431). Synthetic data only. */
 function form() {
@@ -264,6 +265,18 @@ describe("useClientSearch (#1431)", () => {
     expect(items()).toEqual(names);
   });
 
+  it("applies at once when the box loses focus, so a click never lands on a list that changes under it", async () => {
+    mounted = await mount(createElement(Box, { names }));
+    const input = box();
+    input.focus();
+    await typeInto(input, "bear");
+    expect(items()).toEqual(names);
+    await act(async () => { input.blur(); });
+    expect(items()).toEqual(["Bear Patch"]);
+    await pause(SEARCH_DEBOUNCE_MS * 2);
+    expect(items()).toEqual(["Bear Patch"]);
+  });
+
   it("keeps focus on the same input while the list changes", async () => {
     mounted = await mount(createElement(Box, { names }));
     const input = box();
@@ -294,5 +307,29 @@ describe("a converted club-portal list searches as you type, no Enter (#1431)", 
     expect(mounted.container.querySelector('p.sr-only[role="status"]')!.textContent).toBe("2 items shown.");
     await typeInto(box(), "");
     expect(names()).toHaveLength(3);
+  });
+});
+
+describe("a list goes back to page 1 when the search settles (#1431)", () => {
+  it("club order picker: page 2, type, and after the pause it is page 1 of the narrowed list", async () => {
+    const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({
+      itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0,
+    }));
+    mounted = await mount(createElement(ClubOrderWorkspace, {
+      organizationId: "club-1",
+      initial: { helper: [], batches: [], unmatched: [], awardable: [], waiting: [], firstOrderAt: null },
+      stock: many,
+    }));
+    const pager = () => mounted.container.querySelector('nav[aria-label="Honor and item pages"]');
+    const pageText = () => pager()?.textContent ?? "";
+    await act(async () => { buttonByText(mounted.container, "Next").click(); });
+    expect(pageText()).toContain("Showing 101–200 of 250");
+    const box = mounted.container.querySelector<HTMLInputElement>("#club-order-picker-search")!;
+    await typeInto(box, "patch 24");
+    // Still on page 2 until the list actually changes.
+    expect(pageText()).toContain("Showing 101–200 of 250");
+    await pause(SEARCH_DEBOUNCE_MS);
+    expect(pageText()).not.toContain("101–200");
+    expect(mounted.container.querySelector("#club-order-picker-results")!.textContent).toContain("13 items match");
   });
 });

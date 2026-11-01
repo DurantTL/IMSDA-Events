@@ -114,10 +114,8 @@ export function useDebouncedSearch(value: string, delayMs: number = SEARCH_DEBOU
 export function useClientSearch(initial = "", delayMs: number = SEARCH_DEBOUNCE_MS) {
   const [value, setValue] = useState(initial);
   const [term, setTerm] = useState(initial);
+  // Kept current by `set`, the only way the box changes, so `applyNow` always reads what is typed.
   const latest = useRef(value);
-  useEffect(() => {
-    latest.current = value;
-  });
   const debouncer = useDebouncedCallback(() => setTerm(latest.current), delayMs);
   const set = useCallback((next: string) => {
     setValue(next);
@@ -140,6 +138,8 @@ export function useClientSearch(initial = "", delayMs: number = SEARCH_DEBOUNCE_
     inputProps: {
       value,
       onChange: (event: ChangeEvent<HTMLInputElement>) => set(event.target.value),
+      // Leaving the box settles the term first, so a click or Tab never lands on a list that changes under it.
+      onBlur: applyNow,
       onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key !== "Enter") return;
         // A box outside a form has nothing to submit; inside one, the form's own submit handler runs as before.

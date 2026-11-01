@@ -191,7 +191,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
           <input {...search.inputProps} placeholder="Name or email" type="search" />
         </label>
       </div>
-      <SearchResultStatus message={`${visible.length} ${visible.length === 1 ? "invitation" : "invitations"} shown.`} />
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} ${visible.length === 1 ? "invitation" : "invitations"} shown.`} />
 
       <div className="panel selection-bar">
         <span role="status">

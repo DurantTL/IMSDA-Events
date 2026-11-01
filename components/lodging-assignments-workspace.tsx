@@ -375,7 +375,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
       <section className="panel lodging-assign-people" aria-labelledby="la-people">
         <h3 id="la-people">People ({shownPeople.length})</h3>
         <label>Search by name or confirmation code <input type="search" {...searchBox.inputProps} /></label>
-        <SearchResultStatus message={`${shownPeople.length} ${shownPeople.length === 1 ? "person" : "people"} shown.`} />
+        <SearchResultStatus message={search.trim() === "" ? "" : `${shownPeople.length} ${shownPeople.length === 1 ? "person" : "people"} shown.`} />
         <div role="group" aria-label="Show">
           {(["unassigned", "assigned", "all"] as const).map((value) => <label key={value}><input type="radio" name="la-filter" checked={filter === value} onChange={() => setFilter(value)} /> {value === "unassigned" ? "Not placed" : value === "assigned" ? "Placed" : "Everyone"}</label>)}
         </div>
