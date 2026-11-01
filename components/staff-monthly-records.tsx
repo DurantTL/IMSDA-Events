@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import { ReportSummaryBand, RecordsByMonthChart, YearStrip } from "@/components/club-report-charts";
 import {
   staffRecordKindDisplay,
@@ -64,13 +65,14 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           <Link aria-current={view.showAllClubs ? undefined : "true"} className={styles.chip} href={here({ showAll: false })} prefetch={false}>Needs attention ({view.attentionCount})</Link>
           <Link aria-current={view.showAllClubs ? "true" : undefined} className={styles.chip} href={here({ showAll: true })} prefetch={false}>All clubs ({view.totalClubs})</Link>
         </div>
-        <form action="/admin/clubs/summary" className={styles.search} method="get">
+        <SearchAsYouTypeForm action="/admin/clubs/summary" className={styles.search}>
           <input name="year" type="hidden" value={clubYear} /><input name="view" type="hidden" value="records" /><input name="month" type="hidden" value={view.month} />
           {view.showAllClubs && <input name="show" type="hidden" value="all" />}
           <label>Search by club or church name<input autoComplete="off" defaultValue={view.query} maxLength={80} name="q" type="search" /></label>
           <button className="secondary-button" type="submit">Search</button>
           {view.query && <Link className="secondary-button" href={here({ query: null })} prefetch={false}>Clear search</Link>}
-        </form>
+        </SearchAsYouTypeForm>
+        <SearchResultStatus message={`${view.rows.length} ${view.rows.length === 1 ? "club" : "clubs"} shown`} />
         {view.rows.length === 0 ? (
           <p className={styles.empty}>
             {view.query && !view.showAllClubs && view.totalClubs > 0 ? <>No clubs that need attention match this search. <Link href={here({ showAll: true })} prefetch={false}>Search all clubs for “{view.query}”</Link>.</> : view.totalClubs === 0 ? "No active clubs for this club year."

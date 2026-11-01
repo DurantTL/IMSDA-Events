@@ -22,6 +22,7 @@ import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { countLabel, pluralize } from "@/lib/pluralize";
+import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import styles from "./admin-clubs.module.css";
 
 export const metadata: Metadata = { title: "Club administration" };
@@ -171,14 +172,15 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
             <p>{home.reportMonthLabel} records. Clubs with records not submitted or awaiting review appear first.</p>
           </div>
         </div>
-        <form className={styles.searchForm} method="get" action="/admin/clubs">
+        <SearchAsYouTypeForm className={styles.searchForm} action="/admin/clubs">
           <input type="hidden" name="year" value={clubYear} />
           <label>
             Search by club or church name
             <input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" />
           </label>
           <button className="secondary-button" type="submit">Search</button>
-        </form>
+        </SearchAsYouTypeForm>
+        <SearchResultStatus message={registeredClubs.rows.length === 0 ? (query ? `No clubs match "${query}".` : "No active clubs.") : `${registeredClubs.rows.length} ${pluralize(registeredClubs.rows.length, "club")} shown`} />
         {registeredClubs.rows.length === 0 ? (
           <p className="report-empty">{query ? `No clubs match "${query}".` : "No active clubs."}</p>
         ) : (

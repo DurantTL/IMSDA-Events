@@ -22,6 +22,7 @@ import { buildClubDirectory, clubDirectoryClubHref, clubSummaryAnchors, clubSumm
 import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
 import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import styles from "@/components/club-directory.module.css";
 import pointsStyles from "@/components/staff-points.module.css";
 
@@ -88,7 +89,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         ))}
       </nav>
       <h2 className="club-summary-section" id={clubSummaryAnchors[view]}>{views.find((item) => item.key === view)!.label}</h2>
-      <form className={view === "points" ? `${styles.toolbar} ${pointsStyles.toolbar}` : styles.toolbar} method="get" action="/admin/clubs/summary">
+      <SearchAsYouTypeForm className={view === "points" ? `${styles.toolbar} ${pointsStyles.toolbar}` : styles.toolbar} action="/admin/clubs/summary">
         <input type="hidden" name="view" value={view} />
         <label>Club year<select name="year" defaultValue={clubYear}>{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
         {view === "directory" ? <>
@@ -103,10 +104,10 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         </>}
         <button className="secondary-button" type="submit">{view === "directory" ? "Find clubs" : view === "points" ? "Apply" : "Apply year"}</button>
         {view === "directory" && (query || attention) && <Link className="secondary-button" href={clubSummaryHref({ clubYear })} prefetch={false}>Clear filters</Link>}
-      </form>
+      </SearchAsYouTypeForm>
       {view === "directory" && <>
         <p className={styles.note} id="club-attention-help">Needs attention: {directory.monthLabel} records that are not submitted or are submitted and awaiting review. This filter only checks that monthly record.</p>
-        <p className={styles.note}>Showing {directory.from}–{directory.to} of {directory.total} {query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"}. Sorted by club name.</p>
+        <p aria-live="polite" className={styles.note} role="status">Showing {directory.from}–{directory.to} of {directory.total} {query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"}. Sorted by club name.</p>
         {directory.total > 0 ? <ClubDirectoryCards clubs={directory.items} clubYear={clubYear} monthLabel={directory.monthLabel} /> : <div className="panel"><p>{directory.totalClubs === 0 ? "No active clubs for this club year." : "No clubs match these filters. Try another club or church name, or clear the filters."}</p></div>}
         {directory.pageCount > 1 && <nav className="list-pager" aria-label="Club directory pages">
           {directory.page > 1 && <Link className="secondary-button" href={href({ view: "directory", page: directory.page - 1 })} prefetch={false}>Previous</Link>}
@@ -125,6 +126,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
           <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
         </details>
       </>}
+      {points && <SearchResultStatus message={`${points.matches.length} of ${points.totalClubs} clubs shown`} />}
       {points && <StaffPoints clubYear={clubYear} view={points} />}
       {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} />}
     </section>

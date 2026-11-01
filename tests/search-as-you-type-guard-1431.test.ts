@@ -1,0 +1,189 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Regression guard for #1431: a search box must not come back requiring Enter. Every search input under app/ and
+ * components/ (type="search", name="q", or the input inside a `search-field` box) must live in a file that uses the
+ * shared module `@/components/search-as-you-type`, or be on the reviewed allowlist below, each with a reason and the
+ * exact number of boxes allowed, so a NEW box in an allowlisted file still fails.
+ */
+const root = path.resolve(__dirname, "..");
+const SHARED = "components/search-as-you-type.tsx";
+
+function walk(dir: string, found: string[] = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, found);
+    else if (full.endsWith(".tsx")) found.push(full);
+  }
+  return found;
+}
+
+/** The end of a JSX tag that starts at `start`, skipping braces and quotes. */
+function tagEnd(source: string, start: number) {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") quote = char;
+    else if (char === "{") depth += 1;
+    else if (char === "}") depth -= 1;
+    else if (char === ">" && depth === 0) return index;
+  }
+  return source.length - 1;
+}
+
+/** Positions of the search inputs of a file. */
+export function searchInputs(source: string) {
+  const tags: Array<{ pos: number; text: string }> = [];
+  for (const match of source.matchAll(/<input\b/g)) {
+    tags.push({ pos: match.index!, text: source.slice(match.index!, tagEnd(source, match.index!) + 1) });
+  }
+  const visible = (text: string) => !/type="hidden"/.test(text);
+  const hits = new Set<number>();
+  for (const tag of tags) {
+    if (visible(tag.text) && (/type="search"/.test(tag.text) || /\bname="q"/.test(tag.text))) hits.add(tag.pos);
+  }
+  for (const box of source.matchAll(/className=(?:"[^"]*|\{`[^`]*)\bsearch-field\b/g)) {
+    const input = tags.find((tag) => tag.pos > box.index! && tag.pos - box.index! < 1500 && visible(tag.text));
+    if (input) hits.add(input.pos);
+  }
+  return [...hits];
+}
+
+const usesShared = (source: string) => /from "@\/components\/search-as-you-type"/.test(source);
+
+type Allowed = { file: string; count: number; reason: string };
+
+/** Pickers and comboboxes: they filter their own option list on every keystroke. */
+const pickers = [
+  "components/searchable-select.tsx|2",
+  "components/destination-search.tsx|1",
+  "components/honor-combobox.tsx|1",
+  "components/honor-multi-select.tsx|1",
+  "components/more-launcher.tsx|1",
+  "components/more-task-search.tsx|1",
+  "components/registration-builder/builder-palette.tsx|1",
+].map((entry): Allowed => {
+  const [file, count] = entry.split("|");
+  return { file: file!, count: Number(count), reason: "picker: filters its own options on every keystroke" };
+});
+
+/** Client lists that already filter on every keystroke; they move onto the shared hook in round 2. */
+const clientLists = [
+  "components/calendar-admin-workspace.tsx|1",
+  "components/club-earned-awards-workspace.tsx|2",
+  "components/club-honors-workspace.tsx|2",
+  "components/club-order-workspace.tsx|1",
+  "components/club-roster-workspace.tsx|1",
+  "components/club-supply-catalog-workspace.tsx|1",
+  "components/club-supply-stock-workspace.tsx|1",
+  "components/honor-catalog-workspace.tsx|1",
+  "components/honor-watch-panel.tsx|1",
+  "components/lodging-assignments-workspace.tsx|1",
+  "components/public-club-directory.tsx|1",
+  "components/registration-form-notifications-panel.tsx|1",
+  "components/staff-workspace.tsx|1",
+  "components/finance-workspace.tsx|1",
+  "components/check-in-workspace.tsx|1",
+  "components/staff-invitation-list.tsx|1",
+  "components/square-payment-matching.tsx|1",
+  "components/people-workspace.tsx|1",
+  "app/(workspace)/help/help-search.tsx|1",
+].map((entry): Allowed => {
+  const [file, count] = entry.split("|");
+  return { file: file!, count: Number(count), reason: "round 2: filters the list on every keystroke, not yet on the shared hook" };
+});
+
+/** Server and fetch boxes still to convert. Remove each entry when it moves onto the shared module. */
+const converting: Allowed[] = [
+  "app/(public)/events/events-search-field.tsx",
+  "components/attendee-community-board.tsx",
+  "components/area-club-search-form.tsx",
+].map((file) => ({ file, count: 1, reason: "round 1431b: converting next" }));
+
+const allowlist: Allowed[] = [...pickers, ...clientLists, ...converting];
+
+describe("search boxes search as you type (#1431)", () => {
+  const files = [...walk(path.join(root, "app")), ...walk(path.join(root, "components"))]
+    .map((full) => ({ file: path.relative(root, full).split(path.sep).join("/"), full }));
+
+  it("every search input uses the shared module or is on the reviewed allowlist", () => {
+    const problems: string[] = [];
+    for (const { file, full } of files) {
+      if (file === SHARED) continue;
+      const source = fs.readFileSync(full, "utf8");
+      const count = searchInputs(source).length;
+      if (count === 0) continue;
+      const allowed = allowlist.find((entry) => entry.file === file);
+      if (allowed) {
+        if (count !== allowed.count) problems.push(`${file}: ${count} search input(s), the allowlist reviewed ${allowed.count}. Use the shared hook for the new one.`);
+        continue;
+      }
+      if (!usesShared(source)) problems.push(`${file}: ${count} search input(s) without components/search-as-you-type`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("the allowlist is precise: every entry names a real file with a reason and still has that many boxes", () => {
+    for (const entry of allowlist) {
+      expect(entry.reason.length).toBeGreaterThan(10);
+      const full = path.join(root, entry.file);
+      expect(fs.existsSync(full), `${entry.file} exists`).toBe(true);
+      const source = fs.readFileSync(full, "utf8");
+      expect(searchInputs(source).length, `${entry.file} box count`).toBe(entry.count);
+      expect(usesShared(source), `${entry.file} is allowlisted yet already uses the shared module; remove it`).toBe(false);
+    }
+    expect(new Set(allowlist.map((entry) => entry.file)).size).toBe(allowlist.length);
+  });
+
+  it("finds the boxes it should (the scanner itself)", () => {
+    expect(searchInputs('<input type="search" name="q" />')).toHaveLength(1);
+    expect(searchInputs('<input type="hidden" name="q" value="x" />')).toHaveLength(0);
+    expect(searchInputs('<label className="search-field"><X /><input value={q}\n onChange={() => 1} /></label>')).toHaveLength(1);
+    expect(searchInputs('<input name="email" type="email" />')).toHaveLength(0);
+  });
+
+  it("round 1 converted boxes are not on the allowlist", () => {
+    for (const file of [
+      "app/(workspace)/admin/clubs/page.tsx",
+      "app/(workspace)/admin/clubs/summary/page.tsx",
+      "app/(workspace)/admin/forms/page.tsx",
+      "app/(workspace)/people/attendees/page.tsx",
+      "components/staff-monthly-records.tsx",
+      "components/people-quick-filters.tsx",
+      "components/operations-search-bar.tsx",
+      "components/background-check-review-panel.tsx",
+      "components/organization-search-controls.tsx",
+    ]) {
+      expect(allowlist.some((entry) => entry.file === file)).toBe(false);
+      expect(usesShared(fs.readFileSync(path.join(root, file), "utf8")), file).toBe(true);
+    }
+  });
+});
+
+/**
+ * The empty-search rule (#1347, #1348): an empty search lists everything, so a converted server page must never stop
+ * early when the search text is empty. tests/empty-server-search-1348.test.ts covers the pickers; this covers the
+ * pages that now search as you type.
+ */
+describe("converted server searches still list everything when empty (#1347, #1348)", () => {
+  const pages = [
+    "app/(workspace)/admin/clubs/page.tsx",
+    "app/(workspace)/admin/clubs/summary/page.tsx",
+    "app/(workspace)/admin/forms/page.tsx",
+    "app/(workspace)/people/attendees/page.tsx",
+    "components/operations-search-bar.tsx",
+    "components/people-quick-filters.tsx",
+    "components/background-check-review-panel.tsx",
+  ];
+  it.each(pages)("%s has no early return on an empty search", (file) => {
+    const source = fs.readFileSync(path.join(root, file), "utf8");
+    expect(source).not.toMatch(/if\s*\(\s*!\s*(?:q|query|text|search|lookupName|params\.q|filters\.q)(?:\.trim\(\))?\s*\)\s*(?:return|\{\s*return)/);
+  });
+});

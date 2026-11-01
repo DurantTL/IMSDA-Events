@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { RefreshCcw, Search, Undo2, UserCheck, UserX } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListPager } from "@/components/list-pager";
+import { SearchResultStatus, useDebouncedCallback } from "@/components/search-as-you-type";
 import { paginate } from "@/lib/pagination";
 
 /** Unmatched list-wide rows shown per page (#702). */
@@ -254,8 +255,13 @@ export function BackgroundCheckReviewPanel() {
     }
   }
 
+  // Look up as the name is typed (#1431): a short pause after the last keystroke, with the same ticket guard, so an
+  // older answer never replaces a newer one. Enter or Look up goes at once.
+  const lookupSoon = useDebouncedCallback(() => void showLookup(lookupName, 1, 1));
+
   function runLookup(event: FormEvent) {
     event.preventDefault();
+    lookupSoon.cancel();
     void showLookup(lookupName, 1, 1);
   }
 
@@ -417,7 +423,7 @@ export function BackgroundCheckReviewPanel() {
           <input
             autoComplete="off"
             maxLength={100}
-            onChange={(event) => setLookupName(event.target.value)}
+            onChange={(event) => { setLookupName(event.target.value); lookupSoon.schedule(); }}
             placeholder="First and last name, or just a last name"
             type="search"
             value={lookupName}
@@ -425,6 +431,7 @@ export function BackgroundCheckReviewPanel() {
         </label>{" "}
         <button className="secondary-button" disabled={lookingUp} type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
       </form>
+      <SearchResultStatus message={lookup && lookup.hasList ? `${lookup.rowsPage.total} list ${lookup.rowsPage.total === 1 ? "row" : "rows"} and ${lookup.peoplePage.total} ${lookup.peoplePage.total === 1 ? "person" : "people"} found` : ""} />
       {lookup && !lookup.hasList && <p className="report-empty">No list has been uploaded yet.</p>}
       {lookup && lookup.hasList && lookup.rows.length === 0 && lookup.people.length === 0 && <p className="report-empty">{lookup.query === "" ? "No list row or roster or registration person yet." : "No list row or roster or registration person has that name or a similar one."}</p>}
       {lookup && (lookup.rows.length > 0 || lookup.people.length > 0) && (

@@ -9,6 +9,7 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
 vi.mock("@/modules/events/repository", () => ({ isClubAudienceEvent: dependencies.isClubAudienceEvent }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));

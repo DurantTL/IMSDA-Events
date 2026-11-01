@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
+import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { AccessRestricted } from "@/components/access-restricted";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -82,9 +83,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </ul>
       </section>
 
-      {/* Keyed on the current query: a header sort link or Reset is a client navigation that keeps this
-          form mounted, and uncontrolled fields would otherwise submit the previous values. */}
-      <form key={JSON.stringify([query.view, query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
+      {/* Keyed on the filters but never on the search text (#1431): a header sort link or Reset is a client navigation
+          that keeps this form mounted, and uncontrolled selects would otherwise submit the previous values, while
+          the search box must stay mounted so typing keeps its focus. */}
+      <SearchAsYouTypeForm key={JSON.stringify([query.view, query.sort, query.direction, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -126,7 +128,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           <button className="secondary-button" type="submit">Apply</button>
           <Link className="text-button" href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Reset</Link>
         </div>
-      </form>
+      </SearchAsYouTypeForm>
 
       <div className="table-scroll scroll-cue" data-scroll-cue>
         {query.sort && <SortOrderNote>{sortOrderText(LISTING_COLUMNS.find((column) => column.key === query.sort)?.label.toLowerCase() ?? "default order", query.direction)}</SortOrderNote>}

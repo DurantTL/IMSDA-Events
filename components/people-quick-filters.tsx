@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
+import { useDebouncedCallback } from "@/components/search-as-you-type";
 import {
   PEOPLE_FILTER_SEVERAL,
   parsePeopleFilters,
@@ -57,24 +58,35 @@ export function PeopleQuickFilters({
     }, scope);
     setShown(next);
     const typed = event.currentTarget.form ? String(new FormData(event.currentTarget.form).get("q") ?? "").trim() : query;
-    startTransition(() => router.push(peopleHref({ query: typed, filters: next }), { scroll: false }));
+    startTransition(() => router.replace(peopleHref({ query: typed, filters: next }), { scroll: false }));
   };
 
-  // With JavaScript, Search/Enter goes to the canonical repeated-param URL, not the __several / keep* form fields.
+  // With JavaScript, the search goes to the canonical repeated-param URL (page 1, no __several / keep* form fields),
+  // after a pause in typing (#1431) or at once on Enter or Search; replace, so typing adds no history entries.
+  const formRef = useRef<HTMLFormElement>(null);
+  const apply = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const typed = String(new FormData(form).get("q") ?? "").trim();
+    const href = peopleHref({ query: typed, filters: shown });
+    if (href === `${window.location.pathname}${window.location.search}`) return;
+    startTransition(() => router.replace(href, { scroll: false }));
+  };
+  const typing = useDebouncedCallback(apply);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const typed = String(new FormData(event.currentTarget).get("q") ?? "").trim();
-    startTransition(() => router.push(peopleHref({ query: typed, filters: shown }), { scroll: false }));
+    typing.cancel();
+    apply();
   };
 
   const selectValue = (list: readonly string[]) => (list.length === 0 ? "" : list.length === 1 ? list[0] : PEOPLE_FILTER_SEVERAL);
   const roleKeys = shown.roles.map(peopleRoleKey);
   const active = peopleFilterCount(shown) > 0;
   return (
-    <form action="/admin/people" aria-busy={busy} className={styles.search} method="get" onSubmit={submit} role="search">
+    <form action="/admin/people" aria-busy={busy} className={styles.search} method="get" onSubmit={submit} ref={formRef} role="search">
       <label className={styles.searchField}>
         Search by name or email
-        <input autoComplete="off" defaultValue={query} maxLength={120} name="q" type="search" />
+        <input autoComplete="off" defaultValue={query} maxLength={120} name="q" onChange={() => typing.schedule()} type="search" />
       </label>
       <label className={styles.searchField}>
         Who has this role
@@ -110,7 +122,7 @@ export function PeopleQuickFilters({
       {shown.eventIds.length > 1 ? shown.eventIds.map((id) => <input key={id} name="keepEvent" type="hidden" value={id} />) : null}
       {shown.clubIds.length > 1 ? shown.clubIds.map((id) => <input key={id} name="keepClub" type="hidden" value={id} />) : null}
       <button className="primary-button" type="submit">{active ? "Apply" : "Search"}</button>
-      {query ? <Link className="secondary-button" href={peopleHref({ filters })}>Clear</Link> : null}
+      {query ? <Link className="secondary-button" href={peopleHref({ filters })} onClick={() => typing.cancel()}>Clear</Link> : null}
     </form>
   );
 }
