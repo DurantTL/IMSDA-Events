@@ -242,8 +242,135 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
   },
 ];
 
+const AREA = "app/(public)/account/(portal)/area-clubs";
+const COORDINATOR_SHELL = ["components/coordinator-masthead-view.tsx", "components/coordinator-shell-header.tsx", "components/area-clubs-subnav.tsx"] as const;
+const COORDINATOR_NEEDS = ["An Area Coordinator account, signed in with two-step sign-in."] as const;
+
+export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
+  {
+    id: "walkthrough-coordinator-sign-in",
+    audience: "coordinator",
+    title: "Step by step: Sign in as an area coordinator",
+    summary: "Sign in with your email and password, then confirm it is you with your two-step sign-in.",
+    needs: ["Your account email and password.", "Your authenticator app or passkey, set up with the conference."],
+    changes: ["Nothing. You sign in to your account."],
+    verify: ["Your account Overview opens, with Club coordination in the tabs."],
+    next: "Open Club coordination to see your clubs.",
+    destinationIds: ["portal-overview", "portal-security"],
+    keywords: ["sign in", "log in", "login", "coordinator", "area coordinator", "two-step", "authenticator code", "passkey", "confirm it's you", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [
+      "app/(public)/account/sign-in/page.tsx",
+      "app/(public)/account/two-step/page.tsx",
+      "components/attendee-sign-in-form.tsx",
+      "components/roster-unlock-form.tsx",
+    ],
+    steps: [
+      { id: "enter-details", text: "Open the account sign-in page. Type your email address and password, then choose Sign in.", alt: "The Account sign in page filled in, with the Sign in button marked." },
+      { id: "confirm", text: "The Confirm it's you page opens. Use your passkey, or find the six-digit code in your authenticator app.", alt: "The Confirm it's you page, with the Authenticator code box marked." },
+      { id: "enter-code", text: "Type the code. Then choose Continue.", alt: "The Confirm it's you page with the code typed in and the Continue button marked." },
+      { id: "signed-in", text: "You are signed in. Choose Club coordination to see your clubs.", alt: "The account Overview with the Club coordination tab marked." },
+    ],
+  },
+  {
+    id: "walkthrough-coordinator-clubs",
+    audience: "coordinator",
+    title: "Step by step: Your clubs and Who's missing what",
+    summary: "Find a club, read what it has filed, and see which clubs are missing something.",
+    needs: [...COORDINATOR_NEEDS],
+    changes: ["Nothing. Your view is read only."],
+    verify: ["You can open a club and read its page.", "You can say which clubs are missing something."],
+    next: "Follow up with a club that is behind.",
+    destinationIds: ["coordinator-overview", "coordinator-clubs"],
+    keywords: ["clubs", "all clubs", "find a club", "open club", "who's missing what", "whos missing", "overview", "search", "view only", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/clubs/page.tsx", "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "components/area-clubs-views.tsx", ...COORDINATOR_SHELL],
+    steps: [
+      { id: "open-clubs", text: "On Club coordination, choose All clubs.", alt: "The Club overview page with the All clubs tab marked." },
+      { id: "search", text: "Every active club is listed. Type a club, church or city to find one.", alt: "The All clubs page with the search box marked." },
+      { id: "open-club", text: "Choose Open club. You can read what the club has, but not change it.", alt: "The All clubs list with an Open club button marked." },
+      { id: "whos-missing", text: "Back on Overview, Who's missing what lists each club that is missing something, with one next step.", alt: "The Who's missing what list on the Club overview." },
+    ],
+  },
+  {
+    id: "walkthrough-coordinator-records",
+    audience: "coordinator",
+    title: "Step by step: Review Monthly Records",
+    summary: "See which clubs filed each month, and read a record a club filed.",
+    needs: [...COORDINATOR_NEEDS],
+    changes: ["Nothing. Reading a record does not approve or change it."],
+    verify: ["You can say which clubs filed a month, and read one record."],
+    next: "Follow up with a club that is behind.",
+    destinationIds: ["coordinator-records"],
+    keywords: ["monthly records", "records", "filed", "submitted", "not submitted", "month", "review", "due the 10th", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [`${AREA}/reports/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page.tsx", "components/coordinator-monthly-records.tsx", ...COORDINATOR_SHELL],
+    steps: [
+      { id: "open-records", text: "On Club coordination, choose Monthly Records.", alt: "The Club overview with the Monthly Records tab marked." },
+      { id: "pick-month", text: "Pick a month. Each month shows how many clubs filed.", alt: "The Monthly Records page with the month buttons marked." },
+      { id: "see-states", text: "Submitted means the club filed. Not submitted means the month ended and nothing is filed.", alt: "The Monthly Records page for one month, with the Submitted count marked." },
+      { id: "open-record", text: "Choose a filed month for a club to read its record.", alt: "The table of clubs with a filed month for one club marked." },
+    ],
+  },
+  {
+    id: "walkthrough-coordinator-points",
+    audience: "coordinator",
+    title: "Step by step: Read the Points ranking",
+    summary: "See each club's points for the year and what they are made of.",
+    needs: [...COORDINATOR_NEEDS],
+    changes: ["Nothing. This page is reading only."],
+    verify: ["You can say which club leads and what a club's total is made of."],
+    next: "Follow up with a club that is behind.",
+    destinationIds: ["coordinator-points"],
+    keywords: ["points", "ranking", "leader", "score", "total points", "report points", "chart", "table", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [`${AREA}/points/page.tsx`, "components/coordinator-points.tsx", ...COORDINATOR_SHELL],
+    steps: [
+      { id: "open-points", text: "On Club coordination, choose Points.", alt: "The Club overview with the Points tab marked." },
+      { id: "chart", text: "The chart ranks the clubs by total points. The leader is shown at the top.", alt: "The Points page with the Points leader card marked." },
+      { id: "table", text: "Choose Show as a table to see the full list.", alt: "The Points page with the Show as a table button marked." },
+      { id: "table-open", text: "Each row shows the club's points and a link to the records behind them.", alt: "The Points table with the ranking and a club's Records link marked." },
+    ],
+  },
+  {
+    id: "walkthrough-coordinator-follow-up",
+    audience: "coordinator",
+    title: "Step by step: Follow up with a club that is behind",
+    summary: "Find a club that is missing a record, read what it has filed, and see who to contact.",
+    needs: [...COORDINATOR_NEEDS],
+    changes: ["Nothing. The app sends no messages and sets no deadline: you contact the director yourself."],
+    verify: ["You know which month is missing and who to contact."],
+    next: "Check Monthly Records for the whole year.",
+    destinationIds: ["coordinator-overview", "coordinator-records"],
+    keywords: ["follow up", "behind", "late", "missing", "overdue", "contact the director", "who's missing what", "next step", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", ...COORDINATOR_SHELL],
+    steps: [
+      { id: "find-club", text: "On Overview, find the club in Who's missing what. Missing or Missing 1 earlier month says what is not filed.", alt: "The Who's missing what list with a club's Missing marks marked." },
+      { id: "next-step", text: "Read the next step. The app sends nothing for you.", alt: "The Who's missing what list with the club's next step marked." },
+      { id: "open-club", text: "Choose Open club to read what the club has filed.", alt: "The Who's missing what list with the club's Open club link marked." },
+      { id: "club-records", text: "Monthly Records shows each month as submitted or Not submitted.", alt: "The club's page with its Monthly Records list marked." },
+      { id: "contact", text: "Club admins shows the director and their email. Contact them yourself.", alt: "The club's page with the Club admins section and the director marked." },
+    ],
+  },
+  {
+    id: "walkthrough-coordinator-no-director",
+    audience: "coordinator",
+    title: "Step by step: A club with no director",
+    summary: "Spot a club that has no director, and know who can add one.",
+    needs: [...COORDINATOR_NEEDS],
+    changes: ["Nothing. Only the conference office can add a director."],
+    verify: ["You know which club has no director, and that you ask the conference office."],
+    next: "Ask the conference office to add a director.",
+    destinationIds: ["coordinator-overview"],
+    keywords: ["no director", "missing director", "club without a director", "add a director", "conference office", "who's missing what", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "modules/setup-help/coordinator-checklist.ts", ...COORDINATOR_SHELL],
+    steps: [
+      { id: "getting-started", text: "On Overview, Getting started says how many clubs have no director.", alt: "The Getting started list on Overview with A director for every club marked." },
+      { id: "no-director", text: "In Who's missing what, a club with No director has a red mark.", alt: "The Who's missing what list with the No director mark marked." },
+      { id: "ask-office", text: "Its next step says to ask the conference office to add a director. Only they can.", alt: "The Who's missing what list with the next step for a club with no director marked." },
+      { id: "club-admins", text: "Choose Open club. Club admins says no director is assigned yet.", alt: "The club's page with the Club admins message that no director is assigned marked." },
+    ],
+  },
+];
+
 /** Every walkthrough, in the order the capture script and the browser check run them. Coordinator walkthroughs are added here. */
-export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs];
+export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs, ...coordinatorWalkthroughs];
 
 export function findWalkthrough(id: string): WalkthroughDefinition | undefined {
   return walkthroughs.find((walkthrough) => walkthrough.id === id);
@@ -285,4 +412,9 @@ export const walkthroughsForGuide: Record<string, readonly string[]> = {
   "director-orders-and-supplies": ["walkthrough-director-orders"],
   "director-monthly-record": ["walkthrough-director-monthly-records"],
   "director-year-end-report": ["walkthrough-director-year-end"],
+  "coordinator-getting-started": ["walkthrough-coordinator-sign-in", "walkthrough-coordinator-clubs"],
+  "coordinator-find-club": ["walkthrough-coordinator-clubs"],
+  "coordinator-follow-records": ["walkthrough-coordinator-records"],
+  "coordinator-follow-up-clubs": ["walkthrough-coordinator-follow-up", "walkthrough-coordinator-no-director"],
+  "coordinator-points": ["walkthrough-coordinator-points"],
 };

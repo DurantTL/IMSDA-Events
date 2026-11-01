@@ -1,4 +1,28 @@
 {
+  "walkthrough-coordinator-clubs": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "fa4ce2fc5665d28273a50152666d8de8320ae43c7bd0594998f616b93ee68313"
+  },
+  "walkthrough-coordinator-follow-up": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "5d3d683d68bfa137dba0478479222beb52aca29d8e01b78c4ab9e722073d9eab"
+  },
+  "walkthrough-coordinator-no-director": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "e2eb20777e5ede9977a1531bee4e6731837018f236ad1c7720e166a003c78a82"
+  },
+  "walkthrough-coordinator-points": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "f28b40c1efa7a64dc867e71c109bf339ed43c724b595894422035d5ab7f72520"
+  },
+  "walkthrough-coordinator-records": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "fda833ba0ba0b717b32983982ce100a4e65ab4e15b6e99eb968f544b6178165f"
+  },
+  "walkthrough-coordinator-sign-in": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "bb183b8de30f4c80d11f79a25ccf8d5c828e654af2335a918f1f49797c103909"
+  },
   "walkthrough-director-club-forms": {
     "capturedFor": "2026-11-01",
     "sourceHash": "fb9786efb234e2bcaaa9e22c3c79978646dcaeb811bcce1263ca0f4689774066"

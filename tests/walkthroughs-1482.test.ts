@@ -11,8 +11,9 @@ import { portalGuides } from "@/modules/help/portal-guides";
 import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
 import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageSizes, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
-import { directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
+import { coordinatorWalkthroughs, directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
+import { buildCoordinatorChecklist } from "@/modules/setup-help/coordinator-checklist";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { walkthroughActions } from "@/tests/browser/walkthroughs/steps";
 
@@ -24,8 +25,10 @@ const root = process.cwd();
 const kinds: WalkthroughImageKind[] = ["phone", "desktop"];
 
 describe("walkthrough data and browser actions", () => {
-  it("has the 10 club director walkthroughs", () => {
+  it("has the 10 club director and the 6 area coordinator walkthroughs", () => {
     expect(directorWalkthroughs).toHaveLength(10);
+    expect(coordinatorWalkthroughs).toHaveLength(6);
+    expect(coordinatorWalkthroughs.every((walkthrough) => walkthrough.audience === "coordinator")).toBe(true);
     expect(new Set(walkthroughs.map((walkthrough) => walkthrough.id)).size).toBe(walkthroughs.length);
     for (const walkthrough of walkthroughs) expect(walkthrough.id, walkthrough.id).toMatch(/^walkthrough-(director|coordinator)-[a-z0-9-]+$/);
   });
@@ -37,7 +40,10 @@ describe("walkthrough data and browser actions", () => {
       const ids = walkthrough.steps.map((step) => step.id);
       expect(new Set(ids).size, `${walkthrough.id} step ids are unique`).toBe(ids.length);
       expect(Object.keys(actions.steps).sort(), walkthrough.id).toEqual([...ids].sort());
-      expect(["signed-out", "signed-in"]).toContain(actions.start);
+      expect(["signed-out", "signed-in", "signed-in-coordinator"]).toContain(actions.start);
+      // A coordinator walkthrough never starts as the club director, and the reverse.
+      if (walkthrough.audience === "coordinator") expect(actions.start, walkthrough.id).not.toBe("signed-in");
+      if (walkthrough.audience === "director") expect(actions.start, walkthrough.id).not.toBe("signed-in-coordinator");
     }
   });
 
@@ -82,6 +88,22 @@ describe("walkthrough guides", () => {
       const guide = portalGuides.find((candidate) => candidate.id === guideId)!;
       expect(guide.walkthroughIds, guideId).toEqual(ids);
       for (const id of ids) expect(portalGuides.find((candidate) => candidate.id === id)?.audience, `${guideId} -> ${id}`).toBe(guide.audience);
+    }
+  });
+
+  it("are what the area coordinator Getting started checklist links to", () => {
+    const hrefs = Object.fromEntries(
+      buildCoordinatorChecklist({ clubYear: "2026-2027", clubCount: 4, clubsWithoutDirector: 1, recordsMissing: 2, monthNotDue: false, monthLabel: "October 2026", clubsBehind: 3 }).steps.map((step) => [step.id, step.helpHref]),
+    );
+    expect(hrefs).toMatchObject({
+      clubs: "/account/help/walkthrough-coordinator-clubs",
+      directors: "/account/help/walkthrough-coordinator-no-director",
+      records: "/account/help/walkthrough-coordinator-records",
+      behind: "/account/help/walkthrough-coordinator-follow-up",
+      points: "/account/help/walkthrough-coordinator-points",
+    });
+    for (const href of Object.values(hrefs)) {
+      if (href?.includes("walkthrough-")) expect(portalGuides.some((guide) => `/account/help/${guide.id}` === href), href).toBe(true);
     }
   });
 
