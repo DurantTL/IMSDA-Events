@@ -7,13 +7,14 @@ import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import { listClubFormTemplateNames } from "@/modules/club-forms/templates";
 import { listClubsForArea } from "@/modules/organizations/area-coordinators";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: staffPageTitles.clubForms };
 export const dynamic = "force-dynamic";
 
 function formatDate(value: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /**

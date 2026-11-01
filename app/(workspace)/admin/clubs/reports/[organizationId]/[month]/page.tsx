@@ -13,6 +13,7 @@ import { getClubReport, reportPrefill } from "@/modules/club-reports/repository"
 import { getClubReportReview } from "@/modules/club-reports/review";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "Club Monthly Record" };
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ export default async function StaffClubReportPage({
           <h3 id="club-report-review-heading">Review</h3>
           <p className="field-help" data-testid="report-review-status">
             {review
-              ? `Reviewed ${new Date(review.reviewedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" })}${review.reviewedByName ? ` by ${review.reviewedByName}` : ""}.`
+              ? `Reviewed ${formatInConferenceTime(review.reviewedAt, { month: "short", day: "numeric", year: "numeric" })}${review.reviewedByName ? ` by ${review.reviewedByName}` : ""}.`
               : "Submitted and not reviewed yet. Editing the record below clears the mark."}
           </p>
           <ClubReportReview clubName={club.name} month={month} organizationId={organizationId} reviewed={Boolean(review)} />

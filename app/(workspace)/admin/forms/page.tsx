@@ -8,13 +8,14 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { loadFormsHub } from "@/modules/forms-hub/load";
 import { filterFormsHubRows, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "All forms" };
 export const dynamic = "force-dynamic";
 
 function formatDate(value: string | null) {
   if (!value) return "No responses yet";
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /**

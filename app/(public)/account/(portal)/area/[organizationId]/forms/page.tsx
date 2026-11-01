@@ -9,13 +9,14 @@ import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, viewerCanSendLinkForClub } from "@/modules/club-forms/domain";
 import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: "Club forms", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
 function formatDate(value: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Any club's submitted forms, view only, for an Area Coordinator (#610). Sensitive answers are "Restricted". */
