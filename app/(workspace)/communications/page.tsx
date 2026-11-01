@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
+import { getPrisma } from "@/lib/prisma";
+import { loadEmailLayoutSettings } from "@/modules/communications/email-layout-settings";
 import { getMessagingWorkspace } from "@/modules/communications/messaging-repository";
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { listAnnouncements } from "@/modules/communications/repository";
@@ -118,6 +120,7 @@ export default async function CommunicationsPage({
       announcementOptOuts={optOuts}
       initialView={initialView}
       openNew={openNew === "1"}
+      emailLayoutSettings={await loadEmailLayoutSettings(getPrisma())}
     />
     </>
   );

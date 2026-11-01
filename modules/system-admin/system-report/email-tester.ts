@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import type { MessageOutboxStatus, MessageProviderDeliveryStatus } from "@prisma/client";
+import { getEmailBackupStatus } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -25,6 +26,8 @@ export const EMAIL_NOTICE_WAIT_MS = 5 * 60 * 1000;
 export const emailTestInputSchema = z.object({
   /** One address only: the standard email check rejects commas, spaces and lists. */
   to: z.string().trim().max(254).pipe(z.email()),
+  /** Send through the backup provider (Resend) directly (#1444). Refused unless the backup is set up. */
+  backup: z.boolean().optional(),
 }).strict();
 
 export type EmailTestState = "queued" | "waiting" | "delivered" | "bounced" | "complained" | "failed" | "suppressed" | "no-notice" | "unavailable";
@@ -183,6 +186,7 @@ export type EmailTestRun =
   | { kind: "invalid" }
   | { kind: "rate-limited"; nextAllowedAt: string }
   | { kind: "not-configured" }
+  | { kind: "backup-not-configured" }
   | { kind: "started"; status: EmailTestStatus };
 
 /** Validates, charges the limit, queues one message, delivers it now, audits, and returns where it stands. */
@@ -190,6 +194,8 @@ export async function runEmailTest(input: { user: { id: string }; body: unknown;
   const now = input.now ?? new Date();
   const parsed = emailTestInputSchema.safeParse(input.body);
   if (!parsed.success) return { kind: "invalid" };
+  // Checked on the server, before the limit is charged: the card hides the option when there is no backup, but this is the gate.
+  if (parsed.data.backup && !getEmailBackupStatus().active) return { kind: "backup-not-configured" };
 
   const limit = await checkSystemEmailTestRateLimit(input.user.id);
   if (!limit.allowed) return { kind: "rate-limited", nextAllowedAt: nextAllowedAt(limit, now).toISOString() };
@@ -203,7 +209,7 @@ export async function runEmailTest(input: { user: { id: string }; body: unknown;
   }
 
   try {
-    await processAccountEmailQueue({ messageIds: [queued.messageId], limit: 1 });
+    await processAccountEmailQueue({ messageIds: [queued.messageId], limit: 1, ...(parsed.data.backup ? { useBackup: true } : {}) });
   } catch (error) {
     // Not configured at the provider, or the loop failed outright. The row is closed below; nothing is retried later.
     logError("The System report test email could not be delivered", error, { testRef: queued.ref });

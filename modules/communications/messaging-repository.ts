@@ -141,6 +141,7 @@ import { getAttendeeRosterConfig, resolveBillingContactName, resolveResponsibleO
 import type { FormCalculation, RegistrationFormDefinition } from "@/modules/forms/definition";
 import { isLooseEmail } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
+import { emailIsClubLinked } from "@/modules/communications/email-layout";
 
 const fallbackSettings = {
   deliveryMode: "LOCAL_CAPTURE" as const,
@@ -413,7 +414,7 @@ function serializeMessage(message: {
   lastError: string | null;
   retryOfMessageId: string | null;
   createdAt: Date;
-  registration: { id: string; confirmationCode: string } | null;
+  registration: { id: string; confirmationCode: string; clubRegistration?: { id: string } | null } | null;
   templateVersion: { id: string; versionNumber: number } | null;
   files?: Array<{ disposition: "ATTACHMENT" | "INLINE"; file: { id: string; filename: string; sizeBytes: number } }>;
   attempts: Array<{
@@ -432,6 +433,7 @@ function serializeMessage(message: {
     id: message.id,
     templateKey: message.templateKey,
     recipientKind: message.recipientKind,
+    clubLinked: emailIsClubLinked({ clubRegistration: Boolean(message.registration?.clubRegistration), recipientKind: message.recipientKind }),
     recipientEmail: message.recipientEmail,
     recipientName: message.recipientName,
     senderName: message.senderNameSnapshot,
@@ -893,7 +895,7 @@ export async function getMessagingWorkspace(eventId: string): Promise<MessagingW
       orderBy: { createdAt: "desc" },
       take: 150,
       include: {
-        registration: { select: { id: true, confirmationCode: true } },
+        registration: { select: { id: true, confirmationCode: true, clubRegistration: { select: { id: true } } } },
         templateVersion: { select: { id: true, versionNumber: true } },
         attempts: { orderBy: { attemptNumber: "desc" } },
         files: {

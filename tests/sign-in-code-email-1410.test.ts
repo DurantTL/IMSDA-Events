@@ -77,7 +77,8 @@ describe("what the sign-in code puts in the outbox (#1410)", () => {
   it("says what the approved copy says", async () => {
     const data = await queued();
     expect(data.bodyTextSnapshot).toContain("Enter this code to finish signing in:");
-    expect(data.bodyTextSnapshot).toContain("It works for 10 minutes. If you didn't try to sign in, change your password. Someone may know it.");
+    expect(data.bodyTextSnapshot).toContain("It works for 10 minutes. Don't share this code with anyone. IMSDA staff will never ask for it.");
+    expect(data.bodyTextSnapshot).toContain("Didn't try to sign in?\nChange your password. Someone may know it.");
   });
 });
 
@@ -90,6 +91,8 @@ describe("what delivery does with it", () => {
     });
     expect(prepared).not.toHaveProperty("subject");
     expect(prepared.bodyText).toContain("518 207");
+    // The same code, for the layout's code box (#1443); the text part keeps it too.
+    expect(prepared.codeBox).toEqual({ code: "518 207", caption: "Works for 10 minutes" });
     expect(prepared.bodyText).not.toContain("{{");
     expect(spacedSignInCode("518207")).toBe("518 207");
     // The stored row was queued with placeholders only.
