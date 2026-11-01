@@ -231,6 +231,7 @@ export function ClubRosterWorkspace({
   const [notice, setNotice] = useState("");
   // Offered with the "Deactivated …" message; reactivating is the existing reverse action (#1455).
   const [undoDeactivate, setUndoDeactivate] = useState<RosterMemberRecord | null>(null);
+  const [undoFailed, setUndoFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
@@ -305,6 +306,8 @@ export function ClubRosterWorkspace({
 
   /** Add and edit happen in a pop-up (#383), so the list never scrolls away. */
   function openDialog(member: RosterMemberRecord | null) {
+    setUndoDeactivate(null);
+    setUndoFailed(false);
     setEditing(member);
     setFormType(member?.attendeeType ?? "YOUTH");
     setFormBirthDate("");
@@ -525,6 +528,7 @@ export function ClubRosterWorkspace({
     if (!keepMessage) {
       setNotice("");
       setUndoDeactivate(null);
+      setUndoFailed(false);
     }
     try {
       const response = await fetch(url, {
@@ -540,8 +544,6 @@ export function ClubRosterWorkspace({
       if (result.guardians) setGuardianMap(result.guardians);
       if (success) {
         setNotice(success);
-        messageWanted.current = true;
-        setMessageTick((tick) => tick + 1);
       }
       return result;
     } catch (caught) {
@@ -658,7 +660,8 @@ export function ClubRosterWorkspace({
   async function undoStatusChange(member: RosterMemberRecord) {
     const result = await setStatus(member, "ACTIVE", true);
     if (result) setUndoDeactivate(null);
-    // A failure keeps Undo on offer so it can be tried again; either way the message takes focus.
+    // A failure keeps Undo on offer (next to this error only) so it can be tried again; either way the message takes focus.
+    setUndoFailed(!result);
     messageWanted.current = true;
     setMessageTick((tick) => tick + 1);
   }
@@ -683,7 +686,12 @@ export function ClubRosterWorkspace({
     if (!confirmed) return;
     const result = await setStatus(member, next);
     rowChanged(member, result?.members, next === "INACTIVE" ? "Deactivated." : "Reactivated.", true);
-    if (result && next === "INACTIVE") setUndoDeactivate(member);
+    if (result && next === "INACTIVE") {
+      setUndoDeactivate(member);
+      // Undo is on offer, so the message takes focus and scrolls into view; other saves keep the Edit-button focus path.
+      messageWanted.current = true;
+      setMessageTick((tick) => tick + 1);
+    }
     if (result) closeDialog();
   }
 
@@ -712,7 +720,7 @@ export function ClubRosterWorkspace({
       {/* The page's one message slot; while the dialog is open its own slot (inside the dialog) shows errors. */}
       <div id="roster-message-slot" ref={messageSlot} tabIndex={-1}>
         {error && !dialogOpen
-          ? <FormMessage message={error} tone="error" undo={undoDeactivate ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+          ? <FormMessage message={error} tone="error" undo={undoDeactivate && undoFailed ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
           : notice
             ? <FormMessage message={notice} tone="success" undo={undoDeactivate ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
             : null}

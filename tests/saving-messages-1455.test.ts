@@ -232,8 +232,8 @@ describe("Roster message focus, dialog errors and Undo failure (#1455 review)", 
   }
 
   it("moves focus to Undo and scrolls the message into view after Deactivate", async () => {
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
+    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string };
       return new Response(JSON.stringify({ members: [{ ...person, status: body.status }] }), { status: 200 });
@@ -242,16 +242,17 @@ describe("Roster message focus, dialog errors and Undo failure (#1455 review)", 
     await deactivate(mounted.container);
     expect(document.activeElement?.textContent).toBe("Undo");
     expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+    scroll.mockRestore();
   });
 
   it("keeps the message and Undo (busy) while Undo runs, and offers Undo again after a failure", async () => {
-    let calls = 0;
+    const bodies: Array<{ status?: string }> = [];
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
     vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init?: RequestInit) => {
-      calls += 1;
       const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string };
-      if (calls === 1) return new Response(JSON.stringify({ members: [{ ...person, status: body.status }] }), { status: 200 });
+      bodies.push(body);
+      if (bodies.length === 1) return new Response(JSON.stringify({ members: [{ ...person, status: body.status }] }), { status: 200 });
       await gate;
       return new Response(JSON.stringify({ message: "The roster service is down." }), { status: 500 });
     }));
@@ -263,8 +264,32 @@ describe("Roster message focus, dialog errors and Undo failure (#1455 review)", 
     release();
     await flush(30);
     const slot = container.querySelector("#roster-message-slot")!;
+    expect(bodies[1]).toEqual({ status: "ACTIVE" });
     expect(slot.querySelector('[role="alert"]')!.textContent).toMatch(/^Not saved: The roster service is down\./);
     expect(slot.querySelector("button")!.textContent).toBe("Undo");
+    expect(document.activeElement).toBe(slot.querySelector("button"));
+    await click(buttonByText(container, "Undo"));
+    await flush(30);
+    expect(bodies[2]).toEqual({ status: "ACTIVE" });
+  });
+
+  it("an ordinary edit-save returns focus to that row's Edit button, not the message slot", async () => {
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ members: [{ ...person, gender: "FEMALE" }] }), { status: 200 })));
+    mounted = await mount(createElement(ClubRosterWorkspace, props));
+    const { container } = mounted;
+    // A real click focuses the button first; the dialog gives focus back to it when it closes.
+    container.querySelector<HTMLElement>("#roster-edit-m1")!.focus();
+    await click(container.querySelector("#roster-edit-m1")!);
+    await choose(document.body.querySelector<HTMLSelectElement>("#roster-gender")!, "FEMALE");
+    const form = document.body.querySelector<HTMLFormElement>("#roster-dialog-title")!.closest("section")!.querySelector("form")!;
+    await submitForm(form);
+    await flush(60);
+    expect(container.querySelector("#roster-message-slot")!.textContent).toBe("Saved.");
+    expect(document.activeElement?.id).toBe("roster-edit-m1");
+    expect(document.activeElement).not.toBe(container.querySelector("#roster-message-slot"));
+    expect(scroll).not.toHaveBeenCalled();
+    scroll.mockRestore();
   });
 
   it("shows a failed dialog save under the Save row, once", async () => {
