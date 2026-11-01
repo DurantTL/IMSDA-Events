@@ -18,6 +18,7 @@ import type {
   ProgramAssignmentDiagnostic,
   ProgramAssignmentWorkspaceField,
 } from "@/modules/program-assignments/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type AppliedRun = {
   id: string;
@@ -43,7 +44,7 @@ type ApiResult = {
 };
 
 function localDate(value: string) {
-  return new Date(value).toLocaleString();
+  return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function fieldIdentity(field: ProgramAssignmentWorkspaceField) {

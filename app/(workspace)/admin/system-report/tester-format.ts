@@ -1,11 +1,12 @@
 import { useEffect } from "react";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
-/** Local-time display for the tester cards. Times only appear after a run, so nothing differs between server and client. */
+/** Conference-time display (labeled) for the tester cards, so the server and the browser agree. */
 export function clockTime(iso: string | null, withSeconds = true) {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", ...(withSeconds ? { second: "2-digit" } : {}) });
+  return formatInConferenceTime(date, { hour: "numeric", minute: "2-digit", ...(withSeconds ? { second: "2-digit" } : {}) });
 }
 
 /** Calls `clear` when a rate-limit time passes, so the button comes back without a reload. */

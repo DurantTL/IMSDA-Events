@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ListPlus } from "lucide-react";
 import { classRequirementGaps, unavailableReason } from "@/modules/honors/class-picker-view";
 import type { ClassSelectionWorkspace } from "@/modules/honors/enrollment-repository";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 type Workspace = ClassSelectionWorkspace;
 type Offering = Workspace["offerings"][number];
@@ -11,7 +12,7 @@ type Attendee = Workspace["attendees"][number];
 type Waitlist = NonNullable<Workspace["waitlist"]>;
 
 function formatDeadline(iso: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(iso));
+  return formatInTimeZone(iso, timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /**

@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * The email a person gets when a club role is given to them (#1410), once per grant, through the account
@@ -17,7 +18,7 @@ function firstNameOf(displayName: string) {
 }
 
 function startDateText(date: Date) {
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(date, { month: "long", day: "numeric", year: "numeric" });
 }
 
 /** Pure: the subject and plain-text body. `startsOn` is null when the grant simply starts now. */

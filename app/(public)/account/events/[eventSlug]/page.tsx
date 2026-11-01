@@ -35,6 +35,7 @@ import {
   getStaffCommunity,
 } from "@/modules/community/repository";
 import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
+import { formatInConferenceTime, formatInTimeZone } from "@/modules/calendar/conference-format";
 
 export const dynamic = "force-dynamic";
 
@@ -83,14 +84,8 @@ function eventTimeLabel(
   endsAt: string,
   timeZone: string,
 ) {
-  const times = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-    timeZoneName: "short",
-  });
-  return `${times.format(new Date(startsAt))} – ${times.format(new Date(endsAt))}`;
+  const options = { weekday: "long", hour: "numeric", minute: "2-digit" } as const;
+  return `${formatInTimeZone(startsAt, timeZone, options)} – ${formatInTimeZone(endsAt, timeZone, options)}`;
 }
 
 const paragraphs = splitParagraphs;
@@ -295,12 +290,12 @@ export default async function AttendeeEventHubPage({
                 <div className="attendee-community-posts attendee-timeline-items">
                   {staffTimeline.map((item) => item.kind === "OFFICIAL" ? (
                     <article className={`attendee-timeline-official is-${item.announcement.priority.toLowerCase()}`} key={`announcement:${item.announcement.id}`}>
-                      <header><div><Megaphone size={15} aria-hidden="true" /><strong>Official update</strong><small>{item.announcement.priority.toLowerCase()}</small></div><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleString()}</time></header>
+                      <header><div><Megaphone size={15} aria-hidden="true" /><strong>Official update</strong><small>{item.announcement.priority.toLowerCase()}</small></div><time dateTime={item.occurredAt}>{formatInConferenceTime(item.occurredAt, { dateStyle: "medium", timeStyle: "short" })}</time></header>
                       <h3>{item.announcement.title}</h3><p>{announcementBodyForDisplay(item.announcement.body)}</p>
                     </article>
                   ) : (
                     <article className={`attendee-community-post is-${item.post.status.toLowerCase()}`} key={`post:${item.post.id}`}>
-                      <header><strong>{item.post.authorName}</strong><time dateTime={item.post.createdAt}>{new Date(item.post.createdAt).toLocaleString()}</time></header>
+                      <header><strong>{item.post.authorName}</strong><time dateTime={item.post.createdAt}>{formatInConferenceTime(item.post.createdAt, { dateStyle: "medium", timeStyle: "short" })}</time></header>
                       <p>{item.post.status === "PUBLISHED" ? item.post.body : "This post is not visible to attendees."}</p>
                       {item.post.replies.filter((reply) => reply.status === "PUBLISHED").map((reply) => (
                         <article className="community-staff-reply" key={reply.id}>

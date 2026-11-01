@@ -12,6 +12,7 @@ import {
 } from "@/modules/system-admin/readiness-copy";
 import type { SystemReadiness, ManualReadinessRow } from "@/modules/system-admin/readiness-repository";
 import styles from "./system-readiness-workspace.module.css";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 const statusLabel = {
   ok: "Checked: OK",
@@ -21,7 +22,7 @@ const statusLabel = {
 } as const;
 
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+  return formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function SystemReadinessWorkspace({ initialReadiness }: { initialReadiness: SystemReadiness }) {

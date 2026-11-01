@@ -22,6 +22,7 @@ import { enqueueLodgingMessage, deliverAfterCommit, lodgingRecipient } from "@/m
 import { categoryFits, isPastLodgingDeadline } from "@/modules/lodging/preferences-domain";
 import { addWaitingDemand, isStaffInvitationRegistration, staffRegistrationLodgingRefusal, demandFromGroups, loadCategoryCapacity, loadContext, loadDemandGroups, type Client, type DemandGroups, type Tx } from "@/modules/lodging/preferences-service";
 import { lockEventLodgingUnits, lodgingTransactionTimeoutMs, touchEventLodgingCapacity } from "@/modules/lodging/service";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 /**
  * The lodging waitlist (#200): joined, offered (with an expiry), accepted, declined, expired, removed, promoted.
@@ -324,7 +325,7 @@ export async function applyWaitlistAction(eventId: string, actorUserId: string, 
             heading: "A lodging place may be available",
             paragraphs: [
               `A place may now be available in ${lodgingCategoryLabels[entry.category]} for ${entry.partySize} ${entry.partySize === 1 ? "person" : "people"} on ${nightWords(entry.firstNight ? toNight(entry.firstNight) : null, entry.lastNight ? toNight(entry.lastNight) : null, state.context.nights)}.`,
-              `This offer expires on ${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: recipient?.timezone ?? "UTC" }).format(expiresAt)}. After that the place may go to someone else.`,
+              `This offer expires on ${formatInTimeZone(expiresAt, recipient?.timezone ?? "UTC", { dateStyle: "medium", timeStyle: "short" })}. After that the place may go to someone else.`,
               "Open your private registration page to accept or decline. Accepting does not charge anything by itself; the event team confirms your room and any charge.",
             ],
             linkLabel: "Open your private registration page",

@@ -5,10 +5,11 @@ import { useState, type FormEvent } from "react";
 import type { ActiveStationRow } from "@/modules/checkin-stations/repository";
 import { STATION_LABEL_MAX_LENGTH } from "@/modules/checkin-stations/domain";
 import styles from "@/components/check-in-stations-panel.module.css";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 function formatWhen(value: string, timeZone: string) {
   try {
-    return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+    return formatInTimeZone(value, timeZone, { dateStyle: "short", timeStyle: "short" });
   } catch {
     return new Date(value).toISOString();
   }

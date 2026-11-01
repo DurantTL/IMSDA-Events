@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Eye, Flag, MessageSquareWarning, Save, ShieldCheck, UsersRound } from "lucide-react";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type StaffCommunity = {
   eventId: string;
@@ -61,7 +62,7 @@ type StaffCommunity = {
 };
 
 function when(value: string) {
-  return new Date(value).toLocaleString();
+  return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function CommunityModerationWorkspace({ community }: { community: StaffCommunity }) {

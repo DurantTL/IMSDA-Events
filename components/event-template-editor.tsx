@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { ArchiveTemplateDialog } from "@/components/archive-template-dialog";
 import { hasUnsavedTemplateEdits, publishDisabledReason, saveDisabledReason, UNSAVED_PUBLISH_MESSAGE, validateTemplateEdits, type TemplateFieldError } from "@/modules/event-templates/editor-guards";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type EventTemplateEditorProps = {
   initialTemplate: EventTemplateRecord;
@@ -269,7 +270,7 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
           {template.versions.map((entry) => (
             <li key={entry.id}>
               Version {entry.versionNumber} — {entry.status}
-              {entry.publishedAt ? ` — published ${new Date(entry.publishedAt).toLocaleString()}` : ""}
+              {entry.publishedAt ? ` — published ${formatInConferenceTime(entry.publishedAt, { dateStyle: "medium", timeStyle: "short" })}` : ""}
             </li>
           ))}
         </ul>

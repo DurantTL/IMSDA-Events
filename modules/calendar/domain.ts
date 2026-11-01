@@ -5,7 +5,7 @@
  */
 
 import { publicStatusLine, type PublicCapacityStatus } from "@/modules/events/public-registration-status";
-import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
+import { CONFERENCE_TIME_ZONE, formatInTimeZone, shortZoneName } from "@/modules/calendar/conference-format";
 
 export { CONFERENCE_TIME_ZONE };
 
@@ -378,10 +378,9 @@ export function formatDateRange(startsOn: string, endsOn: string) {
 /** A one-day event's hours in its own time zone ("9:00 AM – 5:00 PM CST"); multi-day events show dates only. */
 export function eventTimeLabel(startsAt: Date, endsAt: Date, timeZone: string) {
   if (calendarDateIn(startsAt, timeZone) !== calendarDateIn(endsAt, timeZone)) return "";
-  const time = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
-  const zone = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
-    .formatToParts(startsAt).find((part) => part.type === "timeZoneName")?.value ?? "";
-  return `${time.format(startsAt)} – ${time.format(endsAt)}${zone ? ` ${zone}` : ""}`;
+  const time = (date: Date) => formatInTimeZone(date, timeZone, { hour: "numeric", minute: "2-digit", zoneLabel: false });
+  const zone = shortZoneName(startsAt, timeZone);
+  return `${time(startsAt)} – ${time(endsAt)}${zone ? ` ${zone}` : ""}`;
 }
 
 export const calendarStatusLabels: Record<CalendarItemStatus, string> = {

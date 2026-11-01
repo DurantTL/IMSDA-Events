@@ -875,7 +875,7 @@ export function MessageBodyEditor({
       ) : null}
       <div className="message-editor-footer">
         <span>Visual formatting is converted to the Markdown stored by existing template versions.</span>
-        <span>{value.length.toLocaleString()} / {maxLength.toLocaleString()}</span>
+        <span>{value.length.toLocaleString("en-US")} / {maxLength.toLocaleString("en-US")}</span>
       </div>
     </div>
   );

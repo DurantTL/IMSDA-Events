@@ -7,6 +7,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getEventPackets } from "@/modules/reporting/event-packets-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = {
   title: staffPageTitles.groupedPackets,
@@ -143,7 +144,7 @@ export default async function EventPacketsPage({
             </section>
           )}
 
-          <footer>Printed {new Date().toLocaleString()} · Protect this operational packet and shred it after use.</footer>
+          <footer>Printed {formatInConferenceTime(new Date(), { dateStyle: "medium", timeStyle: "short" })} · Protect this operational packet and shred it after use.</footer>
         </article>
       ))}
 

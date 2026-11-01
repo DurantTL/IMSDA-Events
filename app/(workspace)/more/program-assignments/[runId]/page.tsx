@@ -7,6 +7,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
 import { getAppliedAssignmentRoster } from "@/modules/program-assignments/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export const metadata: Metadata = { title: staffPageTitles.assignmentRoster };
 
@@ -57,7 +58,7 @@ export default async function ProgramAssignmentRosterPage({
         <div>
           <p className="eyebrow">Frozen assignment run</p>
           <h2>{roster.fieldLabel}</h2>
-          <p>{roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {new Date(roster.appliedAt).toLocaleString()} by {roster.appliedByName}</p>
+          <p>{roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</p>
         </div>
         <div className="intro-actions assignment-print-actions">
           <Link className="secondary-button" href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`}>Back to assignments</Link>

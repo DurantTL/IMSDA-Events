@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MAX_PHONE_LENGTH, validatePhone } from "@/lib/field-validation";
 import { eventContentItemSchema, parseEventContentItems, type EventContentItem } from "@/modules/events/content-schemas";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 /**
  * Event emergency plan (#114): pure validation and the published snapshot.
@@ -207,11 +208,11 @@ export function storedProcedureItems(value: unknown): EventContentItem[] {
 
 /** "Fri, Oct 30, 2026, 2:05 PM CDT" in the event's timezone, for the printed footer. */
 export function formatPrintTimestamp(date: Date, timezone: string): string {
-  const options: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" };
+  const options = { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" } as const;
   try {
-    return new Intl.DateTimeFormat("en-US", { ...options, timeZone: timezone }).format(date);
+    return formatInTimeZone(date, timezone, options);
   } catch {
-    return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(date);
+    return formatInTimeZone(date, "UTC", options);
   }
 }
 

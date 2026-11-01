@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatInConferenceTime, shortZoneName } from "@/modules/calendar/conference-format";
 
 const zone = "America/Chicago";
 // Either side of both 2026 US daylight-saving changes, plus a plain winter and summer instant.
@@ -30,9 +30,10 @@ describe("last six date formatter copies (#1373)", () => {
     }
   });
 
-  it("matches toLocaleString for background checks (dateStyle medium, timeStyle short)", () => {
+  it("matches toLocaleString, plus the zone name, for background checks (dateStyle medium, timeStyle short)", () => {
     for (const input of inputs) {
-      expect(formatInConferenceTime(input, mediumShort)).toBe(new Date(input).toLocaleString("en-US", { ...mediumShort, timeZone: zone }));
+      expect(formatInConferenceTime(input, { ...mediumShort, zoneLabel: false })).toBe(new Date(input).toLocaleString("en-US", { ...mediumShort, timeZone: zone }));
+      expect(formatInConferenceTime(input, mediumShort)).toBe(`${new Date(input).toLocaleString("en-US", { ...mediumShort, timeZone: zone })} ${shortZoneName(input)}`);
     }
   });
 

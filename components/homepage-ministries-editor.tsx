@@ -8,6 +8,7 @@ import {
   type HomepageMinistry,
 } from "@/modules/system-admin/homepage-ministries-domain";
 import styles from "@/components/homepage-ministries-editor.module.css";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type TileDraft = Omit<HomepageMinistry, "description" | "linkHref" | "categories"> & { description: string; linkHref: string; categories: string };
 
@@ -125,7 +126,7 @@ export function HomepageMinistriesEditor({
         </div>
         {meta.updatedAt && (
           <p className="field-help platform-note">
-            Last changed {new Date(meta.updatedAt).toLocaleString()}{meta.updatedByName ? ` by ${meta.updatedByName}` : ""}.
+            Last changed {formatInConferenceTime(meta.updatedAt, { dateStyle: "medium", timeStyle: "short" })}{meta.updatedByName ? ` by ${meta.updatedByName}` : ""}.
           </p>
         )}
       </section>

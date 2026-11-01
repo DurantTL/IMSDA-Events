@@ -73,7 +73,7 @@ describe("the digest email", () => {
     expect(subject).toBe("Location waitlist changes: 5 updates (October 6, 2026)");
     expect(bodyText).toContain("Hello Pat Coordinator,");
     expect(bodyText).toContain("Honors Weekend 2027\nCamp Heritage 1\n");
-    expect(bodyText).toContain("Joined the waitlist: River City Pathfinders (12 people, place #2 in line) at 3:15 PM Central");
+    expect(bodyText).toContain("Joined the waitlist: River City Pathfinders (12 people, place #2 in line) at 3:15 PM CDT");
     expect(bodyText).toContain("Promoted to a registration: Prairie Adventurers (1 person, was place #1 in line)");
     expect(bodyText).toContain("Removed from the waitlist: Oak Hill Explorers (5 people, was place #3 in line)");
     expect(bodyText).toContain("Des Moines\n  - Joined the waitlist: Lakeside Guides (8 people, place #1 in line)");

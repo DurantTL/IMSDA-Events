@@ -8,6 +8,7 @@ import type { FeedPreview } from "@/modules/calendar/feed-plan";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import { describeRepeat, parseRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry } from "@/modules/calendar/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type FeedResponse = {
   feeds?: CalendarAdminFeed[];
@@ -24,7 +25,7 @@ const fieldLabels: Record<string, string> = {
 };
 
 function when(value: string | null) {
-  return value ? new Date(value).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "Never";
+  return value ? formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" }) : "Never";
 }
 
 /**

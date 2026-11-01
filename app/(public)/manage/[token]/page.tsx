@@ -41,6 +41,7 @@ import { getRegistrantAssignmentView } from "@/modules/lodging/assignment-view";
 import { getRegistrantWaitlistView } from "@/modules/lodging/waitlist-service";
 import { CancellationRequestPanel } from "@/components/cancellation-request-panel";
 import { getRegistrantRequestView } from "@/modules/cancellation-requests/repository";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 export const dynamic = "force-dynamic";
 
@@ -64,15 +65,7 @@ function submittedLabel(
   timeZone: string,
 ) {
   if (!submittedAt) return "Not submitted";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-    timeZoneName: "short",
-  }).format(new Date(submittedAt));
+  return formatInTimeZone(submittedAt, timeZone, { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function expiryLabel(expiresAt: string) {

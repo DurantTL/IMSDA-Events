@@ -58,7 +58,7 @@ export function informationFormSubmittedContent(input: { formName: string; submi
       "A response was sent through an information form.",
       "",
       `Form: ${formName}`,
-      `When: ${when} (Central Time)`,
+      `When: ${when}`,
       "",
       "Open it (sign-in required):",
       staffLink(input.path),

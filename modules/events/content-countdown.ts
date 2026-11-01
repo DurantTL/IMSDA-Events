@@ -3,6 +3,8 @@
  * and the client enhancement agree and a test can pin them.
  */
 
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
+
 const wallClockFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function wallClockFormatter(timeZone: string) {
@@ -83,9 +85,5 @@ export function splitRemaining(remainingMs: number) {
 }
 
 export function formatCountdownTarget(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "full",
-    timeStyle: "short",
-    timeZone,
-  }).format(date);
+  return formatInTimeZone(date, timeZone, { dateStyle: "full", timeStyle: "short" });
 }

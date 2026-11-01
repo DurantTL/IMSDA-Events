@@ -45,6 +45,7 @@ import {
   waitlistOfferHoursMin,
   type OfferCandidate,
 } from "@/modules/honors/waitlist-domain";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 /**
  * Honors Weekend class waitlists (#831). A full class has a waitlist of youth in
@@ -122,7 +123,7 @@ export function contactOf(registration: {
 }
 
 function formatExpiry(at: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone }).format(at);
+  return formatInTimeZone(at, timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /** Queues the offer email inside the transaction; delivery happens after commit. Returns the outbox id when one is waiting to be sent. */
