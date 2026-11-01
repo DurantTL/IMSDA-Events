@@ -47,7 +47,7 @@ export function EmailInput({ label, stored, value, defaultValue = "", onValueCha
         {...rest}
         {...(blocking || outside
           ? fieldErrorProps(messageId, shown, rest["aria-describedby"])
-          : { "aria-describedby": problem.message ? messageId : rest["aria-describedby"] })}
+          : { "aria-describedby": [rest["aria-describedby"], problem.message ? messageId : ""].filter(Boolean).join(" ") || undefined })}
         inputMode={attributes.inputMode}
         onBlur={(event) => {
           setLeft(true);

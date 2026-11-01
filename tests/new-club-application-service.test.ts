@@ -269,7 +269,7 @@ describe("submitting an application", () => {
     expect(text).toContain("Dana Director");
     expect(text).toContain("https://events.imsda.test/admin/clubs/applications");
     // Nothing sensitive: no phone, address, email, note, signatures, board members or the attachment.
-    for (const secret of ["(515) 555-0100", "555-0199", "100 Example Road", "dana.director@example.test", "secret note", "Hal Elder", "Cleo Clerk", "Ben Board", "Signed page", ".pdf", "attach"]) {
+    for (const secret of ["555-0100", "555-0199", "100 Example Road", "dana.director@example.test", "secret note", "Hal Elder", "Cleo Clerk", "Ben Board", "Signed page", ".pdf", "attach"]) {
       expect(text, secret).not.toContain(secret);
     }
     expect(mocks.processAccountEmailQueue).toHaveBeenCalledWith({ messageIds: ["msg-1"] });
@@ -299,7 +299,7 @@ describe("submitting an application", () => {
     expect(entry).toMatchObject({ action: "NEW_CLUB_APPLICATION_SUBMITTED", entityType: "NewClubApplication", metadata: { source: "PUBLIC", hasAttachment: true, sponsoringChurchId: "church-1" } });
     expect(entry.actorUserId).toBeUndefined();
     const flat = JSON.stringify(entry);
-    for (const secret of ["Dana", "dana.director", "(515) 555-0100", "Example Road", "private note text", "Trailblazers", "Hal Elder"]) expect(flat, secret).not.toContain(secret);
+    for (const secret of ["Dana", "dana.director", "555-0100", "Example Road", "private note text", "Trailblazers", "Hal Elder"]) expect(flat, secret).not.toContain(secret);
   });
 });
 
@@ -524,7 +524,7 @@ describe("approving", () => {
     for (const entry of entries) expect(entry.actorUserId).toBe("user-admin");
     expect(entries[1].metadata).toMatchObject({ applicationId: db.applications[0].id, sponsoringChurchId: "church-1" });
     const flat = JSON.stringify(entries);
-    for (const secret of ["Dana", "dana.director", "(515) 555-0100", "Example Road", "Trailblazers", "We meet"]) expect(flat, secret).not.toContain(secret);
+    for (const secret of ["Dana", "dana.director", "555-0100", "Example Road", "Trailblazers", "We meet"]) expect(flat, secret).not.toContain(secret);
   });
 });
 

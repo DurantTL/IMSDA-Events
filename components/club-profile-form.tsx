@@ -7,7 +7,7 @@ import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
-import { EMAIL_FIELD_MESSAGE, PHONE_FIELD_MESSAGE } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, PHONE_FIELD_MESSAGE } from "@/lib/field-validation";
 import type { ClubProfileRecord } from "@/modules/organizations/club-profile-repository";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 
@@ -148,7 +148,7 @@ export function ClubProfileForm({
         </label>
         <label>
           Contact email
-          <EmailInput defaultValue={profile.contactEmail} id="club-profile-email" label="Contact email" maxLength={254} name="contactEmail" showNow={attempted} stored={profile.contactEmail} {...fieldErrorProps("club-profile-email-server-error", contactErrors.contactEmail)} />
+          <EmailInput defaultValue={profile.contactEmail} id="club-profile-email" label="Contact email" maxLength={MAX_EMAIL_LENGTH} name="contactEmail" showNow={attempted} stored={profile.contactEmail} {...fieldErrorProps("club-profile-email-server-error", contactErrors.contactEmail)} />
           <FieldError id="club-profile-email-server-error">{contactErrors.contactEmail}</FieldError>
         </label>
         <label>

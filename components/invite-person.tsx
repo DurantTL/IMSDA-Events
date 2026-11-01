@@ -16,7 +16,7 @@ import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/d
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
 import { EmailInput } from "@/components/email-input";
-import { EMAIL_FIELD_MESSAGE, isEmail } from "@/lib/field-validation";
+import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, isEmail } from "@/lib/field-validation";
 
 const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs" } as const;
 
@@ -192,7 +192,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </label>
                 <label className={styles.field}>
                   <span>Email</span>
-                  <EmailInput autoComplete="off" error={errors.email} errorId="invite-email-error" id="invite-email" label="Email" maxLength={254} onValueChange={setEmail} value={email} />
+                  <EmailInput autoComplete="off" error={errors.email} errorId="invite-email-error" id="invite-email" label="Email" maxLength={MAX_EMAIL_LENGTH} onValueChange={setEmail} value={email} />
                 </label>
 
                 <fieldset {...fieldErrorProps("invite-access-error", errors.access)} id="invite-access">

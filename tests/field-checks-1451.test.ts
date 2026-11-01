@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { validateGuardianForm } from "@/modules/club-rosters/guardians-domain";
 import { newClubApplicationInputSchema } from "@/modules/club-applications/domain";
 import { inlineFieldProblem, inlinePhoneProblem, phoneToStore, emailToStore, PHONE_FIELD_MESSAGE, EMAIL_FIELD_MESSAGE } from "@/lib/field-validation";
-import { typedAnswerProblem } from "@/modules/forms/definition";
+import { registrationFormDefinitionSchema, typedAnswerProblem, validateTestResponses } from "@/modules/forms/definition";
 import { healthRecordInputSchemaFor } from "@/modules/health-records/domain";
 import { syntheticRecord } from "./health-records-fixtures";
 
@@ -27,11 +27,15 @@ const files = [...sourceFiles("app"), ...sourceFiles("components")];
 describe("every phone field is a PhoneInput", () => {
   /** A file that may keep a literal `type="tel"`, with the reason. None today. */
   const telAllowList: Record<string, string> = {
+    "components/registration-builder/builder-preview.tsx": "A non-interactive preview of a form field in the builder; nothing is saved from it.",
+    "components/search-as-you-type.tsx": "A list of input types the search box treats as typed text, not an input.",
+    "components/registration-amendment-editor.tsx": "One generic input whose type, keypad and autofill follow the form field's type (email, phone, date, number); its message is the shared one.",
+    "components/public-registration-form.tsx": "One generic input whose type, keypad and autofill follow the form field's type (email, phone, date, number); its message is the shared one.",
     "components/phone-input.tsx": "PhoneInput itself is the one place the tel input is made (through inputAttributesFor).",
   };
 
-  it("finds no literal type=\"tel\" in app/ or components/", () => {
-    const offenders = files.filter((file) => !(file.replace(/\\/g, "/") in telAllowList) && /type=["']tel["']|type:\s*["']tel["']/.test(readFileSync(path.join(root, file), "utf8")));
+  it("finds no tel type, keypad or autofill outside PhoneInput in app and components", () => {
+    const offenders = files.filter((file) => !(file.replace(/\\/g, "/") in telAllowList) && /["']tel["']/.test(readFileSync(path.join(root, file), "utf8")));
     expect(offenders).toEqual([]);
   });
 });
@@ -39,39 +43,38 @@ describe("every phone field is a PhoneInput", () => {
 describe("email inputs", () => {
   /**
    * Files that still make a raw type="email" input, with why. The converted forms (club application, club profile,
-   * roster emergency contacts, sign-in, invite a person, pastor contact, event content blocks) use EmailInput.
+   * roster emergency contacts, sign-in, invite a person, pastor contact, event content blocks, year-end report,
+   * registration contact forms) use EmailInput.
    * A new raw email input fails this test: use EmailInput, or add the file here with the reason.
    */
+  const NOT_YET = "Not yet on EmailInput: still a raw email input with the browser's own check. Follow-up for B8.";
   const rawEmailAllowList: Record<string, string> = {
-    "app/(workspace)/admin/system-report/email-tester-card.tsx": "A one-off send-a-test tool that takes several addresses; the server reports the bad one.",
-    "components/attendee-password-reset-form.tsx": "Account lookup: the server answers the same for any address, so it never confirms one.",
-    "components/password-reset-request-form.tsx": "Account lookup: the server answers the same for any address, so it never confirms one.",
-    "components/attendee-verify-by-address-form.tsx": "Account lookup: the server answers the same for any address.",
-    "components/attendee-sign-in-form.tsx": "Attendee sign-in with the older single-step form; the unified sign-in uses EmailInput.",
-    "components/attendee-sign-up-form.tsx": "Account sign-up with its own server messages; follow-up to move onto EmailInput.",
-    "components/public-registration-recovery-form.tsx": "Registration lookup: the server answers the same for any address.",
-    "components/attendee-registration-contact-form.tsx": "Registration contact, checked by the form's own typed-answer validation (typedAnswerProblem).",
-    "components/public-registration-contact-form.tsx": "Registration contact, checked by the form's own typed-answer validation (typedAnswerProblem).",
-    "components/club-directors-workspace.tsx": "Staff action form (invite a director): server checks and names the address.",
-    "components/club-team-workspace.tsx": "Staff action form (invite a team member): server checks and names the address.",
-    "components/club-forms-actions.tsx": "Staff action form (send a link): server checks and names the address.",
-    "components/club-import-workspace.tsx": "Staff import review: addresses are edited in a table, each row checked by the import.",
-    "components/club-registration-editor.tsx": "Guest email already checked inline with inlineFieldProblem (the same message).",
-    "components/club-registration-workspace.tsx": "Staff action form: server checks and names the address.",
-    "components/club-year-end-report-form.tsx": "Year-end report contact, checked inline with the shared check on submit.",
-    "components/communications-workspace.tsx": "Reply-to and test addresses checked inline with the shared check.",
-    "components/email-delivery-section.tsx": "Staff email delivery settings, checked by the settings save.",
-    "components/event-settings-workspace.tsx": "Event help email, checked by the settings save and the summary.",
-    "components/health-record-actions.tsx": "Staff action form (send a health link): server checks and names the address.",
-    "components/honors-instructors-workspace.tsx": "Staff form: server checks and names the address.",
-    "components/new-club-applications-queue.tsx": "Staff invite form: server checks and names the address.",
-    "components/notifications-workspace.tsx": "Staff notification settings, checked by the settings save.",
-    "components/organization-billing-contact.tsx": "Billing contact form: server checks and names the address.",
-    "components/people-workspace.tsx": "Staff people tools: server checks and names the address.",
-    "components/person-access-controls.tsx": "Staff access tools: server checks and names the address.",
-    "components/platform-settings-workspace.tsx": "Platform settings, checked by the settings save and the summary.",
+    "app/(workspace)/admin/system-report/email-tester-card.tsx": NOT_YET,
+    "components/attendee-password-reset-form.tsx": NOT_YET,
+    "components/password-reset-request-form.tsx": NOT_YET,
+    "components/attendee-verify-by-address-form.tsx": NOT_YET,
+    "components/attendee-sign-in-form.tsx": NOT_YET,
+    "components/attendee-sign-up-form.tsx": NOT_YET,
+    "components/public-registration-recovery-form.tsx": NOT_YET,
+    "components/club-directors-workspace.tsx": NOT_YET,
+    "components/club-team-workspace.tsx": NOT_YET,
+    "components/club-forms-actions.tsx": NOT_YET,
+    "components/club-import-workspace.tsx": NOT_YET,
+    "components/club-registration-editor.tsx": NOT_YET,
+    "components/club-registration-workspace.tsx": NOT_YET,
+    "components/communications-workspace.tsx": NOT_YET,
+    "components/email-delivery-section.tsx": NOT_YET,
+    "components/event-settings-workspace.tsx": NOT_YET,
+    "components/health-record-actions.tsx": NOT_YET,
+    "components/honors-instructors-workspace.tsx": NOT_YET,
+    "components/new-club-applications-queue.tsx": NOT_YET,
+    "components/notifications-workspace.tsx": NOT_YET,
+    "components/organization-billing-contact.tsx": NOT_YET,
+    "components/people-workspace.tsx": NOT_YET,
+    "components/person-access-controls.tsx": NOT_YET,
+    "components/platform-settings-workspace.tsx": NOT_YET,
+    "components/staff-workspace.tsx": NOT_YET,
     "components/staff-invitation-registration.tsx": "A read-only, disabled display of the invited address; nothing is typed.",
-    "components/staff-workspace.tsx": "Staff action form (add a staff account): server checks and names the address.",
   };
 
   it("finds no unlisted raw type=\"email\" input", () => {
@@ -83,7 +86,7 @@ describe("email inputs", () => {
   });
 
   it("uses EmailInput on the forms the issue names", () => {
-    for (const file of ["components/new-club-application-form.tsx", "components/club-profile-form.tsx", "components/roster-guardian-fields.tsx", "components/club-form-roster-add.tsx", "components/login-form.tsx", "components/invite-person.tsx"]) {
+    for (const file of ["components/club-year-end-report-form.tsx", "components/attendee-registration-contact-form.tsx", "components/public-registration-contact-form.tsx", "components/new-club-application-form.tsx", "components/club-profile-form.tsx", "components/roster-guardian-fields.tsx", "components/club-form-roster-add.tsx", "components/login-form.tsx", "components/invite-person.tsx"]) {
       expect(readFileSync(path.join(root, file), "utf8"), file).toContain("<EmailInput");
     }
   });
@@ -176,5 +179,32 @@ describe("club application phones (#1451)", () => {
   it("still needs one phone and a real director email", () => {
     expect(newClubApplicationInputSchema.safeParse(application({ directorHomePhone: "" })).success).toBe(false);
     expect(newClubApplicationInputSchema.safeParse(application({ directorEmail: "" })).success).toBe(false);
+  });
+});
+
+describe("server issues name the field (#1451)", () => {
+  const field = (key: string, label: string, type: string) => ({ id: `f_${key}`, key, label, type, helpText: "", scope: "REGISTRATION", required: false, options: [] });
+  const definition = registrationFormDefinitionSchema.parse({
+    title: "Fixture",
+    description: "Fictitious.",
+    confirmationMessage: "Done.",
+    sections: [{ id: "details_section", title: "Details", description: "", fields: [field("cell", "Cell phone", "PHONE"), field("backup", "Backup email", "EMAIL")] }],
+  });
+
+  it("labels the shared phone and email message with the field it is about", () => {
+    const result = validateTestResponses(definition, { cell: "idk 911", backup: "not an email" });
+    expect(result.issues.map((issue) => issue.message)).toEqual([
+      `Cell phone: ${PHONE_FIELD_MESSAGE}`,
+      `Backup email: ${EMAIL_FIELD_MESSAGE}`,
+    ]);
+  });
+});
+
+describe("the error variant of the field message lays out like every other field error", () => {
+  it("is a flex row, so the icon sits beside the text", () => {
+    const css = readFileSync(path.join(root, "app/globals.css"), "utf8");
+    const rule = /\.field-error-message\.phone-input-message[^{]*\{([^}]*)\}/.exec(css);
+    expect(rule?.[1]).toMatch(/display:\s*flex/);
+    expect(css.indexOf(".field-error-message.phone-input-message")).toBeLessThan(css.indexOf("Registration form builder editor shell (#1132"));
   });
 });

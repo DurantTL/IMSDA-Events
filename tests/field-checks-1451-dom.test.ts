@@ -52,6 +52,24 @@ describe("PhoneInput formats on blur (8.5)", () => {
   });
 });
 
+describe("the needs-correcting notice keeps the caller's description (#1451)", () => {
+  it("joins the notice id to aria-describedby on both inputs", async () => {
+    for (const element of [
+      createElement(PhoneInput, { label: "Phone", "aria-describedby": "help-1", defaultValue: "555-0100", stored: "555-0100" }),
+      createElement(EmailInput, { label: "Email", "aria-describedby": "help-1", defaultValue: "old@@example", stored: "old@@example" }),
+    ]) {
+      mounted = await mount(element);
+      const input = mounted.container.querySelector("input")!;
+      const ids = (input.getAttribute("aria-describedby") ?? "").split(" ");
+      expect(ids).toContain("help-1");
+      expect(ids).toHaveLength(2);
+      expect(mounted.container.querySelector(`[id="${ids[1]}"]`)?.textContent).toContain("needs correcting");
+      await mounted.unmount();
+      mounted = null;
+    }
+  });
+});
+
 describe("EmailInput", () => {
   it("shows the one shared message after the field is left, and never repeats the address", async () => {
     mounted = await mount(createElement(EmailInput, { label: "Email", name: "email" }));

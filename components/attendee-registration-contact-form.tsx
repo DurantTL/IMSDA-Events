@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 
 type Contact = {
@@ -76,6 +77,15 @@ export function AttendeeRegistrationContactForm({
     setSiteUpdating(false);
     setAttempted(true);
     // The saved phone is the one the server compares with (#871); the same number never blocks.
+    // The browser's required and email checks are off (noValidate); the app says what is missing.
+    if (!contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim()) {
+      setNotice({ tone: "error", message: "Enter the first name, last name and email address, then save again." });
+      return;
+    }
+    if (emailBlockingMessage("Email", contact.email, savedContact.email)) {
+      setNotice({ tone: "error", message: "Fix the highlighted email address and save again." });
+      return;
+    }
     if (phoneBlocks("Phone", contact.phone, savedContact.phone)) {
       setNotice({ tone: "error", message: "Fix the highlighted phone number and save again." });
       return;
@@ -123,7 +133,7 @@ export function AttendeeRegistrationContactForm({
           {[`${savedContact.firstName} ${savedContact.lastName}`.trim(), savedContact.email].filter(Boolean).join(" · ")}
         </small>
       </summary>
-      <form onSubmit={save}>
+      <form noValidate onSubmit={save}>
         <p>A fresh emailed code is required. It works only in this signed-in session.</p>
         <div className="public-manage-contact-grid">
           <label className="public-registration-field">
@@ -136,7 +146,7 @@ export function AttendeeRegistrationContactForm({
           </label>
           <label className="public-registration-field public-manage-contact-wide">
             <span className="public-registration-field-label">Email</span>
-            <input required type="email" maxLength={160} value={contact.email} onChange={(event) => field("email", event.target.value)} />
+            <EmailInput label="Email" required showNow={attempted} stored={savedContact.email} value={contact.email} onValueChange={(value) => field("email", value)} />
           </label>
           <label className="public-registration-field public-manage-contact-wide">
             <span className="public-registration-field-label">Phone</span>
