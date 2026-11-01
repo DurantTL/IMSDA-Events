@@ -29,6 +29,10 @@ describe("Forms help contact", () => {
     mocks.findUnique.mockRejectedValue(new Error("db down"));
     expect(await getFormsHelpContact()).toEqual({ email: "support@imsda.org", phone: "(515) 223-1197" });
   });
+  it("falls back when the database client cannot be made", async () => {
+    mocks.findUnique.mockImplementation(() => { throw new Error("no client"); });
+    expect(await getFormsHelpContact()).toEqual({ email: "support@imsda.org", phone: "(515) 223-1197" });
+  });
   it("builds the tel link from the digits", () => {
     expect(telHref("(515) 223-1197")).toBe("tel:+15152231197");
     expect(telHref("1-515-223-1197")).toBe("tel:+15152231197");

@@ -193,12 +193,17 @@ export async function getPublicHelpContact(): Promise<{ phone: string | null; em
 /**
  * The contact the "Forms help" popup shows (#1445): Platform settings → Email header and footer → footer help email and
  * phone (#1443), the same contact every email's footer shows. A field left blank still shows the IMSDA support default
- * here, because the popup always needs a way to reach someone. Never throws (`loadEmailLayoutSettings` falls back to
- * the defaults when the read fails).
+ * here, because the popup always needs a way to reach someone. Never throws: any failure shows the defaults.
  */
 export async function getFormsHelpContact(): Promise<FormsHelpContact> {
-  const settings = await loadEmailLayoutSettings(getPrisma());
-  return resolveFormsHelpContact({ email: settings.helpEmail, phone: settings.helpPhone });
+  try {
+    const settings = await loadEmailLayoutSettings(getPrisma());
+    return resolveFormsHelpContact({ email: settings.helpEmail, phone: settings.helpPhone });
+  } catch (error) {
+    // Getting the database client itself can fail (bad environment); the page still loads with the defaults.
+    logError("Reading the Forms help contact failed", error);
+    return resolveFormsHelpContact({});
+  }
 }
 
 export class PlatformSettingsError extends Error {
