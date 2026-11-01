@@ -34,6 +34,7 @@ import { isInAppSetup } from "@/modules/setup-help/types";
 import { createSetupHelpRegistry } from "@/modules/setup-help/registry";
 import { assessSweepHeartbeat } from "@/modules/operations/sweep-heartbeat";
 import { offsiteBackupFields } from "@/modules/system-admin/system-report/backup-signals";
+import { backupServiceFields } from "@/modules/system-admin/system-report/email-backup-signals";
 import {
   alertDeliveryFields,
   autodeployFields,
@@ -236,6 +237,12 @@ describe("a source scan fails on 'not set up' wording nobody covered", () => {
     { file: `${dir}/notice-signals.ts`, snippet: "Square is not set up", rows: ["square-notices"], read: notSetUpReadings.square },
     { file: `${dir}/notice-signals.ts`, snippet: "notices aren't set up", rows: ["resend-notices", "ses-notices"], read: notSetUpReadings.email },
     { file: `${dir}/service-setup.ts`, snippet: "Not set up:", rows: ["connected-services", "payment-setup"], read: notSetUpReadings.services },
+    {
+      file: `${dir}/email-backup-signals.ts`,
+      snippet: "Not set up",
+      rows: ["email-backup"],
+      read: () => (["not_set", "invalid_value", "same_as_primary", "primary_not_ses", "missing_api_key"] as const).map((reason) => backupServiceFields("email-backup", { status: { active: false, reason }, lastUsedAt: null, now })),
+    },
   ];
   const serviceRows = new Set(["connected-services", "payment-setup"]);
 
@@ -407,6 +414,7 @@ describe("the report catalog", () => {
     { reason: "Checked by people on the readiness page, and the administrator list is read from accounts", keys: ["checklist-server", "checklist-go-live", "admin-protection"] },
     { reason: "Pure built-in self-tests with fixed data", keys: ["lodging-quote", "meal-price", "invoice-figures", "ledger-split", "badge-csv", "roster-export", "ics-parsing", "scheduled-email"] },
     { reason: "Summary rows: each service that is not set up gets its own panel through serviceSetup", keys: ["connected-services", "payment-setup"] },
+    { reason: "Backup email: the sent count says how often Resend took over, and the setup checklist row is itself the steps; the Backup email service row carries the setup help", keys: ["email-backup-sent", "email-backup-setup"] },
   ];
   const allowed = NEVER_NEEDS_SETUP.flatMap((group) => group.keys);
 

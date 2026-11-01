@@ -524,9 +524,9 @@ export function PlatformSettingsWorkspace({
             {fieldError("emailHelpEmail", emailProblem)}
           </label>
           <label>Footer help phone (optional)
-            <input {...invalidProps("emailHelpPhone", emailPhoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setEmailPhoneTouched(true)} type="tel" {...field("emailHelpPhone")} />
+            <PhoneInput {...invalidProps("emailHelpPhone")} autoComplete="off" id={fieldId("emailHelpPhone")} label="Phone" onBlur={() => setEmailPhoneTouched(true)} onValueChange={(value) => edit("emailHelpPhone", value)} showNow={emailPhoneTouched} stored={settings.emailHelpPhone} value={draft.emailHelpPhone} />
             <small>A phone number, like (515) 555-0100.</small>
-            {fieldError("emailHelpPhone", emailPhoneProblem.message ?? undefined)}
+            {fieldError("emailHelpPhone")}
           </label>
         </section>
 
