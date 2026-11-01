@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import {
   DEFAULT_ROSTER_EXPORT_COLUMNS,
   ROSTER_EXPORT_COLUMNS,
@@ -47,6 +48,7 @@ export function RosterExportBuilder({
   const [formats, setFormats] = useState(initialFormats);
   const [formatName, setFormatName] = useState("");
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const saveBlocked = !formatName.trim()
     ? "Type a name for the format to save it."
     : columns.length === 0 ? "Choose at least one column to save a format." : null;
@@ -158,6 +160,12 @@ export function RosterExportBuilder({
   }
 
   async function deleteFormat(format: RosterExportFormatRecord) {
+    if (!(await confirm({
+      title: `Delete ${format.name}?`,
+      body: <p>The saved format is removed for everyone who can use this export.</p>,
+      confirmLabel: `Delete ${format.name}`,
+      destructive: true,
+    }))) return;
     setError("");
     setNotice("");
     setBusy(true);
@@ -178,6 +186,7 @@ export function RosterExportBuilder({
 
   return (
     <div className="public-manage-card">
+      {confirmDialog}
       <h2>Export builder</h2>
       <p className="quiet-copy">
         Build a CSV for an outside camporee: choose the columns it needs, put them in the order it wants, and rename

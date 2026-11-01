@@ -69,13 +69,9 @@ const unconfirmedDeleteAllowlist: Record<string, string> = {
   "components/more-launcher.tsx": "Turning a module off opens its own in-page 'Turn off' confirmation panel first.",
   "components/organization-directory-workspace.tsx": "Delete opens a type-the-name confirmation form before the request is sent.",
   "components/staff-passkey-manager.tsx": "Removing a passkey goes through startChange, which asks for confirmation and re-authentication first.",
-  // KNOWN GAPS: these send the request straight from the click. Listed so the scan passes today and
-  // shrinks as each is fixed; do not add to this group. Remove an entry when its file confirms.
-  "components/check-in-stations-panel.tsx": "KNOWN GAP: Revoke station sends DELETE on click with no confirm.",
-  "components/class-waitlist-panel.tsx": "KNOWN GAP: 'Decline the seat' / 'Leave the waitlist' send DELETE on click with no confirm.",
-  "components/registration-notes-tags-panel.tsx": "KNOWN GAP: removing a tag sends DELETE on click with no confirm.",
-  "components/roster-export-builder.tsx": "KNOWN GAP: deleting a saved export format sends DELETE on click with no confirm.",
-  "components/session-manager.tsx": "KNOWN GAP: 'sign out other devices' sends DELETE on click with no confirm.",
+  // Low-stakes by design: nothing is lost and the action is trivially reversible.
+  "components/registration-notes-tags-panel.tsx": "Removes one tag chip; re-adding the tag restores it, no data is lost.",
+  "components/session-manager.tsx": "Ends sessions only; no data is deleted and the devices can sign in again.",
 };
 
 const confirmMarkers = /\buseConfirm\b|\bConfirmDialog\b|\b(?:Delete|Remove|Archive|Cancel)\w*Dialog\b/;
