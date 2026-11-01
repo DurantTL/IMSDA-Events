@@ -183,6 +183,8 @@ const templateTokenLabels: Readonly<Record<string, string>> = Object.fromEntries
  * note in that position renders as broken markup rather than a button.
  */
 const PREVIEW_MANAGE_URL = "https://events.imsda.org/manage/preview-link-not-live";
+/** The origin the preview treats as the site's own, so text-only previews show the same buttons delivery sends. */
+const PREVIEW_ORIGINS = [new URL(PREVIEW_MANAGE_URL).origin];
 const PREVIEW_MANAGE_API_URL = "https://events.imsda.org/api/public/manage/preview-link-not-live";
 
 function withPreviewLinks(value: string) {
@@ -2272,10 +2274,12 @@ export function CommunicationsWorkspace({
                         className="message-body-html"
                         title="Captured message"
                         sandbox=""
-                        // Written from the text as plain paragraphs, as delivery does; no origins, so nothing is linked.
+                        // Written from the text as plain paragraphs, as delivery does. The preview's stand-in manage link counts
+                        // as the site's own address, so the same lines become buttons here as in the sent email.
                         srcDoc={renderEmailHtmlDocument({
                           title: selectedMessage.subject,
-                          bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText)),
+                          preheader: selectedMessage.preheader ? withPreviewLinks(selectedMessage.preheader) : null,
+                          bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText), { buttonOrigins: PREVIEW_ORIGINS }),
                           ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
                         })}
                       />
