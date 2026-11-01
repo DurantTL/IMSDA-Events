@@ -397,7 +397,7 @@ export function AttendeeCommunityBoard({
                 type="search"
                 value={searchQuery}
               />
-              <button className="secondary-button" disabled={searching} type="submit">{searching ? "Searching…" : "Search"}</button>
+              <button className="secondary-button" type="submit">{searching ? "Searching…" : "Search"}</button>
               {searchResults && <button className="text-button" onClick={clearSearch} type="button">Clear</button>}
             </div>
             <small>Searches only visible posts and replies from this event.</small>

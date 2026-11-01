@@ -56,6 +56,27 @@ export function searchInputs(source: string) {
   return [...hits];
 }
 
+/**
+ * Whether the search input at `pos` really searches as you type: its own tag uses the shared debounced callback
+ * (`.schedule(` or `inputProps`), or it sits inside a `<SearchAsYouTypeForm>` or a `<form>` spreading `formProps`.
+ * Importing the module is not enough: a second, Enter-only form in the same file must fail.
+ */
+export function isLive(source: string, pos: number) {
+  const tag = source.slice(pos, tagEnd(source, pos) + 1);
+  if (/\.schedule\(|inputProps|useDebouncedSearch|\{\.\.\.formProps\}/.test(tag)) return true;
+  const before = source.slice(0, pos);
+  const openAt = (open: RegExp, close: string, accept: (text: string) => boolean) => {
+    let found = -1;
+    for (const match of before.matchAll(open)) {
+      const closedAfter = before.indexOf(close, match.index!) !== -1;
+      if (!closedAfter && accept(source.slice(match.index!, tagEnd(source, match.index!) + 1))) found = match.index!;
+    }
+    return found !== -1;
+  };
+  return openAt(/<SearchAsYouTypeForm\b/g, "</SearchAsYouTypeForm>", () => true)
+    || openAt(/<form\b/g, "</form>", (text) => /\{\.\.\.formProps\}/.test(text));
+}
+
 const usesShared = (source: string) => /from "@\/components\/search-as-you-type"/.test(source);
 
 type Allowed = { file: string; count: number; reason: string };
@@ -124,6 +145,10 @@ describe("search boxes search as you type (#1431)", () => {
         continue;
       }
       if (!usesShared(source)) problems.push(`${file}: ${count} search input(s) without components/search-as-you-type`);
+      else {
+        const dead = searchInputs(source).filter((pos) => !isLive(source, pos));
+        if (dead.length > 0) problems.push(`${file}: ${dead.length} of ${count} search input(s) not inside SearchAsYouTypeForm / a formProps form and not using the shared debounce`);
+      }
     }
     expect(problems).toEqual([]);
   });
@@ -145,6 +170,21 @@ describe("search boxes search as you type (#1431)", () => {
     expect(searchInputs('<input type="hidden" name="q" value="x" />')).toHaveLength(0);
     expect(searchInputs('<label className="search-field"><X /><input value={q}\n onChange={() => 1} /></label>')).toHaveLength(1);
     expect(searchInputs('<input name="email" type="email" />')).toHaveLength(0);
+  });
+
+  it("the liveness check tells a shared form from an Enter-only one", () => {
+    const live = '<SearchAsYouTypeForm action="/a"><input name="q" type="search" /></SearchAsYouTypeForm>';
+    const enterOnly = '<form method="get" action="/a"><input name="q" type="search" /></form>';
+    const hook = '<form {...formProps} action="/a"><input name="q" type="search" /></form>';
+    const fetchBox = '<form onSubmit={x}><input type="search" onChange={() => { go(); soon.schedule(); }} /></form>';
+    const pos = (source: string) => searchInputs(source)[0]!;
+    expect(isLive(live, pos(live))).toBe(true);
+    expect(isLive(hook, pos(hook))).toBe(true);
+    expect(isLive(fetchBox, pos(fetchBox))).toBe(true);
+    expect(isLive(enterOnly, pos(enterOnly))).toBe(false);
+    // A live form that closed earlier does not cover a later Enter-only one.
+    const both = live + enterOnly;
+    expect(isLive(both, searchInputs(both)[1]!)).toBe(false);
   });
 
   it("the wrapped events field really sits inside the shared form", () => {

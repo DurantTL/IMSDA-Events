@@ -12,6 +12,7 @@ import { sortOrderText } from "@/lib/list-sort";
 import { isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
+  DEFAULT_LISTING_STATUSES,
   DEFAULT_LISTING_VIEW,
   LISTING_COLUMNS,
   LISTING_STATUSES,
@@ -121,7 +122,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <fieldset className="filter-group">
           <legend>Registration status</legend>
           {LISTING_STATUSES.map((status) => (
-            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
+            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} data-default-checked={DEFAULT_LISTING_STATUSES.includes(status) ? "" : undefined} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
           ))}
         </fieldset>
         <div className="filter-bar-actions">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
-import { useDebouncedCallback } from "@/components/search-as-you-type";
+import { isCurrentAddress, useDebouncedCallback } from "@/components/search-as-you-type";
 import {
   PEOPLE_FILTER_SEVERAL,
   parsePeopleFilters,
@@ -69,7 +69,7 @@ export function PeopleQuickFilters({
     if (!form) return;
     const typed = String(new FormData(form).get("q") ?? "").trim();
     const href = peopleHref({ query: typed, filters: shown });
-    if (href === `${window.location.pathname}${window.location.search}`) return;
+    if (isCurrentAddress(href)) return;
     startTransition(() => router.replace(href, { scroll: false }));
   };
   const typing = useDebouncedCallback(apply);

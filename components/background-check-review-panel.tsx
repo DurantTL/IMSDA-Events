@@ -429,7 +429,7 @@ export function BackgroundCheckReviewPanel() {
             value={lookupName}
           />
         </label>{" "}
-        <button className="secondary-button" disabled={lookingUp} type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
+        <button className="secondary-button" type="submit"><Search aria-hidden="true" size={14} /> {lookingUp ? "Looking…" : "Look up"}</button>
       </form>
       <SearchResultStatus message={lookup && lookup.hasList ? `${lookup.rowsPage.total} list ${lookup.rowsPage.total === 1 ? "row" : "rows"} and ${lookup.peoplePage.total} ${lookup.peoplePage.total === 1 ? "person" : "people"} found` : ""} />
       {lookup && !lookup.hasList && <p className="report-empty">No list has been uploaded yet.</p>}

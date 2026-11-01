@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 
 /**
@@ -12,6 +12,11 @@ import { focusSearchInput, SearchClearButton } from "@/components/search-clear-b
 export function EventsSearchField({ defaultValue }: { defaultValue: string }) {
   const [text, setText] = useState(defaultValue);
   const input = useRef<HTMLInputElement>(null);
+  // After Back or a link the form shows the URL's text (its effect runs after this one), so read the box once that settles.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setText(input.current?.value ?? ""));
+    return () => cancelAnimationFrame(frame);
+  }, [defaultValue]);
   return (
     <span className="search-field" onMouseDown={focusSearchInput}>
       <Search aria-hidden="true" size={16} />

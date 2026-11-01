@@ -1,15 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 
 import { OrganizationSearchControls } from "@/components/organization-search-controls";
 import {
-  SEARCH_DEBOUNCE_MS,
   SearchAsYouTypeForm,
   SearchResultStatus,
-  createDebouncer,
   createTicket,
   searchAsYouTypeHref,
 } from "@/components/search-as-you-type";
@@ -18,10 +16,26 @@ import {
 describe("searchAsYouTypeHref", () => {
   const fields = (entries: Array<[string, string]>) => entries as Array<[string, FormDataEntryValue]>;
 
-  it("keeps the other params and goes back to page 1 when the term changes", () => {
+  it("sends only the form's own fields, like a native GET submit, and never the page", () => {
     expect(searchAsYouTypeHref("/admin/clubs", "?year=2026&q=old&page=3", fields([["year", "2026"], ["q", "eagles"]])))
       .toBe("/admin/clubs?year=2026&q=eagles");
-    expect(searchAsYouTypeHref("/admin/people", "?role=a&page=2", fields([["q", "ann"]]))).toBe("/admin/people?role=a&q=ann");
+    expect(searchAsYouTypeHref("/admin/people", "?role=a&page=2", fields([["q", "ann"]]))).toBe("/admin/people?q=ann");
+    expect(searchAsYouTypeHref("/p", "", fields([["q", "x"], ["page", "4"]]))).toBe("/p?q=x");
+  });
+
+  it("does not carry a stale param the form has no field for (answerQuestion, registration)", () => {
+    const href = searchAsYouTypeHref(
+      "/people",
+      "?event=e1&answerQuestion=meal&answerValue=vegan&registration=r1&q=old",
+      fields([["event", "e1"], ["q", "ann"]]),
+    );
+    expect(href).toBe("/people?event=e1&q=ann");
+    expect(href).not.toContain("answer");
+    expect(href).not.toContain("registration");
+  });
+
+  it("carries a param only when the form opts in with keepParams", () => {
+    expect(searchAsYouTypeHref("/p", "?tab=b&other=1", fields([["q", "x"]]), { keepParams: ["tab"] })).toBe("/p?tab=b&q=x");
   });
 
   it("drops an empty or blank q, and returns the bare path when nothing remains", () => {
@@ -33,50 +47,18 @@ describe("searchAsYouTypeHref", () => {
     expect(searchAsYouTypeHref("/admin/clubs", "", fields([["q", "  Bay & Pines "]]))).toBe("/admin/clubs?q=Bay+%26+Pines");
   });
 
-  it("writes every value of a multi-value field and clears a control left out of the data", () => {
+  it("writes every value of a multi-value field, and none for an unchecked box", () => {
     expect(searchAsYouTypeHref("/p", "?statuses=A", fields([["statuses", "B"], ["statuses", "C"]]))).toBe("/p?statuses=B&statuses=C");
-    // An unchecked checkbox is absent from FormData, so the form's own control names clear it.
-    expect(searchAsYouTypeHref("/p", "?statuses=A&sort=name", fields([]), { ownedParams: ["statuses"] })).toBe("/p?sort=name");
+    expect(searchAsYouTypeHref("/p", "?statuses=A&sort=name", fields([["sort", "name"]]))).toBe("/p?sort=name");
   });
 
   it("treats a select's all-value as empty and honours custom reset params", () => {
     expect(searchAsYouTypeHref("/o", "?status=ACTIVE", fields([["status", "ALL"]]), { ignoreValues: { status: "ALL" } })).toBe("/o");
-    expect(searchAsYouTypeHref("/o", "?pg=4&page=4", fields([["q", "x"]]), { resetParams: ["pg"] })).toBe("/o?page=4&q=x");
+    expect(searchAsYouTypeHref("/o", "", fields([["pg", "4"], ["q", "x"]]), { resetParams: ["pg"] })).toBe("/o?q=x");
   });
 });
 
-describe("createDebouncer and createTicket", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it("runs once after the pause, restarting on every keystroke", () => {
-    const run = vi.fn();
-    const debouncer = createDebouncer(run);
-    debouncer.schedule();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1);
-    debouncer.schedule();
-    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1);
-    expect(run).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(run).toHaveBeenCalledTimes(1);
-  });
-
-  it("cancels, and flushes only a pending call", () => {
-    const run = vi.fn();
-    const debouncer = createDebouncer(run, 100);
-    debouncer.schedule();
-    debouncer.cancel();
-    vi.advanceTimersByTime(500);
-    expect(run).not.toHaveBeenCalled();
-    debouncer.flush();
-    expect(run).not.toHaveBeenCalled();
-    debouncer.schedule();
-    debouncer.flush();
-    expect(run).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(500);
-    expect(run).toHaveBeenCalledTimes(1);
-  });
-
+describe("createTicket", () => {
   it("only the newest ticket is current, so an older answer is dropped", () => {
     const ticket = createTicket();
     const first = ticket.next();

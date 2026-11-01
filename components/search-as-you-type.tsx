@@ -29,20 +29,22 @@ export function syncFieldValue(
 }
 
 /**
- * The address a search lands on: the current URL's params with the form's fields laid over them. Non-empty values are
- * set (trimmed), empty ones deleted (so are the `ownedParams`, the names of every control in the form), and a field with several values (checkboxes) is deleted then appended. The
- * `ignoreValues` (a select's "all" value, such as status "ALL") count as empty. The `resetParams` (the page) are dropped so a changed term goes back to page 1; every other param is kept. Returns the
- * bare path when no params remain.
+ * The address a search lands on, built the way a native GET submit builds it: from the form's own fields only, so
+ * script and no-script send the same thing and a stale param the form never had cannot ride along. Non-empty values
+ * are set (trimmed), empty ones left out, and a field with several values (checkboxes) is appended once per value.
+ * `ignoreValues` (a select's "all" value, such as status "ALL") count as empty. `keepParams` is an explicit opt-in for
+ * a form that must carry a param it has no field for. `resetParams` (the page) are dropped so a changed term goes back
+ * to page 1. Returns the bare path when no params remain.
  */
 export function searchAsYouTypeHref(
   pathname: string,
   currentSearch: string,
   fields: Iterable<[string, FormDataEntryValue]>,
-  { resetParams = ["page"], ownedParams = [], ignoreValues = {} }: { resetParams?: string[]; ownedParams?: Iterable<string>; ignoreValues?: Record<string, string> } = {},
+  { resetParams = ["page"], keepParams = [], ignoreValues = {} }: { resetParams?: string[]; keepParams?: Iterable<string>; ignoreValues?: Record<string, string> } = {},
 ) {
-  const params = new URLSearchParams(currentSearch);
-  // A control the form owns but left out of the data (an unchecked checkbox) must clear its param too.
-  for (const name of ownedParams) params.delete(name);
+  const params = new URLSearchParams();
+  const current = new URLSearchParams(currentSearch);
+  for (const name of keepParams) for (const value of current.getAll(name)) params.append(name, value);
   const grouped = new Map<string, string[]>();
   for (const [name, raw] of fields) {
     if (typeof raw !== "string") continue;
@@ -65,29 +67,13 @@ export function searchAsYouTypeHref(
   return query ? `${pathname}?${query}` : pathname;
 }
 
-/** A debounced call with cancel and flush, free of React so it can be tested with fake timers. */
-export function createDebouncer(fn: () => void, delayMs: number = SEARCH_DEBOUNCE_MS) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const cancel = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
+/** True when `href` is the address the browser is already on (same path, same params in any order). */
+export function isCurrentAddress(href: string) {
+  const parse = (address: string) => {
+    const url = new URL(address, window.location.origin);
+    return `${url.pathname}?${[...url.searchParams.entries()].map(([k, v]) => `${k}=${v}`).sort().join("&")}`;
   };
-  return {
-    schedule() {
-      cancel();
-      timer = setTimeout(() => {
-        timer = null;
-        fn();
-      }, delayMs);
-    },
-    cancel,
-    flush() {
-      if (!timer) return;
-      cancel();
-      fn();
-    },
-    isPending: () => timer !== null,
-  };
+  return parse(href) === parse(`${window.location.pathname}${window.location.search}`);
 }
 
 /** A counter for stale answers: only the newest ticket is current, so an older fetch never overwrites a newer one. */
@@ -163,7 +149,8 @@ export function useSearchAsYouType({
   resetParams = ["page"],
   pathname,
   ignoreValues,
-}: { delayMs?: number; resetParams?: string[]; pathname?: string; ignoreValues?: Record<string, string> } = {}) {
+  keepParams,
+}: { delayMs?: number; resetParams?: string[]; pathname?: string; ignoreValues?: Record<string, string>; keepParams?: string[] } = {}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
@@ -172,10 +159,9 @@ export function useSearchAsYouType({
     const form = formRef.current;
     if (!form) return;
     const path = pathname ?? window.location.pathname;
-    const ownedParams = Array.from(form.elements, (element) => (element as HTMLInputElement).name).filter(Boolean);
-    const href = searchAsYouTypeHref(path, window.location.search, new FormData(form).entries(), { resetParams, ownedParams, ignoreValues });
+    const href = searchAsYouTypeHref(path, window.location.search, new FormData(form).entries(), { resetParams, keepParams, ignoreValues });
     // Re-searching the same words must not stack a navigation.
-    if (href === `${window.location.pathname}${window.location.search}`) return;
+    if (isCurrentAddress(href)) return;
     startTransition(() => router.replace(href, { scroll: false }));
   };
   const debouncer = useDebouncedCallback(applyNow, delayMs);
@@ -255,11 +241,17 @@ export function SearchAsYouTypeForm({
     for (const element of Array.from(form.elements)) {
       if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement) || !element.name) continue;
       if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
-        if (element !== active) element.checked = params.getAll(element.name).includes(element.value);
+        // Links write a comma list (`statuses=A,B`), a form one value per box; absent means the box's default.
+        const chosen = params.getAll(element.name).flatMap((value) => value.split(",").map((part) => part.trim()));
+        if (element !== active) element.checked = params.has(element.name) ? chosen.includes(element.value) : element.hasAttribute("data-default-checked");
       } else if (element instanceof HTMLSelectElement && !params.has(element.name)) {
-        // Left out of the URL means the select's default: `data-default-value`, else its "" option.
-        const fallback = element.dataset.defaultValue ?? "";
-        if (Array.from(element.options).some((option) => option.value === fallback)) syncFieldValue(element, fallback, active);
+        // Left out of the URL means the select's default: `data-default-value`, else its "" option, else the option
+        // marked selected when it first rendered.
+        const options = Array.from(element.options);
+        const fallback = options.find((option) => option.value === element.dataset.defaultValue)
+          ?? options.find((option) => option.value === "")
+          ?? options.find((option) => option.defaultSelected);
+        if (fallback) syncFieldValue(element, fallback.value, active);
       } else if (element instanceof HTMLSelectElement || TYPED_INPUT_TYPES.has((element as HTMLInputElement).type)) {
         syncFieldValue(element, params.get(element.name) ?? "", active);
       }
