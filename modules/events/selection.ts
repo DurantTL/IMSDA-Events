@@ -32,7 +32,7 @@ import { findActiveMembership, listEventsForUser } from "@/modules/events/reposi
  * (the session, the account's events, the remembered event) and acts on the
  * result.
  */
-export async function resolveEventContext(requestedEventId?: string, options: { allowWithoutEventView?: boolean } = {}) {
+export async function resolveEventContext(requestedEventId?: string, options: { allowWithoutEventView?: boolean; kitchenHomeLanding?: boolean } = {}) {
   const { user, events } = await loadSignedInEvents();
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
 
@@ -60,7 +60,9 @@ export async function resolveEventContext(requestedEventId?: string, options: { 
   // Kitchen staff (#1029) have no event view: their home is the counts page, so any other page of the workspace that
   // does not open on a permission of its own, including the dashboard they land on after signing in, sends them there.
   if (!options.allowWithoutEventView && isKitchenWithoutEventView(permissions)) {
-    redirect(`${kitchenCountsPath}?event=${encodeURIComponent(event.id)}`);
+    // The dashboard is where sign-in and Home land, so a kitchen account arriving there is just going home: no notice
+    // (`kitchenHomeLanding`). Any other page they opened is flagged so Kitchen counts can say why they ended up there.
+    redirect(`${kitchenCountsPath}?event=${encodeURIComponent(event.id)}${options.kitchenHomeLanding ? "" : "&restricted=1"}`);
   }
 
   return {

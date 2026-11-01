@@ -17,7 +17,7 @@ export default async function CancellationRequestsPage({ searchParams }: { searc
   const { event: requested, status, request: requestId } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can review cancellation requests." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can review cancellation requests." whoToAsk="your event administrator" />;
   }
   const filter = statusFilterSchema.catch("OPEN").parse(status);
   const [rows, detail] = await Promise.all([

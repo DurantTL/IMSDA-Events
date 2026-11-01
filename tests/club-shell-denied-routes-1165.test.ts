@@ -58,11 +58,11 @@ describe("direct requests to routes outside a role's menu (#1165)", () => {
     noneLoaded();
   });
 
-  it("renders nothing for a reporter's request for /roster and loads no roster", async () => {
+  it("tells a reporter who to ask for /roster instead of a blank page, and loads no roster", async () => {
     // The real capability rule is what turns a reporter into NO_ROSTER (modules/club-rosters/access.ts).
     expect(clubCapabilities("REPORTER").roster).toBe(false);
     mocks.access.mockResolvedValue({ state: "NO_ROSTER", club: club("REPORTER"), capabilities: clubCapabilities("REPORTER") });
-    expect(await ClubRosterPage({ params, searchParams: search })).toBeNull();
+    expect(await ClubRosterPage({ params, searchParams: search })).toMatchObject({ props: { whoToAsk: "your club director" } });
     noneLoaded();
   });
 });

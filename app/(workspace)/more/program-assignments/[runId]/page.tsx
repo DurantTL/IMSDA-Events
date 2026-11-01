@@ -9,6 +9,7 @@ import { getAppliedAssignmentRoster } from "@/modules/program-assignments/reposi
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { formatPersonName } from "@/lib/person-name";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.assignmentRoster };
 
@@ -32,17 +33,15 @@ export default async function ProgramAssignmentRosterPage({
     return (
       <AccessRestricted
         title="Assignment roster is restricted"
-        detail="Ask an event administrator for registration or form-management access before opening this roster."
+        detail="Opening this roster needs registration or form-management access."
+        whoToAsk="your event administrator"
       />
     );
   }
   const roster = await getAppliedAssignmentRoster(event.id, runId);
   if (!roster) {
     return (
-      <AccessRestricted
-        title="Assignment roster not found"
-        detail="This run does not belong to the selected event, or it is no longer available."
-      />
+      <NotAvailableForEvent reason="This run does not belong to the selected event, or it is no longer available." />
     );
   }
   const groups = new Map<string, typeof roster.assignments>();

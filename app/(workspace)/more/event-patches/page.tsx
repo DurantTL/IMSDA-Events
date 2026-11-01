@@ -5,6 +5,7 @@ import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { listEventAwardItems } from "@/modules/earned-awards/event-items";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.eventPatches };
 
@@ -15,7 +16,7 @@ export default async function EventPatchesPage({ searchParams }: { searchParams:
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
       <>
-        <AccessRestricted title="Event patches are restricted" detail="Event administrators link the patch or pin a club event gives its attendees." />
+        <AccessRestricted title="Event patches are restricted" detail="Event administrators link the patch or pin a club event gives its attendees." whoToAsk="your event administrator" />
       </>
     );
   }
@@ -24,7 +25,7 @@ export default async function EventPatchesPage({ searchParams }: { searchParams:
   if (!clubEvent) {
     return (
       <>
-        <AccessRestricted title="Event patches are for club events" detail="This event doesn't take club registrations. Choose a club event to link its patch or pin." />
+        <NotAvailableForEvent reason="This event doesn't take club registrations. Choose a club event to link its patch or pin." />
       </>
     );
   }

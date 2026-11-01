@@ -187,7 +187,7 @@ describe("Upcoming deadlines on the club home (#910)", () => {
   it("loads nothing for someone who does not direct the club", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "FORBIDDEN" });
     const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
-    expect(tree).toBeNull();
+    expect(tree).toMatchObject({ props: { whoToAsk: "your club director" } });
     expect(mocks.listUpcomingDeadlines).not.toHaveBeenCalled();
   });
 });
