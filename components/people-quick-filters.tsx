@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { isCurrentAddress, useDebouncedCallback, useListNavigation } from "@/components/search-as-you-type";
+import { isCurrentAddress, useDebouncedCallback, useListNavigation, useSyncSearchField } from "@/components/search-as-you-type";
 import {
   PEOPLE_FILTER_SEVERAL,
   parsePeopleFilters,
@@ -63,6 +63,8 @@ export function PeopleQuickFilters({
   // With JavaScript, the search goes to the canonical repeated-param URL (page 1, no __several / keep* form fields),
   // after a pause in typing (#1431) or at once on Enter or Search; replace, so typing adds no history entries.
   const formRef = useRef<HTMLFormElement>(null);
+  // Back, Forward or a Clear filters link: the box shows the address's search unless it holds unsaved typing (rule B2, #1456).
+  useSyncSearchField(formRef, "q", query);
   const apply = () => {
     const form = formRef.current;
     if (!form) return;
