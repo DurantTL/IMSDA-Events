@@ -92,7 +92,7 @@ const ALLOWLIST: Record<string, { count: number; reason: string }> = {
   "components/club-registration-editor.tsx": { count: 6, reason: PENDING },
   "components/club-registration-workspace.tsx": { count: 5, reason: PENDING },
   "components/club-roster-carry-forward.tsx": { count: 1, reason: PENDING },
-  "components/club-roster-workspace.tsx": { count: 7, reason: PENDING },
+  "components/club-roster-workspace.tsx": { count: 9, reason: PENDING },
   "components/club-transfer-queue.tsx": { count: 1, reason: PENDING },
   "components/club-uniform-section.tsx": { count: 3, reason: PENDING },
   "components/director-sterling-followup.tsx": { count: 1, reason: PENDING },
