@@ -8,14 +8,19 @@ vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), log
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { resolveFormsHelpContact, telHref } from "@/modules/system-admin/forms-help-contact";
 
-/** The Forms help contact (#1445): settings first, per-field fallback, never throws. Synthetic data only. */
+/** The Forms help contact (#1445): the email footer help contact (#1443) first, per-field fallback, never throws. Synthetic data only. */
 describe("Forms help contact", () => {
+  it("reads the email footer help contact, not the homepage one", async () => {
+    mocks.findUnique.mockResolvedValue({ emailHelpEmail: "footer@example.test", emailHelpPhone: "(515) 555-0122" });
+    expect(await getFormsHelpContact()).toEqual({ email: "footer@example.test", phone: "(515) 555-0122" });
+    expect(mocks.findUnique.mock.calls.at(-1)?.[0].select).toMatchObject({ emailHelpEmail: true, emailHelpPhone: true });
+  });
   it("uses the settings when present", async () => {
-    mocks.findUnique.mockResolvedValue({ publicHelpEmail: " a@example.test ", publicHelpPhone: "(515) 555-0111" });
+    mocks.findUnique.mockResolvedValue({ emailHelpEmail: " a@example.test ", emailHelpPhone: "(515) 555-0111" });
     expect(await getFormsHelpContact()).toEqual({ email: "a@example.test", phone: "(515) 555-0111" });
   });
   it("falls back per field when absent", async () => {
-    mocks.findUnique.mockResolvedValue({ publicHelpEmail: null, publicHelpPhone: "(515) 555-0111" });
+    mocks.findUnique.mockResolvedValue({ emailHelpEmail: null, emailHelpPhone: "(515) 555-0111" });
     expect(await getFormsHelpContact()).toEqual({ email: "support@imsda.org", phone: "(515) 555-0111" });
     mocks.findUnique.mockResolvedValue(null);
     expect(await getFormsHelpContact()).toEqual({ email: "support@imsda.org", phone: "(515) 223-1197" });

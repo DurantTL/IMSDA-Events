@@ -6,6 +6,7 @@ import { TeamFormSheet } from "@/components/team-form-sheet";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { singleSearchParam } from "@/modules/club-teams/domain";
 import { loadFilledTeamForm } from "@/modules/club-teams/team-form-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Team form" };
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function DirectorTeamFormPage({
   if (teamKey === null) notFound();
   const access = await getRosterAccessStateForPage(organizationId);
   // The club layout shows the sign-in and authenticator steps.
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const form = await loadFilledTeamForm({ eventId, organizationId: access.club.organizationId, teamKey });
   if (!form) notFound();
   const back = `/account/clubs/${organizationId}/events/${eventId}${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`;

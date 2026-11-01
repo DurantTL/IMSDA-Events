@@ -3,10 +3,10 @@ import { SquareTesterCard } from "./square-tester-card";
 import styles from "./testers.module.css";
 
 /** The two testers (#1383), side by side under the at-a-glance card. */
-export function SystemReportTesters({ defaultEmail }: { defaultEmail: string }) {
+export function SystemReportTesters({ defaultEmail, emailBackupConfigured = false }: { defaultEmail: string; emailBackupConfigured?: boolean }) {
   return (
     <div className={styles.testers} data-testid="system-report-testers">
-      <EmailTesterCard defaultEmail={defaultEmail} />
+      <EmailTesterCard defaultEmail={defaultEmail} backupConfigured={emailBackupConfigured} />
       <SquareTesterCard />
     </div>
   );

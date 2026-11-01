@@ -5,7 +5,7 @@ import type { Signal } from "./model";
  * stored rejections add up to. They read nothing and carry counts, times and fixed words only: never an address, a
  * payload or a customer.
  */
-export type NoticeFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel">>;
+export type NoticeFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel" | "needsSetup">>;
 
 export const NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** A payment or send newer than this is not yet expected to have a notice, so in-flight notices never alarm. */
@@ -34,7 +34,7 @@ function compare(input: { lastNoticeAt: Date | null; newestDueAt: Date | null; n
 
 export function squareNoticeFields(key: string, input: { configured: boolean; lastNoticeAt: Date | null; newestPaymentAt: Date | null; ignoredCount: number; now: Date }): NoticeFields {
   if (!input.configured) {
-    return { key, state: "info", checkedAt: input.now.toISOString(), whenLabel: "Checked", resultText: "Square is not set up, so no payment notices are expected." };
+    return { key, state: "info", checkedAt: input.now.toISOString(), whenLabel: "Checked", resultText: "Square is not set up, so no payment notices are expected.", needsSetup: true };
   }
   const result = compare({ lastNoticeAt: input.lastNoticeAt, newestDueAt: input.newestPaymentAt, now: input.now, sentNoun: "paid by Square", noticeNoun: "Square" });
   const ignored = `${plural(input.ignoredCount, "notice was", "notices were")} ignored in the last 7 days (a count only: an ignored notice is not a fault).`;
@@ -62,7 +62,7 @@ export function emailNoticeFields(
     return { key, state: "info", checkedAt: now, whenLabel: "Checked", resultText: `Not in use: email is sent with ${PROVIDER_WORD[input.active]}.` };
   }
   if (!input.webhookConfigured) {
-    return { key, state: "watch", checkedAt: now, whenLabel: "Checked", resultText: `${word} notices aren't set up, so bounces and complaints aren't received.` };
+    return { key, state: "watch", checkedAt: now, whenLabel: "Checked", resultText: `${word} notices aren't set up, so bounces and complaints aren't received.`, needsSetup: true };
   }
   const result = compare({ lastNoticeAt: input.lastNoticeAt, newestDueAt: input.newestSentAt, now: input.now, sentNoun: "sent", noticeNoun: word });
   return { key, state: result.state, checkedAt: iso(input.lastNoticeAt), whenLabel: "Last notice", noTimeLabel: "Never", resultText: result.text };

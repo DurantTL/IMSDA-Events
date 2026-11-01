@@ -74,6 +74,9 @@ environment panel:
 CLOUDFLARE_PURGE_WEBHOOK_URL=<the private webhook URL from the hosting panel>   # optional
 ```
 
+The System report shows the same steps (the `cloudflare-purge` entry in
+`modules/setup-help/system-setup-steps.ts`) under **How to set this up**.
+
 This URL is a secret: anyone who has it can clear the cache. Keep it out of
 issues, chat and screenshots. The value must be an `https://` address; anything
 else reads as "Not set up". With it set, the System report's "Security and
@@ -276,8 +279,98 @@ SMTP credentials and the verified sender together.
 **Switching back.** Set `EMAIL_PROVIDER=resend` (or remove the line) and
 redeploy. Resend then sends exactly as before, and `RESEND_API_KEY` is required
 again. Resend's delivery and bounce webhooks stay in place but receive nothing
-while SES is active. The SES notification endpoint below stays in place but is
+while SES is active (unless the automatic backup below is set up). The SES notification endpoint below stays in place but is
 idle while Resend is active.
+
+### Automatic backup: Resend takes over if SES fails (#1444)
+
+Amazon SES sends every email. If SES **definitely did not accept** a message,
+the same message is sent once through Resend instead, automatically. With the
+backup setting left out, nothing changes: SES alone, retried as described above.
+
+**When Resend takes over**
+
+- SES refuses the message: throttling (454), the daily quota, any other 4xx or
+  5xx reply, or a sender that SES will not accept.
+- The connection to SES cannot be made, or fails before the message was sent
+  (DNS, TLS, greeting, a timeout while connecting).
+- SES rejects the SMTP username or password, or is unreachable at the start of a
+  delivery run: that run's messages go straight through Resend instead of
+  stopping.
+
+**When it does not**
+
+- A timeout or dropped connection **after the whole message was handed to SES**.
+  SES may have accepted it, so the app keeps today's retry on SES and never sends
+  a second copy through Resend.
+- A problem with one message (a bad address, an invalid message, a bad
+  unsubscribe link). That is not an outage, and Resend would fail the same way.
+- An address on the do-not-send list. Both services share one list, checked
+  before either sends, so a suppressed address receives nothing from either.
+
+**One message, one service.** A message goes through at most one service per
+attempt. Once any attempt has gone to Resend, later attempts use only Resend
+(it recognises the repeat by the message's idempotency key and does not send it
+again). Once an attempt to SES ended unclear, later attempts never fall back to
+Resend. The delivery log records the service that handled each attempt, and a
+fallback is marked `failover` with the SES error code (a code only, never message
+text or an address).
+
+**If Resend is out of sending allowance too.** On Resend's free plan the daily
+limit is small. When Resend answers with a limit error while acting as the
+backup, that message is marked **failed** with the reason "Amazon SES could not
+send this and the backup service (Resend) has reached its sending limit." It is
+not retried in a loop, and the rest of that run's queue waits untouched. Staff can
+use Retry failed once SES works again or Resend's limit resets.
+
+**Settings to add in the xCloud environment panel** (placeholders shown):
+
+```
+EMAIL_PROVIDER=ses
+EMAIL_BACKUP_PROVIDER=resend
+RESEND_API_KEY=<API key from Resend>
+RESEND_WEBHOOK_SECRET=<signing secret of the Resend webhook>
+```
+
+plus the SES settings from "Sending email through Amazon SES". `resend` is the
+only accepted value for `EMAIL_BACKUP_PROVIDER`. The backup is on only while all
+three conditions hold: `EMAIL_PROVIDER=ses`, `EMAIL_BACKUP_PROVIDER=resend` and a
+`RESEND_API_KEY`. Any other value, or a missing key, turns it off and the System
+report says so; sending through SES is never affected. Redeploy so the container
+restarts with the new values.
+Remove `EMAIL_BACKUP_PROVIDER` only when the System report's **Emails sent by backup**
+shows no recent backup use and Amazon SES is healthy. A redeploy can cut off a send that
+is in progress through Resend, so do not switch the backup off while it is being used.
+
+**DNS for both services.** Each service needs its own proof that it may send for
+the sending domain (`imsda.org`, and `imadventist.org` if it is used):
+
+1. **Amazon SES:** the domain shows as *Verified* under **Verified identities**
+   in `us-east-2`, with its three **DKIM** CNAME records and the SPF/MAIL FROM
+   records SES lists.
+2. **Resend:** add the same domain under **Domains** in Resend, then add the
+   **DKIM** record and the **SPF** record Resend shows, and wait until Resend
+   marks the domain *Verified*.
+3. A domain may have **only one SPF record**. Do not add a second one: merge both
+   services into the single record (for example
+   `v=spf1 include:amazonses.com include:<the include Resend shows> ~all`).
+
+**Resend's webhook.** In Resend, add a webhook to
+`<APP_BASE_URL>/api/webhooks/resend` for delivery, bounce and complaint events
+and set its signing secret as `RESEND_WEBHOOK_SECRET`. While the backup is set
+up, a Resend bounce or complaint stops all email to that address in the same
+do-not-send list the SES reports feed.
+
+**Test the backup.** Open **System report**. When the backup is set up, the
+**Email tester** shows a checkbox **Send through the backup (Resend)**. Tick it
+and send a test to your own address: the test goes straight through Resend (SES
+is not used) and the result says which service sent it. Do this once after
+setting it up, and after changing either service's DNS.
+
+**What the System report shows.** Under Email: **Backup email service** (set up
+or not, and when it was last used), **Emails sent by backup (7 days)** (a count,
+shown as "Check soon" when above zero, because it means SES refused messages),
+and **Backup email setup**, which lists the settings and DNS above.
 
 ### Bounces, complaints and deliveries from SES (#863)
 
@@ -701,6 +794,11 @@ Run `imsda-cleanup` by hand to free space now, and check it with
 `journalctl -u imsda-cleanup.service` and `df -h /`.
 
 ### System report heartbeats
+
+The numbered steps below are also kept in
+`modules/setup-help/system-setup-steps.ts` (the `heartbeat-token` entry), which
+is what the System report shows under **How to set this up** on its "Not
+reporting yet" rows. Change the steps there first.
 
 The System report's "Background jobs" section shows three server jobs:
 auto-deploy, Docker cleanup and the runtime guard. Each run sends one small

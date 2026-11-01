@@ -95,38 +95,12 @@ const pickers = [
   return { file: file!, count: Number(count), reason: "picker: filters its own options on every keystroke" };
 });
 
-/** Client lists that already filter on every keystroke; they move onto the shared hook in round 2. */
-const clientLists = [
-  "components/calendar-admin-workspace.tsx|1",
-  "components/club-earned-awards-workspace.tsx|2",
-  "components/club-honors-workspace.tsx|2",
-  "components/club-order-workspace.tsx|1",
-  "components/club-roster-workspace.tsx|1",
-  "components/club-supply-catalog-workspace.tsx|1",
-  "components/club-supply-stock-workspace.tsx|1",
-  "components/honor-catalog-workspace.tsx|1",
-  "components/honor-watch-panel.tsx|1",
-  "components/lodging-assignments-workspace.tsx|1",
-  "components/public-club-directory.tsx|1",
-  "components/registration-form-notifications-panel.tsx|1",
-  "components/staff-workspace.tsx|1",
-  "components/finance-workspace.tsx|1",
-  "components/check-in-workspace.tsx|1",
-  "components/staff-invitation-list.tsx|1",
-  "components/square-payment-matching.tsx|1",
-  "components/people-workspace.tsx|1",
-  "app/(workspace)/help/help-search.tsx|1",
-].map((entry): Allowed => {
-  const [file, count] = entry.split("|");
-  return { file: file!, count: Number(count), reason: "round 2: filters the list on every keystroke, not yet on the shared hook" };
-});
-
 /** A field component the page renders inside `SearchAsYouTypeForm`, which does the searching. */
 const wrapped: Allowed[] = [
   { file: "app/(public)/events/events-search-field.tsx", count: 1, reason: "wrapped: rendered inside SearchAsYouTypeForm by app/(public)/events/page.tsx" },
 ];
 
-const allowlist: Allowed[] = [...pickers, ...clientLists, ...wrapped];
+const allowlist: Allowed[] = [...pickers, ...wrapped];
 
 describe("search boxes search as you type (#1431)", () => {
   const files = [...walk(path.join(root, "app")), ...walk(path.join(root, "components"))]
@@ -206,6 +180,25 @@ describe("search boxes search as you type (#1431)", () => {
       "components/area-club-search-form.tsx",
       "components/attendee-community-board.tsx",
       "app/(public)/events/page.tsx",
+      "components/calendar-admin-workspace.tsx",
+      "components/club-earned-awards-workspace.tsx",
+      "components/club-honors-workspace.tsx",
+      "components/club-order-workspace.tsx",
+      "components/club-roster-workspace.tsx",
+      "components/club-supply-catalog-workspace.tsx",
+      "components/club-supply-stock-workspace.tsx",
+      "components/honor-catalog-workspace.tsx",
+      "components/honor-watch-panel.tsx",
+      "components/lodging-assignments-workspace.tsx",
+      "components/public-club-directory.tsx",
+      "components/registration-form-notifications-panel.tsx",
+      "components/staff-workspace.tsx",
+      "components/finance-workspace.tsx",
+      "components/check-in-workspace.tsx",
+      "components/staff-invitation-list.tsx",
+      "components/square-payment-matching.tsx",
+      "components/people-workspace.tsx",
+      "app/(workspace)/help/help-search.tsx",
     ]) {
       expect(allowlist.some((entry) => entry.file === file)).toBe(false);
       expect(usesShared(fs.readFileSync(path.join(root, file), "utf8")), file).toBe(true);

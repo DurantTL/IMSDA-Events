@@ -87,7 +87,7 @@ export function AreaClubSearchForm({
       </div>
       <button className="secondary-button" type="submit">Search</button>
       {/* Clearing cancels a search still waiting on its pause, so it cannot put the old filter back. */}
-      {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={cancel}>Clear</Link>}
+      {query && <Link className="text-button" href={areaClubSearchHref(basePath, { year: clubYear, sort, month })} onClick={cancel}>Clear filters</Link>}
       <small aria-live="polite" role="status">{query ? `${shown} of ${total} clubs match` : ""}</small>
     </form>
   );

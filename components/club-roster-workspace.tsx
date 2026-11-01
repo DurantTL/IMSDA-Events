@@ -5,6 +5,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
+import { useAddressParam, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
@@ -41,6 +42,7 @@ import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/compone
 import {
   applyRosterFilters,
   clearedRosterFilters,
+  ROSTER_DETAILS_NEEDED_FILTER,
   rosterColumns,
   rosterDetailsNeededItems,
   rosterDetailsSummary,
@@ -80,30 +82,6 @@ type SectionKey = "STAFF" | "MEMBERS";
 
 const complianceTone = { CLEAR: "green", FLAGGED: "gold", NOT_COMPLIANT: "coral", NO_RECORD: "gold" } as const;
 
-/** A value that follows `value` after it has stopped changing for `delay` ms, so a polite status is not re-read on every keystroke. */
-function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
-/** Takes the named filter parameters out of the address (and nothing else, so `?year=` stays), without adding a history entry. */
-function dropFilterParams(...names: string[]) {
-  try {
-    const url = new URL(window.location.href);
-    const present = names.filter((name) => url.searchParams.has(name));
-    if (present.length === 0) return;
-    for (const name of present) url.searchParams.delete(name);
-    // null state lets Next copy its own state and keep useSearchParams in sync with the cleaned URL.
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-  } catch {
-    // A page without a usable address bar (a preview) simply keeps its address.
-  }
-}
-
 /** Remembered Staff/Members open state (#1305), kept in this browser only. Read with useSyncExternalStore so the server render and first client render agree (the role default). */
 const sectionChoiceListeners = new Set<() => void>();
 function readSectionChoices(organizationId: string) {
@@ -138,6 +116,7 @@ export function ClubRosterWorkspace({
   honorsHref,
   classHistoryBase,
   complianceFilter: initialComplianceFilter = null,
+  initialQuery = "",
   detailsNeededFirst = false,
   headingActions,
   healthTab,
@@ -181,8 +160,10 @@ export function ClubRosterWorkspace({
   classHistoryBase?: string;
   /** `?compliance=` from the What's next reminder link (#479): narrows the list to that one flag. */
   complianceFilter?: ComplianceFilterValue | null;
-  /** `?filter=details-needed` (#1167): open with the Details needed list already on. Search and filters are never saved. */
+  /** `?filter=details-needed` (#1167): open with the Details needed list already on. */
   detailsNeededFirst?: boolean;
+  /** `?q=`: open with the name search already typed, so a reload or shared link keeps it (#1456). */
+  initialQuery?: string;
   /** Extra actions beside "Add to roster", such as "Request a transfer" (#489). */
   headingActions?: React.ReactNode;
   /**
@@ -221,10 +202,13 @@ export function ClubRosterWorkspace({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [birthDates, setBirthDates] = useState<Record<string, string> | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [complianceFilter, setComplianceFilter] = useState(initialComplianceFilter);
-  /** Name search, the "Details needed" list and the optional extra columns (#1167). None of them is saved or sent anywhere. */
-  const [query, setQuery] = useState("");
-  const [detailsOnly, setDetailsOnly] = useState(detailsNeededFirst);
+  /** Name search, the "Details needed" list and the Sterling Volunteers filter live in the address (`?q=`, `?filter=details-needed`, `?compliance=`), so reload, Back and shared links keep them (rule B2, #1456). The extra columns are not saved or sent anywhere. */
+  const [complianceRaw, setComplianceRaw] = useAddressParam("compliance", initialComplianceFilter ?? "");
+  const complianceFilter = Object.hasOwn(complianceFilterLabels, complianceRaw) ? (complianceRaw as ComplianceFilterValue) : null;
+  const search = useClientSearch(initialQuery, undefined, "q");
+  const query = search.term;
+  const [detailsRaw, setDetailsRaw] = useAddressParam("filter", detailsNeededFirst ? ROSTER_DETAILS_NEEDED_FILTER : "");
+  const detailsOnly = detailsRaw === ROSTER_DETAILS_NEEDED_FILTER;
   const [showGender, setShowGender] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -368,14 +352,13 @@ export function ClubRosterWorkspace({
   });
   const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
   const resultText = `${visible.length} of ${population.length} ${population.length === 1 ? "person" : "people"} shown${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
-  const announcedResult = useDebouncedValue(resultText, 300);
   function clearFilters() {
     const cleared = clearedRosterFilters();
-    setQuery(cleared.query);
-    setDetailsOnly(cleared.detailsOnly);
-    setComplianceFilter(cleared.complianceFilter);
-    // The address no longer says what the page is not showing.
-    dropFilterParams("filter", "compliance");
+    // One history entry for the whole clearing, so Back brings every filter back; the address no longer says what the page is not showing.
+    writeAddressParams({ q: null, filter: null, compliance: null }, "push");
+    search.setValue(cleared.query);
+    setDetailsRaw("");
+    setComplianceRaw("");
   }
   /** Each person's accessible name: just the name, or the name with what tells two people of that name apart. */
   const personLabels = rosterPersonLabels(members, {
@@ -757,7 +740,7 @@ export function ClubRosterWorkspace({
         {complianceFilter && complianceStatuses && (
           <p className="inline-notice roster-compliance-notice" role="status">
             Showing only people {complianceFilterLabels[complianceFilter]}.{" "}
-            <button className="text-button" onClick={() => { setComplianceFilter(null); dropFilterParams("compliance"); }} type="button">Clear filter</button>
+            <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
           </p>
         )}
         <div className={styles.rosterSearchPanel}>
@@ -769,12 +752,11 @@ export function ClubRosterWorkspace({
                 <input
                   autoComplete="off"
                   id="roster-search"
-                  onChange={(event) => setQuery(event.target.value)}
+                  {...search.inputProps}
                   placeholder="Find a person by name"
                   type="search"
-                  value={query}
                 />
-                <SearchClearButton onClear={() => setQuery("")} visible={query !== ""} />
+                <SearchClearButton onClear={() => search.setValue("")} visible={search.value !== ""} />
               </span>
             </div>
             <div className={styles.rosterFilterButtons}>
@@ -782,10 +764,7 @@ export function ClubRosterWorkspace({
                 aria-describedby="roster-details-help"
                 aria-pressed={detailsOnly}
                 className={`secondary-button ${styles.rosterFilterButton}`}
-                onClick={() => {
-                  if (detailsOnly) dropFilterParams("filter");
-                  setDetailsOnly((current) => !current);
-                }}
+                onClick={() => setDetailsRaw(detailsOnly ? "" : ROSTER_DETAILS_NEEDED_FILTER)}
                 type="button"
               >
                 Details needed <span className="count-badge">{needDetailsCount}</span>
@@ -808,8 +787,8 @@ export function ClubRosterWorkspace({
               <strong>{visible.length} of {population.length}</strong> {population.length === 1 ? "person" : "people"} shown
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
-            {/* The same result for screen readers, announced once typing pauses rather than on every key. */}
-            <p aria-live="polite" className="sr-only" role="status">{announcedResult}</p>
+            {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
+            <p aria-live="polite" className="sr-only" role="status">{resultText}</p>
             {filtersActive && (
               <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
             )}

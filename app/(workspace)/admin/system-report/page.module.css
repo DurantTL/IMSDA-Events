@@ -240,11 +240,17 @@
 
 .items {
   display: grid;
+  min-width: 0;
   gap: 2px;
   margin: 0;
   padding-left: 18px;
   color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.items li {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rowFix {
@@ -435,4 +441,19 @@
 .purgeText .purgeBad {
   color: var(--ink);
   overflow-wrap: anywhere;
+}
+
+.serviceSetup {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.serviceSetup li {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }

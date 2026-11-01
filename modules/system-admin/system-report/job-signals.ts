@@ -7,7 +7,7 @@ import type { Signal } from "./model";
  * Pure mappers from a stored job run, a disk reading or a stored connection test to report signals (#1357). They hold
  * the wording and the thresholds, and read nothing. Each returns the fields a provider adds to its declared row.
  */
-type Fields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel">>;
+type Fields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "needsSetup">>;
 
 const iso = (date: Date) => date.toISOString();
 const latest = (run: JobRun) => [run.lastSucceededAt, run.lastFailedAt].filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
@@ -125,7 +125,7 @@ export function alertScanFields(key: string, run: JobRun, readAt: Date): Fields 
  */
 export function alertDeliveryFields(key: string, input: { configured: boolean; run: JobRun | null }, readAt: Date): Fields {
   if (!input.configured) {
-    return { key, state: "watch", checkedAt: iso(readAt), whenLabel: "Checked", resultText: "Not set up, so alerts are only written to the app logs." };
+    return { key, state: "watch", checkedAt: iso(readAt), whenLabel: "Checked", resultText: "Not set up, so alerts are only written to the app logs.", needsSetup: true };
   }
   const { run } = input;
   if (!run) {
@@ -158,7 +158,7 @@ export function locationWaitlistDigestFields(key: string, run: JobRun, readAt: D
   if (status === "SWITCHED_OFF") return ranFields(key, run, "info", "Switched off in the notification settings. Changes wait until it is turned on.");
   if (status === "NOT_DUE") return ranFields(key, run, "ok", "Not due yet. It sends once a day, in the morning.");
   if (status === "NO_CHANGES") return ranFields(key, run, "ok", "Nothing changed, so no digest was needed.");
-  if (status === "EMAIL_NOT_CONFIGURED") return ranFields(key, run, "watch", "Changes are waiting because account email is not set up.");
+  if (status === "EMAIL_NOT_CONFIGURED") return { ...ranFields(key, run, "watch", "Changes are waiting because account email is not set up."), needsSetup: true };
   const c = counts(run, ["changesCovered", "recipients", "delivered"]);
   if (status !== "QUEUED" || !c) return ranFields(key, run, "watch", COUNTS_MISSING);
   return ranFields(key, run, "ok", `${c.changesCovered} changes covered, ${c.recipients} recipients, ${c.delivered} delivered.`);
@@ -250,6 +250,9 @@ const REACHABLE_WORDS = {
 
 export type ReachabilityKind = keyof typeof REACHABLE_WORDS;
 
+/** Every connection test, so a guard can check each one has setup help for its "Not set up" reading (#1434). */
+export const REACHABILITY_KINDS = Object.keys(REACHABLE_WORDS) as ReachabilityKind[];
+
 /**
  * A stored connection test (never run on page load). Never tested reads unavailable with no time; a result over 24
  * hours old reads "Test again"; "refused" is attention; "unavailable" is unavailable; only a fresh "reachable" is OK.
@@ -257,7 +260,7 @@ export type ReachabilityKind = keyof typeof REACHABLE_WORDS;
 export function reachabilityFields(kind: ReachabilityKind, key: string, input: { configured: boolean; run: JobRun | null }, now: Date): Fields {
   const words = REACHABLE_WORDS[kind];
   if (!input.configured) {
-    return { key, state: "watch", checkedAt: iso(now), whenLabel: "Checked", resultText: "Not set up, so it was not tested." };
+    return { key, state: "watch", checkedAt: iso(now), whenLabel: "Checked", resultText: "Not set up, so it was not tested.", needsSetup: true };
   }
   const { run } = input;
   if (!run) {
@@ -296,7 +299,7 @@ type HostJob = {
 
 function hostProblem(job: HostJob, key: string, run: JobRun, readAt: Date): Fields | null {
   if (run.status === "never") {
-    return { key, state: "unavailable", checkedAt: iso(readAt), whenLabel: "Tried", resultText: NOT_REPORTING };
+    return { key, state: "unavailable", checkedAt: iso(readAt), whenLabel: "Tried", resultText: NOT_REPORTING, needsSetup: true };
   }
   if (run.status === "failing") {
     const result = run.summary?.result;

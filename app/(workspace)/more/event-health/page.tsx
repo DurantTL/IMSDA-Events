@@ -31,7 +31,7 @@ export default async function EventHealthPage({
   const { event } = await resolveEventContext(query.event, { allowWithoutEventView: true });
   const viewer = await resolveStaffHealthViewer();
   if (!viewer) {
-    return <AccessRestricted title="Health information is restricted" detail="Ask a system administrator if you need health information access for this event." />;
+    return <AccessRestricted title="Health information is restricted" detail="Health information access for this event is granted by a system administrator." whoToAsk="a system administrator" />;
   }
   // The one-time privacy notice (#923) comes before anything is opened.
   if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="STAFF" />;
@@ -43,7 +43,7 @@ export default async function EventHealthPage({
     if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="STAFF" />;
     // The window closes when the event ends: the page no longer applies, which is not a permission failure (#981).
     if (error instanceof HealthViewError && error.code === "WINDOW_CLOSED") return <NotAvailableForEvent reason={error.message} />;
-    if (error instanceof HealthViewError) return <AccessRestricted title="Health information is unavailable" detail={error.message} />;
+    if (error instanceof HealthViewError) return <AccessRestricted title="Health information is unavailable" detail={error.message} whoToAsk="a system administrator" />;
     throw error;
   }
   const base = `/more/event-health?event=${encodeURIComponent(event.id)}`;

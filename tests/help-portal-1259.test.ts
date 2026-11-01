@@ -193,10 +193,11 @@ describe("the portal and its permitted next steps", () => {
   });
 
   it("links the shared permission and not-available states to the Help hub without naming a page", () => {
-    const restricted = renderToStaticMarkup(createElement(AccessRestricted, { title: "Health information is restricted", detail: "Ask a system administrator." }));
+    const restricted = renderToStaticMarkup(createElement(AccessRestricted, { title: "Health information is restricted", detail: "Health information is granted separately.", whoToAsk: "a system administrator" }));
     expect(restricted).toContain('href="/help"');
     expect(renderToStaticMarkup(createElement(NotAvailableForEvent, { reason: "Not for this event." }))).toContain('href="/help"');
     const noAccess = readFileSync(join(root, "app/no-access/page.tsx"), "utf8");
-    expect(noAccess).toContain('href="/help"');
+    // /no-access renders the shared AccessRestricted state, which carries the Help link asserted above (rule 14).
+    expect(noAccess).toContain("<AccessRestricted");
   });
 });

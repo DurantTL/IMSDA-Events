@@ -19,7 +19,8 @@ export default async function ProgramAssignmentsPage({
     return (
       <AccessRestricted
         title="Program assignments are restricted"
-        detail="Ask an event administrator for registration or form-management access before creating seminar rosters."
+        detail="Creating seminar rosters needs registration or form-management access."
+        whoToAsk="your event administrator"
       />
     );
   }

@@ -274,6 +274,13 @@ export type AttendeeListingQuery = {
 const SORT_KEYS: ReadonlySet<string> = new Set(LISTING_COLUMNS.map((column) => column.key));
 const MEAL_VALUES: ReadonlySet<string> = new Set(MEAL_CATEGORIES.map((category) => category.value));
 
+/** Whether anything narrows the list beyond its defaults (view and sort only change columns and order): picks "nothing matches" over "nothing yet" (#1449). */
+export function attendeeFiltersSet(query: Pick<AttendeeListingQuery, "search" | "meal" | "dietaryOnly" | "statuses">): boolean {
+  return Boolean(query.search?.trim()) || Boolean(query.meal) || Boolean(query.dietaryOnly)
+    || query.statuses.length !== DEFAULT_LISTING_STATUSES.length
+    || query.statuses.some((status) => !DEFAULT_LISTING_STATUSES.includes(status));
+}
+
 /**
  * The listing's filters from URL parameters. Anything unknown is ignored, so a
  * hand-edited URL cannot widen the list: statuses default to Confirmed only,

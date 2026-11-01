@@ -38,6 +38,39 @@ function parseProvider(value: string | undefined): EmailProviderName | null {
   return null;
 }
 
+/**
+ * The backup provider (#1444). `EMAIL_BACKUP_PROVIDER=resend` is the only accepted value, and the backup is active only
+ * while Amazon SES is the primary and a Resend API key is set. Unset or blank leaves everything exactly as it was. A
+ * value that is anything else, or one that names the primary itself, switches the backup off and is reported (never
+ * thrown), so a typo can't stop the primary from sending.
+ */
+export type EmailBackupStatus = {
+  active: boolean;
+  /** Why it is off, in words a System report row can show. Null while active. */
+  reason: "not_set" | "invalid_value" | "primary_not_ses" | "same_as_primary" | "missing_api_key" | null;
+};
+
+export function getEmailBackupStatus(env: NodeJS.ProcessEnv = process.env): EmailBackupStatus {
+  const value = env.EMAIL_BACKUP_PROVIDER?.trim().toLowerCase() ?? "";
+  if (value === "") return { active: false, reason: "not_set" };
+  if (value !== "resend") return { active: false, reason: "invalid_value" };
+  const primary = parseProvider(env.EMAIL_PROVIDER);
+  if (primary === "RESEND") return { active: false, reason: "same_as_primary" };
+  if (primary !== "SES") return { active: false, reason: "primary_not_ses" };
+  if (!env.RESEND_API_KEY?.trim()) return { active: false, reason: "missing_api_key" };
+  return { active: true, reason: null };
+}
+
+/** Whether Amazon SES is the primary provider (#1444): Resend reports then feed the shared suppression list. */
+export function isEmailPrimarySes(env: NodeJS.ProcessEnv = process.env) {
+  return parseProvider(env.EMAIL_PROVIDER) === "SES";
+}
+
+/** The Resend configuration to use as the backup, or null when the backup is not active. */
+export function getBackupEmailConfiguration(): ResendEmailConfiguration | null {
+  return getEmailBackupStatus().active ? getResendEmailConfiguration() : null;
+}
+
 /** The provider name recorded on outbox rows and delivery attempts. */
 export function getActiveEmailProviderName(): EmailProviderName {
   return parseProvider(process.env.EMAIL_PROVIDER) ?? "RESEND";

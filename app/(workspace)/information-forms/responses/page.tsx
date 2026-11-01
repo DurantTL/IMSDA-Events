@@ -16,7 +16,7 @@ export default async function EventInformationFormResponsesPage({ searchParams }
   const { event: requested, form: formId, response, cursor } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
-    return <AccessRestricted title="Form responses are restricted" detail="Event administrators and registration managers can see the answers sent through an event's information forms." />;
+    return <AccessRestricted title="Form responses are restricted" detail="Event administrators and registration managers can see the answers sent through an event's information forms." whoToAsk="your event administrator" />;
   }
   if (!formId) notFound();
   const data = await loadInformationFormResponsesPage({ scope: "EVENT", eventId: event.id }, formId, { responseId: response, cursor });

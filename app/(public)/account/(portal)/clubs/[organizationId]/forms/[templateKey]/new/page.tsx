@@ -9,6 +9,7 @@ import { ClubFormError } from "@/modules/club-forms/errors";
 import { listRosterChoices } from "@/modules/club-forms/submissions";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Fill in a club form" };
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function NewClubFormPage({
 }) {
   const [{ organizationId, templateKey }, { member }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   if (!isClubFormsRole(access.club.role)) notFound();
   clubLeaderViewerFromAccess(access);
   const template = await getEnabledClubFormTemplate(templateKey).catch((error: unknown) => {

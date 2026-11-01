@@ -5,6 +5,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { TeamFormSheet } from "@/components/team-form-sheet";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { loadBlankTeamForm } from "@/modules/club-teams/team-form-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Blank team form" };
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function DirectorBlankTeamFormPage({ params }: { params: Promise<{ organizationId: string; eventId: string }> }) {
   const { organizationId, eventId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const form = await loadBlankTeamForm(eventId, { publishedClubOnly: true });
   if (!form) notFound();
   return (

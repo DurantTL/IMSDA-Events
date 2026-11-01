@@ -16,7 +16,7 @@ export default async function StaffBlankTeamFormPage({ searchParams }: { searchP
   const { event: requested } = await searchParams;
   const { event, allowed } = await resolveClubReportsAccess(requested);
   if (!allowed) {
-    return <AccessRestricted title="Team forms are restricted" detail="Ask an event administrator for report access to this club event." />;
+    return <AccessRestricted title="Team forms are restricted" detail="Team results and forms for this club event need report access." whoToAsk="your event administrator" />;
   }
   const form = await loadBlankTeamForm(event.id);
   if (!form) notFound();
