@@ -81,6 +81,7 @@ import { buildCommunicationsProviders } from "./communications-providers";
 import { buildEventOpsProviders } from "./event-ops-providers";
 import { buildSelfTestProviders } from "./self-test-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
+import { buildEmailBackupProviders } from "./email-backup-providers";
 import { buildNoticeProviders } from "./notice-providers";
 
 /**
@@ -731,6 +732,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
   ...buildMoneyProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, jobRow, couldNotReadNote, eventHref }),
   ...buildCommunicationsProviders({ defineProvider, tried, iso, m }),
   ...buildNoticeProviders(defineProvider),
+  ...buildEmailBackupProviders(defineProvider),
   ...buildEventOpsProviders({ defineProvider, reportEvents, perEvent, tried, iso, m, couldNotReadNote, eventHref }),
   ...buildSelfTestProviders({ defineProvider, m, tried }),
 ];

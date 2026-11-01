@@ -44,10 +44,10 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
         {signal.checkedAt ? reportTimeLabel(signal.checkedAt, now) : signal.noTimeLabel ?? reportTimeLabel(null, now)}
       </div>
       <div className={styles.rowResult}>
-        <StateChip state={signal.state} />
+        <StateChip state={signal.state} label={signal.chipLabel} />
         <span>{signal.resultText}</span>
         {signal.items && signal.items.length > 0 && (
-          <ul className={styles.items} aria-label={`${signal.name}: open items`}>
+          <ul className={styles.items} aria-label={`${signal.name}: ${signal.itemsLabel ?? "open items"}`}>
             {signal.items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ul>
         )}
@@ -105,7 +105,7 @@ function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { s
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean }) {
+export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false, emailBackupConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean; emailBackupConfigured?: boolean }) {
   const now = new Date(report.generatedAt);
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
@@ -151,7 +151,7 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
         </ul>
       </section>
 
-      <SystemReportTesters defaultEmail={testerDefaultEmail} />
+      <SystemReportTesters defaultEmail={testerDefaultEmail} emailBackupConfigured={emailBackupConfigured} />
 
       {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} />)}
 

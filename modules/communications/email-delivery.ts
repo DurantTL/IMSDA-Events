@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import {
   getActiveEmailProviderName,
+  getBackupEmailConfiguration,
   getEmailConfiguration,
   preflightEmailProvider,
   providerNameForConfiguration,
@@ -11,9 +12,12 @@ import {
   type EmailProviderConfiguration,
 } from "@/integrations/email/provider";
 import { isSesEmailConfiguration } from "@/integrations/email/ses";
+import type { ResendEmailConfiguration } from "@/integrations/email/resend";
 import {
   EmailProviderConfigurationError,
   EmailProviderRequestError,
+  type EmailDeliveryInput,
+  type EmailDeliveryResult,
   type EmailProviderName,
 } from "@/integrations/email/types";
 import { getServerEnv } from "@/lib/env";
@@ -99,13 +103,20 @@ type DeliveryPrisma = Pick<
   PrismaClient,
   "$transaction" | "eventMessageSettings" | "messageOutbox" | "auditLog" | "invoiceDeliveryRecipient"
 > & Pick<PrismaClient, "emailAddressSuppression">
-& Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings">>;
+& Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings" | "messageDeliveryAttempt">>;
 
 export type ExternalEmailDeliveryDependencies = {
   prisma?: DeliveryPrisma;
   now?: () => Date;
   configuration?: EmailProviderConfiguration;
   sendEmail?: typeof sendEmailWithProvider;
+  /**
+   * The backup provider (#1444): undefined reads the environment, null turns it off. Only used while the primary is
+   * Amazon SES; unset in the environment means no backup and exactly the behavior from before the backup existed.
+   */
+  backupConfiguration?: ResendEmailConfiguration | null;
+  /** The SES pre-flight; a test supplies its own. The default runs only when `sendEmail` is not replaced. */
+  preflight?: typeof preflightEmailProvider;
   /**
    * The opt-out that applies to an announcement's recipient right now (#838). The default reads the database, and a
    * run whose `prisma` has no opt-out table (a test double for another path) checks nothing.
@@ -349,6 +360,76 @@ function resolveEmailPartDependencies(
       }
     }),
   };
+}
+
+/** The code a message ends with when the backup service (Resend) has reached its own sending limit (#1444). */
+export const BACKUP_PROVIDER_LIMIT_ERROR_CODE = "BACKUP_PROVIDER_LIMIT";
+export const BACKUP_PROVIDER_LIMIT_MESSAGE = "Amazon SES could not send this and the backup service (Resend) has reached its sending limit.";
+/** The code of a retryable hold when the message's earlier attempts could not be read, so nothing is sent blind. */
+export const DELIVERY_HISTORY_UNAVAILABLE_CODE = "DELIVERY_HISTORY_UNAVAILABLE";
+/** Likewise when the row could not be stamped before the backup was called. */
+export const DELIVERY_STAMP_UNAVAILABLE_CODE = "DELIVERY_STAMP_UNAVAILABLE";
+
+/**
+ * The backup definitely refused the message: an HTTP 4xx answer other than a limit (429), a timeout (408) or an
+ * in-progress repeat (409). A network error, a timeout or a 5xx is ambiguous, so it is not covered.
+ */
+function backupDefinitelyRefused(error: EmailProviderRequestError) {
+  return error.status >= 400 && error.status < 500 && ![408, 409, 429].includes(error.status);
+}
+
+/**
+ * What a message's earlier attempts say about where it may go now (#1444). Never send twice:
+ *  - once an attempt went to the backup, later attempts use only the backup (Resend dedupes on the idempotency key);
+ *  - once a primary attempt ended ambiguously (it may have been accepted), later attempts never fail over.
+ */
+type AttemptHistory = { usedBackup: boolean; ambiguousPrimary: boolean; primaryErrorCode: string | null };
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+export function summarizeAttemptHistory(
+  attempts: Array<{ provider: string; status: string; providerMetadata: unknown }>,
+): AttemptHistory {
+  const history: AttemptHistory = { usedBackup: false, ambiguousPrimary: false, primaryErrorCode: null };
+  for (const attempt of attempts) {
+    const meta = metadataRecord(attempt.providerMetadata);
+    if (attempt.provider === "RESEND" && meta.realDelivery !== false && meta.backupRefused !== true) {
+      history.usedBackup = true;
+      if (typeof meta.primaryErrorCode === "string") history.primaryErrorCode = meta.primaryErrorCode;
+    }
+    // A failed SES attempt is only known not to have been accepted when it says so. A stale lock (the worker died
+    // mid-send) and an attempt recorded before the backup existed are both unknown, so they count as ambiguous.
+    if (
+      attempt.provider === "SES"
+      && attempt.status === "FAILED"
+      && (meta.recoveredStaleLock === true || (meta.realDelivery !== false && meta.notAccepted !== true))
+    ) {
+      history.ambiguousPrimary = true;
+    }
+  }
+  return history;
+}
+
+async function readAttemptHistory(prisma: DeliveryPrisma, messageId: string): Promise<AttemptHistory> {
+  const table = prisma.messageDeliveryAttempt;
+  if (!table) throw new Error("The delivery attempt table is not available.");
+  return summarizeAttemptHistory(await table.findMany({
+    where: { messageOutboxId: messageId },
+    select: { provider: true, status: true, providerMetadata: true },
+  }));
+}
+
+/** Whether the primary provider definitely did not accept the message, so the backup may take it. */
+function primaryNotAccepted(error: unknown) {
+  if (error instanceof EmailProviderConfigurationError) return error.batchWide;
+  return error instanceof EmailProviderRequestError && error.notAccepted;
+}
+
+/** A code only, never provider text. */
+function primaryFaultCode(error: unknown) {
+  return error instanceof EmailProviderRequestError ? error.code : "PROVIDER_CONFIGURATION_ERROR";
 }
 
 function resolveConfiguration(dependencies: ExternalEmailDeliveryDependencies) {
@@ -691,6 +772,7 @@ async function recoverStaleClaims(
       attemptCount: true,
       lockToken: true,
       lockedAt: true,
+      provider: true,
     },
   });
   const recoveredIds: string[] = [];
@@ -716,7 +798,9 @@ async function recoverStaleClaims(
         data: {
           messageOutboxId: candidate.id,
           attemptNumber: await nextAttemptRowNumber(tx, candidate.id, candidate.attemptCount),
-          provider,
+          // The stamp written before the backup is called: Resend may have accepted it, so history must see the backup.
+          // Honoured even if the backup has been switched off since, so a later re-enable still pins it to Resend.
+          provider: candidate.provider === "RESEND" ? "RESEND" : provider,
           status: "FAILED",
           errorCode: "STALE_DELIVERY_LOCK",
           errorMessage: terminal
@@ -764,6 +848,8 @@ async function claimNextMessage(
   scope: OutboxScope,
   messageIds: string[] | undefined,
   now: Date,
+  /** The run's configured provider: a claim resets the row's provider to it (see the backup stamp, #1444). */
+  resetProvider?: EmailProviderName,
 ): Promise<ClaimedMessage | null> {
   for (let collision = 0; collision < 5; collision += 1) {
     const lockToken = randomUUID();
@@ -816,6 +902,9 @@ async function claimNextMessage(
           status: "PROCESSING",
           lockToken,
           lockedAt: now,
+          // The RESEND stamp means "THIS claim handed the message to the backup" and nothing older: every claim starts
+          // from the configured provider, so a stamp left by an earlier claim can never pin a crash recovery to Resend.
+          ...(resetProvider ? { provider: resetProvider } : {}),
         },
       });
       if (updated.count !== 1) return { kind: "collision" as const };
@@ -857,6 +946,7 @@ async function finalizeSuccessfulAttempt(
   completedAt: Date,
   provider: EmailProviderName = getActiveEmailProviderName(),
   fromEmail: string | null = null,
+  extraMetadata: Record<string, string | boolean> = {},
 ) {
   const attemptNumber = message.attemptCount + 1;
   const providerIdempotencyKey = `outbox:${message.id}`;
@@ -892,6 +982,7 @@ async function finalizeSuccessfulAttempt(
           providerDeliveryStatus: "ACCEPTED",
           idempotencyKey: providerIdempotencyKey,
           realDelivery: true,
+          ...extraMetadata,
           // The From address actually used, recorded when the central sender replaced a stored one (#1043).
           ...(fromEmail && fromEmail !== message.senderEmailSnapshot ? { fromEmail, fromReplacedStoredSender: true } : {}),
         },
@@ -959,6 +1050,7 @@ async function finalizeFailedAttempt(
   completedAt: Date,
   internal = false,
   provider: EmailProviderName = getActiveEmailProviderName(),
+  extraMetadata: Record<string, string | boolean> = {},
 ) {
   const attemptNumber = message.attemptCount + 1;
   // A provider quota is the provider's limit, not this message's fault: it never uses up an attempt, so it can never
@@ -1030,6 +1122,7 @@ async function finalizeFailedAttempt(
           idempotencyKey: `outbox:${message.id}`,
           // A failed pre-send check (no provider was called) is not a real delivery attempt.
           realDelivery: !internal,
+          ...extraMetadata,
         },
         startedAt: message.startedAt,
         completedAt,
@@ -1071,6 +1164,8 @@ async function runDeliveryLoop(
     messageIds?: string[];
     limit?: number;
     dependencies?: ExternalEmailDeliveryDependencies;
+    /** The System report tester's "send through the backup": every message of this run goes straight to the backup. */
+    useBackup?: boolean;
   },
 ): Promise<ExternalEmailQueueResult> {
   const dependencies = options.dependencies ?? {};
@@ -1078,6 +1173,17 @@ async function runDeliveryLoop(
   const configuration = resolveConfiguration(dependencies);
   // What this run actually uses, not what the environment says later.
   const configuredProvider = providerNameForConfiguration(configuration);
+  // The backup (#1444) exists only beside Amazon SES. With none, every branch below is the code that ran before it.
+  const backup = isSesEmailConfiguration(configuration)
+    ? (dependencies.backupConfiguration !== undefined ? dependencies.backupConfiguration : getBackupEmailConfiguration())
+    : null;
+  const forceBackup = options.useBackup === true;
+  if (forceBackup && !backup) {
+    throw new ExternalEmailDeliveryError("EXTERNAL_EMAIL_NOT_CONFIGURED", "The backup email service is not set up on this server.");
+  }
+  // Set when the SES pre-flight failed and the backup took over the run: the code, never provider text.
+  let primaryDownCode: string | null = null;
+  let primaryDownError: EmailProviderRequestError | EmailProviderConfigurationError | null = null;
   const sendEmail = dependencies.sendEmail ?? sendEmailWithProvider;
   const now = dependencies.now ?? (() => new Date());
   const optOutTable = prisma.emailAnnouncementOptOut;
@@ -1130,7 +1236,7 @@ async function runDeliveryLoop(
   // Only when something is due, so an empty sweep or an inline send with nothing to do never opens an SMTP login.
   // Bad credentials stop here, before any message is claimed or any attempt is spent; an unreachable provider
   // ends the run quietly (nothing claimed, the next run tries again) instead of waiting through two timeouts.
-  if (!dependencies.sendEmail && isSesEmailConfiguration(configuration)) {
+  if ((dependencies.preflight || !dependencies.sendEmail) && isSesEmailConfiguration(configuration) && !forceBackup) {
     const due = await prisma.messageOutbox.findFirst({
       where: {
         ...scope,
@@ -1144,16 +1250,24 @@ async function runDeliveryLoop(
     });
     if (due) {
       try {
-        await preflightEmailProvider(configuration);
+        await (dependencies.preflight ?? preflightEmailProvider)(configuration);
       } catch (error) {
-        if (error instanceof EmailProviderConfigurationError) {
-          throw new ExternalEmailDeliveryError("EXTERNAL_EMAIL_NOT_CONFIGURED", error.message, result);
+        // With a backup, an SES that is unreachable or refuses the login does not stop the run: this run's messages go
+        // straight through the backup, and each attempt records why.
+        if (backup && (error instanceof EmailProviderConfigurationError || error instanceof EmailProviderRequestError)) {
+          primaryDownCode = primaryFaultCode(error);
+          primaryDownError = error;
+          logWarn("Amazon SES failed its pre-flight; this run sends through the backup email service.", { code: primaryDownCode });
+        } else {
+          if (error instanceof EmailProviderConfigurationError) {
+            throw new ExternalEmailDeliveryError("EXTERNAL_EMAIL_NOT_CONFIGURED", error.message, result);
+          }
+          if (error instanceof EmailProviderRequestError) {
+            logWarn("The email provider could not be reached before a delivery run; nothing was claimed.", { code: error.code });
+            return result;
+          }
+          throw error;
         }
-        if (error instanceof EmailProviderRequestError) {
-          logWarn("The email provider could not be reached before a delivery run; nothing was claimed.", { code: error.code });
-          return result;
-        }
-        throw error;
       }
     }
   }
@@ -1162,7 +1276,8 @@ async function runDeliveryLoop(
       prisma,
       scope,
       uniqueMessageIds,
-      now()
+      now(),
+      configuredProvider,
     );
     if (!message) break;
     // An invoice email is sent only while its version is still FINALIZED (#168): one a revision replaced is cancelled, never sent.
@@ -1177,6 +1292,9 @@ async function runDeliveryLoop(
       continue;
     }
     let preparedBody: PreparedEmailBody | null = null;
+    // Which provider this attempt ended up with, and the failover facts to record on its row (#1444).
+    let attemptProvider: EmailProviderName = configuredProvider;
+    let attemptFacts: Record<string, string | boolean> = {};
     try {
       const prepareBodyText = dependencies.prepareBodyText
         ?? (scope.eventId === null
@@ -1236,7 +1354,7 @@ async function runDeliveryLoop(
       }
       // Announcements carry an unsubscribe link in the body and the one-click headers (#838).
       const unsubscribe = await announcementUnsubscribeLinks(message, announcementPolicy);
-      const delivery = await sendEmail({
+      const emailInput: EmailDeliveryInput = {
         fromName: message.senderNameSnapshot,
         fromEmail: centralFromEmail ?? message.senderEmailSnapshot ?? "",
         toEmail: message.recipientEmail,
@@ -1272,14 +1390,99 @@ async function runDeliveryLoop(
           : undefined,
         idempotencyKey: `outbox:${message.id}`,
         messageId: message.id,
-      }, configuration);
+      };
+      let delivery: EmailDeliveryResult;
+      if (!backup) {
+        delivery = await sendEmail(emailInput, configuration);
+      } else {
+        // The backup is active (#1444). One message goes through at most one provider per attempt, and the earlier
+        // attempts decide where it may go now.
+        let history: AttemptHistory = { usedBackup: forceBackup, ambiguousPrimary: false, primaryErrorCode: null };
+        if (!forceBackup) {
+          try {
+            history = await readAttemptHistory(prisma, message.id);
+          } catch (historyError) {
+            // Without the history, sending could repeat a message the backup already sent. Hold it and try later.
+            logError("Unable to read a message's earlier delivery attempts; the message will be retried.", historyError);
+            throw new EmailProviderRequestError(
+              "Earlier delivery attempts could not be read, so the message was not sent. It will be tried again.",
+              DELIVERY_HISTORY_UNAVAILABLE_CODE,
+              true,
+              0,
+            );
+          }
+        }
+        // Stamps the claimed row BEFORE the backup is called, so a worker that dies mid-send leaves a mark that stale
+        // recovery turns into a backup attempt (Resend may have accepted it). If the stamp cannot be written the backup
+        // is not called at all.
+        const stampBackup = async () => {
+          let stamped = false;
+          try {
+            const updated = await prisma.messageOutbox.updateMany({
+              where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+              // Also refreshes lockedAt. Stale recovery reserves a row by matching lockToken AND lockedAt, so a recovery
+              // that read the row before this stamp fails its reserve step and skips it, instead of recording the wrong
+              // provider. Chosen over re-reading the provider inside the recovery transaction because it needs no change
+              // to recovery. Nothing else depends on lockedAt staying at the claim time: it is only compared with the
+              // stale cutoff (a later value just delays recovery) and used as an attempt's start time on recovery.
+              data: { provider: "RESEND", lockedAt: now() },
+            });
+            stamped = updated.count === 1;
+          } catch (stampError) {
+            logError("Unable to mark a message as handed to the backup email service.", stampError);
+          }
+          if (!stamped) {
+            throw new EmailProviderRequestError(
+              "The message could not be marked for the backup email service, so it was not sent. It will be tried again.",
+              DELIVERY_STAMP_UNAVAILABLE_CODE,
+              true,
+              0,
+            );
+          }
+        };
+        const sendViaBackup = async (facts: Record<string, string | boolean>) => {
+          await stampBackup();
+          attemptProvider = "RESEND";
+          attemptFacts = facts;
+          return sendEmail(emailInput, backup);
+        };
+        // The first hand-over to the backup: if Resend definitely refuses it (a 4xx other than a limit), the attempt ends
+        // with the primary's own error, so it stays retryable on SES as before, and the refusal is recorded.
+        const firstFailover = async (facts: Record<string, string | boolean>, primaryError: unknown) => {
+          try {
+            return await sendViaBackup(facts);
+          } catch (backupError) {
+            if (backupError instanceof EmailProviderRequestError && backupDefinitelyRefused(backupError)) {
+              attemptProvider = configuredProvider;
+              attemptFacts = { backupRefused: true, backupErrorCode: backupError.code };
+              throw primaryError;
+            }
+            throw backupError;
+          }
+        };
+        if (forceBackup) {
+          delivery = await sendViaBackup({ directBackup: true });
+        } else if (history.usedBackup) {
+          delivery = await sendViaBackup({ failover: true, primaryErrorCode: history.primaryErrorCode ?? "PRIOR_FAILOVER" });
+        } else if (primaryDownCode !== null && primaryDownError !== null && !history.ambiguousPrimary) {
+          delivery = await firstFailover({ failover: true, primaryErrorCode: primaryDownCode, preflight: true }, primaryDownError);
+        } else {
+          try {
+            delivery = await sendEmail(emailInput, configuration);
+          } catch (primaryError) {
+            if (history.ambiguousPrimary || !primaryNotAccepted(primaryError)) throw primaryError;
+            delivery = await firstFailover({ failover: true, primaryErrorCode: primaryFaultCode(primaryError) }, primaryError);
+          }
+        }
+      }
       if (await finalizeSuccessfulAttempt(
         prisma,
         message,
         delivery.providerMessageId,
         now(),
-        delivery.provider ?? configuredProvider,
+        delivery.provider ?? (backup ? attemptProvider : configuredProvider),
         centralFromEmail,
+        attemptFacts,
       )) {
         result.sentIds.push(message.id);
       }
@@ -1289,11 +1492,21 @@ async function runDeliveryLoop(
         // attempt counted, its private link kept) and stop the run with one error.
         await prisma.messageOutbox.updateMany({
           where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-          data: { status: "PENDING", lockedAt: null, lockToken: null },
+          // The stamp (if the backup was tried) is undone: this claim ends without a send.
+          data: { status: "PENDING", lockedAt: null, lockToken: null, ...(backup ? { provider: configuredProvider } : {}) },
         });
         throw new ExternalEmailDeliveryError("EXTERNAL_EMAIL_NOT_CONFIGURED", caught.message, result);
       }
-      const normalized = normalizeEmailDeliveryError(caught);
+      let normalized = normalizeEmailDeliveryError(caught);
+      // The backup (Resend) has hit its own limit: nothing else can send this, so it ends FAILED with a plain reason,
+      // never rescheduled (#1444). The run stops after it so the rest of the queue is not failed one by one.
+      const backupLimitReached = Boolean(backup)
+        && attemptProvider === "RESEND"
+        && caught instanceof EmailProviderRequestError
+        && (isProviderQuotaError(caught) || isProviderRateLimitError(caught));
+      if (backupLimitReached) {
+        normalized = { code: BACKUP_PROVIDER_LIMIT_ERROR_CODE, message: BACKUP_PROVIDER_LIMIT_MESSAGE, retryable: false };
+      }
       if (!normalized.retryable && preparedBody?.revokeOnDefinitiveFailure) {
         try {
           await preparedBody.revokeOnDefinitiveFailure();
@@ -1306,16 +1519,22 @@ async function runDeliveryLoop(
         message,
         normalized,
         now(),
-        // Preparing the unsubscribe link fails before any provider is called, so it is not a provider attempt.
-        normalized.code === "UNSUBSCRIBE_LINK_UNAVAILABLE",
-        configuredProvider,
+        // Preparing the unsubscribe link, or reading the earlier attempts, fails before any provider is called, so it
+        // is not a provider attempt.
+        normalized.code === "UNSUBSCRIBE_LINK_UNAVAILABLE" || normalized.code === DELIVERY_HISTORY_UNAVAILABLE_CODE || normalized.code === DELIVERY_STAMP_UNAVAILABLE_CODE,
+        backup ? attemptProvider : configuredProvider,
+        // With a backup, a failed primary attempt records whether it was definitely not accepted: the next attempt may
+        // fail over only after those.
+        backup
+          ? { ...attemptFacts, ...(attemptProvider === "SES" ? { notAccepted: primaryNotAccepted(caught) } : {}) }
+          : {},
       );
       if (failure.rescheduled) result.rescheduledIds.push(message.id);
       // The provider's quota is spent: stop this run so the rest of the queue waits instead of each message
       // making a doomed call (#860). They stay queued and untouched.
       if (failure.quota) break;
       // A message that gave up on the quota is a final failure (below); the quota is still spent, so the run stops after it.
-      const stopAfterThis = failure.gaveUp;
+      const stopAfterThis = failure.gaveUp || backupLimitReached;
       if (!failure.rescheduled && failure.finalized) {
         result.failedIds.push(message.id);
         // Out of retries or non-retryable: a link that never arrived must not stay live (#610).
@@ -1437,6 +1656,8 @@ export async function processAccountEmailQueue(
     messageIds?: string[];
     limit?: number;
     dependencies?: ExternalEmailDeliveryDependencies;
+    /** Send straight through the backup provider (the System report tester). Refused when there is no backup. */
+    useBackup?: boolean;
   } = {},
 ): Promise<ExternalEmailQueueResult> {
   try {

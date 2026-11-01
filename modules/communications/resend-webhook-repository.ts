@@ -2,7 +2,9 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import type { ResendWebhookEvent } from "@/integrations/email/resend-webhook";
+import { isEmailPrimarySes } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
+import { suppressAddress } from "@/modules/communications/email-suppression";
 import { retireClubFormLinkForMessage } from "@/modules/club-forms/link-email";
 import {
   mapResendDeliveryEvent,
@@ -14,6 +16,27 @@ export type ResendWebhookRecordResult = {
   matchedMessageId: string | null;
   mappedStatus: string | null;
 };
+
+/**
+ * The addresses a Resend event says to stop mailing (#1444): the recipients of a permanent bounce or a spam complaint.
+ * A bounce whose type says it is not permanent, and any other event, suppresses nothing.
+ */
+export function resendSuppression(event: ResendWebhookEvent): { reason: "BOUNCE" | "COMPLAINT"; recipients: string[] } | null {
+  const reason = event.type === "email.bounced" ? "BOUNCE" : event.type === "email.complained" ? "COMPLAINT" : null;
+  if (!reason) return null;
+  // A bounce that says it is not permanent (Resend: "Transient", "Undetermined") suppresses nothing. A complaint
+  // always suppresses. A bounce with no type is treated as permanent (Resend's older payloads carry no type).
+  const bounce = (event.data as { bounce?: { type?: unknown } }).bounce;
+  const bounceType = typeof bounce?.type === "string" ? bounce.type.trim().toLowerCase() : null;
+  if (reason === "BOUNCE" && bounceType !== null && bounceType !== "permanent") return null;
+  const to = (event.data as { to?: unknown }).to;
+  const recipients = (Array.isArray(to) ? to : [])
+    .filter((value): value is string => typeof value === "string")
+    // "Name <a@b.test>" or a bare address.
+    .map((value) => (/<([^<>]+)>/.exec(value)?.[1] ?? value).trim().toLowerCase())
+    .filter((value) => /^[^\s@<>]+@[^\s@<>]+$/.test(value));
+  return recipients.length > 0 ? { reason, recipients: [...new Set(recipients)] } : null;
+}
 
 export async function recordResendWebhookEvent(
   providerEventId: string,
@@ -87,6 +110,21 @@ export async function recordResendWebhookEvent(
         // so it must not kill the parent's link. A message that carries no link matches nothing.
         if (applied.count > 0 && ["BOUNCED", "FAILED", "SUPPRESSED"].includes(transition.status)) {
           await retireClubFormLinkForMessage(tx, message.id, occurredAt);
+        }
+      }
+      // Resend and SES share one do-not-send list (#1444). Only while SES is the primary, so a late Resend report still
+      // counts after the backup is switched off; a server that uses Resend alone keeps the behavior it had before.
+      const suppression = isEmailPrimarySes() ? resendSuppression(event) : null;
+      if (suppression) {
+        for (const normalizedEmail of suppression.recipients) {
+          await suppressAddress(tx, {
+            normalizedEmail,
+            reason: suppression.reason,
+            provider: "RESEND",
+            occurredAt,
+            sourceProviderEventId: providerEventId,
+            sourceMessageOutboxId: message?.id ?? null,
+          });
         }
       }
       return {
