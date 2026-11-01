@@ -275,7 +275,7 @@ export function SearchResultStatus({ message }: { message: string }) {
  * A `<details>` that holds a search form (#1431). The server opens it when a filter is active, but once it is open it
  * stays open: clearing the box as you type removes the filter, and a closing panel would take the focused box with it.
  */
-export function SearchDisclosure({ open, children, ...props }: { open: boolean; children: ReactNode; className?: string; "data-testid"?: string }) {
+export function SearchDisclosure({ open, children, ...props }: { open: boolean; children?: ReactNode; className?: string; "data-testid"?: string }) {
   const [isOpen, setIsOpen] = useState(open);
   const [lastOpen, setLastOpen] = useState(open);
   // Opens again when the server newly opens it; never closes on its own.
