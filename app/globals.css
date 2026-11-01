@@ -13585,6 +13585,9 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .public-header-nav ul { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; padding: 0; list-style: none; }
 .public-header-nav .text-button { white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; }
 
+/* The status word is already worded (#1453): do not capitalize every word of it. */
+.detail-grid strong.status-word-value { text-transform: none; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */

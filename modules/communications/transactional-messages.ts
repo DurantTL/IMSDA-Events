@@ -30,7 +30,7 @@ import {
 import { buildRegistrationSeminarPreferences } from "@/modules/communications/seminar-preferences";
 import { linkQueuedMessageFiles } from "@/modules/communications/message-files";
 import { messageFileIdsInHtml } from "@/modules/communications/message-file-rules";
-import { registrationStatusWords } from "@/modules/registrations/status-words";
+import { registrationStatusWord } from "@/modules/registrations/status-words";
 
 type TransactionalTemplateKey =
   | "REGISTRATION_CONFIRMATION_PAID"
@@ -567,7 +567,11 @@ async function enqueueTransactionalMessage(
       .map((attendee, index) => `${index + 1}. ${attendeeName(attendee)}`)
       .join("\n") || "No attendee names are recorded.",
     total_amount: perPersonNotice ?? formatMessageMoney(totalCents),
-    restored_status: registrationStatusWords[registration.status],
+    restored_status: registrationStatusWord({
+      status: registration.status,
+      attendeeBalanceCents: balanceCents,
+      deferredBilling: isDeferredOrganizationBilling,
+    }),
     balance_amount: perPersonNotice || billedToGroup ? "Nothing is due online." : formatMessageMoney(balanceCents),
     payment_instructions: instructions,
     portal_url: REGISTRATION_MANAGE_LINK_SENTINEL,

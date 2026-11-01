@@ -154,7 +154,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                 {columns.map((column) => {
                   const value = column.key === "confirmationCode"
                     ? <Link href={`/people?event=${encodeURIComponent(event.id)}&registration=${encodeURIComponent(row.registrationId)}`}>{row.confirmationCode}</Link>
-                    : column.key === "status" ? registrationStatusWordOrRaw(row.status) : row[column.key];
+                    : column.key === "status" ? row.statusLabel : row[column.key];
                   // The attendee's name is the card's title on a phone (table-cards).
                   return column.key === "name"
                     ? <th key={column.key} data-col={column.key} role="rowheader" scope="row">{value}</th>

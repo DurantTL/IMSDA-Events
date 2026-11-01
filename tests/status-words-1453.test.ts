@@ -11,6 +11,9 @@ import {
   waitlistStatusText,
 } from "@/modules/registrations/status-words";
 import { describePublicRegistrationStatus } from "@/modules/public-access/domain";
+import { registrationStateLabel } from "@/modules/attendee-accounts/registration-card";
+import { statusLabel as staffStatusLabel } from "@/components/people-workspace";
+import type { RegistrationRecord } from "@/modules/registrations/repository";
 
 const eight = ["Draft", "Submitted", "Pending payment", "Pending approval", "Confirmed", "Waitlisted", "Cancelled", "Refunded"];
 
@@ -72,6 +75,32 @@ describe("status words (#1453, B12)", () => {
   });
 });
 
+describe("one registration, one word (#1453)", () => {
+  const cases = [
+    { name: "submitted with a balance", status: "SUBMITTED", balanceCents: 35000, deferred: false, word: "Pending payment" },
+    { name: "submitted with no balance", status: "SUBMITTED", balanceCents: 0, deferred: false, word: "Submitted" },
+    { name: "submitted and church-billed", status: "SUBMITTED", balanceCents: 0, deferred: true, word: "Submitted" },
+    { name: "confirmed with a balance", status: "CONFIRMED", balanceCents: 500, deferred: false, word: "Confirmed" },
+  ] as const;
+  for (const c of cases) {
+    it(`staff, account, attendee page and email agree for ${c.name}`, () => {
+      const staff = staffStatusLabel({
+        status: c.status, balanceCents: c.balanceCents, totalAmountCents: 35000, isDeferredOrganizationBilling: c.deferred, staffInvitation: null,
+      } as unknown as RegistrationRecord);
+      const attendee = describePublicRegistrationStatus(c.status, null, { attendeeBalanceCents: c.balanceCents, deferredBilling: c.deferred });
+      const account = registrationStateLabel({ lifecycle: c.status, status: attendee });
+      // The reactivation email token (restored_status) is this same function with the same context.
+      const email = registrationStatusWord({ status: c.status, attendeeBalanceCents: c.balanceCents, deferredBilling: c.deferred });
+      expect([staff, attendee.label, account, email]).toEqual([c.word, c.word, c.word, c.word]);
+    });
+  }
+
+  it("builds the email token and the attendee listing from registrationStatusWord", () => {
+    expect(readFileSync(join(__dirname, "../modules/communications/transactional-messages.ts"), "utf8")).toMatch(/restored_status: registrationStatusWord\(/);
+    expect(readFileSync(join(__dirname, "../modules/registrations/attendee-listing.ts"), "utf8")).toMatch(/statusLabel: registrationStatusWord\(/);
+  });
+});
+
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);
@@ -119,6 +148,24 @@ describe("status word source scan (#1453)", () => {
       expect(hits).toEqual([]);
     });
   }
+
+  it("never lowercases a status for display anywhere in app/ (class names excepted)", () => {
+    const hits = files
+      .map((file) => relative(root, file))
+      .filter((file) => file.startsWith("app/"))
+      .flatMap((file) => readFileSync(join(root, file), "utf8").split("\n")
+        .filter((line) => /[sS]tatus\.toLowerCase\(\)/.test(line) && !line.includes("className"))
+        .map((line) => `${file}: ${line.trim().slice(0, 80)}`));
+    expect(hits).toEqual([]);
+  });
+
+  it("has no inline label map keyed by registration status values", () => {
+    // An object literal giving string labels to SUBMITTED and WAITLISTED is a second map.
+    const hits = files
+      .map((file) => relative(root, file))
+      .filter((file) => /SUBMITTED:\s*"[^"]*"[\s\S]{0,200}WAITLISTED:\s*"|WAITLISTED:\s*"[^"]*"[\s\S]{0,200}SUBMITTED:\s*"/.test(readFileSync(join(root, file), "utf8")));
+    expect(hits).toEqual([]);
+  });
 
   it("defines no other RegistrationStatus label map", () => {
     const hits = files

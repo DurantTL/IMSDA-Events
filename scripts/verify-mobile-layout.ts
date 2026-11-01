@@ -244,7 +244,7 @@ const pages: PageSpec[] = [
   { name: "account-registrations-attendee", path: "/account/registrations", role: "attendee" },
   { name: "account-profile-attendee", path: "/account/profile", role: "attendee" },
   // The plain attendee with registrations in every lifecycle state (#1111): see seedHistoryAccount.
-  { name: "account-overview-history", path: "/account", role: "attendee-history", expectText: /(?=[\s\S]*Submitted)(?=[\s\S]*\$40\.00 remaining)/ },
+  { name: "account-overview-history", path: "/account", role: "attendee-history", expectText: /(?=[\s\S]*Pending payment)(?=[\s\S]*\$40\.00 remaining)/ },
   { name: "account-registrations-history", path: "/account/registrations", role: "attendee-history", expectText: /(?=[\s\S]*No payment due while waitlisted)(?=[\s\S]*\$40\.00 remaining)(?=[\s\S]*places requested)/ },
   { name: "account-registrations-history-past", path: "/account/registrations?show=past", role: "attendee-history", expectText: /Mobilecheck Spring Reunion/ },
   { name: "account-registrations-history-cancelled", path: "/account/registrations?show=cancelled", role: "attendee-history", expectText: /(?=[\s\S]*Nothing due now)(?=[\s\S]*\$100\.00 refunded)(?=[\s\S]*No payment is due on a cancelled registration)/ },

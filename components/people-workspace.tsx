@@ -123,7 +123,7 @@ function dateTime(value: string | null, timeZone: string) {
 }
 
 function submittedDateTime(value: string | null, timeZone: string) {
-  return value ? dateTime(value, timeZone) : "Draft";
+  return value ? dateTime(value, timeZone) : "Not yet";
 }
 
 function paymentMethodLabel(value: string) {
@@ -242,7 +242,7 @@ function statusContext(record: RegistrationRecord) {
 }
 
 /** The shared status word (#1453). A club waitlisted at a location adds "at <location>, position N" (#599). */
-function statusLabel(record: RegistrationRecord) {
+export function statusLabel(record: RegistrationRecord) {
   if (record.status === "WAITLISTED") return waitlistStatusText({ position: record.locationWaitlistPlace, place: record.location?.name });
   return registrationStatusWord(statusContext(record));
 }
@@ -1043,7 +1043,7 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong className="status-word-value">{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{formatCents(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{formatCents(selected.balanceCents)}</strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>
