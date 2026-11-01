@@ -40,7 +40,7 @@ function Notice({ eyebrow, title, children }: { eyebrow: string; title: string; 
 }
 
 function when(date: Date) {
-  return `${formatInConferenceTime(date, { dateStyle: "full", timeStyle: "short" })} Central time`;
+  return `${formatInConferenceTime(date, { dateStyle: "full", timeStyle: "short" })}`;
 }
 
 /**
