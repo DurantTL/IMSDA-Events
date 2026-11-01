@@ -67,6 +67,8 @@ The honeypot runs first: every public form's schema (`website` field, `modules/s
 `requireTurnstile`, so a filled honeypot is refused before the fallback is considered. That includes the club form
 application, information form and recovery routes; the code request carries the field too.
 
+Rotating `RATE_LIMIT_HASH_SECRET` changes the keyed address hash, so codes issued in the last 10 minutes stop working (the person asks for a new one). In development with no account email configured, the code in the response reveals whether an address has an account; production never reaches that branch, the same as #1410.
+
 Codes: six digits, ten minutes, five tries, hashed like the #1410 sign-in code, stored in `SecurityCheckCode` (the address
 only as a keyed hash), minted when the message is delivered. A code is spent by the request that uses it, so a wrong password
 after a valid code needs a fresh code. Audit entries (`SECURITY_CHECK_CODE_SENT`, `_VERIFIED`, `_FAILED`) carry the code's id

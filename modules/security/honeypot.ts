@@ -6,6 +6,4 @@ import { z } from "zod";
  * check must at least not look like a bot.
  */
 export const HONEYPOT_FIELD = "website";
-export const honeypotFieldSchema = z.literal("", {
-  error: "We couldn't send this form. Clear your browser's autofill and try again.",
-}).optional();
+export const honeypotFieldSchema = z.literal("").optional();

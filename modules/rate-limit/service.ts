@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   getRateLimitConfiguration,
+  mergeRateLimitOutcomes,
   hashRateLimitIdentifier,
   rateLimitClientIdentityHash,
   rateLimitSubjectHash,
@@ -854,7 +855,7 @@ export async function checkSecurityCheckCodeSendRateLimit(request: Request, emai
   const configuration = getRateLimitConfiguration();
   const { client } = requestIdentities(request, configuration);
   const address = hashRateLimitIdentifier("security-check-code-send", email.trim().toLowerCase(), configuration);
-  return evaluate([
+  const perSourceAndAddress = await evaluate([
     {
       policy: "security-check.code-send.client",
       limit: SECURITY_CHECK_CODE_SEND_BUDGETS.client,
@@ -867,15 +868,17 @@ export async function checkSecurityCheckCodeSendRateLimit(request: Request, emai
       windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
       identifierHashes: [address],
     },
-    ...(action === "attendee-sign-up"
-      ? [{
-        policy: "security-check.code-send.sign-up-total",
-        limit: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit,
-        windowSeconds: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.windowSeconds,
-        identifierHashes: [hashRateLimitIdentifier("security-check-code-send-total", action, configuration)],
-      }]
-      : []),
   ], configuration);
+  // The total is charged only for a request the other two allowed: every bucket in one evaluation is incremented even
+  // when another refuses, so one source hammering the route must not be able to use up the total for everyone.
+  if (!perSourceAndAddress.allowed || action !== "attendee-sign-up") return perSourceAndAddress;
+  const total = await evaluate([{
+    policy: "security-check.code-send.sign-up-total",
+    limit: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit,
+    windowSeconds: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.windowSeconds,
+    identifierHashes: [hashRateLimitIdentifier("security-check-code-send-total", action, configuration)],
+  }], configuration);
+  return mergeRateLimitOutcomes(perSourceAndAddress, total);
 }
 
 /**

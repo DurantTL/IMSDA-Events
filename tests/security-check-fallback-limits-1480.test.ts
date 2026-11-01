@@ -68,4 +68,17 @@ describe("emailed code request limit", () => {
     expect((await checkSecurityCheckCodeSendRateLimit(from("fresh-source"), "fresh@example.test", "attendee-sign-up")).allowed).toBe(false);
     expect((await checkSecurityCheckCodeSendRateLimit(from("fresh-source"), "fresh@example.test", "staff-sign-in")).allowed).toBe(true);
   });
+
+  it("a refused request does not count toward the sign-up total", async () => {
+    // One source hammers the route: only its first 10 are allowed, the rest are refused by the per-source budget.
+    for (let index = 0; index < 50; index += 1) {
+      await checkSecurityCheckCodeSendRateLimit(from("hammer"), `h${index}@example.test`, "attendee-sign-up");
+    }
+    // Only the allowed ones were charged to the total, so other sources still have almost all of it.
+    let allowed = 0;
+    for (let index = 0; index < SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit - SECURITY_CHECK_CODE_SEND_BUDGETS.client; index += 1) {
+      if ((await checkSecurityCheckCodeSendRateLimit(from(`other-${index}`), `o${index}@example.test`, "attendee-sign-up")).allowed) allowed += 1;
+    }
+    expect(allowed).toBe(SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit - SECURITY_CHECK_CODE_SEND_BUDGETS.client);
+  });
 });
