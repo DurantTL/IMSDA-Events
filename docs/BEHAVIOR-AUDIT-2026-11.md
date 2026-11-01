@@ -17,7 +17,7 @@ What people would notice first:
 - **Access pages (rule 14).** A club Reporter who opens the Roster sees a blank
   page. Kitchen staff who open another staff page are moved to Kitchen counts
   with no message. An attendee who opens a staff page sees "Staff sign in".
-  Only 25 of 181 "Permission required" uses say who to ask.
+  Only about 22 of the 98 shared "Permission required" panels say who to ask.
 - **Lost work (rule 6).** Editing your profile, applying for a new club or
   filling a public registration form, then clicking a link, loses what you
   typed without a warning. Only 11 forms have the warning.
@@ -87,7 +87,7 @@ headers; the target count line is the `ListPager` text.
   in React state, not the address.
 - `components/phone-hidden-sort-link.tsx`: used by 1 file (attendee list).
 - `components/list-pager.tsx:7-32` `ListPager` ("Showing a–b of N" plus
-  Previous/Next): used by 11 files.
+  Previous/Next): used by 10 other files.
 
 **Breaks**
 
@@ -693,8 +693,10 @@ outside the shared formatter files.
 ### Rule 14. "You don't have access" pages say the same thing and who to ask
 
 **Shared today:** `components/access-restricted.tsx:8` `AccessRestricted`
-("Permission required" plus a Help link), 181 uses; the separate `/no-access`
-page (`modules/access/no-access-copy.ts`). Only 25 uses say who to ask.
+("Permission required" eyebrow plus a Help link; it takes only `title` and
+`detail`), rendered in 98 places; the separate `/no-access`
+page (`modules/access/no-access-copy.ts`). About 22 of the 98 say who to ask
+(a detail starting "Ask …").
 
 **Breaks**
 
@@ -716,7 +718,7 @@ page (`modules/access/no-access-copy.ts`). Only 25 uses say who to ask.
 6. An attendee on a club page gets "We couldn't find that page" (404). That
    hides the page on purpose, so it may be correct; listed so the decision is
    explicit. (browser)
-7. About 156 `AccessRestricted` uses do not name who to ask, for example "Your
+7. About 76 `AccessRestricted` uses do not name who to ask, for example "Your
    event role does not include this page." (`app/(workspace)/communications/page.tsx:94`).
    (code)
 8. API errors use the raw permission key: "The ${permission} permission is
@@ -781,7 +783,8 @@ mockup.
 11. **Phone cards (rule 3).** Breaks 3.1 to 3.4, plus the sideways-scroll check
     in the mobile audit. Shared layout change (`mobile-check` label). Needs
     mockup (published).
-12. **Sorting and one pager (rule 1).** Breaks 1.1 to 1.11, server-side sort in
+12. **Sorting and one pager (rule 1).** Breaks 1.1 to 1.11 (break 1.11 is four
+    count-only lines and can split off if the issue runs long), server-side sort in
     the address. Needs Caleb's answer on which lists are exempt
     (**needs-decision**). Exports (rule 11, breaks 11.1 to 11.6) can ride with
     this issue or become a 13th small one.
