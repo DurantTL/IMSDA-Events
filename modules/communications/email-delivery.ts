@@ -367,6 +367,16 @@ export const BACKUP_PROVIDER_LIMIT_ERROR_CODE = "BACKUP_PROVIDER_LIMIT";
 export const BACKUP_PROVIDER_LIMIT_MESSAGE = "Amazon SES could not send this and the backup service (Resend) has reached its sending limit.";
 /** The code of a retryable hold when the message's earlier attempts could not be read, so nothing is sent blind. */
 export const DELIVERY_HISTORY_UNAVAILABLE_CODE = "DELIVERY_HISTORY_UNAVAILABLE";
+/** Likewise when the row could not be stamped before the backup was called. */
+export const DELIVERY_STAMP_UNAVAILABLE_CODE = "DELIVERY_STAMP_UNAVAILABLE";
+
+/**
+ * The backup definitely refused the message: an HTTP 4xx answer other than a limit (429), a timeout (408) or an
+ * in-progress repeat (409). A network error, a timeout or a 5xx is ambiguous, so it is not covered.
+ */
+function backupDefinitelyRefused(error: EmailProviderRequestError) {
+  return error.status >= 400 && error.status < 500 && ![408, 409, 429].includes(error.status);
+}
 
 /**
  * What a message's earlier attempts say about where it may go now (#1444). Never send twice:
@@ -385,7 +395,7 @@ export function summarizeAttemptHistory(
   const history: AttemptHistory = { usedBackup: false, ambiguousPrimary: false, primaryErrorCode: null };
   for (const attempt of attempts) {
     const meta = metadataRecord(attempt.providerMetadata);
-    if (attempt.provider === "RESEND" && meta.realDelivery !== false) {
+    if (attempt.provider === "RESEND" && meta.realDelivery !== false && meta.backupRefused !== true) {
       history.usedBackup = true;
       if (typeof meta.primaryErrorCode === "string") history.primaryErrorCode = meta.primaryErrorCode;
     }
@@ -746,6 +756,8 @@ async function recoverStaleClaims(
   messageIds: string[] | undefined,
   now: Date,
   provider: EmailProviderName = getActiveEmailProviderName(),
+  /** With a backup, a claimed row stamped RESEND was (maybe) handed to the backup before the worker died (#1444). */
+  backupActive = false,
 ) {
   const staleBefore = new Date(now.getTime() - EMAIL_DELIVERY_LOCK_TIMEOUT_MS);
   const candidates = await prisma.messageOutbox.findMany({
@@ -762,6 +774,7 @@ async function recoverStaleClaims(
       attemptCount: true,
       lockToken: true,
       lockedAt: true,
+      provider: true,
     },
   });
   const recoveredIds: string[] = [];
@@ -787,7 +800,8 @@ async function recoverStaleClaims(
         data: {
           messageOutboxId: candidate.id,
           attemptNumber: await nextAttemptRowNumber(tx, candidate.id, candidate.attemptCount),
-          provider,
+          // The stamp written before the backup is called: Resend may have accepted it, so history must see the backup.
+          provider: backupActive && candidate.provider === "RESEND" ? "RESEND" : provider,
           status: "FAILED",
           errorCode: "STALE_DELIVERY_LOCK",
           errorMessage: terminal
@@ -1165,6 +1179,7 @@ async function runDeliveryLoop(
   }
   // Set when the SES pre-flight failed and the backup took over the run: the code, never provider text.
   let primaryDownCode: string | null = null;
+  let primaryDownError: EmailProviderRequestError | EmailProviderConfigurationError | null = null;
   const sendEmail = dependencies.sendEmail ?? sendEmailWithProvider;
   const now = dependencies.now ?? (() => new Date());
   const optOutTable = prisma.emailAnnouncementOptOut;
@@ -1207,6 +1222,7 @@ async function runDeliveryLoop(
     uniqueMessageIds,
     now(),
     configuredProvider,
+    backup !== null,
   );
   const result: ExternalEmailQueueResult = {
     recoveredIds,
@@ -1237,6 +1253,7 @@ async function runDeliveryLoop(
         // straight through the backup, and each attempt records why.
         if (backup && (error instanceof EmailProviderConfigurationError || error instanceof EmailProviderRequestError)) {
           primaryDownCode = primaryFaultCode(error);
+          primaryDownError = error;
           logWarn("Amazon SES failed its pre-flight; this run sends through the backup email service.", { code: primaryDownCode });
         } else {
           if (error instanceof EmailProviderConfigurationError) {
@@ -1391,23 +1408,61 @@ async function runDeliveryLoop(
             );
           }
         }
+        // Stamps the claimed row BEFORE the backup is called, so a worker that dies mid-send leaves a mark that stale
+        // recovery turns into a backup attempt (Resend may have accepted it). If the stamp cannot be written the backup
+        // is not called at all.
+        const stampBackup = async () => {
+          let stamped = false;
+          try {
+            const updated = await prisma.messageOutbox.updateMany({
+              where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+              data: { provider: "RESEND" },
+            });
+            stamped = updated.count === 1;
+          } catch (stampError) {
+            logError("Unable to mark a message as handed to the backup email service.", stampError);
+          }
+          if (!stamped) {
+            throw new EmailProviderRequestError(
+              "The message could not be marked for the backup email service, so it was not sent. It will be tried again.",
+              DELIVERY_STAMP_UNAVAILABLE_CODE,
+              true,
+              0,
+            );
+          }
+        };
         const sendViaBackup = async (facts: Record<string, string | boolean>) => {
+          await stampBackup();
           attemptProvider = "RESEND";
           attemptFacts = facts;
           return sendEmail(emailInput, backup);
+        };
+        // The first hand-over to the backup: if Resend definitely refuses it (a 4xx other than a limit), the attempt ends
+        // with the primary's own error, so it stays retryable on SES as before, and the refusal is recorded.
+        const firstFailover = async (facts: Record<string, string | boolean>, primaryError: unknown) => {
+          try {
+            return await sendViaBackup(facts);
+          } catch (backupError) {
+            if (backupError instanceof EmailProviderRequestError && backupDefinitelyRefused(backupError)) {
+              attemptProvider = configuredProvider;
+              attemptFacts = { backupRefused: true, backupErrorCode: backupError.code };
+              throw primaryError;
+            }
+            throw backupError;
+          }
         };
         if (forceBackup) {
           delivery = await sendViaBackup({ directBackup: true });
         } else if (history.usedBackup) {
           delivery = await sendViaBackup({ failover: true, primaryErrorCode: history.primaryErrorCode ?? "PRIOR_FAILOVER" });
-        } else if (primaryDownCode !== null && !history.ambiguousPrimary) {
-          delivery = await sendViaBackup({ failover: true, primaryErrorCode: primaryDownCode, preflight: true });
+        } else if (primaryDownCode !== null && primaryDownError !== null && !history.ambiguousPrimary) {
+          delivery = await firstFailover({ failover: true, primaryErrorCode: primaryDownCode, preflight: true }, primaryDownError);
         } else {
           try {
             delivery = await sendEmail(emailInput, configuration);
           } catch (primaryError) {
             if (history.ambiguousPrimary || !primaryNotAccepted(primaryError)) throw primaryError;
-            delivery = await sendViaBackup({ failover: true, primaryErrorCode: primaryFaultCode(primaryError) });
+            delivery = await firstFailover({ failover: true, primaryErrorCode: primaryFaultCode(primaryError) }, primaryError);
           }
         }
       }
@@ -1456,7 +1511,7 @@ async function runDeliveryLoop(
         now(),
         // Preparing the unsubscribe link, or reading the earlier attempts, fails before any provider is called, so it
         // is not a provider attempt.
-        normalized.code === "UNSUBSCRIBE_LINK_UNAVAILABLE" || normalized.code === DELIVERY_HISTORY_UNAVAILABLE_CODE,
+        normalized.code === "UNSUBSCRIBE_LINK_UNAVAILABLE" || normalized.code === DELIVERY_HISTORY_UNAVAILABLE_CODE || normalized.code === DELIVERY_STAMP_UNAVAILABLE_CODE,
         backup ? attemptProvider : configuredProvider,
         // With a backup, a failed primary attempt records whether it was definitely not accepted: the next attempt may
         // fail over only after those.

@@ -240,11 +240,17 @@
 
 .items {
   display: grid;
+  min-width: 0;
   gap: 2px;
   margin: 0;
   padding-left: 18px;
   color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.items li {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rowFix {

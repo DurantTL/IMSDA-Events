@@ -2,7 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import type { ResendWebhookEvent } from "@/integrations/email/resend-webhook";
-import { getEmailBackupStatus } from "@/integrations/email/provider";
+import { isEmailPrimarySes } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
 import { suppressAddress } from "@/modules/communications/email-suppression";
 import { retireClubFormLinkForMessage } from "@/modules/club-forms/link-email";
@@ -24,6 +24,11 @@ export type ResendWebhookRecordResult = {
 export function resendSuppression(event: ResendWebhookEvent): { reason: "BOUNCE" | "COMPLAINT"; recipients: string[] } | null {
   const reason = event.type === "email.bounced" ? "BOUNCE" : event.type === "email.complained" ? "COMPLAINT" : null;
   if (!reason) return null;
+  // A bounce that says it is not permanent (Resend: "Transient", "Undetermined") only suppresses nothing. A complaint
+  // always suppresses. A bounce with no type is Resend's older permanent form.
+  const bounce = (event.data as { bounce?: { type?: unknown } }).bounce;
+  const bounceType = typeof bounce?.type === "string" ? bounce.type.trim().toLowerCase() : null;
+  if (reason === "BOUNCE" && bounceType !== null && bounceType !== "permanent") return null;
   const to = (event.data as { to?: unknown }).to;
   const recipients = (Array.isArray(to) ? to : [])
     .filter((value): value is string => typeof value === "string")
@@ -107,9 +112,9 @@ export async function recordResendWebhookEvent(
           await retireClubFormLinkForMessage(tx, message.id, occurredAt);
         }
       }
-      // Resend and SES share one do-not-send list (#1444). Only while the SES + Resend backup is set up: a server that
-      // uses Resend alone keeps the behavior it had before.
-      const suppression = getEmailBackupStatus().active ? resendSuppression(event) : null;
+      // Resend and SES share one do-not-send list (#1444). Only while SES is the primary, so a late Resend report still
+      // counts after the backup is switched off; a server that uses Resend alone keeps the behavior it had before.
+      const suppression = isEmailPrimarySes() ? resendSuppression(event) : null;
       if (suppression) {
         for (const normalizedEmail of suppression.recipients) {
           await suppressAddress(tx, {

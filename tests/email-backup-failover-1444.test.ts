@@ -73,7 +73,10 @@ function fakeStore(options: { suppressed?: boolean; historyFails?: boolean; prio
   const audits: Array<Record<string, unknown>> = [];
   const attempts: Attempt[] = [...(options.priorAttempts ?? [])];
   const messageOutbox = {
-    findMany: vi.fn(async () => []),
+    // A row still PROCESSING long after its claim is what stale recovery picks up.
+    findMany: vi.fn(async () => (message.status === "PROCESSING" && message.lockedAt && (message.lockedAt as Date) < new Date("2026-11-01T11:00:00Z")
+      ? [{ id: message.id, attemptCount: message.attemptCount, lockToken: message.lockToken, lockedAt: message.lockedAt, provider: message.provider }]
+      : [])),
     findFirst: vi.fn(async () => (message.status === "PENDING" && (message.availableAt as Date) <= now ? { ...message, attachment: null, files: [] } : null)),
     updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
       if (where.id !== message.id || (where.status && where.status !== message.status)) return { count: 0 };
@@ -281,6 +284,104 @@ describe("a message is never sent twice, across attempts", () => {
     // A pre-send check that never reached a provider is not an attempt.
     expect(summarizeAttemptHistory([{ provider: "INTERNAL", status: "FAILED", providerMetadata: { realDelivery: false } }])).toMatchObject({ usedBackup: false, ambiguousPrimary: false });
     expect(summarizeAttemptHistory([{ provider: "RESEND", status: "FAILED", providerMetadata: { failover: true, primaryErrorCode: "SMTP_421" } }])).toEqual({ usedBackup: true, ambiguousPrimary: false, primaryErrorCode: "SMTP_421" });
+  });
+});
+
+describe("a crash during a backup send cannot lead to a second send (#1444)", () => {
+  it("stamps the claimed row as handed to Resend before Resend is called", async () => {
+    const store = fakeStore();
+    let stampedAtCall: unknown;
+    const mocks = providers({ ses: () => refused(), resend: () => { stampedAtCall = store.message.provider; return undefined; } });
+    await run(store, mocks);
+    expect(stampedAtCall).toBe("RESEND");
+  });
+
+  it("recovers a row that died after the stamp as a backup attempt, and the next attempt goes only to Resend", async () => {
+    const store = fakeStore();
+    // The worker claimed the message, stamped it, called Resend (which accepted it) and died before recording anything.
+    Object.assign(store.message, { status: "PROCESSING", lockToken: "dead-token", lockedAt: new Date("2026-11-01T09:00:00Z"), provider: "RESEND" });
+    const recovery = providers();
+    const first = await run(store, recovery);
+    expect(first.recoveredIds).toEqual(["message-1"]);
+    expect(store.attempts[0]).toMatchObject({ provider: "RESEND", status: "FAILED", errorCode: "STALE_DELIVERY_LOCK" });
+    expect(summarizeAttemptHistory(store.attempts)).toMatchObject({ usedBackup: true });
+
+    store.message.availableAt = new Date("2026-11-01T11:00:00Z");
+    const next = providers({ ses: () => refused() });
+    const result = await run(store, next);
+    expect(next.calls).toEqual(["RESEND"]);
+    expect(result.sentIds).toEqual(["message-1"]);
+  });
+
+  it("a stale row stamped only by an old failure is recorded as before when no backup is set up", async () => {
+    const store = fakeStore();
+    Object.assign(store.message, { status: "PROCESSING", lockToken: "dead-token", lockedAt: new Date("2026-11-01T09:00:00Z"), provider: "RESEND" });
+    await run(store, providers(), { backupConfiguration: null });
+    expect(store.attempts[0]).toMatchObject({ provider: "SES", errorCode: "STALE_DELIVERY_LOCK" });
+  });
+
+  it("does not call Resend when the stamp cannot be written, and retries later", async () => {
+    const store = fakeStore();
+    const original = store.prisma.messageOutbox.updateMany.getMockImplementation()!;
+    store.prisma.messageOutbox.updateMany.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+      if (args.data.provider === "RESEND" && Object.keys(args.data).length === 1) throw new Error("database blip");
+      return original(args as never);
+    });
+    const mocks = providers({ ses: () => refused() });
+    const result = await run(store, mocks);
+    expect(mocks.calls).toEqual(["SES"]);
+    expect(result.rescheduledIds).toEqual(["message-1"]);
+    expect(store.message.status).toBe("PENDING");
+    expect(store.attempts[0]).toMatchObject({ provider: "INTERNAL", errorCode: "DELIVERY_STAMP_UNAVAILABLE" });
+  });
+});
+
+describe("a backup that definitely refused does not turn a retryable SES fault into a failure (#1444)", () => {
+  it.each([["restricted_api_key", 403], ["validation_error", 422], ["missing_api_key", 401]])("Resend %s (%i): the attempt ends with SES's retryable error and the next attempt tries SES", async (name, status) => {
+    const store = fakeStore();
+    const first = providers({ ses: () => refused(), resend: () => new EmailProviderRequestError("Refused.", name, false, status) });
+    const result = await run(store, first);
+    expect(first.calls).toEqual(["SES", "RESEND"]);
+    expect(result.rescheduledIds).toEqual(["message-1"]);
+    expect(store.message.status).toBe("PENDING");
+    expect(store.message.lastError).toContain("limiting the sending rate");
+    expect(store.attempts[0]).toMatchObject({
+      provider: "SES",
+      status: "FAILED",
+      errorCode: "PROVIDER_RATE_LIMITED",
+      providerMetadata: { retryable: true, notAccepted: true, backupRefused: true, backupErrorCode: name },
+    });
+    expect(summarizeAttemptHistory(store.attempts)).toMatchObject({ usedBackup: false, ambiguousPrimary: false });
+
+    store.message.availableAt = new Date("2026-11-01T11:00:00Z");
+    const second = providers();
+    await run(store, second);
+    expect(second.calls).toEqual(["SES"]);
+    expect(store.message).toMatchObject({ status: "SENT", provider: "SES" });
+  });
+
+  it("a Resend timeout or 5xx is ambiguous: the next attempt uses Resend only", async () => {
+    for (const error of [
+      new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0),
+      new EmailProviderRequestError("Server error.", "HTTP_500", true, 500),
+    ]) {
+      const store = fakeStore();
+      await run(store, providers({ ses: () => refused(), resend: () => error }));
+      store.message.availableAt = new Date("2026-11-01T11:00:00Z");
+      const next = providers({ ses: () => refused() });
+      await run(store, next);
+      expect(next.calls).toEqual(["RESEND"]);
+    }
+  });
+
+  it("after a preflight failure, a refusing backup leaves the primary's own error", async () => {
+    const store = fakeStore();
+    const mocks = providers({ resend: () => new EmailProviderRequestError("Refused.", "restricted_api_key", false, 403) });
+    const result = await run(store, mocks, {
+      preflight: vi.fn(async () => { throw new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0, true); }),
+    });
+    expect(result.rescheduledIds).toEqual(["message-1"]);
+    expect(store.attempts[0]).toMatchObject({ provider: "SES", errorCode: "NETWORK_ERROR", providerMetadata: { backupRefused: true, notAccepted: true } });
   });
 });
 

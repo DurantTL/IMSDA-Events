@@ -44,10 +44,10 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
         {signal.checkedAt ? reportTimeLabel(signal.checkedAt, now) : signal.noTimeLabel ?? reportTimeLabel(null, now)}
       </div>
       <div className={styles.rowResult}>
-        <StateChip state={signal.state} />
+        <StateChip state={signal.state} label={signal.chipLabel} />
         <span>{signal.resultText}</span>
         {signal.items && signal.items.length > 0 && (
-          <ul className={styles.items} aria-label={`${signal.name}: open items`}>
+          <ul className={styles.items} aria-label={`${signal.name}: ${signal.itemsLabel ?? "open items"}`}>
             {signal.items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ul>
         )}

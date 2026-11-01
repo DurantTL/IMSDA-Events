@@ -109,6 +109,8 @@ describe("Backup setup panel", () => {
     expect(text).toMatch(/Amazon SES: .*SPF.*DKIM/);
     expect(text).toMatch(/Resend: .*SPF.*DKIM/);
     expect(row.countsTowardOverall).toBe(false);
+    expect(row.resultText).not.toContain("To turn on");
+    expect(row).toMatchObject({ itemsLabel: "setup checklist", chipLabel: "Setup guide" });
     expect(row.items).toEqual([...BACKUP_SETUP_STEPS]);
   });
 });

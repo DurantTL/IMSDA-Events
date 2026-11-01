@@ -5,7 +5,7 @@ import type { Signal } from "./model";
  * Pure mappers for the backup email service rows (#1444). They read nothing and carry counts, times and fixed words
  * only: never an address, a message, a provider payload or a setting's value.
  */
-export type BackupFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel" | "items" | "countsTowardOverall">>;
+export type BackupFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel" | "items" | "itemsLabel" | "chipLabel" | "countsTowardOverall">>;
 
 export const BACKUP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -75,8 +75,10 @@ export function backupSetupFields(key: string, now: Date): BackupFields {
     state: "info",
     checkedAt: now.toISOString(),
     whenLabel: "Checked",
-    resultText: "To turn on the automatic backup, these settings and DNS records are needed. Names only; values are never shown here.",
+    resultText: "Settings and DNS for the backup. Names only; values are never shown here.",
     items: [...BACKUP_SETUP_STEPS],
     countsTowardOverall: false,
+    itemsLabel: "setup checklist",
+    chipLabel: "Setup guide",
   };
 }

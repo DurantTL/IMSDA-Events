@@ -61,6 +61,11 @@ export function getEmailBackupStatus(env: NodeJS.ProcessEnv = process.env): Emai
   return { active: true, reason: null };
 }
 
+/** Whether Amazon SES is the primary provider (#1444): Resend reports then feed the shared suppression list. */
+export function isEmailPrimarySes(env: NodeJS.ProcessEnv = process.env) {
+  return parseProvider(env.EMAIL_PROVIDER) === "SES";
+}
+
 /** The Resend configuration to use as the backup, or null when the backup is not active. */
 export function getBackupEmailConfiguration(): ResendEmailConfiguration | null {
   return getEmailBackupStatus().active ? getResendEmailConfiguration() : null;

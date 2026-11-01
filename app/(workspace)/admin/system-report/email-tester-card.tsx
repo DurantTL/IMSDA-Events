@@ -256,12 +256,16 @@ export function EmailTesterCard({ defaultEmail, backupConfigured = false }: { de
               id="email-tester-backup"
               className={styles.checkbox}
               type="checkbox"
+              aria-describedby="email-tester-backup-help"
               checked={viaBackup}
               onChange={(event) => setViaBackup(event.target.checked)}
               disabled={sending}
             />
             <span>Send through the backup (Resend)</span>
           </label>
+        )}
+        {backupConfigured && (
+          <p className={styles.help} id="email-tester-backup-help">This test skips Amazon SES and goes straight to Resend.</p>
         )}
         <div aria-live="polite">
           {message && (

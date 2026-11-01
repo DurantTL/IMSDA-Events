@@ -55,6 +55,10 @@ export type Signal = {
   countsTowardOverall?: boolean;
   /** A short list under the result, such as the titles of open alerts. Titles of alert kinds only. */
   items?: string[];
+  /** The list's accessible name when it is not "open items" (a setup checklist). */
+  itemsLabel?: string;
+  /** The state chip's text in place of the state's own ("Setup guide" for an information row). */
+  chipLabel?: string;
   /** What to show in place of a time when there is none ("Never"). Defaults to "Not recorded". */
   noTimeLabel?: string;
   /** Replaces the section's status chip text when the section is not counted (for example "11 of 13 ticked"). */

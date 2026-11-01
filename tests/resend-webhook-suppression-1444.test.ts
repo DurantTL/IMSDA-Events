@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getEmailBackupStatus: vi.fn(),
+  isEmailPrimarySes: vi.fn(),
   suppressAddress: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/integrations/email/provider", () => ({ getEmailBackupStatus: mocks.getEmailBackupStatus }));
+vi.mock("@/integrations/email/provider", () => ({ isEmailPrimarySes: mocks.isEmailPrimarySes }));
 vi.mock("@/modules/communications/email-suppression", () => ({ suppressAddress: mocks.suppressAddress }));
 vi.mock("@/modules/club-forms/link-email", () => ({ retireClubFormLinkForMessage: vi.fn() }));
 vi.mock("@/lib/prisma", () => {
@@ -29,13 +29,22 @@ const event = (type: string, to: unknown = ["Attendee@Example.test"]) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.getEmailBackupStatus.mockReturnValue({ active: true, reason: null });
+  mocks.isEmailPrimarySes.mockReturnValue(true);
 });
 
 describe("what a Resend event suppresses", () => {
   it("a bounce or a complaint suppresses its recipients, normalized", () => {
     expect(resendSuppression(event("email.bounced"))).toEqual({ reason: "BOUNCE", recipients: ["attendee@example.test"] });
     expect(resendSuppression(event("email.complained", ["Name <Parent@Example.test>", "parent@example.test"]))).toEqual({ reason: "COMPLAINT", recipients: ["parent@example.test"] });
+  });
+
+  it("a bounce that is not permanent suppresses nothing, a permanent or untyped one does, a complaint always does", () => {
+    const typed = (type: string, kind = "email.bounced") => ({ ...event(kind), data: { email_id: "e", to: ["a@example.test"], bounce: { type } } });
+    expect(resendSuppression(typed("Transient"))).toBeNull();
+    expect(resendSuppression(typed("Undetermined"))).toBeNull();
+    expect(resendSuppression(typed("Permanent"))).toMatchObject({ reason: "BOUNCE" });
+    expect(resendSuppression(event("email.bounced"))).toMatchObject({ reason: "BOUNCE" });
+    expect(resendSuppression(typed("Transient", "email.complained"))).toMatchObject({ reason: "COMPLAINT" });
   });
 
   it("nothing else suppresses, and nothing is guessed from a missing or odd recipient list", () => {
@@ -61,7 +70,7 @@ describe("the Resend webhook and the shared list", () => {
   });
 
   it("leaves a server that uses Resend alone exactly as it was", async () => {
-    mocks.getEmailBackupStatus.mockReturnValue({ active: false, reason: "not_set" });
+    mocks.isEmailPrimarySes.mockReturnValue(false);
     await recordResendWebhookEvent("webhook-2", event("email.complained"));
     expect(mocks.suppressAddress).not.toHaveBeenCalled();
   });
