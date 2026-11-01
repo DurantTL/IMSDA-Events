@@ -53,6 +53,13 @@ export const serverEnvSchema = z
 
     EMBED_ALLOWED_ORIGINS: optionalTrimmed,
 
+    // Cloudflare Turnstile "Security check" on public forms and sign-in (#1399). Read at request time, never
+    // NEXT_PUBLIC_. The check is enforced only when BOTH keys are set; otherwise it is skipped (and in production the
+    // System report warns). ALLOWED_HOSTNAMES is a comma list; blank means the host of APP_BASE_URL. See docs/TURNSTILE.md.
+    TURNSTILE_SITE_KEY: optionalTrimmed,
+    TURNSTILE_SECRET_KEY: optionalTrimmed,
+    TURNSTILE_ALLOWED_HOSTNAMES: optionalTrimmed,
+
     // External email delivery. Blank keeps event messaging on local capture —
     // but it is required in production, because account recovery email has no
     // other path and an operator cannot hand-deliver a link to every colleague.

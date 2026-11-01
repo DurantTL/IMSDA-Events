@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { AttendeePasswordResetForm } from "@/components/attendee-password-reset-form";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function AttendeeForgotPasswordPage() {
             password.
           </p>
         </div>
-        <AttendeePasswordResetForm />
+        <AttendeePasswordResetForm securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );

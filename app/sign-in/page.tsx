@@ -13,6 +13,7 @@ import { isStaffSessionTimedOutForLinkedAttendee, STAFF_TIMED_OUT_NOTICE } from 
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured as attendeePasskeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function SignInPage({
             <p className="auth-divider"><span>or</span></p>
           </>
         )}
-        <LoginForm unified next={next} />
+        <LoginForm unified next={next} securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );

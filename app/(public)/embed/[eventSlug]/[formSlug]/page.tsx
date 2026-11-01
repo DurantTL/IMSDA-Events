@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
@@ -66,6 +67,7 @@ export default async function EmbeddedRegistrationPage({
         lodging={experience.lodging}
         embedded
         disableDrafts={Boolean(account)}
+        securityCheck={await securityCheckConfigForPage()}
       />
     </div>
   );

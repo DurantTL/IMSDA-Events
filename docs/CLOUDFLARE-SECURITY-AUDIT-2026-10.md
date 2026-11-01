@@ -228,7 +228,8 @@ server. **Code** means we build it.
 - **Fix (Dashboard):** Cloudflare dashboard → **Turnstile** → **Add widget**.
   Use the hostname `events.imsda.org` and **Managed** mode. Put the site key
   and secret key in the xCloud environment panel when the code issue is ready.
-  Never paste them into chat or GitHub.
+  Never paste them into chat or GitHub. The code is built (#1399); the steps
+  are in `docs/TURNSTILE.md`.
 
 ### 5. Medium: public health page reveals operational detail
 

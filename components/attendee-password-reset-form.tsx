@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Eye, EyeOff, KeyRound, MailCheck } from "lucide-react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
 
 /**
@@ -19,7 +20,8 @@ import { OneTimeCodeInput } from "@/components/one-time-code-input";
  * whether or not it has a password, and whether or not it uses Google, because
  * the server tells this component none of those things.
  */
-export function AttendeePasswordResetForm() {
+export function AttendeePasswordResetForm({ securityCheck = null }: { securityCheck?: SecurityCheckConfig }) {
+  const check = useRef<SecurityCheckHandle>(null);
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,6 +32,7 @@ export function AttendeePasswordResetForm() {
 
   async function requestCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!check.current?.require("Send me a code")) return;
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -37,15 +40,21 @@ export function AttendeePasswordResetForm() {
     try {
       const response = await fetch("/api/attendee/password-reset/request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({ email }),
       });
       const result = await response.json();
+      check.current?.settle(result);
+      if (!response.ok && check.current?.isRejection(result)) {
+        setBusy(false);
+        return;
+      }
       if (!response.ok) throw new Error(result.message ?? "Unable to send a code.");
       setDevelopmentCode(result.developmentCode ?? null);
       setSentTo(email);
       setBusy(false);
     } catch (caught) {
+      check.current?.settle();
       setError(caught instanceof Error ? caught.message : "Unable to send a code.");
       setBusy(false);
     }
@@ -136,6 +145,7 @@ export function AttendeePasswordResetForm() {
         Email address
         <input name="email" type="email" autoComplete="username" required maxLength={254} />
       </label>
+      <SecurityCheck config={securityCheck} action="forgot-password" handleRef={check} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}>
         <MailCheck aria-hidden="true" size={17} /> {busy ? "Sending…" : "Send me a code"}

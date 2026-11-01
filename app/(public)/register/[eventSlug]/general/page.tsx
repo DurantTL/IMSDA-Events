@@ -1,4 +1,5 @@
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -66,6 +67,7 @@ export default async function GeneralLinkPage({ params }: GeneralLinkPageProps) 
     <PublicMetricsBeacon hits={[{ metric: "REGISTRATION_START", dimension: eventSlug }]} />
     <GeneralLinkRegistrationFlow
       eventSlug={eventSlug}
+      securityCheck={await securityCheckConfigForPage()}
       topContent={
         editableCards.length > 0
           ? (

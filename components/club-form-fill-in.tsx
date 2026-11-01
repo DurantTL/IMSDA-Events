@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useRef, useState } from "react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
 import { useAnswerDraft } from "@/components/use-answer-draft";
@@ -34,6 +35,8 @@ type Props = {
   initialAnswers?: Answers;
   /** Today in the conference zone (Chicago), from the server, so signing dates fill in the same day on both sides (#719). */
   todayDate?: string;
+  /** Public open application only (#1399): from `securityCheckConfigForPage()`; null while Turnstile is off. */
+  securityCheck?: SecurityCheckConfig;
 } & (
   | {
     mode: "club";
@@ -107,6 +110,7 @@ export function ClubFormFillIn(props: Props) {
   // The site was restarting (#1263): the answers stay in the form and Try again re-sends them with the same key.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const lastSubmitRef = useRef(true);
+  const check = useRef<SecurityCheckHandle>(null);
   // A local draft (#1263) for the anonymous modes only: a signed-in director's form and any page that
   // starts from saved answers never write one, the same rule as the public registration drafts.
   const draftIdentity = props.mode === "link"
@@ -160,6 +164,7 @@ export function ClubFormFillIn(props: Props) {
       return;
     }
     if (saving) return;
+    if (props.mode === "open" && !check.current?.require("Submit form")) return;
     setSaving(true);
     setError("");
     setIssues([]);
@@ -183,11 +188,15 @@ export function ClubFormFillIn(props: Props) {
             unlistedClubName: clubChoice === "NOT_LISTED" ? unlistedClubName.trim() : undefined,
             idempotencyKey,
             answers,
-          }, { idempotent: true })
+          }, { idempotent: true, init: { headers: check.current?.headers() } })
           : await submitJson(`/api/public/club-forms/${encodeURIComponent(props.token)}`, { answers });
       if (response.unavailable) {
         setSiteUpdating(unavailableMessage(response));
         return;
+      }
+      if (props.mode === "open") {
+        check.current?.settle(response.body);
+        if (!response.ok && check.current?.isRejection(response.body)) return;
       }
       const result = response.body as {
         message?: string;
@@ -216,6 +225,7 @@ export function ClubFormFillIn(props: Props) {
       setSavedId(result.submission?.id);
       setNotice("Draft saved.");
     } catch {
+      if (props.mode === "open") check.current?.settle();
       setError("The form could not be saved. Check your connection and try again.");
     } finally {
       setSaving(false);
@@ -334,6 +344,7 @@ export function ClubFormFillIn(props: Props) {
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void send(lastSubmitRef.current)} />}
+      {props.mode === "open" && <SecurityCheck config={props.securityCheck ?? null} action="club-application" handleRef={check} />}
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

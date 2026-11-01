@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { logError } from "@/lib/logger";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -94,6 +95,12 @@ async function postHandler(request: Request) {
     const pairLimit = await checkInformationFormRateLimit(request, publicInformationFormKey(target), "submit");
     rateLimit = mergeRateLimitOutcomes(clientLimit, pairLimit);
     if (!pairLimit.allowed) return limited(rateLimit);
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.informationForm });
+    if (securityCheckFailure) {
+      for (const [name, value] of Object.entries(privateHeaders)) securityCheckFailure.headers.set(name, value);
+      return applyRateLimitHeaders(securityCheckFailure, rateLimit);
+    }
 
     const view = await resolvePublicInformationForm(target);
     if (view.state === "NOT_FOUND") return json({ error: "FORM_NOT_FOUND", message: "That form was not found." }, 404, rateLimit);

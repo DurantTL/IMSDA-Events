@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { notFound, redirect } from "next/navigation";
 import { AutoEventInfoCards } from "@/components/auto-event-info-cards";
@@ -123,6 +124,7 @@ export default async function PublicRegistrationPage({
       lodging={experience.lodging}
       initialResponses={scopedPrefill("REGISTRATION")}
       initialAttendeeResponses={scopedPrefill("ATTENDEE")}
+      securityCheck={await securityCheckConfigForPage()}
       disableDrafts={Boolean(account)}
       topContent={
         editableCards.length > 0 || autoCards || clubNotice ? (

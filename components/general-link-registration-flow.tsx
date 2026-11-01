@@ -1,5 +1,6 @@
 "use client";
 
+import type { SecurityCheckConfig } from "@/components/security-check/security-check";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, UsersRound } from "lucide-react";
@@ -18,7 +19,7 @@ type Ready = GeneralLinkExperience & { experience: NonNullable<GeneralLinkExperi
  * team, then fill in the form (the club from the directory list, the people typed in). The server matches the team to the
  * club, enforces the team rules and answers with the same words whether the team is attached at once or waits for staff; this only guides.
  */
-export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { eventSlug: string; ready: Ready; topContent?: ReactNode }) {
+export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent, securityCheck = null }: { eventSlug: string; ready: Ready; topContent?: ReactNode; securityCheck?: SecurityCheckConfig }) {
   const { experience, locations, team } = ready;
   const pickableLocations = locations.filter((location) => locationUnavailableLabel({ ...location, phase: location.phase }, null, location.id, true) === null);
   const [locationId, setLocationId] = useState<string | null>(() => (pickableLocations.length === 1 ? pickableLocations[0]!.id : null));
@@ -104,6 +105,7 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
       lifecycle={experience.lifecycle}
       pricingDate={experience.pricingDate}
       topContent={topContent}
+      securityCheck={securityCheck}
     />
   );
 }

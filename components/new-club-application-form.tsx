@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
@@ -23,6 +24,8 @@ type Props = {
   /** The private link's token, when the page was opened from one. */
   inviteToken?: string;
   prefill?: { email: string; name: string };
+  /** From `securityCheckConfigForPage()`; null while Turnstile is off (#1399). */
+  securityCheck?: SecurityCheckConfig;
 };
 
 /**
@@ -32,7 +35,8 @@ type Props = {
  * application for staff to review: nothing is created until a system
  * administrator approves it. The server checks everything again.
  */
-export function NewClubApplicationForm({ churches, todayLabel, inviteToken, prefill }: Props) {
+export function NewClubApplicationForm({ churches, todayLabel, inviteToken, prefill, securityCheck = null }: Props) {
+  const check = useRef<SecurityCheckHandle>(null);
   const [openedAt] = useState(() => Date.now());
   const [values, setValues] = useState({
     clubName: "",
@@ -73,6 +77,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       setError(`The attachment must be ${Math.floor(MAX_APPLICATION_ATTACHMENT_BYTES / (1024 * 1024))} MB or smaller.`);
       return;
     }
+    if (!check.current?.require("Send application")) return;
     setSaving(true);
     try {
       const isOther = values.church === OTHER;
@@ -100,15 +105,18 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       body.set("data", JSON.stringify(data));
       if (inviteToken) body.set("inviteToken", inviteToken);
       if (file) body.set("attachment", file);
-      const response = await submitJson("/api/public/club-applications", body);
+      const response = await submitJson("/api/public/club-applications", body, { init: { headers: check.current?.headers() } });
       if (response.unavailable) {
         setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as { message?: string };
+      check.current?.settle(result);
+      if (!response.ok && check.current?.isRejection(result)) return;
       if (!response.ok) throw new Error(result.message ?? "The application could not be sent. Please try again.");
       setDone(true);
     } catch (caught) {
+      check.current?.settle();
       setError(caught instanceof Error ? caught.message : "The application could not be sent. Please try again.");
     } finally {
       setSaving(false);
@@ -259,6 +267,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       </div>
 
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void submit()} />}
+      <SecurityCheck config={securityCheck} action="club-application" handleRef={check} />
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="intro-actions">
         <button className="primary-button" disabled={saving} type="submit">{saving ? "Sending…" : "Send application"}</button>

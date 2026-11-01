@@ -9,6 +9,7 @@ import { ClubFormFillIn } from "@/components/club-form-fill-in";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { resolveOpenApplication } from "@/modules/club-forms/open-applications";
 import { checkClubFormApplicationRateLimit } from "@/modules/rate-limit/service";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ export default async function OpenApplicationPage({ params }: { params: Promise<
           clubs={view.clubs}
           definition={form.definition}
           mode="open"
+          securityCheck={await securityCheckConfigForPage()}
           sectionNotes={form.sectionNotes}
           sensitiveFieldKeys={form.sensitiveFieldKeys}
           templateKey={form.key}

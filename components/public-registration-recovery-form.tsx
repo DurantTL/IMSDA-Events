@@ -3,12 +3,18 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { LockKeyhole, MailCheck } from "lucide-react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 
 export function PublicRegistrationRecoveryForm({
   returnTo,
+  securityCheck = null,
 }: {
   returnTo?: string;
+  securityCheck?: SecurityCheckConfig;
 }) {
+  // One box per form: each form has its own Submit, and a token is single-use.
+  const accessCheck = useRef<SecurityCheckHandle>(null);
+  const emailCheck = useRef<SecurityCheckHandle>(null);
   const [busy, setBusy] = useState<"access" | "email" | null>(null);
   const [error, setError] = useState("");
   const [requested, setRequested] = useState(false);
@@ -22,6 +28,8 @@ export function PublicRegistrationRecoveryForm({
     action: "access" | "email",
   ) {
     event.preventDefault();
+    const check = action === "access" ? accessCheck : emailCheck;
+    if (!check.current?.require(action === "access" ? "Manage my registration" : "Email a private link")) return;
     setBusy(action);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -41,7 +49,7 @@ export function PublicRegistrationRecoveryForm({
     try {
       const response = await fetch("/api/public/registration-recovery", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({
           action,
           clientRequestId,
@@ -52,6 +60,8 @@ export function PublicRegistrationRecoveryForm({
         }),
       });
       const result = await response.json();
+      check.current?.settle(result);
+      if (!response.ok && check.current?.isRejection(result)) return;
       if (!response.ok) {
         requestIds.current[action] = null;
         throw new Error(result.message ?? "The recovery request could not be submitted.");
@@ -67,6 +77,7 @@ export function PublicRegistrationRecoveryForm({
         setRequested(true);
       }
     } catch (caught) {
+      check.current?.settle();
       setError(caught instanceof Error
         ? caught.message
         : "The recovery request could not be submitted.");
@@ -116,6 +127,7 @@ export function PublicRegistrationRecoveryForm({
             type="email"
           />
         </label>
+        <SecurityCheck config={securityCheck} action="registration-recovery" handleRef={accessCheck} />
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button full-button" disabled={busy !== null} type="submit">
           <LockKeyhole aria-hidden="true" size={17} />
@@ -137,6 +149,7 @@ export function PublicRegistrationRecoveryForm({
             type="email"
           />
         </label>
+        <SecurityCheck config={securityCheck} action="registration-recovery" handleRef={emailCheck} />
         <button className="secondary-button full-button" disabled={busy !== null} type="submit">
           <MailCheck aria-hidden="true" size={17} />
           {busy === "email" ? "Requesting…" : "Email a private link"}

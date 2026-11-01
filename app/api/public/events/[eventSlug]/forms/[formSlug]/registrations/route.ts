@@ -17,6 +17,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { logError } from "@/lib/logger";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const maximumBodyBytes = 512 * 1024;
 const noStoreHeaders = { "Cache-Control": "no-store" };
@@ -123,6 +124,8 @@ async function postHandler(request: Request, context: { params: Promise<{ eventS
         ), rateLimit);
       }
     }
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.registration });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     let confirmation;
     try {
       // The user agent goes in only as a one-way hash, as approved acknowledgment evidence metadata (#150).

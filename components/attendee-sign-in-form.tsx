@@ -5,6 +5,7 @@ import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { attendeeReturnDestination, signInCodePathFor } from "@/modules/attendee-accounts/return-destination";
 import {
   attendeeAuthReturnPathFromHash,
@@ -14,7 +15,8 @@ import {
 } from "@/modules/attendee-accounts/sign-up-prefill";
 
 /** Password sign-in for a registrant. Staff sign in at `/login` instead. */
-export function AttendeeSignInForm({ next }: { next?: string }) {
+export function AttendeeSignInForm({ next, securityCheck = null }: { next?: string; securityCheck?: SecurityCheckConfig }) {
+  const check = useRef<SecurityCheckHandle>(null);
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,22 +34,29 @@ export function AttendeeSignInForm({ next }: { next?: string }) {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!check.current?.require("Sign in")) return;
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
     try {
       const response = await fetch("/api/attendee/sign-in", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
       });
       const result = await response.json();
+      check.current?.settle(result);
+      if (!response.ok && check.current?.isRejection(result)) {
+        setBusy(false);
+        return;
+      }
       if (!response.ok) throw new Error(result.message ?? "Unable to sign in.");
       const destination = takeAttendeeAuthReturnPath() ?? attendeeReturnDestination(next, "/account");
       // Step 2 of 2: a club role without two-step sign-in enters the code just emailed to them (#1410).
       router.replace(result.signInCode?.required ? signInCodePathFor(destination) : destination);
       router.refresh();
     } catch (caught) {
+      check.current?.settle();
       setError(caught instanceof Error ? caught.message : "Unable to sign in.");
       setBusy(false);
     }
@@ -89,6 +98,7 @@ export function AttendeeSignInForm({ next }: { next?: string }) {
         <span />
         <Link href="/account/forgot-password">Forgot password?</Link>
       </div>
+      <SecurityCheck config={securityCheck} action="attendee-sign-in" handleRef={check} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}>
         <LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}

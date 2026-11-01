@@ -8,6 +8,7 @@ import { honorSelectionsSchema } from "@/modules/honors/registration-picks";
 import { applyRateLimitHeaders, trustedClientIpAddress, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkPublicRegistrationRateLimit } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const maximumBodyBytes = 512 * 1024;
 const noStoreHeaders = { "Cache-Control": "no-store" };
@@ -59,6 +60,8 @@ async function postHandler(request: Request, context: Context) {
       honorSelections: honorSelectionsSchema.optional(),
     }).loose().parse(JSON.parse(body));
     const input = publicRegistrationInputSchema.parse(answers);
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.groupRegistration });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     const result = await submitGroupRegistration(eventSlug, input, { locationId: locationId ?? null, ...(honorSelections ? { honorSelections } : {}), requestContext: { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) } });
     // Counted per public event only, with no registration or person attached (#111).
     countPublicMetric(request, "REGISTRATION_COMPLETE", eventSlug);

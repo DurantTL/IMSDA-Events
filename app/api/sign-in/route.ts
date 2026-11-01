@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { issueMfaChallenge } from "@/modules/access/mfa-service";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
@@ -91,6 +92,9 @@ async function postHandler(request: Request) {
     if (!rateLimit.allowed) {
       return applyRateLimitHeaders(Response.json(RATE_LIMITED_BODY, { status: 429 }), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.staffSignIn });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const userAgent = request.headers.get("user-agent");
     const outcome = await unifiedPasswordSignIn(input.email, input.password, userAgent);

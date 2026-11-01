@@ -1,4 +1,5 @@
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError } from "@/modules/club-forms/api-errors";
 import { resolveOpenApplication, submitOpenApplication } from "@/modules/club-forms/open-applications";
@@ -71,6 +72,8 @@ async function postHandler(request: Request, context: RouteContext) {
       return json({ error: "INVALID_JSON_BODY", message: "Send a JSON request body." }, { status: 400 }, rateLimit);
     }
     const input = openApplicationSubmitSchema.parse(parsed);
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.clubApplication });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     const result = await submitOpenApplication(templateKey, input);
     // The submission id stays inside; the applicant only needs to know it worked.
     return json({ ok: true, confirmationMessage: result.confirmationMessage }, { status: 201 }, rateLimit);

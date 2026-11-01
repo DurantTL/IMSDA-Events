@@ -8,6 +8,7 @@ import { LOCAL_DEMO_EMAIL, LOCAL_DEMO_PASSWORD } from "@/modules/access/local-de
 import { passkeysConfigured } from "@/modules/access/passkeys";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { redirectToUnifiedSignInWhenEnabled } from "@/modules/account-merge/sign-in-redirect";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const metadata: Metadata = { title: "Staff sign in", robots: { index: false, follow: false } };
 
@@ -51,7 +52,7 @@ export default async function LoginPage({
             <p className="auth-divider"><span>or</span></p>
           </>
         )}
-        <LoginForm demoCredentials={showLocalCredentials ? { email: LOCAL_DEMO_EMAIL, password: LOCAL_DEMO_PASSWORD } : undefined} next={next} />
+        <LoginForm demoCredentials={showLocalCredentials ? { email: LOCAL_DEMO_EMAIL, password: LOCAL_DEMO_PASSWORD } : undefined} next={next} securityCheck={await securityCheckConfigForPage()} />
         {showLocalCredentials && (
           <div className="local-credentials">
             <strong>Local test account</strong>

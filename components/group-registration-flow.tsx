@@ -1,5 +1,6 @@
 "use client";
 
+import type { SecurityCheckConfig } from "@/components/security-check/security-check";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, UsersRound } from "lucide-react";
@@ -47,7 +48,7 @@ function readSaved(eventSlug: string): Saved | null {
  * is no payment step. The server prices, checks ages and takes the seats; this
  * only guides.
  */
-export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventSlug: string; ready: Ready; topContent?: ReactNode }) {
+export function GroupRegistrationFlow({ eventSlug, ready, topContent, securityCheck = null }: { eventSlug: string; ready: Ready; topContent?: ReactNode; securityCheck?: SecurityCheckConfig }) {
   const { experience, locations, honorsCatalog } = ready;
   const definition = experience.form.definition;
   const pickableLocations = locations.filter((location) => (
@@ -196,6 +197,7 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
       lifecycle={experience.lifecycle}
       pricingDate={experience.pricingDate}
       topContent={topContent}
+      securityCheck={securityCheck}
     />
   );
 }

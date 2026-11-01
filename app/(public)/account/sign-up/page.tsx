@@ -9,6 +9,7 @@ import {
 import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function AttendeeSignUpPage({
             <p className="auth-divider"><span>or sign up with a password</span></p>
           </>
         )}
-        <AttendeeSignUpForm />
+        <AttendeeSignUpForm securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );
