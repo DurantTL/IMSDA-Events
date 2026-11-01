@@ -15,6 +15,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { PrismaClient } from "@prisma/client";
 import { walkthroughViewports, type WalkthroughImageKind } from "../../modules/help/walkthrough-images";
+import { totpCode } from "../../modules/access/totp";
 import { walkthroughs } from "../../modules/help/walkthroughs";
 import { runWalkthrough, type StepEvent } from "../../tests/browser/walkthroughs/steps";
 import type { WalkthroughContext, WalkthroughPage, WalkthroughStart } from "../../tests/browser/walkthroughs/types";
@@ -71,6 +72,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
   let seeded = false;
   let templateStates: fixtures.TemplateState[] = [];
   let passkeyRpIdBefore: string | null | undefined;
+  let hiddenClubs: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let browser: any;
   const result: HarnessResult = [];
@@ -79,6 +81,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     seeded = true;
     templateStates = await fixtures.readTemplateStates(prisma);
     passkeyRpIdBefore = await fixtures.enablePasskeys(prisma);
+    hiddenClubs = await fixtures.hideOtherClubs(prisma);
     browser = await chromium.launch({
       executablePath: process.env.HELP_SHOTS_BROWSER || undefined,
       args: ["--no-sandbox", "--disable-dev-shm-usage"],
@@ -88,7 +91,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         // Every run starts from the same fixtures, so the pictures come out the same.
         await fixtures.deleteWalkthroughFixtures(prisma);
         await fixtures.clearSignInRateLimits(prisma);
-        await fixtures.createWalkthroughFixtures(prisma);
+        const { authenticatorSecret } = await fixtures.createWalkthroughFixtures(prisma);
         const viewport = walkthroughViewports[kind];
         const context = await browser.newContext({
           viewport,
@@ -128,9 +131,10 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
           throw new Error("No sign-in code arrived. Run the app outside production (npm run dev) with no ACCOUNT_EMAIL_* set, so it returns the code instead of sending mail.");
         };
         const begin = async (start: WalkthroughStart) => {
-          if (start !== "signed-in") return;
-          await fixtures.enrolPlaceholderTwoStep(prisma);
-          const session = await sessionStore.createAttendeeSession(fixtures.walkthroughIds.director, null, { secondFactorVerifiedAt: new Date() });
+          if (start === "signed-out") return;
+          const accountId = start === "signed-in" ? fixtures.walkthroughIds.director : fixtures.walkthroughCoordinator.id;
+          if (start === "signed-in") await fixtures.enrolPlaceholderTwoStep(prisma);
+          const session = await sessionStore.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
           tokens.push(session.token);
           await context.addCookies([{ name: attendeeSessionCookie.legacyName, value: session.token, url: baseUrl, httpOnly: true, expires: Math.floor(session.expiresAt.getTime() / 1000) }]);
         };
@@ -139,6 +143,8 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
           baseUrl,
           clubPath: `/account/clubs/${fixtures.walkthroughIds.club}`,
           director: { email: fixtures.walkthroughDirector.email, password: fixtures.walkthroughDirector.password, displayName: fixtures.walkthroughDirector.displayName },
+          coordinator: { email: fixtures.walkthroughCoordinator.email, password: fixtures.walkthroughCoordinator.password, displayName: fixtures.walkthroughCoordinator.displayName },
+          authenticatorCode: () => totpCode(authenticatorSecret, new Date()),
           rosterPerson: fixtures.walkthroughRosterPerson,
           invitee: { email: fixtures.walkthroughInvitee.email },
           supplyName: fixtures.walkthroughSupplyName,
@@ -168,6 +174,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
       for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
       await fixtures.deleteWalkthroughFixtures(prisma).catch((error: Error) => console.error(`Could not remove the walkthrough fixtures: ${error.message}`));
       await fixtures.restoreTemplateStates(prisma, templateStates).catch((error: Error) => console.error(`Could not restore the form templates: ${error.message}`));
+      await fixtures.restoreOtherClubs(prisma, hiddenClubs).catch((error: Error) => console.error(`Could not restore the seeded clubs: ${error.message}`));
       if (passkeyRpIdBefore !== undefined) await fixtures.restorePasskeys(prisma, passkeyRpIdBefore).catch((error: Error) => console.error(`Could not restore the passkey setting: ${error.message}`));
     }
     await prisma.$disconnect();

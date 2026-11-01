@@ -32,6 +32,51 @@ export const walkthroughDirector = {
   churchName: "Sample Valley Church",
 } as const;
 
+/**
+ * The area coordinator walkthroughs' fixtures (#1482): a coordinator who has two-step sign-in set up (an authenticator app whose
+ * secret the harness knows), and clubs that show each situation: one up to date, one behind, one with no director.
+ * A coordinator sees every active club, so the script hides the seeded clubs while it runs (and puts them back).
+ */
+export const walkthroughCoordinator = {
+  id: `${W}_account_coordinator`,
+  email: `${W}.coordinator@example.test`,
+  password: "Sample-Coordinator-Pass-2026!",
+  displayName: "Avery Sample",
+  firstName: "Avery",
+  lastName: "Sample",
+} as const;
+
+type AreaClubFixture = {
+  id: string;
+  name: string;
+  church: string;
+  /** The club's director account, or null for a club with no director. */
+  director: { id: string; email: string; name: string; first: string; last: string } | null;
+  /** Roster first names (the last name is "Demo"-style sample text). */
+  people: readonly (readonly [string, string])[];
+  /** Months of the club year (0 = the first) the club has filed. */
+  filed: readonly number[];
+  phone: string;
+};
+
+export const walkthroughAreaClubs: readonly AreaClubFixture[] = [
+  {
+    id: `${W}_club_harbor`, name: "Sample Harbor Adventurers", church: "Sample Harbor Church",
+    director: { id: `${W}_account_harbor_director`, email: `${W}.harbor@example.test`, name: "Jordan Placeholder", first: "Jordan", last: "Placeholder" },
+    people: [["Ari", "Mockup"], ["Bay", "Sampleton"], ["Cam", "Exampleson"], ["Dell", "Demo"], ["Eli", "Testperson"]], filed: [0, 1], phone: "(515) 555-0121",
+  },
+  {
+    id: `${W}_club_ridge`, name: "Sample Ridge Explorers", church: "Sample Hillside Church",
+    director: { id: `${W}_account_ridge_director`, email: `${W}.ridge@example.test`, name: "Sam Example", first: "Sam", last: "Example" },
+    people: [["Fay", "Mockup"], ["Gus", "Sampleton"], ["Hal", "Exampleson"], ["Ivy", "Demo"]], filed: [], phone: "(515) 555-0122",
+  },
+  {
+    id: `${W}_club_creek`, name: "Sample Creek Trailblazers", church: "Sample Lakeside Church",
+    director: null,
+    people: [["Jo", "Mockup"], ["Kit", "Sampleton"], ["Lou", "Exampleson"]], filed: [], phone: "(515) 555-0123",
+  },
+];
+
 /** Names of the people added, edited and removed while the roster walkthrough runs. */
 export const walkthroughRosterPerson = {
   firstName: "Casey",
@@ -74,13 +119,16 @@ export async function assertSeededDatabase(prisma: PrismaClient) {
 export type TemplateState = { key: string; enabled: boolean; requirement: ClubFormRequirement; requiredRoles: string[] };
 const walkthroughTemplateKeys = ["pathfinder_membership_application", "off_premises_permission_slip", "club_tlt_application", "can_collecting_report"];
 
-const fixtureAccountIds = [walkthroughIds.director, walkthroughInvitee.id];
+const areaDirectorIds = walkthroughAreaClubs.flatMap((club) => (club.director ? [club.director.id] : []));
+const fixtureAccountIds = [walkthroughIds.director, walkthroughInvitee.id, walkthroughCoordinator.id, ...areaDirectorIds];
+const allClubIds = [walkthroughIds.club, ...walkthroughAreaClubs.map((club) => club.id)];
+const allChurchIds = [walkthroughIds.church, ...walkthroughAreaClubs.map((club) => `${club.id}_church`)];
 const supplyNames = [walkthroughSupplyName, "Sample Pathfinder Scarf Slide", "Sample Club Patch"];
 
 /** Deletes every walkthrough row, newest dependents first. Safe to run when nothing exists. */
 export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
   const mine = { startsWith: `${W}_` };
-  const orgs = { organizationId: walkthroughIds.club };
+  const orgs = { organizationId: { in: allClubIds } };
   const rosterPeople = await prisma.clubRosterMember.findMany({ where: orgs, select: { personId: true } });
   const personIds = [
     ...(await prisma.person.findMany({ where: { id: mine }, select: { id: true } })).map((person) => person.id),
@@ -100,8 +148,10 @@ export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
     prisma.person.deleteMany({ where: { id: { in: personIds } } }),
     prisma.clubInvite.deleteMany({ where: { OR: [orgs, { email: walkthroughInvitee.email }] } }),
     prisma.clubMonthlyReport.deleteMany({ where: orgs }),
+    prisma.clubYearStanding.deleteMany({ where: orgs }),
     prisma.clubYearEndReport.deleteMany({ where: orgs }),
-    prisma.clubDirectorGrant.deleteMany({ where: { attendeeAccountId: { in: fixtureAccountIds } } }),
+    prisma.clubDirectorGrant.deleteMany({ where: { OR: [{ attendeeAccountId: { in: fixtureAccountIds } }, orgs] } }),
+    prisma.areaCoordinatorGrant.deleteMany({ where: { attendeeAccountId: { in: fixtureAccountIds } } }),
     prisma.attendeeMfaEnrollment.deleteMany({ where: { accountId: { in: fixtureAccountIds } } }),
     prisma.attendeePasskey.deleteMany({ where: { accountId: { in: fixtureAccountIds } } }),
     prisma.messageOutbox.deleteMany({ where: { OR: [{ accountAttendeeId: { in: fixtureAccountIds } }, { recipientEmail: { endsWith: "@example.test", startsWith: `${W}.` } }] } }),
@@ -117,8 +167,8 @@ export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
   await prisma.event.deleteMany({ where: { id: walkthroughIds.event } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: fixtureAccountIds } } });
   await prisma.clubProfile.deleteMany({ where: orgs });
-  await prisma.organization.deleteMany({ where: { id: walkthroughIds.club } });
-  await prisma.organization.deleteMany({ where: { id: walkthroughIds.church } });
+  await prisma.organization.deleteMany({ where: { id: { in: allClubIds } } });
+  await prisma.organization.deleteMany({ where: { id: { in: allChurchIds } } });
 }
 
 export async function readTemplateStates(prisma: PrismaClient): Promise<TemplateState[]> {
@@ -238,15 +288,74 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
 
   // Monthly Records: one filed month, the rest of the ended months left to file.
   const { pickedTotal, ON_TIME_POINTS, clubYearMonths } = await import("../../modules/club-reports/domain");
-  const reportPoints = { staffMeeting: 25, meetingsOutings: 50, ratio: 25, uniformMeetings: 20, uniformOutside: 40, devotions: 50, exercise: 0, outreach: 50, guest: 0, honors: 25, classLevel: 25, bonus: 0 };
-  const firstMonth = clubYearMonths(clubYear)[0];
-  const filed: Prisma.ClubMonthlyReportUncheckedCreateInput = {
-    organizationId: walkthroughIds.club, clubYear, reportMonth: firstMonth, meetingPlace: "Fellowship hall", meetingSchedule: "Sundays at 4 pm",
-    averageAttendance: 8, pathfinderCount: 6, tltCount: 0, staffCount: 2, classLevels: ["FRIEND"], points: reportPoints, honors: [],
-    onTimePoints: ON_TIME_POINTS, totalPoints: ON_TIME_POINTS + pickedTotal(reportPoints), signatureName: walkthroughDirector.displayName, signedOn: `${firstMonth}-10`,
-    status: "SUBMITTED", submittedAt: new Date(`${firstMonth}-10T15:00:00Z`), firstSubmittedAt: new Date(`${firstMonth}-10T15:00:00Z`),
+  const months = clubYearMonths(clubYear);
+  const reportPoints = (extra: number) => ({ staffMeeting: 25, meetingsOutings: 50, ratio: 25, uniformMeetings: 20, uniformOutside: 40, devotions: 50, exercise: 0, outreach: 50 + extra, guest: 0, honors: 25, classLevel: 25, bonus: 0 });
+  const fileReport = async (organizationId: string, signatureName: string, monthIndex: number, extra: number, attendance: number, meetingPlace: string) => {
+    const reportMonth = months[monthIndex]!;
+    const points = reportPoints(extra);
+    const data: Prisma.ClubMonthlyReportUncheckedCreateInput = {
+      organizationId, clubYear, reportMonth, meetingPlace, meetingSchedule: "Sundays at 4 pm",
+      averageAttendance: attendance, pathfinderCount: attendance - 2, tltCount: 0, staffCount: 2, classLevels: ["FRIEND"], points, honors: [],
+      onTimePoints: ON_TIME_POINTS, totalPoints: ON_TIME_POINTS + pickedTotal(points), signatureName, signedOn: `${reportMonth}-10`,
+      status: "SUBMITTED", submittedAt: new Date(`${reportMonth}-10T15:00:00Z`), firstSubmittedAt: new Date(`${reportMonth}-10T15:00:00Z`),
+    };
+    await prisma.clubMonthlyReport.create({ data });
   };
-  await prisma.clubMonthlyReport.create({ data: filed });
+  await fileReport(walkthroughIds.club, walkthroughDirector.displayName, 0, 0, 8, "Fellowship hall");
+
+  // The area: more clubs, for the area coordinator walkthroughs.
+  for (const [clubIndex, club] of walkthroughAreaClubs.entries()) {
+    const churchId = `${club.id}_church`;
+    await prisma.organization.create({ data: { id: churchId, type: "CHURCH", name: club.church, normalizedName: club.church.toLowerCase(), city: "Exampleville", state: "IA" } });
+    await prisma.organization.create({ data: { id: club.id, type: "CLUB", name: club.name, normalizedName: club.name.toLowerCase(), parentOrganizationId: churchId } });
+    await prisma.clubProfile.create({ data: { organizationId: club.id, meetingPlace: "Fellowship hall", meetingSchedule: "Sundays at 4 pm", contactEmail: `${club.id}@example.test`, contactPhone: club.phone } });
+    if (club.director) {
+      await prisma.attendeeAccount.create({
+        data: { id: club.director.id, email: club.director.email, displayName: club.director.name, firstName: club.director.first, lastName: club.director.last, status: "ACTIVE", emailVerifiedAt: now },
+      });
+      await prisma.clubDirectorGrant.create({
+        data: { organizationId: club.id, attendeeAccountId: club.director.id, role: "DIRECTOR", effectiveFrom: new Date("2026-01-01T00:00:00Z"), reason: "Synthetic help walkthrough" },
+      });
+    }
+    for (const [index, [firstName, lastName]] of club.people.entries()) {
+      const person = await prisma.person.create({ data: { id: `${W}_person_a${clubIndex}_${index + 1}`, firstName, lastName } });
+      await prisma.clubRosterMember.create({
+        data: { organizationId: club.id, clubYear, personId: person.id, attendeeType: "YOUTH", role: "Pathfinder", classLevel: levels[index % levels.length], reportedAge: 10 + (index % 5), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR" },
+      });
+    }
+    for (const monthIndex of club.filed) await fileReport(club.id, club.director?.name ?? "Sample Director", monthIndex, 25, 10, "Fellowship hall");
+  }
+
+  // The area coordinator: two-step sign-in is set up with an authenticator app whose secret only this script knows.
+  const { generateTotpSecret } = await import("../../modules/access/totp");
+  const { sealSecret } = await import("../../lib/secret-box");
+  const authenticatorSecret = generateTotpSecret();
+  await prisma.attendeeAccount.create({
+    data: {
+      id: walkthroughCoordinator.id, email: walkthroughCoordinator.email, displayName: walkthroughCoordinator.displayName,
+      firstName: walkthroughCoordinator.firstName, lastName: walkthroughCoordinator.lastName, status: "ACTIVE", emailVerifiedAt: now,
+      credential: { create: { passwordHash: await hashPassword(walkthroughCoordinator.password) } },
+    },
+  });
+  await prisma.areaCoordinatorGrant.create({ data: { attendeeAccountId: walkthroughCoordinator.id } });
+  await prisma.attendeeMfaEnrollment.create({
+    data: { accountId: walkthroughCoordinator.id, method: "TOTP", status: "ACTIVE", sealedSecret: sealSecret(authenticatorSecret, "attendee-mfa-totp-secret"), confirmedAt: now },
+  });
+  return { authenticatorSecret };
+}
+
+/**
+ * A coordinator sees every active club, so the seeded clubs are hidden while the script runs. Returns their ids; the caller
+ * puts them back with `restoreOtherClubs`.
+ */
+export async function hideOtherClubs(prisma: PrismaClient): Promise<string[]> {
+  const others = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true, id: { notIn: allClubIds } }, select: { id: true } });
+  if (others.length > 0) await prisma.organization.updateMany({ where: { id: { in: others.map((club) => club.id) } }, data: { isActive: false } });
+  return others.map((club) => club.id);
+}
+
+export async function restoreOtherClubs(prisma: PrismaClient, ids: string[]) {
+  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids } }, data: { isActive: true } });
 }
 
 /**
@@ -277,7 +386,7 @@ export async function restorePasskeys(prisma: PrismaClient, before: string | nul
   await prisma.platformSettings.update({ where: { id: "platform" }, data: { passkeyRpId: before } });
 }
 
-/** Clears the local sign-in and code-send budgets, so repeated runs are not rate limited. Local database only. */
+/** Clears the local rate-limit budgets (sign-in, code send, second step), so repeated runs are not rate limited. Local database only. */
 export async function clearSignInRateLimits(prisma: PrismaClient) {
-  await prisma.rateLimitBucket.deleteMany({ where: { policy: { contains: "sign-in" } } });
+  await prisma.rateLimitBucket.deleteMany({});
 }

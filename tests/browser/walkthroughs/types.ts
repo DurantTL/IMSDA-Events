@@ -10,8 +10,11 @@ export type WalkthroughPage = any;
 export type WalkthroughLocator = any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-/** Where a walkthrough starts: a visitor who is not signed in, or the director signed in with two-step sign-in done. */
-export type WalkthroughStart = "signed-out" | "signed-in";
+/**
+ * Where a walkthrough starts: a visitor who is not signed in, the sample club director signed in with two-step sign-in done,
+ * or the sample area coordinator signed in with two-step sign-in done.
+ */
+export type WalkthroughStart = "signed-out" | "signed-in" | "signed-in-coordinator";
 
 export type WalkthroughContext = {
   page: WalkthroughPage;
@@ -19,6 +22,10 @@ export type WalkthroughContext = {
   /** `/account/clubs/<id>` for the sample club. */
   clubPath: string;
   director: { email: string; password: string; displayName: string };
+  /** The sample area coordinator, who has an authenticator app set up. */
+  coordinator: { email: string; password: string; displayName: string };
+  /** The six-digit code the coordinator's authenticator app shows right now. */
+  authenticatorCode: () => string;
   /** The sample person the roster walkthrough adds, edits and removes. */
   rosterPerson: { firstName: string; lastName: string; editedRole: string };
   /** The sample person the leaders walkthrough invites. */

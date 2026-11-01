@@ -45,6 +45,9 @@ async function main() {
     kinds: ["phone", "desktop"],
     onStep: async ({ walkthroughId, stepId, index, kind, page, target }) => {
       if (target) {
+        // Let a page change finish first: a Next.js navigation scrolls back to the top after it renders.
+        await page.waitForLoadState("networkidle").catch(() => undefined);
+        await page.waitForTimeout(400);
         // Bring the control into the middle of the screen, then mark it.
         await target.first().evaluate((element: Element) => {
           element.scrollIntoView({ block: "center", inline: "nearest" });

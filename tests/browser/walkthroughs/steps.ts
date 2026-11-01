@@ -1,5 +1,6 @@
 import { findWalkthrough } from "@/modules/help/walkthroughs";
 import { clubDirectorWalkthroughActions } from "./club-director";
+import { coordinatorWalkthroughActions } from "./coordinator";
 import type { WalkthroughActions, WalkthroughContext, WalkthroughLocator } from "./types";
 
 /**
@@ -9,6 +10,7 @@ import type { WalkthroughActions, WalkthroughContext, WalkthroughLocator } from 
  */
 export const walkthroughActions: Record<string, WalkthroughActions> = {
   ...clubDirectorWalkthroughActions,
+  ...coordinatorWalkthroughActions,
 };
 
 export type StepEvent = {
