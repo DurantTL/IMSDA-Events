@@ -42,7 +42,7 @@ import { RegistrationNotesTagsPanel } from "@/components/registration-notes-tags
 import { RegistrationSignaturesPanel } from "@/components/registration-signatures-panel";
 import { SelectedAudienceDialog } from "@/components/selected-audience-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
-import { SubmitButton } from "@/components/submit-button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { attendeeCountPhrase, lifecycleActionButtonClass, registrationLifecycleLabel } from "@/lib/confirmation-copy";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
@@ -333,6 +333,9 @@ export function PeopleWorkspace({
   const [savingAttendeeEmail, setSavingAttendeeEmail] = useState(false);
   const [amending, setAmending] = useState(false);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
+  // The optional staff note in the lifecycle dialog; the dialog's field is uncontrolled, so each opening starts blank.
+  const lifecycleReasonRef = useRef("");
+  useEffect(() => { lifecycleReasonRef.current = ""; }, [lifecycleAction]);
   const [operationDraft, setOperationDraft] = useState<RegistrationOperationDraft | null>(null);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [emailingSelection, setEmailingSelection] = useState(false);
@@ -522,20 +525,18 @@ export function PeopleWorkspace({
     }
   }
 
-  async function updateLifecycle(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function updateLifecycle() {
     if (!selected || !lifecycleAction) return;
     setSaving(true);
     setError("");
     setNotice("");
-    const form = new FormData(event.currentTarget);
     try {
       const response = await fetch(
         `/api/events/${eventId}/registrations/${selected.id}/lifecycle/${lifecycleAction}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: String(form.get("reason") ?? "") }),
+          body: JSON.stringify({ reason: lifecycleReasonRef.current }),
         },
       );
       const result = await response.json();
@@ -1188,7 +1189,7 @@ export function PeopleWorkspace({
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
                 {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
-                {canEdit && !addingAttendee && !lifecycleAction && (
+                {canEdit && !addingAttendee && (
                   <>
                     <div className="registration-management-actions">
                       {selected.publicSubmission?.rosterEnabled && <button className="primary-button" type="button" onClick={() => { setError(""); setNotice(""); setAmending(true); }}><PencilLine aria-hidden="true" size={17} /> Edit choices & attendees</button>}
@@ -1211,15 +1212,26 @@ export function PeopleWorkspace({
                   </>
                 )}
                 {lifecycleAction && (
-                  <form className="form-stack lifecycle-confirmation" onSubmit={updateLifecycle}>
-                    <div><p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p><h3>{lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}</h3><p>{lifecycleCopy[lifecycleAction].detail}</p>{lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}{lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <div className="inline-notice" role="note">Already checked in. Cancelling does not undo the check-in.</div>}</div>
-                    <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" /></label>
-                    {error && <p className="form-error" role="alert">{error}</p>}
-                    <div className="form-actions">
-                      <button className="secondary-button" type="button" disabled={saving} onClick={() => { setLifecycleAction(null); setError(""); }}>Keep as is</button>
-                      <SubmitButton className={lifecycleAction === "cancel" ? "primary-button lifecycle-danger-button" : "primary-button"} label={registrationLifecycleLabel(lifecycleAction, `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)} submitting={saving} submittingLabel="Updating…" />
+                  <ConfirmDialog
+                    busy={saving}
+                    busyLabel="Updating…"
+                    cancelLabel="Keep as is"
+                    confirmLabel={registrationLifecycleLabel(lifecycleAction, `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}
+                    destructive={lifecycleAction === "cancel"}
+                    error={error}
+                    onCancel={() => { setLifecycleAction(null); setError(""); }}
+                    onConfirm={() => void updateLifecycle()}
+                    open
+                    title={lifecycleAction === "cancel" ? `${registrationLifecycleLabel("cancel", `${selected.accountHolder.firstName} ${selected.accountHolder.lastName}`)}?` : lifecycleCopy[lifecycleAction].title}
+                  >
+                    <div className="form-stack">
+                      <p className="eyebrow">{lifecycleCopy[lifecycleAction].eyebrow}</p>
+                      <p>{lifecycleCopy[lifecycleAction].detail}</p>
+                      {lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}
+                      {lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <div className="inline-notice" role="note">Already checked in. Cancelling does not undo the check-in.</div>}
+                      <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" onChange={(event) => { lifecycleReasonRef.current = event.target.value; }} /></label>
                     </div>
-                  </form>
+                  </ConfirmDialog>
                 )}
                   </>
                 )}
