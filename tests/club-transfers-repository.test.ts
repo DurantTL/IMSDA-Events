@@ -319,7 +319,7 @@ describe("what each club sees", () => {
     };
     db.memberTransfer.findMany.mockImplementation(async ({ where }: { where: { toOrganizationId?: string } }) => (where.toOrganizationId ? [declined] : []));
     const { incoming } = await listClubTransfers("club-b", directorB, now);
-    expect(incoming[0]).toMatchObject({ status: "PENDING", statusLabel: "Pending", memberName: "Ada Testperson", canCancel: true, canAccept: false });
+    expect(incoming[0]).toMatchObject({ status: "PENDING", statusLabel: "Pending approval", memberName: "Ada Testperson", canCancel: true, canAccept: false });
     expect(incoming[0]!.events.map((event) => event.type)).toEqual(["REQUESTED"]);
     expect(JSON.stringify(incoming)).not.toMatch(/DECLINED|Lovelace-Real|staffReason|sealed|birth/i);
   });

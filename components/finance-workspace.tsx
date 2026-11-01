@@ -25,6 +25,7 @@ import {
   attendeeSummaryLabel,
   registrationMatchesSearch,
 } from "@/modules/registrations/search";
+import { registrationMoneyStatus, registrationStatusWord, registrationStatusWords } from "@/modules/registrations/status-words";
 
 type PaymentRecord = RegistrationRecord["payments"][number];
 type AdjustmentRecord = RegistrationRecord["adjustments"][number];
@@ -249,8 +250,8 @@ export function FinanceWorkspace({
         <div className="finance-row finance-row-cards finance-head"><span>Registration</span><span>Total</span><span>Received</span><span>Balance</span><span /></div>
         {visible.map((registration) => (
           <button className="finance-row finance-row-cards finance-record" type="button" key={registration.id} onClick={() => openDetail(registration)}>
-            <span className="meta-stack"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.status.toLowerCase()} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.isDeferredOrganizationBilling ? (registration.isGroup ? " · group, billed to the contact" : " · billed to church") : ""}</small>{attendeeSummaryLabel(registration) && <small className="finance-attendee-names">{attendeeSummaryLabel(registration)}</small>}</span>
-            <span data-label="Total">{formatCents(registration.totalAmountCents)}</span><span data-label="Received">{formatCents(registration.paidCents)}</span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registration.isGroup ? "Billed to group contact" : "Billed to church"}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance">{formatCents(registration.balanceCents)}</span>}<span>View</span>
+            <span className="meta-stack"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registrationStatusWord({ status: registration.status, attendeeBalanceCents: attendeeBalanceCents(registration), deferredBilling: registration.isDeferredOrganizationBilling })} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.isDeferredOrganizationBilling ? (registration.isGroup ? " · group, billed to the contact" : ` · ${registrationMoneyStatus({ totalCents: 0, balanceCents: 0, deferredBilling: true, audience: "staff" })}`) : ""}</small>{attendeeSummaryLabel(registration) && <small className="finance-attendee-names">{attendeeSummaryLabel(registration)}</small>}</span>
+            <span data-label="Total">{formatCents(registration.totalAmountCents)}</span><span data-label="Received">{formatCents(registration.paidCents)}</span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registrationMoneyStatus({ totalCents: registration.totalAmountCents, balanceCents: 0, deferredBilling: true, isGroup: registration.isGroup, audience: "staff" })}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance">{formatCents(registration.balanceCents)}</span>}<span>View</span>
           </button>
         ))}
         {visible.length === 0 && <div className="empty-state"><Search aria-hidden="true" size={24} /><h3>No financial records found</h3><p>Search covers the payer, every attendee on the registration, and the confirmation code. Try another term or balance filter.</p></div>}
@@ -315,7 +316,7 @@ export function FinanceWorkspace({
                   </div>
                 )}
                 {canManage && selected.balanceCents > 0 && activeFinancialStatuses.has(selected.status) && <button className="primary-button full-button" type="button" onClick={() => { setDepositFirst(false); setError(""); setModal("payment"); }}><Banknote aria-hidden="true" size={17} /> Record payment</button>}
-                {!activeFinancialStatuses.has(selected.status) && <div className="inline-notice">This registration is {selected.status.toLowerCase()}. New payments are disabled, but existing payment and refund history remains available.</div>}
+                {!activeFinancialStatuses.has(selected.status) && <div className="inline-notice">This registration is {registrationStatusWords[selected.status].toLowerCase()}. New payments are disabled, but existing payment and refund history remains available.</div>}
               </div>
             ) : modal === "adjust" ? (
               <form className="form-stack" onSubmit={saveAdjustment}>

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { CalculationFacts, CancellationResult } from "@/modules/cancellation-policy/calculator";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { type CancellationScope } from "@/modules/cancellation-policy/rules";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * Cancellation requests (#170): the pure rules. No database, no clock, no email.
@@ -200,7 +201,7 @@ export function diffRegistrationState(then: RegistrationStateSnapshot, now: Regi
     conflicts.push({
       code: "REGISTRATION_STATUS_CHANGED",
       severity: "CHANGE",
-      message: `The registration was ${then.registrationStatus.toLowerCase()} when requested and is ${now.registrationStatus.toLowerCase()} now.`,
+      message: `The registration was ${registrationStatusWordOrRaw(then.registrationStatus).toLowerCase()} when requested and is ${registrationStatusWordOrRaw(now.registrationStatus).toLowerCase()} now.`,
     });
   }
   const added = now.attendeeIds.filter((id) => !then.attendeeIds.includes(id)).length;

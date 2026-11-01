@@ -129,7 +129,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
       <section className={`panel ${styles.panel}`} id="new-clubs" aria-labelledby="new-clubs-heading">
         <div className={styles.sectionHeading}>
           <div>
-            <p className="eyebrow">Waiting for a decision</p>
+            <p className="eyebrow">Pending approval</p>
             <h2 id="new-clubs-heading" tabIndex={-1}>New clubs</h2>
             <p>{NEW_CLUBS_NOTE}</p>
           </div>

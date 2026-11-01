@@ -293,14 +293,14 @@ export const helpGuides: readonly HelpGuide[] = [
     audience: { kind: "system" },
     needs: [
       "The New club applications and invites page in System management.",
-      "The application waiting under Waiting for a decision.",
+      "The application waiting under Pending approval.",
     ],
     changes: [
       "Nothing while you read. Approve creates the club under its sponsoring church or company and emails the director the club director invite. It can't be undone from the page.",
       "Decline emails the applicant. The reason is optional, and the applicant is emailed it.",
     ],
     steps: [
-      "Open New club applications and invites. Applications wait under Waiting for a decision. Decided ones are under Recently decided.",
+      "Open New club applications and invites. Applications wait under Pending approval. Decided ones are under Recently decided.",
       "Read the card: the club, its sponsoring church, the director's details, the typed signatures, any note and any attachment.",
       "Check the flags under the club name. Sterling Volunteers is a flag to review, not a block. Possible duplicate lines, and a director email that differs from the invited address, are there to be checked, not decided for you.",
       "If the applicant typed a church that is not in the directory, you must choose a Sponsoring church or company from the directory before you can approve.",
@@ -308,7 +308,7 @@ export const helpGuides: readonly HelpGuide[] = [
       "You can also email a prospective director a private link with Send a private link. It opens the same form, works once, and creates nothing until you approve the application.",
     ],
     verify: [
-      "The card moves out of Waiting for a decision and shows Approved or Declined, with when it was decided.",
+      "The card moves out of Pending approval and shows Approved or Declined, with when it was decided.",
       "An approved card shows an Open the new club link.",
     ],
     next: "The director accepts the club invite from the email and lands in the new club. If account email is not set up, the invite waits on the Club invites page.",

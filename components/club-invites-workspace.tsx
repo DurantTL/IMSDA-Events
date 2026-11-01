@@ -9,7 +9,7 @@ import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-
 
 type InvitesResponse = { invites?: ClubInviteRecord[]; sent?: number; message?: string; issues?: Array<{ message?: string }> };
 
-const statusLabels = { PENDING: "Not sent", SENT: "Sent", ACCEPTED: "Accepted", CANCELLED: "Cancelled" } as const;
+const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Accepted", CANCELLED: "Cancelled" } as const;
 const statusTone = { PENDING: "gold", SENT: "purple", ACCEPTED: "green", CANCELLED: "coral" } as const;
 
 function formatDate(value: string | null) {

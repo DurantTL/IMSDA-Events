@@ -15,6 +15,7 @@ import type { ClubCapabilities } from "@/modules/organizations/director-grants-d
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { formatDueDate, isLockedForClub, reportDueDate, reportMonthLabel, reportableMonths } from "@/modules/club-reports/domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { registrationStatusWords } from "@/modules/registrations/status-words";
 
 /** A saved, unsubmitted club form (a DRAFT submission): metadata only, never an answer. */
 export type ClubHomeFormDraft = { id: string; templateName: string; updatedAt: string };
@@ -228,14 +229,6 @@ export function monthlyRecordSteps(
   return { steps, deadlines };
 }
 
-const registrationStatusLabels: Record<ClubRegistrationStatus, string> = {
-  DRAFT: "Not submitted",
-  SUBMITTED: "Submitted",
-  CONFIRMED: "Confirmed",
-  WAITLISTED: "Waitlisted",
-  CANCELLED: "Cancelled",
-};
-
 export type ClubHomeEventCardData = {
   id: string;
   name: string;
@@ -274,8 +267,8 @@ export function clubHomeEventCards(
     const churchBilled = event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
     const billedStatus = statuses.find((status) => isChurchBilledStatus(status));
     const lifecycle = event.multipleTeams && event.teams.length > 0
-      ? `${event.teams.length} ${event.teams.length === 1 ? "team" : "teams"}: ${[...new Set(statuses.map((status) => registrationStatusLabels[status]))].join(", ")}`
-      : statuses[0] ? registrationStatusLabels[statuses[0]] : "Registered";
+      ? `${event.teams.length} ${event.teams.length === 1 ? "team" : "teams"}: ${[...new Set(statuses.map((status) => registrationStatusWords[status]))].join(", ")}`
+      : statuses[0] ? registrationStatusWords[statuses[0]] : "Registered";
     // Today `listClubEvents` returns only church-billed events, so the attendee-pay wording below is not reached in
     // production. It stays so that a future attendee-pay club event can never read as billed to the church (or as owing one).
     const billing = !churchBilled

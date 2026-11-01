@@ -2,6 +2,7 @@ import { DIRECTORY_NOT_LISTED_VALUE, registrationFormDefinitionSchema, type Regi
 import { attendeeAnswerRecord } from "@/modules/registrations/choice-answer-filter";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * The attendee listing (#784): one row per attendee, with meal, dietary,
@@ -348,6 +349,6 @@ export const ATTENDEE_LISTING_BOM = "﻿";
 /** The CSV for exactly the rows shown, UTF-8 with a BOM so Excel opens it correctly. Cells are formula-escaped by `toCsv`. */
 export function attendeeListingCsv(rows: readonly AttendeeListingRow[]): string {
   const table: Array<Array<string | number>> = [LISTING_COLUMNS.map((column) => column.label)];
-  for (const row of rows) table.push(LISTING_COLUMNS.map((column) => row[column.key]));
+  for (const row of rows) table.push(LISTING_COLUMNS.map((column) => (column.key === "status" ? registrationStatusWordOrRaw(row.status) : row[column.key])));
   return ATTENDEE_LISTING_BOM + toCsv(table);
 }

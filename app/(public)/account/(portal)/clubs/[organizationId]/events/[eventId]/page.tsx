@@ -29,6 +29,7 @@ import { ClubRegistrationError, getClubEventWorkspace } from "@/modules/club-reg
 import { activeRegistrationStatuses, calendarDateInEventTimeZone, registrationClosedMessage } from "@/modules/events/lifecycle";
 import { getClassSelectionWorkspaceIfRegistered, getRegistrationHonorsCatalog } from "@/modules/honors/enrollment-repository";
 import { TEAM_LEVELS, teamLevelLabels, draftKeySchema, singleSearchParam } from "@/modules/club-teams/domain";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const metadata: Metadata = { title: "Club registration" };
 export const dynamic = "force-dynamic";
@@ -167,7 +168,7 @@ export default async function ClubEventRegistrationPage({
                   <small>
                     Confirmation <span translate="no">{team.confirmationCode}</span> · {team.attendeeCount} {team.attendeeCount === 1 ? "person" : "people"}
                     {team.locationName ? <> · <span translate="no">{team.locationName}</span></> : ""}
-                    {team.status === "WAITLISTED" ? " · On the waitlist" : team.status === "CANCELLED" ? " · Cancelled" : ""}
+                    {team.status === "WAITLISTED" || team.status === "CANCELLED" ? ` · ${registrationStatusWordOrRaw(team.status)}` : ""}
                   </small>
                 </span>
                 <Link className="secondary-button club-event-action" href={`${eventBase}?team=${encodeURIComponent(team.teamKey)}`}>

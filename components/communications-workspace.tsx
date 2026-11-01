@@ -252,8 +252,22 @@ function messageTypeLabel(message: Pick<MessageOutboxRecord, "templateKey" | "re
   return templateLabels[message.templateKey] ?? message.templateKey.toLowerCase().replaceAll("_", " ");
 }
 
+/** Delivery and message states in capitalized words (#1453). These are not registration status words, so they keep their own names. */
+const deliveryStatusLabels: Record<string, string> = {
+  PENDING: "Queued",
+  PROCESSING: "Processing",
+  CAPTURED: "Captured",
+  SENT: "Sent",
+  FAILED: "Failed",
+  SUPPRESSED: "Suppressed",
+  CANCELLED: "Cancelled",
+};
+
 function friendlyStatus(status: string) {
-  return status.toLowerCase().replaceAll("_", " ");
+  const known = deliveryStatusLabels[status];
+  if (known) return known;
+  const words = status.toLowerCase().replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function localDate(value: string | null) {

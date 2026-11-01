@@ -185,7 +185,7 @@ async function main() {
   assert(unmatchedRow.status === "UNMATCHED" && unmatchedRow.staffReason === "NO_MATCH" && !unmatchedRow.sendingClubVisible, "unmatched request goes to staff only");
   assert(await prisma.clubRosterMember.count({ where: { organizationId: clubs.b } }) === 0, "no receiving roster row before acceptance");
   const bView = await repo.listClubTransfers(clubs.b, directorB, now);
-  assert(bView.incoming.every((row) => row.statusLabel === "Pending"), "the receiving club sees matched and unmatched both as just pending");
+  assert(bView.incoming.every((row) => row.statusLabel === "Pending approval"), "the receiving club sees matched and unmatched both as just pending");
   const aView = await repo.listClubTransfers(clubs.a, directorA, now);
   assert(aView.outgoing.length === 1 && aView.outgoing[0]!.canAccept, "the sending club sees only the matched request");
   assert(!JSON.stringify([aView, bView]).includes(sealed), "no birth date in any club payload");

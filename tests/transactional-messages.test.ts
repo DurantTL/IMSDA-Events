@@ -230,7 +230,7 @@ describe("transactional lifecycle messages", () => {
       status: "PENDING",
     });
     expect(first.create.subjectSnapshot).not.toMatch(/\\{\\{[^{}]+\\}\\}/);
-    expect(first.create.bodyTextSnapshot).toContain("Restored status:** CONFIRMED");
+    expect(first.create.bodyTextSnapshot).toContain("Restored status:** Confirmed");
     expect(first.create.bodyTextSnapshot).toContain("No payment was recreated");
     expect(first.create.bodyTextSnapshot).toContain("No new capacity or waitlist policy was created");
     expect(first.create.bodyTextSnapshot).toContain(REGISTRATION_MANAGE_LINK_SENTINEL);
