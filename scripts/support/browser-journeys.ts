@@ -422,17 +422,29 @@ export async function activeCount(page: Page): Promise<number | null> {
 export async function openAddDialog(page: Page) {
   await page.locator(".club-roster-heading-actions").getByRole("button", { name: /Add to roster/ }).click();
   await page.locator("#roster-dialog-title").waitFor({ state: "visible", timeout: 10_000 });
+  // The dialog hook moves focus into the dialog on the next animation frame (use-accessible-dialog.ts). Typing before that
+  // frame lets the hook take focus from a half-typed field in WebKit and the text is lost, so wait until focus is inside.
+  await page.waitForFunction(() => Boolean(document.activeElement?.closest("form")?.querySelector("#roster-dialog-title")), undefined, { timeout: 10_000 });
 }
 
 export function rosterForm(page: Page) {
   return page.locator("form:has(#roster-dialog-title)");
 }
 
+/** Fills one field and waits until the page holds the value (a fill that raced a focus change is repeated, never skipped). */
+async function fillField(locator: ReturnType<Page["locator"]>, value: string) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await locator.fill(value);
+    if ((await locator.inputValue()) === value) return;
+  }
+  throw new Error(`The field would not keep "${value}"`);
+}
+
 export async function fillRosterForm(page: Page, first: string, last: string) {
   const form = rosterForm(page);
-  await form.locator('input[name="firstName"]').fill(first);
-  await form.locator('input[name="lastName"]').fill(last);
-  await form.locator('input[name="birthDateText"]').fill("6/1/2014");
+  await fillField(form.locator('input[name="firstName"]'), first);
+  await fillField(form.locator('input[name="lastName"]'), last);
+  await fillField(form.locator('input[name="birthDateText"]'), "6/1/2014");
   await form.locator('select[name="gender"]').selectOption("FEMALE");
 }
 
