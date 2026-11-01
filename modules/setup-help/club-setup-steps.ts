@@ -141,10 +141,11 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
         guideId: "director-honors-and-sterling",
       };
     case "no-clubs":
+      // This viewer directs no club, so no director guide is open to them: no guide link, one who-to-ask.
       return {
-        setup: howTo(["Your account does not direct a club yet.", "Ask your club's director to invite you under Club admins, then open the link in the invite.", "To start a new club, use the new club application."], "Your club is listed here."),
-        whoToAsk: askDirector("to send you an invite"),
-        guideId: "director-getting-started",
+        setup: howTo(["Your account does not direct a club right now.", "Club directors are added by the conference office. Contact the conference office with your club's name and the email address you sign in with.", "Once you are added, your club is listed here."], "Your club is listed here."),
+        whoToAsk: askOffice("add a club director"),
+        guideId: null,
       };
     case "two-step-needed":
       return { setup: { href: "/account/security", label: "Set up two-step sign-in" }, guideId: "director-two-step-sign-in" };

@@ -13,12 +13,15 @@ import { guideHrefFor, type RoleSetupEntry } from "@/modules/setup-help/role-set
  * The words live in `modules/setup-help/*-setup-steps.ts`; a page only names an id. No client code.
  */
 function RoleSetupHelp({ entry, context }: { entry: RoleSetupEntry; context?: string }) {
+  const guideHref = guideHrefFor(entry);
   return (
     <div className={styles.help} data-role-setup-help="">
       <SetupHelpPanel context={context} heading="How to do this" setup={entry.setup} whoToAsk={entry.whoToAsk} />
-      <Link className="text-button" href={guideHrefFor(entry)}>
-        <BookOpen aria-hidden="true" size={14} /> Help guide{context && <span className="sr-only"> for {context}</span>}
-      </Link>
+      {guideHref && (
+        <Link className={`text-button ${styles.guide}`} href={guideHref}>
+          <BookOpen aria-hidden="true" size={14} /> <span>Help guide{context && <span className="sr-only"> for {context}</span>}</span>
+        </Link>
+      )}
     </div>
   );
 }

@@ -28,7 +28,7 @@ import { portalDestinations, portalGuides } from "@/modules/help/portal-guides";
 import { portalGuideLinksForViewer, visiblePortalGuides, type PortalHelpViewer } from "@/modules/help/portal-visibility";
 import { clubCapabilities, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { summarizeChecklist, type ChecklistStep } from "@/modules/setup-help/checklist";
-import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
+import { buildClubChecklist, monthsNotSubmitted, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
 import { CLUB_SETUP_IDS, clubSetupFor } from "@/modules/setup-help/club-setup-steps";
 import { buildCoordinatorChecklist } from "@/modules/setup-help/coordinator-checklist";
 import { COORDINATOR_SETUP_IDS, coordinatorSetupFor } from "@/modules/setup-help/coordinator-setup-steps";
@@ -90,8 +90,6 @@ const COORDINATOR_SITES: Array<[file: string, id: (typeof COORDINATOR_SETUP_IDS)
   ["components/coordinator-whos-missing.tsx", "whos-missing"],
   ["components/coordinator-destinations.tsx", "no-clubs"],
   ["components/coordinator-destinations.tsx", "events-none"],
-  ["components/area-clubs-views.tsx", "no-clubs"],
-  ["components/area-clubs-views.tsx", "events-none"],
   [`${COORD}points/page.tsx`, "points-none"],
   ["components/club-overview.tsx", "club-no-director"],
   ["components/club-overview.tsx", "events-none"],
@@ -106,6 +104,7 @@ describe("every club and coordinator state has a next step (H3, H4)", () => {
     for (const id of CLUB_SETUP_IDS) {
       const entry = clubSetupFor(id, base);
       expect(roleSetupHasNextStep(entry), id).toBe(true);
+      if (entry.guideId === null) continue;
       const guide = portalGuides.find((candidate) => candidate.id === entry.guideId);
       expect(guide, `${id} -> ${entry.guideId}`).toBeDefined();
       expect(guide!.audience, id).toBe("director");
@@ -243,11 +242,11 @@ describe("the club director's Getting started checklist", () => {
     base,
     role,
     capabilities: clubCapabilities(role),
-    staffActing: false,
+    twoStepVerified: true,
     rosterCount: 0,
     registeredEventCount: 0,
     hasOpenEvents: true,
-    recordsDueNow: 1,
+    monthsNotSubmitted: 1,
     sterlingReminders: 2,
     ...over,
   });
@@ -258,19 +257,18 @@ describe("the club director's Getting started checklist", () => {
     expect(by.roster!.done).toBe(false);
     expect(by.events!.done).toBe(false);
     expect(by.records!.done).toBe(false);
-    expect(by.sterling!.done).toBe(false);
-    for (const id of ["leaders", "forms", "orders", "help"]) {
+    for (const id of ["leaders", "forms", "orders", "help", "sterling"]) {
       expect(by[id]!.reference, id).toBe(true);
       expect(by[id]!.done, id).toBe(false);
     }
-    const done = buildClubChecklist(facts("DIRECTOR", { rosterCount: 14, registeredEventCount: 1, recordsDueNow: 0, sterlingReminders: 0 }));
+    const done = buildClubChecklist(facts("DIRECTOR", { rosterCount: 14, registeredEventCount: 1, monthsNotSubmitted: 0, sterlingReminders: 0 }));
     expect(done.steps.filter((step) => !step.reference).every((step) => step.done)).toBe(true);
     expect(done.hidden).toBe(true);
   });
 
   it("treats a failed read as unknown (a guide row), never as done or as zero", () => {
-    const list = buildClubChecklist(facts("DIRECTOR", { rosterCount: null, registeredEventCount: null, recordsDueNow: null, sterlingReminders: null }));
-    for (const id of ["roster", "events", "records", "sterling"]) {
+    const list = buildClubChecklist(facts("DIRECTOR", { rosterCount: null, registeredEventCount: null, monthsNotSubmitted: null, sterlingReminders: null }));
+    for (const id of ["roster", "events", "records"]) {
       const step = list.steps.find((candidate) => candidate.id === id)!;
       expect(step.reference, id).toBe(true);
       expect(step.done, id).toBe(false);
@@ -290,8 +288,8 @@ describe("the club director's Getting started checklist", () => {
     expect(reporter.steps.find((candidate) => candidate.id === "records")!.linkable).toBe(true);
   });
 
-  it("does not call a staff act-as session done for two-step sign-in", () => {
-    const step = buildClubChecklist(facts("DIRECTOR", { staffActing: true })).steps[0]!;
+  it("never shows Done for two-step sign-in a page cannot prove (reporter Home, staff act-as)", () => {
+    const step = buildClubChecklist(facts("DIRECTOR", { twoStepVerified: false })).steps[0]!;
     expect(step.reference).toBe(true);
     expect(step.done).toBe(false);
   });
@@ -443,6 +441,8 @@ const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> =
   ["components/square-payment-matching.tsx", "square-unavailable"],
   ["components/club-invites-workspace.tsx", "club-invites-none"],
   ["components/club-invites-workspace.tsx", "club-invites-email"],
+  ["components/area-clubs-views.tsx", "staff-no-clubs"],
+  ["components/area-clubs-views.tsx", "staff-club-events-none"],
 ];
 
 describe("event admin states have a next step (round B: H3, H4)", () => {
@@ -455,7 +455,7 @@ describe("event admin states have a next step (round B: H3, H4)", () => {
       for (const ctx of [full, none, {}]) {
         const entry = eventSetupFor(id, ctx);
         expect(roleSetupHasNextStep(entry), id).toBe(true);
-        expect(guideIds.has(entry.guideId), `${id} -> ${entry.guideId}`).toBe(true);
+        expect(guideIds.has(entry.guideId!), `${id} -> ${entry.guideId}`).toBe(true);
         expect(guideHrefFor(entry)).toBe(`/help/${entry.guideId}`);
       }
     }
@@ -522,5 +522,96 @@ describe("the role guide link stays when a checklist is done", () => {
     expect(overview.activeClubs).toBe(0);
     expect(html).toContain("Getting started guide");
     expect(html).toContain("/account/help/coordinator-getting-started");
+  });
+});
+
+describe("round A review fixes", () => {
+  const reportsFor = (...entries: Array<[string, "DRAFT" | "SUBMITTED"]>) => entries.map(([reportMonth, status]) => ({ reportMonth, status }));
+  const nov3 = new Date("2026-11-03T12:00:00.000Z");
+  const nov20 = new Date("2026-11-20T12:00:00.000Z");
+
+  it("treats the reporter's Home as unable to prove two-step sign-in", () => {
+    const caps = clubCapabilities("REPORTER");
+    const list = buildClubChecklist({ base, role: "REPORTER", capabilities: caps, twoStepVerified: false, rosterCount: null, registeredEventCount: null, hasOpenEvents: false, monthsNotSubmitted: 1, sterlingReminders: null });
+    const step = list.steps.find((candidate) => candidate.id === "two-step")!;
+    expect(step.done).toBe(false);
+    expect(step.reference).toBe(true);
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).toContain("twoStepVerified: false");
+    // Same title on both homes.
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx").match(/title="Get your club set up"/g)).toHaveLength(2);
+  });
+
+  it("is not Done for a draft-only month or an unfiled month that has locked", () => {
+    expect(monthsNotSubmitted(reportsFor(["2026-09", "SUBMITTED"], ["2026-10", "DRAFT"]), "2026-2027", nov3, null)).toBe(1);
+    expect(monthsNotSubmitted(reportsFor(["2026-09", "SUBMITTED"]), "2026-2027", nov20, null)).toBe(1);
+    expect(monthsNotSubmitted(reportsFor(["2026-09", "SUBMITTED"], ["2026-10", "SUBMITTED"]), "2026-2027", nov20, null)).toBe(0);
+    // A club that joined in October owes nothing for September.
+    expect(monthsNotSubmitted(reportsFor(["2026-10", "SUBMITTED"]), "2026-2027", nov20, "2026-10-05")).toBe(0);
+  });
+
+  it("never marks honors and Sterling Volunteers done, even with no reminders on an empty roster", () => {
+    const list = buildClubChecklist({ base, role: "DIRECTOR", capabilities: clubCapabilities("DIRECTOR"), twoStepVerified: true, rosterCount: 0, registeredEventCount: 0, hasOpenEvents: false, monthsNotSubmitted: 0, sterlingReminders: 0 });
+    const step = list.steps.find((candidate) => candidate.id === "sterling")!;
+    expect(step.done).toBe(false);
+    expect(step.reference).toBe(true);
+  });
+
+  it("does not count a cancelled registration as a registered event", () => {
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).toContain('["SUBMITTED", "CONFIRMED", "WAITLISTED"].includes(event.registration.status)');
+  });
+
+  it("lists a late-only club nowhere, and a late club with a real gap keeps the late chip", () => {
+    const filed = (month: string, onTimePoints: number) => ({ reportMonth: month, status: "SUBMITTED" as const, totalPoints: 10, onTimePoints });
+    const lateOnly = club("l", { reports: [filed("2026-09", 5), filed("2026-10", 0)] });
+    expect(lateOnly.late).toBeGreaterThan(0);
+    expect(whosMissingWhat([lateOnly], "2026-10", now)).toEqual([]);
+    const lateAndNoDirector = club("m", { directors: [], reports: [filed("2026-09", 5), filed("2026-10", 0)] });
+    const [row] = whosMissingWhat([lateAndNoDirector], "2026-10", now);
+    expect(row!.items.map((item) => item.kind)).toEqual(["NO_DIRECTOR", "LATE"]);
+    const clear = buildCoordinatorChecklist({ clubYear: "2026-2027", clubCount: 1, clubsWithoutDirector: 0, recordsMissing: 0, monthNotDue: false, monthLabel: "October 2026", clubsBehind: whosMissingWhat([lateOnly], "2026-10", now).length });
+    expect(clear.hidden).toBe(true);
+  });
+
+  it("shows the conference-office note on the directors row only while a club has no director", () => {
+    const base0 = { clubYear: "2026-2027", clubCount: 3, recordsMissing: 0, monthNotDue: false, monthLabel: "October 2026", clubsBehind: 0 };
+    const open = buildCoordinatorChecklist({ ...base0, clubsWithoutDirector: 1 }).steps.find((step) => step.id === "directors")!;
+    expect(open.linkable).toBe(false);
+    expect(open.unavailableNote).toMatch(/conference office/);
+    const done = buildCoordinatorChecklist({ ...base0, clubsWithoutDirector: 0 }).steps.find((step) => step.id === "directors")!;
+    expect(done.done).toBe(true);
+    expect(done.linkable).toBe(true);
+  });
+
+  it("gives a viewer who directs no club a consistent who-to-ask and no guide they cannot open", () => {
+    const entry = clubSetupFor("no-clubs", "/account/clubs");
+    expect(entry.guideId).toBeNull();
+    expect(entry.whoToAsk).toMatch(/conference office/i);
+    expect("steps" in entry.setup && entry.setup.steps.join(" ")).not.toMatch(/invite/i);
+    const html = renderToStaticMarkup(createElement(ClubSetupHelp, { base: "/account/clubs", id: "no-clubs" }));
+    expect(html).not.toContain("/account/help/");
+    const noClub: PortalHelpViewer = { hasAccount: true, directedClubs: [], isAreaCoordinator: false, acting: null };
+    expect(visiblePortalGuides(noClub).some((guide) => guide.audience === "director")).toBe(false);
+  });
+
+  it("keeps coordinator help out of the staff club summary page", () => {
+    const views = read("components/area-clubs-views.tsx");
+    expect(views).not.toContain("CoordinatorSetupHelp");
+    expect(views).not.toContain("/account/help");
+    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-no-clubs", systemAdmin: true }));
+    expect(html).toContain("/admin/clubs/import");
+    expect(html).toContain("/help/review-new-club-application");
+    expect(html).not.toContain("/account/help");
+    const staff = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-club-events-none" }));
+    expect(staff).toMatch(/system administrator/i);
+  });
+
+  it("keeps the Sterling Volunteers wording rule in the new guides", () => {
+    for (const guide of portalGuides) expect(JSON.stringify(guide), guide.id).not.toMatch(/background[ -]checks?\b/i);
+  });
+
+  it("styles the Who's missing what headers and next step in its own module", () => {
+    const css = read("components/coordinator-whos-missing.module.css");
+    expect(css).toMatch(/\.table th \{[^}]*--type-staff-floor[^}]*0\.875rem/);
+    expect(css).toMatch(/\.next \{[^}]*min-width/);
   });
 });

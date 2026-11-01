@@ -24,7 +24,7 @@ export function CoordinatorWhosMissing({ rows, clubCount, monthLabel, query = ""
         <>
           <p className="coordinator-count">{totalMissing} of {clubCount} {clubCount === 1 ? "club is" : "clubs are"} missing something. Each has one next step.{query && ` ${rows.length} listed below match “${query}”.`}</p>
           <div className="report-table-wrap card-box">
-            <table className="report-table table-cards table-cards-tablet" role="table">
+            <table className={`report-table table-cards table-cards-tablet ${styles.table}`} role="table">
               <caption className="sr-only">Clubs that are missing something, with the next step for each</caption>
               <thead role="rowgroup">
                 <tr role="row">
@@ -45,7 +45,7 @@ export function CoordinatorWhosMissing({ rows, clubCount, monthLabel, query = ""
                         {row.items.map((item) => <li key={item.kind}><span className={`status-chip ${item.tone}`}>{item.label}</span></li>)}
                       </ul>
                     </td>
-                    <td {...cardCell("Next step")}>
+                    <td {...cardCell("Next step")} className={styles.next}>
                       {row.next.text}{" "}
                       <Link className="text-button" href={row.next.href}>
                         {row.next.linkLabel}<span className="sr-only">: {row.name}</span>

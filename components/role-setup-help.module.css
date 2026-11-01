@@ -6,3 +6,11 @@
   gap: 4px 16px;
   margin-top: 8px;
 }
+
+/* The book icon sits inline with the words, on one line. */
+.guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}

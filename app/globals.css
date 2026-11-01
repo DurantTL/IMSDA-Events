@@ -10677,6 +10677,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .setup-step.is-next .setup-step-copy strong { font-weight: 800; }
 .setup-step .text-button { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
 .setup-checklist-guide, .role-guide-link { margin: 8px 0 0; }
+.setup-checklist-guide .text-button, .role-guide-link .text-button { white-space: nowrap; }
 .setup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 14px; }
 @media (max-width: 480px) {
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }

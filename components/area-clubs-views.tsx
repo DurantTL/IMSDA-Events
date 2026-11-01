@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CoordinatorSetupHelp } from "@/components/role-setup-help";
+import { EventSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {
@@ -41,7 +41,7 @@ function NoClubs({ query }: { query?: string }) {
   return (
     <>
       <p className="report-empty">{noClubsText(query)}</p>
-      {query ? null : <CoordinatorSetupHelp context="the club list" id="no-clubs" />}
+      {query ? null : <EventSetupHelp context="the club list" id="staff-no-clubs" systemAdmin />}
     </>
   );
 }
@@ -234,7 +234,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
 export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
-  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <CoordinatorSetupHelp context="club events" id="events-none" />}</>;
+  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" systemAdmin />}</>;
   return (
     <>
       {shownEvents.map((event) => (

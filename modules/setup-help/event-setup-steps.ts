@@ -28,6 +28,8 @@ export const EVENT_SETUP_IDS = [
   "square-unavailable",
   "club-invites-none",
   "club-invites-email",
+  "staff-no-clubs",
+  "staff-club-events-none",
 ] as const;
 export type EventSetupId = (typeof EVENT_SETUP_IDS)[number];
 
@@ -135,6 +137,24 @@ export function eventSetupFor(id: EventSetupId, ctx: EventSetupContext = {}): Ro
       };
     case "club-invites-none":
       return { setup: { href: "/admin/clubs/import", label: "Import clubs" }, guideId: "review-new-club-application", guideScope: staff };
+    case "staff-no-clubs":
+      return {
+        setup: ctx.systemAdmin
+          ? { href: "/admin/clubs/import", label: "Import clubs" }
+          : howTo(["Clubs are added in System management, by import or by approving a new club application.", "Ask a system administrator to add the clubs."], "Active clubs are listed here."),
+        whoToAsk: ctx.systemAdmin ? undefined : askSystemAdmin("add clubs"),
+        guideId: "review-new-club-application",
+        guideScope: staff,
+      };
+    case "staff-club-events-none":
+      return {
+        setup: ctx.systemAdmin
+          ? { href: "/event-setup", label: "Create an event" }
+          : howTo(["A club event is an event whose audience is Clubs and that is published.", "Ask a system administrator to create or publish one."], "Each club event is listed with its registered clubs."),
+        whoToAsk: ctx.systemAdmin ? undefined : askSystemAdmin("create a club event"),
+        guideId: "create-or-copy-event",
+        guideScope: staff,
+      };
     case "club-invites-email":
       return {
         setup: ctx.systemAdmin

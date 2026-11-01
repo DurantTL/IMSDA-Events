@@ -1,3 +1,5 @@
+import { monthHasEnded } from "@/modules/club-reports/coordinator-overview-domain";
+import { reportableMonths } from "@/modules/club-reports/domain";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
 import type { ClubCapabilities, ClubRole } from "@/modules/organizations/director-grants-domain";
 import { summarizeChecklist, type Checklist, type ChecklistStep } from "./checklist";
@@ -12,16 +14,22 @@ export type ClubChecklistFacts = {
   base: string;
   role: ClubRole;
   capabilities: ClubCapabilities;
-  /** Staff acting as the director: the second step belongs to the staff session, so it is not shown as done. */
-  staffActing: boolean;
+  /**
+   * The page can prove this viewer's own two-step sign-in is set up: the full club Home is reached only after the
+   * second-step check. A reporter's Home and a staff "act as" cannot prove it, so the step is a guide row there, never Done.
+   */
+  twoStepVerified: boolean;
   /** Active roster members this club year; `null` when the roster could not be read. */
   rosterCount: number | null;
-  /** Club event registrations that exist; `null` when events could not be read. */
+  /** Club event registrations that are not cancelled; `null` when events could not be read. */
   registeredEventCount: number | null;
   hasOpenEvents: boolean;
-  /** Monthly Records due now and not started; `null` when not read (no report access, or a failed read). */
-  recordsDueNow: number | null;
-  /** Sterling Volunteers reminders waiting; `null` when not read. */
+  /**
+   * Months that have ended and are not yet submitted (a draft is not submitted, and a locked unfiled month still counts).
+   * `null` when not read (no report access, or a failed read).
+   */
+  monthsNotSubmitted: number | null;
+  /** Sterling Volunteers reminders waiting; `null` when not read. Only worded, never counted as done (honors cannot be derived). */
   sterlingReminders: number | null;
 };
 
@@ -37,8 +45,8 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     id: "two-step",
     label: "Two-step sign-in",
     detail: "Add a passkey (the easiest) or an authenticator app. It protects youth and medical records.",
-    done: !facts.staffActing,
-    reference: facts.staffActing,
+    done: facts.twoStepVerified,
+    reference: !facts.twoStepVerified,
     href: "/account/security",
     linkable: true,
     actionLabel: "Open Security",
@@ -108,9 +116,11 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "records",
     label: "Monthly Records",
-    detail: "A Monthly Record is due. File it by the 10th of the next month.",
-    done: facts.recordsDueNow !== null && facts.recordsDueNow === 0,
-    reference: facts.recordsDueNow === null,
+    detail: facts.monthsNotSubmitted
+      ? `${facts.monthsNotSubmitted} ${facts.monthsNotSubmitted === 1 ? "month has" : "months have"} no submitted record. A draft is not submitted.`
+      : "File each month's record by the 10th of the next month.",
+    done: facts.monthsNotSubmitted !== null && facts.monthsNotSubmitted === 0,
+    reference: facts.monthsNotSubmitted === null,
     href: `${base}/records`,
     linkable: can.submitReports,
     unavailableNote: askDirector("to file the Monthly Records, or to give you the Reporter role"),
@@ -120,9 +130,10 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "sterling",
     label: "Honors and Sterling Volunteers",
-    detail: "Someone on your roster needs a current Sterling Volunteers check.",
-    done: facts.sterlingReminders !== null && facts.sterlingReminders === 0,
-    reference: facts.sterlingReminders === null,
+    detail: facts.sterlingReminders ? "Someone on your roster needs a current Sterling Volunteers check." : "Record honors, and keep Sterling Volunteers current for adults and staff.",
+    // Honors cannot be read as "done", and zero reminders also means an empty roster, so this is always a guide row.
+    done: false,
+    reference: true,
     href: `${base}/roster`,
     linkable: can.roster,
     unavailableNote: askDirector("about honors and Sterling Volunteers"),
@@ -145,3 +156,15 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
 }
 
 export const CLUB_CHECKLIST_GUIDE_HREF = portalGuideHref(GUIDE);
+
+/** Months of the club year that have ended and have no submitted report. A draft is not submitted. */
+export function monthsNotSubmitted(
+  reports: ReadonlyArray<{ reportMonth: string; status: string }>,
+  clubYear: string,
+  now: Date,
+  joinedOn: string | null,
+): number {
+  const started = new Set(reports.map((report) => report.reportMonth));
+  const submitted = new Set(reports.filter((report) => report.status === "SUBMITTED").map((report) => report.reportMonth));
+  return reportableMonths(clubYear, now, { joinedOn, keep: started }).filter((month) => monthHasEnded(month, now) && !submitted.has(month)).length;
+}

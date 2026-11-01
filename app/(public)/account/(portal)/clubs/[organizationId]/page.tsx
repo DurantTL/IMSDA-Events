@@ -38,7 +38,7 @@ import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubEventRegistrationSteps, listClubEvents } from "@/modules/club-registrations/repository";
 import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { getClubReportYear } from "@/modules/club-reports/repository";
-import { buildClubChecklist, CLUB_CHECKLIST_GUIDE_HREF } from "@/modules/setup-help/club-checklist";
+import { buildClubChecklist, CLUB_CHECKLIST_GUIDE_HREF, monthsNotSubmitted } from "@/modules/setup-help/club-checklist";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels, clubRoleDescriptions } from "@/modules/organizations/director-grants-domain";
 
@@ -107,11 +107,11 @@ export default async function ClubHomePage({
       base,
       role: access.club.role,
       capabilities: access.capabilities,
-      staffActing: false,
+      twoStepVerified: false,
       rosterCount: null,
       registeredEventCount: null,
       hasOpenEvents: false,
-      recordsDueNow: reportYear && reportYear !== "ERROR" ? steps.length : null,
+      monthsNotSubmitted: reportYear && reportYear !== "ERROR" ? monthsNotSubmitted(reportYear.reports, clubYear, now, reportYear.joinedOn) : null,
       sterlingReminders: null,
     });
     return (
@@ -123,7 +123,7 @@ export default async function ClubHomePage({
           guide={{ href: CLUB_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
           headingId="club-getting-started"
           storageKey={`imsda-events:getting-started-collapsed:club:${organizationId}`}
-          title="Get set up"
+          title="Get your club set up"
         />
         {reporterChecklist.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={CLUB_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
         <section className="public-manage-card" aria-labelledby="club-role-heading">
@@ -216,11 +216,11 @@ export default async function ClubHomePage({
         base,
         role: access.club.role,
         capabilities: access.capabilities,
-        staffActing: access.actor?.kind === "STAFF_ACTING",
+        twoStepVerified: access.actor?.kind !== "STAFF_ACTING",
         rosterCount: members === "ERROR" ? null : members.filter((member) => member.status === "ACTIVE").length,
-        registeredEventCount: events === "ERROR" || !events ? null : events.filter((event) => event.registration).length,
+        registeredEventCount: events === "ERROR" || !events ? null : events.filter((event) => event.registration && ["SUBMITTED", "CONFIRMED", "WAITLISTED"].includes(event.registration.status)).length,
         hasOpenEvents: events !== "ERROR" && Boolean(events) && events!.some((event) => event.available && event.phase === "OPEN"),
-        recordsDueNow: reportYear === "ERROR" || !reportYear ? null : steps.filter((step) => step.key.startsWith("report-")).length,
+        monthsNotSubmitted: reportYear === "ERROR" || !reportYear ? null : monthsNotSubmitted(reportYear.reports, clubYear, now, reportYear.joinedOn),
         sterlingReminders: compliance === "ERROR" || !compliance ? null : complianceReminders(compliance, `${base}/roster`).length,
       });
 

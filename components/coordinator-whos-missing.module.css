@@ -7,3 +7,18 @@
   padding: 0;
   list-style: none;
 }
+
+/* Headers keep the staff 14px floor, and the next step gets room on wide screens (#1435). */
+.table th {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (min-width: 861px) {
+  .table th:first-child {
+    width: 22%;
+  }
+
+  .next {
+    min-width: 18rem;
+  }
+}

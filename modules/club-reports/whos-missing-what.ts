@@ -33,9 +33,10 @@ export function whosMissingWhat(clubs: readonly AreaClubSummary[], month: string
     // The overview month is counted once above; earlier months that were never filed are a separate gap.
     const earlier = club.months.filter((cell) => cell.status === "MISSING" && cell.month !== month).length;
     if (earlier > 0) items.push({ kind: "EARLIER_MISSING", label: `Missing ${plural(earlier, "earlier month", "earlier months")}`, tone: "coral" });
-    if (club.late > 0) items.push({ kind: "LATE", label: `Late ${plural(club.late, "record", "records")}`, tone: "coral" });
     if (club.rosterSize === 0) items.push({ kind: "NO_ROSTER", label: "No roster yet", tone: "gold" });
+    // A late record was filed, so it is not missing. It shows as extra information only on a club that has a real gap.
     if (items.length === 0) continue;
+    if (club.late > 0) items.push({ kind: "LATE", label: `Late ${plural(club.late, "record", "records")}`, tone: "coral" });
     rows.push({ clubId: club.id, name: club.name, church: club.church, items, next: nextStepFor(club.id, items) });
   }
   // Most gaps first, then by name, so the clubs that need the most help are read first.
@@ -48,7 +49,7 @@ function nextStepFor(clubId: string, items: readonly MissingItem[]): NextStep {
   if (kinds.has("NO_DIRECTOR")) {
     return { text: "Ask the conference office to add a director. Only they can.", href, linkLabel: "Open club" };
   }
-  if (kinds.has("RECORD_MISSING") || kinds.has("EARLIER_MISSING") || kinds.has("LATE")) {
+  if (kinds.has("RECORD_MISSING") || kinds.has("EARLIER_MISSING")) {
     return { text: "Contact the club's director about the Monthly Record. The app sends nothing for you.", href, linkLabel: "Open club" };
   }
   return { text: "Ask the club's director to add the club's people to the roster.", href, linkLabel: "Open club" };

@@ -42,8 +42,8 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       done: facts.clubCount > 0 && facts.clubsWithoutDirector === 0,
       reference: facts.clubCount === 0,
       href: `#${WHOS_MISSING_ANCHOR}`,
-      // Only the conference adds a director, so there is no page to open: it says who to ask (H4).
-      linkable: false,
+      // Only the conference adds a director, so there is no page to open: while one is missing it says who to ask (H4).
+      linkable: facts.clubsWithoutDirector === 0,
       unavailableNote: `Ask ${CONFERENCE_OFFICE} to add one.`,
       actionLabel: "See which clubs",
       helpHref: portalGuideHref("coordinator-follow-up-clubs"),

@@ -10,7 +10,7 @@ export type RoleSetupEntry = {
   /** Said when only someone else can fix it, such as "Ask the conference office to add a director." */
   whoToAsk?: string;
   /** A guide id: a portal guide (`modules/help/portal-guides.ts`, `/account/help/<id>`), or a staff guide with `guideScope: "staff"` (`modules/help/guides.ts`, `/help/<id>`). */
-  guideId: string;
+  guideId: string | null;
   guideScope?: "portal" | "staff";
 };
 
@@ -33,7 +33,7 @@ export const askDirector = (what: string) => `Ask your club's director or deputy
 export const portalGuideHref = (guideId: string) => `/account/help/${guideId}`;
 
 /** Where an entry's Help guide opens. */
-export const guideHrefFor = (entry: Pick<RoleSetupEntry, "guideId" | "guideScope">) =>
-  entry.guideScope === "staff" ? `/help/${entry.guideId}` : portalGuideHref(entry.guideId);
+export const guideHrefFor = (entry: Pick<RoleSetupEntry, "guideId" | "guideScope">): string | null =>
+  entry.guideId === null ? null : entry.guideScope === "staff" ? `/help/${entry.guideId}` : portalGuideHref(entry.guideId);
 
 export const askSystemAdmin = (what: string) => `Only a system administrator can ${what}. Ask a system administrator.`;

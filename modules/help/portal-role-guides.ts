@@ -166,7 +166,7 @@ export const newDirectorGuides: readonly PortalGuide[] = [
     next: "Nothing else is needed until the next reminder.",
     destinationIds: ["club-honors", "club-roster", "club-events"],
     relatedDocs: [],
-    keywords: ["honors", "honor", "sterling", "background check", "volunteers", "compliance", "adults", "staff", "check-in"],
+    keywords: ["honors", "honor", "sterling", "sterling volunteers", "volunteers", "compliance", "adults", "staff", "check-in"],
     owner: OWNER,
     lastReviewed: REVIEWED,
   },
