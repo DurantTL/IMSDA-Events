@@ -1016,7 +1016,7 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
   // formatting the real thing can never produce.
   attendee_summary: "Attendees:\nAvery Johnson — Adult registration",
   total_amount: "$129.05",
-  restored_status: "CONFIRMED",
+  restored_status: "Confirmed",
   refund_amount: "$25.00",
   refund_reference: "square-demo-refund",
   balance_amount: "$0.00",

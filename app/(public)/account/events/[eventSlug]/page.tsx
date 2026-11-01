@@ -35,6 +35,7 @@ import {
   getStaffCommunity,
 } from "@/modules/community/repository";
 import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const dynamic = "force-dynamic";
 
@@ -218,7 +219,7 @@ export default async function AttendeeEventHubPage({
               <article key={registration.id}>
                 <header>
                   <strong>Confirmation <span translate="no">{registration.confirmationCode}</span></strong>
-                  <span>{registration.status.toLowerCase()}</span>
+                  <span>{registrationStatusWordOrRaw(registration.status)}</span>
                 </header>
                 <ul>
                   {registration.attendees.map((attendee) => (

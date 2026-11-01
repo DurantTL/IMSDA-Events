@@ -7,6 +7,7 @@ import {
   type ChargeCategory,
 } from "@/modules/cancellation-policy/rules";
 import { windowClosesAt } from "@/modules/cancellation-policy/event-time";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * The deterministic cancellation calculator (#169). Pure: it takes a policy version and a snapshot of facts and returns
@@ -285,7 +286,7 @@ export function calculateCancellation(input: {
   const withPolicy = (result: CancellationResult): CancellationResult => ({ ...result, policy: policySummary(policy) });
 
   if (facts.registration && (facts.registration.status === "CANCELLED" || facts.registration.status === "DRAFT")) {
-    return withPolicy(emptyResult(facts, "NOT_CANCELLABLE", `A ${facts.registration.status.toLowerCase()} registration cannot be cancelled.`));
+    return withPolicy(emptyResult(facts, "NOT_CANCELLABLE", `A ${registrationStatusWordOrRaw(facts.registration.status).toLowerCase()} registration cannot be cancelled.`));
   }
   if (!rules.allowedScopes.includes(selection.scope)) {
     return withPolicy(emptyResult(facts, "SCOPE_NOT_ALLOWED", `This policy does not allow cancelling by ${scopeWords(selection.scope)}.`));

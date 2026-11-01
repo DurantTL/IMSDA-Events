@@ -520,6 +520,7 @@ export async function listRegistrationsForVerifiedEmail(
         registration.waitlistEntry?.status === "WAITING"
           ? registration.waitlistEntry.position
           : null,
+        { attendeeBalanceCents: balanceCents, deferredBilling: isDeferredOrganizationBilling },
       ),
       submittedAt: registration.submittedAt?.toISOString() ?? null,
       event: {

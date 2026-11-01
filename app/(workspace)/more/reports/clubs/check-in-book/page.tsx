@@ -9,17 +9,12 @@ import { checkInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporti
 import { getCheckInBookData } from "@/modules/reporting/check-in-book-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { registrationStatusWords } from "@/modules/registrations/status-words";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.checkInBook };
 export const dynamic = "force-dynamic";
 
-const statusLabels: Record<(typeof checkInBookStatuses)[number], string> = {
-  SUBMITTED: "Submitted",
-  CONFIRMED: "Confirmed",
-  WAITLISTED: "Waitlisted",
-  CANCELLED: "Cancelled",
-};
 
 /** Staff's paper check-in book (#600): every club (or registration) on its own printed page. */
 export default async function CheckInBookPage({
@@ -79,7 +74,7 @@ export default async function CheckInBookPage({
           <legend>Registration status</legend>
           {checkInBookStatuses.map((value) => (
             <label key={value}>
-              <input type="checkbox" name="status" value={value} defaultChecked={statuses.includes(value)} /> {statusLabels[value]}
+              <input type="checkbox" name="status" value={value} defaultChecked={statuses.includes(value)} /> {registrationStatusWords[value]}
             </label>
           ))}
         </fieldset>

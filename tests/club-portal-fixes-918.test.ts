@@ -329,7 +329,7 @@ describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
     expect(teamPermissionsIntro.ageRuleLead).toContain("maximum age");
     expect(teamPermissionsIntro.coaches).toContain("registered as coaches");
     expect(teamPermissionsIntro.coaches).toContain("don't need approval");
-    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Waiting for a decision", "Approved", "Declined"]);
+    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Pending approval", "Approved", "Declined"]);
     for (const level of teamPermissionsIntro.levels) expect(level.detail.length).toBeGreaterThan(30);
     expect(teamPermissionsIntro.levels[0]!.detail).toContain("The team is registered while you decide");
     expect(teamPermissionsIntro.levels[2]!.detail).toContain("coach");
@@ -371,7 +371,7 @@ describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
     }
     expect(html).toContain('aria-labelledby="team-approval-rules-heading"');
     expect(html).toContain('id="team-approval-rules-heading"');
-    expect(html.indexOf("Waiting for a decision")).toBeLessThan(html.indexOf("Team members 18 and over"));
+    expect(html.indexOf("Pending approval")).toBeLessThan(html.indexOf("Team members 18 and over"));
   });
   it("with no rows shows the plain age rule and no per-event list", async () => {
     const html = await renderPage([], {});

@@ -321,10 +321,6 @@ function serializeRegistrationAccess(
     && registration.waitlistEntry?.status === "WAITING"
     ? registration.waitlistEntry.position
     : null;
-  const status = describePublicRegistrationStatus(
-    registration.status,
-    waitlistPosition,
-  );
   // Whether the private page has a payment panel (#1405): a promoted waitlist registrant picks how to pay (even with Square off,
   // to record pay-later), or Square is ready and the form takes payment. Without it the summary must not say "pay below".
   const submissionDefinition = registration.publicFormSubmission
@@ -351,6 +347,10 @@ function serializeRegistrationAccess(
     isDeferredOrganizationBilling: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     billedToGroup: Boolean(registration.groupRegistration),
     onlinePaymentOffered,
+  });
+  const status = describePublicRegistrationStatus(registration.status, waitlistPosition, {
+    attendeeBalanceCents: paymentSummary.amountDueCents,
+    deferredBilling: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
   });
   // A "Group" (#650) is billed to its contact and is shown its price and estimated total.
   const isGroup = Boolean(registration.groupRegistration);
