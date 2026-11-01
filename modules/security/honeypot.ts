@@ -6,4 +6,6 @@ import { z } from "zod";
  * check must at least not look like a bot.
  */
 export const HONEYPOT_FIELD = "website";
-export const honeypotFieldSchema = z.literal("").optional();
+/** Shown when autofill filled the hidden field; routes that pass zod's message through (club forms) show these words (#1411). */
+export const HONEYPOT_MESSAGE = "We couldn't send this form. Clear your browser's autofill and try again.";
+export const honeypotFieldSchema = z.literal("", { error: HONEYPOT_MESSAGE }).optional();

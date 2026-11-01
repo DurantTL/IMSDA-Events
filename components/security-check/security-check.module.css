@@ -75,6 +75,12 @@
   opacity: 0.58;
 }
 
+/* The shared hover rule only skips real `:disabled`; keep the resting look while sending. */
+.emailCodeButton.emailCodeButton[aria-disabled="true"]:hover {
+  background: #f9fbfb;
+  border-color: var(--line);
+}
+
 .codeStatus,
 .codeError {
   margin: 0;
