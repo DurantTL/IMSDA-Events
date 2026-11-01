@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { AccessRestricted } from "@/components/access-restricted";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -51,6 +52,12 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const columns = visibleListingColumns(query.view);
   const activeView = LISTING_VIEWS.find((view) => view.id === query.view) ?? LISTING_VIEWS[0]!;
   const canExport = permissions.includes("VIEW_REPORTS");
+
+  // Anything narrowing the list beyond its defaults (view and sort only change columns and order).
+  const filtersSet = Boolean(query.search?.trim()) || Boolean(query.meal) || query.dietaryOnly
+    || query.statuses.length !== DEFAULT_LISTING_STATUSES.length
+    || query.statuses.some((status) => !DEFAULT_LISTING_STATUSES.includes(status));
+  const clearHref = `/people/attendees?event=${encodeURIComponent(event.id)}`;
 
   const href = (next: Partial<AttendeeListingQuery>) => {
     const urlParams = attendeeListingParams({ ...query, ...next });
@@ -127,7 +134,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </fieldset>
         <div className="filter-bar-actions">
           <button className="secondary-button" type="submit">Apply</button>
-          <Link className="text-button" href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Reset</Link>
+          {filtersSet && <Link className="text-button" href={clearHref}>Clear filters</Link>}
         </div>
       </SearchAsYouTypeForm>
 
@@ -149,7 +156,11 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </tr>
           </thead>
           <tbody role="rowgroup">
-            {rows.length === 0 && <tr role="row"><td role="cell" colSpan={columns.length}>No attendees match these filters.</td></tr>}
+            {rows.length === 0 && <tr role="row"><td role="cell" colSpan={columns.length}>
+              {filtersSet
+                ? <NoMatchesState clear={{ href: clearHref }} className="empty-state" noun="attendees" query={query.search} />
+                : <EmptyState className="empty-state" title="No attendees yet">Attendees appear here once people register for this event.</EmptyState>}
+            </td></tr>}
             {rows.map((row) => (
               <tr role="row" key={row.attendeeId}>
                 {columns.map((column) => {

@@ -188,11 +188,11 @@ describe("the People list markup", () => {
     query: "", rows: [], page: 1, pageCount: 1, total: 12, filters, eventOptions: events, clubOptions: clubs, ...extra,
   }));
 
-  it("shows chips with accessible remove links, Clear all, the active count and a polite count", () => {
+  it("shows chips with accessible remove links, Clear filters, the active count and a polite count", () => {
     const html = render(parsePeopleFilters({ role: ["club-director", "club-deputy"], club: ["org_1", "org_2"] }, "full"));
     expect(html).toContain('aria-label="Active filters"');
     expect(html).toContain('aria-label="Remove filter Role: Deputy"');
-    expect(html).toContain(">Clear all<");
+    expect(html).toContain(">Clear filters<");
     expect(html).toContain("4 active");
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain("12 people with Director or Deputy in 2 clubs.");

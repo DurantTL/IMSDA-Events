@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
-import { EmptyState } from "@/components/empty-state";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
@@ -274,6 +275,8 @@ export function PeopleWorkspace({
   openOnlyRegistration = null,
   resultOrderText,
   pendingTeamCount = 0,
+  serverFiltered = false,
+  serverQuery = "",
 }: {
   eventId: string;
   eventSlug: string;
@@ -308,6 +311,10 @@ export function PeopleWorkspace({
   resultOrderText?: string | null;
   /** Teams from the general registration link waiting for staff to confirm a club (#931): not registrations, so not in any count here. */
   pendingTeamCount?: number;
+  /** The server already narrowed `initialRegistrations` (search, location or a choice answer), so an empty list may be "nothing matches", and Clear filters must reload the page. */
+  serverFiltered?: boolean;
+  /** The text of the server-side search, for the "nothing matches" heading. */
+  serverQuery?: string;
 }) {
   const orderText = resultOrderText === undefined ? registrationListOrderText : resultOrderText;
   const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
@@ -367,6 +374,13 @@ export function PeopleWorkspace({
     if (modal !== "detail") return;
     dialogRef.current?.scrollIntoView({ block: "start" });
   }, [modal, selected?.id, dialogRef]);
+
+  const filtersActive = query.trim() !== "" || filter !== "ALL" || serverFiltered;
+  // Server-side narrowing needs a reload to undo; the client search and status filter are cleared either way.
+  const clearHref = serverFiltered ? `/people?event=${encodeURIComponent(eventId)}` : undefined;
+  // Nothing matches only when something narrowed a list that has rows; an empty event with a stray filter is just empty.
+  const nothingYet = !filtersActive || (!serverFiltered && registrations.length === 0);
+  const clearFilters = () => { search.setValue(""); setFilter("ALL"); };
 
   const visible = useMemo(() => registrations.filter((registration) => {
     const matchesQuery = registrationMatchesSearch(registration, query);
@@ -803,6 +817,9 @@ export function PeopleWorkspace({
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
+        {filtersActive && (clearHref
+          ? <Link className="secondary-button" href={clearHref} onClick={clearFilters}>Clear filters</Link>
+          : <button className="secondary-button" onClick={clearFilters} type="button">Clear filters</button>)}
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       <div className="page-intro people-intro">
@@ -888,7 +905,7 @@ export function PeopleWorkspace({
           </div>
         ))}
       </div>
-      {visible.length === 0 && (registrations.length === 0
+      {visible.length === 0 && (nothingYet
         ? <EmptyState
             action={{ label: "Start registration", href: `/events/${eventSlug}` }}
             actionClass="secondary-button"
@@ -902,7 +919,12 @@ export function PeopleWorkspace({
               ? `No team is registered yet, but ${pendingTeamsLabel(pendingTeamCount)}. Use the Review them link above to confirm the club; a team becomes a registration then.`
               : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>
-        : <div className="empty-state panel"><Search aria-hidden="true" size={24} /><h3>No matching registrations</h3><p>Nothing matches this search or filter. Clear it to see all {registrations.length} registrations.</p><button className="secondary-button" onClick={() => { search.setValue(""); setFilter("ALL"); }} type="button">Clear search and filter</button></div>)}
+        : <NoMatchesState
+            clear={{ href: clearHref, onClick: clearFilters }}
+            known={serverFiltered ? undefined : `The event has ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"}.`}
+            noun="registrations"
+            query={query.trim() || serverQuery}
+          />)}
 
       {emailingSelection && (
         <SelectedAudienceDialog
