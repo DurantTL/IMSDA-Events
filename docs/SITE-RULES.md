@@ -28,7 +28,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | --- | --- | --- | --- | --- |
 | S1 | Search boxes must work without typing anything, everywhere. Clicking or focusing a search box, or searching with it empty, shows the full list (sorted and paged as usual). Typing only narrows it. | `tests/search-field-consistency-1347.test.ts`, `tests/empty-server-search-1348.test.ts` (partial: only some of the boxes those issues fixed); rest planned (#1440) | planned (#1439) | #1342, #1347, #1348 |
 | S2 | No minimum number of characters and no "type to search" empty state; "type more to narrow" caps are replaced with paging. | `tests/search-field-consistency-1347.test.ts`, `tests/empty-server-search-1348.test.ts` (partial); rest planned (#1440) | planned (#1439) | #1342, #1347, #1348 |
-| S3 | The background check name lookup also follows the empty-search rule, keeping its existing permission checks and audit logging. | planned (#1440) | planned (#1439) | #1348 |
+| S3 | The Sterling Volunteers name lookup also follows the empty-search rule, keeping its existing permission checks and audit logging. | planned (#1440) | planned (#1439) | #1348 |
 | S4 | Every search box should search as you type, across the board. Empty shows the full list, typing narrows it, and no Enter is needed. | planned (#1440) | planned (#1439) | #1431 |
 | S5 | While results update, focus is kept and results are announced; Enter and no-JavaScript still work. | planned (#1440) | planned (#1439) | #1431 |
 
