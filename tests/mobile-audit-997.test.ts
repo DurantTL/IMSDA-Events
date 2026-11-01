@@ -58,8 +58,6 @@ describe("#997 shared layout CSS", () => {
     expect(css).toContain(".card-box:has(> table.table-cards) { overflow: visible; }");
   });
 
-
-
   it("keeps ordinary words whole in cards: break-word, with anywhere only for emails and codes", () => {
     expect(css).toContain('.break-anywhere.break-anywhere, table td :is(code, a[href^="mailto:"], .team-email) { overflow-wrap: anywhere; }');
   });

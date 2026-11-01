@@ -19,10 +19,42 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** The opening tag of every `<table` in a file, from `<table` to its closing `>`. */
+/**
+ * Every `<table ...>` in a source: its opening tag (scanned to the real closing `>`, so a `=>` inside an attribute expression or a
+ * quoted string does not end it early) and its body up to `</table>`.
+ */
+export function tablesIn(source: string) {
+  const tables: Array<{ tag: string; body: string }> = [];
+  for (const match of source.matchAll(/<table\b/g)) {
+    let depth = 0;
+    let quote = "";
+    let end = match.index + 6;
+    for (; end < source.length; end += 1) {
+      const char = source[end]!;
+      if (quote) {
+        if (char === quote && source[end - 1] !== "\\") quote = "";
+      } else if (char === '"' || char === "'" || (char === "`" && depth > 0)) quote = char;
+      else if (char === "{") depth += 1;
+      else if (char === "}") depth -= 1;
+      else if (char === ">" && depth === 0 && source[end - 1] !== "=") break;
+    }
+    const close = source.indexOf("</table>", end);
+    tables.push({ tag: source.slice(match.index, end + 1), body: source.slice(end + 1, close === -1 ? source.length : close) });
+  }
+  return tables;
+}
+
+/** The class tokens of an opening tag: `table-cards` has to be a whole token, `table-cards-wide` is a variant, `no-table-cards` is neither. */
+export function classTokens(tag: string) {
+  const attribute = /className=(?:"([^"]*)"|\{`([^`]*)`\}|\{"([^"]*)"\})/.exec(tag);
+  const value = attribute?.[1] ?? attribute?.[2] ?? attribute?.[3] ?? "";
+  return value.split(/\s+/).filter((token) => token && !token.startsWith("${"));
+}
+
+const cardsTable = (tag: string) => classTokens(tag).includes("table-cards");
+
 function tableTags(file: string) {
-  const source = readFileSync(path.join(root, file), "utf8");
-  return Array.from(source.matchAll(/<table\b/g), (match) => source.slice(match.index, source.indexOf(">", match.index)));
+  return tablesIn(readFileSync(path.join(root, file), "utf8")).map((table) => table.tag);
 }
 
 const printed = "A printed sheet: its layout is the paper, not a phone screen.";
@@ -72,13 +104,16 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/staff-invitation-import.tsx": { tables: 1, reason: fits },
 };
 
+/** table-cards files whose tables have no row header, and why. Empty unless a table truly has no text that names its row. */
+const noRowHeader: Record<string, string> = {};
+
 describe("every table is the shared card pattern or is allow-listed (rule B3, #1457)", () => {
   const files = [...sourceFiles("app"), ...sourceFiles("components")];
 
   it("has no table without table-cards outside the allow-list, and the allow-list counts are exact", () => {
     const found: Record<string, number> = {};
     for (const file of files) {
-      const without = tableTags(file).filter((tag) => !tag.includes("table-cards")).length;
+      const without = tableTags(file).filter((tag) => !cardsTable(tag)).length;
       if (without > 0) found[file] = without;
     }
     const expected = Object.fromEntries(Object.entries(allowList).map(([file, entry]) => [file, entry.tables]));
@@ -90,6 +125,46 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
       expect(entry.reason.length, file).toBeGreaterThan(20);
       expect(entry.tables, file).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps the table semantics on every table-cards table: role, a row header and labelled cells", () => {
+    const problems: string[] = [];
+    let checked = 0;
+    for (const file of files) {
+      const source = readFileSync(path.join(root, file), "utf8");
+      const tables = tablesIn(source).filter((table) => cardsTable(table.tag));
+      tables.forEach((table, index) => {
+        checked += 1;
+        const name = `${file} #${index + 1}`;
+        if (!/\brole="table"/.test(table.tag)) problems.push(`${name}: no role="table" (display changes drop native table semantics)`);
+        // A body that renders a row component (<MoneyRow .../>) keeps its cells in that component, in the same file.
+        const scan = /<[A-Z]\w*Row\b/.test(table.body) ? source : table.body;
+        const rowHeader = /role="rowheader"|scope="row"/.test(scan);
+        if (!rowHeader && !noRowHeader[file]) problems.push(`${name}: no row header (role="rowheader" / scope="row"), so a card has no heading`);
+        if (rowHeader && noRowHeader[file]) problems.push(`${name}: has a row header, remove ${file} from noRowHeader`);
+        if (!/cardCell\(|data-label/.test(scan)) problems.push(`${name}: its body cells use neither cardCell( nor data-label, so a card shows no column labels`);
+      });
+    }
+    expect(checked).toBeGreaterThan(50);
+    expect(problems).toEqual([]);
+  });
+
+  it("treats table-cards as a whole class token and scans a tag past => inside an attribute", () => {
+    expect(classTokens('<table className="report-table table-cards table-cards-wide">')).toEqual(["report-table", "table-cards", "table-cards-wide"]);
+    expect(classTokens('<table className="no-table-cards-here">')).not.toContain("table-cards");
+    expect(classTokens("<table className={`report-table table-cards ${styles.table}`} role=\"table\">")).toContain("table-cards");
+    const [table] = tablesIn('<table onClick={() => go()} className="a b"><tbody><tr><th role="rowheader">x</th></tr></tbody></table>');
+    expect(table!.tag).toBe('<table onClick={() => go()} className="a b">');
+    expect(table!.body).toContain('role="rowheader"');
+  });
+
+  it("fails the tags table as it was before it had a row header", () => {
+    const before = `<table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Color</th></tr></thead><tbody role="rowgroup">{tags.map((row) => <tr key={row.id} role="row"><td {...cardCell("Color")}><input type="color" /></td></tr>)}</tbody></table>`;
+    const [table] = tablesIn(before);
+    expect(cardsTable(table!.tag)).toBe(true);
+    expect(/role="rowheader"|scope="row"/.test(table!.body)).toBe(false);
+    const fixed = tablesIn(readFileSync(path.join(root, "components/tag-configuration-workspace.tsx"), "utf8"))[0]!;
+    expect(/role="rowheader"[^>]*scope="row"|scope="row"[^>]*role="rowheader"/.test(fixed.body)).toBe(true);
   });
 
   it("never lets a table scroll with a scroll cue", () => {
@@ -115,6 +190,14 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
     expect(css).not.toContain("roster-card-table-wide");
     expect(css).not.toMatch(/\.roster-card-table td\[data-label\]/);
     expect(css).not.toMatch(/\.editable-settings-table td\[data-label\]/);
+  });
+
+  it("sizes every card label from the staff floor (14px on staff pages), keeping the portal's own floor", () => {
+    const css = readFileSync(path.join(root, "app/globals.css"), "utf8");
+    const labelRules = css.split("\n").filter((line) => line.includes("content: attr(data-label)") || /font-weight: 700; font-size: max\(var\(--type-staff-floor/.test(line));
+    expect(css.match(/font-weight: 700; font-size: max\(var\(--type-staff-floor, 0px\), var\(--type-floor, 0px\), 0\.68rem\);/g)).toHaveLength(5);
+    expect(css).not.toContain("font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);");
+    expect(labelRules.length).toBeGreaterThan(5);
   });
 
   it("switches by the width of the table's box, not the viewport", () => {

@@ -9570,7 +9570,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
@@ -9640,7 +9640,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards-tablet > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
@@ -9698,7 +9698,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards-wide > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
@@ -9758,7 +9758,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards-xwide > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
@@ -9824,7 +9824,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards-max > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
