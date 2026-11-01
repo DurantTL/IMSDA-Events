@@ -2,6 +2,7 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useMemo, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Check, Download, FileUp, Package, RefreshCw, Upload } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumber } from "@/modules/club-supplies/catalog-csv";
@@ -58,7 +59,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const [notice, setNotice] = useState("");
   const [stale, setStale] = useState(false);
   const [section, setSection] = useState<ClubSupplySection | "">("");
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
   const [toggling, setToggling] = useState<string | null>(null);
 
   async function send(body: Record<string, unknown>) {
@@ -142,10 +143,10 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   }
 
   const visible = useMemo(() => {
-    const text = query.trim().toLowerCase();
+    const text = search.term.trim().toLowerCase();
     return items.filter((item) => (!section || item.section === section)
       && (!text || `${item.name} ${item.catalogNumber ?? ""}`.toLowerCase().includes(text)));
-  }, [items, section, query]);
+  }, [items, section, search.term]);
 
   const changes = preview ? preview.summary.added + preview.summary.updated : 0;
   const counts: Array<[string, number]> = preview ? [
@@ -273,10 +274,11 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
               </label>
               <label>
                 Search
-                <input onChange={(event) => setQuery(event.target.value)} placeholder="Name or catalog number" type="search" value={query} />
+                <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
               </label>
             </div>
             <p className="quiet-copy">{`${visible.length} shown`}</p>
+            <SearchResultStatus message={`${visible.length} shown.`} />
             <ul className={styles.itemList}>
               {visible.map((item) => (
                 <li className={styles.itemRow} key={item.id}>

@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicClubDirectory } from "@/components/public-club-directory";
+import { SEARCH_DEBOUNCE_MS } from "@/components/search-as-you-type";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 
 vi.mock("@/components/public-club-map", () => ({ PublicClubMap: () => null }));
@@ -29,6 +30,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -37,6 +39,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 
 function type(input: HTMLInputElement, value: string) {
@@ -45,6 +48,12 @@ function type(input: HTMLInputElement, value: string) {
     setter.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+/** Types, then waits out the pause after which the list follows the box (#1431). */
+function typeAndSettle(input: HTMLInputElement, value: string) {
+  type(input, value);
+  act(() => { vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS); });
 }
 
 const clearButton = () => [...container.querySelectorAll("button")].find((b) => (b.getAttribute("aria-label") ?? b.textContent ?? "").includes("Clear search"));
@@ -57,13 +66,13 @@ describe("find a club search flow (#1306)", () => {
     expect(container.textContent).toContain("1 club has no map location and is listed only.");
     expect(clearButton()).toBeUndefined();
 
-    type(input, "riverton");
+    typeAndSettle(input, "riverton");
     expect(container.textContent).toContain("2 publicly listed clubs found · 2 shown on map");
     expect(container.textContent).not.toContain("no map location");
     expect(container.textContent).not.toContain("Brookside Explorers");
     expect(clearButton()).toBeDefined();
 
-    type(input, "brookside");
+    typeAndSettle(input, "brookside");
     expect(container.textContent).toContain("1 publicly listed club found · 0 shown on map");
     expect(container.textContent).toContain("1 club has no map location and is listed only.");
 
@@ -78,18 +87,17 @@ describe("find a club search flow (#1306)", () => {
   });
 
   it("announces the count politely after typing stops", () => {
-    vi.useFakeTimers();
-    try {
-      act(() => root.render(createElement(PublicClubDirectory, { clubs })));
-      const input = container.querySelector("input[type=search]") as HTMLInputElement;
-      type(input, "riverton");
-      const status = container.querySelector('[role="status"]')!;
-      expect(status.textContent).not.toContain("2 publicly listed clubs found");
-      act(() => { vi.advanceTimersByTime(700); });
-      expect(status.textContent).toContain("2 publicly listed clubs found");
-    } finally {
-      vi.useRealTimers();
-    }
+    act(() => root.render(createElement(PublicClubDirectory, { clubs })));
+    const input = container.querySelector("input[type=search]") as HTMLInputElement;
+    type(input, "riverton");
+    const status = container.querySelector('[role="status"]')!;
+    // The list and the announcement wait for the pause, so nothing is read out on each key.
+    act(() => { vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1); });
+    expect(status.textContent).not.toContain("2 publicly listed clubs found");
+    expect(container.textContent).toContain("Brookside Explorers");
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(status.textContent).toContain("2 publicly listed clubs found");
+    expect(container.textContent).not.toContain("Brookside Explorers");
   });
 });
 

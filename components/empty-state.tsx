@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type EmptyStateAction = { label: string; href?: string; onClick?: () => void };
@@ -49,9 +50,56 @@ export function EmptyState({
       <Heading>{title}</Heading>
       {children && <p>{children}</p>}
       {offered && (offered.href
-        ? <Link className={actionClass} href={offered.href}>{offered.label}</Link>
+        ? <Link className={actionClass} href={offered.href} onClick={offered.onClick}>{offered.label}</Link>
         : <button className={actionClass} onClick={offered.onClick} type="button">{offered.label}</button>)}
       {!offered && hint && <p className="empty-state-hint">{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * "Nothing matches" (#1449, rule 4): a search or filter found nothing, which is
+ * not the same as the list being empty. Names what was searched, says how to
+ * get the rows back, and offers "Clear filters". It never offers the create
+ * action or says "yet". Pass an `href` for a server list, an `onClick` for a
+ * client list. `known` is a sentence stating the unfiltered total; pass it only
+ * when that total is actually known.
+ */
+export function NoMatchesState({
+  noun,
+  query,
+  known,
+  clear,
+  icon,
+  className = "empty-state panel",
+  headingLevel = 3,
+  announce = false,
+}: {
+  /** Plural noun for what is listed, e.g. "registrations". */
+  noun: string;
+  /** The text searched for; empty or omitted when only non-text filters are set. */
+  query?: string;
+  known?: string;
+  clear: { href?: string; onClick?: () => void };
+  icon?: ReactNode;
+  className?: string;
+  headingLevel?: 2 | 3 | 4;
+  /** Defaults to false: this is the visible result of a search, so typing never re-announces it. */
+  announce?: boolean;
+}) {
+  const text = (query ?? "").trim();
+  return (
+    <EmptyState
+      action={{ label: "Clear filters", ...clear }}
+      actionClass="primary-button"
+      announce={announce}
+      canCreate
+      className={className}
+      headingLevel={headingLevel}
+      icon={icon ?? <Search aria-hidden="true" size={24} />}
+      title={text ? `No ${noun} match "${text}"` : `No ${noun} match these filters`}
+    >
+      {`${known ? `${known} ` : ""}${text ? "Check the spelling, or clear the search and filters to see them all." : "Clear the filters to see them all."}`}
+    </EmptyState>
   );
 }

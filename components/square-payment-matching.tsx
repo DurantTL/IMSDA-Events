@@ -3,6 +3,7 @@
 import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useMemo, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import Link from "next/link";
 import { AlertTriangle, CreditCard, Link2, Search, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -108,7 +109,13 @@ export function SquarePaymentMatching({
   const [outstanding, setOutstanding] = useState(findings);
   const [attached, setAttached] = useState<string[]>([]);
   const [active, setActive] = useState<SquareReconciliationFinding | null>(null);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
+  /** Sets the box and the list together, for a prefill or a reset (not typing). */
+  function setQuery(next: string) {
+    search.setValue(next);
+    search.applyNow();
+  }
   const [chosen, setChosen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -368,11 +375,11 @@ export function SquarePaymentMatching({
                   <Search aria-hidden="true" size={18} />
                   <span className="sr-only">Search registrations</span>
                   <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
+                    {...search.inputProps}
                     placeholder="Search attendee or payer name, email, or confirmation code"
                   />
                 </label>
+                <SearchResultStatus message={candidates.length === 0 ? "No registrations match." : `${candidates.length} ${candidates.length === 1 ? "registration" : "registrations"} listed.`} />
                 <ul className="finance-attendee-list">
                   {candidates.map((registration) => (
                     <li key={registration.id}>

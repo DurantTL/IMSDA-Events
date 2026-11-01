@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmptyState, NoMatchesState } from "./empty-state";
 import type { ReactNode } from "react";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
 import {
@@ -80,7 +81,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
         </fieldset>
         <div className={styles.panelActions}>
           <button className="primary-button" type="submit">Apply filters</button>
-          {count > 0 ? <Link className="secondary-button" href={peopleHref({ query })}>Clear all</Link> : null}
+          {count > 0 ? <Link className="secondary-button" href={peopleHref({ query })}>Clear filters</Link> : null}
         </div>
       </form>
     </details>
@@ -148,7 +149,9 @@ export function PeopleDirectory({
       ) : pendingOnly ? (
         pendingCount === 0 ? <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p> : pending
       ) : rows.length === 0 ? (
-        <p className={styles.empty}>{query ? "No staff logins or website accounts match that search." : "Nobody has an account yet."}</p>
+        query || peopleFilterCount(filters) > 0
+          ? <NoMatchesState clear={{ href: peopleHref({}) }} noun="people" query={query} />
+          : <EmptyState className="empty-state panel" title="Nobody has an account yet">Staff logins and website accounts appear here once someone signs up or is invited.</EmptyState>
       ) : (
         <ul className={styles.list}>
           {rows.map((row) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import {
   ExceptionsPanel,
   DisplayPanel,
@@ -75,7 +76,8 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   const [selected, setSelected] = useState<{ occupantKey: string; moveAssignmentId?: string } | null>(null);
   const [moveReason, setMoveReason] = useState("Moved by staff");
   const [pendingSpecial, setPendingSpecial] = useState<{ unit: UnitCard; personKeys: string[] } | null>(null);
-  const [search, setSearch] = useState("");
+  const searchBox = useClientSearch();
+  const search = searchBox.term;
   const [filter, setFilter] = useState<"all" | "unassigned" | "assigned">("unassigned");
   const [buildingKey, setBuildingKey] = useState(view.buildings[0]?.key ?? "");
   const [floorLabel, setFloorLabel] = useState("all");
@@ -372,7 +374,8 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
     {tab === "rooms" ? <div className="lodging-assign-board">
       <section className="panel lodging-assign-people" aria-labelledby="la-people">
         <h3 id="la-people">People ({shownPeople.length})</h3>
-        <label>Search by name or confirmation code <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+        <label>Search by name or confirmation code <input type="search" {...searchBox.inputProps} /></label>
+        <SearchResultStatus message={search.trim() === "" ? "" : `${shownPeople.length} ${shownPeople.length === 1 ? "person" : "people"} shown.`} />
         <div role="group" aria-label="Show">
           {(["unassigned", "assigned", "all"] as const).map((value) => <label key={value}><input type="radio" name="la-filter" checked={filter === value} onChange={() => setFilter(value)} /> {value === "unassigned" ? "Not placed" : value === "assigned" ? "Placed" : "Everyone"}</label>)}
         </div>

@@ -5,6 +5,7 @@ import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
 import { useMemo, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { BadgePercent, Banknote, Building2, CircleDollarSign, ReceiptText, RotateCcw, Search, WalletCards, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -55,7 +56,8 @@ export function FinanceWorkspace({
 }) {
   const initialSelected = initialRegistrations.find((row) => row.id === initialRegistrationId) ?? null;
   const [registrations, setRegistrations] = useState(initialRegistrations);
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [filter, setFilter] = useState(initialFilter);
   const [selected, setSelected] = useState<RegistrationRecord | null>(initialSelected);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
@@ -243,7 +245,8 @@ export function FinanceWorkspace({
         <article className="finance-stat muted"><span><RotateCcw aria-hidden="true" size={18} /></span><small>Refunded</small><strong><Money cents={totals.refunded} /></strong></article>
       </section>
       <div className="toolbar panel">
-        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search financial records</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search attendee or payer name, email, or confirmation code" /></label>
+        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search financial records</span><input {...search.inputProps} placeholder="Search attendee or payer name, email, or confirmation code" /></label>
+        <SearchResultStatus message={`${visible.length} financial ${visible.length === 1 ? "record" : "records"} shown.`} />
         <label className="filter-field"><span className="sr-only">Filter financial records</span><select value={filter} onChange={(event) => setFilter(event.target.value)}>{financeFilters.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       </div>
       <section className="panel finance-list">
