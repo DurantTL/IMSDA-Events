@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {
@@ -35,6 +36,16 @@ export type AreaLinks = {
 /** What an empty club list says: nothing matched the search, or there are no clubs at all. */
 const noClubsText = (query?: string) => (query ? `No club name matches “${query}”.` : "No active clubs yet.");
 
+/** The empty club list, with what to do about it when there are no clubs at all (#1435). A no-match search has its own way back. */
+function NoClubs({ query }: { query?: string }) {
+  return (
+    <>
+      <p className="report-empty">{noClubsText(query)}</p>
+      {query ? null : <CoordinatorSetupHelp context="the club list" id="no-clubs" />}
+    </>
+  );
+}
+
 /**
  * A club-name search for the area-coordinator tabs (#791). A plain GET form, so
  * it works without scripts and the address keeps the search; the year and sort
@@ -46,7 +57,7 @@ export function AreaClubSearch({ label = "Search clubs by name", ...props }: { b
 }
 
 export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
-  if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
+  if (clubs.length === 0) return <NoClubs query={query} />;
   return (
     <div className="report-table-wrap card-box">
       <table role="table" className="report-table table-cards table-cards-tablet">
@@ -86,7 +97,7 @@ export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: Ar
 }
 
 export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
-  if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
+  if (clubs.length === 0) return <NoClubs query={query} />;
   const months = clubs[0]!.months.map((cell) => cell.month);
   return (
     <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue>
@@ -155,7 +166,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
         {" · "}
         {sort === "name" ? <strong>club name</strong> : <Link href={sortHref("name")}>club name</Link>}
       </p>
-      {sorted.length === 0 ? <p className="report-empty">{noClubsText(query)}</p> : (
+      {sorted.length === 0 ? <NoClubs query={query} /> : (
         <>
           <figure className="area-points-chart">
             <figcaption>Total points per club, {clubYear}</figcaption>
@@ -223,7 +234,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
 export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
-  if (shownEvents.length === 0) return <p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>;
+  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <CoordinatorSetupHelp context="club events" id="events-none" />}</>;
   return (
     <>
       {shownEvents.map((event) => (

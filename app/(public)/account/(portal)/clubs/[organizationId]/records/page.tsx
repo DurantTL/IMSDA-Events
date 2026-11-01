@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
 import { PortalContextualHelp } from "@/components/contextual-help-slot";
@@ -52,6 +53,7 @@ export default async function ClubRecordsPage({
     return (
       <>
         <p className="public-manage-empty">Monthly Records are kept by the club&apos;s director, deputy, or reporter.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="Monthly Records" id="records-role" />
       </>
     );
   }
@@ -122,7 +124,7 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Reports are due the 10th of the next month</p>
           <h2>Monthly Records</h2>
         </div>
-        {switcherMonths.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
+        {switcherMonths.length === 0 && <><p className="public-manage-empty">Not due for this club yet.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="Monthly Records" id="records-not-due" /></>}
         <ul className="public-manage-club-list">
           {[...switcherMonths].reverse().map((candidate) => {
             const filed = reportsByMonth.get(candidate);
@@ -189,7 +191,7 @@ export default async function ClubRecordsPage({
           <p className="public-registration-eyebrow">Due April 1, pre-filled from your roster, honors, and classes</p>
           <h2 id="club-year-end-heading">Year-End Report</h2>
         </div>
-        {dueYearEndYears.length === 0 && <p className="public-manage-empty">Not due for this club yet.</p>}
+        {dueYearEndYears.length === 0 && <><p className="public-manage-empty">Not due for this club yet.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the Year-End Report" id="records-not-due" /></>}
         <ul className="public-manage-club-list">
           {dueYearEndYears.map((year) => {
             const yearEnd = yearEndReports.get(year);

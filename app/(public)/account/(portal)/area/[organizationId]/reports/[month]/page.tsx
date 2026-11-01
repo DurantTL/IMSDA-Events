@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { ClubReportForm } from "@/components/club-report-form";
 import { getPrisma } from "@/lib/prisma";
@@ -19,7 +20,12 @@ export default async function AreaClubReportPage({ params }: { params: Promise<{
   const report = await getClubReport(organizationId, month);
   if (!report || report.status !== "SUBMITTED") {
     // A real club and month with nothing filed yet (a draft counts as not filed) is not a missing page (#703).
-    return <p className="public-manage-empty" role="status">{noSubmittedReportMessage(month)}</p>;
+    return (
+      <>
+        <p className="public-manage-empty" role="status">{noSubmittedReportMessage(month)}</p>
+        <CoordinatorSetupHelp context="this Monthly Record" id="club-no-report" />
+      </>
+    );
   }
   const rosterPrefill = await reportPrefill(organizationId, new Date());
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };

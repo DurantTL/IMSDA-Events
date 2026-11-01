@@ -1,0 +1,9 @@
+/* Who's missing what (#1435): the chips are the shared .status-chip; this only lays them out in a row. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Award, CheckCircle2, Download, Eye, GraduationCap, Plus, Search, Sparkles, Trash2, Trophy, UsersRound, X } from "lucide-react";
@@ -369,7 +370,10 @@ export function ClubEarnedAwardsWorkspace({
         <section aria-labelledby="earned-members" className={styles.block}>
           <h3 id="earned-members"><UsersRound aria-hidden="true" size={14} /> Members ({data.members.length})</h3>
           {data.members.length === 0 ? (
-            <p className="public-manage-empty" role="status"><UsersRound aria-hidden="true" size={17} /> No active members are on this year&apos;s roster yet.</p>
+            <>
+              <p className="public-manage-empty" role="status"><UsersRound aria-hidden="true" size={17} /> No active members are on this year&apos;s roster yet.</p>
+              <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="class tracking" id="awards-no-members" />
+            </>
           ) : (
             <>
               <div className="club-roster-tools">

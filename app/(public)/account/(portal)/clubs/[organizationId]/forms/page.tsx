@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import styles from "@/components/club-forms-lists.module.css";
@@ -43,6 +44,7 @@ export default async function ClubFormsPage({
     return (
       <>
         <p className="public-manage-empty">Club forms are kept by the club&apos;s director and deputy.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-role" />
       </>
     );
   }
@@ -149,6 +151,9 @@ export default async function ClubFormsPage({
 
       {templates.length === 0 ? (
         <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>
+      ) : null}
+      {templates.length === 0 ? (
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-none" />
       ) : null}
 
       {(families.length > 0 || links.length > 0) && (

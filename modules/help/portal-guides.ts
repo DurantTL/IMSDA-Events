@@ -1,4 +1,5 @@
 import { clubRoleText, type ClubRoleKey } from "@/modules/access/role-descriptions";
+import { newCoordinatorGuides, newDirectorGuides } from "@/modules/help/portal-role-guides";
 import type { PortalDestination, PortalGuide } from "@/modules/help/types";
 
 /**
@@ -20,9 +21,18 @@ export const portalDestinations: Record<string, PortalDestination> = {
   "club-list": { id: "club-list", label: "My clubs", path: "/account/clubs", audience: "director" },
   "club-home": { id: "club-home", label: "Club home", path: "/account/clubs/[organizationId]", audience: "director" },
   "club-records": { id: "club-records", label: "Monthly Records", path: "/account/clubs/[organizationId]/records", audience: "director", capability: "submitReports" },
+  "portal-security": { id: "portal-security", label: "Security", path: "/account/security", audience: "attendee" },
+  "club-roster": { id: "club-roster", label: "Roster", path: "/account/clubs/[organizationId]/roster", audience: "director", capability: "roster" },
+  "club-honors": { id: "club-honors", label: "Honors", path: "/account/clubs/[organizationId]/honors", audience: "director", capability: "roster" },
+  "club-orders": { id: "club-orders", label: "Orders", path: "/account/clubs/[organizationId]/orders", audience: "director", capability: "roster" },
+  "club-forms": { id: "club-forms", label: "Forms", path: "/account/clubs/[organizationId]/forms", audience: "director", formsRole: true },
+  "club-events": { id: "club-events", label: "Club events", path: "/account/clubs/[organizationId]/events", audience: "director", capability: "registerForEvents" },
+  "club-settings": { id: "club-settings", label: "Club settings", path: "/account/clubs/[organizationId]/club-info", audience: "director", capability: "manageTeam" },
   "coordinator-clubs": { id: "coordinator-clubs", label: "Clubs", path: "/account/clubs", audience: "coordinator" },
   "coordinator-overview": { id: "coordinator-overview", label: "Overview", path: "/account/area-clubs/overview", audience: "coordinator" },
   "coordinator-records": { id: "coordinator-records", label: "Monthly Records summary", path: "/account/area-clubs/reports", audience: "coordinator" },
+  "coordinator-points": { id: "coordinator-points", label: "Points", path: "/account/area-clubs/points", audience: "coordinator" },
+  "coordinator-events": { id: "coordinator-events", label: "Club events", path: "/account/area-clubs/events", audience: "coordinator" },
   "coordinator-team-approvals": { id: "coordinator-team-approvals", label: "Team approvals", path: "/account/area-clubs/team-permissions", audience: "coordinator" },
   "coordinator-new-clubs": { id: "coordinator-new-clubs", label: "New clubs (view only)", path: "/account/area-clubs/applications", audience: "coordinator" },
 };
@@ -224,6 +234,8 @@ export const portalGuides: readonly PortalGuide[] = [
     owner: "Communication office",
     lastReviewed: "2026-10-27",
   },
+  ...newDirectorGuides,
+  ...newCoordinatorGuides,
 ];
 
 export function findPortalGuide(id: string): PortalGuide | undefined {

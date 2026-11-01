@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubYearEndReportForm } from "@/components/club-year-end-report-form";
@@ -24,6 +25,7 @@ export default async function ClubYearEndReportPage({ params }: { params: Promis
       <>
         <BackLink href={backHref}>Back to Monthly Records</BackLink>
         <p className="public-manage-empty">The Year-End Report is filed by the club&apos;s director, deputy, or reporter.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the Year-End Report" id="year-end-role" />
       </>
     );
   }

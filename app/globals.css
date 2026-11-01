@@ -10676,9 +10676,12 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .setup-step.is-next { background: var(--imsda-gold-soft); }
 .setup-step.is-next .setup-step-copy strong { font-weight: 800; }
 .setup-step .text-button { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
+.setup-checklist-guide { margin: 8px 0 0; }
+.setup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 14px; }
 @media (max-width: 480px) {
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }
   .setup-step .text-button { grid-column: 2; justify-self: start; min-height: 44px; }
+  .setup-step-actions { grid-column: 2; justify-content: flex-start; }
 }
 
 /* --- Class tracking: long member lists scroll inside their block and can be searched --- */

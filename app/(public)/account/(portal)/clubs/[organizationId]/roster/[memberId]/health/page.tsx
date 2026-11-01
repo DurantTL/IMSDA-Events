@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { HealthRecordActions } from "@/components/health-record-actions";
@@ -35,7 +36,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     throw error;
   });
   if (!viewer) {
-    return <p className="public-manage-empty">Health records are kept by the club&apos;s director and deputy.</p>;
+    return <><p className="public-manage-empty">Health records are kept by the club&apos;s director and deputy.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="health records" id="health-role" /></>;
   }
   const needsAck = (error: unknown) => error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED";
   const rosterHref = `/account/clubs/${organizationId}/roster`;

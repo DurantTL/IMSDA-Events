@@ -1,0 +1,8 @@
+/* Layout for the setup help under a club or coordinator "not set up" state (#1435). The panel itself is the shared #1434 one. */
+.help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 16px;
+  margin-top: 8px;
+}

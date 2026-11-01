@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -564,9 +565,12 @@ export function ClubRegistrationWorkspace({
         </ul>
       )}
       {workspace.roster.length === 0 ? (
-        <p className="public-manage-empty">
-          <UsersRound size={17} aria-hidden="true" /> Your roster is empty. Add regular members using Add to roster on the roster page, or import a CSV. You can add event-only guests when registering.
-        </p>
+        <>
+          <p className="public-manage-empty">
+            <UsersRound size={17} aria-hidden="true" /> Your roster is empty. Add regular members using Add to roster on the roster page, or import a CSV. You can add event-only guests when registering.
+          </p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the registration" id="event-roster-empty" />
+        </>
       ) : (
         <>
           <div className="club-roster-tools">

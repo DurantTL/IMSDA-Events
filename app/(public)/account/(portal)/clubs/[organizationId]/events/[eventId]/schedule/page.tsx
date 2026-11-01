@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { PrintReportButton } from "@/components/print-report-button";
@@ -29,6 +30,7 @@ export default async function ClubSchedulePage({
       <section className="public-manage-card">
         <BackLink href={back}>Back to {data ? data.event.name : "the event"}</BackLink>
         <p className="public-manage-empty">Your club isn&apos;t registered for this event, so there&apos;s no schedule yet.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the schedule" id="event-no-schedule" />
       </section>
     );
   }
@@ -52,7 +54,7 @@ export default async function ClubSchedulePage({
       </div>
       <p className="field-help">Ages are on the first day of the event. Anyone without a class in a session shows a dash.</p>
       {schedule.people.length === 0 ? (
-        <p className="public-manage-empty">No one is on your club&apos;s registration.</p>
+        <><p className="public-manage-empty">No one is on your club&apos;s registration.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the registration" id="event-roster-empty" /></>
       ) : (
         <div className="report-table-wrap">
           <table className="report-table club-schedule-table">

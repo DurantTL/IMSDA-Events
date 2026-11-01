@@ -11,6 +11,7 @@ import {
   ClubHomeTasks,
   ClubHomeUsefulLinks,
 } from "@/components/club-home";
+import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { clubPortalComplianceReminderCounts } from "@/modules/background-checks/repository";
 import { complianceReminders } from "@/modules/background-checks/domain";
@@ -37,6 +38,7 @@ import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubEventRegistrationSteps, listClubEvents } from "@/modules/club-registrations/repository";
 import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { getClubReportYear } from "@/modules/club-reports/repository";
+import { buildClubChecklist, CLUB_CHECKLIST_GUIDE_HREF } from "@/modules/setup-help/club-checklist";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels, clubRoleDescriptions } from "@/modules/organizations/director-grants-domain";
 
@@ -101,9 +103,28 @@ export default async function ClubHomePage({
     ]);
     const { steps, deadlines } = reportYear && reportYear !== "ERROR" ? monthlyRecordSteps(reportYear.reports, clubYear, base, now, reportYear.joinedOn) : { steps: [], deadlines: {} };
     const reportsFailed = reportYear === "ERROR";
+    const reporterChecklist = buildClubChecklist({
+      base,
+      role: access.club.role,
+      capabilities: access.capabilities,
+      staffActing: false,
+      rosterCount: null,
+      registeredEventCount: null,
+      hasOpenEvents: false,
+      recordsDueNow: reportYear && reportYear !== "ERROR" ? steps.length : null,
+      sterlingReminders: null,
+    });
     return (
       <>
         {await allMyClubsLink(null)}
+        <SetupChecklistPanel
+          checklist={reporterChecklist}
+          eyebrow="Getting started"
+          guide={{ href: CLUB_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
+          headingId="club-getting-started"
+          storageKey={`imsda-events:getting-started-collapsed:club:${organizationId}`}
+          title="Get set up"
+        />
         <section className="public-manage-card" aria-labelledby="club-role-heading">
           <div className="public-manage-card-heading">
             <p className="public-registration-eyebrow">Your role: {clubDirectorRoleLabels[access.club.role]}</p>
@@ -188,6 +209,20 @@ export default async function ClubHomePage({
     }
   }
 
+  const checklist = readOnly
+    ? null
+    : buildClubChecklist({
+        base,
+        role: access.club.role,
+        capabilities: access.capabilities,
+        staffActing: access.actor?.kind === "STAFF_ACTING",
+        rosterCount: members === "ERROR" ? null : members.filter((member) => member.status === "ACTIVE").length,
+        registeredEventCount: events === "ERROR" || !events ? null : events.filter((event) => event.registration).length,
+        hasOpenEvents: events !== "ERROR" && Boolean(events) && events!.some((event) => event.available && event.phase === "OPEN"),
+        recordsDueNow: reportYear === "ERROR" || !reportYear ? null : steps.filter((step) => step.key.startsWith("report-")).length,
+        sterlingReminders: compliance === "ERROR" || !compliance ? null : complianceReminders(compliance, `${base}/roster`).length,
+      });
+
   return (
     <>
       {clubsLink}
@@ -200,6 +235,16 @@ export default async function ClubHomePage({
         />
       )}
       <ClubHomeSummary clubYear={clubYear} summary={summary} />
+      {checklist && (
+        <SetupChecklistPanel
+          checklist={checklist}
+          eyebrow="Getting started"
+          guide={{ href: CLUB_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
+          headingId="club-getting-started"
+          storageKey={`imsda-events:getting-started-collapsed:club:${organizationId}`}
+          title="Get your club set up"
+        />
+      )}
       {!readOnly && (
         <ClubHomeTasks
           deadlines={deadlines}
@@ -208,9 +253,10 @@ export default async function ClubHomePage({
           unavailable={unavailable}
         />
       )}
-      <ClubHomeRoster clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
+      <ClubHomeRoster setupBase={base} clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
       {events && (
         <ClubHomeEvents
+          setupBase={base}
           cards={events === "ERROR" ? [] : clubHomeEventCards(events, { base, sponsoringChurch: access.club.sponsoringChurch, clubYear })}
           eventsHref={`${base}/events`}
           hasOpenEvents={events !== "ERROR" && events.some((event) => event.available && event.phase === "OPEN")}

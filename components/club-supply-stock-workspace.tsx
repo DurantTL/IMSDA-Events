@@ -1,5 +1,6 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useMemo, useState } from "react";
 import { Eye, Package, Save } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
@@ -110,6 +111,7 @@ export function ClubSupplyStockWorkspace({
           <Package aria-hidden="true" size={27} />
           <h3>No catalog items yet</h3>
           <p>Conference staff haven&apos;t loaded the supply catalog yet. Check back later, or ask the conference office.</p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the supply catalog" id="supplies-no-catalog" />
         </div>
       ) : (
         <>
