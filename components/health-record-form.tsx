@@ -6,6 +6,7 @@ import { DateInput } from "@/components/club-form-date-input";
 import { FORM_LIMITS, healthFieldLabel, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
 import { PhoneInput } from "@/components/phone-input";
 import { inputAttributesFor, isUnchangedFromStored, storedContactPhone, typedProblemMessage, validateByType, type FieldValueType } from "@/lib/field-validation";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * The Pathfinder Health Record form (#611), used for a parent opening a
@@ -156,7 +157,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
   if (done) {
     return (
       <div className="inline-notice success club-form-done" role="status">
-        {mode.kind === "link" ? "Thank you. The health record has been received, and this link no longer works." : "Saved."}
+        {mode.kind === "link" ? "Thank you. The health record has been received, and this link no longer works." : savedMessage()}
       </div>
     );
   }

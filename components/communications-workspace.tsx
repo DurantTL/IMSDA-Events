@@ -3,6 +3,7 @@
 import { formatCents } from "@/modules/payments/format-cents";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
+import { savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -1058,7 +1059,7 @@ export function CommunicationsWorkspace({
           internalNotificationEmails: recipients,
         }),
       },
-      "Message settings saved.",
+      savedMessage(),
     );
     if (updated) setSettingsDraft(settingsDraftFromMessaging(updated));
   }

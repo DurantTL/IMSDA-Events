@@ -65,7 +65,7 @@ describe("a failed Event settings save keeps the edits (#1258)", () => {
     const result = await saveAnswering(409, { error: "EVENT_CHANGED", message: "Dates changed." });
     expect(result.location.value).toBe("Edited Camp");
     expect(result.status).toBe("conflict");
-    expect(result.bar).toContain("Conflict: not saved");
+    expect(result.bar).toContain("Not saved:");
   });
 
   it("keeps the edit on a plain server failure", async () => {

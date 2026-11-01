@@ -110,8 +110,8 @@ describe("event settings ownership labels (#1258)", () => {
 describe("settings save states (#1258)", () => {
   it("uses one vocabulary: Saving, Conflict, Failed, Saved, Unsaved, in that order of priority", () => {
     expect(settingsSaveState({ saving: true, dirty: true, outcome: "failed" })).toEqual({ state: "saving", label: "Saving…" });
-    expect(settingsSaveState({ saving: false, dirty: true, outcome: "conflict" }).label).toBe("Conflict: not saved");
-    expect(settingsSaveState({ saving: false, dirty: true, outcome: "failed" }).label).toBe("Failed: not saved");
+    expect(settingsSaveState({ saving: false, dirty: true, outcome: "conflict" }).label).toBe("Not saved: changed by someone else");
+    expect(settingsSaveState({ saving: false, dirty: true, outcome: "failed" }).label).toBe("Not saved");
     expect(settingsSaveState({ saving: false, dirty: false, outcome: "saved" }).label).toBe("Saved");
     // An edit after a save is Unsaved, not Saved.
     expect(settingsSaveState({ saving: false, dirty: true, outcome: "saved" }).label).toBe("Unsaved changes");

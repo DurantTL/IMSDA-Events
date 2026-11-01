@@ -445,7 +445,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
     expect(source).toContain("id={`roster-edit-${member.id}`}");
     expect(source).toContain('document.getElementById(`roster-edit-${id}`)');
     expect(source).toContain('document.getElementById("roster-result-text")?.focus()');
-    expect(source).toContain('rowChanged(editing, result?.members, "Saved.", true)');
+    expect(source).toContain('rowChanged(editing, result?.members, savedMessage(), true)');
     expect(source).toContain('rowChanged(member, result?.members, "Removed and erased.", false)');
     expect(source).toContain("no longer needs details.");
     expect(source).toContain("no longer matches the current search or filters.");

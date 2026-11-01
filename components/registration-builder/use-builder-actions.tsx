@@ -2,6 +2,7 @@
 // from a template, save, test, publish, withdraw, slug sync, and switching form
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
+import { notSavedMessage, savedMessage } from "@/components/form-message";
 import { useEffect, useRef } from "react";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
@@ -107,8 +108,8 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       if (response.unavailable) { setError(unavailableMessage(response)); return; }
       const result = response.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!response.ok) throw new Error(result.message ?? "Unable to save this draft.");
-      syncForm(result.form, editsCreateDraft ? `Version ${result.form.activeVersion.versionNumber} was saved as a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "withdrawn version stays withdrawn"} until you publish this draft (a test is optional).` : "Draft saved locally.");
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to save this draft."); }
+      syncForm(result.form, savedMessage(editsCreateDraft ? `Version ${result.form.activeVersion.versionNumber} is a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "withdrawn version stays withdrawn"} until you publish this draft (a test is optional).` : "Publish it when you are ready."));
+    } catch (caught) { setError(notSavedMessage(caught instanceof Error ? caught.message : "Unable to save this draft.")); }
     finally { setBusy(null); }
   }
 

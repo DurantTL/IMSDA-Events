@@ -37,6 +37,7 @@ import {
 } from "@/modules/club-rosters/guardians-domain";
 import { RosterGuardianFields, guardianErrorItems } from "@/components/roster-guardian-fields";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import {
   applyRosterFilters,
@@ -212,6 +213,9 @@ export function ClubRosterWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Offered with the "Deactivated …" message; reactivating is the existing reverse action (#1455).
+  const [undoDeactivate, setUndoDeactivate] = useState<RosterMemberRecord | null>(null);
+  const [undoFailed, setUndoFailed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
@@ -286,6 +290,8 @@ export function ClubRosterWorkspace({
 
   /** Add and edit happen in a pop-up (#383), so the list never scrolls away. */
   function openDialog(member: RosterMemberRecord | null) {
+    setUndoDeactivate(null);
+    setUndoFailed(false);
     setEditing(member);
     setFormType(member?.attendeeType ?? "YOUTH");
     setFormBirthDate("");
@@ -434,9 +440,27 @@ export function ClubRosterWorkspace({
   /** Where focus goes when the row it was on leaves the list (saved out of the filter, removed): the next row's Edit, else the result line. */
   const focusRequest = useRef<{ id: string; order: string[] } | null>(null);
   const [focusTick, setFocusTick] = useState(0);
+  // After a result message, the message (or its Undo) takes focus and scrolls into view; a row Edit button only when there is none.
+  const messageWanted = useRef(false);
+  const messageSlot = useRef<HTMLDivElement>(null);
+  const [messageTick, setMessageTick] = useState(0);
   useEffect(() => {
+    if (dialogOpen) return;
+    if (messageWanted.current) {
+      messageWanted.current = false;
+      focusRequest.current = null;
+      window.requestAnimationFrame(() => {
+        const slot = messageSlot.current;
+        if (!slot) return;
+        const target = slot.querySelector<HTMLElement>("button") ?? slot;
+        // Scrolls only as far as needed, with no smooth motion, so reduced-motion settings are respected.
+        target.focus();
+        slot.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+      });
+      return;
+    }
     const request = focusRequest.current;
-    if (!request || dialogOpen) return;
+    if (!request) return;
     focusRequest.current = null;
     window.requestAnimationFrame(() => {
       const at = request.order.indexOf(request.id);
@@ -451,7 +475,7 @@ export function ClubRosterWorkspace({
       }
       document.getElementById("roster-result-text")?.focus();
     });
-  }, [focusTick, dialogOpen]);
+  }, [focusTick, messageTick, dialogOpen]);
   /** After a change to one person: if they no longer belong in the filtered list, say so and keep focus on the page, not on a row that is gone. */
   function rowChanged(member: RosterMemberRecord, updated: RosterMemberRecord[] | undefined, lead: string, explain: boolean) {
     if (!updated) return;
@@ -480,10 +504,15 @@ export function ClubRosterWorkspace({
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
 
-  async function call(url: string, method: string, body: unknown, success: string) {
+  async function call(url: string, method: string, body: unknown, success: string, keepMessage = false) {
     setSaving(true);
     setError("");
-    setNotice("");
+    // Undo keeps its message on screen (showing "Undoing…") until the answer comes back.
+    if (!keepMessage) {
+      setNotice("");
+      setUndoDeactivate(null);
+      setUndoFailed(false);
+    }
     try {
       const response = await fetch(url, {
         method,
@@ -496,10 +525,12 @@ export function ClubRosterWorkspace({
       }
       if (result.members) setMembers(result.members);
       if (result.guardians) setGuardianMap(result.guardians);
-      if (success) setNotice(success);
+      if (success) {
+        setNotice(success);
+      }
       return result;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The roster could not be updated.");
+      setError(notSavedMessage(caught instanceof Error ? caught.message : "The roster could not be updated."));
       return null;
     } finally {
       setSaving(false);
@@ -566,9 +597,9 @@ export function ClubRosterWorkspace({
       ? await call(`${base}/${encodeURIComponent(editing.id)}`, "PATCH", {
         ...details,
         ...(birthDate ? { birthDate } : {}),
-      }, "Saved.")
+      }, savedMessage())
       : await call(base, "POST", { ...details, birthDate }, "Added to the roster. Next: they can be chosen when the club registers for an event.");
-    if (editing) rowChanged(editing, result?.members, "Saved.", true);
+    if (editing) rowChanged(editing, result?.members, savedMessage(), true);
     if (result) {
       setBirthDates(null);
       formElement.reset();
@@ -599,13 +630,23 @@ export function ClubRosterWorkspace({
       return;
     }
     clearMember();
-    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, "Saved.");
+    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, savedMessage());
     if (result) closeDialog();
   }
 
-  async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE") {
+  async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE", keepMessage = false) {
     return call(`${base}/${encodeURIComponent(member.id)}`, "PATCH", { status },
-      status === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.");
+      status === "INACTIVE" ? `Deactivated ${member.firstName} ${member.lastName}.` : `Reactivated ${member.firstName} ${member.lastName}.`, keepMessage);
+  }
+
+  /** Undo for a deactivation: the same reactivate call the dialog already makes. */
+  async function undoStatusChange(member: RosterMemberRecord) {
+    const result = await setStatus(member, "ACTIVE", true);
+    if (result) setUndoDeactivate(null);
+    // A failure keeps Undo on offer (next to this error only) so it can be tried again; either way the message takes focus.
+    setUndoFailed(!result);
+    messageWanted.current = true;
+    setMessageTick((tick) => tick + 1);
   }
 
   /** Deactivate/reactivate lives in the edit dialog now (#424), with a confirmation there. */
@@ -627,7 +668,13 @@ export function ClubRosterWorkspace({
     });
     if (!confirmed) return;
     const result = await setStatus(member, next);
-    rowChanged(member, result?.members, next === "INACTIVE" ? "Marked inactive. They stay on file." : "Marked active.", true);
+    rowChanged(member, result?.members, next === "INACTIVE" ? "Deactivated." : "Reactivated.", true);
+    if (result && next === "INACTIVE") {
+      setUndoDeactivate(member);
+      // Undo is on offer, so the message takes focus and scrolls into view; other saves keep the Edit-button focus path.
+      messageWanted.current = true;
+      setMessageTick((tick) => tick + 1);
+    }
     if (result) closeDialog();
   }
 
@@ -653,8 +700,14 @@ export function ClubRosterWorkspace({
   return (
     <div className="club-roster-stack">
       {confirmDialog}
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
+      {/* The page's one message slot; while the dialog is open its own slot (inside the dialog) shows errors. */}
+      <div id="roster-message-slot" ref={messageSlot} tabIndex={-1}>
+        {error && !dialogOpen
+          ? <FormMessage message={error} tone="error" undo={undoDeactivate && undoFailed ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+          : notice
+            ? <FormMessage message={notice} tone="success" undo={undoDeactivate ? { busy: saving, onUndo: () => void undoStatusChange(undoDeactivate) } : undefined} />
+            : null}
+      </div>
 
       <section className="public-manage-card">
         <div className="public-manage-card-heading club-roster-heading">
@@ -1027,7 +1080,6 @@ export function ClubRosterWorkspace({
           </button>
         </div>
         {memberItems.length > 0 && <FormErrorSummary items={memberItems} ref={memberRef} />}
-        {error && <div className="inline-notice error" role="alert">{error}</div>}
         {contactsOnlyDialog ? (
           <p className="field-help">Next year&apos;s roster. Only emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
         ) : (
@@ -1114,6 +1166,7 @@ export function ClubRosterWorkspace({
           <button className="secondary-button" disabled={saving} onClick={() => void requestClose()} type="button">Cancel</button>
           <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? (contactsOnlyDialog ? "Save contacts" : "Save") : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
+        {error && <FormMessage message={error} tone="error" />}
       </form>
       </section>
         </div>

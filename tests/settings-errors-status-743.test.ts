@@ -440,7 +440,7 @@ describe("empty states offer a create action only to an authorized viewer (#743)
 
 describe("success states say what happened and what comes next (#743)", () => {
   it("names the next step after a save, a new code, a new tag and a roster add", () => {
-    expect(read("components/event-settings-workspace.tsx")).toContain("Event settings saved. ${nextStep}");
+    expect(read("components/event-settings-workspace.tsx")).toContain("savedMessage(nextStep)");
     expect(read("components/promo-code-workspace.tsx")).toContain("Next: share it with registrants");
     expect(read("components/tag-configuration-workspace.tsx")).toContain("Next: staff can apply it");
     expect(read("components/club-roster-workspace.tsx")).toContain("Next: they can be chosen when the club registers");

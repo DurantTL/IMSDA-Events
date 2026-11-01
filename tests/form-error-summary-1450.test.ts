@@ -89,7 +89,7 @@ describe("profile (/account/profile)", () => {
     expect(summary.textContent).toContain("Phone: Enter a 10-digit US number");
     expect(summary.textContent).toContain("Emergency contact phone: Enter a 10-digit US number");
     // Nothing under the Save button repeats it.
-    expect(container.querySelector(".public-manage-contact-actions p")!.textContent).toBe("");
+    expect(container.querySelector(".public-manage-contact-actions .inline-notice")).toBeNull();
   });
 });
 
