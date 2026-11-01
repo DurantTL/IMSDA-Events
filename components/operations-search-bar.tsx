@@ -182,7 +182,7 @@ export function OperationsSearchBar({
         })}
         <div className="operations-search-actions">
           <button className="primary-button" type="submit"><Search aria-hidden="true" size={14} /> Search</button>
-          {active ? <Link className="secondary-button" href={`${basePath}?${clearParams.toString()}`}><X aria-hidden="true" size={14} /> Clear</Link> : null}
+          {active ? <Link className="secondary-button" href={`${basePath}?${clearParams.toString()}`}><X aria-hidden="true" size={14} /> Clear filters</Link> : null}
         </div>
       </SearchAsYouTypeForm>
       </SearchDisclosure>

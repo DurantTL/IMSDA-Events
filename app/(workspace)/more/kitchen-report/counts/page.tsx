@@ -22,7 +22,7 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   const canEnter = permissions.includes("MANAGE_KITCHEN_COUNTS");
   if (!canEnter && !permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." />;
+    return <AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." whoToAsk="your event administrator" />;
   }
   const report = await loadKitchenCountsReport(event.id);
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
@@ -48,6 +48,11 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
           </p>
         </div>
       </div>
+      {firstParam(params.restricted) === "1" && (
+        <div className="inline-notice" role="status">
+          The page you opened is not part of the Kitchen staff role, so Kitchen counts opened instead. Ask your event administrator if you need access to more of this event.
+        </div>
+      )}
       {canEnter && <KitchenCountsEntry eventId={event.id} services={services} />}
       <KitchenCountsTable report={report} timeZone={report.timeZone} csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen-counts`} />
     </section>

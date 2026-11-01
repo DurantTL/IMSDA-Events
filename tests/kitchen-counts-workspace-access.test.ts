@@ -50,6 +50,12 @@ describe("kitchen staff in the event workspace (#1029)", () => {
     await expect(resolveEventContext(undefined)).rejects.toThrow("REDIRECT:/more/kitchen-report/counts?event=evtA");
   });
 
+  it("flags a redirect from any other page, but not from the dashboard everyone lands on (so sign-in shows no notice)", async () => {
+    await expect(resolveEventContext("evtA")).rejects.toThrow("REDIRECT:/more/kitchen-report/counts?event=evtA&restricted=1");
+    const home = await resolveEventContext("evtA", { kitchenHomeLanding: true }).catch((error: Error) => error.message);
+    expect(home).toBe("REDIRECT:/more/kitchen-report/counts?event=evtA");
+  });
+
   it("opens the counts page itself, and other roles are not redirected", async () => {
     const kitchen = await resolveEventContext("evtA", { allowWithoutEventView: true });
     expect(kitchen.permissions).toEqual(["MANAGE_KITCHEN_COUNTS"]);

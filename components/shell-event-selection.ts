@@ -54,10 +54,10 @@ export function switchEvent(input: {
   eventId: string;
   pathname: string;
   currentSearch: string;
-  guard: (navigate: () => void) => boolean;
+  guard: (navigate: () => void) => boolean | Promise<boolean>;
   commit: (eventId: string) => void;
   push: (href: string) => void;
-}): boolean {
+}): boolean | Promise<boolean> {
   const { eventId, pathname, currentSearch, guard, commit, push } = input;
   return guard(() => {
     commit(eventId);

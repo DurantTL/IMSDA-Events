@@ -3,6 +3,7 @@
 import { formatCents } from "@/modules/payments/format-cents";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
+import { savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -53,6 +54,8 @@ import {
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { PREHEADER_MAX_LENGTH, renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { emailPreviewLayout, plainTextToEmailBodyHtml } from "@/modules/communications/email-layout";
+import { DEFAULT_EMAIL_LAYOUT_SETTINGS, type EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
 import { SendCheckPanel, jumpToSendCheckField } from "@/components/send-check-panel";
 import {
   ANNOUNCEMENT_CHECK_ANCHORS,
@@ -107,6 +110,8 @@ type CommunicationsWorkspaceProps = {
   announcementOptOuts?: EventAnnouncementOptOutRow[];
   initialView: CommunicationsView;
   openNew?: boolean;
+  /** The header names and help contact from Platform settings, so a preview shows what delivery sends (#1443). */
+  emailLayoutSettings?: EmailLayoutSettings;
 };
 
 type ApiResult = {
@@ -179,6 +184,8 @@ const templateTokenLabels: Readonly<Record<string, string>> = Object.fromEntries
  * note in that position renders as broken markup rather than a button.
  */
 const PREVIEW_MANAGE_URL = "https://events.imsda.org/manage/preview-link-not-live";
+/** The origin the preview treats as the site's own, so text-only previews show the same buttons delivery sends. */
+const PREVIEW_ORIGINS = [new URL(PREVIEW_MANAGE_URL).origin];
 const PREVIEW_MANAGE_API_URL = "https://events.imsda.org/api/public/manage/preview-link-not-live";
 
 function withPreviewLinks(value: string) {
@@ -289,6 +296,7 @@ export function CommunicationsWorkspace({
   announcementOptOuts = [],
   initialView,
   openNew = false,
+  emailLayoutSettings = DEFAULT_EMAIL_LAYOUT_SETTINGS,
 }: CommunicationsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1051,7 +1059,7 @@ export function CommunicationsWorkspace({
           internalNotificationEmails: recipients,
         }),
       },
-      "Message settings saved.",
+      savedMessage(),
     );
     if (updated) setSettingsDraft(settingsDraftFromMessaging(updated));
   }
@@ -2013,7 +2021,7 @@ export function CommunicationsWorkspace({
                     title: preview.subject || "Template preview",
                     preheader: preview.preheader,
                     bodyHtml: withPreviewImages(preview.bodyHtml),
-                    footer: messaging.settings.senderName,
+                    ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
                   })}
                 />
                 <div className="message-preview-attachments">
@@ -2259,13 +2267,23 @@ export function CommunicationsWorkspace({
                           // the text here would re-parse registrant values as Markdown
                           // long after the safe render already decided they were not.
                           bodyHtml: withPreviewImages(withPreviewLinks(selectedMessage.bodyHtml)),
-                          footer: selectedMessage.senderName,
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
                         })}
                       />
                     ) : (
-                      <p className="message-body-note">
-                        This message was captured before formatted bodies existed, so it has a plain-text body only.
-                      </p>
+                      <iframe
+                        className="message-body-html"
+                        title="Captured message"
+                        sandbox=""
+                        // Written from the text as plain paragraphs, as delivery does. The preview's stand-in manage link counts
+                        // as the site's own address, so the same lines become buttons here as in the sent email.
+                        srcDoc={renderEmailHtmlDocument({
+                          title: selectedMessage.subject,
+                          preheader: selectedMessage.preheader ? withPreviewLinks(selectedMessage.preheader) : null,
+                          bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText), { buttonOrigins: PREVIEW_ORIGINS }),
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                        })}
+                      />
                     )}
                     <details className="message-body-plain">
                       <summary>Plain-text fallback</summary>

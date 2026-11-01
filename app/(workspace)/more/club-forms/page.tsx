@@ -30,7 +30,7 @@ export default async function StaffClubFormsPage({
   const { event, form, club } = await searchParams;
   const viewer = await resolveStaffViewer();
   if (!viewer) {
-    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" />;
+    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />;
   }
   const [templates, clubs, submissions] = await Promise.all([
     listClubFormTemplateNames(),

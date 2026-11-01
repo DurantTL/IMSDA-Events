@@ -9,9 +9,9 @@ import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { validateRosterResponses as validateRosterResponsesShared } from "@/modules/forms/roster-validation";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowDown,
   ArrowRight,
@@ -138,7 +138,8 @@ import { rosterAnsweredFieldKeys, rosterAnsweredSummary } from "@/modules/club-r
 import { carryoverAttention, missingAnswersAttention, type AttentionItem } from "@/modules/club-registrations/attention";
 import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { FieldError } from "@/components/field-error";
-import { errorSummaryHeading } from "@/components/form-error-summary";
+import { labelledFieldMessage } from "@/lib/field-validation";
+import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -752,6 +753,12 @@ export function PublicRegistrationForm({
   const [draftNotice, setDraftNotice] = useState<"restored" | "version-changed" | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
+  // A real edit since the page opened (prefill alone does not count) warns before leaving; a sent registration
+  // does not. A club's registration keeps its own server-side draft, so it is not warned here (#1452).
+  useUnsavedChangesGuard(
+    draftDirty && !confirmation && !club,
+    "Your registration answers have not been sent. Leave this page and discard them?",
+  );
   useEffect(() => {
     if (!draftsEnabled) {
       // Signed in or prefilled: also drop any older signed-out draft.
@@ -1509,12 +1516,14 @@ export function PublicRegistrationForm({
 
   // The summary names whose field a message is about (#738).
   function issueSummaryMessage(issue: FormIssue) {
-    if (!rosterEnabled) return issue.message;
     const field = allFields.find((candidate) => (
       candidate.id === issue.fieldId || candidate.key === issue.key
     ));
+    // The one phone and email message does not name its field, so the summary adds the label (#1451).
+    const message = labelledFieldMessage(field?.label ?? "", issue.message);
+    if (!rosterEnabled) return message;
     return namedIssueMessage(
-      issue.message,
+      message,
       issueAttendeeIndex(issue, field?.scope ?? null),
       attendees.map((attendee, index) => attendeeName(attendee, index, roster.attendeeLabel)),
       roster.attendeeLabel,
@@ -2398,6 +2407,13 @@ export function PublicRegistrationForm({
     if (attendeeIndex === null) return controlId(field, "registration");
     const attendee = attendees[attendeeIndex];
     return attendee ? controlId(field, `attendee_${attendee.clientId}`) : null;
+  }
+
+  // The linked summary (#1450): one item per problem, each linking to its control. A server message that is not
+  // already one of the problems (and not the generic "review the fields" line) is listed once, unlinked.
+  const summaryItems: ErrorSummaryItem[] = issues.map((issue) => ({ targetId: issueTargetId(issue), message: issueSummaryMessage(issue) }));
+  if (issues.length > 0 && error && !/^(Complete .* before continuing\.|Review the highlighted fields)/.test(error) && !issues.some((issue) => issue.message === error)) {
+    summaryItems.push({ targetId: null, message: error });
   }
 
   function renderRoster(
@@ -3605,16 +3621,18 @@ export function PublicRegistrationForm({
           <p className="sr-only" role="status" aria-live="polite">{submitQueued ? "Updating total…" : ""}</p>
           {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={submitting} focusOnShow onRetry={() => void submit()} />}
           {(error || issues.length > 0) && (
-            <div className="public-registration-error-summary" ref={errorSummaryRef} role="alert" tabIndex={-1}>
-              <strong><AlertTriangle aria-hidden="true" size={16} /> {error || "Review the highlighted fields."}</strong>
-              {issues.length > 0 && <p className="public-registration-error-count">{errorSummaryHeading(issues.length)}</p>}
-              {issues.length > 0 && (
-                <ul>{issues.map((issue, index) => {
-                  const targetId = issueTargetId(issue);
-                  return <li key={`${issue.path ?? issue.key}_${index}`}>{targetId ? <a href={`#${targetId}`} onClick={(clickEvent) => followIssueLink(clickEvent, issue, targetId)}>{issueSummaryMessage(issue)}</a> : issueSummaryMessage(issue)}</li>;
-                })}</ul>
-              )}
-            </div>
+            <FormErrorSummary
+              action={currentStepIndex >= registrationSteps.length - 1 ? "submitting" : "continuing"}
+              className="form-error-summary public-registration-error-summary"
+              heading={issues.length > 0 ? undefined : error || "Review the highlighted fields."}
+              items={summaryItems}
+              onFollow={(clickEvent, _item, index) => {
+                const issue = issues[index];
+                const targetId = issue ? issueTargetId(issue) : null;
+                if (issue && targetId) followIssueLink(clickEvent, issue, targetId);
+              }}
+              ref={errorSummaryRef}
+            />
           )}
 
           <section

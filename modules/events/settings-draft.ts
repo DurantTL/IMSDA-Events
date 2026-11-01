@@ -1,5 +1,6 @@
 import type { EventSettingsRecord } from "@/modules/events/repository";
-import type { EventSettingsInput } from "@/modules/events/schemas";
+import { eventSettingsInputSchema, type EventSettingsInput } from "@/modules/events/schemas";
+import { fieldErrorsFromIssues, settingsFieldBlock, settingsFieldDomId } from "@/modules/events/settings-layout";
 
 /**
  * The event settings form's draft, and the request body a save sends (#965 moved
@@ -98,4 +99,47 @@ export function eventColumnChangeBody(
     expectedStartsOn: event.startsOn,
     expectedEndsOn: event.endsOn,
   };
+}
+
+/**
+ * What the settings form's own HTML attributes used to enforce before it turned the browser bubbles off (#1450):
+ * the required name, address, dates and times, the address pattern, the end not before the start, the capacity
+ * range and the web address. The server schema decides the rest, so its problems are folded in here and the
+ * form can show every one in its summary. Keyed like the server's field errors; the server still checks again.
+ */
+export function eventSettingsClientProblems(draft: EventSettingsInput, mode: "create" | "edit"): Record<string, string> {
+  const found: Record<string, string> = {};
+  if (!draft.startsOn) found.startsOn = "Enter the start date.";
+  if (!draft.endsOn) found.endsOn = "Enter the end date.";
+  if (mode === "create" && !draft.startTime) found.startTime = "Enter the start time.";
+  if (mode === "create" && !draft.endTime) found.endTime = "Enter the end time.";
+  if (draft.capacity !== null && draft.capacity !== undefined && (!Number.isInteger(draft.capacity) || draft.capacity < 1 || draft.capacity > 100_000)) {
+    found.capacity = "Enter a whole number from 1 to 100,000, or leave it blank for no limit.";
+  }
+  const bookingUrl = draft.hotelBookingUrl?.trim();
+  if (bookingUrl && !URL.canParse(bookingUrl)) found.hotelBookingUrl = "Enter a full web address, like https://example.com.";
+  const parsed = eventSettingsInputSchema.safeParse(eventSettingsRequestBody(draft));
+  if (!parsed.success) {
+    for (const [key, message] of Object.entries(fieldErrorsFromIssues(parsed.error.issues.map((issue) => ({ path: issue.path.filter((part): part is string | number => typeof part !== "symbol"), message: issue.message }))))) {
+      if (!found[key]) found[key] = message;
+    }
+  }
+  return found;
+}
+
+/**
+ * A half-typed number, date or time (the browser's `validity.badInput`) reaches the draft as blank, and would save as
+ * "no limit" or "open-ended". These controls are named in the problems instead, keyed like the server's field errors.
+ */
+export function eventSettingsBadInputProblems(
+  controls: Iterable<{ id: string; type: string; validity: { badInput: boolean } }>,
+): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const control of controls) {
+    if (!control.validity.badInput) continue;
+    const key = Object.keys(settingsFieldBlock).find((candidate) => settingsFieldDomId(candidate) === control.id);
+    if (!key) continue;
+    found[key] = control.type === "number" ? "Enter a whole number." : control.type === "time" ? "Enter a full time." : "Enter a full date.";
+  }
+  return found;
 }

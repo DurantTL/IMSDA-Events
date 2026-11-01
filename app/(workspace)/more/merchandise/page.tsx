@@ -14,7 +14,7 @@ export default async function MerchandisePage({
   const requested = (await searchParams).event;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Merchandise catalog access is restricted" detail="Ask an event administrator for configuration access before changing products, artwork, or availability." />;
+    return <AccessRestricted title="Merchandise catalog access is restricted" detail="Changing products, artwork, or availability needs configuration access." whoToAsk="your event administrator" />;
   }
   return (
     <>

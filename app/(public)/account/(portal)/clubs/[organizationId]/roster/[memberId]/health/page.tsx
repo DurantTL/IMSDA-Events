@@ -11,6 +11,7 @@ import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-gla
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Health record", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
   if (!healthRecordsEnabled()) notFound();
   const { organizationId, memberId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const viewer = await requireHealthViewerForClub(organizationId).catch((error: unknown) => {
     if (error instanceof HealthRecordError && error.code === "FORBIDDEN") return null;
     if (error instanceof HealthRecordError || error instanceof RosterAccessError) notFound();

@@ -165,7 +165,10 @@ describe("permission slip saves (#854, #855)", () => {
     const response = await saveSlip({ ...slipAnswers, ...patch });
     expect(response.status).toBe(400);
     const text = await response.text();
-    expect(text).toContain(label);
+    // One phone message everywhere (#1451); the issue still names the field by its key.
+    expect(text).toContain("Enter a 10-digit US number");
+    expect(text).toContain(Object.keys(patch)[0]);
+    expect(label).toBeTruthy();
     for (const value of Object.values(patch)) expect(text).not.toContain(value);
     expect(mocks.submissionCreate).not.toHaveBeenCalled();
     expect(JSON.stringify(mocks.logError.mock.calls)).not.toMatch(/Mine|idk|911/);
@@ -180,7 +183,7 @@ describe("permission slip saves (#854, #855)", () => {
     mocks.templateFindUnique.mockResolvedValue(slipRow(extra));
     const badEmail = await saveSlip({ ...slipAnswers, parent_email: "not-an-email" });
     expect(badEmail.status).toBe(400);
-    expect(await badEmail.text()).toContain("Parent email must be a valid email address");
+    expect(await badEmail.text()).toContain("Enter a valid email address.");
     const badNumber = await saveSlip({ ...slipAnswers, riders: "lots" });
     expect(badNumber.status).toBe(400);
     expect(await badNumber.text()).toContain("Riders must be a number");
@@ -336,8 +339,8 @@ describe("registration answers (#855)", () => {
   });
 
   it.each([
-    ["email", { email: "avery at example" }, "Email must be a valid email address"],
-    ["phone", { phone: "idk" }, "Phone must be a 10-digit US number"],
+    ["email", { email: "avery at example" }, "Enter a valid email address."],
+    ["phone", { phone: "idk" }, "Enter a 10-digit US number"],
     ["number", { party_size: "a few" }, "Party size must be a number"],
   ])("rejects a bad %s without echoing it", (_name, patch, message) => {
     const prepared = prepare({ ...good, ...patch });

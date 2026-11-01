@@ -2,6 +2,7 @@
 // draft, the form settings and open or close. Each calls the information-forms API through information-mode.ts and
 // hands the result back to the builder the same way the registration actions do. Nothing here touches the registration
 // endpoints.
+import { savedMessage } from "@/components/form-message";
 import { useRef } from "react";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import type { useConfirm } from "@/components/use-confirm";
@@ -40,7 +41,7 @@ export function useInformationActions(
       if (!saved.ok) { refused(saved.message, saved.body, definition); return; }
       setInformationIssues(noInformationIssues);
       const view = informationFormToView(saved.value);
-      syncForm(view, editsCreateDraft ? `Version ${view.activeVersion.versionNumber} was saved as a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "earlier version stays as it was"} until you publish this draft.` : "Draft saved.");
+      syncForm(view, savedMessage(editsCreateDraft ? `Version ${view.activeVersion.versionNumber} is a new draft. The ${selectedVersion.status === "PUBLISHED" ? "published version stays live" : "earlier version stays as it was"} until you publish this draft.` : "Publish it when you are ready."));
     } finally { setBusy(null); }
   }
 
@@ -103,7 +104,7 @@ export function useInformationActions(
       const saved = await saveInformationSettingsRequest(information, selectedForm.id, settings);
       if (!saved.ok) { setError(saved.message); return false; }
       applySettingsForm(informationFormToView(saved.value));
-      setNotice("Form settings saved.");
+      setNotice(savedMessage());
       return true;
     } finally { setBusy(null); }
   }

@@ -24,7 +24,14 @@ Accept exactly one positive issue number. Read root `AGENTS.md` before acting.
 6. Implement only accepted scope, add proportional tests, and run targeted
    checks. Run broader checks when risk warrants; the full GitHub CI remains the
    canonical gate.
-7. Review the diff against `origin/main`, commit only intended files, push the
+7. Run the review workflow (`.agents/skills/imsda-review/SKILL.md`) on the
+   branch against `origin/main`, including the site rules browser check: each changed page opened in a
+   real browser at 1280 px and 390 px and checked against the rules in
+   `docs/SITE-RULES.md` that apply. Fix every rule it finds broken. If the
+   issue adds an approved rule, add it to `docs/SITE-RULES.md` in this PR.
+   The build is not done until the review's **Rules checked** list exists;
+   put that list in the PR body.
+8. Check the diff against `origin/main`, commit only intended files, push the
    branch, and open a draft PR using the repository template. Link the issue and
    report verification evidence and unresolved decisions.
 

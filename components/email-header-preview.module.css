@@ -1,0 +1,64 @@
+.preview {
+  display: grid;
+  gap: 12px;
+  max-width: 600px;
+}
+
+.sample {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.caption {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+/* The same colors as the email header: navy bar, gold bottom border, gold mark. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 16px 24px;
+  background: var(--imsda-navy, #003b5c);
+  border-bottom: 4px solid var(--imsda-gold, #f0b323);
+  border-radius: 12px 12px 0 0;
+}
+
+.mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--imsda-gold, #f0b323);
+  color: var(--imsda-navy-deep, #002c45);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.words {
+  display: grid;
+  min-width: 0;
+}
+
+.name {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.subline {
+  color: #c9dbe4;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.3;
+}

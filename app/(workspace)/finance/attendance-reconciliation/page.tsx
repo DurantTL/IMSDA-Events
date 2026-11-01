@@ -12,7 +12,7 @@ export default async function AttendanceReconciliationPage({ searchParams }: { s
   const { event: requested, location: requestedLocation, version } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can review who attended and what each church is billed for." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can review who attended and what each church is billed for." whoToAsk="your event administrator" />;
   }
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);
   const view = await getAttendanceReconciliationView(event.id, { locationId, versionId: version ?? null });

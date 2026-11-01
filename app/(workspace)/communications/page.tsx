@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
+import { getPrisma } from "@/lib/prisma";
+import { loadEmailLayoutSettings } from "@/modules/communications/email-layout-settings";
 import { getMessagingWorkspace } from "@/modules/communications/messaging-repository";
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { listAnnouncements } from "@/modules/communications/repository";
@@ -91,7 +93,7 @@ export default async function CommunicationsPage({
   const { event, permissions } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." />;
+    return <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />;
   }
   const canManage = permissions.includes("MANAGE_COMMUNICATIONS");
   const [announcements, messaging, optOuts] = await Promise.all([
@@ -118,6 +120,7 @@ export default async function CommunicationsPage({
       announcementOptOuts={optOuts}
       initialView={initialView}
       openNew={openNew === "1"}
+      emailLayoutSettings={await loadEmailLayoutSettings(getPrisma())}
     />
     </>
   );

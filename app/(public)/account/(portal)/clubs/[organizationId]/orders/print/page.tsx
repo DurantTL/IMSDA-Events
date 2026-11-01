@@ -6,6 +6,7 @@ import { ORDER_LIST_SECTIONS, activeHelperLines, hasStockTracking, helperLineKey
 import { listHelperLines, loadOrderExportHeader } from "@/modules/club-orders/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Printable order list" };
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubOrderListPrintPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const [header, allLines] = await Promise.all([loadOrderExportHeader(organizationId), listHelperLines(organizationId)]);
   const lines = activeHelperLines(allLines);
   return (

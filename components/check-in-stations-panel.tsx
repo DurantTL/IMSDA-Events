@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import type { ActiveStationRow } from "@/modules/checkin-stations/repository";
 import { STATION_LABEL_MAX_LENGTH } from "@/modules/checkin-stations/domain";
 import styles from "@/components/check-in-stations-panel.module.css";
@@ -28,6 +29,7 @@ export function CheckInStationsPanel({
   timeZone: string;
 }) {
   const router = useRouter();
+  const { confirm, confirmDialog } = useConfirm();
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -57,8 +59,14 @@ export function CheckInStationsPanel({
     }
   }
 
-  async function revoke(stationId: string) {
+  async function revoke(stationId: string, stationName: string) {
     if (busy) return;
+    if (!(await confirm({
+      title: `Revoke ${stationName}?`,
+      body: <p>That device stops working for check-in.</p>,
+      confirmLabel: `Revoke ${stationName}`,
+      destructive: true,
+    }))) return;
     setBusy(stationId);
     setError("");
     try {
@@ -80,6 +88,7 @@ export function CheckInStationsPanel({
 
   return (
     <section className={`panel ${styles.cisPanel}`} aria-labelledby="cis-panel-title">
+      {confirmDialog}
       <h2 id="cis-panel-title">Check-in stations</h2>
       <p className={styles.cisPanelHelp}>
         A station is a staff-run tablet that checks in a whole registration from one code. It works until the event
@@ -118,7 +127,7 @@ export function CheckInStationsPanel({
                 type="button"
                 className="secondary-button"
                 disabled={busy !== ""}
-                onClick={() => revoke(station.id)}
+                onClick={() => void revoke(station.id, station.label || "unnamed station")}
                 aria-label={`Revoke ${station.label || "unnamed station"}`}
               >
                 {busy === station.id ? "Revoking..." : "Revoke"}

@@ -23,6 +23,7 @@ export default async function EventContentPage({
         <AccessRestricted
           title="The event page is restricted"
           detail="Only event administrators can change what the public event page says."
+          whoToAsk="your event administrator"
         />
       </>
     );

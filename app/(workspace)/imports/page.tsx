@@ -12,7 +12,7 @@ export default async function ImportsPage({ searchParams }: { searchParams: Prom
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_IMPORTS")) {
-    return <AccessRestricted title="Staging imports are restricted" detail="Only event administrators can preview, reconcile, and commit source snapshots." />;
+    return <AccessRestricted title="Staging imports are restricted" detail="Only event administrators can preview, reconcile, and commit source snapshots." whoToAsk="your event administrator" />;
   }
   const [runs, reconciliation] = await Promise.all([listImportRuns(event.id), getImportReconciliation(event.id)]);
   return (

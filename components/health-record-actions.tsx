@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 
 type LinkRow = { id: string; recipientEmail: string; state: "OPEN" | "USED" | "REVOKED" | "EXPIRED"; expiresAt: string };
 
@@ -21,6 +22,7 @@ export function HealthRecordActions({
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/health/${encodeURIComponent(memberId)}`;
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -50,6 +52,7 @@ export function HealthRecordActions({
 
   return (
     <section className="public-manage-card form-stack">
+      {confirmDialog}
       <h3>Keep this record current</h3>
       {canConfirm && (
         <button className="secondary-button" disabled={busy} onClick={() => void call(`${base}/confirm`, "POST", undefined, "Confirmed for this club year.")} type="button">
@@ -74,7 +77,15 @@ export function HealthRecordActions({
             <li key={link.id}>
               {link.recipientEmail}: {stateLabel[link.state]}
               {link.state === "OPEN" && (
-                <button className="secondary-button" disabled={busy} onClick={() => void call(`${base}/links/${encodeURIComponent(link.id)}`, "DELETE", undefined, "Withdrawn.")} type="button">
+                <button className="secondary-button" disabled={busy} onClick={async () => {
+                  if (!(await confirm({
+                    title: `Withdraw the link for ${link.recipientEmail}?`,
+                    body: <p>The private link stops working. You can send a new one.</p>,
+                    confirmLabel: `Withdraw link for ${link.recipientEmail}`,
+                    destructive: true,
+                  }))) return;
+                  void call(`${base}/links/${encodeURIComponent(link.id)}`, "DELETE", undefined, "Withdrawn.");
+                }} type="button">
                   Withdraw
                 </button>
               )}

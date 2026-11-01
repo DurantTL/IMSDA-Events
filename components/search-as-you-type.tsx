@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import type { FormEvent, FormHTMLAttributes, ReactNode, RefObject } from "react";
+import type { ChangeEvent, FormEvent, FormHTMLAttributes, KeyboardEvent, ReactNode, RefObject } from "react";
 
 /**
  * The one search-as-you-type behavior (#1431). A search box updates its list a short pause after the last keystroke, no
@@ -105,6 +105,186 @@ export function useDebouncedSearch(value: string, delayMs: number = SEARCH_DEBOU
   return settled;
 }
 
+/** How a filter change reaches the address: a typed search replaces (one entry per search), a toggle or select pushes (Back undoes it). */
+export type AddressMode = "push" | "replace";
+
+/** The mode for a change to `target`: typed text replaces, anything else (select, checkbox, radio, button) pushes. */
+export function addressModeFor(target: EventTarget | null): AddressMode {
+  return isTypedField(target) ? "replace" : "push";
+}
+
+/**
+ * The address after setting (or, with null or "", removing) the named params, keeping every other param, the path and
+ * the hash. Returns null when nothing would change. Pure, so it is unit tested.
+ */
+export function addressWith(
+  location: { pathname: string; search: string; hash?: string },
+  updates: Record<string, string | null | undefined>,
+) {
+  const params = new URLSearchParams(location.search);
+  for (const [name, value] of Object.entries(updates)) {
+    if (value === null || value === undefined || value === "") params.delete(name);
+    else params.set(name, value);
+  }
+  const query = params.toString();
+  const next = `${location.pathname}${query ? `?${query}` : ""}${location.hash ?? ""}`;
+  const current = new URLSearchParams(location.search).toString();
+  return query === current ? null : next;
+}
+
+/**
+ * Write filters of a list that filters in the browser into the address (rule B2, #1456) with the native history API,
+ * which Next keeps in sync with `useSearchParams` without a server round trip. Other params (`?year=`) stay. Nothing
+ * happens when the address already says it.
+ */
+export function writeAddressParams(updates: Record<string, string | null | undefined>, mode: AddressMode) {
+  try {
+    const next = addressWith(window.location, updates);
+    if (next === null) return;
+    // A null state lets Next copy its own state onto the entry.
+    if (mode === "push") window.history.pushState(null, "", next);
+    else window.history.replaceState(null, "", next);
+  } catch {
+    // A page without a usable address bar (a preview) simply keeps its address.
+  }
+}
+
+/** One param of the address as it is now, or null when absent (or on the server). */
+export function readAddressParam(name: string) {
+  try {
+    return new URLSearchParams(window.location.search).get(name);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A client-list filter kept in the address (rule B2, #1456): `value` starts as the server's reading of the address, `set`
+ * updates the list and the address together (default push, so Back undoes a toggle), and Back or Forward puts `value`
+ * back. `fallback` is what an absent param means.
+ */
+export function useAddressParam(name: string, initial: string, fallback = "") {
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    const restore = () => setValue(readAddressParam(name) ?? fallback);
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [name, fallback]);
+  const set = useCallback((next: string, mode: AddressMode = "push") => {
+    setValue(next);
+    writeAddressParams({ [name]: next === fallback ? null : next }, mode);
+  }, [name, fallback]);
+  return [value, set] as const;
+}
+
+/**
+ * Several client-list filters (selects) kept in the address, for a list that filters in the browser (rule B2, #1456).
+ * `parse` reads a whole address into valid values (use a module-level function); a value equal to its default is left out
+ * of the address. `set` updates the list and the address together (default push), and a shared link, reload or Back
+ * puts the values back (and calls `onRestore` after Back or Forward).
+ */
+export function useAddressParams<T extends Record<string, string>>(defaults: T, parse: (params: URLSearchParams) => T, onRestore?: () => void) {
+  const [values, setValues] = useState(defaults);
+  const restored = useRef(onRestore);
+  useEffect(() => {
+    restored.current = onRestore;
+  });
+  useEffect(() => {
+    const restore = () => setValues(parse(new URLSearchParams(window.location.search)));
+    restore();
+    // Back or Forward is a new view of the list too (`onRestore`), as a changed filter is.
+    const onPop = () => { restore(); restored.current?.(); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [parse]);
+  const set = useCallback((patch: Partial<T>, mode: AddressMode = "push") => {
+    setValues((current) => ({ ...current, ...patch }));
+    const updates: Record<string, string | null> = {};
+    for (const [name, value] of Object.entries(patch)) updates[name] = value === defaults[name] ? null : (value as string);
+    writeAddressParams(updates, mode);
+  }, [defaults]);
+  return [values, set] as const;
+}
+
+/** Router navigation for a list's filters: `push` for a select, checkbox or button, `replace` for typed text. */
+export function useListNavigation() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const go = useCallback((href: string, mode: AddressMode) => {
+    startTransition(() => (mode === "push" ? router.push(href, { scroll: false }) : router.replace(href, { scroll: false })));
+  }, [router]);
+  return { go, pending };
+}
+
+/**
+ * Search-as-you-type for a list filtered in the browser (#1431). The box shows every keystroke (`value`), while the list
+ * filters on `term`, which settles a short pause after the last keystroke. Enter applies at once, and clearing the box
+ * shows the full list at once. Spread `inputProps` on the `<input>`; filter, page and count from `term`; reset the
+ * list's page when `term` changes. The input is never remounted, so focus and the cursor stay put.
+ */
+export function useClientSearch(initial = "", delayMs: number = SEARCH_DEBOUNCE_MS, addressParam?: string) {
+  const [value, setValue] = useState(initial);
+  const [term, setTerm] = useState(initial);
+  // Kept current by `set`, the only way the box changes, so `applyNow` always reads what is typed.
+  const latest = useRef(value);
+  const debouncer = useDebouncedCallback(() => setTerm(latest.current), delayMs);
+  const set = useCallback((next: string) => {
+    setValue(next);
+    latest.current = next;
+    if (next.trim() === "") {
+      debouncer.cancel();
+      setTerm(next);
+    } else debouncer.schedule();
+  }, [debouncer]);
+  const applyNow = useCallback(() => {
+    debouncer.cancel();
+    setTerm(latest.current);
+  }, [debouncer]);
+  // Rule B2 (#1456): with an `addressParam`, the settled term is written to the address (replace: one history entry per
+  // search, not per keystroke), and a shared link, reload or Back puts it back in the box.
+  const written = useRef(initial);
+  useEffect(() => {
+    if (!addressParam || term === written.current) return;
+    written.current = term;
+    writeAddressParams({ [addressParam]: term.trim() || null }, "replace");
+  }, [addressParam, term]);
+  useEffect(() => {
+    if (!addressParam) return;
+    const restore = () => {
+      const fromAddress = readAddressParam(addressParam) ?? "";
+      if (fromAddress.trim() === latest.current.trim()) return;
+      debouncer.cancel();
+      latest.current = fromAddress;
+      written.current = fromAddress;
+      setValue(fromAddress);
+      setTerm(fromAddress);
+    };
+    // A page that did not pass the address's term as `initial` still shows it after load.
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [addressParam, debouncer]);
+  return {
+    value,
+    term,
+    setValue: set,
+    applyNow,
+    pending: value !== term,
+    inputProps: {
+      value,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => set(event.target.value),
+      // Leaving the box settles the term first, so a click or Tab never lands on a list that changes under it.
+      onBlur: applyNow,
+      onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter") return;
+        // A box outside a form has nothing to submit; inside one, the form's own submit handler runs as before.
+        if (!event.currentTarget.form) event.preventDefault();
+        applyNow();
+      },
+    },
+  };
+}
+
 /** A debounced callback that always runs the latest function, with cancel and flush; the timer is cleared on unmount. */
 export function useDebouncedCallback(fn: () => void, delayMs: number = SEARCH_DEBOUNCE_MS) {
   const latest = useRef(fn);
@@ -129,7 +309,8 @@ export function useDebouncedCallback(fn: () => void, delayMs: number = SEARCH_DE
     latest.current();
   }, [cancel]);
   useEffect(() => cancel, [cancel]);
-  return useMemo(() => ({ schedule, cancel, flush }), [schedule, cancel, flush]);
+  const isPending = useCallback(() => timer.current !== null, []);
+  return useMemo(() => ({ schedule, cancel, flush, isPending }), [schedule, cancel, flush, isPending]);
 }
 
 const TYPED_INPUT_TYPES = new Set(["search", "text", "email", "tel", "url", "number", ""]);
@@ -151,20 +332,26 @@ export function useSearchAsYouType({
   ignoreValues,
   keepParams,
 }: { delayMs?: number; resetParams?: string[]; pathname?: string; ignoreValues?: Record<string, string>; keepParams?: string[] } = {}) {
-  const router = useRouter();
+  const { go, pending } = useListNavigation();
   const formRef = useRef<HTMLFormElement>(null);
-  const [pending, startTransition] = useTransition();
 
-  const applyNow = () => {
+  // Typed text replaces (one history entry per search); a select, checkbox, radio or submit pushes, so Back steps
+  // through filter changes (rule B2, #1456).
+  const applyNow = (mode: AddressMode = "replace") => {
     const form = formRef.current;
     if (!form) return;
     const path = pathname ?? window.location.pathname;
-    const href = searchAsYouTypeHref(path, window.location.search, new FormData(form).entries(), { resetParams, keepParams, ignoreValues });
+    // A select's `data-default-value` is what leaving it out of the address means, so choosing it adds nothing (`dir=asc`).
+    const defaults: Record<string, string> = {};
+    for (const select of Array.from(form.querySelectorAll<HTMLSelectElement>("select[data-default-value]"))) {
+      if (select.name) defaults[select.name] = select.dataset.defaultValue ?? "";
+    }
+    const href = searchAsYouTypeHref(path, window.location.search, new FormData(form).entries(), { resetParams, keepParams, ignoreValues: { ...defaults, ...ignoreValues } });
     // Re-searching the same words must not stack a navigation.
     if (isCurrentAddress(href)) return;
-    startTransition(() => router.replace(href, { scroll: false }));
+    go(href, mode);
   };
-  const debouncer = useDebouncedCallback(applyNow, delayMs);
+  const debouncer = useDebouncedCallback(() => applyNow("replace"), delayMs);
 
   return {
     formProps: {
@@ -173,13 +360,13 @@ export function useSearchAsYouType({
       onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         debouncer.cancel();
-        applyNow();
+        applyNow("push");
       },
       onChange(event: FormEvent<HTMLFormElement>) {
         if (isTypedField(event.target)) debouncer.schedule();
         else if ((event.target as HTMLElement).tagName !== "INPUT" || (event.target as HTMLInputElement).type !== "hidden") {
           debouncer.cancel();
-          applyNow();
+          applyNow(addressModeFor(event.target));
         }
       },
     },
@@ -188,9 +375,11 @@ export function useSearchAsYouType({
     pending,
     apply: () => {
       debouncer.cancel();
-      applyNow();
+      applyNow("replace");
     },
     cancel: () => debouncer.cancel(),
+    /** True while typed text is waiting for its pause: the box then belongs to the typist, not to the address. */
+    typing: () => debouncer.isPending(),
   };
 }
 
@@ -199,11 +388,24 @@ export function useSearchAsYouType({
  * is typing in.
  */
 export function useSyncSearchField(formRef: RefObject<HTMLFormElement | null>, name: string, value: string) {
+  const previous = useRef(value);
   useEffect(() => {
+    const before = previous.current;
+    previous.current = value;
     const form = formRef.current;
     if (!form) return;
-    syncFieldValue(form.elements.namedItem(name) as HTMLInputElement | null, value, document.activeElement);
+    const field = form.elements.namedItem(name) as HTMLInputElement | null;
+    syncFieldValue(field, value, ownsFocusedField(field, before) ? null : document.activeElement);
   }, [formRef, name, value]);
+}
+
+/**
+ * True when the focused field still shows the address's previous value, so it holds no unsaved typing and may follow a
+ * new address (Back, Forward, a link) even though it has focus (rule B2, #1456). Typing that has not settled yet always
+ * differs from the previous address, so it is never overwritten. Compared on the trimmed value, as the address is.
+ */
+export function ownsFocusedField(field: { value: string } | null, previousValue: string) {
+  return field !== null && field.value.trim() === previousValue.trim();
 }
 
 /**
@@ -222,7 +424,7 @@ export function SearchAsYouTypeForm({
   delayMs?: number;
   resetParams?: string[];
 }) {
-  const { formProps, cancel } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
+  const { formProps, cancel, typing } = useSearchAsYouType({ delayMs, resetParams, pathname: action });
   const lastSearch = useRef<string | null>(null);
 
   // After navigation (Back, a link) show the URL's values (text, selects, checkboxes), except in the control being used.
@@ -233,11 +435,19 @@ export function SearchAsYouTypeForm({
       return;
     }
     if (lastSearch.current === search) return;
+    const before = new URLSearchParams(lastSearch.current);
     lastSearch.current = search;
     const form = formProps.ref.current;
     if (!form) return;
     const params = new URLSearchParams(search);
-    const active = document.activeElement;
+    // Back, Forward or a link: the focused box follows the address too when it still shows the previous address's
+    // value (no unsaved typing), so the words never outlive the filter. Text waiting for its pause is always kept.
+    const focused = document.activeElement;
+    const ownsFocus = !typing()
+      && (focused instanceof HTMLInputElement || focused instanceof HTMLSelectElement)
+      && focused.form === form
+      && ownsFocusedField(focused, before.get(focused.name) ?? "");
+    const active = ownsFocus ? null : focused;
     for (const element of Array.from(form.elements)) {
       if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement) || !element.name) continue;
       if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {

@@ -14,7 +14,7 @@ export default async function LodgingAssignmentsPage({ searchParams }: { searchP
   const { event, permissions } = await resolveEventContext(requested);
   // Decided here on the server, and again by every API route the screen calls.
   if (!permissions.includes("MANAGE_REGISTRATION")) {
-    return <AccessRestricted title="Lodging assignments are restricted" detail="Staff who manage registrations can place guests in rooms and sites." />;
+    return <AccessRestricted title="Lodging assignments are restricted" detail="Staff who manage registrations can place guests in rooms and sites." whoToAsk="your event administrator" />;
   }
   const view = await getAssignmentWorkspace(event.id, { canSeeSensitive: permissions.includes("VIEW_SENSITIVE_DATA") }).catch((error: unknown) => {
     if (error instanceof LodgingError && error.code === "NO_PROPERTY") return null;
