@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
+import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import { serverSort, sortOrderText, sortRows, type SortValue } from "@/lib/list-sort";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
@@ -21,11 +23,25 @@ export const dynamic = "force-dynamic";
  * youth or children's events have adults still needing a check. Moved under
  * Clubs and churches (#427); `/admin/background-checks` redirects here.
  */
-export default async function BackgroundChecksPage() {
+const EVENT_SORT_COLUMNS = ["event", "starts", "adults", "needed"] as const;
+type EventSortColumn = typeof EVENT_SORT_COLUMNS[number];
+type EventRow = Awaited<ReturnType<typeof backgroundCheckSummary>>["events"][number];
+const eventAccessors: Record<EventSortColumn, (event: EventRow) => SortValue> = {
+  event: (event) => event.name,
+  starts: (event) => event.startsOn,
+  adults: (event) => event.adults,
+  needed: (event) => event.needed,
+};
+const eventSortLabels: Record<EventSortColumn, string> = { event: "event", starts: "start date", adults: "adults", needed: "adults needing a check" };
+
+export default async function BackgroundChecksPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const summary = await backgroundCheckSummary();
+  // The event table is the whole list, so it is sorted here (#1458); the order never changes which events are listed.
+  const sorting = serverSort<EventSortColumn>("/admin/organizations/background-checks", await searchParams, EVENT_SORT_COLUMNS, { key: null, dir: "asc" }, { hash: "#events" });
+  const events = sorting.order.key ? sortRows(summary.events, sorting.order.key, sorting.order.dir, eventAccessors) : summary.events;
   const cards = [
     { label: "Current checks", value: summary.current, detail: "Clear, or a Sterling check good for more than 60 days. Does not include the expiring-soon checks below", tone: "green" },
     { label: "Expiring soon", value: summary.expiringSoon, detail: "Marked \"!\" on the roster, or a Sterling check ending within 60 days", tone: "gold" },
@@ -63,7 +79,7 @@ export default async function BackgroundChecksPage() {
         ))}
       </section>
 
-      <section className="panel">
+      <section className="panel" id="events">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Upcoming</p>
@@ -75,11 +91,17 @@ export default async function BackgroundChecksPage() {
           <p className="report-empty">No upcoming event is marked as a youth or children&apos;s event. Turn it on in an event&apos;s settings.</p>
         ) : (
           <div className="report-table-wrap">
+            {sorting.order.key && <SortOrderNote>{sortOrderText(eventSortLabels[sorting.order.key], sorting.order.dir, sorting.order.key === "event" ? "text" : sorting.order.key === "starts" ? "date" : "number")}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Youth and children&apos;s events</caption>
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Event</th><th role="columnheader" scope="col">Starts</th><th role="columnheader" scope="col">Adults</th><th role="columnheader" scope="col">Need a check</th></tr></thead>
+              <thead role="rowgroup"><tr role="row">
+                <ColumnHeader column="event" label="Event" sorting={sorting} />
+                <ColumnHeader column="starts" label="Starts" sorting={sorting} />
+                <ColumnHeader column="adults" label="Adults" sorting={sorting} />
+                <ColumnHeader column="needed" label="Need a check" sorting={sorting} />
+              </tr></thead>
               <tbody role="rowgroup">
-                {summary.events.map((event) => (
+                {events.map((event) => (
                   <tr role="row" key={event.id}>
                     <th role="rowheader" scope="row"><Link className="report-record-link" href={`/more/reports?event=${encodeURIComponent(event.id)}#background-checks`}>{event.name}</Link></th>
                     <td {...cardCell("Starts")}>{event.startsOn}</td>

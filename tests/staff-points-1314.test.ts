@@ -126,7 +126,8 @@ describe("staff points page (#1314)", () => {
 
   it("applies the search, keeps it in links and the form, and says when nothing matches", async () => {
     const html = await render({ q: "pine", all: "1" });
-    expect(html).toContain("Showing 12 of 24 clubs matching");
+    expect(html).toContain("Showing 1\u201312 of 12 clubs matching");
+    expect(html).toContain("The search covers all 24 clubs");
     expect(html).toContain('name="all" value="1"');
     expect(html).toContain('value="pine"');
     expect(html).toContain("Clear filters");

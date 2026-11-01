@@ -1,8 +1,8 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
-import { SortOrderNote, SortableHeader } from "@/components/list-sort";
-import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
+import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
+import { sortByName, sortOrderText, sortRows, type SortKind, type SortState } from "@/lib/list-sort";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
@@ -27,6 +27,13 @@ import {
   visibleHonorHistory,
 } from "@/modules/honors/member-honor-domain";
 import { filterPeopleByWordPrefix } from "@/modules/honors/honor-search";
+
+const HONORS_SORT_COLUMNS = ["name", "class", "honors"] as const;
+type HonorsSortColumn = typeof HONORS_SORT_COLUMNS[number];
+const HONORS_DEFAULT_SORT: SortState<HonorsSortColumn> = { key: "name", dir: "asc" };
+const honorsSortLabels: Record<HonorsSortColumn, { label: string; kind: SortKind }> = {
+  name: { label: "last name", kind: "text" }, class: { label: "current class", kind: "text" }, honors: { label: "number of honors", kind: "number" },
+};
 
 type HonorOption = { id: string; code: string; name: string };
 
@@ -117,15 +124,20 @@ export function ClubHonorsWorkspace({
     : `/api/attendee/clubs/${encodeURIComponent(organizationId)}`;
   // Staff may be looking at another club year (#819); the reload must ask for the same one.
   const listUrl = staff ? `${base}/honors?year=${encodeURIComponent(clubYear)}` : `${base}/honors`;
-  const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
-  const visible = useMemo(
-    () => sortByName(filterRowsByPersonName(filterClubHonorsRows(rows, {
+  // The order lives in the address (`?sort=&dir=`, #1458); name A to Z unless the address says otherwise.
+  const honorsSort = useAddressSort(HONORS_SORT_COLUMNS, HONORS_DEFAULT_SORT);
+  const visible = useMemo(() => {
+    const byName = sortByName(filterRowsByPersonName(filterClubHonorsRows(rows, {
       honorId: honorFilter || undefined,
       status: (statusFilter || undefined) as "IN_PROGRESS" | "COMPLETED" | undefined,
       classLevel: unitFilter || undefined,
-    }), nameSearch), nameDirection),
-    [rows, honorFilter, statusFilter, unitFilter, nameSearch, nameDirection],
-  );
+    }), nameSearch), honorsSort.key === "name" || honorsSort.key === null ? honorsSort.dir : "asc");
+    if (honorsSort.key === null || honorsSort.key === "name") return byName;
+    return sortRows(byName, honorsSort.key, honorsSort.dir, {
+      class: (row) => (row.classLevel ? clubClassLevelLabels[row.classLevel as keyof typeof clubClassLevelLabels] : null),
+      honors: (row) => (honorsByMember.get(row.memberId) ?? row.honors).length,
+    });
+  }, [rows, honorFilter, statusFilter, unitFilter, nameSearch, honorsSort.key, honorsSort.dir, honorsByMember]);
 
   const emptyState = clubHonorsEmptyState(rows, visible);
   const bulkState = bulkHonorButtonState(selected.size, Boolean(bulkHonorId));
@@ -371,13 +383,13 @@ export function ClubHonorsWorkspace({
           <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
         ) : (
           <div className="report-table-wrap card-box">
-            <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>
+            <SortOrderNote>{sortOrderText(honorsSortLabels[honorsSort.key ?? "name"].label, honorsSort.dir, honorsSortLabels[honorsSort.key ?? "name"].kind)}</SortOrderNote>
             <table aria-labelledby="club-honors-heading" className="report-table table-cards table-cards-corner table-cards-compact honors-table" data-fit-width role="table">
               <thead role="rowgroup">
                 <tr role="row">
-                  <SortableHeader active className="honors-col-name" direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />
-                  <th className="honors-col-class" role="columnheader" scope="col">Current class</th>
-                  <th className="honors-col-honors" role="columnheader" scope="col">Honors</th>
+                  <SortableHeader active={honorsSort.key === "name" || honorsSort.key === null} className="honors-col-name" direction={honorsSort.dir} label="Name" onSort={() => honorsSort.toggle("name")} />
+                  <SortableHeader active={honorsSort.key === "class"} className="honors-col-class" direction={honorsSort.dir} label="Current class" onSort={() => honorsSort.toggle("class")} />
+                  <SortableHeader active={honorsSort.key === "honors"} className="honors-col-honors" direction={honorsSort.dir} label="Honors" onSort={() => honorsSort.toggle("honors", "desc")} />
                   <th className={readOnly ? "honors-col-add is-view-only" : "honors-col-add"} role="columnheader" scope="col"><span className="sr-only">{readOnly ? "View honor history" : "Add honor and history"}</span></th>
                 </tr>
               </thead>

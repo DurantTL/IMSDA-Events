@@ -2,7 +2,10 @@ import { NavigationLink as Link } from "@/components/navigation-link";
 import { Download } from "lucide-react";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";
+import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
+import type { CoordinatorGlanceSortColumn } from "@/modules/club-reports/area-table-sort";
 import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import {
   COORDINATOR_SCOPE_TEXT,
@@ -124,13 +127,25 @@ export function CoordinatorClubsAtAGlance({
   overview,
   query,
   now = new Date(),
+  sorting,
 }: {
   clubs: AreaClubSummary[];
   overview: CoordinatorOverview;
   query: string;
   now?: Date;
+  sorting?: ServerSort<CoordinatorGlanceSortColumn>;
 }) {
-  const shown = overviewTableClubs(clubs, query);
+  // Sorting only reorders the clubs the search already narrowed to (#1458).
+  const accessors: Record<CoordinatorGlanceSortColumn, (club: AreaClubSummary) => SortValue> = {
+    club: (club) => club.name,
+    roster: (club) => club.rosterSize,
+    adults: (club) => club.adultCount,
+    record: (club) => clubRecordStatus(club, overview.month, now).label,
+    sterling: (club) => club.backgroundChecks.notInCompliance,
+  };
+  const found = overviewTableClubs(clubs, query);
+  const shown = sorting?.order.key ? sortRows(found, sorting.order.key, sorting.order.dir, accessors) : found;
+  const sortWords: Record<CoordinatorGlanceSortColumn, string> = { club: "club name", roster: "roster", adults: "adults and staff", record: `${overview.monthLabel} record`, sterling: "Sterling Volunteers not in compliance" };
   const clearHref = `/account/area-clubs/overview?year=${encodeURIComponent(overview.clubYear)}`;
   return (
     <section aria-labelledby="coordinator-clubs-title" className="coordinator-clubs">
@@ -159,15 +174,16 @@ export function CoordinatorClubsAtAGlance({
             </p>
           ) : (
             <div className="report-table-wrap card-box">
+              {sorting?.order.key && <SortOrderNote>{sortOrderText(sortWords[sorting.order.key], sorting.order.dir, ["roster", "adults", "sterling"].includes(sorting.order.key) ? "number" : "text")}</SortOrderNote>}
               <table className="report-table table-cards table-cards-tablet" role="table">
                 <caption className="sr-only">Clubs for {overview.clubYear}, with the {overview.monthLabel} record status</caption>
                 <thead role="rowgroup">
                   <tr role="row">
-                    <th role="columnheader" scope="col">Club / church</th>
-                    <th role="columnheader" scope="col">Roster</th>
-                    <th role="columnheader" scope="col">Adults &amp; staff</th>
-                    <th role="columnheader" scope="col">{overview.monthLabel} record</th>
-                    <th role="columnheader" scope="col">Sterling Volunteers</th>
+                    <ColumnHeader column="club" label="Club / church" sorting={sorting} />
+                    <ColumnHeader column="roster" label="Roster" sorting={sorting} />
+                    <ColumnHeader column="adults" label="Adults & staff" sorting={sorting} />
+                    <ColumnHeader column="record" label={`${overview.monthLabel} record`} sorting={sorting} />
+                    <ColumnHeader column="sterling" label="Sterling Volunteers" sorting={sorting} />
                     <th role="columnheader" scope="col">Open club</th>
                   </tr>
                 </thead>
@@ -209,14 +225,14 @@ export function CoordinatorClubsAtAGlance({
 }
 
 /** The whole Overview body for either outcome of the read. */
-export function CoordinatorOverviewBody({ data, query, now = new Date() }: { data: CoordinatorOverviewData; query: string; now?: Date }) {
+export function CoordinatorOverviewBody({ data, query, now = new Date(), sorting }: { data: CoordinatorOverviewData; query: string; now?: Date; sorting?: ServerSort<CoordinatorGlanceSortColumn> }) {
   if (data.status === "unavailable") return <CoordinatorUnavailable />;
   const { clubs, overview } = data;
   return (
     <>
       <CoordinatorSummary overview={overview} />
       <div className="coordinator-overview-layout">
-        <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} />
+        <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} sorting={sorting} />
         <div className="coordinator-overview-side">
           <CoordinatorFollowUp clubYear={overview.clubYear} overview={overview} query={query} />
           <CoordinatorHelp />

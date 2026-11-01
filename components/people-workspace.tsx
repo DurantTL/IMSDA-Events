@@ -1,5 +1,6 @@
 "use client";
 
+import { ListPager } from "@/components/list-pager";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
@@ -847,7 +848,12 @@ export function PeopleWorkspace({
           </ActionsMenu>
         </div>
       </div>
-      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
+      <ListPager
+        label="Registrations shown"
+        noun={`${matchingPersonFilter ? "registrations with a matching person" : "registrations"}${pageScoped ? " on this page of the search results" : ""}`}
+        nounOne={`${matchingPersonFilter ? "registration with a matching person" : "registration"}${pageScoped ? " on this page of the search results" : ""}`}
+        slice={{ from: visible.length === 0 ? 0 : 1, to: visible.length, total: registrations.length, page: 1, pageCount: 1 }}
+      />
       <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
       {/* Always shown, so "Select all" is findable before anything is ticked. */}

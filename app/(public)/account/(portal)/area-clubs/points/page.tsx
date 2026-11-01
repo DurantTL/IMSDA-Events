@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { serverSort } from "@/lib/list-sort";
+import { COORDINATOR_RANKING_DEFAULT_SORT, COORDINATOR_RANKING_SORT_COLUMNS, rankingFirstDirection } from "@/modules/club-reports/area-table-sort";
 import { notFound } from "next/navigation";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { PointsBars, ReportSummaryBand } from "@/components/club-report-charts";
@@ -24,7 +26,7 @@ const BASE_PATH = "/account/area-clubs/points";
  * club. The scoring and the recorded-versus-yearly-registration split are unchanged. A failed read says
  * "unavailable", never zero points.
  */
-export default async function AreaPointsPage({ searchParams }: { searchParams: Promise<{ year?: string; sort?: string; q?: string; all?: string }> }) {
+export default async function AreaPointsPage({ searchParams }: { searchParams: Promise<{ year?: string; sort?: string; dir?: string; q?: string; all?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const params = await searchParams;
@@ -65,7 +67,7 @@ export default async function AreaPointsPage({ searchParams }: { searchParams: P
                 title="Top clubs by total points"
               />
               {showAll && clubs.length > POINTS_CHART_LIMIT && <ShowTopLink href={pointsPageHref(BASE_PATH, state)} />}
-              <CoordinatorPointsRanking allClubs={allClubs} basePath={BASE_PATH} clubYear={clubYear} query={query} sort={sort} />
+              <CoordinatorPointsRanking allClubs={allClubs} clubYear={clubYear} open={Boolean(params.sort)} query={query} sorting={serverSort(BASE_PATH, params, COORDINATOR_RANKING_SORT_COLUMNS, COORDINATOR_RANKING_DEFAULT_SORT, { firstDirection: rankingFirstDirection})} />
             </>
           )}
         </>

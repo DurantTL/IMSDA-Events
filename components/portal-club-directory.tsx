@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ListPager } from "@/components/list-pager";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { portalDirectoryHref, type portalClubDirectory } from "@/modules/club-rosters/portal-directory";
 import styles from "./club-directory.module.css";
@@ -11,7 +12,7 @@ export function PortalClubDirectory({ slice, query, total, searchLabel = "Search
       <AreaClubSearch basePath="/account/clubs" label={searchLabel} query={query} shown={slice.total} total={total} />
       {slice.total === 0 ? <p className="public-manage-empty">{query ? `No ${searchLabel.replace(/^Search by /, "")} matches “${query}”.` : "No active clubs yet."}</p> : (
         <>
-          <p className={styles.note}>Showing {slice.from}–{slice.to} of {slice.total} {query ? "matching " : ""}{slice.total === 1 ? "club" : "clubs"}</p>
+          <ListPager hrefFor={(page) => portalDirectoryHref(query, page)} label="Club directory pages" noun={query ? "matching clubs" : "clubs"} nounOne={query ? "matching club" : "club"} slice={slice} />
           <ul className={styles.grid} aria-label="Clubs">
             {slice.items.map((club) => (
               <li className={styles.card} key={club.organizationId}>
@@ -27,11 +28,6 @@ export function PortalClubDirectory({ slice, query, total, searchLabel = "Search
               </li>
             ))}
           </ul>
-          {slice.pageCount > 1 && <nav aria-label="Club directory pages" className="list-pager">
-            {slice.page > 1 && <Link className="secondary-button" prefetch={false} href={portalDirectoryHref(query, slice.page - 1)}>Previous</Link>}
-            <span>Page {slice.page} of {slice.pageCount}</span>
-            {slice.page < slice.pageCount && <Link className="secondary-button" prefetch={false} href={portalDirectoryHref(query, slice.page + 1)}>Next</Link>}
-          </nav>}
         </>
       )}
     </div>

@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { ListPager } from "@/components/list-pager";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
+import { sortHref, sortOrderText } from "@/lib/list-sort";
 import { ReportSummaryBand, RecordsByMonthChart, YearStrip } from "@/components/club-report-charts";
 import {
   staffRecordKindDisplay,
   staffRecordKindTone,
   staffRecordStatusLabel,
   staffRecordsHref,
+  type StaffRecordSortColumn,
   type StaffRecordsView,
 } from "@/modules/club-reports/staff-monthly-records-domain";
 import styles from "./staff-monthly-records.module.css";
@@ -22,8 +26,13 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
     staffRecordsHref({
       clubYear, month: options.month ?? view.month,
       query: options.query === null ? undefined : options.query ?? view.query,
-      showAll: options.showAll ?? view.showAllClubs, expanded: options.expanded ?? false,
+      showAll: options.showAll ?? view.showAllClubs, expanded: options.expanded ?? false, order: view.order,
     });
+  const sortLink = (column: StaffRecordSortColumn) => `${sortHref("/admin/clubs/summary", {
+    year: clubYear, view: "records", month: view.month, q: view.query || undefined,
+    show: view.showAllClubs ? "all" : undefined, all: view.expanded ? "1" : undefined,
+  }, column, view.order)}#monthly-records`;
+  const sortedBy = view.order.key ? { club: "club name", record: `${view.monthLabel} record`, points: "points" }[view.order.key] : null;
   const filtered = view.query !== "" || !view.showAllClubs;
   return (
     <div className={styles.root}>
@@ -59,7 +68,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
       <section aria-labelledby="records-table-heading" className={styles.card}>
         <div className={styles.head}>
           <h3 className={styles.heading} id="records-table-heading">Clubs, {view.monthLabel}</h3>
-          <span className={styles.muted}>{view.showAllClubs ? "Missing first" : "Needs attention first"}</span>
+          {sortedBy === null && <span className={styles.muted}>{view.showAllClubs ? "Missing first" : "Needs attention first"}</span>}
         </div>
         <div aria-label="Show" className={styles.filters} role="group">
           <Link aria-current={view.showAllClubs ? undefined : "true"} className={styles.chip} href={here({ showAll: false })} prefetch={false}>Needs attention ({view.attentionCount})</Link>
@@ -68,6 +77,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
         <SearchAsYouTypeForm action="/admin/clubs/summary" className={styles.search}>
           <input name="year" type="hidden" value={clubYear} /><input name="view" type="hidden" value="records" /><input name="month" type="hidden" value={view.month} />
           {view.showAllClubs && <input name="show" type="hidden" value="all" />}
+          {view.order.key && <><input name="sort" type="hidden" value={view.order.key} /><input name="dir" type="hidden" value={view.order.dir} /></>}
           <label>Search by club or church name<input autoComplete="off" defaultValue={view.query} maxLength={80} name="q" type="search" /></label>
           <button className="secondary-button" type="submit">Search</button>
           {view.query && <Link className="secondary-button" href={here({ query: null })} prefetch={false}>Clear filters</Link>}
@@ -80,10 +90,18 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
               : `Nothing needs attention for ${view.monthLabel}. Every record is reviewed or not yet due.`}
           </p>
         ) : (
+          <>
+          {sortedBy && <SortOrderNote>{sortOrderText(sortedBy, view.order.dir, view.order.key === "points" ? "number" : "text")}</SortOrderNote>}
           <table className={`report-table report-table-auto ${styles.table}`} role="table">
             <caption className="sr-only">Clubs and their {view.monthLabel} record, {view.showAllClubs ? "all clubs" : "clubs that need attention"}</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">{view.monthLabel} record</th><th role="columnheader" scope="col">Points</th><th role="columnheader" scope="col">Year so far</th><th role="columnheader" scope="col"><span className="sr-only">Action</span></th></tr>
+              <tr role="row">
+                <SortableHeader active={view.order.key === "club"} direction={view.order.dir} href={sortLink("club")} label="Club" />
+                <SortableHeader active={view.order.key === "record"} direction={view.order.dir} href={sortLink("record")} label={`${view.monthLabel} record`} />
+                <SortableHeader active={view.order.key === "points"} direction={view.order.dir} href={sortLink("points")} label="Points" />
+                <th role="columnheader" scope="col">Year so far</th>
+                <th role="columnheader" scope="col"><span className="sr-only">Action</span></th>
+              </tr>
             </thead>
             <tbody role="rowgroup">
               {view.rows.map((row) => {
@@ -109,9 +127,10 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
               })}
             </tbody>
           </table>
+          </>
         )}
         {view.hasMore && <Link className={`secondary-button ${styles.showAll}`} href={here({ expanded: true })} prefetch={false}>Show all {view.matches} {view.matches === 1 ? "club" : "clubs"}</Link>}
-        {filtered && view.rows.length > 0 && <p className={styles.note}>Showing {view.rows.length} of {view.matches} matching clubs.</p>}
+        {filtered && view.rows.length > 0 && <ListPager label="Clubs shown" noun="matching clubs" nounOne="matching club" slice={{ from: 1, to: view.rows.length, total: view.matches, page: 1, pageCount: 1 }} />}
         <p className={`${styles.note} ${styles.stripNote}`}>Year so far: one square per month, September to August, with the same key as the chart. The selected month is outlined.</p>
       </section>
     </div>

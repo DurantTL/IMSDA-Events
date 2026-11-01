@@ -8,8 +8,8 @@ import { useAddressParam, useClientSearch, writeAddressParams } from "@/componen
 import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
-import { SortOrderNote, SortableHeader } from "@/components/list-sort";
-import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
+import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
+import { sortByName, sortOrderText, sortRows, type SortKind, type SortState, type SortValue } from "@/lib/list-sort";
 import { BirthDateField } from "@/components/birth-date-field";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { RosterTypeDefinitions } from "@/components/roster-type-definitions";
@@ -59,6 +59,21 @@ type RosterResponse = {
   nameKept?: boolean;
   message?: string;
   issues?: Array<{ message?: string }>;
+};
+
+/** Every column of the roster except Actions sorts (#1458); the sort lives in the address as `?sort=&dir=`, name A to Z by default. */
+const ROSTER_SORT_COLUMNS = ["name", "age", "birthDate", "type", "class", "details", "gender", "screening"] as const;
+type RosterSortColumn = typeof ROSTER_SORT_COLUMNS[number];
+const ROSTER_DEFAULT_SORT: SortState<RosterSortColumn> = { key: "name", dir: "asc" };
+const rosterSortLabels: Record<RosterSortColumn, { label: string; kind: SortKind }> = {
+  name: { label: "last name", kind: "text" },
+  age: { label: "age", kind: "number" },
+  birthDate: { label: "birth date", kind: "date" },
+  type: { label: "type", kind: "text" },
+  class: { label: "current class", kind: "text" },
+  details: { label: "details needed", kind: "number" },
+  gender: { label: "gender", kind: "text" },
+  screening: { label: "Sterling Volunteers status", kind: "text" },
 };
 
 /** A person's Sterling Volunteers mark on a club page (#427): status only, or status and note for staff. */
@@ -311,7 +326,7 @@ export function ClubRosterWorkspace({
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
-  const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
+  const rosterSort = useAddressSort(ROSTER_SORT_COLUMNS, ROSTER_DEFAULT_SORT);
   const active = members.filter((member) => member.status === "ACTIVE");
   const needBirthDates = active.filter((member) => member.birthDateNeeded).length;
   const notInCompliance = complianceStatuses
@@ -345,9 +360,25 @@ export function ClubRosterWorkspace({
     typeLabel: (member) => clubRosterAttendeeTypeLabels[member.attendeeType],
     classLabel: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : null),
   });
+  // Sort by any column (#1458): the name order is the base, so people who tie on the column stay in name order. Blanks last.
+  const sortAccessors: Record<RosterSortColumn, (member: RosterMemberRecord) => SortValue> = {
+    name: () => null,
+    age: (member) => member.age ?? member.reportedAge,
+    birthDate: (member) => birthDates?.[member.id],
+    type: (member) => clubRosterAttendeeTypeLabels[member.attendeeType],
+    class: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : null),
+    details: (member) => rosterDetailsNeededItems(member).length,
+    gender: (member) => (member.gender ? clubRosterGenderLabels[member.gender] : null),
+    screening: (member) => (complianceStatuses?.[member.id] ? complianceLabel(complianceStatuses[member.id]!) : null),
+  };
+  const sortPeople = (people: RosterMemberRecord[]) => {
+    const byName = sortByName(people, rosterSort.key === "name" || rosterSort.key === null ? rosterSort.dir : "asc");
+    return rosterSort.key === null || rosterSort.key === "name" ? byName : sortRows(byName, rosterSort.key, rosterSort.dir, sortAccessors);
+  };
+  const sortedBy = rosterSortLabels[rosterSort.key ?? "name"];
   const sections = [
-    { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF"), nameDirection) },
-    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
+    { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF")) },
+    { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
   ] as const;
   /**
    * Staff and Members open and close on their own (#1305). Order of precedence: a search or filter that matches people
@@ -784,7 +815,7 @@ export function ClubRosterWorkspace({
               closed section should take no room. The columns of the two tables size independently (some drift between them is
               accepted). The summary is the section heading and names its table. Both tables keep the sortable Name header, so sorting works from whichever is open.
             */}
-            <SortOrderNote>{`${sortOrderText(nameSortLabel, nameDirection)} Staff and Members are listed separately.`}</SortOrderNote>
+            <SortOrderNote>{`${sortOrderText(sortedBy.label, rosterSort.dir, sortedBy.kind)} Staff and Members are listed separately.`}</SortOrderNote>
             {sections.map((section) => (
               <details
                 className={styles.section}
@@ -807,14 +838,14 @@ export function ClubRosterWorkspace({
                         <tr>
                           {columns.map((column) => {
                             switch (column) {
-                              case "name": return <SortableHeader active direction={nameDirection} key={column} hiddenLabel={section.title} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />;
-                              case "age": return <th key={column}>Age</th>;
-                              case "birthDate": return <th key={column}>Birth date</th>;
-                              case "type": return <th key={column}>Type</th>;
-                              case "class": return <th key={column}>Current class</th>;
-                              case "details": return <th key={column}>Details</th>;
-                              case "gender": return <th key={column}>Gender</th>;
-                              case "screening": return <th key={column}>Sterling Volunteers</th>;
+                              case "name": return <SortableHeader active={rosterSort.key === "name" || rosterSort.key === null} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Name" onSort={() => rosterSort.toggle("name")} />;
+                              case "age": return <SortableHeader active={rosterSort.key === "age"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Age" onSort={() => rosterSort.toggle("age")} />;
+                              case "birthDate": return <SortableHeader active={rosterSort.key === "birthDate"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Birth date" onSort={() => rosterSort.toggle("birthDate")} />;
+                              case "type": return <SortableHeader active={rosterSort.key === "type"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Type" onSort={() => rosterSort.toggle("type")} />;
+                              case "class": return <SortableHeader active={rosterSort.key === "class"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Current class" onSort={() => rosterSort.toggle("class")} />;
+                              case "details": return <SortableHeader active={rosterSort.key === "details"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Details" onSort={() => rosterSort.toggle("details")} />;
+                              case "gender": return <SortableHeader active={rosterSort.key === "gender"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Gender" onSort={() => rosterSort.toggle("gender")} />;
+                              case "screening": return <SortableHeader active={rosterSort.key === "screening"} direction={rosterSort.dir} key={column} hiddenLabel={section.title} label="Sterling Volunteers" onSort={() => rosterSort.toggle("screening")} />;
                               case "actions": return <th key={column}>Actions</th>;
                             }
                           })}

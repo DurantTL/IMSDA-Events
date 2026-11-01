@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ListPager } from "@/components/list-pager";
 import { PointsBars, ReportSummaryBand } from "@/components/club-report-charts";
 import type { StaffPointsView } from "@/modules/club-reports/staff-points-domain";
 import styles from "./staff-points.module.css";
@@ -9,10 +10,11 @@ export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffP
     <div className={styles.root}>
       <ReportSummaryBand compact label={`Points at a glance, all ${view.totalClubs} clubs. A search narrows the chart and table only.`} tiles={view.tiles} />
       {view.query !== "" && (
-        <p className={styles.note}>
-          {view.matches.length > 0 && `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”; the figures above count all clubs.`}{" "}
+        <div className={styles.note}>
+          {view.matches.length > 0 && <ListPager label="Clubs matching the search" noun={`clubs matching “${view.query}”`} nounOne={`club matching “${view.query}”`} slice={{ from: 1, to: view.matches.length, total: view.matches.length, page: 1, pageCount: 1 }} />}
+          {view.matches.length > 0 && <p className={styles.note}>The search covers all {view.totalClubs} clubs; the figures above count all clubs.</p>}
           <Link className={styles.clear} href={view.clearHref} prefetch={false}>Clear filters</Link>
-        </p>
+        </div>
       )}
       {view.matches.length === 0 ? (
         <p className={styles.empty}>

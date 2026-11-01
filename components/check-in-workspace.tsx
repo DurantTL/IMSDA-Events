@@ -833,7 +833,7 @@ export function CheckInWorkspace({
             </div>
           );
         })}
-        <ListPager label="Arrival roster pages" onPage={setRosterPage} slice={rosterSlice} />
+        <ListPager label="Arrival roster pages" noun="arrivals" nounOne="arrival" onPage={setRosterPage} slice={rosterSlice} />
         {visible.length === 0 && (
           <div className="empty-state">
             <Search aria-hidden="true" size={24} />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ListPager } from "@/components/list-pager";
 import { ArrowRight, CalendarDays, CircleAlert, FileText, Info, UsersRound } from "lucide-react";
 import type { ClubHomeStep } from "@/modules/club-rosters/home-next-task";
 import {
@@ -161,9 +162,7 @@ export function ClubHomeRoster({
               </li>
             ))}
           </ul>
-          <p className="field-help">
-            Showing {preview.rows.length} of {preview.total} active {preview.total === 1 ? "person" : "people"}.
-          </p>
+          <ListPager label="Roster preview" noun="active people" nounOne="active person" slice={{ from: 1, to: preview.rows.length, total: preview.total, page: 1, pageCount: 1 }} />
         </>
       )}
       <Link className="secondary-button club-event-action club-home-link" href={rosterHref}>
