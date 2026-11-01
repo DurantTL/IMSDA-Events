@@ -19,7 +19,8 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
 | G1 | Make every part of the same kind look and work the same, and fix it in one place. Don't make a new version of something that already exists elsewhere. | planned (#1440) | planned (#1439) | #1342 |
-| G2 | Mockups first: any change to how something looks (borders, outlines, spacing, colors, layout, new shared components) needs a mockup Caleb approves before it's built. | none (review step) | none (review step) | #1342 |
+| G2 | Mockups first: a new design (borders, outlines, spacing, colors, layout, new shared components) needs a mockup Caleb approves before it's built. Consistency fixes that only make something match the existing shared design can be built without waiting for mockup approval; send screenshots for review. | none (review step) | none (review step) | #1342; Caleb, Nov 1 (#1438) |
+| G3 | Everything that's the same kind of thing looks and works the same and is styled from one shared place (tokens, shared components), so one change updates it everywhere. Color variations are allowed only as named token variants, never as one-off styles. | planned (#1440) | planned (#1439) | Caleb, Nov 1 (#1438) |
 
 ## Search
 
