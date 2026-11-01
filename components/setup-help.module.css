@@ -61,3 +61,10 @@
 .again {
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
+
+/* The arrow stays with the last word of a Set up link instead of wrapping onto its own line. */
+.setup :global(.text-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

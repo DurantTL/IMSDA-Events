@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
@@ -431,6 +432,7 @@ export function ScheduledEmailsWorkspace({
         <div className="empty-state">
           <CalendarClock aria-hidden="true" size={22} />
           <p>No emails are scheduled for this event.</p>
+          <EventSetupHelp context="scheduled emails" id="scheduled-emails-none" />
         </div>
       ) : (
         <ul className="scheduled-email-list">

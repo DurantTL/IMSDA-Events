@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, CircleAlert, FileText, Info, UsersRound } from "lucide-react";
 import type { ClubHomeStep } from "@/modules/club-rosters/home-next-task";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import {
   yearLabel,
   type ClubHomeEventCardData,
@@ -133,8 +134,11 @@ export function ClubHomeRoster({
   readOnly,
   clubYear,
   unavailable = false,
+  setupBase,
 }: {
   unavailable?: boolean;
+  /** The club's portal path. Given for the director's own Home, so an empty roster says how to fill it (#1435). */
+  setupBase?: string;
   preview: ClubHomeRosterPreview;
   rosterHref: string;
   readOnly: boolean;
@@ -149,7 +153,10 @@ export function ClubHomeRoster({
       {unavailable ? (
         <p className="inline-notice" role="status"><CircleAlert size={16} aria-hidden="true" /> The roster could not be loaded. Reload the page to try again.</p>
       ) : preview.rows.length === 0 ? (
-        <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> {readOnly ? "No one was on this club's roster that year." : "No one is on this year's roster yet."}</p>
+        <>
+          <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> {readOnly ? "No one was on this club's roster that year." : "No one is on this year's roster yet."}</p>
+          {!readOnly && setupBase && <ClubSetupHelp base={setupBase} context="the roster" id="roster-empty" />}
+        </>
       ) : (
         <>
           <ul className="club-home-roster-list">
@@ -179,8 +186,11 @@ export function ClubHomeEvents({
   hasOpenEvents,
   eventsHref,
   unavailable = false,
+  setupBase,
 }: {
   unavailable?: boolean;
+  /** The club's portal path. Given for the director's own Home (#1435). */
+  setupBase?: string;
   cards: ClubHomeEventCardData[];
   hasOpenEvents: boolean;
   eventsHref: string;
@@ -199,6 +209,7 @@ export function ClubHomeEvents({
             <CalendarDays size={17} aria-hidden="true" />{" "}
             {hasOpenEvents ? "Your club has not registered for a club event yet." : "No club events are open for your club right now."}
           </p>
+          {setupBase && <ClubSetupHelp base={setupBase} context="club events" id={hasOpenEvents ? "events-none-registered" : "events-none-published"} />}
           <Link className="secondary-button club-event-action club-home-link" href={eventsHref}>
             Open club events <ArrowRight size={14} aria-hidden="true" />
           </Link>

@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useState } from "react";
@@ -107,11 +108,14 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
       {!emailConfigured && (
         <div className="inline-notice error" role="status">Account email isn&apos;t set up on this server, so invites can&apos;t be sent yet.</div>
       )}
+      {!emailConfigured && (
+        <EventSetupHelp context="club invites" id="club-invites-email" />
+      )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {clubs.length === 0 && (
-        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them.</p></div>
+        <div className="panel"><p className="report-empty">No invites yet. Invites are created when clubs are imported.</p><EventSetupHelp context="club invites" id="club-invites-none" /></div>
       )}
 
       {clubs.map((club) => {

@@ -1,6 +1,11 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearch } from "@/components/area-clubs-views";
+import { CoordinatorWhosMissing } from "@/components/coordinator-whos-missing";
+import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
+import { whosMissingWhat } from "@/modules/club-reports/whos-missing-what";
+import { buildCoordinatorChecklist, COORDINATOR_CHECKLIST_GUIDE_HREF } from "@/modules/setup-help/coordinator-checklist";
 import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";
 import { cardCell } from "@/components/table-card-labels";
 import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
@@ -47,6 +52,8 @@ export function CoordinatorUnavailable({ what = "The club overview" }: { what?: 
       <h3 id="coordinator-unavailable-title">{what} is unavailable</h3>
       <p>This information could not be read just now, so no counts, statuses or empty lists are shown. Nothing here means a club has no records or that nothing needs attention.</p>
       <CoordinatorRetryButton />
+      {/* Plain text on purpose: a failed read shows no numbers or icons, only the retry and who to ask (#1435). */}
+      <p className="field-help">If it stays unavailable, ask the conference office.</p>
     </section>
   );
 }
@@ -147,7 +154,10 @@ export function CoordinatorClubsAtAGlance({
         <p className="field-help">The CSV files cover the full club year for every available club. They do not change with the search below.</p>
       </div>
       {clubs.length === 0 ? (
-        <p className="report-empty">No active clubs are available to this role yet.</p>
+        <>
+          <p className="report-empty">No active clubs are available to this role yet.</p>
+          <CoordinatorSetupHelp context="the club list" id="no-clubs" />
+        </>
       ) : (
         <>
           <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs by name" query={query} shown={shown.length} total={clubs.length} />
@@ -212,9 +222,33 @@ export function CoordinatorClubsAtAGlance({
 export function CoordinatorOverviewBody({ data, query, now = new Date() }: { data: CoordinatorOverviewData; query: string; now?: Date }) {
   if (data.status === "unavailable") return <CoordinatorUnavailable />;
   const { clubs, overview } = data;
+  // Both come from the club rows above, so neither can show a club the table does not (#1435).
+  const missing = whosMissingWhat(clubs, overview.month, now);
+  // Like Follow-up beside it, the names follow the search while every count speaks about all clubs.
+  const shownIds = new Set(overviewTableClubs(clubs, query).map((club) => club.id));
+  const shownMissing = missing.filter((row) => shownIds.has(row.clubId));
+  const checklist = buildCoordinatorChecklist({
+    clubYear: overview.clubYear,
+    clubCount: clubs.length,
+    clubsWithoutDirector: clubs.filter((club) => club.directors.length === 0).length,
+    recordsMissing: overview.followUp.length,
+    monthNotDue: overview.monthNotDue,
+    monthLabel: overview.monthLabel,
+    clubsBehind: missing.length,
+  });
   return (
     <>
+      <SetupChecklistPanel
+        checklist={checklist}
+        eyebrow="Getting started"
+        guide={{ href: COORDINATOR_CHECKLIST_GUIDE_HREF, label: "Read the Getting started guide" }}
+        headingId="coordinator-getting-started"
+        storageKey="imsda-events:getting-started-collapsed:coordinator"
+        title="Getting started as an area coordinator"
+      />
+      {checklist.hidden && <p className="field-help role-guide-link"><Link className="text-button" href={COORDINATOR_CHECKLIST_GUIDE_HREF}>Getting started guide</Link></p>}
       <CoordinatorSummary overview={overview} />
+      <CoordinatorWhosMissing clubCount={clubs.length} monthLabel={overview.monthLabel} query={query} rows={shownMissing} totalMissing={missing.length} />
       <div className="coordinator-overview-layout">
         <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} />
         <div className="coordinator-overview-side">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { ClubOverview } from "@/components/club-overview";
@@ -41,7 +42,7 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
       reportHref={(month) => `/account/area/${organizationId}/reports/${month}`}
       reportsEditable={false}
     />
-    {guardianViewer && <ClubGuardiansPanel organizationId={organizationId} viewer={guardianViewer} />}
+    {guardianViewer && <ClubGuardiansPanel emptyHelp={<CoordinatorSetupHelp context="emergency contacts" id="club-no-emergency-contacts" />} organizationId={organizationId} viewer={guardianViewer} />}
     </>
   );
 }

@@ -14,7 +14,10 @@ export async function ClubGuardiansPanel({
   organizationId,
   viewer,
   headingLevel = 2,
+  emptyHelp,
 }: {
+  /** Setup help under the empty state: who can add the contacts (#1435). Given where the viewer is not the club's own leader. */
+  emptyHelp?: React.ReactNode;
   organizationId: string;
   viewer: GuardianViewer;
   headingLevel?: 2 | 3;
@@ -34,7 +37,10 @@ export async function ClubGuardiansPanel({
         <Heading id="open-club-guardians">Emergency contacts</Heading>
       </div>
       {contacts.length === 0 ? (
-        <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No emergency contacts are on file for this club yet.</p>
+        <>
+          <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No emergency contacts are on file for this club yet.</p>
+          {emptyHelp}
+        </>
       ) : (
         <div className="club-guardians-table-wrap report-table-wrap">
           <table className="report-table">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { redirect } from "next/navigation";
 import { UsersRound } from "lucide-react";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
@@ -82,10 +83,13 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
       <div className="account-page-body">
         <section className="public-manage-card">
           {clubs.length === 0 ? (
+            <>
             <p className="public-manage-empty">
               <UsersRound size={17} aria-hidden="true" /> You aren&apos;t a director of a club right now. The conference
               office adds club directors.
             </p>
+            <ClubSetupHelp base="/account/clubs" context="your clubs" id="no-clubs" />
+            </>
           ) : (
             <PortalClubDirectory slice={portalClubDirectory(clubs, own, query, page)} query={query} total={clubs.length} searchLabel="Search by club or church" />
           )}

@@ -6375,7 +6375,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .event-readiness-panel > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.66rem); line-height: 1.55; }
 .event-readiness-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 
-.event-readiness-list li {
+/* Direct children only: setup help inside a row (#1435) has its own list items, which must not become readiness rows. */
+.event-readiness-list > li {
   display: grid;
   grid-template-columns: 20px 1fr;
   align-items: start;
@@ -6385,18 +6386,18 @@ body:has(.auth-page) { padding-bottom: 0; }
   padding: 9px;
 }
 
-.event-readiness-list li > span:first-child {
+.event-readiness-list > li > span:first-child {
   width: 17px;
   height: 17px;
   border: 2px solid #b8c5ca;
   border-radius: 50%;
 }
 
-.event-readiness-list li > svg { color: var(--green); }
-.event-readiness-list li > span:last-child { display: grid; gap: 2px; }
-.event-readiness-list strong { font-size: max(var(--type-floor, 0px), 0.64rem); }
-.event-readiness-list small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.54rem); line-height: 1.4; }
-.event-readiness-list li.complete { background: var(--green-soft); }
+.event-readiness-list > li > svg { color: var(--green); }
+.event-readiness-list > li > span:last-child { display: grid; gap: 2px; }
+.event-readiness-list > li > span:last-child > strong { font-size: max(var(--type-floor, 0px), 0.64rem); }
+.event-readiness-list > li > span:last-child > small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.54rem); line-height: 1.4; }
+.event-readiness-list > li.complete { background: var(--green-soft); }
 
 .event-publish-toggle {
   cursor: pointer;
@@ -10679,9 +10680,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .setup-step.is-next { background: var(--imsda-gold-soft); }
 .setup-step.is-next .setup-step-copy strong { font-weight: 800; }
 .setup-step .text-button { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
+.setup-checklist-guide, .role-guide-link { margin: 8px 0 0; }
+.setup-checklist-guide .text-button, .role-guide-link .text-button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.setup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 14px; }
 @media (max-width: 480px) {
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }
   .setup-step .text-button { grid-column: 2; justify-self: start; min-height: 44px; }
+  .setup-step-actions { grid-column: 2; justify-content: flex-start; }
 }
 
 /* --- Class tracking: long member lists scroll inside their block and can be searched --- */
