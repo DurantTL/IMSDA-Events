@@ -8,6 +8,7 @@ import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
@@ -66,6 +67,9 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const [failure, setFailure] = useState("");
   const [result, setResult] = useState<InviteResult | null>(null);
   const titleId = useId();
+  // Anything typed or chosen in the open invitation form, until it has been sent (#1452).
+  const dirty = open && !result && (name.trim() !== "" || email.trim() !== "" || systemAdmin || clubsAdministrator || areaCoordinator || events.length > 0 || clubs.length > 0);
+  useUnsavedChangesGuard(dirty, "This invitation has not been sent. Leave this page and discard it?");
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
 
   function close() {

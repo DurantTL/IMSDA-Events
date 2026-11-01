@@ -498,10 +498,10 @@ export function destinationKeyAction(input: {
  */
 export function selectDestination(input: {
   destination: Pick<SearchDestination, "href">;
-  guard: (navigate: () => void) => boolean;
+  guard: (navigate: () => void) => boolean | Promise<boolean>;
   reset: () => void;
   navigate: (href: string) => void;
-}): boolean {
+}): boolean | Promise<boolean> {
   return input.guard(() => {
     input.reset();
     input.navigate(input.destination.href);

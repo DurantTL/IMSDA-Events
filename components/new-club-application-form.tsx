@@ -9,6 +9,7 @@ import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 import {
@@ -61,7 +62,8 @@ type Props = {
 export function NewClubApplicationForm({ churches, todayLabel, inviteToken, prefill, securityCheck = null }: Props) {
   const check = useRef<SecurityCheckHandle>(null);
   const [openedAt] = useState(() => Date.now());
-  const [values, setValues] = useState({
+  // The values as loaded (a private link prefills the director), so "unsaved" means changed from these (#1452).
+  const [initialValues] = useState(() => ({
     clubName: "",
     church: "",
     churchOther: "",
@@ -76,7 +78,8 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
     clerkSignature: "",
     directorSignature: "",
     note: "",
-  });
+  }));
+  const [values, setValues] = useState(initialValues);
   const [agreed, setAgreed] = useState(false);
   const [boardMembers, setBoardMembers] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -90,6 +93,14 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   // The site was restarting (#1263): the form keeps everything, including the chosen file.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
+  // Anything typed, ticked or attached since the page opened; sending the application turns the warning off.
+  const dirty =
+    !done &&
+    ((Object.keys(initialValues) as Array<keyof typeof initialValues>).some((key) => values[key] !== initialValues[key]) ||
+      agreed ||
+      boardMembers.some((name) => name.trim() !== "") ||
+      file !== null);
+  useUnsavedChangesGuard(dirty, "You have not sent this club application yet. Leave this page and discard what you entered?");
 
   const errorProps = (key: FieldKey, helpId?: string) => fieldErrorProps(`club_${key}_error`, errors[key], helpId);
 

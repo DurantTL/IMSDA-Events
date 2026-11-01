@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
@@ -25,6 +26,9 @@ export function AttendeeRegistrationContactForm({
   // The summary shows the last saved contact, not what is being typed.
   const [savedContact, setSavedContact] = useState(initialContact);
   const [code, setCode] = useState("");
+  // Typed contact details that differ from the last saved ones; saving in place turns the warning off (#1452).
+  const dirty = (Object.keys(contact) as Array<keyof Contact>).some((name) => contact[name] !== savedContact[name]);
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to this contact. Leave this page and discard them?");
   const [attempted, setAttempted] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [saving, setSaving] = useState(false);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { createLinkNavigationListener } from "@/components/link-guard";
-import { registerUnsavedChanges } from "@/components/unsaved-changes-registry";
+import { confirmLeave, hasNavigationPass, registerUnsavedChanges } from "@/components/unsaved-changes-registry";
 
 const defaultMessage = "You have unsaved changes. Leave this page and discard them?";
 
@@ -25,15 +25,16 @@ export function useUnsavedChangesGuard(
     }
 
     function beforeUnload(event: BeforeUnloadEvent) {
-      if (allowNavigationRef.current) return;
+      if (allowNavigationRef.current || hasNavigationPass()) return;
       event.preventDefault();
       event.returnValue = "";
     }
 
-    // One confirm per click: a yes marks the click so `GuardedLink` does not ask again (#1180).
+    // One question per click, in the in-page dialog (#1452). On "Leave" the link is followed again
+    // with a one-shot pass, so neither this listener nor `GuardedLink` asks twice (#1180).
     const beforeLinkNavigation = createLinkNavigationListener({
       message,
-      confirm: (text) => window.confirm(text),
+      confirm: confirmLeave,
       currentHref: () => window.location.href,
       isAllowed: () => allowNavigationRef.current,
     });

@@ -7,6 +7,7 @@ import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
 
 export function AttendeeProfileForm({
@@ -26,6 +27,9 @@ export function AttendeeProfileForm({
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  // Unsaved means the typed values differ from the last saved ones, so saving in place turns the warning off (#1452).
+  const dirty = (Object.keys(profile) as Array<keyof AttendeeProfileInput>).some((name) => profile[name] !== savedProfile[name]);
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to your profile. Leave this page and discard them?");
 
   function field(name: keyof AttendeeProfileInput, value: string) {
     setProfile((current) => ({ ...current, [name]: value }));
