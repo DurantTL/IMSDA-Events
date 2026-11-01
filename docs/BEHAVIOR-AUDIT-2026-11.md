@@ -195,7 +195,7 @@ Reading: "cards" means the shared `table-cards` pattern below 600 px.
 **Shared today:** `table-cards` CSS (`app/globals.css:9602-9670`) with
 `cardCell` / `data-label` from `components/table-card-labels.tsx` (39 files).
 62 of 138 table openings use it. At 390 px these became cards correctly
-(browser): attendee list, churches directory, background checks, club forms,
+(browser): attendee list, churches directory, Sterling Volunteers, club forms,
 form templates, club reports, honor catalog, report packets.
 
 **Breaks**
