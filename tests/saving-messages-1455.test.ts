@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
@@ -28,9 +28,18 @@ import { buttonByText, choose, click, flush, mount, submitForm, typeInto, type M
  */
 
 let mounted: Mounted | null = null;
+// jsdom has no scrollIntoView; a no-op stub lets each test spy on it, whatever order the tests run in.
+const hadScrollIntoView = "scrollIntoView" in Element.prototype;
+beforeAll(() => {
+  if (!hadScrollIntoView) Element.prototype.scrollIntoView = () => {};
+});
+afterAll(() => {
+  if (!hadScrollIntoView) delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+});
 afterEach(async () => {
   await mounted?.unmount();
   mounted = null;
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   window.localStorage.clear();
 });
@@ -232,7 +241,6 @@ describe("Roster message focus, dialog errors and Undo failure (#1455 review)", 
   }
 
   it("moves focus to Undo and scrolls the message into view after Deactivate", async () => {
-    if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
     const scroll = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string };
