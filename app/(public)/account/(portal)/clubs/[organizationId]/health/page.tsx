@@ -10,6 +10,7 @@ import { clubLeaderHealthViewerFromAccess } from "@/modules/coordinator-health/a
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Health", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function ClubHealthPage({
 }) {
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const viewer = clubLeaderHealthViewerFromAccess(access);
   if (!viewer) return <><p className="public-manage-empty">Health information is kept by the club&apos;s director and deputy.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="health information" id="health-role" /></>;
   const base = `/account/clubs/${organizationId}/health`;

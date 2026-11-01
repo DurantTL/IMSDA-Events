@@ -22,6 +22,7 @@ import {
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
 import { MESSAGE_FILE_ID_PATTERN, MESSAGE_FILE_SCHEME } from "@/modules/communications/message-file-rules";
+import { renderEmailLayoutDocument, type EmailLayoutInput } from "@/modules/communications/email-layout";
 
 const ESCAPE_PATTERN = /[&<>"']/g;
 const ESCAPE_REPLACEMENTS: Readonly<Record<string, string>> = {
@@ -408,29 +409,8 @@ export function emailImageSources(html: string) {
   return [...html.matchAll(/<img src="([^"]*)" alt="[^"]*" style="[^"]*" \/>/g)].map((match) => match[1]);
 }
 
-export type EmailHtmlDocumentInput = {
-  /** Shown in the client's tab and read by screen readers. */
-  title: string;
-  /**
-   * The Markdown body, escaped and rendered by `renderEmailBodyHtml`. Use this
-   * where the body is being rendered for the first time.
-   */
-  body?: string;
-  /**
-   * An already-rendered body fragment, wrapped as-is. Delivery uses this: the
-   * fragment was produced at enqueue from the template and its context, where
-   * trusted and untrusted token spans were still distinguishable, and re-parsing
-   * the finished text as Markdown here would lose that distinction.
-   */
-  bodyHtml?: string;
-  /** Small line under the body, used for the sender identity. */
-  footer?: string | null;
-  /**
-   * The inbox preview line (#836): plain text, shown by Gmail, Outlook and phones under the subject, and hidden in
-   * the opened email. Escaped here, never parsed. Absent or blank, the document is exactly what it always was.
-   */
-  preheader?: string | null;
-};
+/** The input of the email document; the layout lives in `email-layout.ts` (#1443). */
+export type EmailHtmlDocumentInput = EmailLayoutInput;
 
 /** The longest preview line staff can write; clients show roughly 40 to 130 characters of it. */
 export const PREHEADER_MAX_LENGTH = 150;
@@ -445,42 +425,9 @@ export function renderPreheaderHtml(preheader: string | null | undefined) {
 }
 
 /**
- * Wrap a rendered body in the email layout. Table-based and inline-styled
- * because mail clients strip stylesheets, with a light-scheme lock so a dark
- * client does not invert the header out of legibility.
+ * Wrap a rendered body in the shared email layout (#1443). Kept here so existing callers keep their import; the layout
+ * itself, the only place an email document is written, is `renderEmailLayoutDocument` in `email-layout.ts`.
  */
 export function renderEmailHtmlDocument(input: EmailHtmlDocumentInput) {
-  const title = escapeHtml(input.title.trim());
-  const footer = input.footer?.trim()
-    ? `<p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#6b7c85;">${renderInline(escapeHtml(input.footer.trim()))}</p>`
-    : "";
-  const preheaderHtml = renderPreheaderHtml(input.preheader);
-  return [
-    "<!DOCTYPE html>",
-    '<html lang="en">',
-    "<head>",
-    '<meta charset="utf-8" />',
-    '<meta name="viewport" content="width=device-width, initial-scale=1" />',
-    '<meta name="color-scheme" content="light" />',
-    '<meta name="supported-color-schemes" content="light" />',
-    `<title>${title}</title>`,
-    "</head>",
-    '<body style="margin:0;padding:0;background:#eef2f4;-webkit-font-smoothing:antialiased;">',
-    ...(preheaderHtml ? [preheaderHtml] : []),
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef2f4;padding:24px 12px;">',
-    "<tr><td align=\"center\">",
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #d9e2e6;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">',
-    '<tr><td style="background:#0b2b3a;padding:18px 28px;">',
-    '<span style="color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">IMSDA Events</span>',
-    "</td></tr>",
-    '<tr><td style="padding:28px;">',
-    input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""),
-    footer,
-    "</td></tr>",
-    "</table>",
-    "</td></tr>",
-    "</table>",
-    "</body>",
-    "</html>",
-  ].join("\n");
+  return renderEmailLayoutDocument(input);
 }

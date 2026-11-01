@@ -11,7 +11,7 @@ const modified = (event: MouseEvent) => event.metaKey || event.ctrlKey || event.
 type Chip = { key: string; label: string; removeLabel: string; href: string };
 
 /**
- * The active filter chips and Clear all (#1321). They are plain links, so they work without JavaScript. With it, a
+ * The active filter chips and Clear filters (#1321). They are plain links, so they work without JavaScript. With it, a
  * click remembers where focus should go (the next chip's remove link, else the previous one, else the result count),
  * and once the new list arrives focus moves there instead of being lost to the page body.
  */
@@ -51,7 +51,7 @@ export function PeopleActiveFilters({ chips, clearHref }: { chips: readonly Chip
           </li>
         ))}
       </ul>
-      <Link className={styles.clearAll} href={clearHref} onClick={(event) => { if (!modified(event)) targets.current = ["status"]; }}>Clear all</Link>
+      <Link className={styles.clearAll} href={clearHref} onClick={(event) => { if (!modified(event)) targets.current = ["status"]; }}>Clear filters</Link>
     </div>
   );
 }

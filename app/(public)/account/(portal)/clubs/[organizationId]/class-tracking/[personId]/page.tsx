@@ -4,6 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { MemberClassHistory } from "@/components/member-class-history";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { loadMemberClassHistory } from "@/modules/earned-awards/order-source";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Class history", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function MemberClassHistoryPage({ params }: { params: Promise<{ organizationId: string; personId: string }> }) {
   const { organizationId, personId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const history = await loadMemberClassHistory(organizationId, personId);
   if (!history) notFound();
   return (

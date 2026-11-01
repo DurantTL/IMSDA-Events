@@ -45,6 +45,7 @@ export default async function PrintableAttendeePassesPage({
       <AccessRestricted
         title="Attendee passes are restricted"
         detail="Only event administrators and check-in staff can print attendee passes."
+        whoToAsk="your event administrator"
       />
     );
   }

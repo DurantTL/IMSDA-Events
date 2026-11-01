@@ -28,6 +28,7 @@ vi.mock("@/modules/emergency-plans/repository", () => ({
 }));
 
 import { AccessRestricted } from "@/components/access-restricted";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import EmergencyPlanPage from "@/app/(workspace)/more/emergency-plan/page";
 import EmergencyPlanPrintPage from "@/app/(workspace)/more/emergency-plan/print/page";
 
@@ -41,6 +42,7 @@ const snapshot = {
 };
 const draftPlan = { locations: [], procedures: [], contacts: [{ role: "Director", name: "Sample", phone: "(515) 555-0100", escalationOrder: 1 }] };
 const search = (params: Record<string, string> = {}) => Promise.resolve({ event: "event-1", ...params });
+const isNotAvailable = (node: unknown) => isValidElement(node) && node.type === NotAvailableForEvent;
 const isRestricted = (node: unknown) => isValidElement(node) && node.type === AccessRestricted;
 
 beforeEach(() => {
@@ -107,7 +109,8 @@ describe("emergency plan print page", () => {
   });
 
   it("rejects a malformed version", async () => {
-    expect(isRestricted(await EmergencyPlanPrintPage({ searchParams: search({ version: "x" }) }))).toBe(true);
+    // Nothing was denied, so it is the plain not-available state, not an ask for access.
+    expect(isNotAvailable(await EmergencyPlanPrintPage({ searchParams: search({ version: "x" }) }))).toBe(true);
     expect(mocks.getEmergencyPlanVersion).not.toHaveBeenCalled();
   });
 

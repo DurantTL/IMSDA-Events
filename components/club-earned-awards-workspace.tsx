@@ -3,6 +3,7 @@
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, Award, CheckCircle2, Download, Eye, GraduationCap, Plus, Search, Sparkles, Trash2, Trophy, UsersRound, X } from "lucide-react";
 import { HonorCombobox } from "@/components/honor-combobox";
 import styles from "@/components/club-orders.module.css";
@@ -148,14 +149,22 @@ export function ClubEarnedAwardsWorkspace({
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
   // One member selection, shared by Mark completed and Add by hand: the members table is listed once.
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [memberQuery, setMemberQuery] = useState("");
+  const memberSearch = useClientSearch();
+  const memberQuery = memberSearch.term;
   const [statusFilter, setStatusFilter] = useState<ClassStatusFilter>("");
   const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
   const [classLevel, setClassLevel] = useState<ClubClassLevel>("FRIEND");
   const [completedOn, setCompletedOn] = useState(today);
   // Add by hand.
   const [itemId, setItemId] = useState("");
-  const [itemQuery, setItemQuery] = useState("");
+  const itemSearch = useClientSearch();
+  const itemQuery = itemSearch.term;
+  // A new item search clears the chosen item once the list has changed (not on every keystroke).
+  const [itemTermSeen, setItemTermSeen] = useState(itemQuery);
+  if (itemTermSeen !== itemQuery) {
+    setItemTermSeen(itemQuery);
+    setItemId("");
+  }
   const [chosen, setChosen] = useState<Array<{ itemId: string; label: string }>>([]);
   const [alreadyHasIt, setAlreadyHasIt] = useState(false);
   // Open items.
@@ -263,7 +272,7 @@ export function ClubEarnedAwardsWorkspace({
     if (!group || chosen.some((entry) => entry.itemId === group.itemId)) return;
     setChosen((current) => [...current, { itemId: group.itemId, label: group.name }]);
     setItemId("");
-    setItemQuery("");
+    itemSearch.setValue("");
   }
 
   async function record() {
@@ -384,10 +393,9 @@ export function ClubEarnedAwardsWorkspace({
                     <input
                       autoComplete="off"
                       id="earned-search"
-                      onChange={(event) => setMemberQuery(event.target.value)}
+                      {...memberSearch.inputProps}
                       placeholder="Search by name or class"
                       type="search"
-                      value={memberQuery}
                     />
                   </span>
                 </label>
@@ -505,7 +513,7 @@ export function ClubEarnedAwardsWorkspace({
                 {data.catalog.length > 8 && (
                   <span className={styles.pickerField}>
                     <label htmlFor="earned-item-search">Find an item</label>
-                    <input autoComplete="off" className={styles.select} aria-describedby="earned-item-results" id="earned-item-search" onChange={(event) => { setItemQuery(event.target.value); setItemId(""); }} placeholder="Item name" type="search" value={itemQuery} />
+                    <input autoComplete="off" className={styles.select} aria-describedby="earned-item-results" id="earned-item-search" {...itemSearch.inputProps} placeholder="Item name" type="search" />
                   </span>
                 )}
                 <span className={styles.pickerField}>

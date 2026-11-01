@@ -21,6 +21,7 @@ import { listRosterChoices, listSubmissionsForViewer } from "@/modules/club-form
 import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Forms" };
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function ClubFormsPage({
 }) {
   const [{ organizationId }, { member }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   if (!isClubFormsRole(access.club.role)) {
     return (
       <>

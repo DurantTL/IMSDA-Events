@@ -188,11 +188,11 @@ describe("the People list markup", () => {
     query: "", rows: [], page: 1, pageCount: 1, total: 12, filters, eventOptions: events, clubOptions: clubs, ...extra,
   }));
 
-  it("shows chips with accessible remove links, Clear all, the active count and a polite count", () => {
+  it("shows chips with accessible remove links, Clear filters, the active count and a polite count", () => {
     const html = render(parsePeopleFilters({ role: ["club-director", "club-deputy"], club: ["org_1", "org_2"] }, "full"));
     expect(html).toContain('aria-label="Active filters"');
     expect(html).toContain('aria-label="Remove filter Role: Deputy"');
-    expect(html).toContain(">Clear all<");
+    expect(html).toContain(">Clear filters<");
     expect(html).toContain("4 active");
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain("12 people with Director or Deputy in 2 clubs.");
@@ -213,9 +213,10 @@ describe("the People list markup", () => {
     expect(html).toContain('id="people-status"');
   });
 
-  it("shows search Clear whenever a search is set, keeping filters", () => {
+  it("shows Clear filters beside the search whenever a search or filter is set, back to the bare list (rule B2, #1456)", () => {
     const html = render(parsePeopleFilters({ role: "club-director" }, "full"), { query: "sam" });
-    expect(html).toContain('class="secondary-button" href="/admin/people?role=club-director"');
+    expect(html).toContain('class="secondary-button" href="/admin/people">Clear filters</a></form>');
+    expect(render(parsePeopleFilters({}, "full"))).not.toContain('href="/admin/people">Clear filters</a></form>');
   });
 
   it("groups roles in the panel with legends", () => {

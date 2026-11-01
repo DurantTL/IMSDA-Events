@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { waitlistOfferHoursMax, waitlistOfferHoursMin } from "@/modules/honors/waitlist-domain";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * How long a club director has to accept a seat offered from a full Honors
@@ -30,7 +31,7 @@ export function HonorWaitlistSettings({ eventId, initialHours }: { eventId: stri
       if (!response.ok || typeof result.offerHours !== "number") throw new Error(result.message ?? "The window could not be saved.");
       setSaved(result.offerHours);
       setHours(String(result.offerHours));
-      setMessage("Saved.");
+      setMessage(savedMessage());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The window could not be saved.");
     } finally {

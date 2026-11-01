@@ -4,6 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { ClubRosterCarryForward } from "@/components/club-roster-carry-forward";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Start next year's roster" };
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubRosterNextYearPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const rosterHref = `/account/clubs/${organizationId}/roster`;
   if (!access.capabilities.manageTeam) {
     return (

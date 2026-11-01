@@ -17,7 +17,7 @@ export default async function IssueAssetsPage({ searchParams }: { searchParams: 
   const { user } = await getCurrentSession();
   // Decided here on the server, and again by every API route the desk calls.
   if (!permissions.includes("MANAGE_CHECK_IN")) {
-    return <AccessRestricted title="Issuing is restricted" detail="Event administrators and check-in staff can issue keys and other items, and check them back in." />;
+    return <AccessRestricted title="Issuing is restricted" detail="Event administrators and check-in staff can issue keys and other items, and check them back in." whoToAsk="your event administrator" />;
   }
   const [types, lots, options, person] = await Promise.all([
     getDeskTypes(event.id),

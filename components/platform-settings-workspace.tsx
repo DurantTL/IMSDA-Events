@@ -8,6 +8,8 @@ import { useConfirm } from "@/components/use-confirm";
 import { Building2, CalendarPlus, FileText, KeyRound, Mail, Megaphone, Save, Wrench } from "lucide-react";
 import { PhoneInput } from "@/components/phone-input";
 import { inlinePhoneProblem } from "@/lib/field-validation";
+import { EmailHeaderPreview } from "@/components/email-header-preview";
+import { checkEmailHeaderName, checkEmailHelpEmail } from "@/modules/communications/email-layout-domain";
 import {
   displayPlatformSettingValue,
   normalizePlatformSettingValue,
@@ -41,6 +43,10 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     invoiceHeaderPhone: settings.invoiceHeaderPhone ?? "",
     publicHelpPhone: settings.publicHelpPhone ?? "",
     publicHelpEmail: settings.publicHelpEmail ?? "",
+    emailHeaderName: settings.emailHeaderName,
+    emailClubHeaderName: settings.emailClubHeaderName,
+    emailHelpEmail: settings.emailHelpEmail ?? "",
+    emailHelpPhone: settings.emailHelpPhone ?? "",
   };
 }
 
@@ -165,6 +171,17 @@ export function PlatformSettingsWorkspace({
   const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
   const [helpPhoneTouched, setHelpPhoneTouched] = useState(false);
   const helpPhoneProblem = inlinePhoneProblem("Phone", draft.publicHelpPhone, settings.publicHelpPhone, helpPhoneTouched);
+  // The email footer phone (#1443), judged like the other phones; the stored one is flagged but never blocks.
+  const [emailPhoneTouched, setEmailPhoneTouched] = useState(false);
+  const emailPhoneProblem = inlinePhoneProblem("Phone", draft.emailHelpPhone, settings.emailHelpPhone, emailPhoneTouched);
+  const [emailLayoutTouched, setEmailLayoutTouched] = useState(false);
+  const nameCheck = checkEmailHeaderName(draft.emailHeaderName);
+  const clubNameCheck = checkEmailHeaderName(draft.emailClubHeaderName);
+  const emailCheck = checkEmailHelpEmail(draft.emailHelpEmail);
+  const nameProblem = emailLayoutTouched && !nameCheck.ok ? nameCheck.message : undefined;
+  const clubNameProblem = emailLayoutTouched && !clubNameCheck.ok ? clubNameCheck.message : undefined;
+  const emailProblem = emailLayoutTouched && !emailCheck.ok ? emailCheck.message : undefined;
+  const emailLayoutBlocking = !nameCheck.ok || !clubNameCheck.ok || !emailCheck.ok;
   const changes = platformSettingsChanges(draftFrom(settings), draft);
   const dirty = changes.length > 0;
   const shownOutcome = outcome?.kind === "conflict" && !dirty ? null : outcome;
@@ -221,17 +238,25 @@ export function PlatformSettingsWorkspace({
     setFieldErrors({});
     setPhoneTouched(false);
     setHelpPhoneTouched(false);
+    setEmailPhoneTouched(false);
+    setEmailLayoutTouched(false);
   }
 
   async function save(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
     setPhoneTouched(true);
     setHelpPhoneTouched(true);
-    if (phoneProblem.blocking || helpPhoneProblem.blocking) {
+    setEmailPhoneTouched(true);
+    setEmailLayoutTouched(true);
+    if (phoneProblem.blocking || helpPhoneProblem.blocking || emailPhoneProblem.blocking || emailLayoutBlocking) {
       setOutcome({ kind: "failed", message: "Check the highlighted answers and try again." });
       focusFirstInvalid([
         ...(phoneProblem.blocking ? ["invoiceHeaderPhone" as const] : []),
         ...(helpPhoneProblem.blocking ? ["publicHelpPhone" as const] : []),
+        ...(!nameCheck.ok ? ["emailHeaderName" as const] : []),
+        ...(!clubNameCheck.ok ? ["emailClubHeaderName" as const] : []),
+        ...(!emailCheck.ok ? ["emailHelpEmail" as const] : []),
+        ...(emailPhoneProblem.blocking ? ["emailHelpPhone" as const] : []),
       ]);
       return;
     }
@@ -316,9 +341,11 @@ export function PlatformSettingsWorkspace({
           }
         }
       }
-      const codeField = result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Help phone")
-        ? "publicHelpPhone"
-        : serverCodeFields[result.error as string];
+      const codeField = result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Email help phone")
+        ? "emailHelpPhone"
+        : result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Help phone")
+          ? "publicHelpPhone"
+          : serverCodeFields[result.error as string];
       if (codeField && !invalid[codeField]) invalid[codeField] = result.message ?? "Check this answer.";
       setFieldErrors(invalid);
       setOutcome({ kind: "failed", message: result.message ?? "The platform settings could not be saved." });
@@ -465,6 +492,41 @@ export function PlatformSettingsWorkspace({
             <input autoComplete="off" maxLength={200} type="email" {...field("publicHelpEmail")} {...invalidProps("publicHelpEmail")} />
             <small>An address the public can write to. Shown as typed, saved in lower case.</small>
             {fieldError("publicHelpEmail")}
+          </label>
+        </section>
+
+        <section className="panel" aria-labelledby="platform-email-layout-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Email</p>
+              <h2 id="platform-email-layout-heading">Email header and footer</h2>
+            </div>
+          </div>
+          <p className="settings-ownership"><strong>Central value.</strong> Every email sent after you save uses these.</p>
+          <p className="field-help platform-note">
+            Every email has the same header and a footer that says who sent it, why the person got it and how to get help.
+            Registration and event emails keep using each event&apos;s own contact for help.
+          </p>
+          <EmailHeaderPreview eventName={draft.emailHeaderName} clubName={draft.emailClubHeaderName} />
+          <label>Header name for event and general emails
+            <input {...invalidProps("emailHeaderName", nameProblem)} autoComplete="off" maxLength={40} onBlur={() => setEmailLayoutTouched(true)} type="text" {...field("emailHeaderName")} />
+            <small>Up to 40 characters. Shown in the header bar and in &ldquo;Sent by&rdquo;. Default: IMSDA Events.</small>
+            {fieldError("emailHeaderName", nameProblem)}
+          </label>
+          <label>Header name for club emails
+            <input {...invalidProps("emailClubHeaderName", clubNameProblem)} autoComplete="off" maxLength={40} onBlur={() => setEmailLayoutTouched(true)} type="text" {...field("emailClubHeaderName")} />
+            <small>Used for club roles and invites, the club director sign-in code, club forms and club registrations. Up to 40 characters.</small>
+            {fieldError("emailClubHeaderName", clubNameProblem)}
+          </label>
+          <label>Footer help email
+            <input {...invalidProps("emailHelpEmail", emailProblem)} autoComplete="off" maxLength={200} onBlur={() => setEmailLayoutTouched(true)} type="email" {...field("emailHelpEmail")} />
+            <small>Shown as &ldquo;Need help?&rdquo; in system and club emails. Leave both help fields blank and the footer says &ldquo;Reply to this email for help&rdquo; only when replies reach an inbox someone reads; otherwise it leaves the line out.</small>
+            {fieldError("emailHelpEmail", emailProblem)}
+          </label>
+          <label>Footer help phone (optional)
+            <input {...invalidProps("emailHelpPhone", emailPhoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setEmailPhoneTouched(true)} type="tel" {...field("emailHelpPhone")} />
+            <small>A phone number, like (515) 555-0100.</small>
+            {fieldError("emailHelpPhone", emailPhoneProblem.message ?? undefined)}
           </label>
         </section>
 

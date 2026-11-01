@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function EventClubReportsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, allowed } = await resolveClubOversight(requested);
-  if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view club reports." />;
+  if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view club reports." whoToAsk="your event administrator" />;
   const now = new Date();
   const clubYear = clubYearFor(now);
   return (

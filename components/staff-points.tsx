@@ -11,7 +11,7 @@ export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffP
       {view.query !== "" && (
         <p className={styles.note}>
           {view.matches.length > 0 && `Showing ${view.matches.length} of ${view.totalClubs} clubs matching “${view.query}”; the figures above count all clubs.`}{" "}
-          <Link className={styles.clear} href={view.clearHref} prefetch={false}>Clear search</Link>
+          <Link className={styles.clear} href={view.clearHref} prefetch={false}>Clear filters</Link>
         </p>
       )}
       {view.matches.length === 0 ? (

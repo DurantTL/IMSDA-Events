@@ -1,5 +1,6 @@
 "use client";
 
+import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { Save } from "lucide-react";
@@ -94,11 +95,12 @@ export function ClubProfileForm({
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The club profile could not be saved.");
       }
       setProfile(result.profile);
-      setNotice("Club settings saved.");
+      setNotice(savedMessage());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The club profile could not be saved.");
+      setError(notSavedMessage(caught instanceof Error ? caught.message : "The club profile could not be saved."));
     } finally {
       setSaving(false);
+      restoreFocusAfterSave("club-profile-save");
     }
   }
 
@@ -110,6 +112,8 @@ export function ClubProfileForm({
       key={profile.updatedAt ?? "new"}
       noValidate
       onChange={(event) => {
+        // Editing again makes "Saved." stale.
+        setNotice("");
         const id = (event.target as HTMLElement).id;
         if (id === "club-profile-email" || id === "club-profile-phone") {
           clearSummaryField(id);
@@ -123,8 +127,6 @@ export function ClubProfileForm({
           <h2>About the club</h2>
         </div>
       </div>
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
       {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
       <div className="form-grid two-column">
         <label>
@@ -170,7 +172,8 @@ export function ClubProfileForm({
         young person&apos;s. Every change is recorded.
       </p>
       <div>
-        <SubmitButton className="primary-button" icon={<Save aria-hidden="true" size={16} />} label="Save profile" submitting={saving} submittingLabel="Saving…" />
+        <SubmitButton className="primary-button" id="club-profile-save" icon={<Save aria-hidden="true" size={16} />} label="Save profile" submitting={saving} submittingLabel="Saving…" />
+        {error ? <FormMessage message={error} tone="error" /> : notice ? <FormMessage message={notice} tone="success" /> : null}
       </div>
     </form>
   );

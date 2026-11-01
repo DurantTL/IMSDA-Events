@@ -5,6 +5,8 @@ import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { notSavedMessage } from "@/components/form-message";
+import { settingsSaveStateLabels } from "@/components/settings-save-state";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { ArrowLeft, ArrowRight, Trash2, UserPlus, UsersRound } from "lucide-react";
 import {
@@ -490,7 +492,7 @@ export function ClubRegistrationWorkspace({
 
   const saveLabel = conflict
     ? DRAFT_CONFLICT_MESSAGE
-    : saveState === "saving" ? "Saving draft…" : saveState === "saved" ? "Draft saved" : saveState === "error" ? "Draft not saved. Check your connection." : "";
+    : saveState === "saving" ? settingsSaveStateLabels.saving : saveState === "saved" ? settingsSaveStateLabels.saved : saveState === "error" ? notSavedMessage("check your connection. Your answers are still here.") : "";
   const saveAction = conflict
     ? <button className="text-button" onClick={() => window.location.reload()} type="button">Reload</button>
     : saveState === "error"
