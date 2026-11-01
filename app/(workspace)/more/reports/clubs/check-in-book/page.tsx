@@ -32,13 +32,14 @@ export default async function CheckInBookPage({
     return (
       <AccessRestricted
         title="The check-in book is restricted"
-        detail="Ask an event administrator for report access, or for Pathfinder event-manager oversight of this club event."
+        detail="This needs report access or Pathfinder event-manager oversight of this club event."
+        whoToAsk="your event administrator"
       />
     );
   }
   const statuses = parseCheckInBookStatuses(status);
   const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location });
-  if (!data) return <AccessRestricted title="Event not found" detail="This event could not be loaded." />;
+  if (!data) return <AccessRestricted title="Event not found" detail="This event could not be loaded." whoToAsk="your event administrator" />;
 
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const downloadParams = new URLSearchParams();

@@ -60,7 +60,7 @@ export async function resolveEventContext(requestedEventId?: string, options: { 
   // Kitchen staff (#1029) have no event view: their home is the counts page, so any other page of the workspace that
   // does not open on a permission of its own, including the dashboard they land on after signing in, sends them there.
   if (!options.allowWithoutEventView && isKitchenWithoutEventView(permissions)) {
-    redirect(`${kitchenCountsPath}?event=${encodeURIComponent(event.id)}`);
+    redirect(`${kitchenCountsPath}?event=${encodeURIComponent(event.id)}&restricted=1`);
   }
 
   return {

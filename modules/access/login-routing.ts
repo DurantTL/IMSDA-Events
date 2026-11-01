@@ -26,6 +26,8 @@ export type LoginRoutingInput = {
 export const SYSTEM_ADMIN_PATH = "/admin";
 export const NO_EVENTS_PATH = "/no-access";
 export const EVENT_PICKER_PATH = "/select-event";
+/** Where a signed-in attendee or club leader (no staff session) is sent from a staff page, so they are told it is not theirs. */
+export const NO_STAFF_ACCESS_PATH = "/no-access?from=attendee";
 /**
  * Where sign-in lands when role routing itself fails after the session is
  * already issued — the pre-#108 destination, whose workspace layout picks an

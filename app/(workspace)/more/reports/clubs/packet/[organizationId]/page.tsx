@@ -30,7 +30,8 @@ export default async function StaffClubPacketPage({
     return (
       <AccessRestricted
         title="Club packets are restricted"
-        detail="Ask an event administrator for report access, or for Pathfinder event-manager oversight of this club event."
+        detail="This needs report access or Pathfinder event-manager oversight of this club event."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -38,7 +39,7 @@ export default async function StaffClubPacketPage({
   if (!packet) {
     // A team this club never registered (or another club's) is not found.
     if (teamKey) notFound();
-    return <AccessRestricted title="No active registration" detail="This club has no submitted or confirmed registration for this event." />;
+    return <AccessRestricted title="No active registration" detail="This club has no submitted or confirmed registration for this event." whoToAsk="your event administrator" />;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
 

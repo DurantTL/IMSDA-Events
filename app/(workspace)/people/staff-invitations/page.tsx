@@ -20,6 +20,7 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
       <AccessRestricted
         title="Staff invitations are restricted"
         detail="Only event administrators and registration managers can create and manage personal registration links."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -28,6 +29,7 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
       <AccessRestricted
         title="Staff invitations aren't used for club events"
         detail="Personal staff, pastor and volunteer links are for events that are open to everyone."
+        whoToAsk="your event administrator"
       />
     );
   }

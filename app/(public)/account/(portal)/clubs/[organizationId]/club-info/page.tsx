@@ -7,6 +7,7 @@ import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
 import { listClubTeam } from "@/modules/organizations/director-grants-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club settings" };
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function ClubInfoPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const { editProfile, manageTeam } = access.capabilities;
   if (!editProfile && !manageTeam) {
     return (

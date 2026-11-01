@@ -20,12 +20,13 @@ export default async function CommunityPage({
       <AccessRestricted
         title="Community moderation is restricted"
         detail="Only event administrators and communications managers can enable or moderate attendee discussion."
+        whoToAsk="your event administrator"
       />
     );
   }
   const community = await getStaffCommunity(event.id);
   if (!community) {
-    return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+    return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." whoToAsk="your event administrator" />;
   }
   return (
     <section className="page-stack community-workspace">

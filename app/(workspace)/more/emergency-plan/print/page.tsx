@@ -24,10 +24,10 @@ export default async function EmergencyPlanPrintPage({ searchParams }: { searchP
   const { event: requested, version, draft } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="The emergency plan is restricted" detail="Ask an event administrator for access to this event." />;
+    return <AccessRestricted title="The emergency plan is restricted" detail="Your account does not have access to this event's emergency plan." whoToAsk="your event administrator" />;
   }
   if (!(await isModuleEnabled(event.id, "emergency-plans"))) {
-    return <AccessRestricted title="The emergency plan is not turned on" detail="A system administrator turns on the Emergency plan for an event before staff can use it." />;
+    return <AccessRestricted title="The emergency plan is not turned on" detail="A system administrator turns on the Emergency plan for an event before staff can use it." whoToAsk="a system administrator" />;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const back = <Link className="secondary-button" href={`/more/emergency-plan?${eventQuery}`}>Back to the emergency plan</Link>;
@@ -36,15 +36,15 @@ export default async function EmergencyPlanPrintPage({ searchParams }: { searchP
   let versionNumber: number | null = null;
   if (draft === "1") {
     if (!permissions.includes("CONFIGURE_EVENT")) {
-      return <AccessRestricted title="Draft previews are restricted" detail="Event administrators can preview the unpublished draft. Print a published version instead." />;
+      return <AccessRestricted title="Draft previews are restricted" detail="Event administrators can preview the unpublished draft. Print a published version instead." whoToAsk="your event administrator" />;
     }
     const [plan, eventRow] = await Promise.all([getEmergencyPlanDraft(event.id), getEmergencyPlanEvent(event.id)]);
-    if (!eventRow) return <AccessRestricted title="Event not found" detail="This event could not be loaded." />;
+    if (!eventRow) return <AccessRestricted title="Event not found" detail="This event could not be loaded." whoToAsk="your event administrator" />;
     sheet = buildEmergencyReferenceSheet(buildEmergencyPlanSnapshot(plan, eventRow), null);
   } else {
     const requestedVersion = version === undefined ? undefined : Number(version);
     if (requestedVersion !== undefined && (!Number.isInteger(requestedVersion) || requestedVersion < 1)) {
-      return <AccessRestricted title="Version not found" detail="Choose a published version from the emergency plan page." />;
+      return <AccessRestricted title="Version not found" detail="Choose a published version from the emergency plan page." whoToAsk="your event administrator" />;
     }
     const published = await getEmergencyPlanVersion(event.id, requestedVersion);
     if (!published) {

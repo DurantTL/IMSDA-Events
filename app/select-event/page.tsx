@@ -63,7 +63,7 @@ export default async function SelectEventPage({
           <p className="eyebrow">Staff workspace</p>
           <h1>Choose an event</h1>
           {unavailable
-            ? <p>That event isn&rsquo;t available. It may not exist, or this account may not have access to it.</p>
+            ? <p>You can&rsquo;t open that event with this account. Ask your event administrator if you need access, or choose one of your events below.</p>
             : <p>{session.user.email} has access to more than one event. Pick one to continue.</p>}
         </div>
         {unavailable && (

@@ -104,7 +104,7 @@ export async function requirePermission(
 
   if (!grants.has(permission)) {
     throw new AccessDeniedError(
-      `The ${permission} permission is required for this event.`,
+      "Your event role doesn't include this. Ask your event administrator if you need access.",
       403,
       "PERMISSION_DENIED",
     );

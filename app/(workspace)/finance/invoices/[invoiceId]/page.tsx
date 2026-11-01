@@ -16,7 +16,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   const [{ invoiceId }, { event: requested, version }] = await Promise.all([params, searchParams]);
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view and prepare invoices." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view and prepare invoices." whoToAsk="your event administrator" />;
   }
   // An invoice of another event is not found, never shown.
   const detail = await getInvoiceDetail(event.id, invoiceId, { versionId: version ?? null });

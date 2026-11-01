@@ -19,6 +19,7 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
       <AccessRestricted
         title="Staff registrations are restricted"
         detail="Only event administrators and registration managers can approve staff, pastor and volunteer registrations."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -27,6 +28,7 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
       <AccessRestricted
         title="Staff invitations aren't used for club events"
         detail="Personal staff, pastor and volunteer links are for events that are open to everyone."
+        whoToAsk="your event administrator"
       />
     );
   }

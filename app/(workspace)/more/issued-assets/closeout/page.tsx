@@ -13,7 +13,7 @@ export default async function IssuedAssetsCloseoutPage({ searchParams }: { searc
   // Decided here on the server, and again by every API route the screen calls.
   const canRead = ["MANAGE_CHECK_IN", "MANAGE_FINANCE", "CONFIGURE_EVENT", "VIEW_REPORTS"].some((permission) => permissions.includes(permission as (typeof permissions)[number]));
   if (!canRead) {
-    return <AccessRestricted title="The closeout is restricted" detail="Check-in staff, finance, report viewers and event administrators can see what is still out, lost, charged or held." />;
+    return <AccessRestricted title="The closeout is restricted" detail="Check-in staff, finance, report viewers and event administrators can see what is still out, lost, charged or held." whoToAsk="your event administrator" />;
   }
   const [report, options] = await Promise.all([getCloseoutReport(event.id), getAssigneeOptions(event.id)]);
   return <AssetCloseoutWorkspace

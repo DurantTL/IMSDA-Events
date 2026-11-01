@@ -26,7 +26,8 @@ export default async function ClubAssignmentsPage({
       <>
         <AccessRestricted
           title="Club assignments are restricted"
-          detail="Ask an event administrator for registration-management access before assigning campsites, duties, or activities."
+          detail="Assigning campsites, duties, or activities needs registration-management access."
+          whoToAsk="your event administrator"
         />
       </>
     );
@@ -39,6 +40,7 @@ export default async function ClubAssignmentsPage({
         <AccessRestricted
           title="Club assignments are for club events"
           detail="This event doesn't take club registrations. Choose a club event to assign campsites, duties, and activities."
+          whoToAsk="your event administrator"
         />
       </>
     );

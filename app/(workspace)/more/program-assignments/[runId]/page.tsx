@@ -30,7 +30,8 @@ export default async function ProgramAssignmentRosterPage({
     return (
       <AccessRestricted
         title="Assignment roster is restricted"
-        detail="Ask an event administrator for registration or form-management access before opening this roster."
+        detail="Opening this roster needs registration or form-management access."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -40,6 +41,7 @@ export default async function ProgramAssignmentRosterPage({
       <AccessRestricted
         title="Assignment roster not found"
         detail="This run does not belong to the selected event, or it is no longer available."
+        whoToAsk="your event administrator"
       />
     );
   }
