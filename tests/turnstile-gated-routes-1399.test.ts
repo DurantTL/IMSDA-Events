@@ -36,16 +36,27 @@ describe("gated routes", () => {
     expect(call).toContain(`fallback: { kind: "${kind}"`);
   });
 
-  // The fallback only applies once the honeypot passed: forms that have a honeypot field parse it first.
-  it.each([
-    "app/api/public/events/[eventSlug]/forms/[formSlug]/registrations/route.ts",
-    "app/api/public/events/[eventSlug]/general-registrations/route.ts",
-    "app/api/public/events/[eventSlug]/group-registrations/route.ts",
-    "app/api/public/club-applications/route.ts",
-  ])("%s checks its honeypot (the schema's website field) before requireTurnstile (#1480)", (path) => {
+  // The fallback only applies once the honeypot passed: every public fallback route parses a schema that carries the
+  // hidden `website` field before it calls requireTurnstile.
+  const honeypotRoutes: Array<[string, RegExp, string[]]> = [
+    ["app/api/public/events/[eventSlug]/forms/[formSlug]/registrations/route.ts", /publicRegistrationInputSchema\.parse\(/, ["modules/forms/public-domain.ts"]],
+    ["app/api/public/events/[eventSlug]/general-registrations/route.ts", /publicRegistrationInputSchema\.parse\(/, ["modules/forms/public-domain.ts"]],
+    ["app/api/public/events/[eventSlug]/group-registrations/route.ts", /publicRegistrationInputSchema\.parse\(/, ["modules/forms/public-domain.ts"]],
+    ["app/api/public/club-applications/route.ts", /newClubApplicationInputSchema\.parse\(/, ["modules/club-applications/domain.ts"]],
+    ["app/api/public/club-form-applications/[templateKey]/route.ts", /openApplicationSubmitSchema\.parse\(/, ["modules/club-forms/open-applications-domain.ts"]],
+    ["app/api/public/information-forms/route.ts", /bodySchema\.safeParse\(/, ["app/api/public/information-forms/route.ts"]],
+    ["app/api/public/registration-recovery/route.ts", /requestSchema\.parse\(/, ["app/api/public/registration-recovery/route.ts"]],
+  ];
+
+  it.each(honeypotRoutes)("%s checks its honeypot before requireTurnstile (#1480)", (path, parseCall, schemaFiles) => {
     const source = readFileSync(path, "utf8");
-    expect(source.search(/(publicRegistrationInputSchema|newClubApplicationInputSchema)\.parse\(/)).toBeGreaterThan(-1);
-    expect(source.search(/(publicRegistrationInputSchema|newClubApplicationInputSchema)\.parse\(/)).toBeLessThan(source.indexOf("requireTurnstile(request"));
+    expect(source.search(parseCall)).toBeGreaterThan(-1);
+    expect(source.search(parseCall)).toBeLessThan(source.indexOf("requireTurnstile(request"));
+    for (const file of schemaFiles) expect(readFileSync(file, "utf8")).toMatch(/website: (z\.literal\(""|honeypotFieldSchema)/);
+  });
+
+  it("the code request route carries the honeypot too", () => {
+    expect(readFileSync("app/api/security-check/email-code/route.ts", "utf8")).toContain("website: honeypotFieldSchema");
   });
 
   it("leaves the promo-code route ungated", () => {

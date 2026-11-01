@@ -14,6 +14,9 @@ const state = vi.hoisted(() => ({
   attendees: [] as string[],
   afterTasks: [] as Array<() => unknown>,
   sequence: 0,
+  configured: true,
+  sealFails: false,
+  outboxFails: false,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -77,6 +80,7 @@ const fakePrisma = {
   },
   messageOutbox: {
     create: async ({ data }: { data: Record<string, unknown> }) => {
+      if (state.outboxFails) throw new Error("outbox unavailable");
       const row = { id: `message-${++state.sequence}`, ...data };
       state.outbox.push(row);
       return { id: row.id };
@@ -87,7 +91,10 @@ const fakePrisma = {
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => fakePrisma }));
 vi.mock("@/lib/secret-box", () => ({
-  sealSecret: (value: string) => `sealed:${value}`,
+  sealSecret: (value: string) => {
+    if (state.sealFails) throw new Error("SECRET_ENCRYPTION_KEY must be set");
+    return `sealed:${value}`;
+  },
   openSecret: (value: string) => value.slice("sealed:".length),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({
@@ -100,7 +107,7 @@ vi.mock("next/server", async (importOriginal) => ({
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
 vi.mock("@/integrations/turnstile/siteverify", () => ({ verifyTurnstileToken: mocks.verify }));
 vi.mock("@/modules/communications/account-email", () => ({
-  isAccountEmailConfigured: () => true,
+  isAccountEmailConfigured: () => state.configured,
   getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@imsda.test", replyTo: null }),
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: vi.fn(async () => ({ sentIds: [], rescheduledIds: [] })) }));
@@ -156,8 +163,15 @@ const registrationContext = { params: Promise.resolve({ eventSlug: "summer-retre
 const registrationWith = (headers: Record<string, string> = {}, body: unknown = registrationBody) =>
   post("/api/public/events/summer-retreat/forms/attendee/registrations", body, headers);
 
+/** The work the route schedules for after its response (eligibility, outbox, audit, delivery). */
+async function runAfterResponse() {
+  const tasks = state.afterTasks.splice(0);
+  for (const task of tasks) await task();
+}
+
 /** What the delivery worker does with the queued message: mint the code into it. Returns the digits. */
 async function deliverLatestCode() {
+  await runAfterResponse();
   const message = state.outbox.at(-1)!;
   const prepared = await prepareSecurityCheckCodeForDelivery({
     messageId: message.id as string,
@@ -184,6 +198,9 @@ beforeEach(() => {
   state.staff.splice(0, state.staff.length, KNOWN);
   state.attendees.length = 0;
   state.sequence = 0;
+  state.configured = true;
+  state.sealFails = false;
+  state.outboxFails = false;
   mocks.sendSendLimit.mockResolvedValue(ALLOWED);
   mocks.fallbackLimit.mockResolvedValue(ALLOWED);
   mocks.authenticateWithPassword.mockResolvedValue(null);
@@ -200,8 +217,8 @@ afterEach(() => {
 describe("email code: blocked check on staff sign-in", () => {
   it("requests a code, then signs in with the code and no token, once", async () => {
     expect((await requestCode(codeRequest(KNOWN))).status).toBe(202);
-    expect(state.outbox).toHaveLength(1);
     const code = await deliverLatestCode();
+    expect(state.outbox).toHaveLength(1);
 
     const first = await login(loginWith({ "x-security-check-code": code }));
     expect(first.status).toBe(401); // the password was wrong; the security check itself passed
@@ -309,19 +326,53 @@ describe("email code request: no account enumeration", () => {
   it("answers identically for a known and an unknown address, and queues mail only for the known one", async () => {
     const known = await requestCode(codeRequest(KNOWN));
     const knownBody = await known.json();
-    const outboxAfterKnown = state.outbox.length;
+    // Before the response ends nothing differs: no lookup result, no outbox row, for either address.
+    expect(state.outbox).toHaveLength(0);
     const unknown = await requestCode(codeRequest(UNKNOWN));
     expect(unknown.status).toBe(known.status);
     expect(await unknown.json()).toEqual(knownBody);
     expect(known.status).toBe(202);
     expect(knownBody).toMatchObject({ ok: true, message: "If that address can use this, we sent a code. It works for 10 minutes." });
-    expect(outboxAfterKnown).toBe(1);
+    expect(state.outbox).toHaveLength(0);
+    expect(state.afterTasks).toHaveLength(2);
+    await runAfterResponse();
     expect(state.outbox).toHaveLength(1);
-    expect(state.afterTasks).toHaveLength(1);
+  });
+
+  it("still answers 202 when the outbox write fails for a known address", async () => {
+    state.outboxFails = true;
+    const known = await requestCode(codeRequest(KNOWN));
+    const unknown = await requestCode(codeRequest(UNKNOWN));
+    expect(known.status).toBe(202);
+    expect(await known.json()).toEqual(await unknown.json());
+    await expect(runAfterResponse()).resolves.toBeUndefined();
+    expect(state.outbox).toHaveLength(0);
+  });
+
+  it("development (no account email): a known address gets the code in the response, an unknown one the same 202 without it, and a missing secret key never makes a 500", async () => {
+    state.configured = false;
+    const known = await requestCode(codeRequest(KNOWN));
+    const knownBody = await known.json();
+    expect(known.status).toBe(202);
+    expect(knownBody.developmentCode).toMatch(/^\d{6}$/);
+    const unknown = await requestCode(codeRequest(UNKNOWN));
+    expect(unknown.status).toBe(202);
+    expect((await unknown.json()).developmentCode).toBeUndefined();
+    state.sealFails = true;
+    const noKey = await requestCode(codeRequest(KNOWN));
+    expect(noKey.status).toBe(202);
+    expect((await noKey.json()).developmentCode).toBeUndefined();
+  });
+
+  it("refuses a filled honeypot on the code request", async () => {
+    const response = await requestCode(post("/api/security-check/email-code", { action: "staff-sign-in", email: KNOWN, website: "http://spam.example" }));
+    expect(response.status).toBe(400);
+    expect(state.codes).toHaveLength(0);
   });
 
   it("never mints a usable code for an unknown address", async () => {
     await requestCode(codeRequest(UNKNOWN));
+    await runAfterResponse();
     expect(state.codes.every((row) => row.codeHash === null && row.deliveryMessageId === null)).toBe(true);
     expect(JSON.stringify(state.codes)).not.toContain(UNKNOWN);
   });
@@ -330,17 +381,23 @@ describe("email code request: no account enumeration", () => {
     await requestCode(codeRequest(KNOWN));
     expect(JSON.stringify(state.codes)).not.toContain(KNOWN);
     expect(state.codes[0].emailHash).toMatch(/^[0-9a-f]{64}$/);
+    // Keyed, not a bare sha256 of the address.
+    const { createHash } = await import("node:crypto");
+    expect(state.codes[0].emailHash).not.toBe(createHash("sha256").update(KNOWN).digest("hex"));
   });
 
   it("sends for a sign-up to any address, and sends for sign-in only when an account exists", async () => {
     expect((await requestCode(codeRequest("new.person@example.test", "attendee-sign-up"))).status).toBe(202);
+    await runAfterResponse();
     expect(state.outbox).toHaveLength(1);
     expect((await requestCode(codeRequest(UNKNOWN, "attendee-sign-in"))).status).toBe(202);
     expect((await requestCode(codeRequest(UNKNOWN, "forgot-password"))).status).toBe(202);
+    await runAfterResponse();
     expect(state.outbox).toHaveLength(1);
     state.attendees.push("reg.person@example.test");
     expect((await requestCode(codeRequest("reg.person@example.test", "attendee-sign-in"))).status).toBe(202);
     expect((await requestCode(codeRequest("reg.person@example.test", "forgot-password"))).status).toBe(202);
+    await runAfterResponse();
     expect(state.outbox).toHaveLength(3);
   });
 

@@ -842,7 +842,15 @@ export async function checkAttendeeSignInCodeVerifyRateLimit(
  */
 export const SECURITY_CHECK_CODE_SEND_BUDGETS = { client: 10, email: 5, windowSeconds: oneHour } as const;
 
-export async function checkSecurityCheckCodeSendRateLimit(request: Request, email: string) {
+/**
+ * An overall ceiling on sign-up codes, whatever the source or address, per hour. A sign-up code goes to any address a
+ * stranger types, so a botnet spreading its requests across sources and addresses stays under the two budgets above;
+ * this caps the mail it can cause in total. Ordinary sign-up is tiny next to it, and the cost of reaching it is that
+ * "Email me a code instead" on the sign-up form waits for the next hour while the contact line stays on screen.
+ */
+export const SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET = { limit: 200, windowSeconds: oneHour } as const;
+
+export async function checkSecurityCheckCodeSendRateLimit(request: Request, email: string, action?: string) {
   const configuration = getRateLimitConfiguration();
   const { client } = requestIdentities(request, configuration);
   const address = hashRateLimitIdentifier("security-check-code-send", email.trim().toLowerCase(), configuration);
@@ -859,6 +867,14 @@ export async function checkSecurityCheckCodeSendRateLimit(request: Request, emai
       windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
       identifierHashes: [address],
     },
+    ...(action === "attendee-sign-up"
+      ? [{
+        policy: "security-check.code-send.sign-up-total",
+        limit: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit,
+        windowSeconds: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.windowSeconds,
+        identifierHashes: [hashRateLimitIdentifier("security-check-code-send-total", action, configuration)],
+      }]
+      : []),
   ], configuration);
 }
 

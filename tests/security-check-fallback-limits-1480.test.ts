@@ -19,6 +19,7 @@ vi.mock("@/modules/rate-limit/repository", () => ({
 import {
   SECURITY_CHECK_CODE_SEND_BUDGETS,
   SECURITY_CHECK_FALLBACK_BUDGETS,
+  SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET,
   checkSecurityCheckCodeSendRateLimit,
   checkSecurityCheckFallbackRateLimit,
 } from "@/modules/rate-limit/service";
@@ -58,5 +59,13 @@ describe("emailed code request limit", () => {
       expect((await checkSecurityCheckCodeSendRateLimit(from("busy"), `n${index}@example.test`)).allowed).toBe(true);
     }
     expect((await checkSecurityCheckCodeSendRateLimit(from("busy"), "another@example.test")).allowed).toBe(false);
+  });
+
+  it("caps sign-up codes overall, whatever the source or address, and leaves other actions alone", async () => {
+    for (let index = 0; index < SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit; index += 1) {
+      expect((await checkSecurityCheckCodeSendRateLimit(from(`source-${index}`), `p${index}@example.test`, "attendee-sign-up")).allowed).toBe(true);
+    }
+    expect((await checkSecurityCheckCodeSendRateLimit(from("fresh-source"), "fresh@example.test", "attendee-sign-up")).allowed).toBe(false);
+    expect((await checkSecurityCheckCodeSendRateLimit(from("fresh-source"), "fresh@example.test", "staff-sign-in")).allowed).toBe(true);
   });
 });

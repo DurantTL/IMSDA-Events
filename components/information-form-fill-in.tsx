@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { HoneypotField } from "@/components/honeypot-field";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
@@ -23,6 +24,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
   const check = useRef<SecurityCheckHandle>(null);
+  const [website, setWebsite] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -78,7 +80,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
     setSiteUpdating(false);
     try {
       const response = await submitJson("/api/public/information-forms", {
-        slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(),
+        slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(), website,
       }, { idempotent: true, init: { headers: check.current?.headers() } });
       if (response.unavailable) {
         check.current?.settle();
@@ -172,6 +174,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
         );
       })}
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void submit()} />}
+      <HoneypotField onChange={setWebsite} value={website} />
       <SecurityCheck config={securityCheck} action="information-form" handleRef={check} />
       {error && (
         <div className="inline-notice error" role="alert">

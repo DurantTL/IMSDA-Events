@@ -35,6 +35,13 @@ const NEED_EMAIL_TEXT = "Type your email address in the form first, then press E
 const NEED_SEND_TEXT = "Press Email me a code instead, enter the code from your email, then submit again. Your answers are still here.";
 const NEED_CODE_TEXT = "Enter the code from your email first. Press Email me a code instead if you need a new one.";
 const CODE_USED_TEXT = "That code has been used. To try again, press Email me a code instead for a new one.";
+/** Answers a form's route gives BEFORE it checks the code (rate limit, bad form input): the code is untouched, so it stays. */
+const BEFORE_CHECK_CODES = new Set(["RATE_LIMITED", "INVALID_LOGIN", "INVALID_SIGN_IN", "INVALID_SIGN_UP", "INVALID_EMAIL", "INVALID_REQUEST", "NOT_FOUND"]);
+function answeredBeforeCodeCheck(body: SecurityCheckBody) {
+  const fields = (body ?? {}) as { code?: unknown; error?: unknown };
+  const code = typeof fields.code === "string" ? fields.code : typeof fields.error === "string" ? fields.error : "";
+  return BEFORE_CHECK_CODES.has(code);
+}
 const CODE_SEND_FAILED_TEXT = "We couldn't send a code. Try again, or contact the conference office.";
 const CODE_REJECTED_TEXT = "That code didn't work. Check it, or press Email me a code instead to get a new one. Codes work once, for 10 minutes.";
 
@@ -182,6 +189,10 @@ export function SecurityCheck({
   const [codeNotice, setCodeNotice] = useState("");
   const [codeError, setCodeError] = useState("");
   const codeInputRef = useRef<HTMLInputElement>(null);
+  // The field only exists once a code was sent: move focus into it then, so a keyboard or screen reader user lands on it.
+  useEffect(() => {
+    if (codeStage === "sent") codeInputRef.current?.focus();
+  }, [codeStage]);
   const codeKind = CODE_ACTIONS.has(action);
   const hasEmailCode = Boolean(emailCode);
   // Bumped by Try again: the effect below tears the widget down and loads the script and the box again.
@@ -220,8 +231,14 @@ export function SecurityCheck({
       const usedCode = !hadToken && codeKind && Boolean(codeRef.current.trim());
       tokenRef.current = null;
       if (widgetId.current && window.turnstile) window.turnstile.reset(widgetId.current);
+      if (usedCode && answeredBeforeCodeCheck(body)) {
+        // The server never looked at the code (rate limited, or the form's own input was invalid): keep it for the next press.
+        setMessage("");
+        return;
+      }
       if (usedCode) {
-        // A code works once. Whatever the answer was, it is spent: clear it and say how to get another.
+        // The server checked it. A wrong guess counts toward five, and an accepted code is spent by this request: clear
+        // the field and say how to get another.
         codeRef.current = "";
         setCodeValue("");
         setCodeStage("idle");
@@ -286,6 +303,8 @@ export function SecurityCheck({
   const contact = resolveFormsHelpContact(config?.contact ?? {});
 
   async function sendCode() {
+    // Not `disabled` while sending (that would drop focus from the button): ignore the press instead.
+    if (codeStage === "sending") return;
     const email = emailCode?.getEmail().trim() ?? "";
     if (!email) {
       setCodeError(NEED_EMAIL_TEXT);
@@ -298,14 +317,13 @@ export function SecurityCheck({
       const response = await fetch(SECURITY_CHECK_CODE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, email }),
+        body: JSON.stringify({ action, email, website: "" }),
       });
       const body = await response.json().catch(() => ({})) as { message?: string; developmentCode?: string };
       if (response.status === 202) {
         // The server's own words, the same for every address. A development server may add the code itself.
         setCodeNotice(`${body.message ?? ""}${body.developmentCode && process.env.NODE_ENV !== "production" ? ` Development code: ${body.developmentCode}` : ""}`.trim());
         setCodeStage("sent");
-        window.setTimeout(() => codeInputRef.current?.focus(), 0);
         return;
       }
       setCodeStage("idle");
@@ -337,10 +355,10 @@ export function SecurityCheck({
       )}
       {unavailable && (
         <p className={styles.contact} data-testid="security-check-contact">
-          Need help? Email{" "}
+          <span>Need help? Email</span>
           <a href={`mailto:${contact.email}`} translate="no">{contact.email}</a>
-          {" "}or call{" "}
-          <a href={telHref(contact.phone)} translate="no">{contact.phone}</a>.
+          <span>or call</span>
+          <a href={telHref(contact.phone)} translate="no">{contact.phone}</a>
         </p>
       )}
       {unavailable && codeKind && emailCode && (
@@ -348,7 +366,7 @@ export function SecurityCheck({
           <button
             className={`secondary-button ${styles.emailCodeButton}`}
             data-testid="security-check-email-code-button"
-            disabled={codeStage === "sending"}
+            aria-disabled={codeStage === "sending"}
             onClick={sendCode}
             type="button"
           >

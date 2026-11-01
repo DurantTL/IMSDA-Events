@@ -120,7 +120,7 @@ describe("blocked check: sign-in, sign-up and reset forms", () => {
     expect(mounted!.container.querySelector('[data-testid="security-check-code-input"]')).toBeNull();
     await click(mounted!.container.querySelector('[data-testid="security-check-email-code-button"]')!);
     await flush();
-    expect(fetchMock).toHaveBeenCalledWith("/api/security-check/email-code", expect.objectContaining({ method: "POST", body: JSON.stringify({ action: "attendee-sign-in", email: "person@example.test" }) }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/security-check/email-code", expect.objectContaining({ method: "POST", body: JSON.stringify({ action: "attendee-sign-in", email: "person@example.test", website: "" }) }));
     expect(mounted!.container.querySelector('[data-testid="security-check-email-code"] [role="status"]')?.textContent).toBe("If that address can use this, we sent a code. It works for 10 minutes.");
     const input = mounted!.container.querySelector<HTMLInputElement>('[data-testid="security-check-code-input"]')!;
     expect(input.closest("label")?.textContent).toContain("Code from your email");
@@ -133,6 +133,36 @@ describe("blocked check: sign-in, sign-up and reset forms", () => {
     await act(async () => { ref.current?.settle({ error: "INVALID_CREDENTIALS" }); });
     expect(mounted!.container.querySelector('[data-testid="security-check-code-input"]')).toBeNull();
     expect(ref.current?.headers()).toEqual({});
+  });
+
+  it("moves focus to the code field once a code was sent, and does not disable the button while sending", async () => {
+    let finish: (response: Response) => void = () => undefined;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; })));
+    await mountBlocked("staff-sign-in", true);
+    const button = mounted!.container.querySelector<HTMLButtonElement>('[data-testid="security-check-email-code-button"]')!;
+    await click(button);
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    await click(button); // ignored while sending
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(new Response(JSON.stringify({ ok: true, message: "Sent." }), { status: 202 })); });
+    await flush();
+    const input = mounted!.container.querySelector<HTMLInputElement>('[data-testid="security-check-code-input"]')!;
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("keeps the typed code when the server answered before looking at it (rate limited), and clears it after a security-check rejection", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, message: "Sent." }), { status: 202 })));
+    const ref = await mountBlocked("attendee-sign-in", true);
+    await click(mounted!.container.querySelector('[data-testid="security-check-email-code-button"]')!);
+    await flush();
+    await typeInto(mounted!.container.querySelector<HTMLInputElement>('[data-testid="security-check-code-input"]')!, "123456");
+    await act(async () => { ref.current?.settle({ error: "RATE_LIMITED" }); });
+    expect(mounted!.container.querySelector<HTMLInputElement>('[data-testid="security-check-code-input"]')?.value).toBe("123456");
+    expect(ref.current?.headers()).toEqual({ "x-security-check-code": "123456" });
+    await act(async () => { ref.current?.settle({ code: "security_check_failed" }); });
+    expect(mounted!.container.querySelector('[data-testid="security-check-code-input"]')).toBeNull();
+    expect(mounted!.container.querySelector('[data-testid="security-check-email-code"] [role="alert"]')?.textContent).toContain("didn't work");
   });
 
   it("asks for the address first when the form's email is empty, and sends nothing", async () => {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { honeypotFieldSchema } from "@/modules/security/honeypot";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
 import {
   SECURITY_CHECK_CODE_ACCEPTED_MESSAGE,
@@ -19,6 +20,8 @@ import { SECURITY_CHECK_CODE_ACTIONS } from "@/modules/security/security-check-c
 const bodySchema = z.object({
   action: z.enum(SECURITY_CHECK_CODE_ACTIONS),
   email: z.string().trim().email().max(254),
+  // The honeypot: the form sends it empty, a script that fills every field does not.
+  website: honeypotFieldSchema,
 }).strict();
 
 const noStore = { "Cache-Control": "private, no-store, max-age=0" };

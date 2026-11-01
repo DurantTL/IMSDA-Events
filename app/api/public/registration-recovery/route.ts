@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { honeypotFieldSchema } from "@/modules/security/honeypot";
 import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
@@ -25,11 +26,13 @@ const requestSchema = z.discriminatedUnion("action", [
     confirmationCode: z.string().trim().min(1).max(80),
     email: z.string().trim().email().max(160),
     returnTo: z.string().trim().min(1).max(2048).optional(),
+    website: honeypotFieldSchema,
   }),
   z.strictObject({
     action: z.literal("email"),
     clientRequestId: z.uuid(),
     email: z.string().trim().email().max(160),
+    website: honeypotFieldSchema,
   }),
 ]);
 

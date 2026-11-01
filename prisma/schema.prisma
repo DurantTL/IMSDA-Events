@@ -1381,7 +1381,7 @@ model AttendeeStepUpCode {
 /**
  * The emailed code that stands in for the Security check (Turnstile) when a privacy browser blocks it (#1480), on
  * sign-in, sign-up and password reset. Not bound to an account: a sign-up has none, and a staff sign-in has not
- * proved a password yet. Bound to one (action, address) instead; the address is kept only as a sha256 of its
+ * proved a password yet. Bound to one (action, address) instead; the address is kept only as a keyed hash of its
  * lowercase form, never as text. `sealedCode` exists only so a delivery retry resends the SAME code, as #1410's does.
  * A valid code is spent on use and satisfies the check for one request.
  */

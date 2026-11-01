@@ -1,3 +1,4 @@
+import { honeypotFieldSchema } from "@/modules/security/honeypot";
 import { z } from "zod";
 import type { ClubFormFillMode } from "@/modules/club-forms/definitions";
 import { DIRECTORY_NOT_LISTED_VALUE, notListedCompanions, type RegistrationFormDefinition } from "@/modules/forms/definition";
@@ -59,6 +60,8 @@ export const openApplicationSubmitSchema = z.object({
   unlistedClubName: z.string().max(400).transform(cleanTypedName).pipe(z.string().max(UNLISTED_CLUB_NAME_MAX)).optional(),
   idempotencyKey: idempotencyKeySchema,
   answers: z.record(z.string().max(80), z.unknown()),
+  /** The honeypot (#1480): a person leaves it empty. */
+  website: honeypotFieldSchema,
 }).strict().superRefine((value, context) => {
   if (value.organizationId === NOT_LISTED_CLUB && !value.unlistedClubName) {
     context.addIssue({ code: "custom", path: ["unlistedClubName"], message: "Type your club's name." });

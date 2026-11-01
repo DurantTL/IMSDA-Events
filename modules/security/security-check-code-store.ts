@@ -1,10 +1,10 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { openSecret, sealSecret } from "@/lib/secret-box";
+import { getRateLimitConfiguration, hashRateLimitIdentifier } from "@/modules/rate-limit/domain";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   ATTENDEE_PENDING_REQUEST_LIFETIME_HOURS,
@@ -23,7 +23,7 @@ import { TURNSTILE_ACTIONS, type TurnstileAction } from "@/modules/security/turn
  * hashed with the same helper, minted when the message is delivered (`sealedCode` only so a delivery retry resends the
  * SAME code), guesses counted atomically BEFORE they are compared, spent on success. Differences:
  * - It is bound to an (action, address) pair, not to an account or a session, because a sign-up has no account and a
- *   staff sign-in has not proved a password yet. The address is stored only as `sha256(lowercase address)`.
+ *   staff sign-in has not proved a password yet. The address is stored only as a keyed hash of its lowercase form.
  * - A valid code only satisfies the human check for one request. It grants nothing else.
  * - A new code retires every earlier unspent code for the same (action, address).
  *
@@ -56,9 +56,12 @@ export function normalizeSecurityCheckEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-/** sha256 of the lowercase address. The address itself is never stored in this table. */
+/**
+ * A keyed hash (HMAC-SHA-256 with the rate limiter's secret) of the lowercase address, so a copy of this table cannot be
+ * checked against a list of known addresses. The address itself is never stored here.
+ */
 export function hashSecurityCheckEmail(email: string) {
-  return createHash("sha256").update(normalizeSecurityCheckEmail(email)).digest("hex");
+  return hashRateLimitIdentifier("security-check-code-email", normalizeSecurityCheckEmail(email), getRateLimitConfiguration());
 }
 
 function requestExpiry(now: Date) {

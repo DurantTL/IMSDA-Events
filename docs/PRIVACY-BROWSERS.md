@@ -61,13 +61,14 @@ Limits, in `modules/rate-limit/service.ts`, all per hour:
 | `SECURITY_CHECK_FALLBACK_BUDGETS.client` | 3 per source address | A family on a blocking browser can send a registration, a recovery email and an information form. A bot behind one address cannot do more. Venue Wi-Fi shares an address, so this is a real cost there and the office contact is the way out. |
 | `SECURITY_CHECK_FALLBACK_BUDGETS.email` | 2 per address typed in the form | A typo is fixed once. A script cannot flood one registration contact. Forms with no email answer are limited per source only. |
 | `SECURITY_CHECK_CODE_SEND_BUDGETS` | 10 per source, 5 per address | Each new code retires the last. Charged the same for known and unknown addresses. |
+| `SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET` | 200 sign-up codes in total | A sign-up code goes to any address typed, so this caps the mail a spread-out script can cause. |
 
-The honeypot runs first: the registration schemas (`website` field), and the new club application, parse before
-`requireTurnstile`, so a filled honeypot is refused before the fallback is considered. The club form application,
-information form and recovery routes have no honeypot field today; they rely on the limits above.
+The honeypot runs first: every public form's schema (`website` field, `modules/security/honeypot.ts`) parses before
+`requireTurnstile`, so a filled honeypot is refused before the fallback is considered. That includes the club form
+application, information form and recovery routes; the code request carries the field too.
 
 Codes: six digits, ten minutes, five tries, hashed like the #1410 sign-in code, stored in `SecurityCheckCode` (the address
-only as a sha256), minted when the message is delivered. A code is spent by the request that uses it, so a wrong password
+only as a keyed hash), minted when the message is delivered. A code is spent by the request that uses it, so a wrong password
 after a valid code needs a fresh code. Audit entries (`SECURITY_CHECK_CODE_SENT`, `_VERIFIED`, `_FAILED`) carry the code's id
 and the action name, never the address, code or a hash.
 

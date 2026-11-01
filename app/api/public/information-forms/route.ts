@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { withRequestContext } from "@/lib/request-context";
+import { honeypotFieldSchema } from "@/modules/security/honeypot";
 import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { logError } from "@/lib/logger";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
@@ -26,6 +27,8 @@ const bodySchema = z.object({
   eventSlug: z.string().trim().min(1).max(160).regex(/^[a-z0-9-]+$/).optional(),
   idempotencyKey: z.string().trim().min(8).max(100),
   answers: z.record(z.string(), z.unknown()),
+  // The honeypot: checked here, with the rest of the body, before requireTurnstile and its fallback (#1480).
+  website: honeypotFieldSchema,
 }).strict();
 
 function json(body: unknown, status: number, rateLimit?: RateLimitOutcome) {

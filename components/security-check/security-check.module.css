@@ -40,15 +40,22 @@
 }
 
 .contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
   margin: 8px 0 0;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   line-height: 1.45;
 }
 
+/* Underlined, so they are not told apart from the text by color alone; the 44px target comes from min-height. */
 .contact a {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   min-height: 44px;
-  line-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .codeBlock {
