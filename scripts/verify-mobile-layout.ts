@@ -2028,6 +2028,7 @@ async function seedHonorsAndRegistrations(prisma: PrismaClient) {
 async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; attendee: string[] }) {
   const staffSession = await import("../modules/access/session-store");
   const attendeeSession = await import("../modules/attendee-accounts/session-store");
+  const { attendeeSessionCookie, staffSessionCookie } = await import("../modules/security/session-cookies");
   const cookie = async (role: SignedInRole) => {
     if (role === "station") {
       // A station is a device cookie, not a session: mint one for the seeded event admin directly.
@@ -2047,14 +2048,14 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       const accountId = accountIds[role];
       const session = await attendeeSession.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
       tokens.attendee.push(session.token);
-      return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
+      return { name: attendeeSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
     }
     const email = role === "system-admin" ? "system@imsda-events.test" : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`The seeded account ${email} is missing. Run \`npm run db:seed\` first.`);
     const session = await staffSession.createDatabaseSession(user.id, null);
     tokens.staff.push(session.token);
-    return { name: staffSession.SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
+    return { name: staffSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
   };
   const cookies: Record<SignedInRole, { name: string; value: string; expires: number }> = {
     "event-admin": await cookie("event-admin"),

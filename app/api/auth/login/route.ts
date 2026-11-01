@@ -5,7 +5,7 @@ import { issueMfaChallenge } from "@/modules/access/mfa-service";
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
+import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { logError } from "@/lib/logger";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
 import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -117,15 +118,7 @@ async function postHandler(request: Request) {
     }
 
     const session = authentication.session;
-    (await cookies()).set(SESSION_COOKIE_NAME, session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: session.expiresAt,
-      maxAge: SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    staffSessionCookie.set((await cookies()), session.token, { expires: session.expiresAt, maxAge: SESSION_LIFETIME_SECONDS });
     countPublicMetric(request, "LOGIN_SUCCESS", "staff-password");
     const redirectTo = await postLoginDestinationOrDefault(
       { id: authentication.userId, globalRole: authentication.globalRole },

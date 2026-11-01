@@ -231,13 +231,14 @@ async function readPdf(data: Uint8Array): Promise<PdfInfo> {
  * seeded administrator directly in the local database and sets its cookie.
  */
 async function signIn(page: Page, prisma: PrismaClient) {
-  const { createDatabaseSession, SESSION_COOKIE_NAME } = await import("../modules/access/session-store");
+  const { createDatabaseSession } = await import("../modules/access/session-store");
+  const { staffSessionCookie } = await import("../modules/security/session-cookies");
   const user = await prisma.user.findUnique({ where: { email: staffEmail } });
   if (!user) throw new Error("The seeded administrator is missing. Run `npm run db:seed` first.");
   const session = await createDatabaseSession(user.id, null);
   mintedToken = session.token;
   await page.context().addCookies([{
-    name: SESSION_COOKIE_NAME,
+    name: staffSessionCookie.legacyName,
     value: session.token,
     url: baseUrl,
     httpOnly: true,

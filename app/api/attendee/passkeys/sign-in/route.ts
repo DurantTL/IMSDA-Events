@@ -7,9 +7,10 @@ import { passkeyApiError } from "@/modules/attendee-accounts/passkey-api";
 import { passkeyVerificationSchema } from "@/modules/attendee-accounts/passkey-schemas";
 import { PASSKEY_SIGN_IN_COOKIE } from "@/modules/attendee-accounts/passkey-sign-in";
 import { finishPasskeySignIn, PasskeyError } from "@/modules/attendee-accounts/passkeys";
-import { ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
+import { ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
 import { checkAttendeePasskeySignInRateLimit } from "@/modules/rate-limit/service";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Signs in with a passkey (#374). The session starts with the second step
@@ -38,15 +39,7 @@ async function postHandler(request: Request) {
       if (error instanceof PasskeyError && error.code === "PASSKEY_NOT_VERIFIED") countPublicMetric(request, "LOGIN_FAILURE", "attendee-passkey");
       throw error;
     });
-    cookieStore.set(ATTENDEE_SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set(cookieStore, result.session.token, { expires: result.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     countPublicMetric(request, "LOGIN_SUCCESS", "attendee-passkey");
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {

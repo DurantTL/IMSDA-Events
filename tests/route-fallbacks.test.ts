@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 
-import { SESSION_COOKIE_NAME } from "@/modules/access/session-store";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 async function redirectRules() {
   vi.resetModules();
@@ -32,7 +32,11 @@ describe("signed-out /check-in goes to staff sign-in and back (#470)", () => {
     expect(checkInRules).toHaveLength(2);
     for (const rule of checkInRules) {
       expect(rule.permanent).toBe(false);
-      expect(rule.missing).toEqual([{ type: "cookie", key: SESSION_COOKIE_NAME }]);
+      // Every `missing` entry must be absent, so the rule fires only with neither name present (#1402).
+      expect(rule.missing).toEqual([
+        { type: "cookie", key: staffSessionCookie.legacyName },
+        { type: "cookie", key: staffSessionCookie.hostName },
+      ]);
       expect(rule.destination.startsWith("/login?next=/check-in")).toBe(true);
       expect(matches(rule.source, "/check-in")).toBe(true);
       expect(matches(rule.source, "/check-in/anything")).toBe(false);

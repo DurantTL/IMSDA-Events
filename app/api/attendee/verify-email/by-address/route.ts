@@ -5,11 +5,11 @@ import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { verifyAttendeeEmailByAddress } from "@/modules/attendee-accounts/account-service";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import { applyRateLimitHeaders, mergeRateLimitOutcomes, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkAttendeeVerificationRateLimit, checkAttendeeVerifyByAddressRateLimit } from "@/modules/rate-limit/service";
+import { attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Completes a verification an administrator asked for ("Send verification email"):
@@ -52,15 +52,7 @@ async function postHandler(request: Request) {
     if (verification.outcome === "rejected") {
       return applyRateLimitHeaders(Response.json(REFUSAL, { status: 400 }), rateLimit);
     }
-    (await cookies()).set(ATTENDEE_SESSION_COOKIE_NAME, verification.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: verification.session.expiresAt,
-      maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    attendeeSessionCookie.set((await cookies()), verification.session.token, { expires: verification.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {
     // Malformed JSON is bad input like any other: the same refusal, not a server error.

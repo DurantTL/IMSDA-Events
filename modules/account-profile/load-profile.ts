@@ -5,7 +5,7 @@ import { resolvePersonFrom } from "@/modules/account-merge/person";
 import { getMfaStatus } from "@/modules/access/mfa-service";
 import { getPasskeySettings } from "@/modules/access/passkeys";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { listUserSessions, SESSION_COOKIE_NAME, SESSION_IDLE_TIMEOUT_SECONDS } from "@/modules/access/session-store";
+import { listUserSessions, SESSION_IDLE_TIMEOUT_SECONDS } from "@/modules/access/session-store";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
 import { getPasskeySettings as getAttendeePasskeySettings } from "@/modules/attendee-accounts/passkeys";
@@ -13,6 +13,7 @@ import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-se
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import type { MfaStatus } from "@/components/mfa-manager";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Data for the one shared profile view (#543, #646). The staff and attendee
@@ -83,7 +84,7 @@ export async function loadProfileData(sessions: ProfileSessions, twoStep: string
     showTwoStepOn = authenticator.status === "ACTIVE" || passkeys.passkeys.length > 0;
   }
   // The staff member's own signed-in devices (#741), moved here from the More page.
-  const staffSessions = staff ? await listUserSessions(staff.id, (await cookies()).get(SESSION_COOKIE_NAME)?.value) : [];
+  const staffSessions = staff ? await listUserSessions(staff.id, staffSessionCookie.read(await cookies())) : [];
   const clubs = attendeeAccount && !secondStepPending ? await listDirectedClubs(attendeeAccount.id) : [];
   const bannerAnnouncements = attendeeAccount && !secondStepPending
     ? await listAccountBannerAnnouncements(attendeeAccount, clubs)

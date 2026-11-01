@@ -8,12 +8,10 @@ import { createOpaqueToken, hashOpaqueToken, hashUserAgent } from "@/modules/acc
  * rather than shared with it (ADR 0003).
  *
  * The separate cookie name is not cosmetic. A staff session is resolved by
- * looking up `imsda_session` in `UserSession`; an attendee session lives under a
+ * looking up the staff session cookie (`modules/security/session-cookies`) in `UserSession`; an attendee session lives under a
  * different name in a different table. Neither lookup can be handed the other's
  * token, so no amount of confusion downstream can turn a registrant into staff.
  */
-
-export const ATTENDEE_SESSION_COOKIE_NAME = "imsda_attendee_session";
 
 /**
  * The handle for a verification in progress. It is not a session and grants

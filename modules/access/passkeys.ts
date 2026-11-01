@@ -11,7 +11,7 @@ import {
 } from "@simplewebauthn/server";
 import { getPrisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { createDatabaseSession, isSessionIdle, SESSION_COOKIE_NAME, shouldTouchSession, touchDatabaseSession } from "@/modules/access/session-store";
+import { createDatabaseSession, isSessionIdle, shouldTouchSession, touchDatabaseSession } from "@/modules/access/session-store";
 import { hashOpaqueToken } from "@/modules/access/tokens";
 import { logWarn } from "@/lib/logger";
 import { verifyCurrentPassword } from "@/modules/access/auth-service";
@@ -19,6 +19,7 @@ import { verifySecondFactorForChange } from "@/modules/access/mfa-service";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { PASSKEY_CHALLENGE_MINUTES, matchRelyingParty, passkeyNameFrom } from "@/modules/passkeys/domain";
 import { PLATFORM_SETTINGS_ID } from "@/modules/system-admin/platform-settings";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * Passkeys for staff (#429): system administrators and other staff can add
@@ -426,7 +427,7 @@ export async function getPasskeySettings(account: StaffAccount) {
  * how `getCurrentAttendee` keeps its own resolver instead of reusing it.
  */
 export async function currentStaffPasskeySession() {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  const token = staffSessionCookie.read(await cookies());
   if (!token) return null;
 
   const tokenHash = hashOpaqueToken(token);

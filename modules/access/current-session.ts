@@ -6,14 +6,14 @@ import { getPrisma } from "@/lib/prisma";
 import type { Session } from "@/modules/access/authorization";
 import {
   isSessionIdle,
-  SESSION_COOKIE_NAME,
   shouldTouchSession,
   touchDatabaseSession,
 } from "@/modules/access/session-store";
 import { hashOpaqueToken } from "@/modules/access/tokens";
+import { staffSessionCookie } from "@/modules/security/session-cookies";
 
 async function loadCurrentSession(touch: boolean): Promise<Session> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  const token = staffSessionCookie.read(await cookies());
   if (!token) return { user: null };
 
   const tokenHash = hashOpaqueToken(token);

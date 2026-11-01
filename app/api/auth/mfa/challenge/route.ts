@@ -10,11 +10,10 @@ import {
 import { DEFAULT_POST_LOGIN_DESTINATION } from "@/modules/access/login-routing";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
+import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { cookies } from "next/headers";
 import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
 import {
-  ATTENDEE_SESSION_COOKIE_NAME,
   ATTENDEE_SESSION_LIFETIME_SECONDS,
 } from "@/modules/attendee-accounts/session-store";
 import {
@@ -23,6 +22,7 @@ import {
 } from "@/modules/rate-limit/domain";
 import { checkLoginClientRateLimit } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
+import { staffSessionCookie, attendeeSessionCookie } from "@/modules/security/session-cookies";
 
 /**
  * The second half of sign-in.
@@ -113,15 +113,7 @@ async function postHandler(request: Request) {
     const result = await completeMfaChallenge(input.challengeToken, input.code, {
       userAgent: request.headers.get("user-agent"),
     });
-    (await cookies()).set(SESSION_COOKIE_NAME, result.session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: result.session.expiresAt,
-      maxAge: SESSION_LIFETIME_SECONDS,
-      priority: "high",
-    });
+    staffSessionCookie.set((await cookies()), result.session.token, { expires: result.session.expiresAt, maxAge: SESSION_LIFETIME_SECONDS });
     // The password step that handed off to this one counted nothing; the sign-in counts as worked only here.
     countPublicMetric(request, "LOGIN_SUCCESS", "staff-mfa");
     // One account per person (#554): with the one-sign-in switch on, a staff person who just
@@ -129,15 +121,7 @@ async function postHandler(request: Request) {
     // passed the second step. Does nothing (null) with the switch off or with no usable link.
     const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });
     if (attendeeSession) {
-      (await cookies()).set(ATTENDEE_SESSION_COOKIE_NAME, attendeeSession.session.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: attendeeSession.session.expiresAt,
-        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
-        priority: "high",
-      });
+      attendeeSessionCookie.set((await cookies()), attendeeSession.session.token, { expires: attendeeSession.session.expiresAt, maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS });
     }
     const redirectTo = await postLoginDestinationOrDefault(
       { id: result.userId, globalRole: result.globalRole },
