@@ -33,6 +33,7 @@ import {
 import { type ClassChangeEmailChoice } from "@/modules/honors/class-change-domain";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import { WRITE_BACK_TRANSACTION, writeBackInstructorCompletions, type HonorsWeekendWriteBackResult } from "@/modules/honors/weekend-completion-repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Honors Weekend class instructors (#833). Staff invite and assign; the
@@ -177,14 +178,14 @@ export async function inviteHonorInstructor(eventId: string, input: InstructorIn
     // The person is found by email, but only if the typed name agrees: someone sharing an address (a spouse, say)
     // must not pass on the other's Sterling Volunteers check.
     const found = await tx.person.findUnique({ where: { normalizedEmail: email }, select: { id: true, firstName: true, lastName: true } });
-    if (found && !namesAgree(`${firstName} ${lastName}`, found)) {
+    if (found && !namesAgree(formatPersonName({ firstName, lastName }), found)) {
       throw new HonorInstructorError("INSTRUCTOR_EMAIL_CONFLICT", EMAIL_BELONGS_TO_OTHER_MESSAGE);
     }
     const person = found ?? await tx.person.create({
       data: { firstName, lastName, normalizedEmail: email },
       select: { id: true, firstName: true, lastName: true },
     });
-    const name = `${person.firstName} ${person.lastName}`.trim();
+    const name = formatPersonName(person);
     const existing = await tx.honorInstructor.findUnique({ where: { eventId_email: { eventId, email } }, select: { id: true, personId: true, revokedAt: true } });
     // An existing row for this email belongs to the person it was made for; never re-point it.
     if (existing && existing.personId !== person.id) throw new HonorInstructorError("INSTRUCTOR_EMAIL_CONFLICT", EMAIL_BELONGS_TO_OTHER_MESSAGE);

@@ -21,6 +21,7 @@ import { requestNights } from "@/modules/lodging/preferences-domain";
 import { attendeeName, loadCurrentRequests, type Client } from "@/modules/lodging/preferences-service";
 import { minorStatusAt, personAgeFromAnswers, eventStartDate } from "@/modules/guardian-authority/domain";
 import type { TogetherInput } from "@/modules/lodging/preferences-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The facts the staff workspace, the reports, the exports and the attendee display are all derived from, computed once
@@ -226,7 +227,7 @@ export async function loadAssignmentFacts(client: Client, eventId: string, optio
     id: entry.id,
     registrationId: entry.registrationId,
     registrationCode: entry.registration.confirmationCode,
-    holder: `${entry.registration.accountHolderPerson.firstName} ${entry.registration.accountHolderPerson.lastName}`.trim(),
+    holder: formatPersonName(entry.registration.accountHolderPerson),
     category: entry.category,
     firstNight: entry.firstNight ? toNight(entry.firstNight) : null,
     lastNight: entry.lastNight ? toNight(entry.lastNight) : null,

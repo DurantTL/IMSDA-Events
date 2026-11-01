@@ -2,6 +2,7 @@ import { DIRECTORY_NOT_LISTED_VALUE, registrationFormDefinitionSchema, type Regi
 import { attendeeAnswerRecord } from "@/modules/registrations/choice-answer-filter";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 import { registrationAwaitingApproval, registrationStatusWord } from "@/modules/registrations/status-words";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 
@@ -175,7 +176,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
       if (cacheKey && !cached) cache.set(cacheKey, fields);
     }
     const registrationAnswers = (submission?.responses ?? {}) as Record<string, unknown>;
-    const accountHolderName = `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`.trim();
+    const accountHolderName = formatPersonName(registration.accountHolder);
     registration.attendees.forEach((attendee, index) => {
       const answers = attendeeAnswerRecord(registration, index);
       const answer = (role: Role) => {
@@ -206,7 +207,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
           attendeeBalanceCents: attendeeBalanceCents(registration),
           deferredBilling: registration.isDeferredOrganizationBilling,
         }),
-        name: `${attendee.firstName} ${attendee.lastName}`.trim(),
+        name: formatPersonName(attendee),
         attendeeType: attendee.attendeeType,
         group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
         church,

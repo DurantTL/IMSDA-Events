@@ -4,6 +4,7 @@
  */
 
 import { isWholeAgeInRange } from "@/modules/attendee-types/age-limits";
+import { formatPersonName } from "@/lib/person-name";
 
 type AgeState = {
   rosterAges: Record<string, number>;
@@ -47,7 +48,7 @@ export function ageInputValue(person: AgeInputPerson, text: Readonly<Record<stri
 
 /** "Sam Synthetic's", or "their" when the roster has no name. */
 function possessiveName(person: Pick<AgeInputPerson, "firstName" | "lastName">) {
-  const name = `${person.firstName} ${person.lastName}`.trim();
+  const name = formatPersonName(person);
   return name ? `${name}'s` : "their";
 }
 
@@ -107,6 +108,6 @@ export function missingAgeSummaryItems(missing: ReadonlyArray<AgeInputPerson>): 
   return missing.map((person) => ({
     memberId: person.memberId,
     fieldId: ageFieldId(person.memberId),
-    text: `${`${person.firstName} ${person.lastName}`.trim() || "A person"} needs an age on the event date.`,
+    text: `${formatPersonName(person) || "A person"} needs an age on the event date.`,
   }));
 }

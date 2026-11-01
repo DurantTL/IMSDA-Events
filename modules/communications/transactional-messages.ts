@@ -30,6 +30,7 @@ import {
 import { buildRegistrationSeminarPreferences } from "@/modules/communications/seminar-preferences";
 import { linkQueuedMessageFiles } from "@/modules/communications/message-files";
 import { messageFileIdsInHtml } from "@/modules/communications/message-file-rules";
+import { formatPersonName } from "@/lib/person-name";
 import { registrationStatusWord } from "@/modules/registrations/status-words";
 
 type TransactionalTemplateKey =
@@ -298,7 +299,7 @@ function attendeeName(attendee: {
   const profile = jsonRecord(attendee.profileSnapshot);
   const firstName = snapshotString(profile, "firstName", attendee.person.firstName);
   const lastName = snapshotString(profile, "lastName", attendee.person.lastName);
-  return `${firstName} ${lastName}`.trim();
+  return formatPersonName({ firstName, lastName });
 }
 
 async function enqueueTransactionalMessage(
@@ -433,15 +434,15 @@ async function enqueueTransactionalMessage(
       skippedReason: "NO_RECIPIENT",
     };
   }
-  const defaultRecipientName = `${snapshotString(
+  const defaultRecipientName = formatPersonName({ firstName: snapshotString(
     contact,
     "firstName",
     registration.accountHolderPerson.firstName,
-  )} ${snapshotString(
+  ), lastName: snapshotString(
     contact,
     "lastName",
     registration.accountHolderPerson.lastName,
-  )}`.trim();
+  ) });
   const recipientName = input.recipientName?.trim() || defaultRecipientName;
   const totalCents = moneyToCents(registration.totalAmount);
   const paidCents = registration.payments.reduce(

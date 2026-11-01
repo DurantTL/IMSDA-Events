@@ -21,6 +21,7 @@ import type { ClubImportItem } from "@/modules/club-imports/schemas";
 import { SPONSOR_ORGANIZATION_TYPES, canSponsorClub, normalizeOrganizationName } from "@/modules/organizations/domain";
 import { listSimilarClubCandidates } from "@/modules/organizations/repository";
 import { clubNameKey, namesAreClose, shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club import storage (#376). The export itself is never stored: the preview
@@ -342,7 +343,7 @@ async function importOne(item: ClubImportItem, actorUserId: string, now: Date): 
       let membersSkipped = 0;
       for (const person of item.people) {
         const key = importPersonKey(person);
-        const name = `${person.firstName} ${person.lastName}`.trim();
+        const name = formatPersonName(person);
         if (onRoster.has(key)) {
           membersSkipped += 1;
           skipped.push({ name, reason: "ALREADY_ON_ROSTER" });

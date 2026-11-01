@@ -7,6 +7,8 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
 import { getAppliedAssignmentRoster } from "@/modules/program-assignments/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.assignmentRoster };
@@ -56,7 +58,7 @@ export default async function ProgramAssignmentRosterPage({
         <div>
           <p className="eyebrow">Frozen assignment run</p>
           <h2>{roster.fieldLabel}</h2>
-          <p>{roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {new Date(roster.appliedAt).toLocaleString()} by {roster.appliedByName}</p>
+          <p>{roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</p>
         </div>
         <div className="intro-actions assignment-print-actions">
           <Link className="secondary-button" href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`}>Back to assignments</Link>
@@ -81,7 +83,7 @@ export default async function ProgramAssignmentRosterPage({
               <tbody>
                 {assignments.map((assignment) => (
                   <tr key={assignment.attendeeId}>
-                    <th scope="row">{assignment.lastName}, {assignment.firstName}</th>
+                    <th scope="row">{formatPersonName(assignment)}</th>
                     <td>{assignment.unassignedReason === "NO_RANKED_CHOICES"
                       ? "No ranking submitted"
                       : assignment.unassignedReason === "CAPACITY_FULL"

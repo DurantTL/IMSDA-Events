@@ -33,6 +33,7 @@ import {
   type ClubComplianceState,
   type BackgroundComplianceStatus,
 } from "@/modules/background-checks/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Sterling Volunteers (#388, #427, #527): one stored list, fed by either CSV
@@ -93,7 +94,7 @@ async function backfillNormalizedNames(tx: PrismaLike) {
   });
   if (missing.length === 0) return 0;
   const ids = missing.map((entry) => entry.id);
-  const names = missing.map((entry) => matchableName(`${entry.firstName} ${entry.lastName}`));
+  const names = missing.map((entry) => matchableName(formatPersonName(entry)));
   await tx.$executeRaw`
     UPDATE "BackgroundCheckEntry" AS e
     SET "normalizedName" = v.name
@@ -245,7 +246,7 @@ function rememberCandidate(
 ) {
   let entry = byPerson.get(personId);
   if (!entry) {
-    entry = { personId, name: `${firstName} ${lastName}`.trim(), firstName, lastName, emails: new Set(), birthDates: new Set(), siteNames: new Set() };
+    entry = { personId, name: formatPersonName({ firstName, lastName }), firstName, lastName, emails: new Set(), birthDates: new Set(), siteNames: new Set() };
     byPerson.set(personId, entry);
   }
   for (const email of options.emails ?? []) entry.emails.add(email);
@@ -412,7 +413,7 @@ async function peopleNamed(tx: PrismaLike, names: string[]) {
     WHERE ${Prisma.raw(PERSON_COMPACT_NAME_SQL)} = ANY(${compacts}::text[])
   `;
   const wanted = new Set(names);
-  return rows.filter((row) => wanted.has(matchableName(`${row.firstName} ${row.lastName}`)));
+  return rows.filter((row) => wanted.has(matchableName(formatPersonName(row))));
 }
 
 async function personIdsNamed(tx: PrismaLike, names: string[]) {
@@ -423,7 +424,7 @@ async function personIdsNamed(tx: PrismaLike, names: string[]) {
 function namesakeCounts(people: Array<{ firstName: string; lastName: string }>) {
   const counts = new Map<string, number>();
   for (const person of people) {
-    const key = matchableName(`${person.firstName} ${person.lastName}`);
+    const key = matchableName(formatPersonName(person));
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
@@ -703,7 +704,7 @@ function matchEntries(
         && memory.matchedName === entry.normalizedName
         && !context.rejected?.get(entry.identityKey)?.has(memory.personId)
         && !contradictsEntry(entry, person!)
-        && (matchableName(`${person!.firstName} ${person!.lastName}`) === entry.normalizedName
+        && (matchableName(formatPersonName(person!)) === entry.normalizedName
           || (matchableName(person!.lastName) === matchableName(entry.lastName) && firstNameVariant(entry.firstName, person!.firstName)));
       if (match && match.personId === memory.personId) {
         if (match.matchedBy === "NAME_ONLY" && fits) {
@@ -733,7 +734,7 @@ async function identitiesByKeys(tx: PrismaLike, identityKeys: string[]) {
   return new Map(
     identities
       .filter((identity): identity is typeof identity & { personId: string; person: NonNullable<typeof identity.person> } => Boolean(identity.personId && identity.person))
-      .map((identity) => [identity.externalId, { personId: identity.personId, name: `${identity.person.firstName} ${identity.person.lastName}`.trim() }]),
+      .map((identity) => [identity.externalId, { personId: identity.personId, name: formatPersonName(identity.person) }]),
   );
 }
 
@@ -918,11 +919,11 @@ async function recomputeNameGroups(tx: PrismaLike, uploadId: string, names: stri
     if (heldMatches.length > 0) {
       const matchedIndex = await buildCandidateIndex(tx, now, { personIds: heldMatches.map((entry) => entry.match!.personId) });
       const realIds = await identitiesByKeys(tx, heldMatches.map((entry) => entry.identityKey));
-      const exactNames = new Set(named.map((row) => matchableName(`${row.firstName} ${row.lastName}`)));
+      const exactNames = new Set(named.map((row) => matchableName(formatPersonName(row))));
       for (const entry of heldMatches) {
         const person = matchedIndex.byPerson.get(entry.match!.personId);
         if (!person || !entry.normalizedName) continue;
-        if (matchableName(`${person.firstName} ${person.lastName}`) === entry.normalizedName) continue;
+        if (matchableName(formatPersonName(person)) === entry.normalizedName) continue;
         if (exactNames.has(entry.normalizedName)) continue;
         // A real remembered id (not a name-only memory) means a rename is a mismatch: recompute.
         if (entry.match!.matchedBy === "IDENTITY" && realIds.get(entry.identityKey)?.personId === entry.match!.personId) continue;
@@ -1040,7 +1041,7 @@ export async function refreshBackgroundCheckMatches(personIds: Iterable<string>,
       });
       const names = new Set<string>();
       for (const person of people) {
-        names.add(matchableName(`${person.firstName} ${person.lastName}`));
+        names.add(matchableName(formatPersonName(person)));
         const priorName = person.backgroundCheckMatch?.entry.normalizedName;
         if (priorName && !LOCKED_SOURCES.has(person.backgroundCheckMatch!.matchedBy)) names.add(priorName);
       }
@@ -1208,13 +1209,13 @@ export async function listBackgroundCheckReviews(): Promise<BackgroundCheckRevie
   return reviews.map((review) => ({
     id: review.id,
     entryId: review.entry.id,
-    name: `${review.entry.firstName} ${review.entry.lastName}`.trim(),
+    name: formatPersonName(review.entry),
     site: review.entry.site,
     reason: review.reason,
     candidates: (review.candidatePersonIds as string[]).map((personId) => {
       const person = peopleById.get(personId);
       return person
-        ? { personId, name: `${person.firstName} ${person.lastName}`.trim(), sites: person.clubRosterMemberships.map((membership) => membership.organization.name) }
+        ? { personId, name: formatPersonName(person), sites: person.clubRosterMemberships.map((membership) => membership.organization.name) }
         : { personId, name: "(person no longer on file)", sites: [] };
     }),
   }));
@@ -1367,8 +1368,8 @@ export async function listManualBackgroundCheckMatches(): Promise<ManualBackgrou
   return matches.map((match) => ({
     id: match.id,
     personId: match.personId,
-    personName: `${match.person.firstName} ${match.person.lastName}`.trim(),
-    entryName: `${match.entry.firstName} ${match.entry.lastName}`.trim(),
+    personName: formatPersonName(match.person),
+    entryName: formatPersonName(match.entry),
     site: match.entry.site,
   }));
 }
@@ -1483,9 +1484,9 @@ export async function listNameOnlyBackgroundCheckMatches(now = new Date()): Prom
   return matches.map((match) => ({
     id: match.id,
     personId: match.personId,
-    personName: `${match.person.firstName} ${match.person.lastName}`.trim(),
+    personName: formatPersonName(match.person),
     personSites: [...(index.byPerson.get(match.personId)?.siteNames ?? [])].sort(),
-    entryName: `${match.entry.firstName} ${match.entry.lastName}`.trim(),
+    entryName: formatPersonName(match.entry),
     site: match.entry.site,
   }));
 }
@@ -1813,7 +1814,7 @@ export async function lookupBackgroundCheckName(
     list.push({ attendeeType: member.attendeeType, club: member.organization.name });
     rosterByPerson.set(member.personId, list);
   }
-  const fullName = (person: { firstName: string; lastName: string }) => `${person.firstName} ${person.lastName}`.trim();
+  const fullName = (person: { firstName: string; lastName: string }) => formatPersonName(person);
   const entryById = new Map(pairRows.map((row) => [row.id, row]));
   const personById = new Map(pairPeople.map((person) => [person.id, person]));
   // Names (only) of the other side of a match that is on neither list nor shares a last name with the listed ones.

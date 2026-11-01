@@ -5,6 +5,7 @@ import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club registration (#358): how roster people map onto an event's published
@@ -500,7 +501,7 @@ export function rosterOwnedResponses(definition: RegistrationFormDefinition, per
     responses[names.first] = person.firstName;
     responses[names.last] = person.lastName;
   } else if (names) {
-    responses[names.key] = `${person.firstName} ${person.lastName}`.trim();
+    responses[names.key] = formatPersonName(person);
   }
   const age = attendeeAgeKey(definition);
   if (age && person.ageOnEventDate !== null) responses[age] = String(person.ageOnEventDate);

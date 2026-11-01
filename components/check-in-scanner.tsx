@@ -49,6 +49,7 @@ import {
   checkInSequentially,
   sequentialCheckInSummary,
 } from "@/modules/checkin/bulk-check-in";
+import { formatPersonName } from "@/lib/person-name";
 
 type ResolvedAttendee = {
   id: string;
@@ -546,7 +547,7 @@ export function CheckInScanner({
       } : current);
       const summary = sequentialCheckInSummary(ids, outcome, (attendeeId) => {
         const attendee = attendeesById.get(attendeeId);
-        return attendee ? `${attendee.firstName} ${attendee.lastName}` : "Unknown attendee";
+        return attendee ? formatPersonName(attendee) : "Unknown attendee";
       });
       if (outcome.needsReview > 0) setError(summary);
       else setNotice(summary);
@@ -740,7 +741,7 @@ export function CheckInScanner({
                         {person.firstName[0]}{person.lastName[0]}
                       </span>
                       <div>
-                        <strong translate="no">{person.firstName} {person.lastName}</strong>
+                        <strong translate="no">{formatPersonName(person)}</strong>
                         <small>
                           {attendeeTypeLabel(person.attendeeType)}
                           {person.checkedIn ? " · Checked in" : ""}
@@ -749,7 +750,7 @@ export function CheckInScanner({
                         </small>
                       </div>
                       <button
-                        aria-label={`Open registration for ${person.firstName} ${person.lastName}`}
+                        aria-label={`Open registration for ${formatPersonName(person)}`}
                         className="secondary-button"
                         disabled={lookupBusy}
                         onClick={() => void resolveLookup("confirmation", person.confirmationCode)}
@@ -857,7 +858,7 @@ export function CheckInScanner({
                           {attendee.firstName[0]}{attendee.lastName[0]}
                         </span>
                         <div>
-                          <strong translate="no">{attendee.firstName} {attendee.lastName}</strong>
+                          <strong translate="no">{formatPersonName(attendee)}</strong>
                           <small>{attendeeTypeLabel(attendee.attendeeType)}</small>
                           {backgroundFlaggedAttendeeIds.includes(attendee.id) && <BackgroundCheckBadge />}
                         </div>
@@ -879,7 +880,7 @@ export function CheckInScanner({
                               await confirmCheckIn(attendee, reason)
                               ?? { status: "CONFLICT" as const, message: "The override was not saved. Nothing was checked in." }
                             )}
-                            personLabel={`${attendee.firstName} ${attendee.lastName}`}
+                            personLabel={formatPersonName(attendee)}
                           />
                         ) : (
                           <button

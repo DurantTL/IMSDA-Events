@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatPersonName } from "@/lib/person-name";
 
 export const checkInRequestSchema = z.strictObject({
   idempotencyKey: z.uuid(),
@@ -193,7 +194,7 @@ export function arrivalMatchesSearch(
   if (looksLikeConfirmationCode(trimmed) && arrival.confirmationCode.toLowerCase().includes(trimmed.toLowerCase())) return true;
   const queryWords = searchWords(trimmed);
   if (queryWords.length === 0) return false;
-  const nameWords = searchWords(`${arrival.firstName} ${arrival.lastName}`);
+  const nameWords = searchWords(formatPersonName(arrival));
   // "obrien" finds O'Brien and "maryjane" finds Mary-Jane.
   const joinedNames = [`${arrival.firstName}`, `${arrival.lastName}`].map((part) => searchWords(part).join(""));
   const clubWords = searchWords(clubName);

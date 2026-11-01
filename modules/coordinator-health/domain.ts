@@ -1,4 +1,5 @@
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Coordinator health view (#658, ADR 0005 Addendum C). Pure rules: who may see
@@ -133,7 +134,7 @@ function shortText(value: unknown, max: number) {
 }
 
 export function normalizeName(first: string, last: string) {
-  return `${first} ${last}`.replace(/\s+/g, " ").trim().toLocaleLowerCase("en-US");
+  return formatPersonName({ firstName: first, lastName: last }).replace(/\s+/g, " ").trim().toLocaleLowerCase("en-US");
 }
 
 export function dietaryFromResponses(responses: unknown) {

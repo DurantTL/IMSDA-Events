@@ -16,6 +16,7 @@ import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { addRosterMemberInTransaction, listRosterDuplicates, RosterOperationError } from "@/modules/club-rosters/repository";
 import type { RosterMemberInput } from "@/modules/club-rosters/schemas";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * "Add to roster" from a submitted club form (#721). Only a club's director or
@@ -248,7 +249,7 @@ export async function confirmAddToRoster(viewer: ClubFormsViewer, input: RosterA
           "DUPLICATE_ON_ROSTER",
           "Someone with this name and birth date is already on the roster. Link this form to them instead of adding a duplicate.",
           // Member ids and display names, so the review screen can offer "Link to existing member".
-          duplicates.map((member) => ({ key: `duplicate:${member.id}`, message: `${member.firstName} ${member.lastName}`.trim() })),
+          duplicates.map((member) => ({ key: `duplicate:${member.id}`, message: formatPersonName(member) })),
         );
       }
       throw new ClubFormError("VALIDATION_FAILED", error.message);

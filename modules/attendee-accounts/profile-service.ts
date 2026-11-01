@@ -4,6 +4,7 @@ import { z } from "zod";
 import { phoneToStore } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { formatPersonName } from "@/lib/person-name";
 
 const optionalProfileValue = (maximum: number) => z.string().trim().max(maximum);
 // Same cap the address field uses for each component (modules/forms/address.ts).
@@ -128,7 +129,7 @@ export async function updateAttendeeProfile(
       data: {
         ...profile,
         ...optional,
-        displayName: `${profile.firstName} ${profile.lastName}`.trim() || undefined,
+        displayName: formatPersonName(profile) || undefined,
       },
       select: profileSelect,
     });
@@ -194,7 +195,7 @@ export function attendeeProfilePrefill(
   profile: AttendeeProfileInput,
   verifiedEmail = "",
 ) {
-  const name = `${profile.firstName} ${profile.lastName}`.trim();
+  const name = formatPersonName(profile);
   return {
     first_name: profile.firstName,
     primary_contact_first_name: profile.firstName,

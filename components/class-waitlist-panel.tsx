@@ -5,6 +5,8 @@ import { useConfirm } from "@/components/use-confirm";
 import { ListPlus } from "lucide-react";
 import { classRequirementGaps, unavailableReason } from "@/modules/honors/class-picker-view";
 import type { ClassSelectionWorkspace } from "@/modules/honors/enrollment-repository";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 type Workspace = ClassSelectionWorkspace;
 type Offering = Workspace["offerings"][number];
@@ -12,7 +14,7 @@ type Attendee = Workspace["attendees"][number];
 type Waitlist = NonNullable<Workspace["waitlist"]>;
 
 function formatDeadline(iso: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(iso));
+  return formatInTimeZone(iso, timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /**
@@ -129,7 +131,7 @@ export function ClassWaitlistPanel({
     const person = attendeeById.get(entryAttendeeId);
     const offering = offeringById.get(entryOfferingId);
     return {
-      name: person ? `${person.firstName} ${person.lastName}`.trim() : "A youth",
+      name: person ? formatPersonName(person) : "A youth",
       className: offering?.honorName ?? "a class",
       sessionName: offering?.sessionName ?? null,
     };
@@ -202,7 +204,7 @@ export function ClassWaitlistPanel({
             <select onChange={(event) => { setAttendeeId(event.target.value); setOffering(""); setConfirmed(false); setReason(""); }} value={attendeeId}>
               <option value="">Choose a youth</option>
               {workspace.attendees.filter((person) => person.consumesSeat).map((person: Attendee) => (
-                <option key={person.id} value={person.id}>{person.lastName}, {person.firstName}</option>
+                <option key={person.id} value={person.id}>{formatPersonName(person)}</option>
               ))}
             </select>
           </label>

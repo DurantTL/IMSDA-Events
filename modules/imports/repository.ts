@@ -10,6 +10,7 @@ import { logError } from "@/lib/logger";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { createImportSnapshotIdentity, CsvImportError, parseImportCsv, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
 import { parseWr26Bundle, type Wr26BundleFile } from "@/modules/imports/wr26-bundle";
+import { formatPersonName } from "@/lib/person-name";
 
 const SOURCE_SYSTEM = "WR26_CSV_STAGING";
 const WR26_BUNDLE_SOURCE_SYSTEM = "WR26_GOOGLE_SHEETS_BUNDLE";
@@ -258,7 +259,7 @@ async function previewImportRows(input: {
         errors.push("The source email belongs to a different person than the matched confirmation code.");
       }
       if (emailMatch && (emailMatch.firstName !== row.data.firstName || emailMatch.lastName !== row.data.lastName)) {
-        warnings.push(`Email matched existing person ${emailMatch.firstName} ${emailMatch.lastName}; review the name difference.`);
+        warnings.push(`Email matched existing person ${formatPersonName(emailMatch)}; review the name difference.`);
       }
       if (registration?.staffInvitation) {
         // A registration made through a personal staff, pastor or volunteer link (#804) is $0 and moves only through the
@@ -671,7 +672,7 @@ async function syncImportedDetails(
             totalCents: data.totalAmountCents,
             attendeeCount: data.attendees.length,
             attendeeNames: data.attendees.map((attendee) => (
-              `${attendee.firstName} ${attendee.lastName}`.trim()
+              formatPersonName(attendee)
             )),
             totalAmountCents: data.totalAmountCents,
           },

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { newPhoneSchema } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Personal staff invitations (#804). Pure rules, shared by the server, the pages and the tests.
@@ -236,8 +237,8 @@ export function partyOf(input: InvitationRegistrationInput): PartyMember[] {
 export function duplicatePartyName(party: readonly PartyMember[]) {
   const seen = new Set<string>();
   for (const member of party) {
-    const key = `${member.firstName} ${member.lastName}`.toLowerCase();
-    if (seen.has(key)) return `${member.firstName} ${member.lastName}`;
+    const key = formatPersonName(member).toLowerCase();
+    if (seen.has(key)) return formatPersonName(member);
     seen.add(key);
   }
   return null;

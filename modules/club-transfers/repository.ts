@@ -42,6 +42,7 @@ import { transferNotificationKey, transferRequestKey } from "@/modules/club-tran
 import type { RequestTransferInput } from "@/modules/club-transfers/schemas";
 import { seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club member transfer storage (#489, decisions of Sept 28). One
@@ -478,7 +479,7 @@ async function requestTransferOnce(toOrganizationId: string, input: RequestTrans
         leaderRecipients(sendingLeaders),
         transferNotificationEmail({
           templateKey: "MEMBER_TRANSFER_STARTED",
-          memberName: `${person.firstName} ${person.lastName}`,
+          memberName: formatPersonName(person),
           fromClubName: fromClub.name,
           toClubName: toClub.name,
           staffCompletes: staffReason === "SAME_DIRECTOR",
@@ -660,11 +661,11 @@ async function completeTransfer(
       ...leaderRecipients(sendingLeaders),
       ...leaderRecipients(receivingLeaders),
       // The member or guardian, if an email is on file (#489): just this one person.
-      ...(person.normalizedEmail ? [{ email: person.normalizedEmail, name: `${person.firstName} ${person.lastName}` }] : []),
+      ...(person.normalizedEmail ? [{ email: person.normalizedEmail, name: formatPersonName(person) }] : []),
     ],
     transferNotificationEmail({
       templateKey: "MEMBER_TRANSFER_COMPLETED",
-      memberName: `${person.firstName} ${person.lastName}`,
+      memberName: formatPersonName(person),
       fromClubName: fromClub.name,
       toClubName: toClub.name,
     }),
@@ -960,7 +961,7 @@ function clubVisibleEvents(transfer: ClubListTransfer, side: "RECEIVING" | "SEND
 }
 
 function typedName(transfer: ClubListTransfer) {
-  const name = `${transfer.requestedFirstName} ${transfer.requestedLastName}`.trim();
+  const name = formatPersonName({ firstName: transfer.requestedFirstName, lastName: transfer.requestedLastName });
   // Once the person is erased, the request keeps no name at all.
   return name || "Request closed";
 }
@@ -994,7 +995,7 @@ function serializeOutgoing(transfer: ClubListTransfer, viewer: { accountId?: str
   return {
     id: transfer.id,
     direction: "OUTGOING" as const,
-    memberName: transfer.person ? `${transfer.person.firstName} ${transfer.person.lastName}` : typedName(transfer),
+    memberName: transfer.person ? formatPersonName(transfer.person) : typedName(transfer),
     otherClubName: transfer.toOrganization.name,
     reason: transfer.reason,
     status: transfer.status,
@@ -1061,8 +1062,8 @@ function serializeStaff(transfer: Prisma.MemberTransferGetPayload<{ select: type
   const open = isOpenTransfer(transfer.status);
   return {
     id: transfer.id,
-    requestedName: `${transfer.requestedFirstName} ${transfer.requestedLastName}`.trim() || "Erased member",
-    matchedMemberName: transfer.person ? `${transfer.person.firstName} ${transfer.person.lastName}` : null,
+    requestedName: formatPersonName({ firstName: transfer.requestedFirstName, lastName: transfer.requestedLastName }) || "Erased member",
+    matchedMemberName: transfer.person ? formatPersonName(transfer.person) : null,
     fromOrganizationId: transfer.fromOrganizationId,
     fromOrganizationName: transfer.fromOrganization.name,
     toOrganizationId: transfer.toOrganizationId,
@@ -1332,7 +1333,7 @@ async function describeMove(client: Client, move: StoredMove, options: { lockLoc
     eventId: move.eventId,
     eventName: move.event.name,
     eventStartsAt: move.event.startsAt.toISOString(),
-    memberName: move.attendee?.person ? `${move.attendee.person.firstName} ${move.attendee.person.lastName}` : "Removed attendee",
+    memberName: move.attendee?.person ? formatPersonName(move.attendee.person) : "Removed attendee",
     fromClubName: move.transfer.fromOrganization.name,
     toClubName: move.transfer.toOrganization.name,
     fromRegistration: move.fromRegistration

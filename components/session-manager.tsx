@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LogOut, MonitorSmartphone } from "lucide-react";
 import { visibleSessionLimit, visibleSessions } from "@/components/session-list";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type SignedInSession = {
   id: string;
@@ -13,7 +14,7 @@ type SignedInSession = {
 };
 
 function when(value: string) {
-  return new Date(value).toLocaleString();
+  return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function SessionManager({

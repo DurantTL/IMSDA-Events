@@ -11,6 +11,7 @@ import { logError } from "@/lib/logger";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 /**
  * Lockout email (#456): considered once, on the transition from not-locked to
@@ -62,11 +63,7 @@ function greeting(displayName: string) {
  */
 function formatLockoutTime(now: Date, timeZone: string) {
   try {
-    return `${new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone,
-    }).format(now)} (${timeZone})`;
+    return formatInTimeZone(now, timeZone, { dateStyle: "medium", timeStyle: "short" });
   } catch {
     return `${now.toISOString()} (UTC)`;
   }

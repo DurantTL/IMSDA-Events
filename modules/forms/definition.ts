@@ -6,6 +6,7 @@ import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibil
 import { isUnchangedFromStored, labelledFieldMessage, normalizePhoneAnswer, typedProblemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
+import { formatPersonName } from "@/lib/person-name";
 
 export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "SIGNATURE", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
 /**
@@ -1703,7 +1704,7 @@ export function isLatePricingActive(field: RegistrationFormField, pricingDate = 
 function attendeeDisplayName(responses: Record<string, unknown>, index: number, attendeeLabel: string) {
   const firstName = typeof responses.first_name === "string" ? responses.first_name.trim() : "";
   const lastName = typeof responses.last_name === "string" ? responses.last_name.trim() : "";
-  const splitName = `${firstName} ${lastName}`.trim();
+  const splitName = formatPersonName({ firstName, lastName });
   if (splitName) return splitName;
   for (const key of attendeeNameKeys) {
     const value = responses[key];

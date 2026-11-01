@@ -18,6 +18,8 @@ import type {
   ProgramAssignmentDiagnostic,
   ProgramAssignmentWorkspaceField,
 } from "@/modules/program-assignments/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 type AppliedRun = {
   id: string;
@@ -43,7 +45,7 @@ type ApiResult = {
 };
 
 function localDate(value: string) {
-  return new Date(value).toLocaleString();
+  return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function fieldIdentity(field: ProgramAssignmentWorkspaceField) {
@@ -410,7 +412,7 @@ export function ProgramAssignmentsWorkspace({
                     <tbody>
                       {preview.assignments.map((assignment) => (
                         <tr key={assignment.attendeeId}>
-                          <th scope="row">{assignment.lastName}, {assignment.firstName}</th>
+                          <th scope="row">{formatPersonName(assignment)}</th>
                           <td>{assignment.assignedOption ?? "Unassigned"}</td>
                           <td>{assignment.unassignedReason === "NO_RANKED_CHOICES"
                             ? "No ranking submitted"

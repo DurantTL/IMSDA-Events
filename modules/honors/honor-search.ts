@@ -1,3 +1,4 @@
+import { formatPersonName } from "@/lib/person-name";
 /**
  * Type-to-search for honors (#819). Pure, so the combobox and its tests share
  * one rule: a honor matches when every word typed is the start of some word in
@@ -96,5 +97,5 @@ export function comboboxPopoverPlacement(input: ComboboxPlacementInput): Combobo
 
 /** The bulk popup's member search: first and last name, from the start of any word. */
 export function filterPeopleByWordPrefix<T extends { firstName: string; lastName: string }>(people: readonly T[], query: string | undefined): T[] {
-  return people.filter((person) => matchesWordPrefixes(`${person.firstName} ${person.lastName}`, query));
+  return people.filter((person) => matchesWordPrefixes(formatPersonName(person), query));
 }

@@ -140,6 +140,7 @@ import {
 import { getAttendeeRosterConfig, resolveBillingContactName, resolveResponsibleOrganization } from "@/modules/forms/definition";
 import type { FormCalculation, RegistrationFormDefinition } from "@/modules/forms/definition";
 import { isLooseEmail } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 import { emailIsClubLinked } from "@/modules/communications/email-layout";
 
 const fallbackSettings = {
@@ -260,17 +261,17 @@ function registrationSummary(
   identity: EventMessageIdentity,
   attendeeResponses: Array<Record<string, unknown>> = [],
 ) {
-  const lines = [`Primary contact: ${identity.firstName} ${identity.lastName}`.trim()];
+  const lines = [`Primary contact: ${formatPersonName(identity)}`.trim()];
   attendeeResponses.forEach((attendee, index) => {
     const firstName = summaryValue(attendee.first_name);
     const lastName = summaryValue(attendee.last_name);
-    const fullName = `${firstName} ${lastName}`.trim()
+    const fullName = formatPersonName({ firstName, lastName })
       || summaryValue(attendee.full_name)
       || summaryValue(attendee.name)
       || summaryValue(attendee.attendee_name)
       || summaryValue(attendee.guest_name)
       || (attendeeResponses.length === 1
-        ? `${identity.firstName} ${identity.lastName}`.trim()
+        ? formatPersonName(identity)
         : `Attendee ${index + 1}`);
     lines.push(`${index + 1}. ${fullName}`);
   });
@@ -664,7 +665,7 @@ async function loadBalanceReminderState(
       registrationId: registration.id,
       confirmationCode: registration.confirmationCode,
       status: registration.status,
-      recipientName: `${firstName} ${lastName}`.trim(),
+      recipientName: formatPersonName({ firstName, lastName }),
       recipientEmail: contactValue(
         "email",
         registration.accountHolderPerson.normalizedEmail ?? "",
@@ -814,14 +815,14 @@ async function loadShirtSizeRequestState(
       registrationId: registration.id,
       confirmationCode: registration.confirmationCode,
       status: registration.status,
-      recipientName: `${firstName} ${lastName}`.trim(),
+      recipientName: formatPersonName({ firstName, lastName }),
       recipientEmail: contactValue(
         "email",
         registration.accountHolderPerson.normalizedEmail ?? "",
       ),
       attendees: registration.attendees.map((attendee) => ({
         attendeeId: attendee.id,
-        fullName: `${attendee.person.firstName} ${attendee.person.lastName}`.trim(),
+        fullName: formatPersonName(attendee.person),
         // The same reader the public confirmation route and the readiness
         // check use, so "still missing" means the same thing everywhere.
         shirtSize: shirtSizeFromResponses(attendee.formResponses),
@@ -1440,7 +1441,7 @@ async function loadTestRegistrationContext(
       confirmation_code: registration.confirmationCode,
       registration_contact_email: contactEmail,
       attendee_summary: registration.attendees
-        .map((attendee) => `- ${`${attendee.person.firstName} ${attendee.person.lastName}`.trim()}`)
+        .map((attendee) => `- ${formatPersonName(attendee.person)}`)
         .join("\n") || "- No attendees recorded",
       total_amount: formatMessageMoney(totalCents),
       balance_amount: formatMessageMoney(balanceCents),
@@ -2335,7 +2336,7 @@ async function loadClubAssignmentState(
       registrationId: row.registration.id,
       confirmationCode: row.registration.confirmationCode,
       registrationStatus: row.registration.status,
-      recipientName: `${firstName} ${lastName}`.trim(),
+      recipientName: formatPersonName({ firstName, lastName }),
       recipientEmail: contactValue("email", row.registration.accountHolderPerson.normalizedEmail ?? ""),
       fields: row.assignment ? {
         campsiteLocation: row.assignment.campsiteLocation,
@@ -3542,7 +3543,7 @@ export async function enqueuePublicRegistrationMessages(
         internalNotificationEmails: stringArrayFromJson(settingsRow.internalNotificationEmails),
       }
     : fallbackSettings;
-  const registrantName = `${input.identity.firstName} ${input.identity.lastName}`.trim();
+  const registrantName = formatPersonName(input.identity);
   const attendeeSummary = registrationSummary(
     input.definition,
     input.responses,
@@ -3856,7 +3857,7 @@ async function loadSelectedAudienceState(
       registrationId: registration.id,
       confirmationCode: registration.confirmationCode,
       status: registration.status,
-      recipientName: `${contactValue("firstName", registration.accountHolderPerson.firstName)} ${contactValue("lastName", registration.accountHolderPerson.lastName)}`.trim(),
+      recipientName: formatPersonName({ firstName: contactValue("firstName", registration.accountHolderPerson.firstName), lastName: contactValue("lastName", registration.accountHolderPerson.lastName) }),
       recipientEmail: contactValue(
         "email",
         registration.accountHolderPerson.normalizedEmail ?? "",

@@ -35,6 +35,7 @@ import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-alert";
 import { usableRosterMapping } from "@/modules/club-forms/roster-mapping";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club form submissions (#610). Every function takes a resolved viewer and
@@ -71,7 +72,7 @@ export async function listRosterChoices(organizationId: string, clubYear = clubY
     select: { id: true, person: { select: { firstName: true, lastName: true } } },
   });
   return members
-    .flatMap((member) => member.person ? [{ id: member.id, name: `${member.person.firstName} ${member.person.lastName}`.trim() }] : [])
+    .flatMap((member) => member.person ? [{ id: member.id, name: formatPersonName(member.person) }] : [])
     .sort((left, right) => left.name.localeCompare(right.name, "en-US"));
 }
 
@@ -82,7 +83,7 @@ export async function resolveRosterMemberName(client: Pick<Prisma.TransactionCli
     select: { id: true, person: { select: { firstName: true, lastName: true } } },
   });
   if (!member) throw new ClubFormError("MEMBER_NOT_FOUND", "That person isn't on your club's roster.");
-  return member.person ? `${member.person.firstName} ${member.person.lastName}`.trim().slice(0, 120) : "";
+  return member.person ? formatPersonName(member.person).slice(0, 120) : "";
 }
 
 /**

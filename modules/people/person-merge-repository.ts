@@ -15,6 +15,7 @@ import {
   type ChildLoader,
   type LinkLoader,
 } from "@/modules/people/person-merge-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Reversible soft-merge of people (#127).
@@ -295,7 +296,7 @@ export async function unmergePeople(mergeId: string, actorUserId: string, reason
       });
       const nameOf = (id: string) => {
         const row = named.find((person) => person.id === id);
-        return row ? `${row.firstName} ${row.lastName}` : id;
+        return row ? formatPersonName(row) : id;
       };
       throw new PersonMergeError(
         "DEPENDENT_MERGE",

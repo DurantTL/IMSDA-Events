@@ -14,6 +14,7 @@ import {
 } from "@/modules/registrations/choice-answer-filter";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { formatPersonName } from "@/lib/person-name";
 
 async function getHandler(
   request: Request,
@@ -72,7 +73,7 @@ async function getHandler(
       const visibleNotes = await listNotesForRegistration(eventId, registration.id, actorPermissions);
       rows.push([
         registration.confirmationCode,
-        `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`,
+        formatPersonName(registration.accountHolder),
         registration.accountHolder.email,
         ...(showLocation ? [registration.location?.name ?? ""] : []),
         registration.status,

@@ -14,6 +14,7 @@ import { loadStaffMealServiceCounts } from "@/modules/meals/staff-coverage";
 import { staffMealServiceCsvRows } from "@/modules/meals/staff-coverage-domain";
 import { repairEventTickets, selectionsMissingTickets } from "@/modules/meals/ticket-repository";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -133,7 +134,7 @@ export async function loadMealTicketRows(eventId: string): Promise<MealTicketRow
     const last = typeof profile.lastName === "string" ? profile.lastName : row.attendee?.person.lastName ?? (typeof contact.lastName === "string" ? contact.lastName : "");
     return {
       confirmationCode: row.registration?.confirmationCode ?? "",
-      attendeeName: `${first} ${last}`.trim(),
+      attendeeName: formatPersonName({ firstName: first, lastName: last }),
       attendeeType: row.attendee ? row.attendee.attendeeTypeDefinition?.label ?? row.attendee.attendeeType : "",
       ageGroup: row.ageGroup,
       mealType: row.mealType,
@@ -208,7 +209,7 @@ export async function loadScannerTickets(eventId: string): Promise<ScannerTicket
     const first = typeof profile.firstName === "string" ? profile.firstName : row.attendee?.person.firstName ?? (typeof contact.firstName === "string" ? contact.firstName : "");
     const last = typeof profile.lastName === "string" ? profile.lastName : row.attendee?.person.lastName ?? (typeof contact.lastName === "string" ? contact.lastName : "");
     return {
-      number, confirmationCode: row.registration?.confirmationCode ?? "", guestName: `${first} ${last}`.trim(), mealType: row.mealType,
+      number, confirmationCode: row.registration?.confirmationCode ?? "", guestName: formatPersonName({ firstName: first, lastName: last }), mealType: row.mealType,
       serviceDate: row.service?.serviceDate ?? "", ageGroup: row.ageGroup, unitPriceCents: row.unitPriceCents, payer: row.payer,
     } satisfies ScannerTicket;
   });

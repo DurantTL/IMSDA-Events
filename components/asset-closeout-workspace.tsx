@@ -9,6 +9,7 @@ import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { chargeCategoryLabels, facilitySeverities, facilityStatuses, holdKindLabels } from "@/modules/issued-assets/returns-domain";
 import type { FacilityIssueRow } from "@/modules/issued-assets/returns-view";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
 
 /**
@@ -19,7 +20,7 @@ import { savedMessage } from "@/components/form-message";
  */
 
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(16).slice(2)}`);
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "");
+const when = (iso: string | null) => (iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "");
 
 
 export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility }: {

@@ -10,6 +10,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { publicAttendeeName } from "@/modules/public-access/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 type SeminarReadClient = Pick<Prisma.TransactionClient, "registration" | "programAttendeeAssignment">;
 type SeminarBatchClient = SeminarReadClient & Pick<Prisma.TransactionClient, "registrationFormVersion">;
@@ -250,7 +251,7 @@ export function buildSubmittedSeminarPreferences(input: {
     .filter(isSeminarPreferenceField);
   const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
   return buildSeminarPreferencesBlock(input.attendeeResponses.map((responses, index) => ({
-    name: `${text(responses.first_name)} ${text(responses.last_name)}`.trim()
+    name: formatPersonName({ firstName: text(responses.first_name), lastName: text(responses.last_name) })
       || text(responses.full_name)
       || text(responses.name)
       || (input.attendeeResponses.length === 1 ? input.registrantName : `Attendee ${index + 1}`),

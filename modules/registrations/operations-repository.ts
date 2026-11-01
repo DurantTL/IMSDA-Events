@@ -25,6 +25,7 @@ import type {
   RegistrationTransferInput,
 } from "@/modules/registrations/schemas";
 import { isLooseEmail } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 type RegistrationOperationKind = "TRANSFER" | "ATTENDEE_SUBSTITUTION";
 
@@ -547,8 +548,8 @@ export async function transferRegistration(
 
     const operationId = randomUUID();
     const correlationId = input.clientRequestId;
-    const recipientName = `${input.firstName} ${input.lastName}`.trim();
-    const priorName = `${prior.firstName} ${prior.lastName}`.trim();
+    const recipientName = formatPersonName(input);
+    const priorName = formatPersonName(prior);
     const queued: QueuedTransactionalMessage[] = [];
     const recipients: NoticeRecipient[] = [];
     const newNotice = await enqueueRegistrationTransferredNewContactMessage(tx, {
@@ -802,7 +803,7 @@ export async function substituteRegistrationAttendee(
       ) {
         throw new RegistrationOperationError(
           "ATTENDEE_ALREADY_IN_PARTY",
-          `${partyIdentity.firstName} ${partyIdentity.lastName} is already in this registration. Choose a person who is not already in the attendee party.`,
+          `${formatPersonName(partyIdentity)} is already in this registration. Choose a person who is not already in the attendee party.`,
           { existingAttendeeId: partyMember.id },
         );
       }
@@ -870,8 +871,8 @@ export async function substituteRegistrationAttendee(
     // The same team rules as any other change to the team, inside this transaction, so a refused one saves nothing.
     if (onTeamEvent) permissionMessageIds.push(...(await enforceTeamRegistrationRules(tx, registrationId, { actorUserId: actor.id, notifyApprovers })).queuedMessageIds);
 
-    const priorName = `${prior.firstName} ${prior.lastName}`.trim();
-    const replacementName = `${input.firstName} ${input.lastName}`.trim();
+    const priorName = formatPersonName(prior);
+    const replacementName = formatPersonName(input);
     const registrationContact = contactIdentity(registration);
     const recipientCandidates: NoticeRecipient[] = [
       {
@@ -897,7 +898,7 @@ export async function substituteRegistrationAttendee(
         ? replacementName
         : roleNames.includes("PRIOR_ATTENDEE")
           ? priorName
-          : `${registrationContact.firstName} ${registrationContact.lastName}`.trim();
+          : formatPersonName(registrationContact);
       const notice = await enqueueAttendeeSubstitutedMessage(tx, {
         eventId,
         registrationId,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { KeyRound, ShieldCheck, ShieldAlert } from "lucide-react";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type MfaStatus = {
   required: boolean;
@@ -123,7 +124,7 @@ export function MfaManager({
       {status.status === "ACTIVE" ? (
         <p className="quiet-copy">
           An authenticator is protecting this account
-          {status.confirmedAt ? ` since ${new Date(status.confirmedAt).toLocaleDateString()}` : ""}.
+          {status.confirmedAt ? ` since ${formatInConferenceTime(status.confirmedAt, { month: "numeric", day: "numeric", year: "numeric" })}` : ""}.
           {" "}{status.unusedRecoveryCodes} recovery code{status.unusedRecoveryCodes === 1 ? "" : "s"} remain unused.
         </p>
       ) : !offer && !hideIntro && (

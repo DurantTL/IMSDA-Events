@@ -10,6 +10,8 @@
  * recently, never names or form answers.
  */
 
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+
 /** How often a visible desk device asks for changes. */
 export const LIVE_POLL_INTERVAL_MS = 5_000;
 /** Longest wait after repeated failures. */
@@ -111,6 +113,6 @@ export function nextLivePollDelay(consecutiveFailures: number) {
 
 /** "Already checked in at 2:04 PM by Dana." */
 export function alreadyCheckedInMessage(checkedInAt: string, checkedInBy: string | null | undefined, locale?: string) {
-  const time = new Date(checkedInAt).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+  const time = formatInConferenceTime(checkedInAt, { hour: "numeric", minute: "2-digit" }, locale);
   return `Already checked in at ${time}${checkedInBy ? ` by ${checkedInBy}` : ""}.`;
 }
