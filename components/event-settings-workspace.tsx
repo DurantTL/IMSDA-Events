@@ -30,7 +30,7 @@ import {
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
 import { getEventPublishReadiness, getEventPublishWarnings, type EventReadinessItem, type EventReadinessRecommendedItem, type EventReadinessSource } from "@/modules/events/readiness";
-import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
+import { draftFromEvent, eventSettingsClientProblems, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
 import {
@@ -73,7 +73,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
-import { FormErrorSummary } from "@/components/form-error-summary";
+import { FormErrorSummary, summaryMessage } from "@/components/form-error-summary";
 import { SettingsBlock } from "@/components/settings-block";
 import {
   blockForControlId,
@@ -206,6 +206,23 @@ function startingDraft(event: EventSettingsRecord | null, prefill: CalendarPrefi
     location: prefill.location || null,
   };
 }
+
+/** How the summary names the fields people most often get wrong; any other field shows its message alone. */
+const SUMMARY_LABELS: Record<string, string> = {
+  name: "Event name",
+  slug: "Short web address",
+  startsOn: "Starts on",
+  endsOn: "Ends on",
+  startTime: "Start time",
+  endTime: "End time",
+  capacity: "Capacity",
+  registrationOpensOn: "Registration opens",
+  registrationClosesOn: "Registration closes",
+  paymentDueOn: "Payment due by",
+  publicInfoUrl: "Public information link",
+  helpEmail: "Help email",
+  hotelBookingUrl: "Hotel booking link",
+};
 
 export function EventSettingsWorkspace({
   mode,
@@ -390,6 +407,15 @@ export function EventSettingsWorkspace({
     event?.preventDefault();
     if (saving) return;
     setSiteUpdating(false);
+    // The browser's own checks are off (noValidate), so the same problems are found here and shown in the summary.
+    const problems = eventSettingsClientProblems(draft, mode);
+    if (Object.keys(problems).length > 0) {
+      setSaveMessage(null);
+      setError("");
+      setNotice("");
+      showFieldErrors(problems);
+      return;
+    }
     setSaving(true);
     setSaveMessage(null);
     setFieldErrors({});
@@ -843,7 +869,7 @@ export function EventSettingsWorkspace({
   const errorItems = Object.entries(fieldErrors)
     .filter(([key]) => key in settingsFieldBlock)
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
-    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message }));
+    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message: key in SUMMARY_LABELS ? summaryMessage(SUMMARY_LABELS[key], message) : message }));
 
   // A field inside a closed block can fail native validation (a bad URL, say).
   // The browser cannot show a message on a hidden field, so Save would do
@@ -914,7 +940,7 @@ export function EventSettingsWorkspace({
         </ul>
       </nav>
 
-      <form className="event-settings-layout" onSubmit={save} onInvalidCapture={openBlockForInvalidField}>
+      <form className="event-settings-layout" noValidate onSubmit={save} onInvalidCapture={openBlockForInvalidField}>
         <div className="event-settings-main">
           {errorItems.length > 0 && (
             <FormErrorSummary

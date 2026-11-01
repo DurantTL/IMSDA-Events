@@ -251,7 +251,7 @@ describe("event settings: focus and error placement (#743 review)", () => {
   });
 
   it("styles a settings error as an error in every block", () => {
-    expect(block).toMatch(/\.settings-block \.field-error-message[^{]*\{[^}]*font-weight: 700/);
+    expect(block).toMatch(/\.settings-block \.field-error-message[^{]*\{[^}]*font-weight: 600/);
     expect(block).toContain(".empty-state:not(.panel)");
   });
 
@@ -311,15 +311,17 @@ describe("error summary (#743)", () => {
     expect(markup).toContain('href="#public_attendee_a_shirt"');
     expect(markup).toContain("Guest Two — T-shirt size is required.");
     expect(markup).toContain("Archery Basics — pick a time.");
-    expect(markup).toContain("3 problems to fix. Your answers are kept.");
+    expect(markup).toContain("3 things to fix before saving");
     expect(markup).toContain("<svg");
-    expect(errorSummaryHeading(1)).toBe("1 problem to fix. Your answers are kept.");
+    expect(errorSummaryHeading(1)).toBe("1 thing to fix before saving");
+    expect(errorSummaryHeading(2, "signing in")).toBe("2 things to fix before signing in");
   });
 
   it("focuses the summary after a failed submit on the public form and keeps answers", () => {
     const source = read("components/public-registration-form.tsx");
     expect(source).toMatch(/window\.requestAnimationFrame\(\(\) => errorSummaryRef\.current\?\.focus\(\)\)/);
-    expect(source).toContain("errorSummaryHeading(issues.length)");
+    expect(source).toContain("<FormErrorSummary");
+    expect(source).toContain("items={summaryItems}");
     expect(source).toContain('<FieldError className="public-registration-field-error"');
     expect(source).toContain("issueSummaryMessage(issue)");
     // A failed submit never clears the entered answers.

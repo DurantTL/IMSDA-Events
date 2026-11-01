@@ -5,7 +5,8 @@ import { useState, type FormEvent } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
-import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { FormErrorSummary, useFormErrorSummary } from "@/components/form-error-summary";
+import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
 
 export function AttendeeProfileForm({
@@ -24,6 +25,7 @@ export function AttendeeProfileForm({
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary } = useFormErrorSummary();
 
   function field(name: keyof AttendeeProfileInput, value: string) {
     setProfile((current) => ({ ...current, [name]: value }));
@@ -36,11 +38,17 @@ export function AttendeeProfileForm({
     if (state === "saving") return;
     setSiteUpdating(false);
     setAttempted(true);
-    if (phoneBlocks("Phone", profile.phone, savedProfile.phone) || phoneBlocks("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone)) {
-      setState("error");
-      setMessage("Fix the highlighted phone number and save again.");
+    const problems = [
+      { targetId: "profile-phone", message: phoneBlockingMessage("Phone", profile.phone, savedProfile.phone) },
+      { targetId: "profile-emergency-phone", message: phoneBlockingMessage("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone) },
+    ].filter((problem) => problem.message);
+    if (problems.length > 0) {
+      setState("idle");
+      setMessage("");
+      showSummary(problems.map((problem) => ({ targetId: problem.targetId, message: problem.message })));
       return;
     }
+    clearSummary();
     setState("saving");
     setMessage("Saving profile…");
     setNeedsSecondStep(false);
@@ -72,7 +80,8 @@ export function AttendeeProfileForm({
   }
 
   return (
-    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" onSubmit={save}>
+    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" noValidate onSubmit={save}>
+      {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Reusable profile</p>
         <h2>Your usual details</h2>
@@ -98,7 +107,7 @@ export function AttendeeProfileForm({
         </label>
         <label className="public-registration-field public-manage-contact-wide">
           <span className="public-registration-field-label">Phone</span>
-          <PhoneInput label="Phone" showNow={attempted} stored={savedProfile.phone} value={profile.phone} onValueChange={(value) => field("phone", value)} />
+          <PhoneInput id="profile-phone" label="Phone" showNow={attempted} stored={savedProfile.phone} value={profile.phone} onValueChange={(value) => field("phone", value)} />
         </label>
         </div>
       </fieldset>
@@ -146,7 +155,7 @@ export function AttendeeProfileForm({
         </label>
         <label className="public-registration-field public-manage-contact-wide">
           <span className="public-registration-field-label">Phone</span>
-          <PhoneInput autoComplete="section-emergency tel" label="Emergency contact phone" showNow={attempted} stored={savedProfile.emergencyContactPhone} value={profile.emergencyContactPhone} onValueChange={(value) => field("emergencyContactPhone", value)} />
+          <PhoneInput autoComplete="section-emergency tel" id="profile-emergency-phone" label="Emergency contact phone" showNow={attempted} stored={savedProfile.emergencyContactPhone} value={profile.emergencyContactPhone} onValueChange={(value) => field("emergencyContactPhone", value)} />
         </label>
         </div>
       </fieldset>

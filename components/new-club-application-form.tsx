@@ -3,6 +3,9 @@
 import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
+import { validateEmail } from "@/lib/field-validation";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
@@ -16,6 +19,23 @@ import {
 
 const OTHER = "__other__";
 const ACCEPT = "application/pdf,image/png,image/jpeg,image/webp";
+
+const FIELD_LABELS = {
+  clubName: "Club name",
+  church: "Sponsoring church or company",
+  churchOther: "Name of the church or company",
+  pastorName: "Church pastor",
+  directorName: "Director name",
+  directorEmail: "Director email",
+  directorAddress: "Mailing address",
+  agreed: "Philosophy of Pathfindering",
+  pastorSignature: "Pastor signature",
+  headElderSignature: "Head elder signature",
+  clerkSignature: "Church clerk signature",
+  directorSignature: "Club director signature",
+} as const;
+type FieldKey = keyof typeof FIELD_LABELS;
+const FIELD_ORDER = Object.keys(FIELD_LABELS) as FieldKey[];
 
 type Props = {
   churches: Array<{ id: string; name: string; type: string }>;
@@ -61,8 +81,28 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary } = useFormErrorSummary();
   // The site was restarting (#1263): the form keeps everything, including the chosen file.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
+
+  const errorProps = (key: FieldKey, helpId?: string) => fieldErrorProps(`club_${key}_error`, errors[key], helpId);
+
+  /** What the browser's required and email checks enforced before noValidate; the server checks everything again. */
+  function findProblems() {
+    const found: Partial<Record<FieldKey, string>> = {};
+    const required = "This is required.";
+    for (const key of ["clubName"] as const) if (!values[key].trim()) found[key] = required;
+    if (!values.church) found.church = "Choose a church or company.";
+    if (values.church === OTHER && !values.churchOther.trim()) found.churchOther = required;
+    for (const key of ["pastorName", "directorName"] as const) if (!values[key].trim()) found[key] = required;
+    if (!values.directorEmail.trim()) found.directorEmail = required;
+    else if (!validateEmail(values.directorEmail).ok) found.directorEmail = "Enter the director's email address.";
+    if (!values.directorAddress.trim()) found.directorAddress = required;
+    if (!agreed) found.agreed = "Tick the box to agree.";
+    for (const key of ["pastorSignature", "headElderSignature", "clerkSignature", "directorSignature"] as const) if (!values[key].trim()) found[key] = required;
+    return found;
+  }
 
   function set<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -73,6 +113,14 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
     if (saving) return;
     setError("");
     setSiteUpdating(false);
+    const found = findProblems();
+    setErrors(found);
+    const keys = FIELD_ORDER.filter((key) => found[key]);
+    if (keys.length > 0) {
+      showSummary(keys.map((key) => ({ targetId: `club_${key}`, message: summaryMessage(FIELD_LABELS[key], found[key] as string) })));
+      return;
+    }
+    clearSummary();
     if (file && file.size > MAX_APPLICATION_ATTACHMENT_BYTES) {
       setError(`The attachment must be ${Math.floor(MAX_APPLICATION_ATTACHMENT_BYTES / (1024 * 1024))} MB or smaller.`);
       return;
@@ -137,32 +185,37 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   }
 
   return (
-    <form className="club-form-fill" onSubmit={(event) => void submit(event)}>
+    <form className="club-form-fill" noValidate onSubmit={(event) => void submit(event)}>
+      {summaryItems.length > 0 && <FormErrorSummary action="submitting" items={summaryItems} ref={summaryRef} />}
       <fieldset className="public-manage-card form-stack" disabled={saving}>
         <ClubFormSectionTitle>The club</ClubFormSectionTitle>
         <div className="form-grid two-column nca-grid">
           <label>
             Club name
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("clubName", event.target.value)} required value={values.clubName} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("clubName", event.target.value)} id="club_clubName" {...errorProps("clubName")} value={values.clubName} />
+            <FieldError id="club_clubName_error">{errors.clubName}</FieldError>
           </label>
           <label>
             Sponsoring church or company
-            <select onChange={(event) => set("church", event.target.value)} required value={values.church}>
+            <select id="club_church" {...errorProps("church")} onChange={(event) => set("church", event.target.value)} value={values.church}>
               <option value="">Choose a church or company…</option>
               {churches.map((church) => <option key={church.id} value={church.id}>{sponsorOptionLabel(church)}</option>)}
               <option value={OTHER}>Other (not in this list)</option>
             </select>
+            <FieldError id="club_church_error">{errors.church}</FieldError>
           </label>
           {values.church === OTHER && (
             <label>
               Name of the church or company
-              <input autoComplete="off" maxLength={160} onChange={(event) => set("churchOther", event.target.value)} required value={values.churchOther} />
+              <input autoComplete="off" maxLength={160} onChange={(event) => set("churchOther", event.target.value)} id="club_churchOther" {...errorProps("churchOther")} value={values.churchOther} />
+              <FieldError id="club_churchOther_error">{errors.churchOther}</FieldError>
               <small className="field-help">The conference will match it to its church directory.</small>
             </label>
           )}
           <label>
             Church pastor
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("pastorName", event.target.value)} required value={values.pastorName} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("pastorName", event.target.value)} id="club_pastorName" {...errorProps("pastorName")} value={values.pastorName} />
+            <FieldError id="club_pastorName_error">{errors.pastorName}</FieldError>
           </label>
         </div>
       </fieldset>
@@ -172,16 +225,19 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
         <div className="form-grid two-column nca-grid">
           <label>
             Name
-            <input autoComplete="name" maxLength={120} onChange={(event) => set("directorName", event.target.value)} required value={values.directorName} />
+            <input autoComplete="name" maxLength={120} onChange={(event) => set("directorName", event.target.value)} id="club_directorName" {...errorProps("directorName")} value={values.directorName} />
+            <FieldError id="club_directorName_error">{errors.directorName}</FieldError>
           </label>
           <label>
             Email
-            <input autoComplete="email" maxLength={160} onChange={(event) => set("directorEmail", event.target.value)} required type="email" value={values.directorEmail} />
-            <small className="field-help">The club director invite is sent here when the application is approved.</small>
+            <input autoComplete="email" maxLength={160} onChange={(event) => set("directorEmail", event.target.value)} type="email" id="club_directorEmail" {...errorProps("directorEmail", "club_directorEmail_help")} value={values.directorEmail} />
+            <FieldError id="club_directorEmail_error">{errors.directorEmail}</FieldError>
+            <small className="field-help" id="club_directorEmail_help">The club director invite is sent here when the application is approved.</small>
           </label>
           <label className="club-form-field-wide">
             Mailing address
-            <textarea autoComplete="street-address" maxLength={300} onChange={(event) => set("directorAddress", event.target.value)} required rows={3} value={values.directorAddress} />
+            <textarea autoComplete="street-address" maxLength={300} onChange={(event) => set("directorAddress", event.target.value)} rows={3} id="club_directorAddress" {...errorProps("directorAddress")} value={values.directorAddress} />
+            <FieldError id="club_directorAddress_error">{errors.directorAddress}</FieldError>
           </label>
           <label>
             Home phone
@@ -199,8 +255,9 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
         <ClubFormSectionTitle>Philosophy of Pathfindering</ClubFormSectionTitle>
         <p className="club-form-note">{PHILOSOPHY_STATEMENT}</p>
         <label className="nca-agree">
-          <input checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required type="checkbox" />
+          <input checked={agreed} id="club_agreed" {...errorProps("agreed")} onChange={(event) => setAgreed(event.target.checked)} type="checkbox" />
           <span>{CHURCH_AGREEMENT}</span>
+          <FieldError id="club_agreed_error">{errors.agreed}</FieldError>
         </label>
       </fieldset>
 
@@ -209,19 +266,23 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
         <div className="form-grid two-column nca-grid">
           <label>
             Church pastor
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("pastorSignature", event.target.value)} required value={values.pastorSignature} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("pastorSignature", event.target.value)} id="club_pastorSignature" {...errorProps("pastorSignature")} value={values.pastorSignature} />
+            <FieldError id="club_pastorSignature_error">{errors.pastorSignature}</FieldError>
           </label>
           <label>
             Head elder
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("headElderSignature", event.target.value)} required value={values.headElderSignature} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("headElderSignature", event.target.value)} id="club_headElderSignature" {...errorProps("headElderSignature")} value={values.headElderSignature} />
+            <FieldError id="club_headElderSignature_error">{errors.headElderSignature}</FieldError>
           </label>
           <label>
             Church clerk
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("clerkSignature", event.target.value)} required value={values.clerkSignature} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("clerkSignature", event.target.value)} id="club_clerkSignature" {...errorProps("clerkSignature")} value={values.clerkSignature} />
+            <FieldError id="club_clerkSignature_error">{errors.clerkSignature}</FieldError>
           </label>
           <label>
             Club director
-            <input autoComplete="off" maxLength={120} onChange={(event) => set("directorSignature", event.target.value)} required value={values.directorSignature} />
+            <input autoComplete="off" maxLength={120} onChange={(event) => set("directorSignature", event.target.value)} id="club_directorSignature" {...errorProps("directorSignature")} value={values.directorSignature} />
+            <FieldError id="club_directorSignature_error">{errors.directorSignature}</FieldError>
           </label>
           <div className="club-form-field-wide nca-board">
             <span className="nca-board-title">Other church board members (optional)</span>
