@@ -91,7 +91,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       <h2 className="club-summary-section" id={clubSummaryAnchors[view]}>{views.find((item) => item.key === view)!.label}</h2>
       <SearchAsYouTypeForm className={view === "points" ? `${styles.toolbar} ${pointsStyles.toolbar}` : styles.toolbar} action="/admin/clubs/summary">
         <input type="hidden" name="view" value={view} />
-        <label>Club year<select name="year" defaultValue={clubYear}>{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
+        <label>Club year<select data-default-value={resolveAreaClubYear(undefined, now)} defaultValue={clubYear} name="year">{clubYearOptions(clubYear, now).map((year) => <option key={year}>{year}</option>)}</select></label>
         {view === "directory" ? <>
           <label className={styles.search}>Search by club or church name<input type="search" name="q" defaultValue={query} maxLength={80} autoComplete="off" /></label>
           <label>Show<select name="attention" defaultValue={attention ? "needs-attention" : "all"} aria-describedby="club-attention-help"><option value="all">All clubs</option><option value="needs-attention">Needs attention</option></select></label>

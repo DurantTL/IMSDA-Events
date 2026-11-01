@@ -6,7 +6,7 @@ const nav = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: vi.fn() }) }));
 
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
-import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm } from "@/components/search-as-you-type";
+import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure } from "@/components/search-as-you-type";
 import { mount, typeInto, type Mounted } from "./helpers/dom-render";
 
 /** The shared hook in a real DOM, with fake timers and a mocked router (#1431). Synthetic data only. */
@@ -167,5 +167,24 @@ describe("background-check lookup ignores stale answers", () => {
     expect(status).toContain("2 list rows and 0 people found");
     expect(status).not.toContain("1 list row and");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("SearchDisclosure (#1431)", () => {
+  const panel = (open: boolean) => createElement(SearchDisclosure, { className: "operations-search-disclosure", open }, createElement("summary", null, "Advanced search"), createElement("input", { name: "q", type: "search" }));
+  const details = () => mounted.container.querySelector("details")!;
+
+  it("stays open when clearing the box removes the last filter, and opens when the server opens it", async () => {
+    mounted = await mount(panel(true));
+    expect(details().open).toBe(true);
+    await act(async () => { mounted.root.render(panel(false)); });
+    expect(details().open).toBe(true);
+  });
+
+  it("starts closed when no filter is active, and opens when one becomes active", async () => {
+    mounted = await mount(panel(false));
+    expect(details().open).toBe(false);
+    await act(async () => { mounted.root.render(panel(true)); });
+    expect(details().open).toBe(true);
   });
 });

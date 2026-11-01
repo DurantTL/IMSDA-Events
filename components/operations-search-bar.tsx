@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
-import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
+import { SearchAsYouTypeForm, SearchDisclosure } from "@/components/search-as-you-type";
 import {
   activeFilterKeys,
   hasActiveFilters,
@@ -96,7 +96,7 @@ export function OperationsSearchBar({
 
   return (
     <section aria-label="Search registrations" className="operations-search" data-testid="operations-search">
-      <details className="operations-search-disclosure" data-testid="operations-search-disclosure" open={activeFilterKeys(query).some((key) => key !== "location") || summary !== null}>
+      <SearchDisclosure className="operations-search-disclosure" data-testid="operations-search-disclosure" open={activeFilterKeys(query).some((key) => key !== "location") || summary !== null}>
       <summary>Advanced search</summary>
       <SearchAsYouTypeForm action={basePath} className="form-stack operations-search-form">
         <input name="event" type="hidden" value={eventId} />
@@ -185,7 +185,7 @@ export function OperationsSearchBar({
           {active ? <Link className="secondary-button" href={`${basePath}?${clearParams.toString()}`}><X aria-hidden="true" size={14} /> Clear</Link> : null}
         </div>
       </SearchAsYouTypeForm>
-      </details>
+      </SearchDisclosure>
       {summary && summary.issues.length > 0 ? (
         <ul className="form-error" data-testid="operations-search-issues" role="alert">
           {summary.issues.map((issue) => <li key={`${issue.filter}:${issue.code}`}>{filterLabels[issue.filter] ?? humanize(issue.filter)}: {issue.message}</li>)}
