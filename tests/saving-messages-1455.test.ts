@@ -19,7 +19,7 @@ import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-me
 import { settingsSaveState } from "@/components/settings-save-state";
 import { getEventPublishReadiness } from "@/modules/events/readiness";
 import type { EventSettingsRecord } from "@/modules/events/repository";
-import { buttonByText, click, flush, mount, submitForm, typeInto, type Mounted } from "./helpers/dom-render";
+import { buttonByText, choose, click, flush, mount, submitForm, typeInto, type Mounted } from "./helpers/dom-render";
 
 /**
  * Rules 5 and 10 (#1455): the pressed button reads "Saving…" (aria-busy) until the answer comes back, then one message
@@ -214,6 +214,94 @@ describe("Roster deactivate", () => {
     expect(bodies[1]).toEqual({ status: "ACTIVE" });
     expect(liveRegionsWith(container, /Reactivated Jordan Ellis/)).toHaveLength(1);
     expect([...container.querySelectorAll("button")].some((button) => button.textContent === "Undo")).toBe(false);
+  });
+});
+
+describe("Roster message focus, dialog errors and Undo failure (#1455 review)", () => {
+  const person = {
+    id: "m1", firstName: "Jordan", lastName: "Ellis", attendeeType: "ADULT", role: "", classLevel: null, gender: null, status: "ACTIVE",
+    source: "DIRECTOR", age: 30, reportedAge: null, birthDateNeeded: false, updatedAt: "2027-01-01T00:00:00.000Z",
+  };
+  const props = { canSeeBirthDates: false, clubYear: "2026-2027", initialMembers: [person], organizationId: "club-1" } as never;
+
+  async function deactivate(container: HTMLElement) {
+    await click(container.querySelector("#roster-edit-m1")!);
+    await click(buttonByText(document.body, "Deactivate"));
+    await click(buttonByText(document.body, "Deactivate Jordan Ellis"));
+    await flush(30);
+  }
+
+  it("moves focus to Undo and scrolls the message into view after Deactivate", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string };
+      return new Response(JSON.stringify({ members: [{ ...person, status: body.status }] }), { status: 200 });
+    }));
+    mounted = await mount(createElement(ClubRosterWorkspace, props));
+    await deactivate(mounted.container);
+    expect(document.activeElement?.textContent).toBe("Undo");
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+  });
+
+  it("keeps the message and Undo (busy) while Undo runs, and offers Undo again after a failure", async () => {
+    let calls = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.stubGlobal("fetch", vi.fn(async (_u: unknown, init?: RequestInit) => {
+      calls += 1;
+      const body = JSON.parse(String(init?.body ?? "{}")) as { status?: string };
+      if (calls === 1) return new Response(JSON.stringify({ members: [{ ...person, status: body.status }] }), { status: 200 });
+      await gate;
+      return new Response(JSON.stringify({ message: "The roster service is down." }), { status: 500 });
+    }));
+    mounted = await mount(createElement(ClubRosterWorkspace, props));
+    const { container } = mounted;
+    await deactivate(container);
+    await click(buttonByText(container, "Undo"));
+    expect(container.querySelector("#roster-message-slot")!.textContent).toMatch(/^Deactivated.*Undoing…/);
+    release();
+    await flush(30);
+    const slot = container.querySelector("#roster-message-slot")!;
+    expect(slot.querySelector('[role="alert"]')!.textContent).toMatch(/^Not saved: The roster service is down\./);
+    expect(slot.querySelector("button")!.textContent).toBe("Undo");
+  });
+
+  it("shows a failed dialog save under the Save row, once", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "The roster could not be updated." }), { status: 500 })));
+    mounted = await mount(createElement(ClubRosterWorkspace, props));
+    const { container } = mounted;
+    await click(container.querySelector("#roster-edit-m1")!);
+    await choose(document.body.querySelector<HTMLSelectElement>("#roster-gender")!, "FEMALE");
+    const form = document.body.querySelector<HTMLFormElement>("#roster-dialog-title")!.closest("section")!.querySelector("form")!;
+    await submitForm(form);
+    await flush(30);
+    const alerts = document.body.querySelectorAll('[role="alert"]');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.textContent).toMatch(/^Not saved: /);
+    expect(form.querySelector(".form-actions")!.nextElementSibling).toBe(alerts[0]);
+  });
+});
+
+describe("Stale Saved and focus after a save", () => {
+  it("club profile: editing again clears Saved, and focus returns to Save", async () => {
+    const clubProfile = {
+      id: "club-1", name: "Synthetic Pathfinders", sponsoringChurchId: "church-1", meetingPlace: "", meetingSchedule: "",
+      contactEmail: "", contactPhone: "", publicDescription: "", listPublicly: false, updatedAt: "2027-01-01T00:00:00.000Z",
+    };
+    heldFetch(200, { profile: { ...clubProfile, updatedAt: "2027-01-02T00:00:00.000Z" } }).release();
+    mounted = await mount(createElement(ClubProfileForm, {
+      sponsors: [{ id: "church-1", name: "Synthetic Church", type: "CHURCH" }],
+      endpoint: "/api/club-profile",
+      initialProfile: clubProfile as never,
+    }));
+    const { container } = mounted;
+    await submitForm(container.querySelector("form")!);
+    await flush(30);
+    expect(liveRegionsWith(container, /^Saved/)).toHaveLength(1);
+    expect(document.activeElement?.id).toBe("club-profile-save");
+    await typeInto(container.querySelector<HTMLInputElement>('input[name="meetingPlace"]')!, "Fellowship hall");
+    expect(liveRegionsWith(container, /^Saved/)).toHaveLength(0);
   });
 });
 

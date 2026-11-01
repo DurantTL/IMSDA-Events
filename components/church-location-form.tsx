@@ -3,7 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { MapPin, Save } from "lucide-react";
-import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import type { ChurchLocationRecord } from "@/modules/organizations/church-location-repository";
 import { displayCoordinate, numberOrNull } from "@/components/church-location-coordinates";
@@ -47,6 +47,7 @@ export function ChurchLocationForm({
   function handlePin(latitude: number, longitude: number) {
     setLatitudeText(displayCoordinate(latitude));
     setLongitudeText(displayCoordinate(longitude));
+    setNotice("");
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -79,11 +80,12 @@ export function ChurchLocationForm({
       setError(notSavedMessage(caught instanceof Error ? caught.message : "The church location could not be saved."));
     } finally {
       setSaving(false);
+      restoreFocusAfterSave("church-location-save");
     }
   }
 
   return (
-    <form className="panel form-stack" key={location.updatedAt ?? "new"} onSubmit={save}>
+    <form className="panel form-stack" key={location.updatedAt ?? "new"} onChange={() => setNotice("")} onSubmit={save}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">{location.name}</p>
@@ -151,7 +153,7 @@ export function ChurchLocationForm({
         {" "}A church without coordinates still lists its clubs; it just won&apos;t have a pin on the map.
       </p>
       <div>
-        <SubmitButton icon={<Save aria-hidden="true" size={16} />} iconSize={16} label="Save location" submitting={saving} submittingLabel="Saving…" />
+        <SubmitButton id="church-location-save" icon={<Save aria-hidden="true" size={16} />} iconSize={16} label="Save location" submitting={saving} submittingLabel="Saving…" />
         {error ? <FormMessage message={error} tone="error" /> : notice ? <FormMessage message={notice} tone="success" /> : null}
       </div>
     </form>

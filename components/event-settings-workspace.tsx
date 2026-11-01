@@ -74,7 +74,7 @@ import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage } from "@/components/form-error-summary";
-import { notSavedMessage, savedMessage } from "@/components/form-message";
+import { notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SettingsBlock } from "@/components/settings-block";
 import {
   blockForControlId,
@@ -495,6 +495,7 @@ export function EventSettingsWorkspace({
       setSaveMessage({ kind: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "The event could not be saved.") });
     } finally {
       setSaving(false);
+      restoreFocusAfterSave("event-save-button");
     }
   }
 

@@ -59,3 +59,16 @@ export function FormMessage({ tone, message, undo, className }: FormMessageProps
     </div>
   );
 }
+
+/**
+ * A disabled "Saving…" button loses focus when the save ends. Put it back on the Save button, but only when nothing
+ * else (a field with a problem, the message, a dialog) has taken focus in the meantime.
+ */
+export function restoreFocusAfterSave(targetId: string) {
+  if (typeof window === "undefined") return;
+  window.requestAnimationFrame(() => {
+    const active = document.activeElement;
+    // Looked up by id after the frame: a form that remounts on save has a new button.
+    if (!active || active === document.body) document.getElementById(targetId)?.focus();
+  });
+}

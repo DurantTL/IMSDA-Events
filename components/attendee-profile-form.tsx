@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -82,6 +82,8 @@ export function AttendeeProfileForm({
     } catch (error) {
       setState("error");
       setMessage(notSavedMessage(error instanceof Error ? error.message : "Your profile could not be saved."));
+    } finally {
+      restoreFocusAfterSave("profile-save-button");
     }
   }
 
@@ -183,7 +185,7 @@ export function AttendeeProfileForm({
         </div>
       </fieldset>
       <div className="public-manage-contact-actions">
-        <SubmitButton className="" icon={<Save size={17} aria-hidden="true" />} label="Save profile" submitting={state === "saving"} submittingLabel="Saving…" />
+        <SubmitButton className="" id="profile-save-button" icon={<Save size={17} aria-hidden="true" />} label="Save profile" submitting={state === "saving"} submittingLabel="Saving…" />
         {message && state !== "idle" && state !== "saving" && (
           <FormMessage tone={state === "error" ? "error" : "success"} message={message} />
         )}
