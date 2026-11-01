@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import type { FormEvent, FormHTMLAttributes, ReactNode, RefObject } from "react";
+import type { ChangeEvent, FormEvent, FormHTMLAttributes, KeyboardEvent, ReactNode, RefObject } from "react";
 
 /**
  * The one search-as-you-type behavior (#1431). A search box updates its list a short pause after the last keystroke, no
@@ -103,6 +103,51 @@ export function useDebouncedSearch(value: string, delayMs: number = SEARCH_DEBOU
     return () => clearTimeout(timer);
   }, [value, settled, delayMs]);
   return settled;
+}
+
+/**
+ * Search-as-you-type for a list filtered in the browser (#1431). The box shows every keystroke (`value`), while the list
+ * filters on `term`, which settles a short pause after the last keystroke. Enter applies at once, and clearing the box
+ * shows the full list at once. Spread `inputProps` on the `<input>`; filter, page and count from `term`; reset the
+ * list's page when `term` changes. The input is never remounted, so focus and the cursor stay put.
+ */
+export function useClientSearch(initial = "", delayMs: number = SEARCH_DEBOUNCE_MS) {
+  const [value, setValue] = useState(initial);
+  const [term, setTerm] = useState(initial);
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  });
+  const debouncer = useDebouncedCallback(() => setTerm(latest.current), delayMs);
+  const set = useCallback((next: string) => {
+    setValue(next);
+    latest.current = next;
+    if (next.trim() === "") {
+      debouncer.cancel();
+      setTerm(next);
+    } else debouncer.schedule();
+  }, [debouncer]);
+  const applyNow = useCallback(() => {
+    debouncer.cancel();
+    setTerm(latest.current);
+  }, [debouncer]);
+  return {
+    value,
+    term,
+    setValue: set,
+    applyNow,
+    pending: value !== term,
+    inputProps: {
+      value,
+      onChange: (event: ChangeEvent<HTMLInputElement>) => set(event.target.value),
+      onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key !== "Enter") return;
+        // A box outside a form has nothing to submit; inside one, the form's own submit handler runs as before.
+        if (!event.currentTarget.form) event.preventDefault();
+        applyNow();
+      },
+    },
+  };
 }
 
 /** A debounced callback that always runs the latest function, with cancel and flush; the timer is cleared on unmount. */

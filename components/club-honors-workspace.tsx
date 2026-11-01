@@ -5,6 +5,7 @@ import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Download, ListPlus, Plus, Search, UsersRound, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HonorCombobox } from "@/components/honor-combobox";
@@ -74,10 +75,12 @@ export function ClubHonorsWorkspace({
   const [honorFilter, setHonorFilter] = useState(initialHonorFilter);
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [unitFilter, setUnitFilter] = useState("");
-  const [nameSearch, setNameSearch] = useState("");
+  const nameSearchBox = useClientSearch();
+  const nameSearch = nameSearchBox.term;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [memberSearch, setMemberSearch] = useState("");
+  const memberSearchBox = useClientSearch();
+  const memberSearch = memberSearchBox.term;
   const [singleHonorId, setSingleHonorId] = useState("");
   const [bulkHonorId, setBulkHonorId] = useState("");
   const [bulkStatus, setBulkStatus] = useState<"IN_PROGRESS" | "COMPLETED">("IN_PROGRESS");
@@ -179,7 +182,7 @@ export function ClubHonorsWorkspace({
       setBulkHonorId("");
       setBulkStatus("IN_PROGRESS");
       setBulkDate("");
-      setMemberSearch("");
+      memberSearchBox.setValue("");
       setConfirmingBulk(false);
       setBulkOpen(false);
     } catch (caught) {
@@ -336,10 +339,9 @@ export function ClubHonorsWorkspace({
               <Search aria-hidden="true" size={14} />
               <input
                 autoComplete="off"
-                onChange={(event) => setNameSearch(event.target.value)}
+                {...nameSearchBox.inputProps}
                 placeholder="Search by name"
                 type="search"
-                value={nameSearch}
               />
             </span>
           </label>
@@ -364,6 +366,7 @@ export function ClubHonorsWorkspace({
           </label>
         </div>
 
+        <SearchResultStatus message={`${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
           <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
         ) : (
@@ -453,16 +456,16 @@ export function ClubHonorsWorkspace({
                       <Search aria-hidden="true" size={14} />
                       <input
                         autoComplete="off"
-                        onChange={(event) => setMemberSearch(event.target.value)}
+                        {...memberSearchBox.inputProps}
                         placeholder="Search members by name"
                         type="search"
-                        value={memberSearch}
                       />
                     </span>
                   </label>
                   <button className="text-button" disabled={bulkMembers.length === 0} onClick={selectAllListed} type="button">Select all</button>
                   <button className="text-button" disabled={selected.size === 0} onClick={() => setSelected(new Set())} type="button">Clear</button>
                 </div>
+                <SearchResultStatus message={`${bulkMembers.length} ${bulkMembers.length === 1 ? "member" : "members"} listed.`} />
                 <ul className="honor-bulk-member-list">
                   {bulkMembers.map((row) => (
                     <li key={row.memberId}>

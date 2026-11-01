@@ -1,5 +1,5 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Class tracking bulk actions act only on members that are selected AND shown
@@ -20,9 +20,14 @@ vi.mock("react", async (importOriginal) => {
       return [runtime.slots[i], set];
     },
     useMemo: (factory: () => unknown) => factory(),
+    // A ref is a fresh object per render and effects never run (no DOM); the search hook only needs these to exist.
+    useRef: (initial: unknown) => ({ current: initial }),
+    useCallback: (fn: unknown) => fn,
+    useEffect: () => {},
   };
 });
 
+import { SEARCH_DEBOUNCE_MS } from "@/components/search-as-you-type";
 import { ClubEarnedAwardsWorkspace, completionPayload, emptyEarnedAwardsData, recordPayload, selectShown, visibleSelectedIds } from "@/components/club-earned-awards-workspace";
 
 type Props = Record<string, unknown> & { children?: ReactNode };
@@ -45,8 +50,15 @@ function render() {
 const buttons = (tree: ReactNode, label: string) => walk(tree).filter((el) => el.type === "button" && text(el.props.children).includes(label));
 const searchBoxes = (tree: ReactNode) => walk(tree).filter((el) => el.type === "input" && el.props.type === "search");
 
+/** The members search settles a short pause after the last keystroke (#1431). */
+const typeSearch = (tree: ReactNode, value: string) => {
+  (searchBoxes(tree)[0].props.onChange as (e: unknown) => void)({ target: { value } });
+  vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+};
+
 const posts: Array<{ url: string; body: Record<string, unknown> }> = [];
 beforeEach(() => {
+  vi.useFakeTimers();
   runtime.slots = [];
   posts.length = 0;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
@@ -54,6 +66,8 @@ beforeEach(() => {
     return { ok: true, json: async () => ({ created: 1, marked: 0 }) };
   }));
 });
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe("pure helpers", () => {
   it("acts on selected members that are shown, in roster order", () => {
@@ -74,6 +88,9 @@ describe("Mark a class completed", () => {
     tree = render();
     expect(text(buttons(tree, "Mark Friend completed")[0])).toContain("(12)");
     (searchBoxes(tree)[0].props.onChange as (e: unknown) => void)({ target: { value: "ann" } });
+    // The list keeps showing everyone until typing pauses.
+    expect(text(buttons(render(), "Mark Friend completed")[0])).toContain("(12)");
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
     tree = render();
     const mark = buttons(tree, "Mark Friend completed")[0];
     expect(text(mark)).toContain("(4)");
@@ -88,7 +105,7 @@ describe("Mark a class completed", () => {
     let tree = render();
     (buttons(tree, "Select all")[0].props.onClick as () => void)();
     tree = render();
-    (searchBoxes(tree)[0].props.onChange as (e: unknown) => void)({ target: { value: "nobody" } });
+    typeSearch(tree, "nobody");
     tree = render();
     expect(buttons(tree, "Mark Friend completed")[0].props.disabled).toBe(true);
   });
@@ -106,7 +123,7 @@ describe("Add by hand", () => {
     // The one members table feeds both actions: select all, then search "bob" there.
     (buttons(tree, "Select all")[0].props.onClick as () => void)();
     tree = render();
-    (searchBoxes(tree)[0].props.onChange as (e: unknown) => void)({ target: { value: "bob" } });
+    typeSearch(tree, "bob");
     tree = render();
     const record = buttons(tree, "Record items")[0];
     expect(text(record)).toContain("(8)");

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type 
 import { List, MapPin, Search, UsersRound } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
+import { useClientSearch } from "@/components/search-as-you-type";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 import type { PublicClubMapStatus } from "@/components/public-club-map";
 import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
@@ -29,14 +30,14 @@ export function matches(club: PublicClubListing, query: string) {
  * is already nothing more (see modules/organizations/public-club-directory).
  */
 export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [selection, setSelection] = useState<{ id: string; fromMap: boolean } | null>(null);
   const selectedId = selection?.id ?? null;
   const [view, setView] = useState<"list" | "map">("list");
   const [mapStatus, setMapStatus] = useState<PublicClubMapStatus>("loading");
   const [mapAttempt, setMapAttempt] = useState(0);
   const [MapComponent, setMapComponent] = useState<ComponentType<MapProps> | null>(null);
-  const [announced, setAnnounced] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
   const rowIdPrefix = useId();
   const searchId = `${rowIdPrefix}-search`;
@@ -85,15 +86,11 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     return () => { cancelled = true; };
   }, [anyMappable, mapAttempt]);
 
-  // The visible count updates at once; screen readers hear it once typing stops.
+  // The list and this count follow the search term, which settles once typing pauses, so screen readers hear it once.
   const countText = announcedCountText(filtered.length, mappable.length, !mapProblem);
-  useEffect(() => {
-    const timer = setTimeout(() => setAnnounced(countText), 600);
-    return () => clearTimeout(timer);
-  }, [countText]);
 
   function clearSearch() {
-    setQuery("");
+    search.setValue("");
     searchRef.current?.focus();
   }
 
@@ -112,13 +109,12 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
           <Search aria-hidden="true" size={17} />
           <input
             id={searchId}
-            onChange={(event) => setQuery(event.target.value)}
+            {...search.inputProps}
             placeholder="Town, ZIP, club or church"
             ref={searchRef}
             type="search"
-            value={query}
           />
-          <SearchClearButton onClear={clearSearch} visible={query !== ""} />
+          <SearchClearButton onClear={clearSearch} visible={search.value !== ""} />
         </div>
       </div>
 
@@ -128,7 +124,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
             {countText}
             {unmappedShown > 0 && <small> {unmappedSentence(unmappedShown)}</small>}
           </p>
-          <p className="sr-only" role="status">{announced}</p>
+          <p className="sr-only" role="status">{countText}</p>
           {mapProblem && (
             <p className={styles.mapProblem}>
               {mapStatus === "unavailable"
