@@ -3,6 +3,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useState } from "react";
 import { RotateCcw, Save, Send } from "lucide-react";
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import {
   undatedHonorCompletionsNote,
@@ -125,6 +126,11 @@ export function ClubYearEndReportForm({
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const next: "DRAFT" | "SUBMITTED" = submitter?.value === "draft" ? "DRAFT" : "SUBMITTED";
     setAttempted(true);
+    if (emailBlockingMessage("Email", contact.contactEmail)) {
+      setError("Fix the highlighted email address and save again.");
+      setNotice("");
+      return;
+    }
     if (phoneFields.some(([key, label]) => phoneBlocks(label, contact[key], savedContact[key]))) {
       setError("Fix the highlighted phone number and save again.");
       setNotice("");
@@ -175,7 +181,7 @@ export function ClubYearEndReportForm({
   );
 
   return (
-    <form className="page-stack club-report-form" onSubmit={save}>
+    <form className="page-stack club-report-form" noValidate onSubmit={save}>
       <div className="public-manage-card">
         <p className="public-registration-eyebrow">{`Pathfinder year ${reportYear} · ${spanLabel}`}</p>
         <h2>Year-End Report</h2>
@@ -224,7 +230,7 @@ export function ClubYearEndReportForm({
         <legend className="public-registration-eyebrow">Who is reporting</legend>
         <div className="form-grid two-column">
           <label>Name<input autoComplete="name" maxLength={120} onChange={(event) => setContact({ ...contact, contactName: event.target.value })} value={contact.contactName} /></label>
-          <label>Email<input autoComplete="email" maxLength={200} onChange={(event) => setContact({ ...contact, contactEmail: event.target.value })} type="email" value={contact.contactEmail} /></label>
+          <label>Email<EmailInput label="Email" maxLength={200} onValueChange={(value) => setContact({ ...contact, contactEmail: value })} showNow={attempted} value={contact.contactEmail} /></label>
           <label>Work phone<PhoneInput label="Work phone" onValueChange={(value) => setContact({ ...contact, contactWorkPhone: value })} showNow={attempted} stored={savedContact.contactWorkPhone} value={contact.contactWorkPhone} /></label>
           <label>Home phone<PhoneInput label="Home phone" onValueChange={(value) => setContact({ ...contact, contactHomePhone: value })} showNow={attempted} stored={savedContact.contactHomePhone} value={contact.contactHomePhone} /></label>
           <label>Cell phone<PhoneInput label="Cell phone" onValueChange={(value) => setContact({ ...contact, contactCellPhone: value })} showNow={attempted} stored={savedContact.contactCellPhone} value={contact.contactCellPhone} /></label>

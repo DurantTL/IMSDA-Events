@@ -17,6 +17,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
+import { EMAIL_FIELD_MESSAGE, PHONE_FIELD_MESSAGE } from "@/lib/field-validation";
 import { updateClubProfile } from "@/modules/organizations/club-profile-repository";
 import { clubProfileInputSchema } from "@/modules/organizations/club-profile-schemas";
 
@@ -62,7 +63,7 @@ describe("club profile (#375)", () => {
   });
 
   it("records a staff editor as the audit actor", async () => {
-    await updateClubProfile("club-1", input({ contactPhone: "555-0100" }), { userId: "staff-1" });
+    await updateClubProfile("club-1", input({ contactPhone: "(515) 555-0100" }), { userId: "staff-1" });
     expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ actorUserId: "staff-1" });
   });
 
@@ -97,8 +98,63 @@ describe("club profile (#375)", () => {
     expect(mocks.updateOrganization).not.toHaveBeenCalled();
   });
 
-  it("rejects a bad contact email but allows a blank one", () => {
-    expect(clubProfileInputSchema.safeParse({ name: "Club", contactEmail: "not-an-email" }).success).toBe(false);
+  it("allows a blank contact email and phone", async () => {
     expect(clubProfileInputSchema.safeParse({ name: "Club", contactEmail: "" }).success).toBe(true);
+    await updateClubProfile("club-1", input({ contactEmail: "", contactPhone: "" }), { accountId: "account-1" });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  describe("contact email and phone use the shared check against the saved values (#1451)", () => {
+    const withStored = (clubProfile: Record<string, unknown>) => mocks.findOrganization.mockImplementation(({ where }: { where: { id: string } }) => Promise.resolve(
+      where.id === "church-2" ? { type: "CHURCH", isActive: true } : { ...stored, clubProfile: { meetingPlace: "", meetingSchedule: "", contactEmail: "", contactPhone: "", publicDescription: "", listPublicly: false, updatedAt: new Date("2026-01-01T00:00:00Z"), ...clubProfile } },
+    ));
+    const saved = () => mocks.upsertProfile.mock.calls[0][0].update;
+    const failure = async (promise: Promise<unknown>) => {
+      const error = await promise.then(() => null, (caught: unknown) => caught as { issues: Array<{ path: unknown[]; message: string }> });
+      expect(error?.issues).toBeDefined();
+      return error!.issues;
+    };
+
+    it("saves an unrelated change with an old bad saved phone and keeps the phone exactly", async () => {
+      withStored({ contactPhone: "555-0100" });
+      await updateClubProfile("club-1", input({ contactPhone: "555-0100", meetingPlace: "Fellowship hall" }), { accountId: "account-1" });
+      expect(saved()).toMatchObject({ meetingPlace: "Fellowship hall", contactPhone: "555-0100" });
+      expect(mocks.writeAuditLog.mock.calls[0][0].metadata.fields).toEqual(["meetingPlace"]);
+    });
+
+    it("rejects a changed bad phone with the one message, naming the field and not the number", async () => {
+      withStored({ contactPhone: "555-0100" });
+      const issues = await failure(updateClubProfile("club-1", input({ contactPhone: "(555) 010-0199" }), { accountId: "account-1" }));
+      expect(issues).toEqual([expect.objectContaining({ path: ["contactPhone"], message: PHONE_FIELD_MESSAGE })]);
+      expect(JSON.stringify(issues)).not.toContain("010-0199");
+      expect(mocks.upsertProfile).not.toHaveBeenCalled();
+    });
+
+    it("stores a changed valid phone normalised", async () => {
+      withStored({ contactPhone: "555-0100" });
+      await updateClubProfile("club-1", input({ contactPhone: "5155550134" }), { accountId: "account-1" });
+      expect(saved().contactPhone).toBe("(515) 555-0134");
+    });
+
+    it("does not trust anything but the saved value: the same bad phone is rejected when nothing is saved", async () => {
+      withStored({ contactPhone: "" });
+      const issues = await failure(updateClubProfile("club-1", input({ contactPhone: "555-0100", meetingPlace: "Hall" }), { accountId: "account-1" }));
+      expect(issues[0]).toMatchObject({ path: ["contactPhone"], message: PHONE_FIELD_MESSAGE });
+    });
+
+    it("saves an unrelated change with an old bad saved email and keeps it exactly", async () => {
+      withStored({ contactEmail: "Old Address@@Example" });
+      await updateClubProfile("club-1", input({ contactEmail: "Old Address@@Example", meetingPlace: "Fellowship hall" }), { accountId: "account-1" });
+      expect(saved()).toMatchObject({ meetingPlace: "Fellowship hall", contactEmail: "Old Address@@Example" });
+    });
+
+    it("rejects a changed bad email, accepts a changed good one, and reports both fields together", async () => {
+      withStored({ contactEmail: "old@@example" });
+      const issues = await failure(updateClubProfile("club-1", input({ contactEmail: "not an email", contactPhone: "idk" }), { accountId: "account-1" }));
+      expect(issues.map((issue) => issue.path[0])).toEqual(["contactEmail", "contactPhone"]);
+      expect(issues[0].message).toBe(EMAIL_FIELD_MESSAGE);
+      await updateClubProfile("club-1", input({ contactEmail: "Club@Example.TEST" }), { accountId: "account-1" });
+      expect(saved().contactEmail).toBe("club@example.test");
+    });
   });
 });

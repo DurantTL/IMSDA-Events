@@ -34,7 +34,7 @@ describe("emergency plan draft validation", () => {
     const result = emergencyPlanDraftSchema.safeParse(draft({ contacts: [{ role: "Director", name: "Sample", phone: "(555) 010-0100", escalationOrder: 1 }] }));
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toContain("valid phone number");
+      expect(result.error.issues[0].message).toContain("10-digit US number");
       expect(result.error.issues[0].message).not.toContain("010-0100");
     }
   });

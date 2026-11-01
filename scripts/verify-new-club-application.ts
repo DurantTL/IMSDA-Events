@@ -46,7 +46,7 @@ const stamp = `nca817${Date.now().toString(36)}`;
 const storageDir = mkdtempSync(path.join(tmpdir(), "new-club-verify-"));
 const notifyAddress = `${stamp}-notify@imsda-events.test`;
 const directorEmail = `${stamp}-dana@imsda-events.test`;
-const directorPhone = "555-0117";
+const directorPhone = "(515) 555-0117";
 const directorAddress = `${stamp} 100 Example Road, Sampletown, ZZ 00000`;
 
 type Sent = { to: string[]; subject: string; text: string };

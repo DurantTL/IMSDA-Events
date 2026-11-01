@@ -28,8 +28,10 @@ describe("PhoneInput", () => {
     expect(hidden).not.toContain("phone-input-message");
     expect(hidden).not.toContain("aria-invalid");
     const shown = render({ value: "idk 911", showNow: true });
-    expect(shown).toContain("Phone must be a 10-digit US number");
-    expect(shown).toContain('role="alert"');
+    expect(shown).toContain("Enter a 10-digit US number");
+    // The summary is the one announcement (#1450), so the field message is plain text linked by aria-describedby.
+    expect(shown).not.toContain('role="alert"');
+    expect(shown).toContain("field-error-message");
     expect(shown).toContain('aria-invalid="true"');
     expect(shown.match(/idk 911/g)).toHaveLength(1);
   });
@@ -43,7 +45,7 @@ describe("PhoneInput", () => {
 
   it("treats a legacy number copied somewhere new as a new value", () => {
     const html = render({ value: "555-0100", stored: undefined, showNow: true });
-    expect(html).toContain('role="alert"');
+    expect(html).toContain("field-error-message");
     expect(html).not.toContain("needs correcting");
   });
 });
@@ -67,7 +69,7 @@ describe("how the message looks", () => {
       expect(css).toContain(`.app-shell .form-stack label > small.phone-input-message.${state}`);
     }
     const errorRule = css.slice(css.indexOf(".phone-input-message.is-error"));
-    expect(errorRule.slice(0, errorRule.indexOf("}"))).toContain("var(--danger");
+    expect(errorRule.slice(0, errorRule.indexOf("}"))).toContain("var(--coral");
     const base = css.slice(css.indexOf(".phone-input-message,"));
     expect(base.slice(0, base.indexOf("}"))).toContain("0.875rem");
     expect(css.indexOf(".phone-input-message")).toBeLessThan(css.indexOf("/* Registration form builder editor shell (#1132)"));

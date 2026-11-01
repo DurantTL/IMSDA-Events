@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { CheckCircle2, ListChecks, Save } from "lucide-react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -106,6 +107,7 @@ export function AttendeeRegistrationAnswersForm({
     return { message: shown ? dateProblem : "", blocking: true };
   };
   const dirty = useMemo(() => !valuesEqual(saved, attendees), [attendees, saved]);
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to these answers. Leave this page and discard them?");
   const endpoint = answerEndpoint
     ?? `/api/attendee/registrations/${encodeURIComponent(registrationId ?? "")}/answers`;
 

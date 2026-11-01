@@ -2,6 +2,7 @@
 import { LiveListBoundary, ReloadButton } from "@/components/live-list-boundary";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import Link from "next/link";
 import { type ComponentProps, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
@@ -35,7 +36,9 @@ import {
   type GuardianFormErrors,
   type GuardianRecord,
 } from "@/modules/club-rosters/guardians-domain";
-import { RosterGuardianFields } from "@/components/roster-guardian-fields";
+import { RosterGuardianFields, guardianErrorItems } from "@/components/roster-guardian-fields";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import {
   applyRosterFilters,
   clearedRosterFilters,
@@ -111,6 +114,8 @@ function subscribeSectionChoices(listener: () => void) {
     window.removeEventListener("storage", listener);
   };
 }
+
+const rosterFieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
 
 function ClubRosterWorkspaceInner({
   canSeeBirthDates,
@@ -241,6 +246,7 @@ function ClubRosterWorkspaceInner({
     setGuardianMap(initialGuardians);
   }
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
+  const { ref: memberRef, items: memberItems, show: showMember, clear: clearMember, clearField: clearMemberField } = useFormErrorSummary();
   const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
   const contactsOnlyDialog = guardiansOnly && readOnly;
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
@@ -250,11 +256,17 @@ function ClubRosterWorkspaceInner({
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/roster`;
   /** Reads and contact saves name the year on next year's roster, so the server answers for that year (#959). */
   const yearQuery = contactsOnlyDialog ? `?year=${encodeURIComponent(clubYear)}` : "";
+  /** The editor's values differ from the loaded ones (#1452); read from the form on each edit, since its fields are not controlled. */
+  const [dialogDirty, setDialogDirty] = useState(false);
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
+    setDialogDirty(false);
     setEditing(null);
-  }, []);
+    clearMember();
+  }, [clearMember]);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
+  // Escape and Close keep their own "Discard unsaved changes?"; this adds the warning for links, Back and reload while the editor is open and changed.
+  useUnsavedChangesGuard(dialogOpen && dialogDirty, "You have unsaved changes to this roster member. Leave this page and discard them?");
   const formRef = useRef<HTMLFormElement>(null);
   const baselineRef = useRef<RosterFormSnapshot | null>(null);
   const savingRef = useRef(false);
@@ -272,6 +284,7 @@ function ClubRosterWorkspaceInner({
     const form = formRef.current;
     if (!dialogOpen || !form || !baselineRef.current) return;
     baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
+    setDialogDirty(rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form))));
   }, [guardianRev, dialogOpen]);
   const editorIsDirty = useCallback(() => {
     const form = formRef.current;
@@ -311,6 +324,7 @@ function ClubRosterWorkspaceInner({
     setError("");
     setFieldErrors({});
     setGuardianErrors({});
+    setDialogDirty(false);
     setDialogOpen(true);
     // Re-read this member's guardians as the dialog opens, so a page left open
     // can't save over a co-leader's newer edit (#510). Until the answer is
@@ -565,17 +579,18 @@ function ClubRosterWorkspaceInner({
       : null;
     const guardianProblems = guardianSlots ? validateGuardianForm(guardianSlots, (editing ? guardianMap?.[editing.id] : undefined) ?? []) : {};
     setGuardianErrors(guardianProblems);
-    const firstInvalid = rosterFormFieldOrder.find((field) => errors[field]);
-    if (firstInvalid) {
-      const target = firstInvalid === "birthDate" ? "birthDateText" : firstInvalid;
-      (formElement.elements.namedItem(target) as HTMLElement | null)?.focus();
+    const memberProblems = [
+      ...rosterFormFieldOrder.filter((field) => errors[field]).map((field) => ({
+        targetId: field === "birthDate" ? "birthDate-input" : `roster-${field}`,
+        message: summaryMessage(rosterFieldLabels[field], errors[field] as string),
+      })),
+      ...guardianErrorItems(guardianProblems),
+    ];
+    if (memberProblems.length > 0) {
+      showMember(memberProblems);
       return;
     }
-    const firstGuardianProblem = Object.keys(guardianProblems)[0];
-    if (firstGuardianProblem) {
-      (formElement.elements.namedItem(firstGuardianProblem) as HTMLElement | null)?.focus();
-      return;
-    }
+    clearMember();
     const details = {
       firstName: String(form.get("firstName") ?? ""),
       lastName: String(form.get("lastName") ?? ""),
@@ -616,11 +631,12 @@ function ClubRosterWorkspaceInner({
     }));
     const problems = validateGuardianForm(slots, guardianMap?.[editing.id] ?? []);
     setGuardianErrors(problems);
-    const firstProblem = Object.keys(problems)[0];
-    if (firstProblem) {
-      (formElement.elements.namedItem(firstProblem) as HTMLElement | null)?.focus();
+    const contactProblems = guardianErrorItems(problems);
+    if (contactProblems.length > 0) {
+      showMember(contactProblems);
       return;
     }
+    clearMember();
     const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, "Saved.");
     if (result) closeDialog();
   }
@@ -1034,10 +1050,16 @@ function ClubRosterWorkspaceInner({
         className="form-stack"
         key={editing?.id ?? "new"}
         noValidate
+        // Adding or removing a contact changes the form without an input event, so look again after any click once it has rendered.
+        onClick={() => window.requestAnimationFrame(() => setDialogDirty(editorIsDirty()))}
         onInput={(event) => {
+          setDialogDirty(editorIsDirty());
           const name = (event.target as HTMLInputElement).name;
           const field = (name === "birthDateText" ? "birthDate" : name) as RosterFormField;
           setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+          // The changed field's summary item goes with its message (the summary hides when it empties).
+          clearMemberField((event.target as HTMLElement).id);
+          if (name in guardianErrors) setGuardianErrors((current) => ({ ...current, [name]: undefined }));
         }}
         onSubmit={save}
       >
@@ -1050,6 +1072,7 @@ function ClubRosterWorkspaceInner({
             <X aria-hidden="true" size={18} />
           </button>
         </div>
+        {memberItems.length > 0 && <FormErrorSummary items={memberItems} ref={memberRef} />}
         {error && (
           <div className="inline-notice error" ref={dialogNoticeRef} role="alert" tabIndex={-1}>
             <span>{error}</span>
@@ -1062,13 +1085,13 @@ function ClubRosterWorkspaceInner({
         <div className="form-grid two-column">
           <label>
             First name
-            <input aria-describedby={fieldErrors.firstName ? "roster-firstName-error" : undefined} aria-invalid={fieldErrors.firstName ? true : undefined} autoComplete="off" defaultValue={editing?.firstName ?? ""} maxLength={80} name="firstName" required />
-            {fieldErrors.firstName && <span className="roster-field-error" id="roster-firstName-error" role="alert">{fieldErrors.firstName}</span>}
+            <input {...fieldErrorProps("roster-firstName-error", fieldErrors.firstName)} autoComplete="off" defaultValue={editing?.firstName ?? ""} id="roster-firstName" maxLength={80} name="firstName" required />
+            <FieldError id="roster-firstName-error">{fieldErrors.firstName}</FieldError>
           </label>
           <label>
             Last name
-            <input aria-describedby={fieldErrors.lastName ? "roster-lastName-error" : undefined} aria-invalid={fieldErrors.lastName ? true : undefined} autoComplete="off" defaultValue={editing?.lastName ?? ""} maxLength={80} name="lastName" required />
-            {fieldErrors.lastName && <span className="roster-field-error" id="roster-lastName-error" role="alert">{fieldErrors.lastName}</span>}
+            <input {...fieldErrorProps("roster-lastName-error", fieldErrors.lastName)} autoComplete="off" defaultValue={editing?.lastName ?? ""} id="roster-lastName" maxLength={80} name="lastName" required />
+            <FieldError id="roster-lastName-error">{fieldErrors.lastName}</FieldError>
           </label>
           <BirthDateField
             defaultValue={editing && birthDates ? birthDates[editing.id] ?? "" : ""}
@@ -1106,13 +1129,13 @@ function ClubRosterWorkspaceInner({
           </label>
           <label>
             Gender
-            <select aria-describedby={fieldErrors.gender ? "roster-gender-error" : undefined} aria-invalid={fieldErrors.gender ? true : undefined} defaultValue={editing?.gender ?? ""} name="gender" required>
+            <select {...fieldErrorProps("roster-gender-error", fieldErrors.gender)} defaultValue={editing?.gender ?? ""} id="roster-gender" name="gender" required>
               <option disabled value="">Choose one</option>
               {Object.entries(clubRosterGenderLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            {fieldErrors.gender && <span className="roster-field-error" id="roster-gender-error" role="alert">{fieldErrors.gender}</span>}
+            <FieldError id="roster-gender-error">{fieldErrors.gender}</FieldError>
           </label>
         </div>
         )}

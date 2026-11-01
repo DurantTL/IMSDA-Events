@@ -107,8 +107,8 @@ beforeEach(() => {
 
 describe("public registration route (#855, #1193)", () => {
   it.each([
-    ["phone", { phone: "idk-call-me" }, "Phone must be a 10-digit US number"],
-    ["email", { email: "avery at example" }, "Email must be a valid email address"],
+    ["phone", { phone: "idk-call-me" }, "Enter a 10-digit US number"],
+    ["email", { email: "avery at example" }, "Enter a valid email address."],
     ["number", { party_size: "a few" }, "Party size must be a number"],
   ])("answers 422 for a bad %s, creates nothing, and never echoes the value", async (_name, patch, message) => {
     const response = await POST(post({ ...good, ...patch }), context);

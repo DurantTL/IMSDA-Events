@@ -30,7 +30,7 @@ import {
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
 import { getEventPublishReadiness, getEventPublishWarnings, type EventReadinessItem, type EventReadinessRecommendedItem, type EventReadinessSource } from "@/modules/events/readiness";
-import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
+import { draftFromEvent, eventSettingsBadInputProblems, eventSettingsClientProblems, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
 import {
@@ -73,7 +73,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
-import { FormErrorSummary } from "@/components/form-error-summary";
+import { FormErrorSummary, summaryMessage } from "@/components/form-error-summary";
 import { SettingsBlock } from "@/components/settings-block";
 import {
   blockForControlId,
@@ -206,6 +206,23 @@ function startingDraft(event: EventSettingsRecord | null, prefill: CalendarPrefi
     location: prefill.location || null,
   };
 }
+
+/** How the summary names the fields people most often get wrong; any other field shows its message alone. */
+const SUMMARY_LABELS: Record<string, string> = {
+  name: "Event name",
+  slug: "Short web address",
+  startsOn: "Starts on",
+  endsOn: "Ends on",
+  startTime: "Start time",
+  endTime: "End time",
+  capacity: "Capacity",
+  registrationOpensOn: "Registration opens",
+  registrationClosesOn: "Registration closes",
+  paymentDueOn: "Payment due by",
+  publicInfoUrl: "Public information link",
+  helpEmail: "Help email",
+  hotelBookingUrl: "Hotel booking link",
+};
 
 export function EventSettingsWorkspace({
   mode,
@@ -390,6 +407,20 @@ export function EventSettingsWorkspace({
     event?.preventDefault();
     if (saving) return;
     setSiteUpdating(false);
+    // The browser's own checks are off (noValidate), so the same problems are found here and shown in the summary.
+    // A half-typed number or date reaches the draft as blank, so look at what the browser holds (validity.badInput).
+    const form = event?.currentTarget ?? document.querySelector<HTMLFormElement>("form.event-settings-layout");
+    const problems = {
+      ...eventSettingsClientProblems(draft, mode),
+      ...eventSettingsBadInputProblems(form ? [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=date], input[type=time]")] : []),
+    };
+    if (Object.keys(problems).length > 0) {
+      setSaveMessage(null);
+      setError("");
+      setNotice("");
+      showFieldErrors(problems);
+      return;
+    }
     setSaving(true);
     setSaveMessage(null);
     setFieldErrors({});
@@ -540,13 +571,12 @@ export function EventSettingsWorkspace({
     block.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
   }
 
-  // After a failed save the first invalid field takes focus, once. goToControl
-  // opens every closed <details> around it, "More settings" included. Later
-  // changes to the errors (one clearing as someone types) never move focus.
+  // After a failed save the summary takes focus, once (rule 7, #1450): it lists every problem, and a link opens
+  // the closed block holding the field (onFollow below). Later changes to the errors (one clearing as someone
+  // types) never move focus.
   useEffect(() => {
     const targetId = takePendingFocus(pendingFocusRef);
-    if (targetId) goToControl(targetId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (targetId) errorSummaryRef.current?.focus();
   }, [fieldErrors]);
 
   function openPublishDialog() {
@@ -843,24 +873,7 @@ export function EventSettingsWorkspace({
   const errorItems = Object.entries(fieldErrors)
     .filter(([key]) => key in settingsFieldBlock)
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
-    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message }));
-
-  // A field inside a closed block can fail native validation (a bad URL, say).
-  // The browser cannot show a message on a hidden field, so Save would do
-  // nothing; open the block and focus the field instead.
-  function openBlockForInvalidField(event: React.FormEvent<HTMLFormElement>) {
-    const target = event.target as HTMLElement;
-    let opened = false;
-    for (let node = target.closest("details"); node; node = node.parentElement?.closest("details") ?? null) {
-      if (!node.open) {
-        node.open = true;
-        opened = true;
-      }
-      const id = node.dataset.settingsBlock as SettingsBlockId | undefined;
-      if (id) setBlockOpen(id, true);
-    }
-    if (opened) target.focus();
-  }
+    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message: key in SUMMARY_LABELS ? summaryMessage(SUMMARY_LABELS[key], message) : message }));
 
   return (
     <section className="page-stack event-settings-workspace">
@@ -914,7 +927,7 @@ export function EventSettingsWorkspace({
         </ul>
       </nav>
 
-      <form className="event-settings-layout" onSubmit={save} onInvalidCapture={openBlockForInvalidField}>
+      <form className="event-settings-layout" noValidate onSubmit={save}>
         <div className="event-settings-main">
           {errorItems.length > 0 && (
             <FormErrorSummary
