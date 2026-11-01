@@ -1,4 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { ColumnHeader } from "@/components/column-header";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,7 +7,7 @@ import { redirect } from "next/navigation";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { serverSort, sortOrderText, sortRows, type SortValue } from "@/lib/list-sort";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";

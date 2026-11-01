@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { serverSort } from "@/lib/list-sort";
 
 /**
  * Rule B1 guard (#1458): every staff and admin table sorts from its column headers, and the one count line is
@@ -104,6 +105,28 @@ const unsortedTables: Record<string, string> = {
   "components/staff-invitation-list.tsx": "round 2 (#1458)",
 };
 
+/** Files that say "N of M ... shown" outside ListPager, and why. */
+const shownWording: Record<string, string> = {
+  "components/people-workspace.tsx": "screen-reader search status (SearchResultStatus), not a visible count line",
+  "components/club-roster-workspace.tsx": "the roster's own result line and its screen-reader copy; round 2 (#1458)",
+  "app/(workspace)/admin/clubs/summary/page.tsx": "screen-reader search status (SearchResultStatus) for the points chart",
+  "components/club-honors-workspace.tsx": "screen-reader search status (SearchResultStatus)",
+  "components/check-in-workspace.tsx": "screen-reader search status (SearchResultStatus)",
+  "components/honor-catalog-workspace.tsx": "screen-reader search status (SearchResultStatus)",
+  "components/club-earned-awards-workspace.tsx": "selection summary beside the bulk actions; round 2 (#1458)",
+};
+
+/** Files with a sorted table and one more table that is not (the exact number), and why. */
+const partlyUnsortedTables: Record<string, { unsorted: number; reason: string }> = {
+  "components/area-clubs-views.tsx": { unsorted: 1, reason: "AreaPointsChart is not used by any page; coordinator-points.tsx has the sortable ranking" },
+};
+
+/** Tables with a header row and no sortable header in one file: each `<table` up to the next one. */
+function unsortedTableCount(source: string): number {
+  const segments = source.split(/<table\b/).slice(1);
+  return segments.filter((segment) => /<thead\b/.test(segment) && !/<(SortableHeader|ColumnHeader)\b|\{header\(/.test(segment)).length;
+}
+
 /** Files that write "Showing", and why. */
 const showingWords: Record<string, string> = {
   "app/(workspace)/admin/organizations/[organizationId]/club/page.tsx": "not a count: club year banner",
@@ -129,12 +152,37 @@ const showingWords: Record<string, string> = {
 };
 
 describe("sorting and the pager, rule B1 (#1458)", () => {
-  it("every table with a header row has sortable headers or is on the allowlist with a reason", () => {
-    const unlisted = files
-      .filter(({ source }) => /<table\b/.test(source) && /<thead\b/.test(source) && !/<(SortableHeader|ColumnHeader)\b/.test(source))
-      .map(({ relative }) => relative)
-      .filter((relative) => !(relative in unsortedTables));
-    expect(unlisted).toEqual([]);
+  it("every table with a header row has sortable headers or is on an allowlist with a reason", () => {
+    const bad = files
+      .map(({ relative, source }) => ({ relative, unsorted: unsortedTableCount(source) }))
+      .filter(({ unsorted }) => unsorted > 0)
+      .filter(({ relative, unsorted }) => !(relative in unsortedTables) && unsorted !== (partlyUnsortedTables[relative]?.unsorted ?? 0))
+      .map(({ relative, unsorted }) => `${relative}: ${unsorted} table(s) with a header row and no sortable headers`);
+    expect(bad).toEqual([]);
+  });
+
+  it("is not fooled by a second table: the allowed count of unsorted tables in a partly sorted file is exact", () => {
+    const wrong = Object.entries(partlyUnsortedTables)
+      .filter(([relative, entry]) => unsortedTableCount(files.find((file) => file.relative === relative)?.source ?? "") !== entry.unsorted)
+      .map(([relative]) => relative);
+    expect(wrong).toEqual([]);
+  });
+
+  it("keeps ColumnHeader free of \"use client\": its `sorting` holds a function, which cannot cross into a client component", () => {
+    const columnHeader = files.find((file) => file.relative === "components/column-header.tsx")!;
+    expect(columnHeader.source).not.toMatch(/^\s*["']use client["']/);
+    // No client module takes the server sort (it carries `hrefFor`), so no server page can hand it one.
+    const clientTakingServerSort = files.filter(({ source }) => /^\s*["']use client["']/.test(source) && /\bServerSort\b/.test(source)).map((file) => file.relative);
+    expect(clientTakingServerSort).toEqual([]);
+  });
+
+  it("serverSort returns only a function-free order next to its hrefFor, and SortableHeader takes plain strings", () => {
+    const sorting = serverSort("/x", { sort: "a" }, ["a", "b"] as const, { key: null, dir: "asc" });
+    expect(JSON.parse(JSON.stringify(sorting.order))).toEqual({ key: "a", dir: "asc" });
+    expect(typeof sorting.hrefFor("b")).toBe("string");
+    const listSort = files.find((file) => file.relative === "components/list-sort.tsx")!;
+    expect(listSort.source).toMatch(/href\?: string/);
+    expect(listSort.source).not.toMatch(/sorting\??: /);
   });
 
   it("writes no count line of its own: \"Showing\" belongs to ListPager", () => {
@@ -143,6 +191,15 @@ describe("sorting and the pager, rule B1 (#1458)", () => {
       .map(({ relative }) => relative)
       .filter((relative) => !(relative in showingWords));
     expect(unlisted).toEqual([]);
+  });
+
+  it("writes no \"N of M shown\" count wording of its own", () => {
+    const countWording = /(\}|\d) of (\$?\{|\d)[^\n]{0,80}\bshown\b/;
+    const found = files
+      .filter(({ relative, source }) => relative !== "components/list-pager.tsx" && source.split("\n").some((line) => !/^\s*(\*|\/\/|\/\*)/.test(line) && countWording.test(line)))
+      .map(({ relative }) => relative)
+      .filter((relative) => !(relative in shownWording));
+    expect(found).toEqual([]);
   });
 
   it("keeps the allowlists honest: every entry still needs its exception and has a plain reason", () => {

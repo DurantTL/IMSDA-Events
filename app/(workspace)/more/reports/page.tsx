@@ -259,7 +259,7 @@ export default async function OperationalReportsPage({
                 </p>
               </div>
             </div>
-            <a className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/background-checks`}><Download aria-hidden="true" size={15} /> Download CSV</a>
+            <ExportLink className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/background-checks`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
           </div>
           <BackgroundCheckList people={backgroundFlags.people} registrationHref={{ base: "/people", query: `event=${encodeURIComponent(event.id)}` }} />
         </section>

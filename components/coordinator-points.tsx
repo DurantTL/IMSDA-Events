@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { ColumnHeader } from "@/components/column-header";
 import { CoordinatorScrollRegion } from "@/components/coordinator-destinations";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort } from "@/lib/list-sort";
 import { filterClubsByName, sortLeaderboard, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";

@@ -6,6 +6,7 @@ import { backgroundFlagsCsv } from "@/modules/background-checks/domain";
 import { listEventBackgroundFlags } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /** Adults at a youth or children's event with no current Sterling Volunteers (#388), as CSV. */
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string }> }) {
@@ -19,7 +20,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
         { status: 404 },
       );
     }
-    return csvDownloadResponse(backgroundFlagsCsv(flags.people), exportFileName({ scope: eventId, kind: "sterling-volunteers-needed" }));
+    return csvDownloadResponse(backgroundFlagsCsv(flags.people), exportFileName({ scope: await eventFileScope(eventId), kind: "sterling-volunteers-needed" }));
   } catch (error) {
     return backgroundCheckApiError(error, "Downloading the Sterling Volunteers list");
   }

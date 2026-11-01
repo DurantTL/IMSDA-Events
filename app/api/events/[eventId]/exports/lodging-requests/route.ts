@@ -6,6 +6,7 @@ import { lodgingRequestsCsv } from "@/modules/lodging/export";
 import { getLodgingRequestExportRows } from "@/modules/lodging/preferences-service";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Lodging requests for staff: approved fields only (confirmation code, type, nights, party size, private room,
@@ -17,7 +18,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     const { eventId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "VIEW_REPORTS", findActiveMembership);
     const includeAccessibility = new Set(effectivePermissions(access.user, access.membership)).has("VIEW_SENSITIVE_DATA");
-    return csvDownloadResponse(lodgingRequestsCsv(await getLodgingRequestExportRows(eventId), includeAccessibility), exportFileName({ scope: eventId, kind: "lodging-requests" }));
+    return csvDownloadResponse(lodgingRequestsCsv(await getLodgingRequestExportRows(eventId), includeAccessibility), exportFileName({ scope: await eventFileScope(eventId), kind: "lodging-requests" }));
   } catch (error) {
     return lodgingApiError(error, "Exporting lodging requests");
   }

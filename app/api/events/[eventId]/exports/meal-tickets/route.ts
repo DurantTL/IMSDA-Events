@@ -1,6 +1,7 @@
 import { mealRoute } from "@/modules/meals/api";
 import { mealTicketsCsv } from "@/modules/meals/view-repository";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Meal tickets in the conference café scanner's import format (#916): one row per ticket (a selection of 3 is three
@@ -9,5 +10,5 @@ import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-
  * spreadsheet formulas are defused. VIEW_REPORTS, like the kitchen report.
  */
 export const GET = mealRoute("VIEW_REPORTS", "Exporting meal tickets", async ({ eventId }) => {
-  return csvDownloadResponse(await mealTicketsCsv(eventId), exportFileName({ scope: eventId, kind: "meal-tickets" }));
+  return csvDownloadResponse(await mealTicketsCsv(eventId), exportFileName({ scope: await eventFileScope(eventId), kind: "meal-tickets" }));
 }, { mutates: false });

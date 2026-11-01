@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { BackLink } from "@/components/back-link";
@@ -39,9 +40,9 @@ export default async function ClubSchedulePage({
       <div className="club-schedule-actions">
         <BackLink href={back}>Back to {data.event.name}</BackLink>
         <div>
-          <a className="secondary-button" href={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/schedule`}>
-            <Download aria-hidden="true" size={15} /> CSV
-          </a>
+          <ExportLink className="secondary-button" href={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/schedule`}>
+            <Download aria-hidden="true" size={15} /> Download CSV
+          </ExportLink>
           <PrintReportButton label="Print" />
         </div>
       </div>

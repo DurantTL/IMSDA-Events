@@ -32,7 +32,9 @@ function headerLabels(tableSource: string): string[] {
   const head = /<thead[\s\S]*?<\/thead>/.exec(tableSource)?.[0] ?? "";
   const labels: string[] = [];
   for (const match of head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)) labels.push(normalize(match[1]));
-  for (const match of head.matchAll(/<SortableHeader\b[^>]*?\blabel="([^"]+)"/g)) labels.push(normalize(match[1]));
+  // The sortable header components (#1458): `ColumnHeader` on server tables, `SortableHeader` on client ones.
+  for (const match of head.matchAll(/<(?:SortableHeader|ColumnHeader)\b[^>]*?\blabel="([^"]+)"/g)) labels.push(normalize(match[1]));
+  for (const match of head.matchAll(/<(?:SortableHeader|ColumnHeader)\b[^>]*?\blabel=\{`([^`]+)`\}/g)) labels.push(normalize(match[1].replace(/\$\{[^}]*\}/g, " ")));
   // A string literal inside a header expression, e.g. {active ? "Name ▲" : "Name"}.
   for (const match of head.matchAll(/<th\b[^>]*>\s*\{[^}]*"([^"]+)"[^}]*\}\s*<\/th>/g)) labels.push(normalize(match[1]));
   // Headers built from a label map at run time: read the same map the component reads.
@@ -81,8 +83,8 @@ describe("card labels match their column headers", () => {
   });
 
   it("the helper reads headers and labels as intended", () => {
-    const sample = `<table><thead><tr><th>Club</th><SortableHeader label="Name" /></tr></thead><tbody><tr><td data-label="Club" /><td {...cardCell("Name")} /></tr></tbody></table>`;
-    expect(headerLabels(sample)).toEqual(["club", "name"]);
+    const sample = `<table><thead><tr><th>Club</th><SortableHeader label="Name" /><ColumnHeader column="x" label={\`\${m} record\`} sorting={s} /></tr></thead><tbody><tr><td data-label="Club" /><td {...cardCell("Name")} /></tr></tbody></table>`;
+    expect(headerLabels(sample)).toEqual(["club", "name", "record"]);
     expect(cellLabels(sample)).toEqual(["Club", "Name"]);
   });
 });

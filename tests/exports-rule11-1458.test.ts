@@ -3,6 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ActionsMenu } from "@/components/actions-menu";
 import { ExportLink, downloadErrorMessage, fileNameFromDisposition } from "@/components/export-link";
 import { csvDownloadResponse, exportFileName, slugifyFilePart } from "@/modules/reporting/export-response";
 
@@ -44,6 +45,11 @@ describe("csvDownloadResponse (#1458)", () => {
     expect(new TextDecoder().decode(bytes.slice(3))).toBe('"a","b"\r\n');
   });
 
+  it("can leave the mark off for a file a third-party importer reads", async () => {
+    const response = csvDownloadResponse('"a"\r\n', "x.csv", { bom: false });
+    expect(new Uint8Array(await response.arrayBuffer())[0]).toBe(0x22);
+  });
+
   it("does not double the mark and keeps the file name safe", async () => {
     const response = csvDownloadResponse("﻿x", 'a"b\r\nc.csv');
     expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="a-b--c.csv"');
@@ -66,6 +72,13 @@ describe("ExportLink (#1458)", () => {
     expect(await refuse(403, { error: "PERMISSION_DENIED" })).toBe("You don't have access to download this file.");
     expect(await refuse(500, "<html>boom</html>")).toBe("The download didn't work. Try again.");
     expect(await refuse(404, { message: "   " })).toBe("That file isn't available.");
+  });
+
+  it("shows a menu item's status outside the closed menu", () => {
+    const html = renderToStaticMarkup(createElement(ActionsMenu, null, createElement("li", null, createElement(ExportLink, { href: "/api/x" }))));
+    // Inside a menu the link renders no status of its own; the menu has one status element beside its button.
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+    expect(html.indexOf("</details>")).toBeLessThan(html.indexOf('role="status"'));
   });
 
   it("saves the file under the server's name", () => {
@@ -114,7 +127,7 @@ describe("every CSV download is named and sent the same way, rule B11 (#1458)", 
   it("every CSV route file calls exportFileName", () => {
     const routes = files(path.join(root, "app"), /route\.ts$/).filter((file) => /csvDownloadResponse/.test(read(file)));
     expect(routes.length).toBeGreaterThan(30);
-    expect(routes.filter((file) => !/exportFileName|FileName\(/.test(read(file))).map(rel)).toEqual([]);
+    expect(routes.filter((file) => !/exportFileName\(/.test(read(file))).map(rel)).toEqual([]);
   });
 
   const tsx = [...files(path.join(root, "app"), /\.tsx$/), ...files(path.join(root, "components"), /\.tsx$/)];
@@ -123,15 +136,22 @@ describe("every CSV download is named and sent the same way, rule B11 (#1458)", 
     expect(tsx.filter((file) => /Export CSV/i.test(read(file))).map(rel)).toEqual([]);
   });
 
-  it("every link to a CSV export endpoint goes through ExportLink", () => {
-    const bad = tsx.filter((file) => !file.endsWith("export-link.tsx")).filter((file) => {
-      if (rel(file) in exportLinkAllowlist) return false;
-      // An <a> or <Link> whose href is an API endpoint that sends a file (page links to /account/... or /more/... are not downloads).
+  it("every link to an API endpoint that sends a file goes through ExportLink", () => {
+    // Any <a> or <Link> whose href, or the value its href variable or function is built from in the same file, is an /api/ address.
+    // PDFs, QR codes, calendars and uploaded files are not CSV downloads.
+    const notCsv = /pdf|\/qr\b|\.ics|\/image|\/asset|message-file|\/files?\/|logout|callback|oauth|attachment/i;
+    const bad = tsx.filter((file) => !file.endsWith("export-link.tsx") && !(rel(file) in exportLinkAllowlist)).filter((file) => {
       const source = read(file);
       const anchors = source.match(/<(a|Link)\b[^>]*>/g) ?? [];
-      return anchors.some((tag) => /href=\{?[`"'][^`"']*\/api\/[^`"']*(export|csv|template|check-in-book|club-reports|\/reports|team-results|roster\?format=csv)/.test(tag)
-        || /href=\{`\$\{(base|api)\}\/(csv|exports?|template|roster\?format=csv)/.test(tag)
-        || /href=\{[^}]*\b(exportHref|csvHref|downloadHref|reportDownloadHref|exportCsvHref|templateHref|TEMPLATE_HREF|membersExportHref|exceptionsCsvHref|exportMonthHref)\b/.test(tag));
+      return anchors.some((tag) => {
+        const href = /href=(\{[^]*\}|"[^"]*")/.exec(tag)?.[1] ?? "";
+        if (href.includes("/api/")) return !notCsv.test(href);
+        // href={someName} or href={someName(...)}: read how the name is built in this file.
+        const name = /^\{\s*`?\$?\{?\s*([A-Za-z_$][\w$]*)/.exec(href)?.[1];
+        if (!name) return false;
+        const definition = new RegExp(`(?:const|let|function)\\s+${name.replace("$", "\\$")}\\b[^;]*?(?:;|\\n\\}|\\n  \\})`, "s").exec(source)?.[0] ?? "";
+        return definition.includes("/api/") && !notCsv.test(definition);
+      });
     }).map(rel);
     expect(bad).toEqual([]);
   });

@@ -24,6 +24,8 @@ export function ListPager({
   onPage,
   hrefFor,
   slice,
+  announce = true,
+  part = "all",
 }: {
   label: string;
   noun?: string;
@@ -31,16 +33,23 @@ export function ListPager({
   onPage?: (page: number) => void;
   hrefFor?: (page: number) => string;
   slice: PagerSlice;
+  /** False where a `SearchResultStatus` already announces the same change, so a screen reader hears it once. */
+  announce?: boolean;
+  /** "count" is only the count line and "pages" only Previous/Next, for a list that shows the count above and the buttons below. */
+  part?: "all" | "count" | "pages";
 }) {
   if (slice.total === 0) return null;
   const previous = slice.page - 1;
   const next = slice.page + 1;
   const atStart = slice.page <= 1;
   const atEnd = slice.page >= slice.pageCount;
+  const countLine = <span className="quiet-copy" role={announce ? "status" : undefined}>{pagerText(slice, noun, nounOne)}</span>;
+  // A navigation landmark only when there are pages to move between; one page is just the count line.
+  if (part === "count" || slice.pageCount <= 1) return part === "pages" ? null : <div className="list-pager">{countLine}</div>;
   return (
     <nav aria-label={label} className="list-pager">
-      <span className="quiet-copy" role="status">{pagerText(slice, noun, nounOne)}</span>
-      {slice.pageCount > 1 && (
+      {part === "all" && countLine}
+      {(
         <span className="list-pager-buttons">
           {hrefFor ? (
             atStart

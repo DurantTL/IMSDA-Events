@@ -14,9 +14,10 @@ import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
-function csvResponse(body: string, eventId: string, kind: string) {
-  return csvDownloadResponse(body, exportFileName({ scope: eventId, kind }));
+async function csvResponse(body: string, eventId: string, kind: string) {
+  return csvDownloadResponse(body, exportFileName({ scope: await eventFileScope(eventId), kind }));
 }
 
 /** Honors Weekend rosters as CSV (#360): classes, the site roster, or one club's schedule. */

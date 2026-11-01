@@ -1,8 +1,9 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ColumnHeader } from "@/components/column-header";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RecordsByMonthChart, ReportSummaryBand, YearStrip, shortMonth } from "@/components/club-report-charts";
 import { ListPager } from "@/components/list-pager";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import type { CoordinatorMonthSortColumn } from "@/modules/club-reports/area-table-sort";

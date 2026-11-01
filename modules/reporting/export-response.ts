@@ -36,15 +36,15 @@ export function exportFileName({ scope, kind, date, extension = "csv" }: {
   return `${parts.join("-")}.${ext}`;
 }
 
-export const CSV_BYTE_ORDER_MARK = "﻿";
+export const CSV_BYTE_ORDER_MARK = "\uFEFF";
 
 /**
  * The CSV download response: text/csv, an attachment under `fileName`, private and not cached, and the byte-order mark
- * in front of the body (one only, even when the body already starts with it). `init.headers` may add or override headers.
+ * in front of the body (one only, even when the body already starts with it; `bom: false` sends the body as it is). `init.headers` may add or override headers.
  */
-export function csvDownloadResponse(body: string, fileName: string, init: { status?: number; headers?: Record<string, string> } = {}): Response {
+export function csvDownloadResponse(body: string, fileName: string, init: { status?: number; headers?: Record<string, string>; /** False for a file a third-party importer reads and may not accept a byte-order mark (the Sterling Volunteers upload template). */ bom?: boolean } = {}): Response {
   const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, "-");
-  return new Response(CSV_BYTE_ORDER_MARK + body.replace(/^﻿/, ""), {
+  return new Response(init.bom === false ? body : CSV_BYTE_ORDER_MARK + body.replace(/^\uFEFF/, ""), {
     status: init.status ?? 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

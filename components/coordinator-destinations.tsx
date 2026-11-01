@@ -1,6 +1,8 @@
+import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ColumnHeader } from "@/components/column-header";
 import { Download } from "lucide-react";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import { eventClubAccessors, type EventClubSortColumn } from "@/modules/club-reports/area-table-sort";
@@ -47,9 +49,9 @@ export function CoordinatorExportLink({ clubYear, kind }: { clubYear: string; ki
   return (
     <div className="coordinator-export">
       <div className="intro-actions">
-        <a className="secondary-button" href={`${EXPORT_PATH}?report=${kind}&year=${encodeURIComponent(clubYear)}`}>
+        <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=${kind}&year=${encodeURIComponent(clubYear)}`}>
           <Download aria-hidden="true" size={15} /> {fullYearExportLabel(clubYear, kind)}
-        </a>
+        </ExportLink>
       </div>
       <p className="field-help">The CSV covers the full club year for every available club. It does not change with the search below.</p>
     </div>
@@ -115,7 +117,7 @@ export function CoordinatorMonthlyRecords({
   const sortedLabel = key === null ? null : key.startsWith("month-") ? `${months.find((entry) => `month-${entry.month}` === key)?.short ?? "month"} record` : { club: "club name", submitted: "submitted", notSubmitted: "not submitted" }[key as "club"];
   return (
     <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}. Scroll sideways to see every month.`}>
-      {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : "number")}</SortOrderNote>}
+      {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : key?.startsWith("month-") ? "state" : "number")}</SortOrderNote>}
       <table className="report-table table-cards" role="table">
         <caption className="sr-only">Monthly Record status by club for {clubYear}</caption>
         <thead role="rowgroup">

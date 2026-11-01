@@ -4,6 +4,7 @@ import { emergencyPlanApiError } from "@/modules/emergency-plans/api-errors";
 import { getEmergencyPlanVersion } from "@/modules/emergency-plans/repository";
 import { buildEmergencyReferenceSheet, emergencyReferenceCsv } from "@/modules/reporting/emergency-reference";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
@@ -22,7 +23,7 @@ async function getHandler(request: Request, context: RouteContext) {
       return Response.json({ error: "VERSION_NOT_FOUND", message: "There is no published emergency plan to export." }, { status: 404 });
     }
     const sheet = buildEmergencyReferenceSheet(version.snapshot, version);
-    return csvDownloadResponse(emergencyReferenceCsv(sheet), exportFileName({ scope: eventId, kind: `emergency-plan-v${version.versionNumber}` }));
+    return csvDownloadResponse(emergencyReferenceCsv(sheet), exportFileName({ scope: await eventFileScope(eventId), kind: `emergency-plan-v${version.versionNumber}` }));
   } catch (error) {
     return emergencyPlanApiError(error, "Exporting the emergency plan");
   }

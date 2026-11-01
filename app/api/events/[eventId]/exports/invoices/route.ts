@@ -8,6 +8,7 @@ import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Finalized invoices as a CSV for the treasurer (#168): number, church, event, total, posted-to-AR date and reference,
@@ -19,7 +20,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     const { eventId } = await context.params;
     await requirePermission(await getCurrentSession(), eventId, "MANAGE_FINANCE", findActiveMembership);
     const invoices = await getTreasurerCsvInvoices(eventId);
-    return csvDownloadResponse(toCsv(treasurerCsvRows(invoices)), exportFileName({ scope: eventId, kind: "finalized-invoices" }));
+    return csvDownloadResponse(toCsv(treasurerCsvRows(invoices)), exportFileName({ scope: await eventFileScope(eventId), kind: "finalized-invoices" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof InvoiceError) return Response.json({ error: error.code, message: error.message }, { status: 404 });

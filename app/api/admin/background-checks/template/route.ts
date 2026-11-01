@@ -12,7 +12,7 @@ async function getHandler(request: Request) {
   try {
     await requireClubsAdministration();
     const sterling = new URL(request.url).searchParams.get("format") === "sterling";
-    return csvDownloadResponse(sterling ? sterlingCsvTemplate() : rosterBackgroundCsvTemplate(), exportFileName({ scope: "sterling-volunteers", kind: sterling ? "export-template" : "roster-template" }));
+    return csvDownloadResponse(sterling ? sterlingCsvTemplate() : rosterBackgroundCsvTemplate(), exportFileName({ scope: "sterling-volunteers", kind: sterling ? "export-template" : "roster-template" }), { bom: false });
   } catch (error) {
     return backgroundCheckApiError(error, "Downloading the Sterling Volunteers template");
   }

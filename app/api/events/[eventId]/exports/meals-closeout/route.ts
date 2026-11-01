@@ -2,6 +2,7 @@ import { mealRoute } from "@/modules/meals/api";
 import { closeoutCsv, closeoutExceptionsCsv } from "@/modules/meals/closeout";
 import { loadMealCloseout } from "@/modules/meals/closeout-repository";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Meal money closeout (#212) as CSV: the money table by default, or the exceptions with their review notes with
@@ -12,5 +13,5 @@ import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-
 export const GET = mealRoute("MANAGE_FINANCE", "Exporting the meal closeout", async ({ request, eventId }) => {
   const exceptions = new URL(request.url).searchParams.get("part") === "exceptions";
   const closeout = await loadMealCloseout(eventId);
-  return csvDownloadResponse(exceptions ? closeoutExceptionsCsv(closeout.exceptions) : closeoutCsv(closeout), exportFileName({ scope: eventId, kind: `meals-closeout${exceptions ? "-exceptions" : ""}` }));
+  return csvDownloadResponse(exceptions ? closeoutExceptionsCsv(closeout.exceptions) : closeoutCsv(closeout), exportFileName({ scope: await eventFileScope(eventId), kind: `meals-closeout${exceptions ? "-exceptions" : ""}` }));
 }, { mutates: false });

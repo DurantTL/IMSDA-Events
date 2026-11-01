@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ColumnHeader } from "@/components/column-header";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {
@@ -15,7 +16,7 @@ import type { AreaClubEvent } from "@/modules/club-reports/area-summary-reposito
 import { supportingRecordMonths } from "@/modules/club-reports/coordinator-destinations-domain";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import { cardCell } from "@/components/table-card-labels";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText, sortRows, type ServerSort } from "@/lib/list-sort";
 import {
   eventClubAccessors,
@@ -60,7 +61,7 @@ export function AreaClubsOverview({ clubs, clubYear, links, query, sorting }: { 
   if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
   const rows = sorting?.order.key ? sortRows(clubs, sorting.order.key, sorting.order.dir, overviewAccessors) : clubs;
   return (
-    <div className="report-table-wrap card-box">
+    <div className="report-table-wrap card-box" id="club-overview">
       {sorting?.order.key && <SortOrderNote>{sortOrderText(overviewLabels[sorting.order.key], sorting.order.dir, ["roster", "reports", "points", "sterling"].includes(sorting.order.key) ? "number" : sorting.order.key === "lastReport" ? "date" : "text")}</SortOrderNote>}
       <table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Club overview for {clubYear}</caption>
@@ -105,7 +106,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting
   const rows = key ? sortRows(clubs, key, sorting!.order.dir, gridAccessors(clubYear)) : clubs;
   const sortedLabel = key === null ? null : key.startsWith("month-") ? `${reportMonthLabel(key.slice(6))} points` : { club: "club", submitted: "submitted", drafts: "drafts", missing: "missing", points: "total points" }[key as "club"];
   return (
-    <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue>
+    <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue id="monthly-grid">
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : "number")}</SortOrderNote>}
       <table role="table" className="report-table table-cards">
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>

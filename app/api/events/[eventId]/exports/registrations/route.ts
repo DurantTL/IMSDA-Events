@@ -15,6 +15,7 @@ import {
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 async function getHandler(
   request: Request,
@@ -45,7 +46,7 @@ async function getHandler(
       if (!choice || !choice.value) {
         return Response.json({ error: "CHOICE_FILTER_UNAVAILABLE", message: "That question cannot be used to filter an export." }, { status: 400 });
       }
-      return csvDownloadResponse(toCsv(choiceExportRows(registrations, { ...choice, value: choice.value })), exportFileName({ scope: eventId, kind: "registrations-by-answer" }));
+      return csvDownloadResponse(toCsv(choiceExportRows(registrations, { ...choice, value: choice.value })), exportFileName({ scope: await eventFileScope(eventId), kind: "registrations-by-answer" }));
     }
     const showLocation = locations.length > 0;
     const rows: Array<Array<string | number>> = [[
@@ -80,7 +81,7 @@ async function getHandler(
         visibleNotes.map((note) => note.body).join(" | "),
       ]);
     }
-    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: eventId, kind: "registrations" }));
+    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: await eventFileScope(eventId), kind: "registrations" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

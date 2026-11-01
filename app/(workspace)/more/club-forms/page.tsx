@@ -1,13 +1,15 @@
 import { ExportLink } from "@/components/export-link";
+import { ColumnHeader } from "@/components/column-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ListPager } from "@/components/list-pager";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
-import { serverSort, sortOrderText, sortRows, type SortValue } from "@/lib/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
+import { serverSort, sortOrderText } from "@/lib/list-sort";
+import { parsePageParam } from "@/lib/pagination";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
-import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
+import { CLUB_FORM_SORT_COLUMNS, pageSubmissionsForViewer, type ClubFormSortColumn } from "@/modules/club-forms/submissions";
 import { listClubFormTemplateNames } from "@/modules/club-forms/templates";
 import { listClubsForArea } from "@/modules/organizations/area-coordinators";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -21,17 +23,8 @@ function formatDate(value: string | null) {
   return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
-const SORT_COLUMNS = ["club", "form", "subject", "submitted", "entered"] as const;
-type SortColumn = typeof SORT_COLUMNS[number];
-type Row = Awaited<ReturnType<typeof listSubmissionsForViewer>>[number];
-const accessors: Record<SortColumn, (row: Row) => SortValue> = {
-  club: (row) => row.organizationName,
-  form: (row) => row.templateName,
-  subject: (row) => row.subjectName,
-  submitted: (row) => row.submittedAt,
-  entered: (row) => (row.enteredVia === "LINK" ? "Private link" : "Club director"),
-};
-const sortLabels: Record<SortColumn, string> = { club: "club", form: "form", subject: "member or subject", submitted: "date submitted", entered: "how it was entered" };
+const STAFF_FORMS_PAGE_SIZE = 25;
+const sortLabels: Record<ClubFormSortColumn, string> = { club: "club", form: "form", subject: "member or subject", submitted: "date submitted", entered: "how it was entered" };
 
 /**
  * Submitted club forms across clubs, for conference staff (#610), with a CSV
@@ -41,7 +34,7 @@ const sortLabels: Record<SortColumn, string> = { club: "club", form: "form", sub
 export default async function StaffClubFormsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; form?: string; club?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ event?: string; form?: string; club?: string; sort?: string; dir?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const { event, form, club } = params;
@@ -49,14 +42,22 @@ export default async function StaffClubFormsPage({
   if (!viewer) {
     return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" />;
   }
-  const [templates, clubs, submissions] = await Promise.all([
+  // The sort and the page run in the query, with the viewer's own scoping, so the count is the whole filtered list (#1458).
+  const sorting = serverSort<ClubFormSortColumn>("/more/club-forms", params, CLUB_FORM_SORT_COLUMNS, { key: null, dir: "asc" });
+  const [templates, clubs, list] = await Promise.all([
     listClubFormTemplateNames(),
     listClubsForArea(),
-    listSubmissionsForViewer(viewer, { templateKey: form || undefined, organizationId: club || undefined }),
+    pageSubmissionsForViewer(viewer, { templateKey: form || undefined, organizationId: club || undefined }, { sort: sorting.order, page: parsePageParam(params.page), pageSize: STAFF_FORMS_PAGE_SIZE }),
   ]);
-  // Sorting only changes the order of the rows this viewer was already allowed to list (#1458).
-  const sorting = serverSort<SortColumn>("/more/club-forms", params, SORT_COLUMNS, { key: null, dir: "asc" });
-  const rows = sorting.order.key ? sortRows(submissions, sorting.order.key, sorting.order.dir, accessors) : submissions;
+  const rows = list.rows;
+  const pageHref = (target: number) => {
+    const query = new URLSearchParams();
+    for (const [name, value] of [["event", event], ["form", form], ["club", club]] as const) if (value) query.set(name, value);
+    if (sorting.order.key) { query.set("sort", sorting.order.key); query.set("dir", sorting.order.dir); }
+    if (target > 1) query.set("page", String(target));
+    const text = query.toString();
+    return text ? `/more/club-forms?${text}` : "/more/club-forms";
+  };
   const eventQuery = event ? `?event=${encodeURIComponent(event)}` : "";
   const exportHref = form
     ? `/api/staff/club-forms/export?form=${encodeURIComponent(form)}${club ? `&club=${encodeURIComponent(club)}` : ""}`
@@ -100,7 +101,7 @@ export default async function StaffClubFormsPage({
             ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</ExportLink>
             : <small className="field-help">Choose one form to download its CSV.</small>}
         </form>
-        {submissions.length === 0 ? (
+        {list.total === 0 ? (
           <p className="quiet-copy">No submitted forms match.</p>
         ) : (
           <div className="report-table-wrap">
@@ -132,7 +133,7 @@ export default async function StaffClubFormsPage({
             </table>
           </div>
         )}
-        <ListPager label="Submitted club forms" noun="forms" nounOne="form" slice={{ from: 1, to: submissions.length, total: submissions.length, page: 1, pageCount: 1 }} />
+        <ListPager hrefFor={pageHref} label="Submitted club forms" noun="forms" nounOne="form" slice={{ from: list.total === 0 ? 0 : (list.page - 1) * list.pageSize + 1, to: (list.page - 1) * list.pageSize + rows.length, page: list.page, pageCount: list.pageCount, total: list.total }} />
       </section>
     </section>
   );

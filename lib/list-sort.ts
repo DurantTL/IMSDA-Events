@@ -15,12 +15,16 @@ export function ariaSortValue(active: boolean, direction: SortDirection): AriaSo
 export const flipDirection = (direction: SortDirection): SortDirection => (direction === "asc" ? "desc" : "asc");
 
 /** "A to Z" / "oldest first" and so on, by what the column holds. */
-export type SortKind = "text" | "date" | "number";
+export type SortKind = "text" | "date" | "number" | "state" | "group";
 
 const directionWords: Record<SortKind, Record<SortDirection, string>> = {
   text: { asc: "A to Z", desc: "Z to A" },
   date: { asc: "oldest first", desc: "newest first" },
   number: { asc: "lowest first", desc: "highest first" },
+  // A status column sorts by how much needs doing, not by its words.
+  state: { asc: "needs attention first", desc: "needs attention last" },
+  // A column the database orders by its own category order, not alphabetically.
+  group: { asc: "in the system's order", desc: "in the system's reverse order" },
 };
 
 /** The sentence a list shows about its order: "Sorted by last name, A to Z." */
@@ -120,10 +124,10 @@ export function sortRows<T, K extends string>(
     .map((entry) => entry.row);
 }
 
-export type SortParamNames = { sort: string; dir: string };
+export type SortParamNames = { sort: string; dir: string; /** The page param this table owns: a prefixed table drops only its own, never another list's `page`. */ page: string };
 
 /** `sort` and `dir`, or a prefixed pair (`gridSort`, `gridDir`) for a second table on the same page. */
-export const sortParamNames = (prefix?: string): SortParamNames => (prefix ? { sort: `${prefix}Sort`, dir: `${prefix}Dir` } : { sort: "sort", dir: "dir" });
+export const sortParamNames = (prefix?: string): SortParamNames => (prefix ? { sort: `${prefix}Sort`, dir: `${prefix}Dir`, page: `${prefix}Page` } : { sort: "sort", dir: "dir", page: "page" });
 
 /**
  * The address a column header links to: sort set to `column`, the direction flipped when that column is already the
@@ -148,7 +152,7 @@ export function sortHref(
   }
   params.set(names.sort, column);
   params.set(names.dir, current.key === column ? flipDirection(current.dir) : (options.firstDirection ?? "asc"));
-  params.delete("page");
+  params.delete(names.page);
   return `${pathname}?${params.toString()}${options.hash ?? ""}`;
 }
 

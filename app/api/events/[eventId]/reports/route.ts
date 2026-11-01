@@ -10,6 +10,7 @@ import { getOperationalReport } from "@/modules/reporting/repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 function isOperationalReportKind(value: string | null): value is OperationalReportKind {
   return operationalReportKinds.includes(value as OperationalReportKind);
@@ -39,7 +40,7 @@ async function getHandler(
       findActiveMembership
     );
     const report = await getOperationalReport(eventId);
-    return csvDownloadResponse(operationalReportCsv(report, kind), exportFileName({ scope: eventId, kind: kind }));
+    return csvDownloadResponse(operationalReportCsv(report, kind), exportFileName({ scope: await eventFileScope(eventId), kind: kind }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json(

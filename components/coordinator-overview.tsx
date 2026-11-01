@@ -1,8 +1,11 @@
+import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ListPager } from "@/components/list-pager";
+import { ColumnHeader } from "@/components/column-header";
 import { Download } from "lucide-react";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import type { CoordinatorGlanceSortColumn } from "@/modules/club-reports/area-table-sort";
@@ -152,12 +155,12 @@ export function CoordinatorClubsAtAGlance({
       <h3 id="coordinator-clubs-title">Clubs at a glance</h3>
       <div className="coordinator-export">
         <div className="intro-actions">
-          <a className="secondary-button" href={`${EXPORT_PATH}?report=summary&year=${encodeURIComponent(overview.clubYear)}`}>
+          <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=summary&year=${encodeURIComponent(overview.clubYear)}`}>
             <Download aria-hidden="true" size={15} /> {fullYearExportLabel(overview.clubYear)}
-          </a>
-          <a className="secondary-button" href={`${EXPORT_PATH}?report=points&year=${encodeURIComponent(overview.clubYear)}`}>
+          </ExportLink>
+          <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=points&year=${encodeURIComponent(overview.clubYear)}`}>
             <Download aria-hidden="true" size={15} /> {fullYearExportLabel(overview.clubYear, "points")}
-          </a>
+          </ExportLink>
         </div>
         <p className="field-help">The CSV files cover the full club year for every available club. They do not change with the search below.</p>
       </div>
@@ -166,7 +169,7 @@ export function CoordinatorClubsAtAGlance({
       ) : (
         <>
           <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs by name" query={query} shown={shown.length} total={clubs.length} />
-          <p className="coordinator-count">{shown.length} of {clubs.length} {clubs.length === 1 ? "club" : "clubs"} shown</p>
+          <ListPager label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
           {shown.length === 0 ? (
             <p className="report-empty">
               No club name matches “{query}”.{" "}

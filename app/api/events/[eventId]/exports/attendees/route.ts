@@ -12,6 +12,7 @@ import {
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * The attendee listing as CSV (#784): the same rows and columns the page shows
@@ -34,7 +35,7 @@ async function getHandler(
     const registrations = await listRegistrations(eventId, { statuses: query.statuses });
     const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent: await isClubAudienceEvent(eventId) });
     const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
-    return csvDownloadResponse(attendeeListingCsv(rows), exportFileName({ scope: eventId, kind: "attendees" }));
+    return csvDownloadResponse(attendeeListingCsv(rows), exportFileName({ scope: await eventFileScope(eventId), kind: "attendees" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

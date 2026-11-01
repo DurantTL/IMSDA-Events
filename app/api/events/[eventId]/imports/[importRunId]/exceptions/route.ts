@@ -6,6 +6,7 @@ import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string; importRunId: string }> }) {
   try {
@@ -14,7 +15,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     const exceptions = await listImportExceptions(eventId, importRunId);
     const rows: Array<Array<string | number>> = [["Source row", "Source ID", "Confirmation code", "Proposed action", "Errors", "Warnings"]];
     for (const row of exceptions) rows.push([row.sourceRow, row.sourceRecordKey, row.confirmationCode, row.action, row.errors, row.warnings]);
-    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: eventId, kind: `import-exceptions-${importRunId}` }));
+    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: await eventFileScope(eventId), kind: `import-exceptions-${importRunId}` }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof ImportOperationError) return Response.json({ error: error.code, message: error.message }, { status: 404 });

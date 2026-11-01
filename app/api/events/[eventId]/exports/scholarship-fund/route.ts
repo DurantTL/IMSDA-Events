@@ -7,6 +7,7 @@ import { fundCsvRows } from "@/modules/scholarship-funds/domain";
 import { exportFund } from "@/modules/scholarship-funds/repository";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * The scholarship fund as a finance CSV (#398): the balance, contributions against awards per sponsor or church, and
@@ -19,7 +20,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     const { eventId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_FINANCE", findActiveMembership);
     const data = await exportFund(eventId, access.user.id);
-    return csvDownloadResponse(toCsv(fundCsvRows(data)), exportFileName({ scope: eventId, kind: "scholarship-fund" }));
+    return csvDownloadResponse(toCsv(fundCsvRows(data)), exportFileName({ scope: await eventFileScope(eventId), kind: "scholarship-fund" }));
   } catch (error) {
     return scholarshipFundApiError(error, "Exporting the scholarship fund");
   }

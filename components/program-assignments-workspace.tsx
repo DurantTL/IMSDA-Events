@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -475,12 +476,12 @@ export function ProgramAssignmentsWorkspace({
                     {run.invalidatedAt
                       ? <span className="review-badge">Choices changed · reapply</span>
                       : index === 0 && <span className="review-badge">Newest</span>}
-                    <a
+                    <ExportLink
                       className="secondary-button"
                       href={`/api/events/${encodeURIComponent(eventId)}/program-assignments/${encodeURIComponent(run.id)}/roster`}
                     >
                       <Download aria-hidden="true" size={15} /> CSV
-                    </a>
+                    </ExportLink>
                     <Link
                       className="secondary-button"
                       href={`/more/program-assignments/${encodeURIComponent(run.id)}?event=${encodeURIComponent(eventId)}`}

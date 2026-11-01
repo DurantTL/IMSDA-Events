@@ -19,6 +19,7 @@ import { requireClubReportsAccess } from "@/modules/reporting/club-reports-acces
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 function isClubReportKind(value: string | null): value is ClubReportKind {
   return clubReportKinds.includes(value as ClubReportKind);
@@ -55,7 +56,7 @@ async function getHandler(
     // ?location= narrows the export to one location; without it every location is combined (#413).
     const { locationId } = await resolveLocationFilter(eventId, locationParam(request));
     const data = await getClubEventRecords(eventId, { locationId });
-    return csvDownloadResponse(csvForKind(kind, data), exportFileName({ scope: eventId, kind: `club-${kind}` }));
+    return csvDownloadResponse(csvForKind(kind, data), exportFileName({ scope: await eventFileScope(eventId), kind: `club-${kind}` }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

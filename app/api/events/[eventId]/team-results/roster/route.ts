@@ -7,6 +7,7 @@ import { requireClubReportsAccess } from "@/modules/reporting/club-reports-acces
 import { toCsv } from "@/modules/reporting/csv";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * The roster of the teams at one level (#945), as data or a CSV with `?format=csv`: team, club, Area, and each person's
@@ -21,7 +22,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const level = levelFromParam(params.get("level"));
     const teams = await listLevelTeams(eventId, level);
     if (params.get("format") === "csv") {
-      return csvDownloadResponse(toCsv(levelRosterCsvRows(teams)), exportFileName({ scope: eventId, kind: `team-roster-${level.toLowerCase()}` }));
+      return csvDownloadResponse(toCsv(levelRosterCsvRows(teams)), exportFileName({ scope: await eventFileScope(eventId), kind: `team-roster-${level.toLowerCase()}` }));
     }
     return Response.json({ level, teams }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {

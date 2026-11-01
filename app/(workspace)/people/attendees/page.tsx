@@ -79,7 +79,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <div>
           <p className="eyebrow">{event.name}</p>
           <h2>{staffPageTitles.attendeeList}</h2>
-          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
+          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}.{query.view !== DEFAULT_LISTING_VIEW ? <> This is the {activeView.label} view.</> : null}</p>
         </div>
         <div className="intro-actions">
           {canExport && <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</ExportLink>}
@@ -153,7 +153,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                 const active = query.sort === column.key;
                 const nextDirection = active && query.direction === "asc" ? "desc" : "asc";
                 // No page in the link: a new order starts at page 1.
-                return <SortableHeader key={column.key} active={active} direction={query.direction} href={href({ sort: column.key, direction: nextDirection })} label={column.label} />;
+                return <SortableHeader key={column.key} active={active} dataCol={column.key} direction={query.direction} href={href({ sort: column.key, direction: nextDirection })} label={column.label} />;
               })}
             </tr>
           </thead>

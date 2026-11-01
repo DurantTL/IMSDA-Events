@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ListPager, pagerText } from "@/components/list-pager";
 import { SortableHeader } from "@/components/list-sort";
-import { parseSortParams, serverSort, sortHref, sortRows } from "@/lib/list-sort";
+import { parseSortParams, serverSort, sortHref, sortParamNames, sortRows } from "@/lib/list-sort";
 import { paginate } from "@/lib/pagination";
 
 const columns = ["name", "city", "count"] as const;
@@ -81,9 +81,34 @@ describe("serverSort (#1458)", () => {
   it("reads the whitelisted order and builds header links, with a prefix for a second table", () => {
     const sorting = serverSort("/x", { q: "a", gridSort: "city", gridDir: "asc", sort: "name;drop", page: "2" }, columns, fallback, { prefix: "grid", hash: "#t" });
     expect(sorting.order).toEqual({ key: "city", dir: "asc" });
-    expect(sorting.hrefFor("city")).toBe("/x?q=a&gridSort=city&gridDir=desc&sort=name%3Bdrop#t");
-    expect(sorting.hrefFor("name")).toBe("/x?q=a&gridSort=name&gridDir=asc&sort=name%3Bdrop#t");
+    expect(sorting.hrefFor("city")).toBe("/x?q=a&gridSort=city&gridDir=desc&sort=name%3Bdrop&page=2#t");
+    expect(sorting.hrefFor("name")).toBe("/x?q=a&gridSort=name&gridDir=asc&sort=name%3Bdrop&page=2#t");
     expect(serverSort("/x", { sort: "name;drop" }, columns, fallback).order).toEqual(fallback);
+  });
+});
+
+describe("review fixes (#1458)", () => {
+  it("a prefixed table drops only its own page, and the plain one drops page", () => {
+    const search = "page=3&gridPage=2&gridSort=city";
+    expect(sortHref("/x", search, "club", { key: null, dir: "asc" }, { names: sortParamNames("grid") })).toBe("/x?page=3&gridSort=club&gridDir=asc");
+    expect(sortHref("/x", search, "club", { key: null, dir: "asc" })).toBe("/x?gridPage=2&gridSort=city&sort=club&dir=asc");
+  });
+
+  it("the pager is a nav only with several pages, can skip role=status, and can split count from buttons", () => {
+    const many = paginate(Array.from({ length: 60 }, (_, i) => i), 1, 25);
+    const one = paginate([1, 2, 3], 1, 25);
+    const render = (props: Record<string, unknown>) => renderToStaticMarkup(createElement(ListPager, { label: "L", noun: "rows", ...props } as never));
+    expect(render({ slice: one })).not.toContain("<nav");
+    expect(render({ slice: one })).toContain('role="status"');
+    expect(render({ slice: many, hrefFor: (n: number) => `/p?page=${n}` })).toContain("<nav");
+    expect(render({ slice: one, announce: false })).not.toContain('role="status"');
+    const count = render({ slice: many, hrefFor: (n: number) => `/p?page=${n}`, part: "count" });
+    expect(count).toContain("Showing 1\u201325 of 60 rows");
+    expect(count).not.toContain("Next");
+    const pages = render({ slice: many, hrefFor: (n: number) => `/p?page=${n}`, part: "pages" });
+    expect(pages).toContain("Next");
+    expect(pages).not.toContain("Showing");
+    expect(render({ slice: one, part: "pages" })).toBe("");
   });
 });
 

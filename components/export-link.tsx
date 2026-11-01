@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 
 /**
@@ -9,6 +9,19 @@ import type { MouseEvent, ReactNode } from "react";
  * file under the name the server chose, and, when the server refuses, shows the reason in plain words next to the link
  * instead of opening raw JSON.
  */
+
+export type ExportStatus = { phase: "idle" | "preparing" | "failed"; message: string };
+
+/**
+ * A container that hides its links once one is clicked (the Actions menu) provides this, so the "Preparing download…"
+ * and the failure message show beside the container's own control instead of inside the closed menu.
+ */
+export const ExportStatusContext = createContext<((status: ExportStatus) => void) | null>(null);
+
+/** The words for a status, for whoever shows it. */
+export function exportStatusText(status: ExportStatus): string {
+  return status.phase === "preparing" ? "Preparing download…" : status.phase === "failed" ? status.message : "";
+}
 
 const plainStatusText: Record<number, string> = {
   401: "Sign in again to download this file.",
@@ -36,7 +49,12 @@ export async function downloadErrorMessage(response: Pick<Response, "status" | "
 }
 
 export function ExportLink({ href, children = "Download CSV", className }: { href: string; children?: ReactNode; className?: string }) {
-  const [state, setState] = useState<{ phase: "idle" | "preparing" | "failed"; message: string }>({ phase: "idle", message: "" });
+  const [state, setLocalState] = useState<ExportStatus>({ phase: "idle", message: "" });
+  const sink = useContext(ExportStatusContext);
+  const setState = (next: ExportStatus) => {
+    setLocalState(next);
+    sink?.(next);
+  };
   const busy = useRef(false);
 
   async function onClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -72,9 +90,11 @@ export function ExportLink({ href, children = "Download CSV", className }: { hre
   return (
     <>
       <a aria-busy={state.phase === "preparing" || undefined} className={className} download href={href} onClick={onClick}>{children}</a>
-      <span aria-live="polite" className={state.phase === "failed" ? "form-error export-link-status" : "quiet-copy export-link-status"} role="status">
-        {state.phase === "preparing" ? " Preparing download…" : state.phase === "failed" ? ` ${state.message}` : ""}
-      </span>
+      {!sink && (
+        <span aria-live="polite" className={state.phase === "failed" ? "form-error export-link-status" : "quiet-copy export-link-status"} role="status">
+          {exportStatusText(state) ? ` ${exportStatusText(state)}` : ""}
+        </span>
+      )}
     </>
   );
 }

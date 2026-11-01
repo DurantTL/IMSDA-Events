@@ -8,6 +8,7 @@ import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Attendance reconciliation as a CSV (#166): one row per registration with the registered,
@@ -22,7 +23,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const { locationId } = await resolveLocationFilter(eventId, locationParam(request));
     const versionId = new URL(request.url).searchParams.get("version");
     const { result, versionLabel, factsChanged } = await getAttendanceReconciliationExport(eventId, { locationId, versionId });
-    return csvDownloadResponse(toCsv(reconciliationCsvRows(result, { versionLabel, factsChanged })), exportFileName({ scope: eventId, kind: "attendance-reconciliation" }));
+    return csvDownloadResponse(toCsv(reconciliationCsvRows(result, { versionLabel, factsChanged })), exportFileName({ scope: await eventFileScope(eventId), kind: "attendance-reconciliation" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof AttendanceReconciliationError) return Response.json({ error: error.code, message: error.message }, { status: 404 });

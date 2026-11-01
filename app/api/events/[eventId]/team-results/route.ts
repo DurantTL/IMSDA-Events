@@ -7,6 +7,7 @@ import { requireClubReportsAccess } from "@/modules/reporting/club-reports-acces
 import { toCsv } from "@/modules/reporting/csv";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * The team results report (#809) as data, or as a CSV with `?format=csv`. For staff with report access, or an event
@@ -23,7 +24,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const all = await listTeamResults(eventId);
     const rows = level ? teamsAtLevel(all, level) : all;
     if (params.get("format") === "csv") {
-      return csvDownloadResponse(toCsv(teamResultsCsvRows(all, level)), exportFileName({ scope: eventId, kind: `team-results${level ? `-${level.toLowerCase()}` : ""}` }));
+      return csvDownloadResponse(toCsv(teamResultsCsvRows(all, level)), exportFileName({ scope: await eventFileScope(eventId), kind: `team-results${level ? `-${level.toLowerCase()}` : ""}` }));
     }
     return Response.json({ level: level ?? null, teams: rows }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {

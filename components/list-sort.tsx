@@ -4,7 +4,7 @@ import { ArrowDown, ArrowDownUp, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { PhoneHiddenSortLink } from "@/components/phone-hidden-sort-link";
 import { useAddressParams } from "@/components/search-as-you-type";
-import { ariaSortValue, flipDirection, parseSortParams, sortParamNames, type ServerSort, type SortDirection, type SortState } from "@/lib/list-sort";
+import { ariaSortValue, flipDirection, parseSortParams, sortParamNames, type SortDirection, type SortState } from "@/lib/list-sort";
 
 /** One line saying how a list is ordered (#743). Plain text, so it is read as well as seen. */
 export function SortOrderNote({ children, id }: { children: string; id?: string }) {
@@ -29,6 +29,7 @@ export function SortableHeader({
   disabled,
   className,
   hiddenLabel,
+  dataCol,
 }: {
   label: string;
   active: boolean;
@@ -41,6 +42,8 @@ export function SortableHeader({
   className?: string;
   /** Extra words for assistive technology only, so two tables' identical headers have different names ("Name, Staff"). */
   hiddenLabel?: string;
+  /** Sets `data-col` on the header cell, for column width rules that name it. */
+  dataCol?: string;
 }) {
   const content = (
     <>
@@ -52,7 +55,7 @@ export function SortableHeader({
     </>
   );
   return (
-    <th aria-sort={ariaSortValue(active, direction)} className={className} role="columnheader" scope="col">
+    <th aria-sort={ariaSortValue(active, direction)} className={className} data-col={dataCol} role="columnheader" scope="col">
       {href !== undefined ? (
         <PhoneHiddenSortLink className="table-sort-button" href={href}>{content}</PhoneHiddenSortLink>
       ) : (
@@ -60,21 +63,6 @@ export function SortableHeader({
       )}
     </th>
   );
-}
-
-/**
- * A column header of a server-rendered table: a sort link when the page passed `sorting` (from `serverSort`), a plain
- * header otherwise, so a shared table component can still be used somewhere that does not sort (#1458).
- */
-export function ColumnHeader<K extends string>({ column, label, sorting, className, hiddenLabel }: {
-  column: K;
-  label: string;
-  sorting?: ServerSort<K>;
-  className?: string;
-  hiddenLabel?: string;
-}) {
-  if (!sorting) return <th className={className} role="columnheader" scope="col">{label}{hiddenLabel && <span className="sr-only">, {hiddenLabel}</span>}</th>;
-  return <SortableHeader active={sorting.order.key === column} className={className} direction={sorting.order.dir} hiddenLabel={hiddenLabel} href={sorting.hrefFor(column)} label={label} />;
 }
 
 /**

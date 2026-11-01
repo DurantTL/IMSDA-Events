@@ -1,10 +1,11 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { ColumnHeader } from "@/components/column-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { ListPager } from "@/components/list-pager";
-import { ColumnHeader, SortOrderNote } from "@/components/list-sort";
+import { SortOrderNote } from "@/components/list-sort";
 import { OrganizationSearchControls } from "@/components/organization-search-controls";
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
@@ -82,7 +83,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
             {total} {total === 1 ? "organization" : "organizations"}{searching ? " match" : ""}.
           </p>
           <div className="report-table-wrap">
-            {state.sort && <SortOrderNote>{sortOrderText(orderLabels[sorting.order.key!], sorting.order.dir)}</SortOrderNote>}
+            {state.sort && <SortOrderNote>{sortOrderText(orderLabels[sorting.order.key!], sorting.order.dir, ["kind", "status"].includes(sorting.order.key!) ? "group" : "text")}</SortOrderNote>}
             <table className="report-table table-cards table-cards-wide org-directory-table" role="table">
               <thead role="rowgroup">
                 <tr role="row">

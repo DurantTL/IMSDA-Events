@@ -75,9 +75,17 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   };
   // Each table on a view sorts through its own params (#1458): the records table `sort`/`dir`, the two tables under
   // "Full-year grid" `gridSort` and `overviewSort`, the event tables `sort`/`dir` on their own view.
-  const searchParamsRecord: Record<string, string | string[] | undefined> = { ...params };
-  const gridSorting = serverSort("/admin/clubs/summary", searchParamsRecord, gridSortColumns(clubYear), GRID_DEFAULT_SORT, { prefix: "grid", hash: "#monthly-records" });
-  const overviewSorting = serverSort("/admin/clubs/summary", searchParamsRecord, OVERVIEW_SORT_COLUMNS, OVERVIEW_DEFAULT_SORT, { prefix: "overview", hash: "#monthly-records" });
+  // Sort links carry only the params the current view uses, so a stale filter of another view (the directory's
+  // `attention`, `page`) never rides along (#1458).
+  const viewKeys: Record<typeof view, readonly string[]> = {
+    directory: [],
+    records: ["year", "view", "month", "q", "show", "all", "sort", "dir", "gridSort", "gridDir", "overviewSort", "overviewDir"],
+    points: [],
+    events: ["year", "view", "sort", "dir"],
+  };
+  const searchParamsRecord: Record<string, string | string[] | undefined> = Object.fromEntries(Object.entries(params).filter(([name]) => viewKeys[view].includes(name)));
+  const gridSorting = serverSort("/admin/clubs/summary", searchParamsRecord, gridSortColumns(clubYear), GRID_DEFAULT_SORT, { prefix: "grid", hash: "#monthly-grid" });
+  const overviewSorting = serverSort("/admin/clubs/summary", searchParamsRecord, OVERVIEW_SORT_COLUMNS, OVERVIEW_DEFAULT_SORT, { prefix: "overview", hash: "#club-overview" });
   const eventSorting = serverSort("/admin/clubs/summary", searchParamsRecord, EVENT_CLUB_SORT_COLUMNS, EVENT_CLUB_DEFAULT_SORT, { hash: "#club-events" });
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
@@ -123,9 +131,10 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       </SearchAsYouTypeForm>
       {view === "directory" && <>
         <p className={styles.note} id="club-attention-help">Needs attention: {directory.monthLabel} records that are not submitted or are submitted and awaiting review. This filter only checks that monthly record.</p>
-        <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" noun={query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"} nounOne={query || attention ? `matching club (${directory.totalClubs} active clubs in total)` : "active club"} slice={directory} />
+        <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="count" noun={query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"} nounOne={query || attention ? `matching club (${directory.totalClubs} active clubs in total)` : "active club"} slice={directory} />
         <p className={styles.note}>Sorted by club name.</p>
         {directory.total > 0 ? <ClubDirectoryCards clubs={directory.items} clubYear={clubYear} monthLabel={directory.monthLabel} /> : <div className="panel"><p>{directory.totalClubs === 0 ? "No active clubs for this club year." : "No clubs match these filters. Try another club or church name, or clear the filters."}</p></div>}
+        <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="pages" slice={directory} />
         {newYearStatus && newYearStatus.clubs.length > 0 && <details className={`panel ${styles.details}`}><summary>Roster carry-forward status</summary><ClubNewYearStatus clubHref={(id) => clubDirectoryClubHref(id, newYearStatus.toClubYear)} status={newYearStatus} /></details>}
       </>}
       {view === "records" && <>

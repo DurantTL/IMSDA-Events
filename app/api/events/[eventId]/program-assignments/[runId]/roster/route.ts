@@ -7,6 +7,7 @@ import { getAppliedAssignmentRoster } from "@/modules/program-assignments/reposi
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 async function getHandler(
   _request: Request,
@@ -29,7 +30,7 @@ async function getHandler(
         { status: 404 }
       );
     }
-    return csvDownloadResponse(programAssignmentRosterCsv(roster), exportFileName({ scope: eventId, kind: `program-assignments-${runId}` }));
+    return csvDownloadResponse(programAssignmentRosterCsv(roster), exportFileName({ scope: await eventFileScope(eventId), kind: `program-assignments-${runId}` }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json(

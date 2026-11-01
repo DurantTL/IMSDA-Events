@@ -91,7 +91,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           </p>
         ) : (
           <>
-          {sortedBy && <SortOrderNote>{sortOrderText(sortedBy, view.order.dir, view.order.key === "points" ? "number" : "text")}</SortOrderNote>}
+          {sortedBy && <SortOrderNote>{sortOrderText(sortedBy, view.order.dir, view.order.key === "points" ? "number" : view.order.key === "record" ? "state" : "text")}</SortOrderNote>}
           <table className={`report-table report-table-auto ${styles.table}`} role="table">
             <caption className="sr-only">Clubs and their {view.monthLabel} record, {view.showAllClubs ? "all clubs" : "clubs that need attention"}</caption>
             <thead role="rowgroup">

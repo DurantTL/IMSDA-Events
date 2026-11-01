@@ -853,7 +853,8 @@ export function PeopleWorkspace({
         label="Registrations shown"
         noun={`${matchingPersonFilter ? "registrations with a matching person" : "registrations"}${pageScoped ? " on this page of the search results" : ""}`}
         nounOne={`${matchingPersonFilter ? "registration with a matching person" : "registration"}${pageScoped ? " on this page of the search results" : ""}`}
-        slice={{ from: visible.length === 0 ? 0 : 1, to: visible.length, total: registrations.length, page: 1, pageCount: 1 }}
+        announce={false}
+        slice={{ from: visible.length === 0 ? 0 : 1, to: visible.length, total: visible.length, page: 1, pageCount: 1 }}
       />
       <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}

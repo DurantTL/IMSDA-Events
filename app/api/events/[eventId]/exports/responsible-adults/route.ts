@@ -6,6 +6,7 @@ import { responsibleAdultsCsv } from "@/modules/guardian-authority/export";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * Minors and their responsible adults for lodging and check-in (#131). The same permissions as the people
@@ -20,7 +21,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     if (!new Set(effectivePermissions(access.user, access.membership)).has("VIEW_SENSITIVE_DATA")) {
       throw new AccessDeniedError("Your event role does not include access to attendee names.", 403, "PERMISSION_DENIED");
     }
-    return csvDownloadResponse(responsibleAdultsCsv(await getResponsibleAdultExportRows(eventId)), exportFileName({ scope: eventId, kind: "responsible-adults" }));
+    return csvDownloadResponse(responsibleAdultsCsv(await getResponsibleAdultExportRows(eventId)), exportFileName({ scope: await eventFileScope(eventId), kind: "responsible-adults" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof GuardianAuthorityError && error.code === "EVENT_NOT_FOUND") return Response.json({ error: error.code }, { status: 404 });
