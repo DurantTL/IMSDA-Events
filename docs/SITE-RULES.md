@@ -48,6 +48,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | H3 | Anywhere an event admin or club admin sees something that's not set up, missing, blocked or incomplete, it shows either a **Set up** link straight to the page where they fix it, or a **How to do this** panel with plain steps. It never just says "not set up" or leaves a dead end. | planned (#1440) | planned (#1439) | #1435 |
 | H4 | If only someone else can fix it (for example a system admin), it says who to ask. | planned (#1440) | planned (#1439) | #1435 |
 | H5 | Club directors and area coordinators each get a short "Getting started" checklist and Help guide written for that role, in plain language: short steps, no jargon. They're linked from the role's home screen, from each related "not set up" state, and from the Help search. | planned (#1440) | planned (#1439) | #1435 |
+| H6 | Every club director and area coordinator guide shows each step with a screenshot of the real screen, captured automatically from sample data. | `tests/walkthroughs-1482.test.ts` | `npm run test:walkthroughs` (`scripts/verify-help-walkthroughs.ts`) | #1482 |
 
 ## Behavior: lists and tables
 

@@ -158,7 +158,7 @@ describe("rendered help", () => {
     const html = renderToStaticMarkup(createElement(ClubHomeRoster, { clubYear: "2026-2027", preview: empty, readOnly: false, rosterHref: `${base}/roster`, setupBase: base }));
     expect(html).toContain("data-role-setup-help");
     expect(html).toContain("How to do this");
-    expect(html).toContain("/account/help/director-roster-and-forms");
+    expect(html).toContain("/account/help/walkthrough-director-roster");
     const past = renderToStaticMarkup(createElement(ClubHomeRoster, { clubYear: "2025-2026", preview: empty, readOnly: true, rosterHref: `${base}/roster`, setupBase: base }));
     expect(past).not.toContain("data-role-setup-help");
   });
@@ -166,7 +166,7 @@ describe("rendered help", () => {
   it("tells a director with no open event who to ask", () => {
     const html = renderToStaticMarkup(createElement(ClubHomeEvents, { cards: [], eventsHref: `${base}/events`, hasOpenEvents: false, setupBase: base }));
     expect(html).toMatch(/Only the conference office can open registration/);
-    expect(html).toContain("/account/help/director-register-for-events");
+    expect(html).toContain("/account/help/walkthrough-director-register-event");
   });
 
   it("renders a Set up link for an in-app state and who to ask beside steps", () => {
