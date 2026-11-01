@@ -92,7 +92,7 @@ function plainLinksToDownloads(source: string): string[] {
     if (depth > 6) return text;
     let all = text;
     for (const [, name] of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)(?=\s*[(}\s,`/?&)\]]|$)/g)) {
-      if (!name || seen.has(name) || /^(const|let|function|encodeURIComponent|return|true|false|null|undefined|href|api|events|attendee|clubs)$/.test(name)) continue;
+      if (!name || seen.has(name) || /^(const|let|function|encodeURIComponent|return|true|false|null|undefined|api|events|attendee|clubs)$/.test(name)) continue;
       const definition = definitionOf(name);
       if (!definition) continue;
       seen.add(name);
@@ -170,6 +170,8 @@ describe("every CSV download is named and sent the same way, rule B11 (#1458)", 
     expect(plainLinksToDownloads(nested)).toHaveLength(1);
     const viaExportLink = nested.replace("<a className", "<ExportLink className").replace("</a>", "</ExportLink>");
     expect(plainLinksToDownloads(viaExportLink)).toHaveLength(0);
+    // A variable named href is followed like any other.
+    expect(plainLinksToDownloads('const href = `/api/events/${id}/attendees/export`;\n<a className="x" href={href}>CSV</a>')).toHaveLength(1);
     // A closeout or format=csv address is a download even when its path says "asset"; a PDF is not.
     expect(plainLinksToDownloads('<a href={`/api/events/${id}/assets/closeout?section=x`}>x</a>')).toHaveLength(1);
     expect(plainLinksToDownloads('<a href="/api/events/e/invoices/versions/v/pdf">PDF</a>')).toHaveLength(0);
