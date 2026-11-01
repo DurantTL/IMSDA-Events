@@ -258,7 +258,7 @@ async function clubPages(context: J.BrowserContext) {
     await page.locator('form button[type="submit"]').first().click();
     await name.fill("Transcheck Trailblazers");
     await page.locator('form button[type="submit"]').first().click();
-    await expectText(page, /Club settings saved/, "club settings form: saved notice");
+    await expectText(page, /Saved\./, "club settings form: saved notice");
   });
   await page.close();
 }
