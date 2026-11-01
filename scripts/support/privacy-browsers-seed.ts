@@ -75,7 +75,8 @@ export async function cleanupPrivacyBrowsers(prisma: PrismaClient) {
   await prisma.attendeeCredential.deleteMany({ where: { accountId: { in: accounts } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: accounts } } });
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: ids.club } });
-  await prisma.person.deleteMany({ where: { id: startsWithP } });
+  // The people the journeys' registrations created (their emails start "pbx.") go with the event's registrations above.
+  await prisma.person.deleteMany({ where: { OR: [{ id: startsWithP }, { normalizedEmail: { startsWith: `${P}.` } }] } });
   await prisma.organization.deleteMany({ where: { id: ids.club } });
   await prisma.organization.deleteMany({ where: { id: ids.church } });
 }

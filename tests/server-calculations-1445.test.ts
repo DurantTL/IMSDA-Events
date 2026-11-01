@@ -93,7 +93,9 @@ describe("public registration, group registration, general link and club event r
     for (const key of TAMPERED_AMOUNT_KEYS) {
       expect(publicRegistrationInputSchema.safeParse({ ...base, attendees: [tamper(attendee, key)] }).success, key).toBe(false);
     }
-    const lodging = { category: "cabin", nights: ["2026-12-01"] };
+    const lodging = { category: null, firstNight: "2027-06-15", lastNight: "2027-06-16", partySize: 2 };
+    // A valid base first: a refused tamper only proves something when the untampered request is accepted.
+    expect(registrationLodgingSchema.safeParse(lodging).success).toBe(true);
     for (const key of TAMPERED_AMOUNT_KEYS) {
       expect(registrationLodgingSchema.safeParse(tamper(lodging, key)).success, key).toBe(false);
     }
@@ -116,9 +118,10 @@ describe("public registration, group registration, general link and club event r
   it("a negative or fractional quantity never lowers the total; a huge one is the server's product, not a client sum", () => {
     const negative = calculateFormTotal(formDefinition, { ...honest, shirts: -40 }, PRICING_DATE);
     expect(negative.totalCents).toBe(5000);
-    // A fractional quantity is priced by the server's own rule (rounded to a whole cent), never taken from the page.
+    // Whether a fractional quantity (2.5 shirts) should be refused is a decision for Caleb (docs/SERVER-CALCULATIONS-AUDIT.md).
+    // Whatever is decided, the amount is the server's and is a whole number of cents.
     const fractional = preparePublicRegistration(formDefinition, { versionId: "v", idempotencyKey: KEY, responses: { ...honest, shirts: 2.5 } }, OPTIONS);
-    expect(fractional.calculation.totalCents).toBe(5000 + 3750);
+    expect(Number.isInteger(fractional.calculation.totalCents)).toBe(true);
     const big = calculateFormTotal(formDefinition, { ...honest, shirts: 100 }, PRICING_DATE);
     expect(big.totalCents).toBe(5000 + 100 * 1500);
   });

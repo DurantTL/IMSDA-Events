@@ -132,6 +132,14 @@ export function SecurityCheck({
   const widgetId = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
+  // The script was blocked or the check cannot start. Kept apart from `message` so that pressing Submit cannot replace the
+  // blocked text and its Try again button with "Finish the security check" (a dead end). Cleared by Try again or a token.
+  const [blocked, setBlockedState] = useState(false);
+  const blockedRef = useRef(false);
+  const setBlocked = (value: boolean) => {
+    blockedRef.current = value;
+    setBlockedState(value);
+  };
   // Bumped by Try again: the effect below tears the widget down and loads the script and the box again.
   const [attempt, setAttempt] = useState(0);
   const siteKey = config?.siteKey ?? null;
@@ -142,7 +150,7 @@ export function SecurityCheck({
     headers: (): Record<string, string> => (tokenRef.current ? { [TURNSTILE_TOKEN_HEADER]: tokenRef.current } : {}),
     require: (buttonWord: string) => {
       if (!siteKey || tokenRef.current) return true;
-      setMessage(securityCheckMissingText(buttonWord));
+      if (!blockedRef.current) setMessage(securityCheckMissingText(buttonWord));
       // A sticky Submit can sit away from the box on a phone: bring the box and its message into view.
       groupRef.current?.scrollIntoView({ block: "center" });
       return false;
@@ -168,6 +176,7 @@ export function SecurityCheck({
         theme: "light",
         callback: (token: string) => {
           tokenRef.current = token;
+          setBlocked(false);
           setMessage("");
         },
         "error-callback": () => {
@@ -176,7 +185,7 @@ export function SecurityCheck({
         },
         "unsupported-callback": () => {
           tokenRef.current = null;
-          setMessage(SECURITY_CHECK_BLOCKED_TEXT);
+          setBlocked(true);
         },
         "expired-callback": () => {
           tokenRef.current = null;
@@ -186,7 +195,7 @@ export function SecurityCheck({
         },
       });
     }).catch(() => {
-      if (!cancelled) setMessage(SECURITY_CHECK_BLOCKED_TEXT);
+      if (!cancelled) setBlocked(true);
     });
     return () => {
       cancelled = true;
@@ -198,18 +207,20 @@ export function SecurityCheck({
 
   if (!siteKey) return null;
 
-  const failed = message === SECURITY_CHECK_FAILED_TEXT || message === SECURITY_CHECK_BLOCKED_TEXT;
+  const shown = blocked ? SECURITY_CHECK_BLOCKED_TEXT : message;
+  const failed = blocked || message === SECURITY_CHECK_FAILED_TEXT;
 
   return (
     <section className={styles.securityCheck} ref={groupRef} role="group" aria-labelledby={labelId} data-testid="security-check">
       <p className={styles.label} id={labelId}>{SECURITY_CHECK_LABEL}</p>
       <div className={styles.box} ref={containerRef} />
-      <div className={styles.message} role="alert">{message}</div>
+      <div className={styles.message} role="alert">{shown}</div>
       {failed && (
         <button
           className={`secondary-button ${styles.retry}`}
           data-testid="security-check-retry"
           onClick={() => {
+            setBlocked(false);
             setMessage("");
             setAttempt((current) => current + 1);
           }}

@@ -137,6 +137,18 @@ async function newContext(browser: Browser, mode: BlockMode, tracker: Tracker, b
   }
   if (mode !== "control") {
     await context.route("**/*", async (route: any) => {
+      try {
+        await handleRoute(route);
+      } catch {
+        // The page or context went away while this request was in flight (a journey ended): nothing left to answer.
+        await route.abort().catch(() => undefined);
+      }
+    });
+  }
+  return context;
+
+  async function handleRoute(route: any) {
+    {
       const request = route.request();
       const url: string = request.url();
       const filter = blockedBy(url);
@@ -163,9 +175,14 @@ async function newContext(browser: Browser, mode: BlockMode, tracker: Tracker, b
         }
       }
       return route.continue();
-    });
+    }
   }
-  return context;
+}
+
+/** Stops the routes first: a handler that is still fetching when the context closes would reject with nobody to catch it. */
+async function closeContext(context: Context) {
+  await context.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
+  await context.close().catch(() => undefined);
 }
 
 function watch(page: Page, tracker: Tracker) {
@@ -194,8 +211,11 @@ async function noErrorScreen(page: Page) {
   assert(shown === 0, `The page showed its "Something went wrong" error screen at ${page.url()}.`);
 }
 
+/** Only the limits these journeys hit (sign-in and its code, registration, promo quotes, password reset), not every bucket. */
+const RATE_LIMIT_POLICIES = ["attendee.sign-in", "attendee.sign-in-code", "attendee.password-reset", "public.registration.", "public.promo-quote.", "registration.code-access"];
+
 async function clearRateLimits() {
-  await prisma.rateLimitBucket.deleteMany({});
+  await prisma.rateLimitBucket.deleteMany({ where: { OR: RATE_LIMIT_POLICIES.map((policy) => ({ policy: { startsWith: policy } })) } });
 }
 
 // ---- Journeys ---------------------------------------------------------------------------------------------------
@@ -232,7 +252,7 @@ async function signInWithEmailCode({ browser, mode, tracker, browserName }: Para
     assert(page.url().startsWith(`${baseUrl}/account`), `After the code, expected the account area, got ${page.url()}`);
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -257,7 +277,7 @@ async function clubDirectorPages({ browser, mode, tracker, browserName }: Parame
     await noErrorScreen(page);
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -325,7 +345,7 @@ async function paymentStep(page: Page, link: any, mode: BlockMode) {
   }
   const text = await failure.innerText();
   assert(/could not load/i.test(text) && /Try again/.test(text), `The card-form fallback message was unclear: ${text}`);
-  assert(/pay later|in person|Pay on Square/i.test(text), `The fallback did not name another way to pay: ${text}`);
+  assert(/Pay later|contact the event team/i.test(text), `The fallback did not name another way to pay: ${text}`);
   await failure.getByRole("button", { name: "Try again" }).click();
   await failure.waitFor();
 }
@@ -343,7 +363,7 @@ async function publicRegistration({ browser, mode, tracker, browserName }: Param
     await noErrorScreen(page);
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -377,7 +397,7 @@ async function publicRegistrationPreviewFails({ browser, mode, tracker, browserN
     await noErrorScreen(page);
     noUncaughtErrors(tracker, [/Minified React error #(418|423|425)/, /hydrat/i]);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -416,7 +436,7 @@ async function calendarEmbed({ browser, mode, tracker, browserName }: Parameters
     }
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -432,7 +452,7 @@ async function eventPageWithoutAnalytics({ browser, mode, tracker, browserName }
     await noErrorScreen(page);
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -473,11 +493,13 @@ async function securityCheckBlocked(path: string, { browser, mode, tracker, brow
     const password = page.getByLabel("Password", { exact: true });
     if (await password.count()) await password.fill(PASSWORD);
     await page.getByRole("button", { name: /^(Sign in|Send|Email|Reset|Continue)/ }).last().click();
-    await group.getByText(/Finish the security check/).waitFor();
+    // Blocked, Submit keeps the blocked message and Try again (never a dead end) and sends nothing.
+    await retry.waitFor();
+    assert(/could not load/i.test(await group.innerText()), "Submit replaced the blocked message.");
     assert(signInPosts.length === 0, `A request was sent without the Security check: ${signInPosts.join(", ")}`);
     noUncaughtErrors(tracker);
   } finally {
-    await context.close();
+    await closeContext(context);
   }
 }
 
@@ -552,6 +574,16 @@ async function main() {
     process.exit(1);
   }
 }
+
+process.on("unhandledRejection", async (error) => {
+  console.error("Unhandled rejection:", error);
+  try {
+    if (process.env.PRIVACY_KEEP !== "1") await cleanupPrivacyBrowsers(prisma);
+    await prisma.$disconnect();
+  } finally {
+    process.exit(1);
+  }
+});
 
 main().catch(async (error) => {
   console.error(error);

@@ -33,6 +33,10 @@ database, three browsers) with the preview made to throw.
 | Meals | Meal tickets are priced lines of the form (`pricedLineItem`) and meal plan prices are staff-managed; the meals staff routes are permission gated | Form answers (covered above) | Already safe | Covered by the registration tests |
 | Honors | Class picks are class ids per person; capacity and prerequisites are checked on the server (`modules/honors/`); no price | Class ids, at most six per person | Already safe | Test: shape and cap; non-id values refused |
 | Capacity and eligibility (choice limits, waitlist, club year, ages, responsible adult) | Decided in `submitPublicRegistration` under locks from the submitted answers and the stored data; `responsibleAdults` is checked "against the ages in the answers, never against what the browser decided" | Answers | Already safe | Existing capacity tests and `scripts/verify-public-registration-capacity.ts` |
+| Check-in station payments (`recordStationPayment`, `modules/checkin-stations/service.ts:219`) | A station volunteer enters a cash or check amount; the server refuses an amount over the registration's balance (`PAYMENT_EXCEEDS_BALANCE`) and records it through the audited `recordManualPayment`. "Paid by card in Square app" is an audit note only and creates no payment | A staff or volunteer's amount, bounded by the balance | Staff-entered by design; bounded on the server; not changed | Existing station tests |
+| Issued-asset deposits (`/api/events/[eventId]/assets/deposits`) | Staff record the deposit received against the asset type's configured deposit (`depositCents`); permission gated | A staff member's amount | Staff-entered by design; not a client total | Existing issued-asset tests |
+| Scholarship funds (`modules/scholarship-funds/`) | Staff record fund receipts and awards; permission gated and bounded | A staff member's amount | Staff-entered by design | Existing scholarship tests |
+| Honor class additional cost (`HonorOffering.additionalCostCents`) | Shown as a badge on the info card ("Additional cost (paid separately)") and never added to a registration total or charged | Nothing | Display only; **nothing is charged from it**, so no amount can be tampered with | n/a |
 | Staff payments, adjustments, imports (`/api/events/[eventId]/registrations/.../payments`, `adjustments`, imports) | A staff member enters an amount on purpose; the server checks permission, bounds and idempotency | A staff member's amount | Staff-entered by design; not a client total | Existing payment and adjustment tests |
 
 ## The page's preview
@@ -53,3 +57,10 @@ A new money path is safe when: its input schema is strict and has no amount; the
 `calculateRosterTotal`, `evaluatePromoCode`, `processingFeeForSubtotal` or a stored row; and a test posts a tampered number
 and sees the server's. If a route must accept a number a person typed (a refund by staff, a payment by staff), it is
 permission gated, bounded and audited, and it is listed above as staff-entered.
+
+## Decision for Caleb: fractional quantities
+
+A priced NUMBER field charges quantity x price. The form accepts a fractional quantity such as 2.5 shirts and the server
+prices it (rounded to a whole cent). It is the server's number, not a tampered one, but 2.5 shirts is probably never
+meant. Options: refuse non-whole quantities on priced NUMBER fields (a small validation change), or leave it. No test
+locks the current behaviour in; the guard test only asserts the amount is a whole number of cents.

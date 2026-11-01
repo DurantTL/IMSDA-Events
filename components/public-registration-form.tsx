@@ -254,6 +254,7 @@ type DisplayedCalculation = Pick<FormCalculation, "lineItems"> & Partial<Omit<Fo
 };
 
 /** Shown where the preview total would be when the browser could not work it out. The server prices the submission either way. */
+export const PROMO_AMOUNT_ON_SUBMIT_TEXT = "Promo code applied. Your discount is calculated when you submit.";
 export const PREVIEW_UNAVAILABLE_TEXT =
   "We couldn't show your total on this page. Your total will be calculated when you submit, and shown on your confirmation.";
 
@@ -1960,7 +1961,8 @@ export function PublicRegistrationForm({
               aria-live="polite"
             >
               {promoCodeApplied && <BadgePercent size={15} aria-hidden="true" />}
-              {promoCodeNotice}
+              {/* With the preview broken the quote's amount may no longer match the answers: never show it. */}
+              {promoCodeApplied && baseCalculation.previewFailed ? PROMO_AMOUNT_ON_SUBMIT_TEXT : promoCodeNotice}
             </small>
           )}
         </div>
@@ -1983,7 +1985,7 @@ export function PublicRegistrationForm({
       return (
         <div className={`${wrapperClass} public-registration-calculated`} key={field.id}>
           <span><strong>{field.label}</strong><small>Automatically included in your order.</small></span>
-          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
+          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : baseCalculation.previewFailed ? "Calculated on submit" : "Included"}</strong>
         </div>
       );
     }

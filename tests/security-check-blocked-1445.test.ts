@@ -57,6 +57,19 @@ describe("Security check when the script is blocked", () => {
     expect(ref.current?.headers()).toEqual({});
   });
 
+  it("pressing Submit while blocked keeps the blocked message and Try again (no dead end)", async () => {
+    const { SecurityCheck, SECURITY_CHECK_BLOCKED_TEXT } = await loadComponent();
+    const ref = createRef<SecurityCheckHandle>();
+    mounted = await mount(createElement(SecurityCheck, { config: { siteKey: "synthetic-site-key" }, action: "registration", handleRef: ref }));
+    await blockScript();
+    let allowed = true;
+    await act(async () => { allowed = ref.current?.require("Submit") ?? true; });
+    expect(allowed).toBe(false);
+    expect(mounted.container.textContent).toContain(SECURITY_CHECK_BLOCKED_TEXT);
+    expect(mounted.container.textContent).not.toContain("Finish the security check");
+    expect(mounted.container.querySelector('[data-testid="security-check-retry"]')).not.toBeNull();
+  });
+
   it("shows the message again when the retry is blocked too", async () => {
     const { SecurityCheck, SECURITY_CHECK_BLOCKED_TEXT } = await loadComponent();
     const ref = createRef<SecurityCheckHandle>();
