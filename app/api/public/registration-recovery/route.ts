@@ -99,7 +99,10 @@ async function postHandler(request: Request) {
       }, { status: 429 }, rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.registrationRecovery });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.registrationRecovery,
+      fallback: { kind: "public-form", email: input.email },
+    });
     if (securityCheckFailure) {
       for (const [name, value] of Object.entries(privateHeaders)) securityCheckFailure.headers.set(name, value);
       return applyRateLimitHeaders(securityCheckFailure, rateLimit);

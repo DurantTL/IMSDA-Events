@@ -93,6 +93,14 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | A4 | List passkey first, marked "Easiest", ahead of the authenticator app. | planned (#1440) | planned (#1439) | #1410 |
 | A5 | One name on the gate page: "two-step sign-in". | planned (#1440) | planned (#1439) | #1410 |
 
+## Privacy browsers and the Security check
+
+| ID | Rule | Guard test | Browser test | Issue |
+| --- | --- | --- | --- | --- |
+| T3 | When the Security check cannot load or complete (a privacy browser, ad blocker or VPN blocks it), the person is never stuck. Sign-in, sign-up and password reset offer **"Email me a code instead"**: a one-time code to the address they typed (10 minutes, single use, five tries, rate limited, audit logged with ids only) that satisfies the check for that one request. Every other public form sends without a token, only through a much stricter rate limit (3 per hour per source, 2 per hour per address), and is flagged for staff in the audit log, never shown to the person. | `tests/security-check-fallback-1480.test.ts`, `tests/security-check-fallback-limits-1480.test.ts`, `tests/security-check-fallback-ui-1480.test.ts`, `tests/turnstile-gated-routes-1399.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
+| T4 | Next to the blocked-check message the office contact is shown (the footer help contact setting, default support@imsda.org and (515) 223-1197), with `translate="no"` on the email and phone. | `tests/security-check-fallback-ui-1480.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
+| T5 | A token that is present but invalid is never bypassed: the fallback applies only when the check could not produce a token. The emailed-code answer never says whether an account exists (same status and words either way). | `tests/security-check-fallback-1480.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
+
 ## Look
 
 | ID | Rule | Guard test | Browser test | Issue |

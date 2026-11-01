@@ -79,7 +79,10 @@ async function postHandler(request: Request) {
       rateLimit = mergeRateLimitOutcomes(rateLimit, linkLimit);
       if (!linkLimit.allowed) return limited(rateLimit);
     }
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.clubApplication });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.clubApplication,
+      fallback: { kind: "public-form", email: input.directorEmail },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     await submitNewClubApplication(input, {
       attachment: attachment instanceof File ? attachment : null,

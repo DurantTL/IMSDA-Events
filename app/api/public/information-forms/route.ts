@@ -96,7 +96,7 @@ async function postHandler(request: Request) {
     rateLimit = mergeRateLimitOutcomes(clientLimit, pairLimit);
     if (!pairLimit.allowed) return limited(rateLimit);
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.informationForm });
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.informationForm, fallback: { kind: "public-form" } });
     if (securityCheckFailure) {
       for (const [name, value] of Object.entries(privateHeaders)) securityCheckFailure.headers.set(name, value);
       return applyRateLimitHeaders(securityCheckFailure, rateLimit);

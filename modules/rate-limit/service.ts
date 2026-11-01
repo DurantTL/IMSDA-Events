@@ -834,6 +834,68 @@ export async function checkAttendeeSignInCodeVerifyRateLimit(
   ], configuration);
 }
 
+/**
+ * Asking for the emailed Security check code (#1480), per source and per address, per hour. Charged the same for a
+ * known and an unknown address, so the limit itself says nothing about whether an account exists. Each send retires
+ * the previous code, so an unlimited budget would also keep a real owner's code perpetually stale, and a sign-up
+ * request sends to any address a stranger types, so the per-address ceiling is also what stops mail-bombing.
+ */
+export const SECURITY_CHECK_CODE_SEND_BUDGETS = { client: 10, email: 5, windowSeconds: oneHour } as const;
+
+export async function checkSecurityCheckCodeSendRateLimit(request: Request, email: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const address = hashRateLimitIdentifier("security-check-code-send", email.trim().toLowerCase(), configuration);
+  return evaluate([
+    {
+      policy: "security-check.code-send.client",
+      limit: SECURITY_CHECK_CODE_SEND_BUDGETS.client,
+      windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
+      identifierHashes: [client],
+    },
+    {
+      policy: "security-check.code-send.email",
+      limit: SECURITY_CHECK_CODE_SEND_BUDGETS.email,
+      windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
+      identifierHashes: [address],
+    },
+  ], configuration);
+}
+
+/**
+ * A public form submitted with NO Security check token because a privacy browser blocked it (#1480). The submission
+ * is allowed, but only this many times, which is far below the ordinary form budgets because there is no check
+ * behind it, only the honeypot. Per hour:
+ * - 3 per source address: one family on a blocking browser can send a registration, a recovery email and an
+ *   information form, and a bot behind one address cannot do more than that.
+ * - 2 per email address typed in the form: a person fixes a typo once; a script cannot flood one registration contact.
+ * Both are charged before the submission runs and are not refunded on failure. Raise them only with Caleb's approval.
+ */
+export const SECURITY_CHECK_FALLBACK_BUDGETS = { client: 3, email: 2, windowSeconds: oneHour } as const;
+
+export async function checkSecurityCheckFallbackRateLimit(request: Request, email?: string | null) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const rules: RuleInput[] = [
+    {
+      policy: "security-check.fallback.client",
+      limit: SECURITY_CHECK_FALLBACK_BUDGETS.client,
+      windowSeconds: SECURITY_CHECK_FALLBACK_BUDGETS.windowSeconds,
+      identifierHashes: [client],
+    },
+  ];
+  const address = email?.trim().toLowerCase();
+  if (address) {
+    rules.push({
+      policy: "security-check.fallback.email",
+      limit: SECURITY_CHECK_FALLBACK_BUDGETS.email,
+      windowSeconds: SECURITY_CHECK_FALLBACK_BUDGETS.windowSeconds,
+      identifierHashes: [hashRateLimitIdentifier("security-check-fallback", address, configuration)],
+    });
+  }
+  return evaluate(rules, configuration);
+}
+
 const oneDay = 24 * 60 * 60;
 
 /**

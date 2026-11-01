@@ -98,7 +98,7 @@ export function AttendeeSignInForm({ next, securityCheck = null }: { next?: stri
         <span />
         <Link href="/account/forgot-password">Forgot password?</Link>
       </div>
-      <SecurityCheck config={securityCheck} action="attendee-sign-in" handleRef={check} />
+      <SecurityCheck config={securityCheck} action="attendee-sign-in" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? "" }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}>
         <LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}

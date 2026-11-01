@@ -218,7 +218,7 @@ export function AttendeeSignUpForm({
       </label>
       <PasswordRequirementsChecklist password={password} owner={{ email, displayName }} />
       {retryNotice}
-      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} />
+      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? email }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button
         className="primary-button full-button"

@@ -49,7 +49,10 @@ async function postHandler(request: Request) {
       }, { status: 429 }), rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.attendeeSignIn });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.attendeeSignIn,
+      fallback: { kind: "email-code", email: input.email },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const authentication = await authenticateAttendee(
