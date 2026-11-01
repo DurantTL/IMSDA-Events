@@ -1281,6 +1281,8 @@ export function PublicRegistrationForm({
     if (issue) return { ok: false, text: issue.message };
     const applied = activeAttendeePromo.attendeeDiscounts.find((candidate) => candidate.attendeeIndex === attendeeIndex);
     const sponsor = applied ? activeAttendeePromo.sponsors?.[applied.code.normalize("NFKC").trim().toUpperCase()] : undefined;
+    // With the preview broken the quote's amount may not match the answers: no dollar amount, the server decides on submit.
+    if (applied && baseCalculation.previewFailed) return { ok: true, text: `${applied.code} applied. Your discount is calculated when you submit.` };
     return applied ? { ok: true, text: `${applied.code} applied — ${formatCents(applied.discountAmountCents)} off for this person.${sponsor ? ` Sponsored by ${sponsor}.` : ""}` } : null;
   }
 
@@ -1985,7 +1987,7 @@ export function PublicRegistrationForm({
       return (
         <div className={`${wrapperClass} public-registration-calculated`} key={field.id}>
           <span><strong>{field.label}</strong><small>Automatically included in your order.</small></span>
-          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : baseCalculation.previewFailed ? "Calculated on submit" : "Included"}</strong>
+          <strong>{baseCalculation.previewFailed ? "Calculated on submit" : lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
         </div>
       );
     }

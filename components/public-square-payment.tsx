@@ -386,12 +386,23 @@ export function PublicSquarePayment({
         const [cardResult, applePayResult, googlePayResult] =
           await Promise.allSettled([
             payments.card().then(async (nextCard) => {
-              await withTimeout(nextCard.attach(`#${cardContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              try {
+                await withTimeout(nextCard.attach(`#${cardContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              } catch (error) {
+                // A slow attach must not finish later and leave a second card form after Try again.
+                destroyPaymentMethod(nextCard);
+                throw error;
+              }
               return nextCard;
             }),
             payments.applePay(request),
             payments.googlePay(request).then(async (nextGooglePay) => {
-              await withTimeout(nextGooglePay.attach(`#${googlePayContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              try {
+                await withTimeout(nextGooglePay.attach(`#${googlePayContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              } catch (error) {
+                destroyPaymentMethod(nextGooglePay);
+                throw error;
+              }
               return nextGooglePay;
             }),
           ]);
@@ -953,7 +964,7 @@ export function PublicSquarePayment({
             <p>
               {payLaterChoice && paymentChoice?.available && !paymentChoice.locked
                 ? "You can choose Pay later in the options above."
-                : "Your registration is saved, so you can still pay another way: contact the event team."}
+                : "You can still pay another way: contact the event team."}
               {checkout.hostedLink && " If this keeps failing, Pay on Square below opens Square's own page, which a blocker may stop too."}
             </p>
             <button className="secondary-button" onClick={retrySquareLoad} type="button">Try again</button>
