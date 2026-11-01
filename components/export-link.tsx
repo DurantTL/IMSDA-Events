@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 
 /**
@@ -16,7 +16,12 @@ export type ExportStatus = { phase: "idle" | "preparing" | "failed"; message: st
  * A container that hides its links once one is clicked (the Actions menu) provides this, so the "Preparing download…"
  * and the failure message show beside the container's own control instead of inside the closed menu.
  */
-export const ExportStatusContext = createContext<((status: ExportStatus) => void) | null>(null);
+export type ExportStatusSink = {
+  report: (status: ExportStatus) => void;
+  /** Called on mount by each link inside, so the container renders its live region before any text arrives; returns the cleanup. */
+  register: () => () => void;
+};
+export const ExportStatusContext = createContext<ExportStatusSink | null>(null);
 
 /** The words for a status, for whoever shows it. */
 export function exportStatusText(status: ExportStatus): string {
@@ -51,9 +56,10 @@ export async function downloadErrorMessage(response: Pick<Response, "status" | "
 export function ExportLink({ href, children = "Download CSV", className }: { href: string; children?: ReactNode; className?: string }) {
   const [state, setLocalState] = useState<ExportStatus>({ phase: "idle", message: "" });
   const sink = useContext(ExportStatusContext);
+  useEffect(() => sink?.register(), [sink]);
   const setState = (next: ExportStatus) => {
     setLocalState(next);
-    sink?.(next);
+    sink?.report(next);
   };
   const busy = useRef(false);
 

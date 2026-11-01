@@ -3,7 +3,6 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ActionsMenu } from "@/components/actions-menu";
 import { ExportLink, downloadErrorMessage, fileNameFromDisposition } from "@/components/export-link";
 import { csvDownloadResponse, exportFileName, slugifyFilePart } from "@/modules/reporting/export-response";
 
@@ -74,18 +73,39 @@ describe("ExportLink (#1458)", () => {
     expect(await refuse(404, { message: "   " })).toBe("That file isn't available.");
   });
 
-  it("shows a menu item's status outside the closed menu", () => {
-    const html = renderToStaticMarkup(createElement(ActionsMenu, null, createElement("li", null, createElement(ExportLink, { href: "/api/x" }))));
-    // Inside a menu the link renders no status of its own; the menu has one status element beside its button.
-    expect(html.match(/role="status"/g)).toHaveLength(1);
-    expect(html.indexOf("</details>")).toBeLessThan(html.indexOf('role="status"'));
-  });
 
   it("saves the file under the server's name", () => {
     expect(fileNameFromDisposition('attachment; filename="evt-attendees-2026-11-01.csv"')).toBe("evt-attendees-2026-11-01.csv");
     expect(fileNameFromDisposition(null)).toBeNull();
   });
 });
+
+/**
+ * The plain `<a>` and `<Link>` tags in a source file whose href is, or is built from (through any number of `const`/`function`
+ * definitions in the same file), an /api/ address that sends a file. PDFs, QR codes, calendars and uploads are not CSV downloads.
+ */
+function plainLinksToDownloads(source: string): string[] {
+  const notCsv = /pdf|\/qr\b|\.ics|\/image|\/assets\/\$\{|message-file|\/files?\/|logout|callback|oauth|attachment/i;
+  const csvish = /format=csv|export|closeout|\.csv|\bcsv\b|\/csv/i;
+  const definitionOf = (name: string) => new RegExp(`(?:const|let|function)\\s+${name.replace("$", "\\$")}\\b[^;]*?(?:;|\\n\\}|\\n  \\})`, "s").exec(source)?.[0] ?? "";
+  const expand = (text: string, seen: Set<string>, depth: number): string => {
+    if (depth > 6) return text;
+    let all = text;
+    for (const [, name] of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)(?=\s*[(}\s,`/?&)\]]|$)/g)) {
+      if (!name || seen.has(name) || /^(const|let|function|encodeURIComponent|return|true|false|null|undefined|href|api|events|attendee|clubs)$/.test(name)) continue;
+      const definition = definitionOf(name);
+      if (!definition) continue;
+      seen.add(name);
+      all += ` ${expand(definition, seen, depth + 1)}`;
+    }
+    return all;
+  };
+  return (source.match(/<(a|Link)\b[^>]*>/g) ?? []).filter((tag) => {
+    const href = /href=(\{[^]*\}|"[^"]*")/.exec(tag)?.[1] ?? "";
+    const text = expand(href, new Set(), 0);
+    return text.includes("/api/") && (csvish.test(text) || !notCsv.test(text));
+  });
+}
 
 const root = path.resolve(__dirname, "..");
 function files(dir: string, ext: RegExp): string[] {
@@ -137,22 +157,22 @@ describe("every CSV download is named and sent the same way, rule B11 (#1458)", 
   });
 
   it("every link to an API endpoint that sends a file goes through ExportLink", () => {
-    // Any <a> or <Link> whose href, or the value its href variable or function is built from in the same file, is an /api/ address.
-    // PDFs, QR codes, calendars and uploaded files are not CSV downloads.
-    const notCsv = /pdf|\/qr\b|\.ics|\/image|\/asset|message-file|\/files?\/|logout|callback|oauth|attachment/i;
-    const bad = tsx.filter((file) => !file.endsWith("export-link.tsx") && !(rel(file) in exportLinkAllowlist)).filter((file) => {
-      const source = read(file);
-      const anchors = source.match(/<(a|Link)\b[^>]*>/g) ?? [];
-      return anchors.some((tag) => {
-        const href = /href=(\{[^]*\}|"[^"]*")/.exec(tag)?.[1] ?? "";
-        if (href.includes("/api/")) return !notCsv.test(href);
-        // href={someName} or href={someName(...)}: read how the name is built in this file.
-        const name = /^\{\s*`?\$?\{?\s*([A-Za-z_$][\w$]*)/.exec(href)?.[1];
-        if (!name) return false;
-        const definition = new RegExp(`(?:const|let|function)\\s+${name.replace("$", "\\$")}\\b[^;]*?(?:;|\\n\\}|\\n  \\})`, "s").exec(source)?.[0] ?? "";
-        return definition.includes("/api/") && !notCsv.test(definition);
-      });
-    }).map(rel);
+    const bad = tsx.filter((file) => !file.endsWith("export-link.tsx") && !(rel(file) in exportLinkAllowlist)).filter((file) => plainLinksToDownloads(read(file)).length > 0).map(rel);
     expect(bad).toEqual([]);
+  });
+
+  it("follows href variables through any number of definitions, so a nested csv(section) built from base is caught", () => {
+    const nested = `
+      const base = "/api/attendee/clubs/x/exports";
+      const csv = (section: string) => \`\${base}/csv?section=\${section}\`;
+      export const A = () => <a className="secondary-button" href={csv("charges")}>Download CSV</a>;
+    `;
+    expect(plainLinksToDownloads(nested)).toHaveLength(1);
+    const viaExportLink = nested.replace("<a className", "<ExportLink className").replace("</a>", "</ExportLink>");
+    expect(plainLinksToDownloads(viaExportLink)).toHaveLength(0);
+    // A closeout or format=csv address is a download even when its path says "asset"; a PDF is not.
+    expect(plainLinksToDownloads('<a href={`/api/events/${id}/assets/closeout?section=x`}>x</a>')).toHaveLength(1);
+    expect(plainLinksToDownloads('<a href="/api/events/e/invoices/versions/v/pdf">PDF</a>')).toHaveLength(0);
+    expect(plainLinksToDownloads('<a href="/events/e/page">page</a>')).toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ExportStatusContext, exportStatusText, type ExportStatus } from "@/components/export-link";
 import { ChevronDown } from "lucide-react";
 
@@ -15,6 +15,15 @@ export function ActionsMenu({ label = "Actions", ariaLabel, children }: { label?
   const ref = useRef<HTMLDetailsElement>(null);
   // A download started from a menu item reports here, because the menu closes on the click (#1458).
   const [download, setDownload] = useState<ExportStatus>({ phase: "idle", message: "" });
+  // The live region exists only for a menu that holds a download link, and is there before any text arrives.
+  const [downloadLinks, setDownloadLinks] = useState(0);
+  const sink = useMemo(() => ({
+    report: setDownload,
+    register: () => {
+      setDownloadLinks((count) => count + 1);
+      return () => setDownloadLinks((count) => count - 1);
+    },
+  }), []);
   useEffect(() => {
     const menu = ref.current;
     if (!menu) return;
@@ -57,10 +66,10 @@ export function ActionsMenu({ label = "Actions", ariaLabel, children }: { label?
           menu.querySelector("summary")?.focus();
         }}
       >
-        <ExportStatusContext.Provider value={setDownload}>{children}</ExportStatusContext.Provider>
+        <ExportStatusContext.Provider value={sink}>{children}</ExportStatusContext.Provider>
       </ul>
     </details>
-    <span aria-live="polite" className={download.phase === "failed" ? "form-error" : "quiet-copy"} role="status">{exportStatusText(download)}</span>
+    {downloadLinks > 0 && <span aria-live="polite" className={download.phase === "failed" ? "form-error" : "quiet-copy"} role="status">{exportStatusText(download)}</span>}
     </>
   );
 }

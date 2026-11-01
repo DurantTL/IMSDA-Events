@@ -171,8 +171,8 @@ describe("sorting and the pager, rule B1 (#1458)", () => {
   it("keeps ColumnHeader free of \"use client\": its `sorting` holds a function, which cannot cross into a client component", () => {
     const columnHeader = files.find((file) => file.relative === "components/column-header.tsx")!;
     expect(columnHeader.source).not.toMatch(/^\s*["']use client["']/);
-    // No client module takes the server sort (it carries `hrefFor`), so no server page can hand it one.
-    const clientTakingServerSort = files.filter(({ source }) => /^\s*["']use client["']/.test(source) && /\bServerSort\b/.test(source)).map((file) => file.relative);
+    // No client module takes or builds the server sort (it carries `hrefFor`), so no server page can hand it one.
+    const clientTakingServerSort = files.filter(({ source }) => /^\s*["']use client["']/.test(source) && /\b(ServerSort|serverSort|hrefFor)\b/.test(source)).map((file) => file.relative);
     expect(clientTakingServerSort).toEqual([]);
   });
 
