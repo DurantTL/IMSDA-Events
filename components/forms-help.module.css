@@ -1,0 +1,152 @@
+/* The small "Forms help" link and popup (#1445). Quiet text link in page flow; compact dialog; short bottom sheet on a phone. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--imsda-navy);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.trigger svg {
+  flex: 0 0 auto;
+}
+
+.triggerAction {
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--imsda-navy);
+  border-radius: 10px;
+  background: #fff;
+  font-size: max(var(--type-staff-floor, 0px), 0.9rem);
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.triggerAction:hover {
+  background: var(--imsda-navy-soft);
+}
+
+/* The shared backdrop centers its card; the element selector outranks its single class. */
+div.backdrop {
+  padding: 16px;
+}
+
+section.card {
+  width: min(360px, 100vw - 32px);
+  max-width: min(360px, 100vw - 32px);
+  max-height: min(80vh, 560px);
+  padding: 12px 14px 14px;
+  border-radius: 14px;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.head h2 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  line-height: 1.2;
+}
+
+.close {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--imsda-navy);
+  cursor: pointer;
+}
+
+.sections {
+  display: grid;
+  margin-top: 4px;
+}
+
+.section {
+  border-top: 1px solid var(--line);
+}
+
+.section summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.body {
+  padding: 0 0 10px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.4;
+}
+
+.body p,
+.body ul {
+  margin: 0 0 8px;
+}
+
+.body ul {
+  padding-left: 18px;
+}
+
+.body a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+/* Safari steps lead on a phone; both orders are the same markup, so nothing differs between server and browser. */
+.body ul.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.desktopStep { order: 1; }
+.phoneStep { order: 2; }
+
+@media (max-width: 640px) {
+  .desktopStep { order: 2; }
+  .phoneStep { order: 1; }
+
+  div.backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  section.card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 16px 16px 0 0;
+  }
+}

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
+import { FormsHelp } from "@/components/forms-help";
 import { LoginForm } from "@/components/login-form";
+import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { StaffPasskeySignInButton } from "@/components/staff-passkey-sign-in-button";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { LOCAL_DEMO_EMAIL, LOCAL_DEMO_PASSWORD } from "@/modules/access/local-demo-credentials";
@@ -46,6 +48,7 @@ export default async function LoginPage({
           <h1>Staff sign in</h1>
           <p>Sign in to manage the events assigned to your account.</p>
         </div>
+        <FormsHelp contact={await getFormsHelpContact()} />
         {passkeysAvailable && (
           <>
             <StaffPasskeySignInButton next={next} />

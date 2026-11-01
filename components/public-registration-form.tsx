@@ -40,7 +40,9 @@ import { DateGuidance } from "@/components/date-guidance";
 import { PUBLIC_DATE_GUIDANCE, parseTypedDate } from "@/modules/forms/typed-date";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
 import { SearchableSelect } from "@/components/searchable-select";
+import { FormsHelp } from "@/components/forms-help";
 import { SubmitButton } from "@/components/submit-button";
+import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
@@ -297,6 +299,8 @@ export type PublicRegistrationFormProps = {
    * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
    */
   securityCheck?: SecurityCheckConfig;
+  /** The help contact for the small "Forms help" link under Submit (#1445); absent (the embed) leaves the link off. */
+  formsHelpContact?: FormsHelpContact;
   /**
    * Club registration (#358): the people come from the club roster, so the
    * party is fixed (no add, remove, or CSV) and their roster-owned fields are
@@ -504,6 +508,7 @@ export function PublicRegistrationForm({
   club,
   group,
   securityCheck = null,
+  formsHelpContact,
 }: PublicRegistrationFormProps) {
   const securityCheckRef = useRef<SecurityCheckHandle>(null);
   // Same action the route expects: the general link's team flow and the individual form share "registration".
@@ -3715,6 +3720,7 @@ export function PublicRegistrationForm({
                 submitting={submitting || submitQueued}
                 submittingLabel={submitQueued && !submitting ? "Updating total…" : undefined}
               />
+              {formsHelpContact && <FormsHelp contact={formsHelpContact} />}
             </section>
           )}
         </div>

@@ -5,6 +5,7 @@ import { MAX_PHONE_LENGTH, resolvePhoneChange } from "@/lib/field-validation";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { isValidRelyingPartyId } from "@/modules/attendee-accounts/passkey-domain";
+import { resolveFormsHelpContact, type FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 
 export const PLATFORM_SETTINGS_ID = "platform";
 
@@ -159,6 +160,16 @@ export async function getPublicHelpContact(): Promise<{ phone: string | null; em
     logError("Reading the homepage help contact failed", error);
     return { phone: null, email: null };
   }
+}
+
+/**
+ * The contact the "Forms help" popup shows (#1445): the public help email and phone settings, each falling back to the
+ * IMSDA support defaults. Never throws (getPublicHelpContact already swallows read errors). #1443 adds a separate
+ * "Email footer help contact" setting that is not on this branch, so this reads the existing public help settings.
+ */
+export async function getFormsHelpContact(): Promise<FormsHelpContact> {
+  const contact = await getPublicHelpContact();
+  return resolveFormsHelpContact(contact);
 }
 
 export class PlatformSettingsError extends Error {
