@@ -6,6 +6,7 @@ import { findActiveMembership } from "@/modules/events/repository";
 import { requireClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { toCsv } from "@/modules/reporting/csv";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * The roster of the teams at one level (#945), as data or a CSV with `?format=csv`: team, club, Area, and each person's
@@ -20,15 +21,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const level = levelFromParam(params.get("level"));
     const teams = await listLevelTeams(eventId, level);
     if (params.get("format") === "csv") {
-      const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-      return new Response(toCsv(levelRosterCsvRows(teams)), {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${safeEventId}-team-roster-${level.toLowerCase()}.csv"`,
-          "Cache-Control": "private, no-store, max-age=0",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+      return csvDownloadResponse(toCsv(levelRosterCsvRows(teams)), exportFileName({ scope: eventId, kind: `team-roster-${level.toLowerCase()}` }));
     }
     return Response.json({ level, teams }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
   } catch (error) {

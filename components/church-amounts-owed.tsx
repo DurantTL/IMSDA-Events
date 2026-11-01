@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { formatCents } from "@/modules/payments/format-cents";
 import Link from "next/link";
 import { Building2, Download } from "lucide-react";
@@ -70,9 +71,9 @@ export function ChurchAmountsOwed({
         </div>
         <div className="page-intro-actions">
           {isDeferredOrganizationBilling && <a className="secondary-button" href={`/finance/billing-responsibility?event=${eventId}`}>Billing responsibility</a>}
-          <a className="secondary-button" href={`/api/events/${eventId}/exports/church-owed${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}>
-            <Download aria-hidden="true" size={17} /> Export CSV
-          </a>
+          <ExportLink className="secondary-button" href={`/api/events/${eventId}/exports/church-owed${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}>
+            <Download aria-hidden="true" size={17} /> Download CSV
+          </ExportLink>
         </div>
       </div>
       <section className="finance-summary" aria-label="Church billing summary">

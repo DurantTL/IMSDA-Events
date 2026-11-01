@@ -620,7 +620,7 @@ describe("who may file, reopen, or export", () => {
     const response = await EXPORT(new Request("https://events.imsda.test/api/admin/club-reports/year-end/export?year=2026-27"));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(response.headers.get("content-disposition")).toContain("year-end-reports-2026-27.csv");
+    expect(response.headers.get("content-disposition")).toMatch(/2026-27-year-end-reports-\d{4}-\d{2}-\d{2}\.csv/);
     const lines = (await response.text()).trim().split("\r\n");
     expect(lines).toHaveLength(3);
     mocks.requireClubsAdministration.mockRejectedValue(new AccessDeniedError("System administrator access is required.", 403, "PERMISSION_DENIED"));

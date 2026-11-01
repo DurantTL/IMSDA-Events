@@ -4,6 +4,7 @@ import { clubHonorsCsv } from "@/modules/honors/member-honor-domain";
 import { requireHonorsAccess } from "@/modules/honors/member-honor-access";
 import { memberHonorApiError } from "@/modules/honors/member-honor-api-errors";
 import { auditClubHonorsExport, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
@@ -21,12 +22,7 @@ async function getHandler(_request: Request, context: RouteContext) {
       access.mode === "EDIT" ? access.actor : access.viewer,
       access.mode === "READ",
     );
-    return new Response(clubHonorsCsv(rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="club-honors-${clubYear}.csv"`,
-      },
-    });
+    return csvDownloadResponse(clubHonorsCsv(rows), exportFileName({ scope: organizationId, kind: `honors-${clubYear}` }));
   } catch (error) {
     return memberHonorApiError(error, "Exporting club honors");
   }

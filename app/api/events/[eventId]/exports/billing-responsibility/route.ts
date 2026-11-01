@@ -7,6 +7,7 @@ import { locationParam, resolveLocationFilter } from "@/modules/event-locations/
 import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * Who is billed for each registration, and whether that party's billing contact is ready (#165).
@@ -19,13 +20,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     await requirePermission(await getCurrentSession(), eventId, "MANAGE_FINANCE", findActiveMembership);
     const { locationId } = await resolveLocationFilter(eventId, locationParam(request));
     const { groups, invoiceGrouping } = await getBillingResponsibilityExport(eventId, { locationId });
-    return new Response(toCsv(billingResponsibilityCsvRows(groups, invoiceGrouping)), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${eventId}-billing-responsibility.csv"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    return csvDownloadResponse(toCsv(billingResponsibilityCsvRows(groups, invoiceGrouping)), exportFileName({ scope: eventId, kind: "billing-responsibility" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof BillingResponsibilityError) return Response.json({ error: error.code, message: error.message }, { status: 404 });

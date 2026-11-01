@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { formatReportYearDueDate, yearEndProgress } from "@/modules/club-reports/year-end-domain";
@@ -52,9 +53,9 @@ export function ClubYearEndConference({ reportYear, initialRows }: { reportYear:
             <strong>{progress.missing}</strong> missing{progress.drafts > 0 ? ` (${progress.drafts} still a draft)` : ""}.
           </p>
         </div>
-        <a className="secondary-button" href={`/api/admin/club-reports/year-end/export?year=${reportYear}`}>
-          <Download aria-hidden="true" size={16} /> Export CSV
-        </a>
+        <ExportLink className="secondary-button" href={`/api/admin/club-reports/year-end/export?year=${reportYear}`}>
+          <Download aria-hidden="true" size={16} /> Download CSV
+        </ExportLink>
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="table-wrap">

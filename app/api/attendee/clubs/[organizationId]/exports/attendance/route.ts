@@ -6,6 +6,7 @@ import { clubYearDateBounds, isMeetingDate } from "@/modules/club-meeting-notes/
 import { loadAttendanceExport } from "@/modules/club-meeting-notes/repository";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
@@ -56,14 +57,7 @@ async function getHandler(request: Request, context: RouteContext) {
         ...("actAsId" in actor ? { actAsId: actor.actAsId } : {}),
       },
     });
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="${attendanceExportFileName(clubYear, { from, to })}"`,
-      },
-    });
+    return csvDownloadResponse(csv, exportFileName({ scope: organizationId, kind: attendanceExportFileName(clubYear, { from, to }).replace(/\.csv$/, "") }));
   } catch (error) {
     return clubMeetingNoteApiError(error, "Exporting meeting attendance");
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useClientSearch } from "@/components/search-as-you-type";
@@ -372,7 +373,7 @@ export function ClubEarnedAwardsWorkspace({
           <span className="count-badge">{data.needs.length} open</span>
           {(exportCsvHref || exportPrintHref) && (
             <div className="report-actions" role="group" aria-label="Export class tracking">
-              {exportCsvHref && <a className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Export CSV</a>}
+              {exportCsvHref && <ExportLink className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Download CSV</ExportLink>}
               {exportPrintHref && <Link className="secondary-button" href={exportPrintHref}>Print report</Link>}
             </div>
           )}

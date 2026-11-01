@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Download, Mail, Printer, RefreshCw, Trophy } from "lucide-react";
@@ -317,7 +318,7 @@ export function TeamResultsWorkspace({
         )}
         <div className="intro-actions">
           <a className="secondary-button" href={`${api}?format=csv&level=${level}`}><Download aria-hidden="true" size={14} /> Results CSV</a>
-          <a className="secondary-button" href={`${api}/roster?format=csv&level=${level}`}><Download aria-hidden="true" size={14} /> Roster CSV</a>
+          <ExportLink className="secondary-button" href={`${api}/roster?format=csv&level=${level}`}><Download aria-hidden="true" size={14} /> Roster CSV</ExportLink>
           <Link className="secondary-button" href={`/more/reports/clubs/team-form/level?${eventQuery}&level=${level}`}><Printer aria-hidden="true" size={14} /> Print team forms</Link>
           {level === "AREA" && <Link className="secondary-button" href="/check-in">Check in people (Area day)</Link>}
           {canEdit && <button className="secondary-button" disabled={recomputing} onClick={() => void recompute()} type="button"><RefreshCw aria-hidden="true" size={14} /> {recomputing ? "Working…" : "Recompute who advances"}</button>}

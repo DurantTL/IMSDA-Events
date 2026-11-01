@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -106,7 +107,7 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
         </div>
         {canExport && (
           <div className="intro-actions">
-            <a className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/responsible-adults`}><Download aria-hidden="true" size={16} /> Export CSV</a>
+            <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/responsible-adults`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
           </div>
         )}
       </div>

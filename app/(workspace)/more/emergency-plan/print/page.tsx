@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -62,7 +63,7 @@ export default async function EmergencyPlanPrintPage({ searchParams }: { searchP
     <>
       {back}
       {versionNumber !== null && (
-        <a className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/emergency-plan/export?version=${versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV</a>
+        <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/emergency-plan/export?version=${versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
       )}
       <PrintReportButton label="Print the reference" />
     </>

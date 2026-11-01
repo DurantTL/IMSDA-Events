@@ -214,7 +214,7 @@ describe("GET /api/events/[eventId]/team-results", () => {
     database({ listRows: [listRow] });
     const response = await GET(new Request("https://events.imsda.test/api/events/event-1/team-results?format=csv"), listCtx);
     expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(response.headers.get("content-disposition")).toContain("event-1-team-results.csv");
+    expect(response.headers.get("content-disposition")).toMatch(/event-1-team-results-\d{4}-\d{2}-\d{2}\.csv/);
     const csv = await response.text();
     expect(csv.split("\r\n")[0]).toBe('"Team","Club","Church","Confirmation","Area","AC permission pending","Area place","Area advancing","Area notes","Conference place","Conference advancing","Conference notes","Union place","Union advancing","Union notes"');
     expect(csv).toContain('"Bible Bees","Test Pathfinders","Test SDA Church","PBE-1","Iowa","1","2nd","Yes","","5th","No","\'=SUM(A1)","","",""');

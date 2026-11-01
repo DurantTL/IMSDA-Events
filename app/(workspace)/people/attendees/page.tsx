@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -81,7 +82,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
         </div>
         <div className="intro-actions">
-          {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</a>}
+          {canExport && <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</ExportLink>}
         </div>
       </div>
 

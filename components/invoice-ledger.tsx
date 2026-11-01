@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { PaymentInstructionsForm, PostToArForm, RecordPaymentForm, VoidPaymentButton } from "@/components/invoice-ledger-controls";
 import { invoiceMoney, invoiceWhen } from "@/components/invoices";
 import { DEFAULT_PAYMENT_INSTRUCTIONS, deliveryStatusLabel, settlementLabel } from "@/modules/invoices/delivery-domain";
@@ -172,7 +173,7 @@ export function StatementsList({ eventId, eventName, parties, totals }: { eventI
         </div>
         <div className="page-intro-actions">
           <a className="secondary-button" href={`/finance/invoices?event=${eventId}`}>All invoices</a>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/invoices`}>Download CSV for the treasurer</a>
+          <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/invoices`}>Download CSV for the treasurer</ExportLink>
         </div>
       </div>
       <TotalsRow totals={totals} />
@@ -261,7 +262,7 @@ export function FinanceReportPanel({ eventId, report, paymentInstructions }: { e
         <p><small>Attendee payments for this event, net of refunds, are separate: {invoiceMoney(report.attendeePayments.netCents)}.</small></p>
         <p className="billing-inline-action">
           <a className="secondary-button" href={`/finance/invoices/statements?event=${eventId}`}>Statements by church</a>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/invoices`}>Download CSV for the treasurer</a>
+          <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/invoices`}>Download CSV for the treasurer</ExportLink>
         </p>
       </section>
       <section className="panel billing-settings" aria-label="Payment instruction">

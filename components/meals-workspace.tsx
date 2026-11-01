@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useState } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
@@ -58,7 +59,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
       <p className="eyebrow">Event configuration</p>
       <h2 className="duplicate-page-title">{staffPageTitles.meals}</h2>
       <p>Meal services, plans and prices for {eventName}. What people ordered is kept here separately from anything used or served at the café. Registration form tickets are priced from the ticket plan below.{" "}
-        {canExport ? <><a href={`/api/events/${eventId}/exports/meal-tickets`}>Download meal tickets CSV</a> (café scanner format) or the <a href={`/api/events/${eventId}/exports/meal-ticket-summary`}>meal ticket summary</a>.</> : null}</p>
+        {canExport ? <><ExportLink href={`/api/events/${eventId}/exports/meal-tickets`}>Download meal tickets CSV</ExportLink> (café scanner format) or the <ExportLink href={`/api/events/${eventId}/exports/meal-ticket-summary`}>meal ticket summary</ExportLink>.</> : null}</p>
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}

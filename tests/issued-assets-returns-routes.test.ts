@@ -218,8 +218,8 @@ describe("closeout route", () => {
     const csv = await get("?format=csv&section=charges");
     expect(csv.status).toBe(200);
     expect(csv.headers.get("content-type")).toContain("text/csv");
-    expect(csv.headers.get("content-disposition")).toContain("asset-closeout-charges.csv");
-    expect(csv.headers.get("cache-control")).toBe("no-store");
+    expect(csv.headers.get("content-disposition")).toMatch(/ev1-asset-closeout-charges-\d{4}-\d{2}-\d{2}\.csv/);
+    expect(csv.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect((await get("?format=csv&section=everything")).status).toBe(400);
   });
 });

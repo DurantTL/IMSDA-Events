@@ -5,6 +5,7 @@ import { findActiveMembership } from "@/modules/events/repository";
 import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string; importRunId: string }> }) {
   try {
@@ -13,7 +14,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
     const exceptions = await listImportExceptions(eventId, importRunId);
     const rows: Array<Array<string | number>> = [["Source row", "Source ID", "Confirmation code", "Proposed action", "Errors", "Warnings"]];
     for (const row of exceptions) rows.push([row.sourceRow, row.sourceRecordKey, row.confirmationCode, row.action, row.errors, row.warnings]);
-    return new Response(toCsv(rows), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${importRunId}-exceptions.csv"`, "Cache-Control": "no-store" } });
+    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: eventId, kind: `import-exceptions-${importRunId}` }));
   } catch (error) {
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
     if (error instanceof ImportOperationError) return Response.json({ error: error.code, message: error.message }, { status: 404 });

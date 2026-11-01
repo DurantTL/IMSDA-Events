@@ -11,6 +11,7 @@ import {
 } from "@/modules/registrations/attendee-listing";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * The attendee listing as CSV (#784): the same rows and columns the page shows
@@ -33,15 +34,7 @@ async function getHandler(
     const registrations = await listRegistrations(eventId, { statuses: query.statuses });
     const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent: await isClubAudienceEvent(eventId) });
     const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
-    const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-    return new Response(attendeeListingCsv(rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeEventId}-attendees.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(attendeeListingCsv(rows), exportFileName({ scope: eventId, kind: "attendees" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

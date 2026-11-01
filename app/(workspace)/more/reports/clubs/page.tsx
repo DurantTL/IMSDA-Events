@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, PackageOpen, ShieldCheck, Tent } from "lucide-react";
@@ -69,7 +70,7 @@ export default async function ClubEventReportsPage({
             <span className="report-icon navy"><Tent aria-hidden="true" size={19} /></span>
             <div><p className="eyebrow">Camping coordinator</p><h2>Camping summary</h2><p>Campsite footprint and headcounts by role, one row per club.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "camping", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "camping", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {reports.camping.length === 0 ? <p className="report-empty">No active club registrations yet.</p> : (
           <div className="report-table-wrap">
@@ -112,7 +113,7 @@ export default async function ClubEventReportsPage({
           <div className="report-title">
             <div><p className="eyebrow">Program planning</p><h2>Duties and activities</h2><p>Each club&apos;s preferences, and staff&apos;s assignment (#410) once it exists.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "duties-activities", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "duties-activities", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {reports.dutiesActivities.length === 0 ? <p className="report-empty">No active club registrations yet.</p> : (
           <div className="report-table-wrap">
@@ -144,7 +145,7 @@ export default async function ClubEventReportsPage({
           <div className="report-title">
             <div><p className="eyebrow">Pastoral follow-up</p><h2>Spiritual milestones</h2><p>Baptism interest and Bible read-through names, per club.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "milestones", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "milestones", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {reports.milestones.length === 0 ? <p className="report-empty">No club has submitted a baptism or Bible read-through name yet.</p> : (
           <div className="report-table-wrap">
@@ -171,7 +172,7 @@ export default async function ClubEventReportsPage({
           <div className="report-title">
             <div><p className="eyebrow">Staffing</p><h2>Special roles</h2><p>Medical personnel and Master Guide investiture candidates, across every club.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "special-roles", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "special-roles", locationId)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {reports.specialRoles.length === 0 ? <p className="report-empty">No club has flagged medical personnel or a Master Guide candidate yet.</p> : (
           <div className="report-table-wrap">

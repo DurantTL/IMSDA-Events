@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
@@ -287,14 +288,14 @@ export function ClubMeetingNotes({
           </div>
           <span className="club-team-invite-actions">
             {exportMonthHref && attendanceAvailable && (
-              <a className="secondary-button club-event-action" href={exportMonthHref}>
+              <ExportLink className="secondary-button club-event-action" href={exportMonthHref}>
                 <Download aria-hidden="true" size={14} /> Export {monthLabel.split(" ")[0]} attendance (CSV)
-              </a>
+              </ExportLink>
             )}
             {exportHref && attendanceAvailable && (
-              <a className="secondary-button club-event-action" href={exportHref}>
+              <ExportLink className="secondary-button club-event-action" href={exportHref}>
                 <Download aria-hidden="true" size={14} /> Export whole year (CSV)
-              </a>
+              </ExportLink>
             )}
             <button className="primary-button" data-meeting-note-add="" disabled={saving} onClick={startAdd} type="button">
               <Plus aria-hidden="true" size={16} /> Add meeting note

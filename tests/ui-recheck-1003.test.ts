@@ -65,7 +65,7 @@ describe("disabled buttons say why (#1003)", () => {
     ["Continue with N people", "components/group-registration-editor.tsx", "group-editor-continue-hint"],
     ["Mark class completed", "components/club-earned-awards-workspace.tsx", "earned-class-hint"],
     ["Already handed out", "components/club-order-workspace.tsx", "club-order-handed-out-hint"],
-    ["Export list (CSV)", "components/club-order-workspace.tsx", "club-order-nothing"],
+    ["Download list (CSV)", "components/club-order-workspace.tsx", "club-order-nothing"],
     ["PBE group start Continue", "components/group-registration-flow.tsx", "group-flow-continue-hint"],
     ["Team start Continue", "components/general-link-registration-flow.tsx", "general-link-continue-hint"],
     ["Save format", "components/roster-export-builder.tsx", "roster-export-save-hint"],
@@ -74,7 +74,7 @@ describe("disabled buttons say why (#1003)", () => {
     const source = read(file);
     if (id === "club-order-nothing") {
       // A fixed hint that already existed: the disabled Export button names it, and it is rendered on the page.
-      expect(source).toMatch(/<button aria-describedby="club-order-nothing"[^>]*disabled[^>]*>[^<]*<Download[^>]*\/> Export list \(CSV\)<\/button>/);
+      expect(source).toMatch(/<button aria-describedby="club-order-nothing"[^>]*disabled[^>]*>[^<]*<Download[^>]*\/> Download list \(CSV\)<\/button>/);
       expect(source).toContain('id="club-order-nothing"');
       return;
     }

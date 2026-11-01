@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
@@ -216,8 +217,8 @@ export default async function OperationalReportsPage({
         primary={<PrintReportButton />}
         actions={(
           <>
-            <li><a href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-tickets`}><Utensils aria-hidden="true" size={16} /> Meal tickets CSV</a></li>
-            <li><a href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-ticket-summary`}><Utensils aria-hidden="true" size={16} /> Meal ticket summary</a></li>
+            <li><ExportLink href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-tickets`}><Utensils aria-hidden="true" size={16} /> Meal tickets CSV</ExportLink></li>
+            <li><ExportLink href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-ticket-summary`}><Utensils aria-hidden="true" size={16} /> Meal ticket summary</ExportLink></li>
           </>
         )}
         tools={[
@@ -270,7 +271,7 @@ export default async function OperationalReportsPage({
             <span className="report-icon navy"><UsersRound aria-hidden="true" size={19} /></span>
             <div><p className="eyebrow">People</p><h2>Attendee roster by group</h2><p>Uses a club, group, church, congregation, organization, household, or family answer when the form has one.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "roster")}><Download aria-hidden="true" size={15} /> Download roster CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "roster")}><Download aria-hidden="true" size={15} /> Download roster CSV</ExportLink>
         </div>
         {report.rosterGroups.length === 0
           ? <EmptyReport>No active attendees are available yet.</EmptyReport>
@@ -308,7 +309,7 @@ export default async function OperationalReportsPage({
             <span className="report-icon navy"><UsersRound aria-hidden="true" size={19} /></span>
             <div><p className="eyebrow">People</p><h2>Attendees by type</h2><p>One list per attendee type from the form, such as Adult, Teen, or Child. The Teen list is the Teen Program roster.</p></div>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendee-types")}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendee-types")}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
         </div>
         {report.attendeeTypeGroups.length === 0
           ? <EmptyReport>No active attendees are available yet.</EmptyReport>
@@ -347,7 +348,7 @@ export default async function OperationalReportsPage({
               <span className="report-icon gold"><Utensils aria-hidden="true" size={19} /></span>
               <div><p className="eyebrow">Food service</p><h2>Meal and dietary-choice counts</h2><p>Counts structured meal choices and ticket quantities. Free-text dietary and allergy notes stay private.</p></div>
             </div>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</ExportLink>
           </div>
           <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." />
         </section>
@@ -360,7 +361,7 @@ export default async function OperationalReportsPage({
               <span className="report-icon green"><BedDouble aria-hidden="true" size={19} /></span>
               <div><p className="eyebrow">Lodging</p><h2>Housing and lodging counts</h2><p>Shows configured room, cabin, campsite, overnight, and housing selections without exposing private notes.</p></div>
             </div>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</ExportLink>
           </div>
           <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." />
         </section>
@@ -373,7 +374,7 @@ export default async function OperationalReportsPage({
               <span className="report-icon purple"><ListOrdered aria-hidden="true" size={19} /></span>
               <div><p className="eyebrow">Program planning</p><h2>Ranked seminar interest</h2><p>Compares first choices, second choices, and total interest for every ranked-choice field.</p></div>
             </div>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "seminars")}><Download aria-hidden="true" size={15} /> Download ranking CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "seminars")}><Download aria-hidden="true" size={15} /> Download ranking CSV</ExportLink>
           </div>
           <SeminarFields fields={report.seminars} />
         </section>
@@ -386,7 +387,7 @@ export default async function OperationalReportsPage({
               <span className="report-icon green"><Baby aria-hidden="true" size={19} /></span>
               <div><p className="eyebrow">Family support</p><h2>Childcare planning</h2><p>Counts structured childcare requests and child quantities without exporting free-text ages or care notes.</p></div>
             </div>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</ExportLink>
           </div>
           <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." />
         </section>
@@ -406,8 +407,8 @@ export default async function OperationalReportsPage({
                 registrationIds={report.volunteerRoster.map((volunteer) => volunteer.registrationId)}
               />
             )}
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteer-roster")}><Download aria-hidden="true" size={15} /> Volunteer list CSV</a>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteers")}><Download aria-hidden="true" size={15} /> Counts CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteer-roster")}><Download aria-hidden="true" size={15} /> Volunteer list CSV</ExportLink>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteers")}><Download aria-hidden="true" size={15} /> Counts CSV</ExportLink>
           </span>
         </div>
         {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" />}
@@ -445,7 +446,7 @@ export default async function OperationalReportsPage({
               <span className="report-icon navy"><CalendarCheck2 aria-hidden="true" size={19} /></span>
               <div><p className="eyebrow">Programme planning</p><h2>Optional-session attendance</h2><p>Counts structured attendance intentions such as Sunday sessions without treating interest rankings as attendance.</p></div>
             </div>
-            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</a>
+            <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</ExportLink>
           </div>
           <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." />
         </section>

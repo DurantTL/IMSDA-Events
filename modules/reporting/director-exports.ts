@@ -129,6 +129,3 @@ export function classTrackingExportCsv(context: ExportContext, rows: readonly Cl
   return toCsv(out);
 }
 
-export function exportFileName(report: "honors" | "class-tracking", clubYear: string) {
-  return `club-${report}-${clubYear}.csv`;
-}

@@ -1,5 +1,6 @@
 import { mealRoute } from "@/modules/meals/api";
 import { mealTicketSummaryCsv } from "@/modules/meals/view-repository";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * The meal ticket summary: one row per active selection of a submitted or confirmed registration, with the
@@ -8,13 +9,5 @@ import { mealTicketSummaryCsv } from "@/modules/meals/view-repository";
  * Written by the shared CSV writer, so spreadsheet formulas are defused. VIEW_REPORTS, like the kitchen report.
  */
 export const GET = mealRoute("VIEW_REPORTS", "Exporting the meal ticket summary", async ({ eventId }) => {
-  const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-  return new Response(await mealTicketSummaryCsv(eventId), {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${safeEventId}-meal-ticket-summary.csv"`,
-      "Cache-Control": "private, no-store, max-age=0",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return csvDownloadResponse(await mealTicketSummaryCsv(eventId), exportFileName({ scope: eventId, kind: "meal-ticket-summary" }));
 }, { mutates: false });

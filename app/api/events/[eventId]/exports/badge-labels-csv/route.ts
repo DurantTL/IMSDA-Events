@@ -1,7 +1,7 @@
 import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { badgeCsvFilename, buildBadgeCsvRows, eligiblePositionField } from "@/modules/checkin/badge-csv";
+import { buildBadgeCsvRows, eligiblePositionField } from "@/modules/checkin/badge-csv";
 import { normalizeBadgeShowAttendeeType } from "@/modules/checkin/badge-labels";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { findActiveMembership, findEventSlug } from "@/modules/events/repository";
@@ -9,6 +9,7 @@ import { listRegistrations } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * Name-badge CSV for Avery Design & Print (mail merge with a QR code). Same
@@ -58,14 +59,7 @@ async function getHandler(
       summary: "Downloaded the name badge CSV for Avery Design & Print.",
       metadata: { rowCount: rows.length - 1 },
     });
-    return new Response(toCsv(rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${badgeCsvFilename(slug)}"`,
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: slug, kind: "avery-94237-badges" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

@@ -7,6 +7,7 @@ import { locationParam } from "@/modules/event-locations/filter";
 import { requireClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 async function getHandler(
   request: Request,
@@ -23,15 +24,7 @@ async function getHandler(
       location: locationParam(request),
     });
     if (!data) return Response.json({ error: "EVENT_NOT_FOUND" }, { status: 404 });
-    const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-    return new Response(checkInBookCsv(data.book), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeEventId}-check-in-book.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(checkInBookCsv(data.book), exportFileName({ scope: eventId, kind: "check-in-book" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

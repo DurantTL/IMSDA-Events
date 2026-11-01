@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import { BackLink } from "@/components/back-link";
 import { cardCell } from "@/components/table-card-labels";
@@ -39,7 +40,7 @@ export default async function ClubClassTrackingReportPage({
           <button className="secondary-button" type="submit">Apply</button>
         </form>
         <div className="report-actions">
-          <a className="secondary-button" href={`/api/attendee/clubs/${organizationId}/exports/class-tracking?year=${clubYear}`}>Download CSV</a>
+          <ExportLink className="secondary-button" href={`/api/attendee/clubs/${organizationId}/exports/class-tracking?year=${clubYear}`}>Download CSV</ExportLink>
           <PrintReportButton label="Print" />
         </div>
         {rows.length === 0 ? (

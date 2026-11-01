@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -62,9 +63,9 @@ export function ClubReportsConference({
         </div>
         {!viewOnly && (
           <div className="intro-actions">
-            <a className="secondary-button" href={`/api/admin/club-reports/export?year=${encodeURIComponent(clubYear)}`}>
+            <ExportLink className="secondary-button" href={`/api/admin/club-reports/export?year=${encodeURIComponent(clubYear)}`}>
               <Download aria-hidden="true" size={15} /> Download CSV
-            </a>
+            </ExportLink>
           </div>
         )}
       </div>

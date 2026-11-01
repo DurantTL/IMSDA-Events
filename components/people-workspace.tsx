@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { ListPager } from "@/components/list-pager";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
@@ -843,7 +844,7 @@ export function PeopleWorkspace({
             {/* Personal staff, pastor and volunteer links (#804); the same permission. */}
             {canEdit && <li><a href={`/people/staff-invitations?event=${encodeURIComponent(eventId)}`}><MailPlus aria-hidden="true" size={16} /> Staff invitations</a></li>}
             <li><a href={`/people/responsible-adults?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Responsible adults</a></li>
-            <li><a href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Export CSV</a></li>
+            <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
             {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
           </ActionsMenu>
         </div>

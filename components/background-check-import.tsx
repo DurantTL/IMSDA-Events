@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useCallback, useRef, useState } from "react";
 import { Download, FileUp, Upload, X } from "lucide-react";
 import { isCsvFile } from "@/components/csv-import-dialog";
@@ -128,7 +129,7 @@ export function BackgroundCheckImport({ onImported }: { onImported: (result: Imp
 
   return (
     <>
-      <a className="secondary-button" href="/api/admin/background-checks/template"><Download aria-hidden="true" size={14} /> CSV template</a>
+      <ExportLink className="secondary-button" href="/api/admin/background-checks/template"><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
       <button className="secondary-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> Upload CSV</button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) close(); }} role="presentation">

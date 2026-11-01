@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, HandCoins, WalletCards } from "lucide-react";
@@ -104,7 +105,7 @@ export function ScholarshipFundWorkspace({
         </div>
         <div className="page-intro-actions button-pair">
           <a className="secondary-button" href={`/finance?event=${encodeURIComponent(eventId)}`}><WalletCards aria-hidden="true" size={17} /> Payments</a>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/scholarship-fund`}><Download aria-hidden="true" size={17} /> Export CSV</a>
+          <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/scholarship-fund`}><Download aria-hidden="true" size={17} /> Download CSV</ExportLink>
         </div>
       </div>
 

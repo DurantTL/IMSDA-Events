@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -96,7 +97,7 @@ export default async function StaffClubFormsPage({
           </label>
           <button className="secondary-button" type="submit">Filter</button>
           {exportHref
-            ? <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</a>
+            ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</ExportLink>
             : <small className="field-help">Choose one form to download its CSV.</small>}
         </form>
         {submissions.length === 0 ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useCallback, useRef, useState } from "react";
 import { Download, FileUp, Upload, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -144,7 +145,7 @@ export function CsvImportDialog({
 
   return (
     <>
-      <a className="text-button" href={templateHref}><Download aria-hidden="true" size={14} /> CSV template</a>
+      <ExportLink className="text-button" href={templateHref}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
       <button className="text-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> Upload CSV</button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) close(); }} role="presentation">

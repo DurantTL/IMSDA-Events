@@ -198,7 +198,7 @@ describe("the lodging request export", () => {
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
     const response = await exportGet(request("GET"), { params: Promise.resolve(eventParams) });
     expect(response.headers.get("Cache-Control")).toContain("no-store");
-    expect(response.headers.get("Content-Disposition")).toContain("lodging-requests.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/ev1-lodging-requests-\d{4}-\d{2}-\d{2}\.csv/);
   });
 });
 

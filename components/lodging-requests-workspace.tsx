@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useState, type FormEvent } from "react";
 import { describeRate, lodgingCategories, lodgingCategoryLabels } from "@/modules/lodging/domain";
 import {
@@ -66,7 +67,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       <p className="eyebrow">Registration</p>
       <h2 className="duplicate-page-title">Lodging requests</h2>
       <p>What guests asked for at {eventName}. A request is a preference, never an assignment: nobody is placed in a room here (use Lodging assignments for that). Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown.</p>
-      {canExport ? <p><a className="secondary-button" href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</a></p> : null}
+      {canExport ? <p><ExportLink className="secondary-button" href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></p> : null}
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useMemo, useState } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
@@ -180,7 +181,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
           until you confirm the preview.
         </p>
         <div className={styles.actions}>
-          <a className="secondary-button" download href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</a>
+          <ExportLink className="secondary-button" href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
           <label className={`secondary-button ${styles.upload}`}>
             <FileUp aria-hidden="true" size={14} /> {busy && !preview ? "Reading…" : "Upload CSV"}
             <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />

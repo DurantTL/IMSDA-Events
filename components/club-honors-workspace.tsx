@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { SubmitButton } from "@/components/submit-button";
 import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
 import { sortByName, sortOrderText, sortRows, type SortKind, type SortState } from "@/lib/list-sort";
@@ -324,9 +325,9 @@ export function ClubHonorsWorkspace({
           </div>
           {!staff && (
             <div className="report-actions" role="group" aria-label="Export honors">
-              <a className="secondary-button" href={`${base}/exports/honors`}>
-                <Download aria-hidden="true" size={14} /> Export CSV
-              </a>
+              <ExportLink className="secondary-button" href={`${base}/exports/honors`}>
+                <Download aria-hidden="true" size={14} /> Download CSV
+              </ExportLink>
               {!readOnly && (
                 <Link className="secondary-button" href={`/account/clubs/${encodeURIComponent(organizationId)}/exports/honors`}>
                   Print report
