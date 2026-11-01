@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { validateChosenPassword } from "@/modules/access/passwords";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { beginAttendeeSignUp } from "@/modules/attendee-accounts/account-service";
@@ -56,6 +57,9 @@ async function postHandler(request: Request) {
         message: "Too many sign-up attempts for this address. Try again later.",
       }, { status: 429 }), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.attendeeSignUp });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     // The password rules are the platform's, and they are stated plainly: this
     // is the one part of sign-up where a specific answer helps the person and

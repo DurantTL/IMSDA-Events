@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { Eye, EyeOff, LogIn, MailCheck, UserPlus } from "lucide-react";
@@ -32,9 +33,12 @@ import {
  */
 export function AttendeeSignUpForm({
   initialEmail = "",
+  securityCheck = null,
 }: {
   initialEmail?: string;
+  securityCheck?: SecurityCheckConfig;
 }) {
+  const check = useRef<SecurityCheckHandle>(null);
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,20 +69,34 @@ export function AttendeeSignUpForm({
 
   async function send(kind: "details" | "code", body: Record<string, unknown>) {
     if (busy) return;
+    // Only the details step carries the check; the emailed code step is already tied to this browser.
+    if (kind === "details" && !check.current?.require("Create account")) return;
     pendingRef.current = { kind, body };
     setSiteUpdating(false);
     setBusy(true);
     setError("");
     const email = String(body.email ?? "");
     try {
-      const response = await submitJson(kind === "details" ? "/api/attendee/sign-up" : "/api/attendee/verify-email", body);
+      const response = await submitJson(
+        kind === "details" ? "/api/attendee/sign-up" : "/api/attendee/verify-email",
+        body,
+        kind === "details" ? { init: { headers: check.current?.headers() } } : undefined,
+      );
       if (response.unavailable) {
+        if (kind === "details") check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         setBusy(false);
         return;
       }
       pendingRef.current = null;
       const result = response.body as { message?: string; developmentCode?: string };
+      if (kind === "details") {
+        check.current?.settle(result);
+        if (!response.ok && check.current?.isRejection(result)) {
+          setBusy(false);
+          return;
+        }
+      }
       if (kind === "code") {
         if (!response.ok) throw new Error(result.message ?? "That code could not be checked.");
         router.replace(takeAttendeeAuthReturnPath() ?? "/account");
@@ -90,6 +108,7 @@ export function AttendeeSignUpForm({
       setSentTo(email);
       setBusy(false);
     } catch (caught) {
+      if (kind === "details") check.current?.settle();
       setError(caught instanceof Error ? caught.message : kind === "code" ? "That code could not be checked." : "Unable to create an account.");
       setBusy(false);
     }
@@ -198,6 +217,7 @@ export function AttendeeSignUpForm({
       </label>
       <PasswordRequirementsChecklist password={password} owner={{ email, displayName }} />
       {retryNotice}
+      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button
         className="primary-button full-button"

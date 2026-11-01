@@ -1,5 +1,6 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { MAX_APPLICATION_ATTACHMENT_BYTES, newClubApplicationInputSchema } from "@/modules/club-applications/domain";
 import { newClubApplicationApiError } from "@/modules/club-applications/api-errors";
 import { submitNewClubApplication } from "@/modules/club-applications/repository";
@@ -78,6 +79,8 @@ async function postHandler(request: Request) {
       rateLimit = mergeRateLimitOutcomes(rateLimit, linkLimit);
       if (!linkLimit.allowed) return limited(rateLimit);
     }
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.clubApplication });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     await submitNewClubApplication(input, {
       attachment: attachment instanceof File ? attachment : null,
       inviteToken: typeof inviteToken === "string" && inviteToken ? inviteToken : null,

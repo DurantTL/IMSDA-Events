@@ -35,8 +35,8 @@ const embedFrameOrigins = [
 // Turnstile (#1399). Add the origin to the list for the directive it needs;
 // every page then gets it. `'strict-dynamic'` ignores host sources in
 // browsers that support it, so a script host listed here is only a fallback.
-const extraScriptOrigins: string[] = [];
-const extraFrameOrigins: string[] = [];
+const extraScriptOrigins: string[] = ["https://challenges.cloudflare.com"];
+const extraFrameOrigins: string[] = ["https://challenges.cloudflare.com"];
 
 export type ContentSecurityPolicyInput = {
   pathname: string;

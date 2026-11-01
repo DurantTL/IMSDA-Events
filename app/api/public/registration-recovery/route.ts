@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import {
@@ -96,6 +97,12 @@ async function postHandler(request: Request) {
         error: "RATE_LIMITED",
         message: "Too many recovery requests for those details. Try again later.",
       }, { status: 429 }, rateLimit);
+    }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.registrationRecovery });
+    if (securityCheckFailure) {
+      for (const [name, value] of Object.entries(privateHeaders)) securityCheckFailure.headers.set(name, value);
+      return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     }
 
     if (input.action === "access") {

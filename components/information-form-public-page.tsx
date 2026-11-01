@@ -8,6 +8,7 @@ import { attendeeSignInStepPending } from "@/modules/attendee-accounts/portal-se
 import { attendeeSignInPathFor, twoStepPathFor } from "@/modules/attendee-accounts/return-destination";
 import { publicInformationFormKey, publicInformationFormPath, resolvePublicInformationForm, type PublicInformationFormTarget } from "@/modules/information-forms/public";
 import { checkInformationFormClientRateLimit, checkInformationFormRateLimit } from "@/modules/rate-limit/service";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -109,7 +110,7 @@ export async function InformationFormPublicPage({ target }: { target: PublicInfo
         </div>
       </section>
       <div className="public-manage-layout club-form-public">
-        <InformationFormFillIn definition={form.definition} disableDrafts={Boolean(account)} eventSlug={target.eventSlug} slug={target.slug} />
+        <InformationFormFillIn definition={form.definition} disableDrafts={Boolean(account)} eventSlug={target.eventSlug} securityCheck={await securityCheckConfigForPage()} slug={target.slug} />
       </div>
     </Shell>
   );

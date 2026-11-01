@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { beginAttendeePasswordReset } from "@/modules/attendee-accounts/account-service";
 import { ATTENDEE_PENDING_REQUEST_LIFETIME_HOURS } from "@/modules/attendee-accounts/codes";
@@ -50,6 +51,9 @@ async function postHandler(request: Request) {
         message: "Too many reset requests for this address. Try again later.",
       }, { status: 429 }), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.forgotPassword });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const reset = await beginAttendeePasswordReset({ email: input.email });
 

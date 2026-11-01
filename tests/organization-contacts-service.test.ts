@@ -111,7 +111,9 @@ describe("setPastorContact", () => {
     const text = JSON.stringify(state.audits);
     expect(text).not.toContain("Pat Pastor");
     expect(text).not.toContain("example.test");
-    expect(text).not.toContain("555");
+    // The phone itself, formatted or as digits: a bare "555" also matches a random correlation UUID.
+    expect(text).not.toContain("555-0100");
+    expect(text).not.toContain("5155550100");
   });
 
   it("scopes the previous contact to the organization being changed", async () => {

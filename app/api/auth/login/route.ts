@@ -18,6 +18,7 @@ import {
   checkLoginClientRateLimit,
 } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -78,6 +79,9 @@ async function postHandler(request: Request) {
         { status: 429 },
       ), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.staffSignIn });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const userAgent = request.headers.get("user-agent");
     const authentication = await authenticateWithPassword(input.email, input.password, userAgent);

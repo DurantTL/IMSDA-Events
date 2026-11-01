@@ -13,6 +13,7 @@ import {
   checkPasswordResetClientRateLimit,
 } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const requestSchema = z.object({ email: z.string().trim().email().max(254) });
 
@@ -41,6 +42,9 @@ async function postHandler(request: Request) {
         message: "If that account exists, password reset instructions are ready.",
       }), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.forgotPassword });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     // With email configured the link is emailed and never returned — the
     // response is identical whether or not the account exists. Without it, the

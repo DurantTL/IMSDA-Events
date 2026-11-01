@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
+import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { authenticateAttendee } from "@/modules/attendee-accounts/account-service";
 import {
@@ -47,6 +48,9 @@ async function postHandler(request: Request) {
         message: "Too many sign-in attempts. Try again later.",
       }, { status: 429 }), rateLimit);
     }
+
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.attendeeSignIn });
+    if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const authentication = await authenticateAttendee(
       input.email,

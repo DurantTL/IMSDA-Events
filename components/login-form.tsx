@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
 import {
   attendeeAuthReturnPathFromHash,
@@ -80,11 +81,15 @@ export function LoginForm({
   demoCredentials,
   next,
   unified = false,
+  securityCheck = null,
 }: {
   demoCredentials?: { email: string; password: string };
   next?: string;
   unified?: boolean;
+  /** From `securityCheckConfigForPage()`; null while Turnstile is off (#1399). Only the password step carries it. */
+  securityCheck?: SecurityCheckConfig;
 }) {
+  const check = useRef<SecurityCheckHandle>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     // The post-registration offer links here with the address and return path in the fragment,
@@ -123,16 +128,23 @@ export function LoginForm({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!check.current?.require("Sign in")) return;
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
     try {
       const response = await fetch(unified ? "/api/sign-in" : "/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({ email: form.get("email"), password: form.get("password"), next }),
       });
       const result = await response.json();
+      // The token is single-use: reset the box after every attempt, and say so in its own words when it was refused.
+      check.current?.settle(result);
+      if (!response.ok && check.current?.isRejection(result)) {
+        setBusy(false);
+        return;
+      }
       if (!response.ok) throw new Error(result.message ?? "Unable to sign in.");
 
       if (result.mfa?.required) {
@@ -166,6 +178,7 @@ export function LoginForm({
       router.replace(attendeeReturn ?? landing);
       router.refresh();
     } catch (caught) {
+      check.current?.settle();
       setError(caught instanceof Error ? caught.message : "Unable to sign in.");
       setBusy(false);
     }
@@ -278,6 +291,7 @@ export function LoginForm({
       <label>Password<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span></label>
       <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label>{unified ? <Link href="/account/forgot-password">Forgot password?</Link> : <Link href="/forgot-password">Forgot password?</Link>}</div>
       {unified && <p className="field-help">Team member who cannot sign in? <Link href="/forgot-password">Reset a team password</Link>.</p>}
+      <SecurityCheck config={securityCheck} action="staff-sign-in" handleRef={check} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}><LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}</button>
       {unified && (

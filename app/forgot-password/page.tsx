@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BrandMark } from "@/components/brand-mark";
 import { PasswordResetRequestForm } from "@/components/password-reset-request-form";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const metadata: Metadata = {
   title: "Reset password",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 // it cannot be decided at build time — a build has no sender address set.
 export const dynamic = "force-dynamic";
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
   const linkShownOnPage = !isAccountEmailConfigured();
 
   return (
@@ -31,7 +32,7 @@ export default function ForgotPasswordPage() {
               : "Enter your staff email. If an account exists, a one-time link is on its way — it expires thirty minutes after it is sent."}
           </p>
         </div>
-        <PasswordResetRequestForm />
+        <PasswordResetRequestForm securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );

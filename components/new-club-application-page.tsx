@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 import { NewClubApplicationForm } from "@/components/new-club-application-form";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import { listPublicSponsorOptions } from "@/modules/club-applications/repository";
 
 /**
@@ -39,6 +40,7 @@ export async function NewClubApplicationPage({ invite }: { invite?: { token: str
         <NewClubApplicationForm
           churches={churches}
           inviteToken={invite?.token}
+          securityCheck={await securityCheckConfigForPage()}
           prefill={invite ? { email: invite.email, name: invite.name } : undefined}
           todayLabel={todayLabel}
         />

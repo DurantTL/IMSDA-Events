@@ -12,6 +12,7 @@ import { redirectToUnifiedSignInWhenEnabled } from "@/modules/account-merge/sign
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export default async function AttendeeSignInPage({
             <p className="auth-divider"><span>or</span></p>
           </>
         )}
-        <AttendeeSignInForm next={next} />
+        <AttendeeSignInForm next={next} securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );

@@ -43,6 +43,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { ResponsibleAdultChoice } from "@/components/responsible-adult-choice";
 import { PublicLodgingStep } from "@/components/public-lodging-step";
 import {
@@ -291,6 +292,11 @@ export type PublicRegistrationFormProps = {
   /** True for a signed-in visitor: no browser draft is read or written (#574). */
   disableDrafts?: boolean;
   /**
+   * The Turnstile "Security check" for the public submit (#1399), from `securityCheckConfigForPage()`; null or absent while
+   * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
+   */
+  securityCheck?: SecurityCheckConfig;
+  /**
    * Club registration (#358): the people come from the club roster, so the
    * party is fixed (no add, remove, or CSV) and their roster-owned fields are
    * read-only. Submits to the club endpoint and reports every change so the
@@ -496,7 +502,11 @@ export function PublicRegistrationForm({
   disableDrafts = false,
   club,
   group,
+  securityCheck = null,
 }: PublicRegistrationFormProps) {
+  const securityCheckRef = useRef<SecurityCheckHandle>(null);
+  // Same action the route expects: the general link's team flow and the individual form share "registration".
+  const securityCheckAction = group && !group.teamFlow ? "group-registration" : "registration";
   const { definition } = form;
   const eventsSiteNavigation = embedded
     ? { target: "_blank" as const, rel: "noopener noreferrer" }
@@ -3160,6 +3170,7 @@ export function PublicRegistrationForm({
       return;
     }
 
+    if (!club && !securityCheckRef.current?.require(group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration"))) return;
     setSubmitting(true);
     submitInFlight.current = true;
     setIssues([]);
@@ -3196,9 +3207,14 @@ export function PublicRegistrationForm({
           ...(Object.keys(groupPicks).length > 0 ? { honorSelections: groupPicks } : {}),
           website,
         },
-        { idempotent: true, fallbackMessage: "We could not complete the registration." },
+        {
+          idempotent: true,
+          fallbackMessage: "We could not complete the registration.",
+          ...(club ? {} : { init: { headers: securityCheckRef.current?.headers() } }),
+        },
       );
       if (submission.unavailable) {
+        if (!club) securityCheckRef.current?.settle();
         // The site is restarting: keep every answer, the key and the draft; offer Try again.
         setSiteUpdating(unavailableMessage(submission));
         // The notice sits at the top of the form: bring the host page there too (a cross-origin iframe
@@ -3207,6 +3223,14 @@ export function PublicRegistrationForm({
         return;
       }
       const response = submission;
+      if (!club) {
+        // The token is single-use: reset the box after every attempt that stays on the page.
+        securityCheckRef.current?.settle(submission.body);
+        if (!response.ok && securityCheckRef.current?.isRejection(submission.body)) {
+          // Nothing was saved; the key is kept so submitting again replays safely.
+          return;
+        }
+      }
       const result = submission.body as {
         confirmation?: Confirmation;
         honors?: { error?: string } | null;
@@ -3243,6 +3267,7 @@ export function PublicRegistrationForm({
       window.imsdaEmbedScrollTop?.();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
+      if (!club) securityCheckRef.current?.settle();
       setError("We could not reach the registration service. Your answers are still here; please try again.");
       window.imsdaEmbedScrollTop?.();
       window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
@@ -3663,6 +3688,7 @@ export function PublicRegistrationForm({
             <section className="public-registration-submit-card">
               <div><ShieldCheck size={21} aria-hidden="true" /><span><strong>Server-verified registration</strong><small>Pricing and remaining capacity are checked again when you submit.</small></span></div>
               {cardSelected && !joiningWaitlist && !deferredOrganizationBilling && <p>Submitting saves the registration first. Your private registration page will then offer secure Square checkout when online payments are configured.</p>}
+              {!club && <SecurityCheck config={securityCheck} action={securityCheckAction} handleRef={securityCheckRef} />}
               <SubmitButton
                 className="public-registration-submit-button"
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}

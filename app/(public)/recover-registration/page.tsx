@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicRegistrationRecoveryForm } from "@/components/public-registration-recovery-form";
+import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function RecoverRegistrationPage({
             no longer have the code.
           </p>
         </div>
-        <PublicRegistrationRecoveryForm returnTo={returnTo} />
+        <PublicRegistrationRecoveryForm returnTo={returnTo} securityCheck={await securityCheckConfigForPage()} />
       </section>
     </main>
   );

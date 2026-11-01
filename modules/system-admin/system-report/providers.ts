@@ -76,6 +76,7 @@ import { isAlertDeliveryConfigured } from "@/modules/operations/alerting";
 import { getServerEnv } from "@/lib/env";
 import { getOffsiteBackups } from "@/modules/operations/offsite-backups-reader";
 import { offsiteBackupFields } from "./backup-signals";
+import { securityCheckFields } from "./security-check-signal";
 import { buildCommunicationsProviders } from "./communications-providers";
 import { buildEventOpsProviders } from "./event-ops-providers";
 import { buildSelfTestProviders } from "./self-test-providers";
@@ -609,6 +610,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("connected-services", "Connected services", "Payments, email, Google sign-in, alerts and the email sweep are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections"),
     m("breach-service-reachable", "Password breach service", "A read-only test that the password breach service answers one fixed, made-up lookup. No password is used.", null, "Press Test connections"),
+    m("security-check", "Security check", "Cloudflare Turnstile on public forms and sign-in has both its keys set (environment names only; no key is shown).", null, serverFix),
   ], async (ctx) => {
     const env = await environment(ctx);
     return [
@@ -617,6 +619,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       !env.ok ? { key: "connected-services", ...tried(env) } : connectedServices(env.value, env.readAt),
       await reachabilityRow(ctx, "google-keys", "google-keys-reachable", GOOGLE_KEYS_REACHABILITY_JOB, isGoogleSignInConfigured),
       await reachabilityRow(ctx, "breach-service", "breach-service-reachable", BREACH_SERVICE_REACHABILITY_JOB, isBreachCheckEnabled),
+      securityCheckFields(undefined, ctx.now),
     ];
   }),
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
 import { useAnswerDraft } from "@/components/use-answer-draft";
@@ -18,9 +19,10 @@ type Issue = { key?: string; message: string };
  * already decided the visitor may answer; the server checks everything again against the published version, and the
  * same idempotency key is sent on every retry so a double tap stores once.
  */
-export function InformationFormFillIn({ definition, slug, eventSlug, disableDrafts = false }: { definition: RegistrationFormDefinition; slug: string; eventSlug?: string; /** True for a signed-in visitor: no browser draft is read or written (#1263). */ disableDrafts?: boolean }) {
+export function InformationFormFillIn({ definition, slug, eventSlug, disableDrafts = false, securityCheck = null }: { securityCheck?: SecurityCheckConfig; definition: RegistrationFormDefinition; slug: string; eventSlug?: string; /** True for a signed-in visitor: no browser draft is read or written (#1263). */ disableDrafts?: boolean }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
+  const check = useRef<SecurityCheckHandle>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -69,6 +71,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
       return;
     }
     if (saving) return;
+    if (!check.current?.require("Submit")) return;
     setSaving(true);
     setError("");
     setIssues([]);
@@ -76,12 +79,15 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
     try {
       const response = await submitJson("/api/public/information-forms", {
         slug, ...(eventSlug ? { eventSlug } : {}), idempotencyKey, answers: cleanedAnswers(),
-      }, { idempotent: true });
+      }, { idempotent: true, init: { headers: check.current?.headers() } });
       if (response.unavailable) {
+        check.current?.settle();
         setSiteUpdating(unavailableMessage(response));
         return;
       }
       const result = response.body as { message?: string; issues?: Issue[]; confirmationMessage?: string };
+      check.current?.settle(response.body);
+      if (!response.ok && check.current?.isRejection(response.body)) return;
       if (!response.ok) {
         setError(result.message ?? "Your answers could not be sent.");
         setIssues(result.issues ?? []);
@@ -95,6 +101,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
       answerDraft.clear();
       setDoneMessage(result.confirmationMessage || "Thank you. Your answers have been received.");
     } catch {
+      check.current?.settle();
       setError("Your answers could not be sent. Check your connection and try again.");
     } finally {
       setSaving(false);
@@ -165,6 +172,7 @@ export function InformationFormFillIn({ definition, slug, eventSlug, disableDraf
         );
       })}
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void submit()} />}
+      <SecurityCheck config={securityCheck} action="information-form" handleRef={check} />
       {error && (
         <div className="inline-notice error" role="alert">
           {error}

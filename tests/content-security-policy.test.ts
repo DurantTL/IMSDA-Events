@@ -42,6 +42,14 @@ describe("Content Security Policy (#1401)", () => {
     }
   });
 
+  it("lets Cloudflare Turnstile load and frame on every page (#1399)", () => {
+    for (const pathname of ["/", "/login", "/events/synthetic/register", "/account/sign-up"]) {
+      const policy = policyFor(pathname);
+      expect(directiveSources(policy, "script-src")).toContain("https://challenges.cloudflare.com");
+      expect(directiveSources(policy, "frame-src")).toContain("https://challenges.cloudflare.com");
+    }
+  });
+
   it("allows unsafe-eval in development only", () => {
     expect(directiveSources(policyFor("/", { isDevelopment: true }), "script-src")).toContain("'unsafe-eval'");
     expect(policyFor("/")).not.toContain("unsafe-eval");
@@ -63,7 +71,10 @@ describe("Content Security Policy (#1401)", () => {
     expect(policy).toContain("base-uri 'self'");
     expect(policy).toContain("form-action 'self'");
     expect(policy).toContain("frame-ancestors 'none'");
-    expect(policy).not.toContain("challenges.cloudflare.com");
+    // Turnstile (#1399) is allowed to load and frame, and nothing more.
+    for (const directive of ["connect-src", "img-src", "style-src", "font-src"]) {
+      expect(directiveSources(policy, directive)).not.toContain("https://challenges.cloudflare.com");
+    }
   });
 
   it("admits OpenStreetMap tiles on /clubs and the church location editor only", () => {
