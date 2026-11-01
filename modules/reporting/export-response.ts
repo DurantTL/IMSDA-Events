@@ -5,6 +5,9 @@
  * club or organization slug or id, a club year, or a fixed name, and nothing here accepts a free-text title.
  */
 
+import { calendarDateIn } from "@/modules/calendar/domain";
+import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
+
 const MAX_PART_LENGTH = 60;
 
 /** Lowercase `[a-z0-9-]`, repeats collapsed, trimmed, capped. A part that looks like an email is dropped (no personal data in a file name). */
@@ -16,9 +19,7 @@ export function slugifyFilePart(value: string | number | null | undefined): stri
 
 /** Today in America/Chicago as YYYY-MM-DD, so a download late on a Central evening is not dated tomorrow (UTC). */
 export function exportDateStamp(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-  const get = (type: string) => parts.find((part) => part.type === type)!.value;
-  return `${get("year")}-${get("month")}-${get("day")}`;
+  return calendarDateIn(now, CONFERENCE_TIME_ZONE);
 }
 
 /**

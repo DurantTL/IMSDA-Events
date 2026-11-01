@@ -1,5 +1,4 @@
 import { ExportLink } from "@/components/export-link";
-import { formatCents } from "@/modules/payments/format-cents";
 import { ExactValue, Money } from "@/components/exact-value";
 import Link from "next/link";
 import { Building2, Download } from "lucide-react";

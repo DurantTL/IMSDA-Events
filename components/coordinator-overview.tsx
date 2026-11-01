@@ -1,5 +1,4 @@
 import { ExportLink } from "@/components/export-link";
-import { NavigationLink as Link } from "@/components/navigation-link";
 import { ListPager } from "@/components/list-pager";
 import { ColumnHeader } from "@/components/column-header";
 import { ExactValue } from "@/components/exact-value";

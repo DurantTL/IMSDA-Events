@@ -46,6 +46,7 @@ const unsortedTables: Record<string, string> = {
   "components/event-features-table.tsx": "short fixed list: event feature settings",
   "components/tag-configuration-workspace.tsx": "short fixed list: settings table",
   "components/calendar-feeds-panel.tsx": "short fixed list: settings table",
+  "components/coordinator-whos-missing.tsx": "round 2 (#1458)",
   "components/csv-import-dialog.tsx": "set order: import preview in file order",
   "components/club-import-workspace.tsx": "set order: import preview in file order",
   "components/eadventist-import-workspace.tsx": "set order: import preview in file order",

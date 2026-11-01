@@ -71,7 +71,7 @@ export function ExportLink({ href, children = "Download CSV", className }: { hre
     busy.current = true;
     setState({ phase: "preparing", message: "" });
     try {
-      const response = await fetch(href, { credentials: "same-origin" });
+      const response = await fetch(href, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) {
         setState({ phase: "failed", message: await downloadErrorMessage(response) });
         return;
