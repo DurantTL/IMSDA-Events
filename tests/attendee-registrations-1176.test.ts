@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-nonce": "synthetic-nonce" }) }));
 vi.mock("next/navigation", () => ({
   redirect: (target: string) => {
     throw new Error(`REDIRECT ${target}`);

@@ -1,54 +1,9 @@
 import type { NextConfig } from "next";
 
-const isDevelopment = process.env.NODE_ENV === "development";
-const embedAllowedOrigins = process.env.EMBED_ALLOWED_ORIGINS
-  ?? "'self' https://imsda.org https://*.imsda.org";
-const squareWebOrigins = [
-  "https://web.squarecdn.com",
-  "https://sandbox.web.squarecdn.com",
-].join(" ");
-const squarePciOrigins = [
-  "https://pci-connect.squareup.com",
-  "https://pci-connect.squareupsandbox.com",
-].join(" ");
-const squareTelemetryOrigin = "https://o160250.ingest.sentry.io";
-const squareFontOrigins = [
-  "https://square-fonts-production-f.squarecdn.com",
-  "https://d1g145x70srn7h.cloudfront.net",
-].join(" ");
 const buildTsconfigPath = process.env.NEXT_BUILD_TSCONFIG?.trim() || "tsconfig.json";
 // Only the Docker image sets this, because the check needs more memory than the
 // production server has. CI type-checks every commit; deploy only green ones.
 const skipBuildTypecheck = process.env.NEXT_SKIP_BUILD_TYPECHECK === "1";
-
-// OpenStreetMap's tile server, for the public club map (#437) and the
-// church-location pin picker (#480) only.
-const mapTileOrigin = "https://tile.openstreetmap.org";
-
-// The only origins a public event page's video or map block may frame (#816).
-// Keep in step with `embedFrameOrigins` in modules/events/content-embeds.ts;
-// tests/event-page-embed-csp.test.ts fails when the two drift apart.
-const embedFrameOrigins = [
-  "https://www.youtube-nocookie.com",
-  "https://player.vimeo.com",
-  "https://www.google.com",
-].join(" ");
-
-function contentSecurityPolicy(frameAncestors: string, extraImageOrigins = "", extraFrameOrigins = "") {
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' ${squareWebOrigins}${isDevelopment ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'unsafe-inline' ${squareWebOrigins}`,
-    `img-src 'self' blob: data:${extraImageOrigins ? ` ${extraImageOrigins}` : ""}`,
-    `font-src 'self' data: ${squareFontOrigins}`,
-    `connect-src 'self' ${squareWebOrigins} ${squarePciOrigins} ${squareTelemetryOrigin}`,
-    `frame-src 'self' ${squareWebOrigins}${extraFrameOrigins ? ` ${extraFrameOrigins}` : ""}`,
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    `frame-ancestors ${frameAncestors}`,
-  ].join("; ");
-}
 
 const sharedSecurityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -60,10 +15,6 @@ const sharedSecurityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
   },
-  {
-    key: "Content-Security-Policy",
-    value: contentSecurityPolicy("'none'"),
-  },
 ];
 
 const privateRegistrationHeaders = [
@@ -74,6 +25,10 @@ const privateRegistrationHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // No "X-Powered-By: Next.js" (#1401).
+  poweredByHeader: false,
+  // The Content-Security-Policy is not set here: proxy.ts sends it per
+  // request with a nonce (modules/security/content-security-policy.ts).
   // Docker's production build checks only code that can ship in the app. The
   // normal local/CI build keeps using tsconfig.json, which also covers tests,
   // import helpers, and operator scripts.
@@ -128,47 +83,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // The club map is the one page that loads third-party images. Its
-        // policy is the site policy plus the tile origin; listed after the
-        // site-wide rule so this Content-Security-Policy replaces that one
-        // (for a header key set by two matching rules, Next.js sends the
-        // last), leaving /clubs with a single policy.
-        source: "/clubs",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy("'none'", mapTileOrigin),
-          },
-        ],
-      },
-      {
-        // The church location editor's "Pick on map" helper (#480) is the
-        // only staff page that loads the same tiles. Scoped the same way as
-        // /clubs above: this rule must stay after the site-wide one so its
-        // Content-Security-Policy is the one Next.js sends for this path.
-        source: "/admin/organizations/:organizationId/location",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy("'none'", mapTileOrigin),
-          },
-        ],
-      },
-      {
-        // A public event page's video or map block (#816) is the one place a
-        // third-party frame is allowed: the site policy plus the three embed
-        // origins in frame-src, nothing else. Exactly this path, so the
-        // registration pages and every other page keep the locked policy.
-        // Listed after the site-wide rule so this policy is the one sent.
-        source: "/events/:eventSlug",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy("'none'", "", embedFrameOrigins),
-          },
-        ],
-      },
-      {
         source: "/api/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store" },
@@ -178,10 +92,6 @@ const nextConfig: NextConfig = {
       {
         source: "/embed/:path*",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy(embedAllowedOrigins),
-          },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },

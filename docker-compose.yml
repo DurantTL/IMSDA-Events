@@ -29,8 +29,9 @@ services:
     build:
       context: .
       args:
-        # Public, non-secret values consumed while Next compiles metadata and
-        # response headers. The same values are supplied at runtime below.
+        # Public, non-secret values consumed while Next compiles metadata. The
+        # same values are supplied at runtime below. EMBED_ALLOWED_ORIGINS is
+        # read at request time by proxy.ts (frame-ancestors for /embed/*).
         APP_BASE_URL: ${APP_BASE_URL?set this to the new public https origin}
         EMBED_ALLOWED_ORIGINS: ${EMBED_ALLOWED_ORIGINS:-'self' https://imsda.org https://*.imsda.org}
         SQUARE_ENVIRONMENT: ${SQUARE_ENVIRONMENT:-sandbox}

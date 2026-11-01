@@ -25,6 +25,7 @@ import { PublicRegistrationContactForm } from "@/components/public-registration-
 import { PublicShirtSizeConfirmation } from "@/components/public-shirt-size-confirmation";
 import { AttendeeRegistrationAnswersForm } from "@/components/attendee-registration-answers-form";
 import { PublicSquarePayment } from "@/components/public-square-payment";
+import { getRequestNonce } from "@/modules/security/request-nonce";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { ClubClassPicker } from "@/components/club-class-picker";
 import { GroupRegistrationEditor } from "@/components/group-registration-editor";
@@ -89,6 +90,7 @@ export default async function PublicManagePage({
 }: PublicManagePageProps) {
   await connection();
   const { token } = await params;
+  const nonce = await getRequestNonce();
   // A balance reminder links here with `?pay=balance` (#415): it opens the pay page on the whole balance rather than
   // on the deposit the registrant chose on the form.
   const { pay } = await searchParams;
@@ -392,7 +394,7 @@ export default async function PublicManagePage({
               <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
             )}
             {/* Only when online payment is offered (#1405): the summary above says "pay below" only then. */}
-            {!view.perPerson && !view.isGroup && view.payment.paymentPanelShown && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
+            {!view.perPerson && !view.isGroup && view.payment.paymentPanelShown && <PublicSquarePayment token={token} initialKind={initialPaymentKind} nonce={nonce} />}
           </section>
 
           {cancellationView && (cancellationView.available || cancellationView.requests.length > 0) && (

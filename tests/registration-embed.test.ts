@@ -12,6 +12,7 @@ import { buildRegistrationEmbedCode } from "@/modules/forms/embed";
 const root = process.cwd();
 const globalsCss = readFileSync(path.join(root, "app/globals.css"), "utf8");
 const nextConfig = readFileSync(path.join(root, "next.config.ts"), "utf8");
+const cspModule = readFileSync(path.join(root, "modules/security/content-security-policy.ts"), "utf8");
 const registrationForm = readFileSync(
   path.join(root, "components/public-registration-form.tsx"),
   "utf8",
@@ -123,10 +124,10 @@ describe("registration embed", () => {
   });
 
   it("uses CSP frame ancestors without a conflicting X-Frame-Options header", () => {
-    expect(nextConfig).toContain(
+    expect(cspModule).toContain(
       `"'self' https://imsda.org https://*.imsda.org"`,
     );
-    expect(nextConfig).toContain("frame-ancestors");
+    expect(cspModule).toContain("frame-ancestors");
     expect(nextConfig).not.toContain("X-Frame-Options");
   });
 

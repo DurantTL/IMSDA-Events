@@ -234,6 +234,7 @@ export function PublicSquarePayment({
   manageEndpoint: explicitManageEndpoint,
   staffPreview = false,
   initialKind,
+  nonce,
 }: {
   token?: string;
   manageEndpoint?: string;
@@ -241,6 +242,8 @@ export function PublicSquarePayment({
   initialKind?: "BALANCE" | "DEPOSIT";
   /** True only in a staff preview session; the public never sees the test-mode line. */
   staffPreview?: boolean;
+  /** The request's CSP nonce for the Square script tag (#1401); `strict-dynamic` ignores hosts. */
+  nonce?: string;
 }) {
   const manageEndpoint = explicitManageEndpoint
     ?? `/api/public/manage/${encodeURIComponent(token ?? "")}`;
@@ -902,6 +905,7 @@ export function PublicSquarePayment({
       <Script
         id={`square-web-payments-${checkout.square.environment}`}
         src={checkout.square.scriptUrl}
+        nonce={nonce}
         strategy="afterInteractive"
         onReady={() => setSdkReady(true)}
         onError={() => setNotice({

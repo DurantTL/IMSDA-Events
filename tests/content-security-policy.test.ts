@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { buildContentSecurityPolicy, generateNonce } from "@/modules/security/content-security-policy";
 
 const squareWebOrigins = [
   "https://web.squarecdn.com",
@@ -8,174 +9,84 @@ const squarePciOrigins = [
   "https://pci-connect.squareup.com",
   "https://pci-connect.squareupsandbox.com",
 ];
-const originalSquareEnvironment = process.env.SQUARE_ENVIRONMENT;
-const originalSquareProductionEnabled = process.env.SQUARE_ENABLE_PRODUCTION;
+const tileOrigin = "https://tile.openstreetmap.org";
+const nonce = "c3ludGhldGljLW5vbmNl";
 
-function setBuildEnvironment(
-  squareEnvironment: string | undefined,
-  squareProductionEnabled: string | undefined,
-) {
-  if (squareEnvironment === undefined) {
-    delete process.env.SQUARE_ENVIRONMENT;
-  } else {
-    process.env.SQUARE_ENVIRONMENT = squareEnvironment;
-  }
-
-  if (squareProductionEnabled === undefined) {
-    delete process.env.SQUARE_ENABLE_PRODUCTION;
-  } else {
-    process.env.SQUARE_ENABLE_PRODUCTION = squareProductionEnabled;
-  }
+function policyFor(pathname: string, options: { isDevelopment?: boolean; embedAllowedOrigins?: string } = {}) {
+  return buildContentSecurityPolicy({ pathname, nonce, isDevelopment: false, ...options });
 }
 
 function directiveSources(policy: string, directive: string) {
-  const value = policy
-    .split("; ")
-    .find((entry) => entry.startsWith(`${directive} `));
-
-  if (!value) {
-    throw new Error(`Missing ${directive} directive`);
-  }
-
+  const value = policy.split("; ").find((entry) => entry.startsWith(`${directive} `));
+  if (!value) throw new Error(`Missing ${directive} directive`);
   return value.split(" ").slice(1);
 }
 
-async function compiledContentSecurityPolicies() {
-  vi.resetModules();
-  const nextConfig = (await import("../next.config")).default;
-  const headerRules = await nextConfig.headers?.();
+describe("Content Security Policy (#1401)", () => {
+  it("generates a different base64 nonce each time", () => {
+    const first = generateNonce();
+    const second = generateNonce();
+    expect(first).toMatch(/^[A-Za-z0-9+/]{22}==$/);
+    expect(second).not.toBe(first);
+  });
 
-  if (!headerRules) {
-    throw new Error("Next.js headers configuration is missing");
-  }
-
-  return headerRules
-    .flatMap((rule) => rule.headers)
-    .filter((header) => header.key === "Content-Security-Policy")
-    .map((header) => header.value);
-}
-
-afterEach(() => {
-  setBuildEnvironment(
-    originalSquareEnvironment,
-    originalSquareProductionEnabled,
-  );
-});
-
-describe("compiled Content Security Policy", () => {
-  it.each([
-    {
-      name: "build variables are absent",
-      squareEnvironment: undefined,
-      squareProductionEnabled: undefined,
-    },
-    {
-      name: "Sandbox is selected",
-      squareEnvironment: "sandbox",
-      squareProductionEnabled: "false",
-    },
-    {
-      name: "Production is selected",
-      squareEnvironment: "production",
-      squareProductionEnabled: "true",
-    },
-  ])("permits both Square environments when $name", async ({
-    squareEnvironment,
-    squareProductionEnabled,
-  }) => {
-    setBuildEnvironment(squareEnvironment, squareProductionEnabled);
-
-    const policies = await compiledContentSecurityPolicies();
-
-    // Site-wide, /clubs, the church location editor, the public event page (#816) and /embed.
-    expect(policies).toHaveLength(5);
-    for (const policy of policies) {
-      for (const directive of [
-        "script-src",
-        "style-src",
-        "connect-src",
-        "frame-src",
-      ]) {
-        expect(directiveSources(policy, directive)).toEqual(
-          expect.arrayContaining(squareWebOrigins),
-        );
-      }
-
-      expect(directiveSources(policy, "connect-src")).toEqual(
-        expect.arrayContaining(squarePciOrigins),
-      );
-      for (const directive of ["script-src", "style-src", "frame-src"]) {
-        for (const origin of squarePciOrigins) {
-          expect(directiveSources(policy, directive)).not.toContain(origin);
-        }
-      }
-
-      expect(policy).toContain("object-src 'none'");
-      expect(policy).toContain("base-uri 'self'");
-      expect(policy).toContain("form-action 'self'");
+  it("uses the nonce with strict-dynamic and no unsafe-inline in script-src", () => {
+    for (const pathname of ["/", "/events/synthetic", "/clubs", "/embed/calendar", "/admin"]) {
+      const sources = directiveSources(policyFor(pathname), "script-src");
+      expect(sources).toContain("'self'");
+      expect(sources).toContain(`'nonce-${nonce}'`);
+      expect(sources).toContain("'strict-dynamic'");
+      expect(sources).not.toContain("'unsafe-inline'");
+      expect(sources).not.toContain("'unsafe-eval'");
+      expect(sources).toEqual(expect.arrayContaining(squareWebOrigins));
     }
   });
 
-  it("admits OpenStreetMap tiles on /clubs only, as that page's single policy (#437)", async () => {
-    vi.resetModules();
-    const nextConfig = (await import("../next.config")).default;
-    const rules = (await nextConfig.headers?.()) ?? [];
-    const cspRules = rules
-      .map((rule, index) => ({
-        index,
-        source: rule.source,
-        policy: rule.headers.find((header) => header.key === "Content-Security-Policy")?.value,
-      }))
-      .filter((rule): rule is { index: number; source: string; policy: string } => rule.policy !== undefined);
-
-    const tileOrigin = "https://tile.openstreetmap.org";
-    const siteWide = cspRules.find((rule) => rule.source === "/:path*");
-    const clubs = cspRules.find((rule) => rule.source === "/clubs");
-    if (!siteWide || !clubs) throw new Error("Missing site-wide or /clubs policy");
-
-    for (const rule of cspRules.filter((candidate) => candidate.source !== "/clubs" && candidate.source !== "/admin/organizations/:organizationId/location")) {
-      expect(rule.policy).not.toContain(tileOrigin);
-    }
-    expect(directiveSources(clubs.policy, "img-src")).toContain(tileOrigin);
-
-    // Same policy otherwise: only img-src differs.
-    expect(clubs.policy.replace(` ${tileOrigin}`, "")).toBe(siteWide.policy);
-
-    // Both rules match /clubs and set the same key; Next.js sends the last
-    // one, so the /clubs rule must come after the site-wide rule.
-    expect(clubs.index).toBeGreaterThan(siteWide.index);
-    expect(cspRules.filter((rule) => rule.source === "/clubs")).toHaveLength(1);
+  it("allows unsafe-eval in development only", () => {
+    expect(directiveSources(policyFor("/", { isDevelopment: true }), "script-src")).toContain("'unsafe-eval'");
+    expect(policyFor("/")).not.toContain("unsafe-eval");
   });
 
-  it("admits OpenStreetMap tiles on the church location editor only, as scoped as #437 (#480)", async () => {
-    vi.resetModules();
-    const nextConfig = (await import("../next.config")).default;
-    const rules = (await nextConfig.headers?.()) ?? [];
-    const cspRules = rules
-      .map((rule, index) => ({
-        index,
-        source: rule.source,
-        policy: rule.headers.find((header) => header.key === "Content-Security-Policy")?.value,
-      }))
-      .filter((rule): rule is { index: number; source: string; policy: string } => rule.policy !== undefined);
-
-    const tileOrigin = "https://tile.openstreetmap.org";
-    const siteWide = cspRules.find((rule) => rule.source === "/:path*");
-    const locationEditor = cspRules.find((rule) => rule.source === "/admin/organizations/:organizationId/location");
-    if (!siteWide || !locationEditor) throw new Error("Missing site-wide or church location editor policy");
-
-    for (const rule of cspRules.filter((candidate) => candidate.source !== "/clubs" && candidate.source !== locationEditor.source)) {
-      expect(rule.policy).not.toContain(tileOrigin);
+  it("keeps the Square origins and the other locked directives", () => {
+    const policy = policyFor("/");
+    for (const directive of ["style-src", "connect-src", "frame-src"]) {
+      expect(directiveSources(policy, directive)).toEqual(expect.arrayContaining(squareWebOrigins));
     }
-    expect(directiveSources(locationEditor.policy, "img-src")).toContain(tileOrigin);
+    expect(directiveSources(policy, "connect-src")).toEqual(expect.arrayContaining(squarePciOrigins));
+    for (const directive of ["script-src", "style-src", "frame-src"]) {
+      for (const origin of squarePciOrigins) expect(directiveSources(policy, directive)).not.toContain(origin);
+    }
+    // Styles keep unsafe-inline: Square needs it.
+    expect(directiveSources(policy, "style-src")).toContain("'unsafe-inline'");
+    expect(policy).toContain("default-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("base-uri 'self'");
+    expect(policy).toContain("form-action 'self'");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).not.toContain("challenges.cloudflare.com");
+  });
 
-    // Same policy otherwise: only img-src differs.
-    expect(locationEditor.policy.replace(` ${tileOrigin}`, "")).toBe(siteWide.policy);
+  it("admits OpenStreetMap tiles on /clubs and the church location editor only", () => {
+    const sitePolicy = policyFor("/");
+    for (const pathname of ["/clubs", "/admin/organizations/org_synthetic/location"]) {
+      const policy = policyFor(pathname);
+      expect(directiveSources(policy, "img-src")).toContain(tileOrigin);
+      // Only img-src differs.
+      expect(policy.replace(` ${tileOrigin}`, "")).toBe(sitePolicy);
+    }
+    for (const pathname of ["/", "/clubs/register", "/admin", "/admin/organizations/org_synthetic", "/events/synthetic"]) {
+      expect(policyFor(pathname)).not.toContain(tileOrigin);
+    }
+  });
 
-    // Both rules match this path and set the same key; Next.js sends the
-    // last one, so the location-editor rule must come after the site-wide
-    // rule.
-    expect(locationEditor.index).toBeGreaterThan(siteWide.index);
-    expect(cspRules.filter((rule) => rule.source === locationEditor.source)).toHaveLength(1);
+  it("uses the embed allow-list for frame-ancestors on /embed/* only", () => {
+    const defaultPolicy = policyFor("/embed/calendar");
+    expect(directiveSources(defaultPolicy, "frame-ancestors")).toEqual(["'self'", "https://imsda.org", "https://*.imsda.org"]);
+    expect(policyFor("/embed/calendar", { embedAllowedOrigins: "https://example.org" })).toContain("frame-ancestors https://example.org");
+    for (const blank of ["", "   "]) {
+      expect(policyFor("/embed/calendar", { embedAllowedOrigins: blank })).toBe(defaultPolicy);
+    }
+    expect(policyFor("/embedded")).toContain("frame-ancestors 'none'");
+    expect(policyFor("/")).toContain("frame-ancestors 'none'");
   });
 });
