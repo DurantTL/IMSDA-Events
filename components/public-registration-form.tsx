@@ -249,7 +249,15 @@ type Confirmation = {
 };
 
 /** What the browser prices a form with. A church-billed event carries the lines only, never a sum (#621). */
-type DisplayedCalculation = Pick<FormCalculation, "lineItems"> & Partial<Omit<FormCalculation, "lineItems">>;
+type DisplayedCalculation = Pick<FormCalculation, "lineItems"> & Partial<Omit<FormCalculation, "lineItems">> & {
+  /** The browser's own preview threw (#1445). The server still prices the submission; the page says so instead of a total. */
+  previewFailed?: boolean;
+};
+
+/** Shown where the preview total would be when the browser could not work it out. The server prices the submission either way. */
+export const PROMO_AMOUNT_ON_SUBMIT_TEXT = "Promo code applied. Your discount is calculated when you submit.";
+export const PREVIEW_UNAVAILABLE_TEXT =
+  "We couldn't show your total on this page. Your total will be calculated when you submit, and shown on your confirmation.";
 
 type PromoCodeQuote = Partial<FormCalculation> & {
   /** Absent on a church-billed event (#621). */
@@ -822,26 +830,32 @@ export function PublicRegistrationForm({
   );
   const baseCalculation = useMemo<DisplayedCalculation>(
     () => {
-      // A church-billed registrant is never shown a total, so the browser prices the lines only (#621).
-      if (deferredOrganizationBilling) {
-        return {
-          lineItems: rosterEnabled
-            ? calculateRosterLineItems(definition, registrationResponses, attendees.map((attendee) => attendee.responses), pricingDate)
-            : calculateFormLineItems(definition, responses, pricingDate),
-        };
+      try {
+        // A church-billed registrant is never shown a total, so the browser prices the lines only (#621).
+        if (deferredOrganizationBilling) {
+          return {
+            lineItems: rosterEnabled
+              ? calculateRosterLineItems(definition, registrationResponses, attendees.map((attendee) => attendee.responses), pricingDate)
+              : calculateFormLineItems(definition, responses, pricingDate),
+          };
+        }
+        const priced = rosterEnabled
+          ? calculateRosterTotal(
+            definition,
+            registrationResponses,
+            attendees.map((attendee) => attendee.responses),
+            pricingDate,
+          )
+          : calculateFormTotal(definition, responses, pricingDate);
+        // The lodging charge is its own line of the total, ahead of promo codes and fees (#199).
+        return lodgingLine
+          ? calculationWithLine(definition, rosterEnabled ? registrationResponses : responses, priced, lodgingLine.key, lodgingLine)
+          : priced;
+      } catch {
+        // The total shown here is only a preview from the shared function. If it cannot run in this browser, say so:
+        // the server recalculates from the answers on submit and never uses a number from this page.
+        return { lineItems: [], previewFailed: true };
       }
-      const priced = rosterEnabled
-        ? calculateRosterTotal(
-          definition,
-          registrationResponses,
-          attendees.map((attendee) => attendee.responses),
-          pricingDate,
-        )
-        : calculateFormTotal(definition, responses, pricingDate);
-      // The lodging charge is its own line of the total, ahead of promo codes and fees (#199).
-      return lodgingLine
-        ? calculationWithLine(definition, rosterEnabled ? registrationResponses : responses, priced, lodgingLine.key, lodgingLine)
-        : priced;
     },
     [attendees, definition, deferredOrganizationBilling, lodgingLine, pricingDate, registrationResponses, responses, rosterEnabled],
   );
@@ -1274,6 +1288,8 @@ export function PublicRegistrationForm({
     if (issue) return { ok: false, text: issue.message };
     const applied = activeAttendeePromo.attendeeDiscounts.find((candidate) => candidate.attendeeIndex === attendeeIndex);
     const sponsor = applied ? activeAttendeePromo.sponsors?.[applied.code.normalize("NFKC").trim().toUpperCase()] : undefined;
+    // With the preview broken the quote's amount may not match the answers: no dollar amount, the server decides on submit.
+    if (applied && baseCalculation.previewFailed) return { ok: true, text: `${applied.code} applied. Your discount is calculated when you submit.` };
     return applied ? { ok: true, text: `${applied.code} applied — ${formatCents(applied.discountAmountCents)} off for this person.${sponsor ? ` Sponsored by ${sponsor}.` : ""}` } : null;
   }
 
@@ -1956,7 +1972,8 @@ export function PublicRegistrationForm({
               aria-live="polite"
             >
               {promoCodeApplied && <BadgePercent size={15} aria-hidden="true" />}
-              {promoCodeNotice}
+              {/* With the preview broken the quote's amount may no longer match the answers: never show it. */}
+              {promoCodeApplied && baseCalculation.previewFailed ? PROMO_AMOUNT_ON_SUBMIT_TEXT : promoCodeNotice}
             </small>
           )}
         </div>
@@ -1979,7 +1996,7 @@ export function PublicRegistrationForm({
       return (
         <div className={`${wrapperClass} public-registration-calculated`} key={field.id}>
           <span><strong>{field.label}</strong><small>Automatically included in your order.</small></span>
-          <strong>{lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
+          <strong>{baseCalculation.previewFailed ? "Calculated on submit" : lineItem ? <span translate="no">{formatCents(lineItem.amountCents)}</span> : "Included"}</strong>
         </div>
       );
     }
@@ -2975,6 +2992,8 @@ export function PublicRegistrationForm({
               <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-review-lines" />
               {displayedPromoCode && <p>Promo code {displayedPromoCode} applied.</p>}
             </>
+          ) : baseCalculation.previewFailed ? (
+            <p className="public-registration-review-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p>
           ) : calculation.lineItems.length > 0 ? (
             <div className="public-registration-review-lines">
               {calculation.lineItems.map((item) => (
@@ -3730,7 +3749,7 @@ export function PublicRegistrationForm({
           )}
           {group?.waitlistNote && <p className="public-registration-summary-empty">{group.waitlistNote}</p>}
           {rosterEnabled && <p className="public-registration-summary-roster"><UsersRound size={15} aria-hidden="true" /> {attendees.length} {pluralAttendeeLabel(roster.attendeeLabel, attendees.length)}</p>}
-          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
+          {deferredOrganizationBilling ? <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-summary-lines" /> : baseCalculation.previewFailed ? <p className="public-registration-summary-empty" data-testid="preview-unavailable" role="status">{PREVIEW_UNAVAILABLE_TEXT}</p> : calculation.lineItems.length === 0 ? <p className="public-registration-summary-empty">Select any priced options to see your total.</p> : (
             <div className="public-registration-summary-lines">
               {calculation.lineItems.map((item) => (
                 <div key={item.key}><span>{item.label}{item.pricingLabel && <small>{item.pricingLabel}</small>}</span><strong translate="no">{formatCents(item.amountCents)}</strong></div>

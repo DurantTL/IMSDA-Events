@@ -1,0 +1,99 @@
+name: Browser privacy
+
+# Real-browser check that the site works, or says plainly what is blocked, in privacy browsers (#1445): Chromium, Firefox
+# and WebKit with EasyList/EasyPrivacy-style request blocking, and with third-party iframes, cookies and site storage
+# refused. Key journeys: sign-in with the emailed code, club director pages, public registration with a promo code and
+# card (the recorded and charged amounts are the server's, even when the page's own price preview throws), the calendar
+# embed, and the Security check blocked. See docs/PRIVACY-BROWSERS.md.
+#
+# It is optional (continue-on-error), like the mobile layout audit: a browser or runner flake must not turn a pull
+# request red; read the job's log.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-privacy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-privacy:
+    name: Browser privacy (real browsers, optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      - run: npm run lodging:sync
+      - run: npm run form-templates:sync
+      - run: npm run event-content:sync
+      - run: npm run build
+      - run: npm i --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium firefox webkit
+      # Fictitious CI-only values for production mode. Keep the secrets identical to the block in ci.yml ("verify").
+      # The Square values are fictitious too: they only make the app offer the card form, so the check can see what a
+      # blocker does to it. Nothing is charged. The embed host is the check's own local page.
+      - name: Start the built app (and a second one with the Security check on)
+        env:
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+          ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+          RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+          OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+          SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+          ACCOUNT_EMAIL_SENDER_ADDRESS: events@ci.example.test
+          RESEND_API_KEY: ci-placeholder-never-sent
+          SQUARE_ENVIRONMENT: sandbox
+          SQUARE_APPLICATION_ID: sandbox-sq0idb-synthetic
+          SQUARE_LOCATION_ID: LSYNTHETIC
+          SQUARE_ACCESS_TOKEN: synthetic-token-never-used
+          SQUARE_WEBHOOK_SIGNATURE_KEY: synthetic-signature-key-0000
+          SQUARE_WEBHOOK_NOTIFICATION_URL: https://events.example.test/api/webhooks/square
+          EMBED_ALLOWED_ORIGINS: "'self' http://127.0.0.1:3999 http://localhost:3999"
+        run: |
+          APP_BASE_URL=http://localhost:3000 nohup npm run start -- -p 3000 > app.log 2>&1 &
+          # Cloudflare's published test keys: the widget loads and answers with a dummy token.
+          APP_BASE_URL=http://localhost:3002 TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA TURNSTILE_ALLOWED_HOSTNAMES=localhost nohup npm run start -- -p 3002 > app-turnstile.log 2>&1 &
+          for port in 3000 3002; do
+            for attempt in $(seq 1 60); do
+              if curl -fsS -o /dev/null http://localhost:$port/; then break; fi
+              if [ "$attempt" = 60 ]; then echo "The app on $port did not start:" && cat app.log app-turnstile.log && exit 1; fi
+              sleep 2
+            done
+          done
+      - name: Check privacy browsers
+        env:
+          PRIVACY_BASE_URL: http://localhost:3000
+          PRIVACY_TURNSTILE_BASE_URL: http://localhost:3002
+        run: npm run test:privacy-browsers
+      - name: Show the app logs when the check failed
+        if: failure()
+        run: cat app.log app-turnstile.log || true

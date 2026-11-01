@@ -821,6 +821,41 @@ describe("Square payment repository", () => {
       .toHaveBeenCalledWith(["receipt-1"]);
   });
 
+  it("charges the stored balance even when the request body carries an amount, a total or a fee (#1445)", async () => {
+    const tx = transactionClient();
+    const prisma = prismaFor(tx);
+    const attempt = processingAttempt();
+    tx.paymentAttempt.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(attempt);
+    tx.paymentAttempt.create.mockResolvedValue(attempt);
+    tx.paymentAttempt.update.mockResolvedValue({ ...attempt, status: "FAILED" });
+    dependencies.getPrisma.mockReturnValue(prisma);
+    const adapter = vi.fn().mockResolvedValue({
+      id: "square-payment-1",
+      status: "FAILED",
+      amountCents: 8_000,
+      currency: "USD",
+      createdAt: "2026-07-23T13:00:00.000Z",
+      updatedAt: "2026-07-23T13:00:01.000Z",
+    });
+
+    await createPublicSquarePayment(
+      "a".repeat(43),
+      // The route's schema refuses these keys; this proves the repository would not read them even if one slipped through.
+      { sourceId: "cnon:card-nonce-ok", idempotencyKey: attempt.clientIdempotencyKey, amountCents: 1, totalCents: 1, surchargeCents: 0, balanceCents: 1 } as never,
+      { configuration, createPayment: adapter, now: new Date("2026-07-23T13:00:01.000Z") },
+    ).catch(() => undefined);
+
+    // The stored $100.00 total less $20.00 already paid: $80.00, with no surcharge on this legacy registration.
+    expect(tx.paymentAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amountCents: 8_000, surchargeCents: 0 }) }),
+    );
+    expect(adapter).toHaveBeenCalledWith(configuration, expect.objectContaining({ amountCents: 8_000 }));
+    expect(adapter).not.toHaveBeenCalledWith(configuration, expect.objectContaining({ amountCents: 1 }));
+  });
+
   it("returns a completed attempt without calling Square again", async () => {
     const tx = transactionClient();
     const prisma = prismaFor(tx);
