@@ -477,7 +477,7 @@ describe("one full panel per page", () => {
     const markup = render([
       row("payment-setup", undefined), row("connected-services", undefined),
     ].map((signal, index) => ({ ...signal, serviceSetup: summarizeServices("x", index === 0 ? nothingSet().services.filter((service) => service.id.startsWith("payment")) : nothingSet().services, now).serviceSetup })));
-    const ids = [...markup.matchAll(/<ol class="[^"]*" id="(setup-help-[a-z-]+)"/g)].map((match) => match[1]);
+    const ids = [...markup.matchAll(/<details class="[^"]*" id="(setup-help-[a-z-]+)"/g)].map((match) => match[1]);
     expect(ids.length).toBeGreaterThan(0);
     expect(new Set(ids).size).toBe(ids.length);
   });

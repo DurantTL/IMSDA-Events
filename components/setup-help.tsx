@@ -60,13 +60,13 @@ export function SetupHelpPanel({
   }
   return (
     <div className={styles.setup} data-setup-help="steps">
-      <details className={`attendee-reg-action ${styles.disclosure}`}>
+      <details className={`attendee-reg-action ${styles.disclosure}`} id={setupKey ? setupHelpAnchor(setupKey) : undefined}>
         <summary>
           <span>{heading}{context && <span className="sr-only"> for {context}</span>}</span>
           <ChevronDown aria-hidden="true" size={16} />
         </summary>
         <div className={`attendee-reg-action-panel ${styles.panel}`}>
-          <ol className={styles.steps} id={setupKey ? setupHelpAnchor(setupKey) : undefined}>
+          <ol className={styles.steps}>
             {setup.steps.map((step, index) => <li key={index}>{step}</li>)}
           </ol>
           {setup.settingNames.length > 0 && (
