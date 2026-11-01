@@ -75,9 +75,10 @@ CLOUDFLARE_PURGE_WEBHOOK_URL=<the private webhook URL from the hosting panel>   
 ```
 
 This URL is a secret: anyone who has it can clear the cache. Keep it out of
-issues, chat and screenshots. With it set, the System report's "Security and
+issues, chat and screenshots. The value must be an `https://` address; anything
+else reads as "Not set up". With it set, the System report's "Security and
 setup" section has a **Clear Cloudflare cache** button (system administrators
-only, after a confirm step, three times an hour, each use logged). The button
+only, after a confirm step, three times an hour across all administrators, each use logged). The button
 sends `{"purge_everything": true}` and clears every cached file for
 events.imsda.org, so pages may load a little slower for a few minutes. It is an
 emergency tool, not a routine one. Unset, the row says "Not set up" and names

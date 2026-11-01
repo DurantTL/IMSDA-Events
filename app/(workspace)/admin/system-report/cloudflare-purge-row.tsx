@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { clockTime, useLimitExpiry } from "./tester-format";
 import styles from "./page.module.css";
 
-type Message = { tone: "ok" | "bad" | "warn"; text: string };
+type Message = { tone: "ok" | "bad"; text: string };
 
 /**
  * "Clear Cloudflare cache" (#1429), in the System report's Security and setup section. Only a yes/no "configured" comes
@@ -19,7 +19,7 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState<Message | null>(null);
   const [limitedUntil, setLimitedUntil] = useState<string | null>(null);
-  useLimitExpiry(limitedUntil, () => setLimitedUntil(null));
+  useLimitExpiry(limitedUntil, () => { setLimitedUntil(null); setError(""); });
 
   async function confirm() {
     setBusy(true);
@@ -31,9 +31,9 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
         setMessage({ tone: "ok", text: body.message ?? "Cloudflare cache cleared." });
         setOpen(false);
       } else if (response.status === 429 && body.nextAllowedAt) {
+        // Keep the dialog open and say it there, so focus stays in the dialog and returns to a live button on Cancel.
         setLimitedUntil(body.nextAllowedAt);
-        setMessage({ tone: "warn", text: `${body.message ?? "Limit reached."} You can try again at ${clockTime(body.nextAllowedAt, false)}.` });
-        setOpen(false);
+        setError(`${body.message ?? "Limit reached."} You can try again at ${clockTime(body.nextAllowedAt, false)}.`);
       } else {
         setError(body.message ?? "The cache could not be cleared. Try again.");
       }
@@ -49,22 +49,22 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
       <div className={styles.purgeText}>
         <strong>Clear Cloudflare cache</strong>
         <span>Clears every cached file for events.imsda.org. An emergency tool, not a routine one.</span>
-        {configured ? (
-          message && <span className={message.tone === "ok" ? styles.purgeOk : styles.purgeBad} role="status">{message.text}</span>
-        ) : (
+        {!configured && (
           <span className={styles.purgeBad}>
             <CloudOff aria-hidden="true" size={14} /> Not set up. Add <code>CLOUDFLARE_PURGE_WEBHOOK_URL</code> in the xCloud settings.
           </span>
         )}
+        <span aria-live="polite" className={message?.tone === "ok" ? styles.purgeOk : styles.purgeBad}>{configured && message ? message.text : ""}</span>
       </div>
       {configured && (
-        <button className="secondary-button" type="button" onClick={() => { setError(""); setMessage(null); setOpen(true); }} disabled={limitedUntil !== null}>
+        <button className="secondary-button" type="button" onClick={() => { setError(""); setMessage(null); setOpen(true); }}>
           Clear Cloudflare cache
         </button>
       )}
       <ConfirmDialog
         busy={busy}
         busyLabel="Clearing…"
+        confirmDisabled={limitedUntil !== null}
         confirmLabel="Clear cache"
         error={error}
         onCancel={() => setOpen(false)}

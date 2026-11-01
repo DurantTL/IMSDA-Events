@@ -31,7 +31,7 @@ export async function runCloudflarePurge(input: { user: { id: string }; now?: Da
       actorUserId: input.user.id,
       action: "SYSTEM_REPORT_CLOUDFLARE_PURGE",
       entityType: "CloudflareCache",
-      summary: "A system administrator cleared the Cloudflare cache from the System report.",
+      summary: `A system administrator asked Cloudflare to clear the cache from the System report: ${outcome === "purged" ? "cleared" : `failed (${outcome})`}.`,
       metadata: { outcome },
     });
   } catch (error) {

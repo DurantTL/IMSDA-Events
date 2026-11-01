@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement("a", { href, ...rest }, children as never) }));
-vi.mock("@/lib/logger", async () => ({ ...(await vi.importActual<object>("@/lib/logger")), logError: mocks.logError }));
+// The real logger runs (its redaction is part of what is under test); the spy only records the call.
+vi.mock("@/lib/logger", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
+  return { ...actual, logError: (...args: Parameters<typeof actual.logError>) => { mocks.logError(...args); return actual.logError(...args); } };
+});
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/request-security", () => ({
   rejectCrossOriginRequest: (request: Request) => (
@@ -47,9 +51,21 @@ function request(headers: Record<string, string> = { origin }) {
   return new Request(`${origin}/api/admin/system-report/cloudflare-purge`, { method: "POST", headers });
 }
 
+/** Turns Errors (which JSON.stringify drops) and nested values into text, so a secret anywhere in them is found. */
+function serialize(value: unknown, seen = new WeakSet<object>()): string {
+  return JSON.stringify(value, (_key, item) => {
+    if (item instanceof Error) return { name: item.name, message: item.message, stack: item.stack, cause: item.cause };
+    if (item && typeof item === "object") {
+      if (seen.has(item)) return "[circular]";
+      seen.add(item);
+    }
+    return item;
+  }) ?? "";
+}
+
 function everythingWritten() {
-  return JSON.stringify([
-    mocks.logError.mock.calls,
+  // What is actually written: the logger's console lines (after its redaction), console calls and audit rows.
+  return serialize([
     mocks.writeAuditLog.mock.calls,
     consoleSpies.map((spy) => spy.mock.calls),
   ]);
@@ -167,6 +183,7 @@ describe("the purge route", () => {
     await POST(request());
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     const entry = mocks.writeAuditLog.mock.calls[0][0];
+    expect(entry.summary).toContain(": cleared");
     expect(entry).toMatchObject({ actorUserId: "user_admin_1", action: "SYSTEM_REPORT_CLOUDFLARE_PURGE", entityType: "CloudflareCache", metadata: { outcome: "purged" } });
     expect(Object.keys(entry.metadata)).toEqual(["outcome"]);
   });
@@ -177,6 +194,8 @@ describe("the purge route", () => {
     const response = await POST(request());
     expect(response.status).toBe(502);
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toEqual({ outcome: "unreachable" });
+    expect(mocks.writeAuditLog.mock.calls[0][0].summary).toContain("failed (unreachable)");
+    expect(mocks.writeAuditLog.mock.calls[0][0].summary).not.toMatch(/: cleared/);
   });
 
   it("never lets the secret reach a log line, the console or the audit log", async () => {
@@ -189,6 +208,16 @@ describe("the purge route", () => {
     const written = everythingWritten();
     expect(written).not.toContain(SECRET_TOKEN);
     expect(written).not.toContain("purge.example.test");
+  });
+});
+
+describe("the leak check itself", () => {
+  it("catches a secret placed in an Error message", () => {
+    expect(JSON.stringify(new Error(`failed for ${SECRET_URL}`))).not.toContain(SECRET_TOKEN);
+    expect(serialize([new Error(`failed for ${SECRET_URL}`)])).toContain(SECRET_TOKEN);
+    expect(serialize({ nested: [{ cause: new Error(SECRET_URL) }] })).toContain(SECRET_TOKEN);
+    mocks.writeAuditLog({ summary: "x", metadata: { error: new Error(`failed for ${SECRET_URL}`) } });
+    expect(everythingWritten()).toContain(SECRET_TOKEN);
   });
 });
 
