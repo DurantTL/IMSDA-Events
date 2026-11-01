@@ -1,4 +1,4 @@
-import { Money } from "@/components/exact-value";
+import { ExactValue, Money } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -102,7 +102,7 @@ export default async function LedgerCheckPage({
               <li className={styles.issue} key={row.registrationId}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
-                    <strong>{row.confirmationCode} · {words(row.status)}</strong>
+                    <strong><ExactValue>{row.confirmationCode}</ExactValue> · {words(row.status)}</strong>
                     <span className={`${styles.badge} ${row.hasNoEntries ? "" : styles.badgeUrgent}`}>
                       {row.hasNoEntries ? "No ledger entries" : `${row.entryCount} ${row.entryCount === 1 ? "entry" : "entries"}`}
                     </span>

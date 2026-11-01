@@ -38,7 +38,8 @@ async function flow(browser: J.Browser, browserName: string, translate: boolean,
   const first = "Zed";
   const last = `Livecheck-${browserName}-${translate ? "t" : "p"}-${stamp}`;
 
-  const a = await J.newContext(browser, { translate, cookie });
+  // The translated runs use a phone width, where the dialog scrolls and the notice could sit out of view.
+  const a = await J.newContext(browser, { translate, cookie, width: translate ? 390 : 1280 });
   const b = await J.newContext(browser, { translate, cookie });
   const pageA = await a.newPage();
   const pageB = await b.newPage();
@@ -83,7 +84,19 @@ async function flow(browser: J.Browser, browserName: string, translate: boolean,
     await J.fillRosterForm(pageA, first, `${last}-blocked`);
     await J.submitRosterForm(pageA);
     if (!(await J.visibleText(pageA, "connection was lost or blocked"))) fail(`${mode}: a blocked save showed no message`);
-    else if (!(await pageA.getByRole("button", { name: /Reload/ }).first().isVisible())) fail(`${mode}: a blocked save showed no Reload button`);
+    else {
+      // The Reload button is inside the open dialog (the page behind it is covered by the backdrop) and can really be clicked.
+      const reload = J.rosterForm(pageA).getByRole("button", { name: /Reload/ });
+      if ((await reload.count()) !== 1) fail(`${mode}: the dialog's notice has no Reload button`);
+      else {
+        const inView = await reload.evaluate((node: Element) => {
+          const box = node.getBoundingClientRect();
+          return box.top >= 0 && box.bottom <= window.innerHeight;
+        });
+        if (!inView) fail(`${mode}: the dialog's Reload button is scrolled out of view`);
+      }
+      if ((await reload.count()) === 1) await reload.click({ trial: true, timeout: 5_000 }).catch((error: Error) => fail(`${mode}: the dialog's Reload button cannot be clicked: ${error.message.split("\n")[0]}`));
+    }
     await pageA.unroute(`**/api/attendee/clubs/${J.clubId}/roster`);
     await J.assertHealthy(pageA, `${mode}: after a blocked save`, failures);
 

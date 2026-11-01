@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
 import { AttendeeAccountSettings } from "@/components/attendee-account-settings";
@@ -43,7 +44,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
             {data.linkedAttendee && (
               <div>
                 <dt>Registration account</dt>
-                <dd>{`Linked to ${data.linkedAttendee.verifiedEmail}`}</dd>
+                <dd>Linked to <ExactValue>{data.linkedAttendee.verifiedEmail}</ExactValue></dd>
               </div>
             )}
           </dl>

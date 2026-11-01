@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
@@ -236,7 +237,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
               <Link href="/account">
                 <span>
                   <strong>My registrations</strong>
-                  {signedInName && <small>{`Signed in as ${signedInName}`}</small>}
+                  {signedInName && <small>Signed in as <ExactValue>{signedInName}</ExactValue></small>}
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </Link>

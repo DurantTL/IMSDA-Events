@@ -159,7 +159,17 @@ async function publicRegistration(context: J.BrowserContext) {
   await step(`${label}: review`, page, async () => {
     await expectText(page, /Review & submit/, `${label}: review step`);
     await expectText(page, /Registration total/, `${label}: totals`);
-    await expectExactValues(page, `${label}: review`, { amounts: 3, texts: ["$112.50", "pat@example.test"].filter((text) => text.startsWith("$")) });
+    await expectExactValues(page, `${label}: review`, { amounts: 3, texts: ["$112.50", "pat@example.test"] });
+  });
+  // Submit for real, with the simulation on: the server's total (promo applied) and a confirmation code come back.
+  await step(`${label}: submit and confirmation`, page, async () => {
+    // The first submit button is the phone's sticky copy and is hidden at desktop width; the last is the one in the form.
+    await page.locator("button[type=submit]").last().click();
+    await expectText(page, /Total recorded/, `${label}: confirmation`);
+    await expectText(page, "$112.50", `${label}: the server's total on the confirmation`);
+    await expectExactValues(page, `${label}: confirmation`, { amounts: 3, texts: ["$112.50"] });
+    const codes: string[] = await page.evaluate(() => Array.from(document.querySelectorAll('[translate="no"]')).map((node) => (node.textContent ?? "").trim()).filter((text) => /^[A-Z0-9]{2,}(?:-[A-Z0-9]+)+$/.test(text)));
+    if (codes.length === 0) fail(`${label}: no confirmation code in a translate="no" element`);
   });
   await page.close();
 }
@@ -248,7 +258,7 @@ async function clubPages(context: J.BrowserContext) {
     await page.locator('form button[type="submit"]').first().click();
     await name.fill("Transcheck Trailblazers");
     await page.locator('form button[type="submit"]').first().click();
-    await page.waitForTimeout(800);
+    await expectText(page, /Club settings saved/, "club settings form: saved notice");
   });
   await page.close();
 }
@@ -272,6 +282,13 @@ async function publicPages(context: J.BrowserContext) {
     await page.locator('form button[type="submit"]').first().click();
     await page.waitForTimeout(400);
     await email.fill("someone@example.test");
+    await page.locator('input[name="password"]').fill("not-the-password-1");
+    await page.locator('form button[type="submit"]').first().click();
+    // A wrong password gets one plain error message, still readable and in place after translation.
+    await page.locator("[role=alert].form-error").first().waitFor({ state: "visible", timeout: 15_000 });
+    await page.locator('input[name="password"]').fill("another-wrong-one-2");
+    await page.locator('form button[type="submit"]').first().click();
+    await page.waitForTimeout(500);
   });
   await page.close();
 }

@@ -95,6 +95,57 @@ describe("translate=\"no\" only on exact values (#1445, rule T1)", () => {
   });
 });
 
+/**
+ * Staff-only money screens whose tests assert the amount as contiguous sentence text. They still print bare
+ * `formatCents(...)`; every other page and component marks amounts `translate="no"` (use `<Money>`).
+ * Remove a file from this list when it is migrated; a file that no longer has a bare amount must be removed too.
+ */
+const bareMoneyAllowlist = new Set<string>([
+  "components/asset-closeout-workspace.tsx",
+  "components/asset-return-panel.tsx",
+  "components/attendance-reconciliation-controls.tsx",
+  "components/attendance-reconciliation.tsx",
+  "components/church-code-invoices.tsx",
+  "components/club-check-in-panel.tsx",
+]);
+
+function bareMoneyFiles() {
+  const found = new Set<string>();
+  for (const directory of ["app", "components"]) {
+    for (const file of sourceFiles(path.join(root, directory), [".tsx"])) {
+      const source = readFileSync(file, "utf8");
+      if (!source.includes("formatCents")) continue;
+      const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const exactAncestor = (node: ts.Node) => {
+        for (let up = node.parent; up; up = up.parent) {
+          if (!ts.isJsxElement(up)) continue;
+          const tag = up.openingElement.tagName.getText();
+          if (tag === "Money" || tag === "ExactValue") return true;
+          if (up.openingElement.attributes.properties.some((property) => ts.isJsxAttribute(property) && property.name.getText() === "translate")) return true;
+        }
+        return false;
+      };
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxExpression(node) && (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent)) && node.expression && ts.isCallExpression(node.expression)
+          && /^formatCents(Plain)?$/.test(node.expression.expression.getText()) && !exactAncestor(node)) {
+          found.add(path.relative(root, file));
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+    }
+  }
+  return found;
+}
+
+describe("amounts are exact values (#1445, rule T1)", () => {
+  it("no bare formatCents(...) in JSX outside the documented allowlist", () => {
+    const bare = [...bareMoneyFiles()].sort();
+    expect(bare.filter((file) => !bareMoneyAllowlist.has(file)), "use <Money cents={...} /> instead").toEqual([]);
+    expect([...bareMoneyAllowlist].filter((file) => !bare.includes(file)), "migrated: remove from the allowlist").toEqual([]);
+  });
+});
+
 describe("shared exact-value components", () => {
   it("ExactValue and its typed variants render translate=\"no\" around only the value", () => {
     expect(renderToStaticMarkup(ExactValue({ children: "Synthetic Club" }))).toBe('<span translate="no">Synthetic Club</span>');

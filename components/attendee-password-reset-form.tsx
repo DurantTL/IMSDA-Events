@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -85,7 +86,7 @@ export function AttendeePasswordResetForm({ securityCheck = null }: { securityCh
     return (
       <form className="auth-form" onSubmit={completeReset}>
         <div className="auth-success">
-          <strong>{`Check ${sentTo}`}</strong>
+          <strong>Check <ExactValue>{sentTo}</ExactValue></strong>
           <p>
             If that address has an account with a password, a six-digit code is on its way. Enter
             it here with your new password — the code only works in this browser, and it expires in

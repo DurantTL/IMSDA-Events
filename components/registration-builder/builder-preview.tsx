@@ -9,7 +9,6 @@ import { SearchableSelect } from "@/components/searchable-select";
 import type { AddressValue } from "@/modules/forms/address";
 import { getAvailabilityMode, isFieldVisible, isLatePricingActive, type RegistrationFormField } from "@/modules/forms/definition";
 import { type PreviewValue, localId } from "./builder-types";
-import { formatCents } from "@/modules/payments/format-cents";
 import { useLoadedBuilder } from "./builder-context";
 import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "./preview-continue";
 
@@ -89,7 +88,7 @@ export function BuilderPreview() {
       const tracksAvailability = getAvailabilityMode(field) !== "NONE";
       const price = isLatePricingActive(field, pricingPreviewDate) ? field.latePricing?.choicePricesCents?.[option] ?? field.choicePricesCents?.[option] : field.choicePricesCents?.[option];
       if (price === undefined && !tracksAvailability) return null;
-      return <small className={full ? "choice-availability full" : "choice-availability"}>{price !== undefined && <>{formatCents(price)}{tracksAvailability ? " · " : ""}</>}{tracksAvailability && <>{ranked && <>{stats.first} first · {stats.second} second · </>}{stats.total} interested{limit ? ` · limit ${limit}` : " · unlimited"}</>}</small>;
+      return <small className={full ? "choice-availability full" : "choice-availability"}>{price !== undefined && <><Money cents={price} />{tracksAvailability ? " · " : ""}</>}{tracksAvailability && <>{ranked && <>{stats.first} first · {stats.second} second · </>}{stats.total} interested{limit ? ` · limit ${limit}` : " · unlimited"}</>}</small>;
     };
     const choiceDescription = (option: string) => {
       const description = field.optionDescriptions?.[option]?.trim();

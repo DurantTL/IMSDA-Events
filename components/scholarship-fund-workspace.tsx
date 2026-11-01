@@ -132,7 +132,7 @@ export function ScholarshipFundWorkspace({
             <span><strong>{sponsor.name}</strong>{sponsor.unallocatedCents > 0 ? <small><Money cents={sponsor.unallocatedCents} /> received, not yet awarded</small> : null}</span>
             <span><Money cents={sponsor.receivedCents} /></span>
             <span><Money cents={sponsor.awardedCents} /></span>
-            <span>{sponsor.outstandingCents > 0 ? <strong><Money cents={sponsor.outstandingCents} /></strong> : formatCents(0)}</span>
+            <span>{sponsor.outstandingCents > 0 ? <strong><Money cents={sponsor.outstandingCents} /></strong> : <Money cents={0} />}</span>
           </div>
         ))}
         {summary.generalAwardedCents > 0 && (

@@ -173,8 +173,8 @@ export function RegistrationMoveApprovals() {
                   honor class seats, capacity choices and history.
                 </p>
                 <dl className="transfer-totals">
-                  <div><dt>{`${move.fromClubName} total`}</dt><dd><Money cents={move.fromRegistration.totalCents} /> → <Money cents={move.fromRegistration.totalCents - shift} /></dd></div>
-                  <div><dt>{`${move.toClubName} total`}</dt><dd><Money cents={move.toRegistration.totalCents} /> → <Money cents={move.toRegistration.totalCents + shift} /></dd></div>
+                  <div><dt><ExactValue>{move.fromClubName}</ExactValue> total</dt><dd><Money cents={move.fromRegistration.totalCents} /> → <Money cents={move.fromRegistration.totalCents - shift} /></dd></div>
+                  <div><dt><ExactValue>{move.toClubName}</ExactValue> total</dt><dd><Money cents={move.toRegistration.totalCents} /> → <Money cents={move.toRegistration.totalCents + shift} /></dd></div>
                 </dl>
                 <p>
                   <strong>Nothing is repriced.</strong> {move.fromClubName}&apos;s registration still carries this

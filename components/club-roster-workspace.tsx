@@ -1,6 +1,5 @@
 "use client";
 import { LiveListBoundary, ReloadButton } from "@/components/live-list-boundary";
-import { ExactValue } from "@/components/exact-value";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
@@ -233,6 +232,14 @@ function ClubRosterWorkspaceInner({
   const [error, setError] = useState("");
   /** The request never reached the server (blocked, offline): the list on screen may be out of date, so offer Reload (#1445). */
   const [connectionLost, setConnectionLost] = useState(false);
+  /** The dialog's own notice: a blocked save scrolls it into view and focuses it, so it is seen on a phone (#1445). */
+  const dialogNoticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (connectionLost && dialogNoticeRef.current) {
+      dialogNoticeRef.current.scrollIntoView({ block: "nearest" });
+      dialogNoticeRef.current.focus();
+    }
+  }, [connectionLost, error]);
   const [notice, setNotice] = useState("");
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
@@ -680,7 +687,7 @@ function ClubRosterWorkspaceInner({
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && (
         <div className="inline-notice error" role="alert">
-          {error}
+          <span>{error}</span>
           {connectionLost && <ReloadButton />}
         </div>
       )}
@@ -914,7 +921,7 @@ function ClubRosterWorkspaceInner({
                                 case "name": return (
                                   <td className="roster-card-name" data-label="Name" key={column}>
                                     <strong className={styles.rosterMemberName} translate="no">{member.lastName}, {member.firstName}</strong>
-                                    {member.role && <span className={styles.rosterMemberRole}>Role: <ExactValue>{member.role}</ExactValue></span>}
+                                    {member.role && <span className={styles.rosterMemberRole}>{`Role: ${member.role}`}</span>}
                                     {classHistoryBase && member.personId && (
                                       <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                         Class history<span className="sr-only">{` for ${label}`}</span>
@@ -1053,7 +1060,12 @@ function ClubRosterWorkspaceInner({
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        {error && (
+          <div className="inline-notice error" ref={dialogNoticeRef} role="alert" tabIndex={-1}>
+            <span>{error}</span>
+            {connectionLost && <ReloadButton />}
+          </div>
+        )}
         {contactsOnlyDialog ? (
           <p className="field-help">Next year&apos;s roster. Only emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
         ) : (

@@ -1833,7 +1833,7 @@ export function PublicRegistrationForm({
                 aria-describedby={hintId}
                 onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked ? promoSharedCode : "")}
               />
-              <span>{`Covered by the code ${promoSharedCode}: ${personName}`}</span>
+              <span>Covered by the code <ExactValue>{promoSharedCode}</ExactValue>: <ExactValue>{personName}</ExactValue></span>
             </label>
             <small id={hintId}>{`Leave this unticked if ${personName} pays for themselves.`}</small>
             {notice && (
@@ -2641,7 +2641,7 @@ export function PublicRegistrationForm({
                     {(group ?? club)?.renderAttendeeExtras?.(attendee, attendeeIndex)}
                     {inSheet && (
                       <div className="public-registration-attendee-sheet-footer">
-                        <button type="button" onClick={closeAttendee}>{`Done with ${displayName}`}</button>
+                        <button type="button" onClick={closeAttendee}>Done with <ExactValue>{displayName}</ExactValue></button>
                       </div>
                     )}
                 </div>
@@ -2833,7 +2833,7 @@ export function PublicRegistrationForm({
           {answers.map(({ field, answer }) => (
             <div key={field.id}>
               <dt>{field.label}</dt>
-              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined}>{answer}</dd>
+              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined} translate={field.type === "EMAIL" || field.type === "PHONE" || isCodeLikeAnswer(answer) ? "no" : undefined}>{answer}</dd>
             </div>
           ))}
         </dl>

@@ -131,16 +131,19 @@ function files(directory: string, extensions: string[], found: string[] = []) {
 describe("nothing in the app caches a live list (#1445, rule P2)", () => {
   it("every browser GET in a component asks the server (cache: \"no-store\")", () => {
     const offenders: string[] = [];
-    for (const file of files(path.join(root, "components"), [".ts", ".tsx"])) {
+    for (const file of [...files(path.join(root, "components"), [".ts", ".tsx"]), ...files(path.join(root, "app"), [".tsx"])]) {
       const source = readFileSync(file, "utf8");
       if (!/\bfetch\(/.test(source)) continue;
+      // In app/ only client components run in the browser; route handlers and server pages are not checked here.
+      if (file.includes(`${path.sep}app${path.sep}`) && !/^\s*["']use client["']/.test(source)) continue;
       const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
       const visit = (node: ts.Node) => {
         if (ts.isCallExpression(node) && node.expression.getText() === "fetch") {
           const init = node.arguments[1];
           const text = init ? init.getText() : "";
           // A call with an options variable or spread is checked by hand; a literal init either names a method (a write) or says no-store.
-          const isWrite = /\bmethod\b/.test(text);
+          // Only a non-GET method is exempt; `method: "GET"` is a read. A shorthand `method,` names a variable, which is a write helper.
+          const isWrite = /\bmethod\b/.test(text) && !/method\s*:\s*["']GET["']/i.test(text);
           if (!isWrite && !/cache\s*:\s*"no-store"/.test(text) && !(init && !ts.isObjectLiteralExpression(init)) && !/\.\.\./.test(text)) {
             offenders.push(`${path.relative(root, file)}:${sf.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
           }
