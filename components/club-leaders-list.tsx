@@ -39,7 +39,7 @@ export function ClubLeadersList({
           </select>
         </label>
         <button className="primary-button" type="submit">Show</button>
-        {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear</Link> : null}
+        {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear filters</Link> : null}
       </form>
       <p className={styles.count} role="status">
         {leaders.length === 0 ? "No current club leaders found." : leaders.length >= CLUB_LEADERS_MAX_ROWS ? `Showing the first ${leaders.length} current roles. Pick a club or role to narrow the list.` : `${leaders.length} current ${leaders.length === 1 ? "role" : "roles"}.`}

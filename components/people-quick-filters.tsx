@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
-import { isCurrentAddress, useDebouncedCallback } from "@/components/search-as-you-type";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { isCurrentAddress, useDebouncedCallback, useListNavigation } from "@/components/search-as-you-type";
 import {
   PEOPLE_FILTER_SEVERAL,
   parsePeopleFilters,
@@ -20,7 +19,7 @@ type Dimension = "role" | "event" | "club";
 
 /**
  * The search box and the Role, Event and Club selects (#1321). Changing a select goes straight to the filtered list
- * (`router.push` inside a transition, so the select stays mounted and keeps focus). It is still a plain GET form, so
+ * (a history push inside a transition, so the select stays mounted and keeps focus). It is still a plain GET form, so
  * without JavaScript the Search/Apply button does the same job. When the Filters panel chose several values for a
  * select, that select shows "Several (n)", and hidden `keep*` inputs carry the values through a no-JavaScript submit.
  */
@@ -37,8 +36,7 @@ export function PeopleQuickFilters({
   eventOptions: readonly Option[];
   clubOptions: readonly Option[];
 }) {
-  const router = useRouter();
-  const [busy, startTransition] = useTransition();
+  const { go, pending: busy } = useListNavigation();
   // What the selects show: the URL's filters, replaced at once by the tidied result of the viewer's own change.
   const signature = peopleHref({ filters });
   const [shown, setShown] = useState(filters);
@@ -58,7 +56,8 @@ export function PeopleQuickFilters({
     }, scope);
     setShown(next);
     const typed = event.currentTarget.form ? String(new FormData(event.currentTarget.form).get("q") ?? "").trim() : query;
-    startTransition(() => router.replace(peopleHref({ query: typed, filters: next }), { scroll: false }));
+    // A select change is a filter change: push, so Back undoes it (rule B2, #1456).
+    go(peopleHref({ query: typed, filters: next }), "push");
   };
 
   // With JavaScript, the search goes to the canonical repeated-param URL (page 1, no __several / keep* form fields),
@@ -70,7 +69,7 @@ export function PeopleQuickFilters({
     const typed = String(new FormData(form).get("q") ?? "").trim();
     const href = peopleHref({ query: typed, filters: shown });
     if (isCurrentAddress(href)) return;
-    startTransition(() => router.replace(href, { scroll: false }));
+    go(href, "replace");
   };
   const typing = useDebouncedCallback(apply);
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -122,7 +121,7 @@ export function PeopleQuickFilters({
       {shown.eventIds.length > 1 ? shown.eventIds.map((id) => <input key={id} name="keepEvent" type="hidden" value={id} />) : null}
       {shown.clubIds.length > 1 ? shown.clubIds.map((id) => <input key={id} name="keepClub" type="hidden" value={id} />) : null}
       <button className="primary-button" type="submit">{active ? "Apply" : "Search"}</button>
-      {query ? <Link className="secondary-button" href={peopleHref({ filters })} onClick={() => typing.cancel()}>Clear</Link> : null}
+      {query || active ? <Link className="secondary-button" href={peopleHref({})} onClick={() => typing.cancel()}>Clear filters</Link> : null}
     </form>
   );
 }

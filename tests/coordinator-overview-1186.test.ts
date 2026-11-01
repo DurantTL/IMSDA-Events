@@ -213,16 +213,16 @@ describe("overview markup (#1186)", () => {
     expect(out).not.toContain("Echo Club");
   });
 
-  it("offers Clear search for a search with no results, and says that differently from no clubs", () => {
+  it("offers Clear filters for a search with no results, and says that differently from no clubs", () => {
     const none = render(ready(six), "zzz");
     expect(none).toContain("No club name matches");
-    expect(none).toContain("Clear search");
+    expect(none).toContain("Clear filters");
     expect(none).toContain('href="/account/area-clubs/overview?year=2026-27"');
     expect(none).toContain("0 of 6 clubs shown");
     const empty = render(ready([]));
     expect(empty).toContain("No active clubs are available to this role yet.");
     expect(empty).not.toContain("No club name matches");
-    expect(empty).not.toContain("Clear search");
+    expect(empty).not.toContain("Clear filters");
   });
 
   it("labels the full-year export and keeps it independent of the search", () => {

@@ -126,13 +126,13 @@ describe("Monthly Records (#1187)", () => {
     expect(html).toContain("Monthly Record status by club for 2026-27");
   });
 
-  it("says plainly when a search has no match or there are no clubs, and offers Clear search only for the first", () => {
+  it("says plainly when a search has no match or there are no clubs, and offers Clear filters only for the first", () => {
     const none = monthly([], "zzz");
     expect(none).toContain("No club name matches");
-    expect(none).toContain("Clear search");
+    expect(none).toContain("Clear filters");
     const empty = monthly([], "", 0);
     expect(empty).toContain("No active clubs are available to this role yet.");
-    expect(empty).not.toContain("Clear search");
+    expect(empty).not.toContain("Clear filters");
   });
 
   it("keeps long club and church names whole", () => {
@@ -246,9 +246,9 @@ describe("Club events (#1187)", () => {
     expect(html).toContain("You cannot register a club, change a registration or pay a balance, including for an event a church is billed for.");
   });
 
-  it("narrows by search, with Clear search for no match, and says no events when there are none", () => {
+  it("narrows by search, with Clear filters for no match, and says no events when there are none", () => {
     expect(render("alp")).not.toContain("Delta Club");
-    expect(render("zzz")).toContain("Clear search");
+    expect(render("zzz")).toContain("Clear filters");
     const none = renderToStaticMarkup(createElement(CoordinatorClubEvents, { clearHref: "/x", events: [], query: "" }));
     expect(none).toContain("No club events are published for this club year.");
   });
