@@ -81,6 +81,8 @@ function fakeStore(options: { suppressed?: boolean; historyFails?: boolean; prio
     updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
       if (where.id !== message.id || (where.status && where.status !== message.status)) return { count: 0 };
       if ("lockToken" in where && where.lockToken !== message.lockToken) return { count: 0 };
+      // Stale recovery reserves a row by lockedAt too.
+      if (where.lockedAt instanceof Date && (message.lockedAt as Date | null)?.getTime() !== where.lockedAt.getTime()) return { count: 0 };
       Object.assign(message, data);
       return { count: 1 };
     }),
@@ -353,11 +355,46 @@ describe("a crash during a backup send cannot lead to a second send (#1444)", ()
     expect(providerAtSend).toBe("SES");
   });
 
-  it("the stamp refreshes the row's lock time, so a recovery that read the row earlier cannot reserve it", async () => {
+  it("the stamp moves the row's lock time forward from the claim", async () => {
     const store = fakeStore();
-    let lockedAtDuringSend: unknown;
-    await run(store, providers({ ses: () => refused(), resend: () => { lockedAtDuringSend = store.message.lockedAt; return undefined; } }));
-    expect(lockedAtDuringSend).toEqual(now);
+    let tick = 0;
+    const clock = () => new Date(now.getTime() + (tick += 1000));
+    let lockedAtAtClaim: unknown;
+    let lockedAtAtBackup: unknown;
+    await run(store, providers({
+      ses: () => { lockedAtAtClaim = store.message.lockedAt; return refused(); },
+      resend: () => { lockedAtAtBackup = store.message.lockedAt; return undefined; },
+    }), { now: clock });
+    expect((lockedAtAtBackup as Date).getTime()).toBeGreaterThan((lockedAtAtClaim as Date).getTime());
+  });
+
+  it("a recovery that read the row before the real stamp cannot reserve it, and records nothing", async () => {
+    const store = fakeStore();
+    let snapshot: Record<string, unknown> | null = null;
+    let nested: Awaited<ReturnType<typeof run>> | null = null;
+    const mocks = providers({
+      // The row as a recovery would have read it: claimed, not yet stamped.
+      ses: () => { snapshot = { id: "message-1", attemptCount: 0, lockToken: store.message.lockToken, lockedAt: store.message.lockedAt, provider: store.message.provider }; return refused(); },
+      // The live worker has stamped the row and is calling Resend. Now the recovery that read the old snapshot runs.
+      resend: () => {
+        store.prisma.messageOutbox.findMany.mockImplementationOnce((async () => [snapshot]) as never);
+        return undefined;
+      },
+    });
+    // The nested recovery must run while the stamped row is still PROCESSING, so it is started from the Resend call.
+    const original = mocks.sendEmail.getMockImplementation()!;
+    mocks.sendEmail.mockImplementation(async (payload, configuration) => {
+      const outcome = await original(payload, configuration);
+      if (!isSesEmailConfiguration(configuration)) nested = await run(store, providers());
+      return outcome;
+    });
+    // An advancing clock: the claim and the stamp must get different lock times.
+    let tick = 0;
+    await run(store, mocks, { now: () => new Date(now.getTime() + (tick += 1000)) });
+    expect(nested).not.toBeNull();
+    expect(nested!.recoveredIds).toEqual([]);
+    expect(store.attempts.map((attempt) => attempt.errorCode)).not.toContain("STALE_DELIVERY_LOCK");
+    expect(store.message).toMatchObject({ status: "SENT", provider: "RESEND" });
   });
 
   it("does not call Resend when the stamp cannot be written, and retries later", async () => {

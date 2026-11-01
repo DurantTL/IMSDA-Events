@@ -335,8 +335,9 @@ three conditions hold: `EMAIL_PROVIDER=ses`, `EMAIL_BACKUP_PROVIDER=resend` and 
 `RESEND_API_KEY`. Any other value, or a missing key, turns it off and the System
 report says so; sending through SES is never affected. Redeploy so the container
 restarts with the new values.
-Before removing `EMAIL_BACKUP_PROVIDER`, wait about 10 minutes so sends already handed
-to Resend finish and are recorded correctly.
+Remove `EMAIL_BACKUP_PROVIDER` only when the System report's **Emails sent by backup**
+shows no recent backup use and Amazon SES is healthy. A redeploy can cut off a send that
+is in progress through Resend, so do not switch the backup off while it is being used.
 
 **DNS for both services.** Each service needs its own proof that it may send for
 the sending domain (`imsda.org`, and `imadventist.org` if it is used):
