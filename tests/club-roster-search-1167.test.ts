@@ -220,7 +220,7 @@ describe("what a row says (#1167)", () => {
 
   it("keeps a person's role under their name, so a phone card shows name, role, age and Edit", () => {
     const out = html();
-    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}" translate="no">Role: Pathfinder</span>`);
+    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}">Role: <span translate="no">Pathfinder</span></span>`);
     expect(out).toContain('data-label="Age"');
     expect(out).toContain('aria-label="Edit Sam Fixture-a"');
   });
@@ -474,7 +474,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
     const out = html();
     expect(out).toContain("Show gender");
     expect(out).not.toContain("More columns");
-    expect(out).toContain("Role: Pathfinder");
+    expect(out).toContain("Role: <span translate=\"no\">Pathfinder</span>");
   });
 
   it("keeps Edit and the Actions trigger at 44px at every width and opens the menu in the flow", () => {

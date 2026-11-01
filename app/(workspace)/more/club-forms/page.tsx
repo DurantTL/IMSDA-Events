@@ -93,7 +93,7 @@ export default async function StaffClubFormsPage({
                   <tr key={row.id}>
                     <th scope="row" translate="no">{row.organizationName}</th>
                     <td>{row.templateName}</td>
-                    <td translate="no">{row.subjectName || "Not named"}</td>
+                    <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
                     <td>{formatDate(row.submittedAt)}</td>
                     <td>{row.enteredVia === "LINK" ? "Private link" : "Club director"}</td>
                     <td><Link className="secondary-button" href={`/more/club-forms/${row.id}${eventQuery}`}>Open</Link></td>

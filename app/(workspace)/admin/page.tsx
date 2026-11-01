@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { systemRoleText } from "@/modules/access/role-descriptions";
@@ -322,7 +322,7 @@ export default async function SystemAdminPage({
                   <span><strong>{event.waitingCount}</strong><small>Waitlisted</small></span>
                   <span>
                     <Link href={`/finance?${query}`} title="Money still owed on active registrations">
-                      <strong>{formatCents(event.ledgerBalanceCents, { wholeDollars: true })}</strong><small>Outstanding balance</small>
+                      <strong><Money cents={event.ledgerBalanceCents} options={{ wholeDollars: true }} /></strong><small>Outstanding balance</small>
                     </Link>
                   </span>
                 </div>

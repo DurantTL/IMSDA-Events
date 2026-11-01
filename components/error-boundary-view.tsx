@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useEffect } from "react";
 import { CircleAlert, RotateCw } from "lucide-react";
@@ -39,7 +40,7 @@ export function ErrorBoundaryView({ error, retry, variant }: ErrorBoundaryViewPr
         <button className="primary-button app-error-action" onClick={() => retry()} type="button">
           <RotateCw size={16} aria-hidden="true" /> Try again
         </button>
-        <a className="app-error-support" href={`mailto:${SUPPORT_EMAIL}`}>Email the IMSDA youth office at {SUPPORT_EMAIL}</a>
+        <a className="app-error-support" href={`mailto:${SUPPORT_EMAIL}`}>Email the IMSDA youth office at <ExactValue>{SUPPORT_EMAIL}</ExactValue></a>
       </div>
     </section>
   );

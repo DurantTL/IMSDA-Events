@@ -114,7 +114,7 @@ export function ClubImportYearMove({
                   <p><strong>{current.conflicts.length} conflict{current.conflicts.length === 1 ? "" : "s"}. Nothing can be moved until each is resolved:</strong></p>
                   <ul className="club-import-problems">
                     {current.conflicts.map((conflict, index) => (
-                      <li key={`${conflict.kind}-${"rosterMemberId" in conflict ? conflict.rosterMemberId : index}`} translate="no">
+                      <li key={`${conflict.kind}-${"rosterMemberId" in conflict ? conflict.rosterMemberId : index}`}>
                         {conflictLabel(conflict, current.toYear)}
                       </li>
                     ))}

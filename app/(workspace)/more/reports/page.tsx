@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
@@ -425,7 +426,7 @@ export default async function OperationalReportsPage({
                   <tbody role="rowgroup">
                     {report.volunteerRoster.map((volunteer) => (
                       <tr role="row" key={`${volunteer.attendeeId}-${volunteer.question}`}>
-                        <th role="rowheader" scope="row" translate="no">{volunteer.lastName}, {volunteer.firstName}<small className="quiet-copy"> · {volunteer.attendeeType}</small></th>
+                        <th role="rowheader" scope="row"><ExactValue>{volunteer.lastName}, {volunteer.firstName}</ExactValue><small className="quiet-copy"> · {volunteer.attendeeType}</small></th>
                         <td {...cardCell("Answer")}>{volunteer.answer}{report.volunteers.length > 1 && <small className="quiet-copy"> · {volunteer.question}</small>}</td>
                         <td {...cardCell("Phone")} translate="no">{volunteer.phone || "—"}</td>
                         <td {...cardCell("Group")}>{volunteer.groupLabel ?? "—"}</td>

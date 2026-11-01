@@ -179,7 +179,7 @@ export default async function ClubEventRegistrationPage({
               <li key={entry.draftKey}>
                 <CalendarDays size={17} aria-hidden="true" />
                 <span>
-                  <strong translate="no">{entry.teamName || "Unnamed team"}</strong>
+                  <strong translate={entry.teamName ? "no" : undefined}>{entry.teamName || "Unnamed team"}</strong>
                   <small>Not submitted yet · {entry.selectedCount} chosen</small>
                 </span>
                 <Link className="secondary-button club-event-action" href={`${eventBase}?draft=${encodeURIComponent(entry.draftKey)}`}>
@@ -231,7 +231,7 @@ export default async function ClubEventRegistrationPage({
             {workspace.registration.confirmationEmail.supportEmail && (
               <>
                 {" "}Questions? Email{" "}
-                <a href={`mailto:${workspace.registration.confirmationEmail.supportEmail}`}>
+                <a href={`mailto:${workspace.registration.confirmationEmail.supportEmail}`} translate="no">
                   {workspace.registration.confirmationEmail.supportEmail}
                 </a>.
               </>
@@ -247,7 +247,7 @@ export default async function ClubEventRegistrationPage({
           )}
           {workspace.registration.permissionNotices.length > 0 && (
             <ul className={`inline-notice team-permission-notices${workspace.registration.permissionNotices.some((notice) => notice.status !== "GRANTED") ? " warning" : ""}`} role="status">
-              {workspace.registration.permissionNotices.map((notice) => <li key={notice.attendeeId} translate="no">{notice.text}</li>)}
+              {workspace.registration.permissionNotices.map((notice) => <li key={notice.attendeeId}>{notice.text}</li>)}
             </ul>
           )}
           <div className="field-help">

@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useId } from "react";
 import {
@@ -257,7 +258,7 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
             const registration = club.totalPoints - club.reportPoints;
             return (
               <li className={styles.barRow} key={club.id}>
-                <span className={styles.barName} translate="no">{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}{club.name}</span>
+                <span className={styles.barName}>{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}<ExactValue>{club.name}</ExactValue></span>
                 <span aria-hidden="true" className={styles.barTrack}>
                   <span className={styles.barReport} style={{ width: `${(club.reportPoints / max) * 100}%` }} title={`Report points: ${number(club.reportPoints)}`} />
                   <span className={styles.barRegistration} style={{ width: `${(registration / max) * 100}%` }} title={`Yearly registration: ${number(registration)}`} />

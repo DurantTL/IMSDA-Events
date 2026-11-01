@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
@@ -1832,9 +1833,9 @@ export function PublicRegistrationForm({
                 aria-describedby={hintId}
                 onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked ? promoSharedCode : "")}
               />
-              <span>Covered by the code {promoSharedCode}: {personName}</span>
+              <span>{`Covered by the code ${promoSharedCode}: ${personName}`}</span>
             </label>
-            <small id={hintId}>Leave this unticked if {personName} pays for themselves.</small>
+            <small id={hintId}>{`Leave this unticked if ${personName} pays for themselves.`}</small>
             {notice && (
               <small className={notice.ok ? "public-registration-promo-success" : "field-error"} role={notice.ok ? "status" : "alert"} aria-live="polite">
                 {notice.ok && <BadgePercent size={15} aria-hidden="true" />} {notice.text}
@@ -2024,7 +2025,7 @@ export function PublicRegistrationForm({
       return (
         <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused} aria-describedby={description}>
           <legend>{fieldLabel(field, context)}</legend>
-          <small>Choose {minimum > 0 ? `at least ${minimum} and ` : ""}up to {maximum}.</small>
+          <small>{`Choose ${minimum > 0 ? `at least ${minimum} and ` : ""}up to ${maximum}.`}</small>
           <div className="public-registration-choice-list">
             {field.options.map((option, index) => {
               const { full } = choiceState(field, option);
@@ -2433,7 +2434,7 @@ export function PublicRegistrationForm({
                 : "Review the event options that apply separately to each attendee."}
             </p>
           </div>
-          <strong>{attendees.length} of {roster.maxAttendees}</strong>
+          <strong>{`${attendees.length} of ${roster.maxAttendees}`}</strong>
         </header>
 
         <p className="sr-only" aria-live="polite">{rosterAnnouncement}</p>
@@ -2640,7 +2641,7 @@ export function PublicRegistrationForm({
                     {(group ?? club)?.renderAttendeeExtras?.(attendee, attendeeIndex)}
                     {inSheet && (
                       <div className="public-registration-attendee-sheet-footer">
-                        <button type="button" onClick={closeAttendee}>Done with {displayName}</button>
+                        <button type="button" onClick={closeAttendee}>{`Done with ${displayName}`}</button>
                       </div>
                     )}
                 </div>
@@ -2856,7 +2857,7 @@ export function PublicRegistrationForm({
               </div>
               {rosterSummary.byRole.map((row) => (
                 <div key={row.role}>
-                  <dt translate="no">{row.role}</dt>
+                  <dt>{row.role}</dt>
                   <dd>{row.count}</dd>
                 </div>
               ))}
@@ -2909,7 +2910,7 @@ export function PublicRegistrationForm({
                 {lodgingLine ? `. Lodging charge ${formatCents(lodgingLine.amountCents, { grouping: false })} is part of your total below.` : joiningWaitlist ? ". Saved with your waitlist request; nothing is charged for lodging now." : ". Included in your registration."}
               </p>
             )}
-            {lodgingSubmission && ((lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)) > 0 && <p>Roommate requests: {(lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)}. Each stays private until the other person asks for you too, or the event team approves it.</p>}
+            {lodgingSubmission && ((lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)) > 0 && <p>{`Roommate requests: ${(lodgingSubmission.roommates?.length ?? 0) + (lodgingSubmission.roommatesWithin?.length ?? 0)}. Each stays private until the other person asks for you too, or the event team approves it.`}</p>}
           </section>
         )}
 
@@ -2957,7 +2958,7 @@ export function PublicRegistrationForm({
           {deferredOrganizationBilling ? (
             <>
               <ChurchInvoiceNotice terms={shownInvoiceTerms} price={perPerson} className="public-registration-review-lines" />
-              {displayedPromoCode && <p>Promo code {displayedPromoCode} applied.</p>}
+              {displayedPromoCode && <p>Promo code <ExactValue>{displayedPromoCode}</ExactValue> applied.</p>}
             </>
           ) : calculation.lineItems.length > 0 ? (
             <div className="public-registration-review-lines">
@@ -2974,7 +2975,7 @@ export function PublicRegistrationForm({
               {displayedDiscountCents > 0 && (
                 <>
                   <div className="is-discount">
-                    <span>Promo code {displayedPromoCode}</span>
+                    <span>Promo code <ExactValue>{displayedPromoCode}</ExactValue></span>
                     <strong translate="no">−{formatCents(displayedDiscountCents)}</strong>
                   </div>
                   <div>
@@ -3412,7 +3413,7 @@ export function PublicRegistrationForm({
                 <div><span>Subtotal</span><strong translate="no">{formatCents(confirmation.preDiscountSubtotalCents ?? 0)}</strong></div>
                 {(confirmation.discountAmountCents ?? 0) > 0 && (
                   <>
-                    <div className="is-discount"><span>Promo code {confirmation.promoCode}</span><strong translate="no">−{formatCents(confirmation.discountAmountCents ?? 0)}</strong></div>
+                    <div className="is-discount"><span>Promo code <ExactValue>{confirmation.promoCode}</ExactValue></span><strong translate="no">−{formatCents(confirmation.discountAmountCents ?? 0)}</strong></div>
                     <div><span>Discounted subtotal</span><strong translate="no">{formatCents(confirmation.subtotalCents ?? 0)}</strong></div>
                   </>
                 )}
@@ -3720,7 +3721,7 @@ export function PublicRegistrationForm({
               <div><span>Subtotal</span><strong translate="no">{formatCents(displayedPreDiscountSubtotalCents)}</strong></div>
               {displayedDiscountCents > 0 && (
                 <>
-                  <div className="is-discount"><span>Promo code {displayedPromoCode}</span><strong translate="no">−{formatCents(displayedDiscountCents)}</strong></div>
+                  <div className="is-discount"><span>Promo code <ExactValue>{displayedPromoCode}</ExactValue></span><strong translate="no">−{formatCents(displayedDiscountCents)}</strong></div>
                   <div><span>Discounted subtotal</span><strong translate="no">{formatCents(calculation.subtotalCents ?? 0)}</strong></div>
                 </>
               )}
@@ -3728,7 +3729,7 @@ export function PublicRegistrationForm({
               <div className="is-total"><span>{joiningWaitlist ? "Estimated if promoted" : group ? "Estimated total" : "Total"}</span><strong translate="no">{formatCents((joiningWaitlist ? calculation.subtotalCents : calculation.totalCents) ?? 0)}</strong></div>
             </div>
           )}
-          <small className="public-registration-pricing-date">Pricing verified for {formatPricingDate(pricingDate)}</small>
+          <small className="public-registration-pricing-date">{`Pricing verified for ${formatPricingDate(pricingDate)}`}</small>
           <div className="public-registration-summary-note">{joiningWaitlist ? <Clock3 size={15} aria-hidden="true" /> : <LockKeyhole size={15} aria-hidden="true" />}<span>{joiningWaitlist ? "This estimate is not charged while you are on the waitlist." : group ? `${group.billingNotice}${group.noCost ? "" : " No payment is due online."}` : deferredOrganizationBilling ? "No payment is due online." : "Final pricing and availability are confirmed securely on submission."}</span></div>
         </aside>
       </form>
@@ -3748,7 +3749,7 @@ export function PublicRegistrationForm({
             open={pendingIndex >= 0}
             title={`Remove ${pendingName} and their answers?`}
           >
-            <p>Everything entered for {pendingName} will be cleared. Cancel keeps every answer.</p>
+            <p>{`Everything entered for ${pendingName} will be cleared. Cancel keeps every answer.`}</p>
           </ConfirmDialog>
         );
       })()}

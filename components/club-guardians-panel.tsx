@@ -69,7 +69,7 @@ function GuardianCell({ guardian }: { guardian: GuardianRecord | undefined }) {
   return (
     <span className="club-guardian-cell">
       <small className="club-guardian-term">{EMERGENCY_CONTACT_TERM.singular}</small>
-      <strong translate="no">{guardian.name || "Name not given"}</strong>
+      <strong translate={guardian.name ? "no" : undefined}>{guardian.name || "Name not given"}</strong>
       {guardian.relationship && <small>{guardian.relationship}</small>}
       {guardian.phone && <a href={`tel:${guardian.phone.replace(/[^0-9+]/g, "")}`} translate="no"><Phone aria-hidden="true" size={12} /> {guardian.phone}</a>}
       {guardian.email && <a href={`mailto:${guardian.email}`} translate="no">{guardian.email}</a>}

@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
 import type { DirectorSterlingPerson } from "@/modules/background-checks/director-follow-up";
 
@@ -29,8 +30,8 @@ export function DirectorSterlingFollowUp({ people }: { people: DirectorSterlingP
             <tbody>
               {people.map((person) => (
                 <tr key={person.attendeeId}>
-                  <th scope="row" translate="no">
-                    {person.lastName}, {person.firstName}
+                  <th scope="row">
+                    <ExactValue>{person.lastName}, {person.firstName}</ExactValue>
                     <small className="quiet-copy"> · {person.attendeeType}</small>
                   </th>
                   <td>{backgroundFlagLabels[person.state]}</td>

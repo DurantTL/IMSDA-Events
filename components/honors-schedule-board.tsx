@@ -315,7 +315,7 @@ function RowCells({ row, section, columns, clashes, selected, dragId, overKey, b
   return (
     <>
       <div className="schedule-rowhead">
-        <strong translate="no">{row.room ? row.room.name : "No room yet"}</strong>
+        <strong translate={row.room ? "no" : undefined}>{row.room ? row.room.name : "No room yet"}</strong>
         <small>{row.room ? `seats ${row.room.capacity}` : "not placed"}</small>
       </div>
       {columns.map((column) => {

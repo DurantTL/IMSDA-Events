@@ -35,7 +35,7 @@ export function RegistrationSignaturesPanel({
   const [state, setState] = useState<{ status: "loading" } | { status: "error" } | { status: "ready"; data: RegistrationSignatures }>({ status: "loading" });
   useEffect(() => {
     let live = true;
-    fetch(`/api/events/${encodeURIComponent(eventId)}/registrations/${encodeURIComponent(registrationId)}/signatures`)
+    fetch(`/api/events/${encodeURIComponent(eventId)}/registrations/${encodeURIComponent(registrationId)}/signatures`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("not ok");
         return await response.json() as RegistrationSignatures;

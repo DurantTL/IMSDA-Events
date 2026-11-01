@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
@@ -52,7 +53,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
       <section className="page-stack club-form-page">
         <BackLink href={rosterHref}>Back to roster</BackLink>
         <header>
-          <h2 translate="no">Health record entry: {entryName}</h2>
+          <h2>Health record entry: <ExactValue>{entryName}</ExactValue></h2>
           <p><HealthStatusChip status={entry.status} /></p>
           {entry.exists ? (
             <p className="quiet-copy">A health record is on file; the director or a deputy can update it.</p>
@@ -97,7 +98,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     <section className="page-stack club-form-page">
       <BackLink href={rosterHref}>Back to roster</BackLink>
       <header>
-        <h2 translate="no">Health record: {memberName}</h2>
+        <h2>Health record: <ExactValue>{memberName}</ExactValue></h2>
         <p><HealthStatusChip status={health.status} /></p>
         <p className="quiet-copy">Opening this page is recorded. Health details are never emailed, exported, or printed in the check-in book.</p>
       </header>

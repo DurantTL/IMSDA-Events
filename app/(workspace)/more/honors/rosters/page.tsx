@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Award, Download, ShieldCheck, UsersRound } from "lucide-react";
@@ -170,8 +171,8 @@ export default async function HonorRostersPage({
                         const pick = roster.picks.find((candidate) => candidate.attendeeId === person.id);
                         return (
                           <tr key={person.id}>
-                            <th scope="row" translate="no">
-                              {person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
+                            <th scope="row">
+                              <ExactValue>{person.lastName}, {person.firstName}</ExactValue>{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
                               {/* Only system administrators are sent the reason, and it never prints on a class sheet (#962). */}
                               {pick?.adminPlacementReason && <small className="field-help honor-seat-override"> Placed by a system administrator: {pick.adminPlacementReason}</small>}
                             </th>
@@ -241,7 +242,7 @@ export default async function HonorRostersPage({
                   {siteRoster.people.map((person) => (
                     <tr key={person.id}>
                       <td className="honor-roster-box">{person.checkedIn ? "✓" : ""}</td>
-                      <th scope="row" translate="no">{person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
+                      <th scope="row"><ExactValue>{person.lastName}, {person.firstName}</ExactValue>{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
                       <td translate="no">{person.clubName}</td>
                       {data.hasLocations && <td translate="no">{person.locationName ?? "—"}</td>}
                       <td>{ageText(person.ageOnEventDate)}</td>
@@ -292,7 +293,7 @@ export default async function HonorRostersPage({
                     <tbody>
                       {schedule.people.map((row) => (
                         <tr key={row.person.id}>
-                          <th scope="row" translate="no">{row.person.lastName}, {row.person.firstName}{flagged.has(row.person.id) && <> <BackgroundCheckBadge /></>}</th>
+                          <th scope="row"><ExactValue>{row.person.lastName}, {row.person.firstName}</ExactValue>{flagged.has(row.person.id) && <> <BackgroundCheckBadge /></>}</th>
                           <td>{ageText(row.person.ageOnEventDate)}</td>
                           {schedule.sessions.map((session) => {
                             const offering = row.bySession[session.id];

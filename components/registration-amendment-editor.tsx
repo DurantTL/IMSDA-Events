@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -370,7 +371,7 @@ export function RegistrationAmendmentEditor({
   useEffect(() => {
     if (!hasAcknowledgments) return;
     let live = true;
-    fetch(`/api/events/${eventId}/registrations/${registration.id}/acknowledgments`)
+    fetch(`/api/events/${eventId}/registrations/${registration.id}/acknowledgments`, { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
       .then((body: { acknowledgments?: Array<{ fieldKey: string; status: string; subject: { kind: string; attendeeId?: string } }> } | null) => {
         if (!live || !body?.acknowledgments) return;
@@ -593,9 +594,9 @@ export function RegistrationAmendmentEditor({
         </div>
         <div className="amendment-quote-grid">
           <span><small>Attendees</small><strong>{preview.previousAttendeeCount} → {preview.attendeeCount}</strong></span>
-          <span><small>Previous total</small><strong>{formatCents(preview.previousTotalCents)}</strong></span>
-          <span><small>New total</small><strong>{formatCents(preview.totalCents)}</strong></span>
-          <span><small>New balance</small><strong>{formatCents(preview.balanceCents)}</strong></span>
+          <span><small>Previous total</small><strong><Money cents={preview.previousTotalCents} /></strong></span>
+          <span><small>New total</small><strong><Money cents={preview.totalCents} /></strong></span>
+          <span><small>New balance</small><strong><Money cents={preview.balanceCents} /></strong></span>
         </div>
         {(preview.addedAttendeeCount > 0 || preview.removedAttendeeCount > 0) && (
           <div className="inline-notice">
@@ -607,10 +608,10 @@ export function RegistrationAmendmentEditor({
           {preview.lineItems.map((item) => (
             <div key={item.key}>
               <span>{item.label}{item.attendeeLabel ? ` · ${item.attendeeLabel}` : ""}</span>
-              <strong>{formatCents(item.amountCents)}</strong>
+              <strong><Money cents={item.amountCents} /></strong>
             </div>
           ))}
-          <div className="total"><span>Total</span><strong>{formatCents(preview.totalCents)}</strong></div>
+          <div className="total"><span>Total</span><strong><Money cents={preview.totalCents} /></strong></div>
         </section>
         {reason && <p className="quiet-copy"><strong>Staff note:</strong> {reason}</p>}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void confirmAmendment()} />}

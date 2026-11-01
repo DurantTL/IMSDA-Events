@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -169,13 +170,13 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
           <div><dt>Director</dt><dd translate="no">{application.director.name}</dd></div>
           <div><dt>Email</dt><dd translate="no">{application.director.email}</dd></div>
           <div><dt>Mailing address</dt><dd translate="no">{application.director.address}</dd></div>
-          <div><dt>Home phone</dt><dd translate="no">{application.director.homePhone ?? "Not given"}</dd></div>
-          <div><dt>Work phone</dt><dd translate="no">{application.director.workPhone ?? "Not given"}</dd></div>
+          <div><dt>Home phone</dt><dd translate={application.director.homePhone ? "no" : undefined}>{application.director.homePhone ?? "Not given"}</dd></div>
+          <div><dt>Work phone</dt><dd translate={application.director.workPhone ? "no" : undefined}>{application.director.workPhone ?? "Not given"}</dd></div>
           <div><dt>Pastor</dt><dd translate="no">{application.pastorName}</dd></div>
           <div>
             <dt>Typed signatures</dt>
-            <dd translate="no">
-              Pastor {application.signatures.pastor}; Head elder {application.signatures.headElder}; Clerk {application.signatures.clerk}; Director {application.signatures.director}
+            <dd>
+              Pastor <ExactValue>{application.signatures.pastor}</ExactValue>; Head elder <ExactValue>{application.signatures.headElder}</ExactValue>; Clerk <ExactValue>{application.signatures.clerk}</ExactValue>; Director <ExactValue>{application.signatures.director}</ExactValue>
             </dd>
           </div>
           {application.otherBoardMembers.length > 0 && (

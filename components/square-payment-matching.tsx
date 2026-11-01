@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -272,7 +273,7 @@ export function SquarePaymentMatching({
                 </small>
               )}
             </span>
-            <span>{formatCents(finding.amountCents)}</span>
+            <span><Money cents={finding.amountCents} /></span>
             <span>
               {finding.balanceCents === null ? "—" : formatCents(finding.balanceCents)}
             </span>
@@ -328,7 +329,7 @@ export function SquarePaymentMatching({
           >
             <div className="modal-head">
               <div>
-                <p className="eyebrow">{formatCents(active.amountCents)} · {when(active.createdAt)}</p>
+                <p className="eyebrow"><Money cents={active.amountCents} /> · {when(active.createdAt)}</p>
                 <h2 id="square-match-title">Attach this Square payment</h2>
               </div>
               <button
@@ -354,8 +355,8 @@ export function SquarePaymentMatching({
               {selected && gap !== null && gap > 0 && (
                 <div className="inline-notice" role="status">
                   <AlertTriangle aria-hidden="true" size={16} /> Square took{" "}
-                  {formatCents(gap)} more than this registration&rsquo;s balance. The
-                  full {formatCents(active.amountCents)} is recorded as received, so
+                  <Money cents={gap} /> more than this registration&rsquo;s balance. The
+                  full <Money cents={active.amountCents} /> is recorded as received, so
                   the registration will show an overpayment until someone
                   adjusts its total.
                 </div>
@@ -393,8 +394,8 @@ export function SquarePaymentMatching({
                           </strong>
                           <small>
                             {registration.confirmationCode} · balance{" "}
-                            {formatCents(registration.balanceCents)} of{" "}
-                            {formatCents(registration.totalAmountCents)}
+                            <Money cents={registration.balanceCents} /> of{" "}
+                            <Money cents={registration.totalAmountCents} />
                           </small>
                         </span>
                       </label>
@@ -418,16 +419,16 @@ export function SquarePaymentMatching({
                   <ul>
                     {(duplicateWarning.details.existingPayments ?? []).map((existing) => (
                       <li key={existing.id}>
-                        {formatCents(existing.amountCents)} · reference{" "}
+                        <Money cents={existing.amountCents} /> · reference{" "}
                         {existing.externalReference ?? "none"}
                       </li>
                     ))}
                   </ul>
                   <p>
                     Attaching this would take the registration to{" "}
-                    {formatCents(duplicateWarning.details.resultingPaidCents ?? 0)}{" "}
+                    <Money cents={duplicateWarning.details.resultingPaidCents ?? 0} />{" "}
                     received against a{" "}
-                    {formatCents(duplicateWarning.details.totalCents ?? 0)} total.
+                    <Money cents={duplicateWarning.details.totalCents ?? 0} /> total.
                   </p>
                   <p>
                     The spreadsheet import recorded whatever payment reference

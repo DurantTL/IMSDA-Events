@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { requestCorrelationId, setLogRequestFieldSource } from "@/lib/logger";
+import { withNoStore } from "@/lib/live-list-response";
 
 /**
  * One correlation ID per request, reachable from anywhere inside it.
@@ -74,6 +75,8 @@ export function withRequestContext<Arguments extends unknown[]>(
     // Response headers are immutable once set on some responses, so failing to
     // attach the header must never turn a successful response into an error.
     try {
+      // Every API response is current data: never stored (rule P2, #1445), unless the handler chose its own header.
+      withNoStore(response);
       response.headers.set(CORRELATION_HEADER, context.correlationId);
       return response;
     } catch {

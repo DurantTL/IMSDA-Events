@@ -97,7 +97,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
 
   useEffect(() => {
     let cancelled = false;
-    fetch(base, { headers: { Accept: "application/json" } })
+    fetch(base, { headers: { Accept: "application/json" }, cache: "no-store" })
       .then(async (response) => {
         const result = await response.json().catch(() => null) as (PanelData & { message?: string }) | null;
         if (cancelled) return;

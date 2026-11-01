@@ -29,7 +29,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
   useEffect(() => { onCountChange?.(state.batches.length); }, [onCountChange, state.batches.length]);
 
   async function refresh() {
-    const response = await fetch("/api/admin/calendar/deadline-reminders");
+    const response = await fetch("/api/admin/calendar/deadline-reminders", { cache: "no-store" });
     const result = await response.json().catch(() => ({})) as ApiResult;
     if (response.ok && result.batches) setState({ batches: result.batches, emailConfigured: result.emailConfigured ?? false });
   }

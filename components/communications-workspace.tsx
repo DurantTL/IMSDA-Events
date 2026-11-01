@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
@@ -445,7 +445,7 @@ export function CommunicationsWorkspace({
     let cancelled = false;
     void Promise.all(missing.map(async (id) => {
       try {
-        const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/message-files/${encodeURIComponent(id)}?disposition=inline`);
+        const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/message-files/${encodeURIComponent(id)}?disposition=inline`, { cache: "no-store" });
         if (!response.ok) return [id, ""] as const;
         const blob = await response.blob();
         const url = await new Promise<string>((resolve) => {
@@ -1231,7 +1231,7 @@ export function CommunicationsWorkspace({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/balance-reminders`);
+      const response = await fetch(`/api/events/${eventId}/balance-reminders`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as ApiResult;
       if (!response.ok || !result.reminderPreview) {
         throw new Error(result.message ?? "The reminder preview could not be refreshed.");
@@ -1254,7 +1254,7 @@ export function CommunicationsWorkspace({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/shirt-size-requests`);
+      const response = await fetch(`/api/events/${eventId}/shirt-size-requests`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as ApiResult;
       if (!response.ok || !result.shirtSizePreview) {
         throw new Error(result.message ?? "The shirt-size preview could not be refreshed.");
@@ -1636,7 +1636,7 @@ export function CommunicationsWorkspace({
               <article>
                 <span className="message-stat-icon gold"><WalletCards size={18} aria-hidden="true" /></span>
                 <small>Total balance</small>
-                <strong>{formatCents(messaging.reminderPreview.totalBalanceCents)}</strong>
+                <strong><Money cents={messaging.reminderPreview.totalBalanceCents} /></strong>
               </article>
               <article>
                 <span className="message-stat-icon purple"><AlertTriangle size={18} aria-hidden="true" /></span>
@@ -1681,7 +1681,7 @@ export function CommunicationsWorkspace({
                       <td>{recipient.recipientName}</td>
                       <td>{recipient.confirmationCode}</td>
                       <td>{recipient.recipientEmail}</td>
-                      <td>{formatCents(recipient.balanceCents)}</td>
+                      <td><Money cents={recipient.balanceCents} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1728,7 +1728,7 @@ export function CommunicationsWorkspace({
                 onChange={(event) => setReminderConfirmed(event.target.checked)}
               />
               <span>
-                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of {formatCents(messaging.reminderPreview.totalBalanceCents)}.</strong>
+                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of <Money cents={messaging.reminderPreview.totalBalanceCents} />.</strong>
                 <small>
                   I understand this action uses the exact preview above. If a registration, payment, refund, email, template, or sender setting changes, IMSDA Events will stop and require a new review.
                 </small>

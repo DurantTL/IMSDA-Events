@@ -1,3 +1,4 @@
+import { liveJson } from "@/lib/live-list-response";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterApiError } from "@/modules/club-rosters/api-errors";
@@ -18,7 +19,7 @@ async function getHandler(request: Request, context: RouteContext) {
     const clubYear = contactsRosterYear(new URL(request.url).searchParams.get("year"));
     // Guardian contacts (#510) are in the response for a director or deputy only.
     const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
-    return Response.json({ clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) });
+    return liveJson({ clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) });
   } catch (error) {
     return rosterApiError(error, "Loading the roster");
   }
@@ -39,7 +40,7 @@ async function postHandler(request: Request, context: RouteContext) {
     // check list right away, without waiting on the next upload.
     await refreshBackgroundCheckMatchesSafely([personId]);
     const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
-    return Response.json({ clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) }, { status: 201 });
+    return liveJson({ clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) }, { status: 201 });
   } catch (error) {
     return rosterApiError(error, "Adding a person to the roster");
   }

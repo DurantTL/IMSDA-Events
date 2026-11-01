@@ -265,7 +265,7 @@ export function ClubReportForm({
         {readOnlyNote ?? (
           <>
             This report closed on {dueLabel}. You can&apos;t submit changes now — email{" "}
-            <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`}>{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
+            <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`} translate="no">{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
           </>
         )}
       </div>

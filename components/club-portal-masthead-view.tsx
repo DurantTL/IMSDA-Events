@@ -54,8 +54,8 @@ export function ClubPortalMastheadView({ model, role }: { model: ClubMastheadMod
         <div className={styles.account}>
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (
-            <span className="club-masthead-identity" translate="no">
-              <span className="club-masthead-name">{model.identity}</span>
+            <span className="club-masthead-identity">
+              <span className="club-masthead-name" translate="no">{model.identity}</span>
               <span className="club-masthead-role"> · {clubDirectorRoleLabels[role]}</span>
             </span>
           )}

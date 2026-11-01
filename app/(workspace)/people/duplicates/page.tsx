@@ -1,3 +1,4 @@
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -175,7 +176,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.confirmationCode}</strong>
                       <small>
-                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {formatCents(member.totalAmountCents)} total · {formatCents(member.balanceCents)} due
+                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · <Money cents={member.totalAmountCents} /> total · <Money cents={member.balanceCents} /> due
                       </small>
                       <small className="duplicate-contact">
                         {member.email && <span><Mail aria-hidden="true" size={12} /> {member.email}</span>}

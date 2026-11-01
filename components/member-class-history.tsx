@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -142,7 +143,7 @@ export function MemberClassHistory({ history, canEdit = false, organizationId = 
 
   return (
     <section className="public-manage-card page-stack">
-      <h2 translate="no">Class history: {history.firstName} {history.lastName}</h2>
+      <h2>Class history: <ExactValue>{history.firstName} {history.lastName}</ExactValue></h2>
       <p className="field-help">
         Classes recorded as completed, and the class this member is working on now. Listed in class order, Friend first.
         {!canEdit && " View only. The club director, deputy or registrar changes class history."}

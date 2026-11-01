@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/post-json";
@@ -135,8 +136,8 @@ export function ClubRosterCarryForward({
                       type="checkbox"
                     />
                   </td>
-                  <th scope="row" translate="no">
-                    {fullName}
+                  <th scope="row">
+                    <ExactValue>{fullName}</ExactValue>
                     {row.transferring && <small> Transferring to another club</small>}
                     {row.transferWithStaff && <small> Transfer request is with conference staff</small>}
                   </th>

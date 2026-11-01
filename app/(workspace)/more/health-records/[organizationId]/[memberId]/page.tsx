@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
@@ -52,7 +53,7 @@ export default async function StaffHealthRecordPage({
   return (
     <section className="page-stack club-form-page">
       <header>
-        <h2 translate="no">Health record: {`${health.member.firstName} ${health.member.lastName}`.trim()}</h2>
+        <h2>Health record: <ExactValue>{`${health.member.firstName} ${health.member.lastName}`.trim()}</ExactValue></h2>
         <p translate="no">{health.club.name}</p>
         <p><HealthStatusChip status={health.status} /></p>
         <p className="quiet-copy">View only. Opening this page is recorded.</p>

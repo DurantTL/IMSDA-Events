@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { Download } from "lucide-react";
 import { AreaClubSearch } from "@/components/area-clubs-views";
@@ -179,7 +180,7 @@ export function CoordinatorClubsAtAGlance({
                         <th className="coordinator-club-cell" role="rowheader" scope="row">
                           <span translate="no">{club.name}</span>
                           {club.church && <small translate="no">{club.church}</small>}
-                          <small translate="no">Director: {club.directors.length > 0 ? club.directors.join(", ") : "none listed"}</small>
+                          <small>Director: {club.directors.length > 0 ? <ExactValue>{club.directors.join(", ")}</ExactValue> : "none listed"}</small>
                         </th>
                         <td {...cardCell("Roster")}>{formatNumber(club.rosterSize)}</td>
                         <td {...cardCell("Adults & staff")}>{formatNumber(club.adultCount)}</td>

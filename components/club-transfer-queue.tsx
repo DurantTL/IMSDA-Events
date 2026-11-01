@@ -88,7 +88,7 @@ export function ClubTransferQueue() {
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`);
+      const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { transfers?: StaffTransferRecord[]; message?: string };
       if (!response.ok) throw new Error(result.message ?? "The transfer queue could not be loaded.");
       setTransfers(result.transfers ?? []);
@@ -111,7 +111,7 @@ export function ClubTransferQueue() {
     setCandidates(null);
     if (next.kind === "override" && next.transfer.needsMemberChoice) {
       try {
-        const response = await fetch(`${API}/${encodeURIComponent(next.transfer.id)}/candidates`);
+        const response = await fetch(`${API}/${encodeURIComponent(next.transfer.id)}/candidates`, { cache: "no-store" });
         const result = await response.json().catch(() => ({})) as { candidates?: Candidate[]; message?: string };
         if (!response.ok) throw new Error(result.message ?? "The sending club's roster could not be loaded.");
         setCandidates(result.candidates ?? []);

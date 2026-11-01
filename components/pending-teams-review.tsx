@@ -211,7 +211,7 @@ function TeamRow({ eventId, team, clubs, sponsors, canAddClub, timeZone }: { eve
       <header className="pending-team-head">
         <h3 className="pending-team-title">
           <Users aria-hidden="true" size={18} />
-          <span translate="no">{team.teamName || "Team"}</span>
+          <span translate={team.teamName ? "no" : undefined}>{team.teamName || "Team"}</span>
           <small className="pending-team-code" translate="no">{team.confirmationCode}</small>
         </h3>
         <p className="pending-team-meta">

@@ -361,10 +361,10 @@ export function EventContentBlocks({
                   <h3>{contact.name}</h3>
                   {contact.role && <p className="event-contact-role">{contact.role}</p>}
                   {contact.email && (
-                    <a href={`mailto:${contact.email}`}><Mail size={16} aria-hidden="true" /> {contact.email}</a>
+                    <a href={`mailto:${contact.email}`} translate="no"><Mail size={16} aria-hidden="true" /> {contact.email}</a>
                   )}
                   {contact.phone && (
-                    <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}><Phone size={16} aria-hidden="true" /> {contact.phone}</a>
+                    <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`} translate="no"><Phone size={16} aria-hidden="true" /> {contact.phone}</a>
                   )}
                 </article>
               </li>

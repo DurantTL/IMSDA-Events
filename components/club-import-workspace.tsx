@@ -254,7 +254,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     type="checkbox"
                   />
                   <span>
-                    <strong translate="no">{draft.clubName || "Unnamed club"}</strong>
+                    <strong translate={draft.clubName ? "no" : undefined}>{draft.clubName || "Unnamed club"}</strong>
                     <small>
                       {isList ? (
                         <>{draft.existingClub ? "Already in the directory (will be linked, not duplicated)" : "New"}{draft.isActive ? "" : " · inactive"}</>

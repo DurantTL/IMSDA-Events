@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import { LockKeyhole } from "lucide-react";
 import { formatClubFormAnswer, RESTRICTED_LABEL } from "@/modules/club-forms/domain";
 import type { ClubFormSubmissionView as SubmissionView } from "@/modules/club-forms/submissions";
@@ -34,7 +35,7 @@ export function ClubFormSubmissionView({ submission }: { submission: SubmissionV
         {definition.description && <p>{definition.description}</p>}
         <p className="club-form-sheet-meta">
           <span>{statusLabel[submission.status]}{submission.status === "SUBMITTED" ? ` on ${submittedOn(submission.submittedAt)}` : ""}</span>
-          {submission.subjectName && <span translate="no">For {submission.subjectName}</span>}
+          {submission.subjectName && <span>For <ExactValue>{submission.subjectName}</ExactValue></span>}
           <span>{submission.enteredVia === "LINK" ? "Filled in through a private link" : "Filled in by the club"}</span>
           {submission.linkSentBy && (
             <span>
@@ -121,7 +122,7 @@ function PassengerList({ submission, restricted }: { submission: SubmissionView;
             {passengers.map((n, row) => (
               <tr key={n}>
                 <td>{row + 1}</td>
-                <td translate="no">{answer(`passenger_${n}_name`) || <span className="club-form-blank">(no name)</span>}</td>
+                <td>{answer(`passenger_${n}_name`) ? <ExactValue>{answer(`passenger_${n}_name`)}</ExactValue> : <span className="club-form-blank">(no name)</span>}</td>
                 <td translate="no">{answer(`passenger_${n}_phone`)}</td>
                 <td translate="no">
                   {restricted.has(`passenger_${n}_emergency_contact`)

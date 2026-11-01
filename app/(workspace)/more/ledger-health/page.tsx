@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -108,7 +108,7 @@ export default async function LedgerCheckPage({
                     </span>
                   </div>
                   <p>
-                    Current total {formatCents(row.expectedCents)} · Ledger {formatCents(row.ledgerCents)} · Difference {formatCents(row.differenceCents)}
+                    Current total <Money cents={row.expectedCents} /> · Ledger <Money cents={row.ledgerCents} /> · Difference <Money cents={row.differenceCents} />
                   </p>
                 </div>
                 <Link className={styles.resolveLink} href={`/finance?${eventQuery}&registration=${encodeURIComponent(row.registrationId)}`}>

@@ -13,7 +13,7 @@ export function ClubDirectoryCards({ clubs, clubYear, monthLabel }: { clubs: rea
           <li className={styles.card} key={club.id}>
             <div className={styles.identity}>
               <h3 translate="no">{club.name}</h3>
-              <p translate="no">{club.church || "No church listed"}</p>
+              <p translate={club.church ? "no" : undefined}>{club.church || "No church listed"}</p>
             </div>
             <p className={styles.roster}><UsersRound size={18} aria-hidden="true" /><strong>{club.rosterSize}</strong> roster {club.rosterSize === 1 ? "member" : "members"}</p>
             <div className={styles.record}>
