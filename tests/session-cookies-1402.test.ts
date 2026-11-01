@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { proxy } from "@/proxy";
 import { attendeeSessionCookie, staffSessionCookie } from "@/modules/security/session-cookies";
-import { ATTENDEE_SESSION_LIFETIME_SECONDS } from "@/modules/attendee-accounts/session-store";
-import { SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({}) }));
@@ -63,35 +61,23 @@ describe("session cookie names (#1402)", () => {
       for (const [, value, options] of store.calls) expect([value, options.maxAge, options.path]).toEqual(["", 0, "/"]);
     }
   });
-
-  it("migration lifetimes match the real session lifetimes", () => {
-    expect(staffSessionCookie.migrationMaxAgeSeconds).toBe(SESSION_LIFETIME_SECONDS);
-    expect(attendeeSessionCookie.migrationMaxAgeSeconds).toBe(ATTENDEE_SESSION_LIFETIME_SECONDS);
-  });
 });
 
 describe("proxy legacy cookie migration (#1402)", () => {
   const run = (cookie: string) => proxy(new NextRequest("https://events.imsda.test/overview", { headers: { cookie } }));
   const setCookies = (response: Response) => response.headers.getSetCookie();
 
-  it("copies a legacy-only cookie to the __Host- name and expires the old one", () => {
+  it("never promotes a legacy-only cookie to the __Host- name (session fixation)", () => {
     vi.stubEnv("NODE_ENV", "production");
-    const lines = setCookies(run("imsda_session=legacy-token; imsda_attendee_session=attendee-legacy"));
-    const staffNew = lines.find((line) => line.startsWith("__Host-imsda_session="));
-    expect(staffNew).toContain("legacy-token");
-    expect(staffNew).toMatch(/Secure/i);
-    expect(staffNew).toMatch(/Path=\//);
-    expect(staffNew).not.toMatch(/Domain=/i);
-    expect(lines.find((line) => line.startsWith("imsda_session="))).toMatch(/Max-Age=0/i);
-    expect(lines.find((line) => line.startsWith("__Host-imsda_attendee_session="))).toContain("attendee-legacy");
-    expect(lines.find((line) => line.startsWith("imsda_attendee_session="))).toMatch(/Max-Age=0/i);
+    expect(setCookies(run("imsda_session=planted; imsda_attendee_session=planted"))).toEqual([]);
   });
 
   it("only expires the legacy cookie when the new one is already present", () => {
     vi.stubEnv("NODE_ENV", "production");
     const lines = setCookies(run("__Host-imsda_session=new; imsda_session=old"));
-    expect(lines.some((line) => line.startsWith("__Host-imsda_session="))).toBe(false);
-    expect(lines.find((line) => line.startsWith("imsda_session="))).toMatch(/Max-Age=0/i);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^imsda_session=;/);
+    expect(lines[0]).toMatch(/Max-Age=0/i);
   });
 
   it("does nothing outside production or without a legacy cookie", () => {

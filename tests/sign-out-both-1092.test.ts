@@ -224,4 +224,15 @@ describe("sign-out in production (#1402)", () => {
     expect(clearedNames()).toEqual(STAFF_ONLY);
     vi.unstubAllEnvs();
   });
+
+  it("revokes __Host- tokens and clears both names for both sessions", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mocks.enabled.mockResolvedValue(true);
+    mocks.cookies = new Map([["__Host-imsda_session", "host-staff"], ["__Host-imsda_attendee_session", "host-attendee"]]);
+    await staffLogout(post("/api/auth/logout"));
+    expect(mocks.revokeStaff).toHaveBeenCalledWith("host-staff");
+    expect(mocks.revokeAttendee).toHaveBeenCalledWith("host-attendee");
+    expect(clearedNames()).toEqual(BOTH_STAFF_AND_ATTENDEE);
+    vi.unstubAllEnvs();
+  });
 });

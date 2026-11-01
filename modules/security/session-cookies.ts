@@ -8,9 +8,18 @@
  * a `__Host-` cookie would be refused, so the plain names stay.
  *
  * For one release the plain (legacy) name is still READ in production when the
- * new name is absent, so nobody is signed out by the deploy, and it is expired
- * whenever the session is set again and by `proxy.ts` on every page request.
- * Remove the legacy handling (`legacyName`, the proxy step) after that release.
+ * new name is absent, so nobody is signed out by the deploy. It is expired
+ * whenever the session is set again, and by `proxy.ts` on a page request that
+ * already carries the `__Host-` cookie. It is never copied to the new name: a
+ * sibling subdomain can plant a plain cookie, and promoting it would be session
+ * fixation.
+ *
+ * Removing the fallback: delete `legacyName` handling here, the proxy step and
+ * the `imsda_session` entry in the `next.config.ts` /check-in redirects. The
+ * scripts that mint cookies under `legacyName` and rely on the fallback must
+ * switch to the `__Host-` name or `writeName()` first:
+ * scripts/verify-badge-print.ts, scripts/verify-mobile-layout.ts and
+ * scripts/verify-honor-instructors-http.ts.
  *
  * This module is dependency-free on purpose: `proxy.ts` and scripts import it.
  * Every set, read and clear of a session cookie goes through it.
@@ -41,14 +50,12 @@ function baseOptions() {
   };
 }
 
-export function createSessionCookie(legacyName: string, migrationMaxAgeSeconds: number) {
+export function createSessionCookie(legacyName: string) {
   const hostName = `__Host-${legacyName}`;
   return {
     /** The plain name: the only name outside production, the fallback read name inside it. */
     legacyName,
     hostName,
-    /** Used by the proxy when it copies a legacy cookie to the new name. */
-    migrationMaxAgeSeconds,
     /** The name this environment writes. */
     writeName: () => (isProduction() ? hostName : legacyName),
     /** The token from the current name, else (production only) the legacy name. */
@@ -73,7 +80,5 @@ export function createSessionCookie(legacyName: string, migrationMaxAgeSeconds: 
   };
 }
 
-/** 8 hours: the staff session lifetime (`SESSION_LIFETIME_SECONDS`). */
-export const staffSessionCookie = createSessionCookie("imsda_session", 8 * 60 * 60);
-/** 14 days: the attendee session lifetime (`ATTENDEE_SESSION_LIFETIME_SECONDS`). */
-export const attendeeSessionCookie = createSessionCookie("imsda_attendee_session", 14 * 24 * 60 * 60);
+export const staffSessionCookie = createSessionCookie("imsda_session");
+export const attendeeSessionCookie = createSessionCookie("imsda_attendee_session");

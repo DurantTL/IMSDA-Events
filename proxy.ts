@@ -46,25 +46,19 @@ export function proxy(request: NextRequest) {
 }
 
 /**
- * One release of `__Host-` migration (#1402). In production a browser that
- * still holds a plain-named session cookie gets the same token under the
- * `__Host-` name, and the plain one is expired. Server components cannot set
- * cookies, so this is where it happens, on any page request. The token is
- * copied as is (the database holds the real expiry); the cookie lifetime is
- * the session's full lifetime. The readers already fall back to the plain
- * name, so the request in flight and any request this never reaches stay
- * signed in. Remove with the fallback after that release.
+ * One release of `__Host-` migration (#1402). A plain-named session cookie is
+ * never promoted to the `__Host-` name: any sibling subdomain can plant a plain
+ * cookie with `Domain=`, and promoting it would turn it into a real host-only
+ * cookie (session fixation). Legacy-only browsers keep working through the
+ * readers' fallback and pick up a `__Host-` cookie at their next sign-in. Once a
+ * `__Host-` cookie is present, the plain one is expired here (server components
+ * cannot set cookies). Remove with the fallback after that release.
  */
 function migrateLegacySessionCookies(request: NextRequest, response: NextResponse) {
   if (process.env.NODE_ENV !== "production") return;
   for (const cookie of [staffSessionCookie, attendeeSessionCookie]) {
-    const legacy = request.cookies.get(cookie.legacyName)?.value;
-    if (legacy === undefined) continue;
-    if (legacy && !request.cookies.get(cookie.hostName)?.value) {
-      cookie.set(response.cookies, legacy, { maxAge: cookie.migrationMaxAgeSeconds });
-    } else {
-      cookie.clearLegacy(response.cookies);
-    }
+    if (request.cookies.get(cookie.legacyName) === undefined) continue;
+    if (request.cookies.get(cookie.hostName)?.value) cookie.clearLegacy(response.cookies);
   }
 }
 
