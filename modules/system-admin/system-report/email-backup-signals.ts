@@ -5,7 +5,7 @@ import type { Signal } from "./model";
  * Pure mappers for the backup email service rows (#1444). They read nothing and carry counts, times and fixed words
  * only: never an address, a message, a provider payload or a setting's value.
  */
-export type BackupFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel" | "items" | "itemsLabel" | "chipLabel" | "countsTowardOverall">>;
+export type BackupFields = Pick<Signal, "key" | "state" | "resultText" | "checkedAt" | "whenLabel"> & Partial<Pick<Signal, "noTimeLabel" | "fixHref" | "fixLabel" | "items" | "itemsLabel" | "chipLabel" | "countsTowardOverall" | "needsSetup">>;
 
 export const BACKUP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -32,6 +32,8 @@ export function backupServiceFields(
       checkedAt: input.now.toISOString(),
       whenLabel: "Checked",
       resultText: OFF_REASON[status.reason ?? "not_set"],
+      // Every off reading says "Not set up", so the row shows its setup help (#1434, #1481).
+      needsSetup: true,
     };
   }
   return {
