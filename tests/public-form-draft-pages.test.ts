@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({
   getCurrentAttendee: async () => ({ account: mocks.account }),
 }));
+// The security check config now also reads the office contact from platform settings (#1480); the check is off here.
+vi.mock("@/modules/security/security-check-config", () => ({
+  securityCheckConfigForPage: async () => null,
+}));
 vi.mock("@/modules/forms/public-repository", () => ({
   getPublicRegistrationExperience: async () => ({
     event: { name: "Synthetic Retreat", slug: "synthetic-retreat", startsAt: new Date("2026-10-09T00:00:00Z"), endsAt: new Date("2026-10-11T00:00:00Z"), timezone: "America/Chicago", location: null, capacity: null, billingMode: "ATTENDEE_PAY" },
