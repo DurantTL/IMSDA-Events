@@ -1,3 +1,4 @@
+import { walkthroughs } from "@/modules/help/walkthroughs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
@@ -55,6 +56,8 @@ describe("portal guide registry", () => {
       "director-register-for-events",
       "director-orders-and-supplies",
       "director-honors-and-sterling",
+      // The step-by-step walkthroughs (#1482), in modules/help/walkthroughs.ts.
+      ...walkthroughs.filter((walkthrough) => walkthrough.audience === "director").map((walkthrough) => walkthrough.id),
     ]);
     expect(forAudience("coordinator")).toEqual([
       "coordinator-find-club",
@@ -63,6 +66,7 @@ describe("portal guide registry", () => {
       "coordinator-getting-started",
       "coordinator-follow-up-clubs",
       "coordinator-points",
+      ...walkthroughs.filter((walkthrough) => walkthrough.audience === "coordinator").map((walkthrough) => walkthrough.id),
     ]);
     for (const guide of portalGuides) {
       for (const list of [guide.needs, guide.changes, guide.steps, guide.verify, guide.keywords]) expect(list.length, guide.id).toBeGreaterThan(0);

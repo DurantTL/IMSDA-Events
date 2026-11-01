@@ -1,0 +1,42 @@
+{
+  "walkthrough-director-club-forms": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "fb9786efb234e2bcaaa9e22c3c79978646dcaeb811bcce1263ca0f4689774066"
+  },
+  "walkthrough-director-first-sign-in": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "401374990a355cc88e83cc20a1e541f82ea2c69dc28a95fe4ad60892e1736309"
+  },
+  "walkthrough-director-get-help": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "5f46869e201f7079a0dec2ab4e38b1f61134aeed0d0e4de8ec6d3a0e939a1f58"
+  },
+  "walkthrough-director-leaders": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "cbad354f95b8d3885f7192d43da13971baedee51e15567ac64a9ed9625894925"
+  },
+  "walkthrough-director-monthly-records": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "af33cd405a2e703bb6ffa02aa402e45c6f9def08256f90df6ad28c0d5a875b63"
+  },
+  "walkthrough-director-orders": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "529f5e2f152f379877fcc314afddb30465818ae74f99b8ef079c55bbc356d5fc"
+  },
+  "walkthrough-director-register-event": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "1f93f616f178cbdd75add8fe8c95033e83650c12aca8ed53ff4ec1d2983c579b"
+  },
+  "walkthrough-director-roster": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "633d44335f72cb0a918dd8f5a5c1af43c4a3e1b0a2f209905719715a80aadd5f"
+  },
+  "walkthrough-director-two-step": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "7a18a88ab0661dc155ffead1580e7a6f8e3dabb8090dcf38b5edfe502a57cdcc"
+  },
+  "walkthrough-director-year-end": {
+    "capturedFor": "2026-11-01",
+    "sourceHash": "b0936a09a832c75f8e5dff89044dd539c900d9d5b5309d2a320e406e7b882e5b"
+  }
+}
