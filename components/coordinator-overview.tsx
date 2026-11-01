@@ -166,7 +166,7 @@ export function CoordinatorClubsAtAGlance({
           {shown.length === 0 ? (
             <p className="report-empty">
               No club name matches “{query}”.{" "}
-              <Link className="text-button" href={clearHref}>Clear search</Link>
+              <Link className="text-button" href={clearHref}>Clear filters</Link>
             </p>
           ) : (
             <div className="report-table-wrap card-box">

@@ -12,6 +12,7 @@ import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { requestStatuses, requestStatusLabels, type RequestStatus } from "@/modules/cancellation-requests/domain";
 import type { StaffQueueRow, StaffRequestDetail } from "@/modules/cancellation-requests/views";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * Staff queue for cancellation requests (#170). It shows what the registrant was shown, what has changed since, and the
@@ -137,7 +138,7 @@ function RequestDetail({ detail, eventId, timezone, carryOut }: { detail: StaffR
     }
     setText("");
     setAcknowledge(false);
-    setMessage({ kind: "ok", text: action === "APPROVE" ? "Approval recorded. Nothing was cancelled or refunded." : action === "DECLINE" ? "Decline recorded." : "Saved." });
+    setMessage({ kind: "ok", text: action === "APPROVE" ? "Approval recorded. Nothing was cancelled or refunded." : action === "DECLINE" ? "Decline recorded." : savedMessage() });
     router.refresh();
   }
 

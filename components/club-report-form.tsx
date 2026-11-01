@@ -17,6 +17,7 @@ import {
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ClubReportRecord } from "@/modules/club-reports/repository";
 import { clubClassLevelLabels, type ClubClassLevel } from "@/modules/club-rosters/domain";
+import { savedMessage } from "@/components/form-message";
 
 type Prefill = {
   meetingPlace: string;
@@ -169,7 +170,7 @@ export function ClubReportForm({
       if (!response.ok || !result.report) throw new Error(result.message ?? result.issues?.[0]?.message ?? "The report could not be saved.");
       setReport(result.report);
       setCountsRefresh(null);
-      setNotice(status === "DRAFT" ? "Draft saved." : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
+      setNotice(status === "DRAFT" ? savedMessage("Submit it when you are ready.") : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The report could not be saved.");
     } finally {

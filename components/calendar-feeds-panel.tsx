@@ -8,6 +8,7 @@ import type { FeedPreview } from "@/modules/calendar/feed-plan";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import { describeRepeat, parseRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry } from "@/modules/calendar/repository";
+import { savedMessage } from "@/components/form-message";
 
 type FeedResponse = {
   feeds?: CalendarAdminFeed[];
@@ -97,7 +98,7 @@ export function CalendarFeedsPanel({
       ? await call(`/api/admin/calendar/feeds/${encodeURIComponent(editing.id)}`, "PATCH", body)
       : await call("/api/admin/calendar/feeds", "POST", body);
     if (result) {
-      setNotice(editing ? "Saved." : "Added. Preview it, then import.");
+      setNotice(editing ? savedMessage() : "Added. Preview it, then import.");
       setEditing(null);
       formElement.reset();
     }

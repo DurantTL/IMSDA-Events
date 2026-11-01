@@ -81,7 +81,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
         </fieldset>
         <div className={styles.panelActions}>
           <button className="primary-button" type="submit">Apply filters</button>
-          {count > 0 ? <Link className="secondary-button" href={peopleHref({ query })}>Clear filters</Link> : null}
+          {count > 0 ? <Link className="secondary-button" href={peopleHref({})}>Clear filters</Link> : null}
         </div>
       </form>
     </details>
@@ -130,7 +130,7 @@ export function PeopleDirectory({
     <div className={styles.wrap}>
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
-      <PeopleActiveFilters chips={chips} clearHref={peopleHref({ query })} />
+      <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
       {peopleFilterCount(filters) === 0 || pendingOnly ? pending : null}
       <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent

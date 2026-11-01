@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { CheckCircle2, ListChecks, Save } from "lucide-react";
+import { savedMessage } from "@/components/form-message";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AddressFieldGroup } from "@/components/address-field-group";
@@ -185,7 +186,7 @@ export function AttendeeRegistrationAnswersForm({
       setSaved(next);
       setExpectedUpdatedAt(result.expectedUpdatedAt as string);
       setClientRequestId(crypto.randomUUID());
-      setNotice("Attendee choices saved.");
+      setNotice(savedMessage());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The attendee choices could not be saved.");
     } finally {

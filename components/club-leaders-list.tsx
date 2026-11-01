@@ -23,7 +23,8 @@ export function ClubLeadersList({
       <p className={styles.addLeader}>
         <Link className="secondary-button" href={addHref}>Add a leader</Link>
       </p>
-      <form action="/admin/clubs/leaders" className={styles.search} method="get">
+      {/* Keyed by the address's filters: Clear filters or Back remounts the uncontrolled selects at what the address says. There is no text box here to lose. */}
+      <form action="/admin/clubs/leaders" className={styles.search} key={`${filters.clubId ?? ""}|${filters.role ?? ""}`} method="get">
         <label className={styles.searchField}>
           Club
           <select defaultValue={filters.clubId ?? ""} name="club">
@@ -39,7 +40,7 @@ export function ClubLeadersList({
           </select>
         </label>
         <button className="primary-button" type="submit">Show</button>
-        {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear</Link> : null}
+        {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear filters</Link> : null}
       </form>
       <p className={styles.count} role="status">
         {leaders.length === 0 ? "No current club leaders found." : leaders.length >= CLUB_LEADERS_MAX_ROWS ? `Showing the first ${leaders.length} current roles. Pick a club or role to narrow the list.` : `${leaders.length} current ${leaders.length === 1 ? "role" : "roles"}.`}

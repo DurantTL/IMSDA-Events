@@ -8,6 +8,7 @@ import {
   type HomepageMinistry,
 } from "@/modules/system-admin/homepage-ministries-domain";
 import styles from "@/components/homepage-ministries-editor.module.css";
+import { savedMessage } from "@/components/form-message";
 
 type TileDraft = Omit<HomepageMinistry, "description" | "linkHref" | "categories"> & { description: string; linkHref: string; categories: string };
 
@@ -68,7 +69,7 @@ export function HomepageMinistriesEditor({
       setSaved(next);
       setTiles(next);
       setMeta({ updatedAt: result.updatedAt ?? null, updatedByName: result.updatedByName ?? null });
-      setNotice("Homepage ministries saved.");
+      setNotice(savedMessage());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The homepage ministries could not be saved.");
     } finally {

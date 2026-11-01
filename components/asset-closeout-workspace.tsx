@@ -9,6 +9,7 @@ import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { chargeCategoryLabels, facilitySeverities, facilityStatuses, holdKindLabels } from "@/modules/issued-assets/returns-domain";
 import type { FacilityIssueRow } from "@/modules/issued-assets/returns-view";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * The issued-asset closeout (#214): what is still out, lost, damaged, charged, waived and held, the facility issues that
@@ -235,7 +236,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
       void post("facility", {
         action: "update", issueId: issue.id, ...(status !== issue.status ? { status } : {}), ...(severity !== issue.severity ? { severity } : {}),
         ...(assignee !== (issue.assigneeUserId ?? "") ? { assigneeUserId: assignee } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(finishing ? { resolution: resolution.trim() } : {}),
-      }, "Saved.");
+      }, savedMessage());
     }}>
       <label>Status <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>{facilityStatuses.map((value) => <option key={value} value={value}>{value.toLowerCase().replace("_", " ")}</option>)}</select></label>
       <label>Severity <select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>{facilitySeverities.map((value) => <option key={value} value={value}>{value.toLowerCase()}</option>)}</select></label>

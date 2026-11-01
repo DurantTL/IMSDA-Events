@@ -33,6 +33,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive = false,
   error = "",
+  initialFocus,
   onCancel,
   onConfirm,
   open,
@@ -47,13 +48,15 @@ export function ConfirmDialog({
   confirmLabel: string;
   destructive?: boolean;
   error?: string;
+  /** Where focus lands on open (default: the first focusable element); e.g. a reason field. */
+  initialFocus?: () => HTMLElement | null | undefined;
   onCancel: () => void;
   onConfirm: () => void;
   open: boolean;
   title: string;
 }) {
   const titleId = useId();
-  const dialogRef = useAccessibleDialog<HTMLElement>(open, () => cancelUnlessBusy(busy, onCancel));
+  const dialogRef = useAccessibleDialog<HTMLElement>(open, () => cancelUnlessBusy(busy, onCancel), { initialFocus });
   if (!open) return null;
 
   return (

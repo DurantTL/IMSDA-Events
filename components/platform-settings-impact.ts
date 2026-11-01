@@ -12,6 +12,10 @@ export type PlatformSettingsDraft = {
   invoiceHeaderPhone: string;
   publicHelpPhone: string;
   publicHelpEmail: string;
+  emailHeaderName: string;
+  emailClubHeaderName: string;
+  emailHelpEmail: string;
+  emailHelpPhone: string;
 };
 
 export type PlatformSettingsField = keyof PlatformSettingsDraft;
@@ -19,6 +23,7 @@ export type PlatformSettingsField = keyof PlatformSettingsDraft;
 const identityEffect = "Shown everywhere the organization appears, right away.";
 const newEventEffect = "Newly created events start from this; existing events and already sent messages keep their own values.";
 const homepageEffect = "Shown on the public front page right away.";
+const emailLayoutEffect = "Applies to email sent after saving; messages already sent keep their header and footer.";
 const invoiceEffect = "Applies to invoice PDFs made after saving; earlier PDFs keep their header.";
 
 export const platformSettingsFieldInfo: Record<PlatformSettingsField, { label: string; effect: string }> = {
@@ -34,6 +39,10 @@ export const platformSettingsFieldInfo: Record<PlatformSettingsField, { label: s
   invoiceHeaderPhone: { label: "Invoice phone", effect: invoiceEffect },
   publicHelpPhone: { label: "Homepage help phone", effect: homepageEffect },
   publicHelpEmail: { label: "Homepage help email", effect: homepageEffect },
+  emailHeaderName: { label: "Email header name", effect: emailLayoutEffect },
+  emailClubHeaderName: { label: "Club email header name", effect: emailLayoutEffect },
+  emailHelpEmail: { label: "Email footer help email", effect: emailLayoutEffect },
+  emailHelpPhone: { label: "Email footer help phone", effect: emailLayoutEffect },
 };
 
 export const platformSettingsFields = Object.keys(platformSettingsFieldInfo) as PlatformSettingsField[];
@@ -59,7 +68,7 @@ export type PlatformSettingsChange = {
 /** Surrounding spaces are not a change (the server trims), and the passkey domain and help email are lower-cased there too. */
 export function normalizePlatformSettingValue(field: PlatformSettingsField, value: string) {
   const trimmed = value.trim();
-  return field === "passkeyRpId" || field === "publicHelpEmail" ? trimmed.toLowerCase() : trimmed;
+  return field === "passkeyRpId" || field === "publicHelpEmail" || field === "emailHelpEmail" ? trimmed.toLowerCase() : trimmed;
 }
 
 /** Every field whose draft value differs from the saved one, in form order, with its plain-language effect. */

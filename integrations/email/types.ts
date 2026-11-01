@@ -59,6 +59,13 @@ export class EmailProviderRequestError extends Error {
     public readonly code: string,
     public readonly retryable: boolean,
     public readonly status: number,
+    /**
+     * True only when the provider definitely did NOT accept this message (#1444): it refused it with an error reply,
+     * or the failure happened before the message data was sent. A backup provider may take over only then. False
+     * (the default) means accepted, or possibly accepted (a timeout after the data went out), or not a provider
+     * outage at all (a bad address), so nothing is ever sent twice.
+     */
+    public readonly notAccepted = false,
   ) {
     super(message);
     this.name = "EmailProviderRequestError";

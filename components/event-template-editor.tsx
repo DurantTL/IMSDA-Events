@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { ArchiveTemplateDialog } from "@/components/archive-template-dialog";
 import { hasUnsavedTemplateEdits, publishDisabledReason, saveDisabledReason, UNSAVED_PUBLISH_MESSAGE, validateTemplateEdits, type TemplateFieldError } from "@/modules/event-templates/editor-guards";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
+import { savedMessage } from "@/components/form-message";
 
 type EventTemplateEditorProps = {
   initialTemplate: EventTemplateRecord;
@@ -92,7 +93,7 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
       setDescription(body.template.description);
       const savedVersion = currentVersion(body.template as EventTemplateRecord);
       if (savedVersion) setPayloadText(JSON.stringify(savedVersion.payload ?? {}, null, 2));
-      setNotice("Draft saved.");
+      setNotice(savedMessage());
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "The draft could not be saved.");
     } finally {

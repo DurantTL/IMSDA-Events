@@ -14,6 +14,7 @@ import {
   type YearEndSection,
 } from "@/modules/club-reports/year-end-domain";
 import type { YearEndReportRecord } from "@/modules/club-reports/year-end-repository";
+import { savedMessage } from "@/components/form-message";
 
 type Contact = {
   contactName: string;
@@ -165,7 +166,7 @@ export function ClubYearEndReportForm({
       setResolved(result.report.resolved);
       setCurrent(result.report.status);
       setIsLate(result.report.late);
-      setNotice(next === "DRAFT" ? "Draft saved." : "Report submitted. Thank you.");
+      setNotice(next === "DRAFT" ? savedMessage("Submit it when you are ready.") : "Report submitted. Thank you.");
     } catch {
       setError("The report could not be saved. Check your connection and try again.");
     } finally {

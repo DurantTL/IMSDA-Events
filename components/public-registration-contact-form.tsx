@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
+import { savedMessage } from "@/components/form-message";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -22,7 +23,7 @@ type PublicRegistrationContactFormProps = {
 type SaveState =
   | { kind: "idle"; message: "" }
   | { kind: "saving"; message: "Saving contact details…" }
-  | { kind: "saved"; message: "Contact details saved." }
+  | { kind: "saved"; message: string }
   | { kind: "error"; message: string };
 
 export function PublicRegistrationContactForm({
@@ -95,7 +96,7 @@ export function PublicRegistrationContactForm({
         setSavedPhone(payload.registration.contact.phone);
         setSavedEmail(payload.registration.contact.email);
       }
-      setSaveState({ kind: "saved", message: "Contact details saved." });
+      setSaveState({ kind: "saved", message: savedMessage() });
     } catch (error) {
       setSaveState({
         kind: "error",

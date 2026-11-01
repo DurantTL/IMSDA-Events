@@ -129,12 +129,12 @@ describe("staff points page (#1314)", () => {
     expect(html).toContain("Showing 12 of 24 clubs matching");
     expect(html).toContain('name="all" value="1"');
     expect(html).toContain('value="pine"');
-    expect(html).toContain("Clear search");
+    expect(html).toContain("Clear filters");
     expect(html).toContain("All clubs by total points");
     expect(html).toContain("Points at a glance, all 24 clubs");
     const none = await render({ q: "zzzz" });
     expect(none).toContain("No clubs match this search");
-    expect(none).toContain("Clear search");
+    expect(none).toContain("Clear filters");
     const limited = await render({ q: "synthetic" });
     expect(limited).toContain("q=synthetic&amp;all=1");
   });
