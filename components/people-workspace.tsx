@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
