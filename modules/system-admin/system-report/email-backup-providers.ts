@@ -2,6 +2,7 @@ import "server-only";
 
 import { getEmailBackupStatus } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
+import { SYSTEM_SETUP_STEPS } from "@/modules/setup-help/system-setup-steps";
 import { BACKUP_LOOKBACK_MS, backupSentFields, backupServiceFields, backupSetupFields } from "./email-backup-signals";
 import type { SignalMeta } from "./model";
 import type { defineProvider, ReportContext, SignalProvider } from "./providers";
@@ -11,7 +12,7 @@ import type { defineProvider, ReportContext, SignalProvider } from "./providers"
  * never imports `providers.ts` at run time (that file appends this provider).
  */
 
-const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null): SignalMeta => ({ key, name, description, fixHref, fixLabel });
+const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null, setup?: SignalMeta["setup"]): SignalMeta => ({ key, name, description, fixHref, fixLabel, ...(setup ? { setup } : {}) });
 
 function triedRow(key: string, readAt: Date) {
   return { key, checkedAt: readAt.toISOString(), whenLabel: "Tried", state: "unavailable" as const, resultText: "This could not be read just now. It is not shown as healthy or as zero." };
@@ -28,7 +29,7 @@ const failoverSent = (since?: Date) => ({
 export function buildEmailBackupProviders(define: typeof defineProvider): SignalProvider[] {
   return [
     define("email", [
-      m("email-backup", "Backup email service", "Whether Resend is set up to take over when Amazon SES does not accept a message, and when it was last used.", null, "Set up on the server"),
+      m("email-backup", "Backup email service", "Whether Resend is set up to take over when Amazon SES does not accept a message, and when it was last used.", null, "Set up on the server", SYSTEM_SETUP_STEPS["email-backup"]),
       m("email-backup-sent", "Emails sent by backup (7 days)", "Emails Resend sent in the last 7 days because Amazon SES did not accept them.", null, "Check Amazon SES"),
       m("email-backup-setup", "Backup email setup", "The settings and DNS records the backup needs on both services.", null, "Fixed on the server"),
     ], async (ctx: ReportContext) => {
