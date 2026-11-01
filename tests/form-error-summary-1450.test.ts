@@ -86,7 +86,8 @@ describe("profile (/account/profile)", () => {
     await typeInto(container.querySelector<HTMLInputElement>("#profile-emergency-phone")!, "456");
     await submitForm(container.querySelector("form")!);
     const { summary } = expectLinkedSummary(container, 2, /^2 things to fix before saving$/);
-    expect(summary.textContent).toContain("Phone");
+    expect(summary.textContent).toContain("Phone: Enter a 10-digit US number");
+    expect(summary.textContent).toContain("Emergency contact phone: Enter a 10-digit US number");
     // Nothing under the Save button repeats it.
     expect(container.querySelector(".public-manage-contact-actions p")!.textContent).toBe("");
   });
@@ -129,9 +130,10 @@ describe("a changed field drops its own message and summary item", () => {
     const { container } = mounted;
     expect(container.querySelectorAll("[required]")).toHaveLength(11);
     await submitForm(container.querySelector("form")!);
-    expectLinkedSummary(container, 11, /^11 things to fix before submitting$/);
+    // Eleven required answers, plus the director needing a home or work phone.
+    expectLinkedSummary(container, 12, /^12 things to fix before submitting$/);
     await typeInto(container.querySelector<HTMLInputElement>("#club_clubName")!, "Synthetic Club");
-    expect(summaryOf(container)!.querySelectorAll("li a")).toHaveLength(10);
+    expect(summaryOf(container)!.querySelectorAll("li a")).toHaveLength(11);
     expect(container.querySelector("#club_clubName")!.getAttribute("aria-invalid")).toBeNull();
     expect(container.querySelector("#club_clubName_error")).toBeNull();
     expect(container.querySelector("#club_pastorName")!.getAttribute("aria-invalid")).toBe("true");
@@ -159,9 +161,9 @@ describe("club application (/clubs/register)", () => {
     expectNoValidate(container);
     await typeInto(container.querySelector<HTMLInputElement>("#club_directorEmail")!, "nope");
     await submitForm(container.querySelector("form")!);
-    const { summary, links } = expectLinkedSummary(container, 11, /^11 things to fix before submitting$/);
+    const { summary, links } = expectLinkedSummary(container, 12, /^12 things to fix before submitting$/);
     expect(links[0]!.getAttribute("href")).toBe("#club_clubName");
-    expect(summary.textContent).toContain("Director email: Enter the director's email address.");
+    expect(summary.textContent).toContain("Director email: Enter a valid email address.");
   });
 });
 

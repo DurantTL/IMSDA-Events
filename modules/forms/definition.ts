@@ -3,7 +3,7 @@ import { isInformationTemplateAudience } from "@/modules/forms/information-audie
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibilityRuleProblems } from "@/modules/forms/visibility-rule";
-import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
+import { isUnchangedFromStored, normalizePhoneAnswer, typedProblemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
 
@@ -1993,7 +1993,7 @@ export function typedAnswerProblem(field: RegistrationFormField, value: unknown,
     if (typeof value !== "string") return `${fieldDisplayLabel(field)} must be text.`;
     if (isUnchangedFromStored(value, stored)) return null;
     const check = field.type === "EMAIL" ? validateEmail(value) : field.type === "PHONE" ? validatePhone(value) : validateDate(value);
-    if (!check.ok) return problemMessage(fieldDisplayLabel(field), check.problem);
+    if (!check.ok) return typedProblemMessage(field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "phone" : "date", fieldDisplayLabel(field), check.problem);
     return field.type === "DATE" ? dateFieldProblem(field, check.value) : null;
   }
   if (field.type === "NUMBER") {

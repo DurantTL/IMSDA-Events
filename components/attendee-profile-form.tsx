@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
-import { FormErrorSummary, useFormErrorSummary } from "@/components/form-error-summary";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
 
@@ -39,13 +39,13 @@ export function AttendeeProfileForm({
     setSiteUpdating(false);
     setAttempted(true);
     const problems = [
-      { targetId: "profile-phone", message: phoneBlockingMessage("Phone", profile.phone, savedProfile.phone) },
-      { targetId: "profile-emergency-phone", message: phoneBlockingMessage("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone) },
+      { targetId: "profile-phone", label: "Phone", message: phoneBlockingMessage("Phone", profile.phone, savedProfile.phone) },
+      { targetId: "profile-emergency-phone", label: "Emergency contact phone", message: phoneBlockingMessage("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone) },
     ].filter((problem) => problem.message);
     if (problems.length > 0) {
       setState("idle");
       setMessage("");
-      showSummary(problems.map((problem) => ({ targetId: problem.targetId, message: problem.message })));
+      showSummary(problems.map((problem) => ({ targetId: problem.targetId, message: summaryMessage(problem.label, problem.message) })));
       return;
     }
     clearSummary();

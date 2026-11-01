@@ -137,6 +137,7 @@ import { rosterAnsweredFieldKeys, rosterAnsweredSummary } from "@/modules/club-r
 import { carryoverAttention, missingAnswersAttention, type AttentionItem } from "@/modules/club-registrations/attention";
 import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { FieldError } from "@/components/field-error";
+import { labelledFieldMessage } from "@/lib/field-validation";
 import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
@@ -1492,12 +1493,14 @@ export function PublicRegistrationForm({
 
   // The summary names whose field a message is about (#738).
   function issueSummaryMessage(issue: FormIssue) {
-    if (!rosterEnabled) return issue.message;
     const field = allFields.find((candidate) => (
       candidate.id === issue.fieldId || candidate.key === issue.key
     ));
+    // The one phone and email message does not name its field, so the summary adds the label (#1451).
+    const message = labelledFieldMessage(field?.label ?? "", issue.message);
+    if (!rosterEnabled) return message;
     return namedIssueMessage(
-      issue.message,
+      message,
       issueAttendeeIndex(issue, field?.scope ?? null),
       attendees.map((attendee, index) => attendeeName(attendee, index, roster.attendeeLabel)),
       roster.attendeeLabel,

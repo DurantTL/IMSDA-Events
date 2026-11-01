@@ -74,7 +74,7 @@ function input(overrides: Record<string, unknown> = {}) {
     directorName: "Dana Director",
     directorAddress: "100 Example Road, Sampletown, ZZ 00000",
     directorEmail: "dana.director@example.test",
-    directorHomePhone: "555-0100",
+    directorHomePhone: "(515) 555-0100",
     philosophyAgreed: true,
     pastorSignature: "Pat Pastor",
     headElderSignature: "Hal Elder",
@@ -269,7 +269,7 @@ describe("submitting an application", () => {
     expect(text).toContain("Dana Director");
     expect(text).toContain("https://events.imsda.test/admin/clubs/applications");
     // Nothing sensitive: no phone, address, email, note, signatures, board members or the attachment.
-    for (const secret of ["555-0100", "555-0199", "100 Example Road", "dana.director@example.test", "secret note", "Hal Elder", "Cleo Clerk", "Ben Board", "Signed page", ".pdf", "attach"]) {
+    for (const secret of ["(515) 555-0100", "555-0199", "100 Example Road", "dana.director@example.test", "secret note", "Hal Elder", "Cleo Clerk", "Ben Board", "Signed page", ".pdf", "attach"]) {
       expect(text, secret).not.toContain(secret);
     }
     expect(mocks.processAccountEmailQueue).toHaveBeenCalledWith({ messageIds: ["msg-1"] });
@@ -299,7 +299,7 @@ describe("submitting an application", () => {
     expect(entry).toMatchObject({ action: "NEW_CLUB_APPLICATION_SUBMITTED", entityType: "NewClubApplication", metadata: { source: "PUBLIC", hasAttachment: true, sponsoringChurchId: "church-1" } });
     expect(entry.actorUserId).toBeUndefined();
     const flat = JSON.stringify(entry);
-    for (const secret of ["Dana", "dana.director", "555-0100", "Example Road", "private note text", "Trailblazers", "Hal Elder"]) expect(flat, secret).not.toContain(secret);
+    for (const secret of ["Dana", "dana.director", "(515) 555-0100", "Example Road", "private note text", "Trailblazers", "Hal Elder"]) expect(flat, secret).not.toContain(secret);
   });
 });
 
@@ -341,7 +341,7 @@ describe("who can see applications and the attachment", () => {
     await expect(getApplicationAttachment(null, db.applications[0].id)).rejects.toBeInstanceOf(AccessDeniedError);
     for (const viewer of ["SYSTEM_ADMIN", "AREA_COORDINATOR"] as const) {
       const [record] = await listNewClubApplications(viewer, NOW);
-      expect(record).toMatchObject({ clubName: "Synthetic Trailblazers", director: { name: "Dana Director", email: "dana.director@example.test", homePhone: "555-0100" } });
+      expect(record).toMatchObject({ clubName: "Synthetic Trailblazers", director: { name: "Dana Director", email: "dana.director@example.test", homePhone: "(515) 555-0100" } });
       expect(record!.attachment).toMatchObject({ name: "Signed page.pdf", contentType: "application/pdf" });
       await expect(getApplicationAttachment(viewer, db.applications[0].id)).resolves.toMatchObject({ displayName: "Signed page.pdf", contentType: "application/pdf" });
     }
@@ -524,7 +524,7 @@ describe("approving", () => {
     for (const entry of entries) expect(entry.actorUserId).toBe("user-admin");
     expect(entries[1].metadata).toMatchObject({ applicationId: db.applications[0].id, sponsoringChurchId: "church-1" });
     const flat = JSON.stringify(entries);
-    for (const secret of ["Dana", "dana.director", "555-0100", "Example Road", "Trailblazers", "We meet"]) expect(flat, secret).not.toContain(secret);
+    for (const secret of ["Dana", "dana.director", "(515) 555-0100", "Example Road", "Trailblazers", "We meet"]) expect(flat, secret).not.toContain(secret);
   });
 });
 

@@ -28,7 +28,7 @@ describe("PhoneInput", () => {
     expect(hidden).not.toContain("phone-input-message");
     expect(hidden).not.toContain("aria-invalid");
     const shown = render({ value: "idk 911", showNow: true });
-    expect(shown).toContain("Phone must be a 10-digit US number");
+    expect(shown).toContain("Enter a 10-digit US number");
     // The summary is the one announcement (#1450), so the field message is plain text linked by aria-describedby.
     expect(shown).not.toContain('role="alert"');
     expect(shown).toContain("field-error-message");

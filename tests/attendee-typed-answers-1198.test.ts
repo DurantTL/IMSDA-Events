@@ -86,7 +86,7 @@ describe("attendee self-service phone, email and date answers (#1198)", () => {
     expect(result.responses.cell_phone).toBe("call after 5");
     expect(result.responses.contact_email).toBe("legacy-at-example");
     // A changed value is judged as new, and nothing the browser sends can vouch for it.
-    expect(failure(stored, { cell_phone: "call after 6" })).toMatch(/Cell phone/);
+    expect(failure(stored, { cell_phone: "call after 6" })).toMatch(/^Enter a 10-digit US number/);
     expect(failure({}, { contact_email: "legacy-at-example" })).toMatch(/Contact email/);
   });
 

@@ -1,4 +1,5 @@
-import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { EmailInput } from "@/components/email-input";
+import { PhoneInput } from "@/components/phone-input";
 import { summaryMessage, type ErrorSummaryItem } from "@/components/form-error-summary";
 import {
   GUARDIAN_SLOTS,
@@ -48,13 +49,11 @@ export function RosterGuardianFields({ errors: guardianErrors, guardianState, re
               </label>
               <label>
                 {guardianFieldLabels.email}
-                <input {...fieldErrorProps(`roster-g${slot}Email-error`, emailError)} autoComplete="email" id={`roster-g${slot}Email`} defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
-                <FieldError id={`roster-g${slot}Email-error`}>{emailError}</FieldError>
+                <EmailInput autoComplete="email" defaultValue={stored.email} error={emailError} errorId={`roster-g${slot}Email-error`} id={`roster-g${slot}Email`} label={guardianFieldLabels.email} maxLength={160} name={`g${slot}Email`} readOnly={guardianState !== "ready"} stored={stored.email} />
               </label>
               <label>
                 {guardianFieldLabels.phone}
-                <input {...fieldErrorProps(`roster-g${slot}Phone-error`, phoneError)} autoComplete="tel" id={`roster-g${slot}Phone`} defaultValue={stored.phone} readOnly={guardianState !== "ready"} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="tel" />
-                <FieldError id={`roster-g${slot}Phone-error`}>{phoneError}</FieldError>
+                <PhoneInput defaultValue={stored.phone} error={phoneError} errorId={`roster-g${slot}Phone-error`} id={`roster-g${slot}Phone`} label={guardianFieldLabels.phone} name={`g${slot}Phone`} readOnly={guardianState !== "ready"} stored={stored.phone} />
               </label>
             </div>
           </div>

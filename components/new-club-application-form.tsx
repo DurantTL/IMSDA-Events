@@ -5,7 +5,8 @@ import { Plus, X } from "lucide-react";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
-import { validateEmail } from "@/lib/field-validation";
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
+import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
@@ -27,6 +28,8 @@ const FIELD_LABELS = {
   pastorName: "Church pastor",
   directorName: "Director name",
   directorEmail: "Director email",
+  directorHomePhone: "Home phone",
+  directorWorkPhone: "Work phone",
   directorAddress: "Mailing address",
   agreed: "Philosophy of Pathfindering",
   pastorSignature: "Pastor signature",
@@ -81,12 +84,18 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // After a failed send the phone and email fields show their own messages at once.
+  const [attempted, setAttempted] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   // The site was restarting (#1263): the form keeps everything, including the chosen file.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
 
   const errorProps = (key: FieldKey, helpId?: string) => fieldErrorProps(`club_${key}_error`, errors[key], helpId);
+
+  // The email and phone inputs say what is wrong with a value themselves; these two are the messages they do not.
+  const emailRequiredError = values.directorEmail.trim() ? undefined : errors.directorEmail;
+  const phoneNeededError = !values.directorHomePhone.trim() && !values.directorWorkPhone.trim() ? errors.directorHomePhone : undefined;
 
   /** What the browser's required and email checks enforced before noValidate; the server checks everything again. */
   function findProblems() {
@@ -97,8 +106,16 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
     if (values.church === OTHER && !values.churchOther.trim()) found.churchOther = required;
     for (const key of ["pastorName", "directorName"] as const) if (!values[key].trim()) found[key] = required;
     if (!values.directorEmail.trim()) found.directorEmail = required;
-    else if (!validateEmail(values.directorEmail).ok) found.directorEmail = "Enter the director's email address.";
+    else {
+      const email = emailBlockingMessage("Director email", values.directorEmail);
+      if (email) found.directorEmail = email;
+    }
     if (!values.directorAddress.trim()) found.directorAddress = required;
+    const home = phoneBlockingMessage("Home phone", values.directorHomePhone);
+    const work = phoneBlockingMessage("Work phone", values.directorWorkPhone);
+    if (home) found.directorHomePhone = home;
+    if (work) found.directorWorkPhone = work;
+    if (!values.directorHomePhone.trim() && !values.directorWorkPhone.trim()) found.directorHomePhone = "Give a home or work phone for the director.";
     if (!agreed) found.agreed = "Tick the box to agree.";
     for (const key of ["pastorSignature", "headElderSignature", "clerkSignature", "directorSignature"] as const) if (!values[key].trim()) found[key] = required;
     return found;
@@ -113,6 +130,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
     if (saving) return;
     setError("");
     setSiteUpdating(false);
+    setAttempted(true);
     const found = findProblems();
     setErrors(found);
     const keys = FIELD_ORDER.filter((key) => found[key]);
@@ -240,8 +258,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
           </label>
           <label>
             Email
-            <input autoComplete="email" maxLength={160} onChange={(event) => set("directorEmail", event.target.value)} type="email" id="club_directorEmail" required {...errorProps("directorEmail", "club_directorEmail_help")} value={values.directorEmail} />
-            <FieldError id="club_directorEmail_error">{errors.directorEmail}</FieldError>
+            <EmailInput aria-describedby="club_directorEmail_help" error={emailRequiredError} errorId="club_directorEmail_error" label="Director email" id="club_directorEmail" onValueChange={(value) => set("directorEmail", value)} required showNow={attempted} value={values.directorEmail} />
             <small className="field-help" id="club_directorEmail_help">The club director invite is sent here when the application is approved.</small>
           </label>
           <label className="club-form-field-wide">
@@ -251,11 +268,11 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
           </label>
           <label>
             Home phone
-            <input autoComplete="tel" maxLength={40} onChange={(event) => set("directorHomePhone", event.target.value)} type="tel" value={values.directorHomePhone} />
+            <PhoneInput error={phoneNeededError} errorId="club_directorHomePhone_error" label="Home phone" id="club_directorHomePhone" onValueChange={(value) => set("directorHomePhone", value)} showNow={attempted} value={values.directorHomePhone} />
           </label>
           <label>
             Work phone
-            <input maxLength={40} onChange={(event) => set("directorWorkPhone", event.target.value)} type="tel" value={values.directorWorkPhone} />
+            <PhoneInput autoComplete="off" label="Work phone" id="club_directorWorkPhone" onValueChange={(value) => set("directorWorkPhone", value)} showNow={attempted} value={values.directorWorkPhone} />
             <small className="field-help">Give at least one phone number.</small>
           </label>
         </div>

@@ -15,7 +15,8 @@ import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
-import { isLooseEmail } from "@/lib/field-validation";
+import { EmailInput } from "@/components/email-input";
+import { EMAIL_FIELD_MESSAGE, isEmail } from "@/lib/field-validation";
 
 const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs" } as const;
 
@@ -84,7 +85,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   function validate(): FieldErrors {
     const found: FieldErrors = {};
     if (name.trim().length < 2) found.name = "Enter the person's name.";
-    if (!isLooseEmail(email.trim())) found.email = "Enter a valid email address.";
+    if (!isEmail(email.trim())) found.email = EMAIL_FIELD_MESSAGE;
     if (events.some((row) => !row.eventId)) found.events = "Choose an event for each event row, or remove the row.";
     else if (new Set(events.map((row) => row.eventId)).size !== events.length) found.events = "Each event can be chosen once.";
     if (clubs.some((row) => !row.organizationId)) found.clubs = "Choose a club for each club row, or remove the row.";
@@ -191,8 +192,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </label>
                 <label className={styles.field}>
                   <span>Email</span>
-                  <input {...fieldErrorProps("invite-email-error", errors.email)} autoComplete="off" id="invite-email" inputMode="email" maxLength={254} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
-                  <FieldError id="invite-email-error">{errors.email}</FieldError>
+                  <EmailInput autoComplete="off" error={errors.email} errorId="invite-email-error" id="invite-email" label="Email" maxLength={254} onValueChange={setEmail} value={email} />
                 </label>
 
                 <fieldset {...fieldErrorProps("invite-access-error", errors.access)} id="invite-access">
