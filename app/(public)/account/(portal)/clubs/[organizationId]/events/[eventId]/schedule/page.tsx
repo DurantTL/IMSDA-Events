@@ -5,6 +5,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { buildClubSchedule, rosterGroupLabels, rosterGroupOf } from "@/modules/honors/roster-domain";
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club class schedule" };
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function ClubSchedulePage({
   const { organizationId, eventId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
   // The club layout shows the sign-in and authenticator steps.
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
 
   const back = `/account/clubs/${organizationId}/events/${eventId}`;
   // Only this club's people are loaded; dietary answers are never read here.

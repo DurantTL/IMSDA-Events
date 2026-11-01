@@ -7,6 +7,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getEventPackets } from "@/modules/reporting/event-packets-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = {
   title: staffPageTitles.groupedPackets,
@@ -34,11 +35,11 @@ export default async function EventPacketsPage({
   const query = await searchParams;
   const { event, permissions } = await resolveEventContext(query.event);
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Event packets are restricted" detail="Ask an event administrator for report access." />;
+    return <AccessRestricted title="Event packets are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
   }
   const packets = await getEventPackets(event.id);
   if (!packets) {
-    return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+    return <NotAvailableForEvent reason="The selected event could not be loaded." />;
   }
   const selectedGroups = query.group
     ? packets.groups.filter((group) => group.id === query.group)

@@ -20,7 +20,7 @@ export default async function HonorInstructorsPage({ searchParams }: { searchPar
     return (
       <>
         {back}
-        <AccessRestricted title="Instructors are restricted" detail="Event administrators choose who teaches each Honors Weekend class." />
+        <AccessRestricted title="Instructors are restricted" detail="Event administrators choose who teaches each Honors Weekend class." whoToAsk="your event administrator" />
       </>
     );
   }

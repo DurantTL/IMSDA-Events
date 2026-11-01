@@ -34,7 +34,7 @@ export default async function EventFeaturesPage({ searchParams }: { searchParams
   const { event, permissions, user } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="Event features are restricted" detail="Your event role does not include this page." />;
+    return <AccessRestricted title="Event features are restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />;
   }
   const { allowed: clubOversight, clubEvent } = await resolveClubOversight(event.id);
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";

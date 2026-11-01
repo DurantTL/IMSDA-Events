@@ -17,6 +17,7 @@ export default async function DirectoryReviewPage({ searchParams }: { searchPara
       <AccessRestricted
         title="Directory review is restricted"
         detail="Only event administrators and registration managers can review clubs and churches that weren't found in the directory."
+        whoToAsk="your event administrator"
       />
     );
   }

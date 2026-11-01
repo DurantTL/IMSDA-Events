@@ -28,7 +28,7 @@ export default async function EventClubReportPage({
 }) {
   const [{ organizationId, month }, { event: requested, from }] = await Promise.all([params, searchParams]);
   const { event, allowed } = await resolveClubOversight(requested);
-  if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view club reports." />;
+  if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view club reports." whoToAsk="your event administrator" />;
   if (!isReportMonth(month)) notFound();
   const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true } });
   if (!club || club.type !== "CLUB") notFound();

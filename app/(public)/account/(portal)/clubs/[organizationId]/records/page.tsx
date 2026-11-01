@@ -28,6 +28,7 @@ import {
 import { listYearEndReportsForClub } from "@/modules/club-reports/year-end-repository";
 import { getClubRoleAccessForPage, getRosterAccessState } from "@/modules/club-rosters/access";
 import { clubYearChoices, clubYearFor } from "@/modules/club-rosters/domain";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Monthly Records" };
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function ClubRecordsPage({
 }) {
   const [{ organizationId }, { month: monthParam }] = await Promise.all([params, searchParams]);
   const access = await getClubRoleAccessForPage(organizationId);
-  if (access.state !== "OK") return null;
+  if (access.state !== "OK") return clubAccessClosed(access);
   if (!access.capabilities.submitReports) {
     return (
       <>

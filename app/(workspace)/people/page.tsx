@@ -40,7 +40,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const { event: requested, filter, registration, location: requestedLocation, [CHOICE_FILTER_QUESTION_PARAM]: answerQuestion, [CHOICE_FILTER_VALUE_PARAM]: answerValue } = rawParams as { event?: string; filter?: string; registration?: string; location?: string; answerQuestion?: string; answerValue?: string };
   const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
-    return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, contact details, or registration records." />;
+    return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, contact details, or registration records." whoToAsk="your event administrator" />;
   }
   // Each location on its own, or all combined (#413).
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);

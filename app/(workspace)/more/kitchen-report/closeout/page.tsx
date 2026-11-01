@@ -19,7 +19,7 @@ export default async function MealCloseoutPage({ searchParams }: { searchParams:
   const requested = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="The meal closeout is restricted" detail="Your event role does not include finance access." />;
+    return <AccessRestricted title="The meal closeout is restricted" detail="Your event role does not include finance access." whoToAsk="your event administrator" />;
   }
   const closeout = await loadMealCloseout(event.id);
   const base = `/api/events/${encodeURIComponent(event.id)}/exports/meals-closeout`;

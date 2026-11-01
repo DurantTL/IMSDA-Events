@@ -17,7 +17,7 @@ export default async function ChurchOwedPage({ searchParams }: { searchParams: P
   const { event: requested, location: requestedLocation } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view what each church owes." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view what each church owes." whoToAsk="your event administrator" />;
   }
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);
   const [owed, sponsoredLines, flags, codeReport] = await Promise.all([

@@ -103,10 +103,12 @@ describe("(workspace) layout for /profile without a staff session", () => {
     expect(mocks.listEventsForUser).not.toHaveBeenCalled();
   });
 
-  it("still sends a signed-out request for any other workspace page to the staff login", async () => {
+  it("sends a signed-out request for any other workspace page to the staff login, and a signed-in attendee to the access page (rule 14)", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
+    mocks.getCurrentAttendee.mockResolvedValue(nobody);
     expect(await redirectedTo("/overview")).toBe("/login?next=%2Foverview");
+    mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
+    expect(await redirectedTo("/overview")).toBe("/no-access?from=attendee");
   });
 
   it("lets staff with no events through to the page for /profile only", async () => {
@@ -129,9 +131,12 @@ describe("(workspace) layout for /profile without a staff session", () => {
     // A path that only starts with the same letters is not Help.
     expect(await redirectedTo("/helpful")).toBe("/no-access");
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
+    mocks.getCurrentAttendee.mockResolvedValue(nobody);
     expect(await redirectedTo("/help")).toBe("/login?next=%2Fhelp");
     expect(await redirectedTo("/help/invite-staff")).toBe("/login?next=%2Fhelp%2Finvite-staff");
+    // A signed-in attendee is told the page is for staff, not asked to sign in as if signed out.
+    mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
+    expect(await redirectedTo("/help")).toBe("/no-access?from=attendee");
   });
 
   it("lets staff with no events through to Homepage & site content (#111), and nothing that only starts with it", async () => {
