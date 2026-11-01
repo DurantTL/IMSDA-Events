@@ -313,18 +313,58 @@ describe("a crash during a backup send cannot lead to a second send (#1444)", ()
     expect(result.sentIds).toEqual(["message-1"]);
   });
 
-  it("a stale row stamped only by an old failure is recorded as before when no backup is set up", async () => {
+  it("records a RESEND stamp as a backup attempt even after the backup was switched off", async () => {
     const store = fakeStore();
     Object.assign(store.message, { status: "PROCESSING", lockToken: "dead-token", lockedAt: new Date("2026-11-01T09:00:00Z"), provider: "RESEND" });
     await run(store, providers(), { backupConfiguration: null });
+    expect(store.attempts[0]).toMatchObject({ provider: "RESEND", errorCode: "STALE_DELIVERY_LOCK" });
+    expect(summarizeAttemptHistory(store.attempts).usedBackup).toBe(true);
+  });
+
+  it("a stamp from an earlier claim never pins a later crash to Resend", async () => {
+    const store = fakeStore();
+    // SES: bad credentials, so the message is stamped and handed to Resend, which refuses it. The run stops and the
+    // row is handed back.
+    const first = providers({
+      ses: () => new EmailProviderConfigurationError("Amazon SES rejected the SMTP username or password."),
+      resend: () => new EmailProviderRequestError("Refused.", "restricted_api_key", false, 403),
+    });
+    await expect(run(store, first)).rejects.toBeInstanceOf(ExternalEmailDeliveryError);
+    expect(first.calls).toEqual(["SES", "RESEND"]);
+    expect(store.message).toMatchObject({ status: "PENDING", provider: "SES" });
+
+    // SES is fixed and claims the row; the worker crashes mid-send and recovery reads the row.
+    let providerAtSend: unknown;
+    const second = providers({ ses: () => { providerAtSend = store.message.provider; return undefined; } });
+    await run(store, second);
+    expect(providerAtSend).toBe("SES");
+    Object.assign(store.message, { status: "PROCESSING", lockToken: "dead-token", lockedAt: new Date("2026-11-01T09:00:00Z"), provider: "SES", attemptCount: 0 });
+    store.attempts.length = 0;
+    await run(store, providers());
     expect(store.attempts[0]).toMatchObject({ provider: "SES", errorCode: "STALE_DELIVERY_LOCK" });
+    expect(summarizeAttemptHistory(store.attempts).usedBackup).toBe(false);
+  });
+
+  it("a claim resets a leftover RESEND stamp to the configured provider", async () => {
+    const store = fakeStore();
+    store.message.provider = "RESEND";
+    let providerAtSend: unknown;
+    await run(store, providers({ ses: () => { providerAtSend = store.message.provider; return undefined; } }));
+    expect(providerAtSend).toBe("SES");
+  });
+
+  it("the stamp refreshes the row's lock time, so a recovery that read the row earlier cannot reserve it", async () => {
+    const store = fakeStore();
+    let lockedAtDuringSend: unknown;
+    await run(store, providers({ ses: () => refused(), resend: () => { lockedAtDuringSend = store.message.lockedAt; return undefined; } }));
+    expect(lockedAtDuringSend).toEqual(now);
   });
 
   it("does not call Resend when the stamp cannot be written, and retries later", async () => {
     const store = fakeStore();
     const original = store.prisma.messageOutbox.updateMany.getMockImplementation()!;
     store.prisma.messageOutbox.updateMany.mockImplementation(async (args: { data: Record<string, unknown> }) => {
-      if (args.data.provider === "RESEND" && Object.keys(args.data).length === 1) throw new Error("database blip");
+      if (args.data.provider === "RESEND" && "lockedAt" in args.data && Object.keys(args.data).length === 2) throw new Error("database blip");
       return original(args as never);
     });
     const mocks = providers({ ses: () => refused() });

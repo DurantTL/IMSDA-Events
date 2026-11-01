@@ -756,8 +756,6 @@ async function recoverStaleClaims(
   messageIds: string[] | undefined,
   now: Date,
   provider: EmailProviderName = getActiveEmailProviderName(),
-  /** With a backup, a claimed row stamped RESEND was (maybe) handed to the backup before the worker died (#1444). */
-  backupActive = false,
 ) {
   const staleBefore = new Date(now.getTime() - EMAIL_DELIVERY_LOCK_TIMEOUT_MS);
   const candidates = await prisma.messageOutbox.findMany({
@@ -801,7 +799,8 @@ async function recoverStaleClaims(
           messageOutboxId: candidate.id,
           attemptNumber: await nextAttemptRowNumber(tx, candidate.id, candidate.attemptCount),
           // The stamp written before the backup is called: Resend may have accepted it, so history must see the backup.
-          provider: backupActive && candidate.provider === "RESEND" ? "RESEND" : provider,
+          // Honoured even if the backup has been switched off since, so a later re-enable still pins it to Resend.
+          provider: candidate.provider === "RESEND" ? "RESEND" : provider,
           status: "FAILED",
           errorCode: "STALE_DELIVERY_LOCK",
           errorMessage: terminal
@@ -849,6 +848,8 @@ async function claimNextMessage(
   scope: OutboxScope,
   messageIds: string[] | undefined,
   now: Date,
+  /** The run's configured provider: a claim resets the row's provider to it (see the backup stamp, #1444). */
+  resetProvider?: EmailProviderName,
 ): Promise<ClaimedMessage | null> {
   for (let collision = 0; collision < 5; collision += 1) {
     const lockToken = randomUUID();
@@ -901,6 +902,9 @@ async function claimNextMessage(
           status: "PROCESSING",
           lockToken,
           lockedAt: now,
+          // The RESEND stamp means "THIS claim handed the message to the backup" and nothing older: every claim starts
+          // from the configured provider, so a stamp left by an earlier claim can never pin a crash recovery to Resend.
+          ...(resetProvider ? { provider: resetProvider } : {}),
         },
       });
       if (updated.count !== 1) return { kind: "collision" as const };
@@ -1222,7 +1226,6 @@ async function runDeliveryLoop(
     uniqueMessageIds,
     now(),
     configuredProvider,
-    backup !== null,
   );
   const result: ExternalEmailQueueResult = {
     recoveredIds,
@@ -1273,7 +1276,8 @@ async function runDeliveryLoop(
       prisma,
       scope,
       uniqueMessageIds,
-      now()
+      now(),
+      configuredProvider,
     );
     if (!message) break;
     // An invoice email is sent only while its version is still FINALIZED (#168): one a revision replaced is cancelled, never sent.
@@ -1416,7 +1420,12 @@ async function runDeliveryLoop(
           try {
             const updated = await prisma.messageOutbox.updateMany({
               where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-              data: { provider: "RESEND" },
+              // Also refreshes lockedAt. Stale recovery reserves a row by matching lockToken AND lockedAt, so a recovery
+              // that read the row before this stamp fails its reserve step and skips it, instead of recording the wrong
+              // provider. Chosen over re-reading the provider inside the recovery transaction because it needs no change
+              // to recovery. Nothing else depends on lockedAt staying at the claim time: it is only compared with the
+              // stale cutoff (a later value just delays recovery) and used as an attempt's start time on recovery.
+              data: { provider: "RESEND", lockedAt: now() },
             });
             stamped = updated.count === 1;
           } catch (stampError) {
@@ -1483,7 +1492,8 @@ async function runDeliveryLoop(
         // attempt counted, its private link kept) and stop the run with one error.
         await prisma.messageOutbox.updateMany({
           where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-          data: { status: "PENDING", lockedAt: null, lockToken: null },
+          // The stamp (if the backup was tried) is undone: this claim ends without a send.
+          data: { status: "PENDING", lockedAt: null, lockToken: null, ...(backup ? { provider: configuredProvider } : {}) },
         });
         throw new ExternalEmailDeliveryError("EXTERNAL_EMAIL_NOT_CONFIGURED", caught.message, result);
       }

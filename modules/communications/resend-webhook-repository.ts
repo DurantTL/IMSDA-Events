@@ -18,14 +18,14 @@ export type ResendWebhookRecordResult = {
 };
 
 /**
- * The addresses a Resend event says to stop mailing (#1444): the recipients of a bounce (Resend's `email.bounced` is
- * a permanent rejection) or a spam complaint. Anything else suppresses nothing.
+ * The addresses a Resend event says to stop mailing (#1444): the recipients of a permanent bounce or a spam complaint.
+ * A bounce whose type says it is not permanent, and any other event, suppresses nothing.
  */
 export function resendSuppression(event: ResendWebhookEvent): { reason: "BOUNCE" | "COMPLAINT"; recipients: string[] } | null {
   const reason = event.type === "email.bounced" ? "BOUNCE" : event.type === "email.complained" ? "COMPLAINT" : null;
   if (!reason) return null;
-  // A bounce that says it is not permanent (Resend: "Transient", "Undetermined") only suppresses nothing. A complaint
-  // always suppresses. A bounce with no type is Resend's older permanent form.
+  // A bounce that says it is not permanent (Resend: "Transient", "Undetermined") suppresses nothing. A complaint
+  // always suppresses. A bounce with no type is treated as permanent (Resend's older payloads carry no type).
   const bounce = (event.data as { bounce?: { type?: unknown } }).bounce;
   const bounceType = typeof bounce?.type === "string" ? bounce.type.trim().toLowerCase() : null;
   if (reason === "BOUNCE" && bounceType !== null && bounceType !== "permanent") return null;
