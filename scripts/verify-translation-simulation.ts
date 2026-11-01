@@ -257,7 +257,8 @@ async function publicPages(context: J.BrowserContext) {
   const page = await context.newPage();
   J.watchPage(page, failures);
   await step("public event page", page, async () => {
-    await page.goto(`${J.baseUrl}/events/${J.eventSlug}`, { waitUntil: "load" });
+    // A third-party embed that is slow or unreachable must not hold the check up: DOMContentLoaded is enough.
+    await page.goto(`${J.baseUrl}/events/${J.eventSlug}`, { waitUntil: "domcontentloaded" });
     await translated(page);
     await guardInstalled(page, "public event page");
     await expectExactValues(page, "public event page", {});

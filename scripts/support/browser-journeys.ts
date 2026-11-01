@@ -159,7 +159,7 @@ export const translationSimulatorScript = `
     let stable = 0;
     const timer = setInterval(() => {
       waited += 100;
-      stable = document.readyState === "complete" && hydrated() ? stable + 1 : 0;
+      stable = document.readyState !== "loading" && hydrated() ? stable + 1 : 0;
       if (stable >= 3 || waited > 20000) {
         clearInterval(timer);
         start();
@@ -406,7 +406,10 @@ export async function settleRoster(page: Page) {
   const translating: boolean = await page.evaluate("typeof window.__translationSim !== 'undefined'");
   if (translating) await page.waitForFunction(() => (window as unknown as { __translationSim: { wrapped: number } }).__translationSim.wrapped > 0, undefined, { timeout: 30_000 });
   const closed = page.locator(".club-roster-stack details[data-roster-section]:not([open]) > summary");
-  for (let attempts = 0; attempts < 6 && (await closed.count()) > 0; attempts += 1) await closed.first().click();
+  for (let attempts = 0; attempts < 6 && (await closed.count()) > 0; attempts += 1) {
+    // A section can open by itself (a remembered choice restored after hydration); a click that finds it gone is fine.
+    await closed.first().click({ timeout: 3_000 }).catch(() => undefined);
+  }
 }
 
 export async function activeCount(page: Page): Promise<number | null> {
