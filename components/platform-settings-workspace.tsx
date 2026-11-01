@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useConfirm } from "@/components/use-confirm";
 import { Building2, CalendarPlus, FileText, KeyRound, Mail, Megaphone, Save, Wrench } from "lucide-react";
+import { PhoneInput } from "@/components/phone-input";
 import { inlinePhoneProblem } from "@/lib/field-validation";
 import {
   displayPlatformSettingValue,
@@ -456,9 +457,9 @@ export function PlatformSettingsWorkspace({
             blank no help line shows. This is separate from the alert addresses, which are internal.
           </p>
           <label>Help phone
-            <input {...invalidProps("publicHelpPhone", helpPhoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setHelpPhoneTouched(true)} type="tel" {...field("publicHelpPhone")} />
+            <PhoneInput {...invalidProps("publicHelpPhone")} autoComplete="off" id={fieldId("publicHelpPhone")} label="Help phone" onBlur={() => setHelpPhoneTouched(true)} onValueChange={(value) => edit("publicHelpPhone", value)} showNow={helpPhoneTouched} stored={settings.publicHelpPhone} value={draft.publicHelpPhone} />
             <small>A phone number the public can call, like (515) 555-0100.</small>
-            {fieldError("publicHelpPhone", helpPhoneProblem.message ?? undefined)}
+            {fieldError("publicHelpPhone")}
           </label>
           <label>Help email
             <input autoComplete="off" maxLength={200} type="email" {...field("publicHelpEmail")} {...invalidProps("publicHelpEmail")} />
@@ -507,9 +508,9 @@ export function PlatformSettingsWorkspace({
             {fieldError("invoiceHeaderAddress")}
           </label>
           <label>Phone
-            <input {...invalidProps("invoiceHeaderPhone", phoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} type="tel" {...field("invoiceHeaderPhone")} />
+            <PhoneInput {...invalidProps("invoiceHeaderPhone")} autoComplete="off" id={fieldId("invoiceHeaderPhone")} label="Phone" onBlur={() => setPhoneTouched(true)} onValueChange={(value) => edit("invoiceHeaderPhone", value)} showNow={phoneTouched} stored={settings.invoiceHeaderPhone} value={draft.invoiceHeaderPhone} />
             <small>Printed under the address, like (515) 555-0100.</small>
-            {fieldError("invoiceHeaderPhone", phoneProblem.message ?? undefined)}
+            {fieldError("invoiceHeaderPhone")}
           </label>
         </section>
 

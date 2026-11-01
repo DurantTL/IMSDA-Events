@@ -10504,18 +10504,18 @@ button[aria-busy="true"] { cursor: progress; }
 @media only screen and (max-width: 768px) { .settings-jump-bar a { min-height: var(--target-touch, 44px); } }
 
 /* --- Errors: an icon with the text, and the linked summary ------------------ */
-.field-error-message, .public-registration-field .public-registration-field-error { display: flex; align-items: flex-start; gap: 6px; color: var(--danger, #8f3a30); font-weight: 700; line-height: 1.4; }
+.field-error-message, .public-registration-field .public-registration-field-error { display: flex; align-items: flex-start; gap: 6px; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; line-height: 1.4; }
 .field-error-message > svg, .public-registration-field-error > svg { flex: none; margin-top: 2px; }
 :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger, #8f3a30); box-shadow: 0 0 0 1px var(--danger, #8f3a30); }
 .public-registration-error-summary strong { display: flex; align-items: center; gap: 8px; }
-.form-error-summary { display: block; margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--danger-line, #e3b8b1); border-left: 5px solid var(--danger, #8f3a30); border-radius: 10px; background: var(--danger-soft, #fdf4f2); color: var(--ink); }
+.form-error-summary { display: block; margin-bottom: 14px; padding: 13px 15px; border: 2px solid var(--coral); border-radius: 12px; background: var(--coral-soft); color: var(--ink); }
 .form-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .form-error-summary > strong { display: flex; align-items: center; gap: 8px; color: var(--danger, #8f3a30); }
 .form-error-summary ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
-.form-error-summary a { color: var(--danger, #8f3a30); font-weight: 700; }
+.form-error-summary a { display: inline-flex; align-items: center; min-height: 44px; color: var(--danger, #8f3a30); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 /* Beats ".event-settings-panel label > small" so a settings error reads as an error in every block, More settings included. */
 .settings-block .field-error-message,
-.event-settings-panel label > small.field-error-message { color: var(--danger, #8f3a30); font-size: max(var(--type-staff-floor, 0px), 0.85rem); font-weight: 700; }
+.event-settings-panel label > small.field-error-message { color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
 .public-registration-error-count { margin: 6px 0 0; font-size: var(--text-helper-min, 0.875rem); }
 
 /* --- Empty states ------------------------------------------------------------ */
@@ -12955,7 +12955,11 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* A blocking problem reads as an error: danger colour, bold. These selectors beat the generic label help-text rules. */
 .phone-input-message.is-error,
 .public-registration-field > small.phone-input-message.is-error,
-.app-shell .form-stack label > small.phone-input-message.is-error { color: var(--danger, #8f3a30); font-weight: 700; }
+.app-shell .form-stack label > small.phone-input-message.is-error { color: var(--coral); font-weight: 600; }
+/* The error variant is a FieldError: icon and text in a row like every other field error (#1451). */
+.field-error-message.phone-input-message,
+.public-registration-field > small.field-error-message.phone-input-message,
+.app-shell .form-stack label > small.field-error-message.phone-input-message { display: flex; }
 /* An old saved number left alone only needs correcting: calm, with a rule on the left so it is not mistaken for help text. */
 .phone-input-message.is-notice,
 .public-registration-field > small.phone-input-message.is-notice,

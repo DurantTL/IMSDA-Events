@@ -1,8 +1,10 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { inlineFieldProblem, inlinePhoneProblem, inputAttributesFor, type FieldValueType } from "@/lib/field-validation";
+import { EmailInput } from "@/components/email-input";
+import { PhoneInput } from "@/components/phone-input";
+import type { FieldValueType } from "@/lib/field-validation";
 import type { EventAssetRecord } from "@/modules/events/asset-repository";
 import type { SanitizedHtml } from "@/modules/events/content-html";
 import {
@@ -142,36 +144,23 @@ function TextField({
   required?: boolean;
   help?: string;
   onChange: (value: string) => void;
+  /** The input type for a plain field (url, datetime-local). Phone and email go through `valueType`. */
   type?: string;
-  /** Phone or email: the same check the server runs on save, shown inline once the field is left (#855, #1193). */
+  /** Phone or email: the shared input with the one shared message, also checked by the server on save (#855, #1193, #1451). */
   valueType?: Extract<FieldValueType, "phone" | "email">;
 }) {
   // What the field held when it appeared is the saved value: an old one that fails is flagged but never blocks, and the
   // server decides by comparing with what it stored.
   const [saved] = useState(value);
-  const [touched, setTouched] = useState(false);
-  const problem = valueType === "phone"
-    ? inlinePhoneProblem(label, value, saved, touched)
-    : valueType ? inlineFieldProblem(label, valueType, value, saved, touched) : { message: "", blocking: false };
-  const attributes = valueType ? inputAttributesFor(valueType) : null;
-  const errorId = useId();
   return (
     <label>
       {label}
-      <input
-        aria-describedby={problem.message ? errorId : undefined}
-        aria-invalid={problem.message ? true : undefined}
-        autoComplete={attributes?.autoComplete}
-        inputMode={attributes?.inputMode}
-        maxLength={max}
-        onBlur={() => setTouched(true)}
-        onChange={(event) => onChange(event.target.value)}
-        required={required}
-        type={attributes?.type ?? type}
-        value={value}
-      />
+      {valueType === "phone"
+        ? <PhoneInput label={label} maxLength={max} onValueChange={onChange} required={required} stored={saved} value={value} />
+        : valueType === "email"
+          ? <EmailInput label={label} maxLength={max} onValueChange={onChange} required={required} stored={saved} value={value} />
+          : <input maxLength={max} onChange={(event) => onChange(event.target.value)} required={required} type={type} value={value} />}
       {help && <small>{help}</small>}
-      {problem.message && <small className="field-error" id={errorId} role="alert">{problem.message}</small>}
     </label>
   );
 }
@@ -575,8 +564,8 @@ export function BlockEditor({
             <>
               <TextField label="Name" value={text(row.name)} max={80} required onChange={(name) => setRow({ name })} />
               <TextField label="Role" value={text(row.role)} max={100} onChange={(role) => setRow({ role })} />
-              <TextField label="Email" type="email" valueType="email" value={text(row.email)} max={200} onChange={(email) => setRow({ email })} />
-              <TextField label="Phone" type="tel" valueType="phone" value={text(row.phone)} max={40} onChange={(phone) => setRow({ phone })} help="Add an email address, a phone number, or both. Only what you enter is shown." />
+              <TextField label="Email" valueType="email" value={text(row.email)} max={200} onChange={(email) => setRow({ email })} />
+              <TextField label="Phone" valueType="phone" value={text(row.phone)} max={40} onChange={(phone) => setRow({ phone })} help="Add an email address, a phone number, or both. Only what you enter is shown." />
             </>
           )}
         </RowList>

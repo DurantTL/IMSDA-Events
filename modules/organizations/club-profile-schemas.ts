@@ -8,7 +8,9 @@ export const clubProfileInputSchema = z.object({
   sponsoringChurchId: z.string().trim().max(40).nullable().default(null),
   meetingPlace: text(200),
   meetingSchedule: text(120),
-  contactEmail: z.union([z.literal(""), z.string().trim().toLowerCase().pipe(z.email("Enter a valid contact email, or leave it blank."))]).default(""),
+  // Checked in `updateClubProfile` against the stored value (#1451), so an old address or number nobody touched never blocks
+  // saving something else. Here they are only trimmed (and the address lower-cased).
+  contactEmail: z.string().trim().max(254).transform((value) => value.toLowerCase()).default(""),
   contactPhone: text(40),
   publicDescription: text(1000),
   listPublicly: z.boolean().default(false),

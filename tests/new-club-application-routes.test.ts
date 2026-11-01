@@ -88,7 +88,7 @@ const validData = {
   directorName: "Dana Director",
   directorAddress: "100 Example Road, Sampletown, ZZ 00000",
   directorEmail: "dana.director@example.test",
-  directorHomePhone: "555-0100",
+  directorHomePhone: "(515) 555-0100",
   philosophyAgreed: true,
   pastorSignature: "Pat Pastor",
   headElderSignature: "Hal Elder",
