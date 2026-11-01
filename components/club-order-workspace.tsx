@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
+import { savedMessage } from "@/components/form-message";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
 import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, hasStockTracking, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
@@ -197,9 +199,17 @@ export function ClubOrderWorkspace({
   const [beforeDate, setBeforeDate] = useState("");
   // Remembered per club on this device. The server snapshot is "not dismissed", so the first render matches the server.
   const promptDismissed = useSyncExternalStore(subscribeDismissed, () => readDismissed(organizationId), () => false);
-  const [pickerQuery, setPickerQuery] = useState("");
+  const pickerSearch = useClientSearch();
+  const pickerQuery = pickerSearch.term;
   const [pickerPage, setPickerPage] = useState(1);
   const [pickerItem, setPickerItem] = useState("");
+  // A new search starts on page 1 with nothing chosen, once the list has changed (not on every keystroke).
+  const [pickerTermSeen, setPickerTermSeen] = useState(pickerQuery);
+  if (pickerTermSeen !== pickerQuery) {
+    setPickerTermSeen(pickerQuery);
+    setPickerPage(1);
+    setPickerItem("");
+  }
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
   const focusHonorId = useRef<string | null>(null);
@@ -323,7 +333,7 @@ export function ClubOrderWorkspace({
       setError("Enter a whole number, 0 or more.");
       return;
     }
-    return setQuantity(lineKey(line), Number(draft), "Quantity saved.");
+    return setQuantity(lineKey(line), Number(draft), savedMessage());
   }
 
   /** "Honors to order separately": adds the honor with the number of members who completed it (#1330). */
@@ -346,7 +356,7 @@ export function ClubOrderWorkspace({
     }
     if (await setQuantity(chosenItem, quantity, "Added to the list.")) {
       setPickerItem("");
-      setPickerQuery(""); setPickerPage(1);
+      pickerSearch.setValue(""); setPickerPage(1);
       setPickerQuantity("1");
     }
   }
@@ -662,7 +672,7 @@ export function ClubOrderWorkspace({
             <div className={styles.pickerRow}>
               <label className={styles.pickerField} htmlFor="club-order-picker-search">
                 Search honors and items
-                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerPage(1); setPickerItem(""); }} placeholder="Honor or item name, or item number" type="search" value={pickerQuery} />
+                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" {...pickerSearch.inputProps} placeholder="Honor or item name, or item number" type="search" />
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item

@@ -15,10 +15,10 @@ export default async function EmergencyPlanPage({ searchParams }: { searchParams
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="The emergency plan is restricted" detail="Ask an event administrator for access to this event." />;
+    return <AccessRestricted title="The emergency plan is restricted" detail="Your account does not have access to this event's emergency plan." whoToAsk="your event administrator" />;
   }
   if (!(await isModuleEnabled(event.id, "emergency-plans"))) {
-    return <AccessRestricted title="The emergency plan is not turned on" detail="A system administrator turns on the Emergency plan for an event before staff can use it." />;
+    return <AccessRestricted title="The emergency plan is not turned on" detail="A system administrator turns on the Emergency plan for an event before staff can use it." whoToAsk="a system administrator" />;
   }
   const canEdit = permissions.includes("CONFIGURE_EVENT");
   // Drafts are administrators' working copy: read-only staff are sent no draft content at all, only the published versions.

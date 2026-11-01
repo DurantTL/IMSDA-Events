@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, CheckCheck, Eraser } from "lucide-react";
 import type { InstructorRosterRow } from "@/modules/honors/instructor-domain";
 import { formatPersonName } from "@/lib/person-name";
+import { savedMessage } from "@/components/form-message";
 
 type MarkResponse = { people?: InstructorRosterRow[]; locked?: number; writeBack?: { skipped: number } | null; message?: string };
 
@@ -46,7 +47,7 @@ export function InstructorRoster({
         result.locked ? `${result.locked} already in the honor record were left as they are; ask the conference office to void one if it was a mistake.` : "",
         result.writeBack?.skipped ? `${result.writeBack.skipped} marked completed here have no club roster record to update.` : "",
       ].filter(Boolean);
-      setNotice(["Saved.", ...notes].join(" "));
+      setNotice([savedMessage(), ...notes].join(" "));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The marks could not be saved.");
     } finally {

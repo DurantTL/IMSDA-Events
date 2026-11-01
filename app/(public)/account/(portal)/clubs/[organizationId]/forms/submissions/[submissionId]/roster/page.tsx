@@ -7,6 +7,7 @@ import { isClubFormsRole } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { getRosterAddReview } from "@/modules/club-forms/roster-add";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Add to roster", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function AddToRosterPage({ params }: { params: Promise<{ organizationId: string; submissionId: string }> }) {
   const { organizationId, submissionId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   if (!isClubFormsRole(access.club.role)) notFound();
   const viewer = clubLeaderViewerFromAccess(access);
   const formHref = `/account/clubs/${organizationId}/forms/submissions/${submissionId}`;

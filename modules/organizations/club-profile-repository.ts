@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+import { emailToStore, phoneToStore } from "@/lib/field-validation";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import type { ClubProfileInput } from "@/modules/organizations/club-profile-schemas";
@@ -59,7 +61,30 @@ export async function listSponsorOptions(currentSponsorId: string | null = null)
   return sponsors;
 }
 
-export async function updateClubProfile(organizationId: string, input: ClubProfileInput, actor: ClubProfileActor) {
+/**
+ * The contact email and phone to store (#1451). A changed value has to pass the shared check and a phone is stored
+ * normalised; a value equal to the one in the database is kept exactly as stored, so an old bad one never blocks saving
+ * another field and is never rewritten. `stored` is read from the database, never the request. Both problems are
+ * reported together, without the values.
+ */
+function contactToStore(input: ClubProfileInput, stored: { contactEmail: string; contactPhone: string } | null) {
+  const issues: z.core.$ZodIssue[] = [];
+  const attempt = (work: () => string) => {
+    try {
+      return work();
+    } catch (error) {
+      if (error instanceof z.ZodError) issues.push(...error.issues);
+      else throw error;
+      return "";
+    }
+  };
+  const contactEmail = attempt(() => emailToStore(["contactEmail"], input.contactEmail, stored?.contactEmail));
+  const contactPhone = attempt(() => phoneToStore(["contactPhone"], input.contactPhone, stored?.contactPhone));
+  if (issues.length > 0) throw new z.ZodError(issues);
+  return { contactEmail, contactPhone };
+}
+
+export async function updateClubProfile(organizationId: string, submitted: ClubProfileInput, actor: ClubProfileActor) {
   await getPrisma().$transaction(async (tx) => {
     const club = await tx.organization.findUnique({
       where: { id: organizationId },
@@ -68,6 +93,7 @@ export async function updateClubProfile(organizationId: string, input: ClubProfi
     if (!club || club.type !== "CLUB") {
       throw new OrganizationOperationError("ORGANIZATION_NOT_FOUND", "That club could not be found.");
     }
+    const input = { ...submitted, ...contactToStore(submitted, club.clubProfile) };
     if (input.sponsoringChurchId === null) {
       throw new OrganizationOperationError("ORGANIZATION_PARENT_REQUIRED", "Choose the club's sponsoring church or company. Every club needs one.");
     }

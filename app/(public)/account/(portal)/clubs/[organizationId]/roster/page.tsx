@@ -19,6 +19,7 @@ import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthEntryStatusesForMembers, healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Roster" };
 export const dynamic = "force-dynamic";
@@ -32,11 +33,11 @@ export default async function ClubRosterPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ compliance?: string; filter?: string | string[]; year?: string | string[]; returnTo?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; compliance?: string; filter?: string | string[]; year?: string | string[]; returnTo?: string | string[] }>;
 }) {
-  const [{ organizationId }, { compliance: complianceParam, filter: filterParam, year: yearParam, returnTo: returnToParam }] = await Promise.all([params, searchParams]);
+  const [{ organizationId }, { q: qParam, compliance: complianceParam, filter: filterParam, year: yearParam, returnTo: returnToParam }] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   // The previous or next club year can be opened with ?year= (#541), read-only:
   // every roster write, the birth-date reveal, and transfers work on the
   // current year, so none of them is offered for another year.
@@ -103,6 +104,7 @@ export default async function ClubRosterPage({
         // The club Home "Review roster" task links to `?filter=details-needed` and counts with `rosterRowMissingFields` (through `rosterDetailsNeeded`),
         // so the roster opens on the same list that count describes. Any other value shows the whole roster (#1167).
         detailsNeededFirst={filterParam === ROSTER_DETAILS_NEEDED_FILTER}
+        initialQuery={(Array.isArray(qParam) ? qParam[0] : qParam)?.trim().slice(0, 80) ?? ""}
         complianceStatuses={complianceStatuses}
         headingActions={canTransfer ? <RequestTransferButton clubOptions={clubOptions} organizationId={organizationId} /> : undefined}
         guardians={guardians}

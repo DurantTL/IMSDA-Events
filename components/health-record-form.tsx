@@ -4,7 +4,9 @@ import { useState } from "react";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { DateInput } from "@/components/club-form-date-input";
 import { FORM_LIMITS, healthFieldLabel, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
-import { inputAttributesFor, isUnchangedFromStored, storedContactPhone, problemMessage, validateByType, type FieldValueType } from "@/lib/field-validation";
+import { PhoneInput } from "@/components/phone-input";
+import { inputAttributesFor, isUnchangedFromStored, storedContactPhone, typedProblemMessage, validateByType, type FieldValueType } from "@/lib/field-validation";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * The Pathfinder Health Record form (#611), used for a parent opening a
@@ -87,7 +89,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
     if (check.ok) return "";
     const unchanged = isUnchangedFromStored(value, stored);
     if (!unchanged && !attempted && !touched[key]) return "";
-    return `${problemMessage(spec.label, check.problem)}${unchanged ? " This saved answer needs correcting." : ""}`;
+    return `${typedProblemMessage(spec.type, spec.label, check.problem)}${unchanged ? " This saved answer needs correcting." : ""}`;
   };
   const blockingProblem = () => {
     for (const [key, spec] of Object.entries(typedKeys)) {
@@ -155,7 +157,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
   if (done) {
     return (
       <div className="inline-notice success club-form-done" role="status">
-        {mode.kind === "link" ? "Thank you. The health record has been received, and this link no longer works." : "Saved."}
+        {mode.kind === "link" ? "Thank you. The health record has been received, and this link no longer works." : savedMessage()}
       </div>
     );
   }
@@ -267,29 +269,15 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
           <div className="form-grid two-column" key={index}>
             <label>First name<input onChange={(event) => updateContact(index, "firstName", event.target.value)} type="text" value={contact.firstName} /></label>
             <label>Last name<input onChange={(event) => updateContact(index, "lastName", event.target.value)} type="text" value={contact.lastName} /></label>
-            {(() => {
-              const message = problemFor(
-                `contact-${index}`,
-                contact.phone,
-                storedContactPhone(contactsFrom(initialValues), index, contact),
-                { type: "phone", label: "Phone" },
-              );
-              return (
-                <label>Phone
-                  <input
-                    aria-describedby={message ? `health-contact-${index}-problem` : undefined}
-                    aria-invalid={message ? true : undefined}
-                    autoComplete="tel"
-                    inputMode="tel"
-                    onBlur={() => touch(`contact-${index}`)}
-                    onChange={(event) => updateContact(index, "phone", event.target.value)}
-                    type="tel"
-                    value={contact.phone}
-                  />
-                  {message && <small className="field-error" id={`health-contact-${index}-problem`} role="alert">{message}</small>}
-                </label>
-              );
-            })()}
+            <label>Phone
+              <PhoneInput
+                label="Phone"
+                onValueChange={(value) => updateContact(index, "phone", value)}
+                showNow={attempted}
+                stored={storedContactPhone(contactsFrom(initialValues), index, contact)}
+                value={contact.phone}
+              />
+            </label>
             <label>Relationship to the minor<input onChange={(event) => updateContact(index, "relationship", event.target.value)} type="text" value={contact.relationship} /></label>
             {contacts.length > 1 && (
               <button className="secondary-button" onClick={() => setContacts((current) => current.filter((_, i) => i !== index))} type="button">Remove this contact</button>

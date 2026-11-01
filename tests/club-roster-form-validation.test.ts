@@ -35,9 +35,9 @@ describe("validateRosterForm", () => {
 });
 
 describe("BirthDateField inline error", () => {
-  it("shows the error as an alert linked to the input and marks it invalid", () => {
+  it("shows the error linked to the input and marks it invalid, without its own alert (#1450)", () => {
     const html = renderToStaticMarkup(createElement(BirthDateField, { name: "birthDate", label: "Birth date", error: "Birth date is required." }));
-    expect(html).toContain('role="alert"');
+    expect(html).not.toContain('role="alert"');
     expect(html).toContain("Birth date is required.");
     expect(html).toContain('id="birthDate-error"');
     expect(html).toContain('aria-describedby="birthDate-parsed birthDate-error"');

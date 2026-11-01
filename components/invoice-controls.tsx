@@ -3,6 +3,7 @@
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { savedMessage } from "@/components/form-message";
 
 /**
  * Staff controls for the Invoices screens (#167). Every action posts to one endpoint that checks
@@ -223,7 +224,7 @@ export function InvoiceClubTypeForm({ eventId, clubType }: { eventId: string; cl
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-club-type", clubType: text.trim() === "" ? null : text }, () => "Saved.");
+        void run({ action: "set-club-type", clubType: text.trim() === "" ? null : text }, () => savedMessage());
       }}
     >
       <label>
@@ -315,7 +316,7 @@ export function InvoiceCodeForm({ eventId, explicit, effective, locked, year }: 
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-code", code: code.trim() === "" ? null : code }, () => "Saved.");
+        void run({ action: "set-code", code: code.trim() === "" ? null : code }, () => savedMessage());
       }}
     >
       <label>

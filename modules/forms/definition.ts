@@ -3,7 +3,7 @@ import { isInformationTemplateAudience } from "@/modules/forms/information-audie
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibilityRuleProblems } from "@/modules/forms/visibility-rule";
-import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
+import { isUnchangedFromStored, labelledFieldMessage, normalizePhoneAnswer, typedProblemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 import { isSensitiveFieldText } from "@/modules/forms/sensitive-fields";
 import { adventurerInformationTemplates } from "@/modules/information-forms/adventurer-templates";
 import { formatPersonName } from "@/lib/person-name";
@@ -1994,7 +1994,7 @@ export function typedAnswerProblem(field: RegistrationFormField, value: unknown,
     if (typeof value !== "string") return `${fieldDisplayLabel(field)} must be text.`;
     if (isUnchangedFromStored(value, stored)) return null;
     const check = field.type === "EMAIL" ? validateEmail(value) : field.type === "PHONE" ? validatePhone(value) : validateDate(value);
-    if (!check.ok) return problemMessage(fieldDisplayLabel(field), check.problem);
+    if (!check.ok) return typedProblemMessage(field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "phone" : "date", fieldDisplayLabel(field), check.problem);
     return field.type === "DATE" ? dateFieldProblem(field, check.value) : null;
   }
   if (field.type === "NUMBER") {
@@ -2087,7 +2087,7 @@ export function validateTestResponses(
       if (field.type === "TEXT" && String(value).length > 500) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be 500 characters or fewer.` });
       if (field.type === "LONG_TEXT" && String(value).length > 5000) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be 5,000 characters or fewer.` });
       const typedProblem = typedAnswerProblem(field, value, options.previousResponses?.[field.key]);
-      if (typedProblem) issues.push({ fieldId: field.id, key: field.key, message: typedProblem });
+      if (typedProblem) issues.push({ fieldId: field.id, key: field.key, message: labelledFieldMessage(fieldDisplayLabel(field), typedProblem) });
       if (field.type === "CHECKBOX" && typeof value !== "boolean") issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be checked or unchecked.` });
       // An acknowledgment is only ever given (`true`); `hasValue` already treats an unticked box as no answer (#150).
       if (field.type === "ACKNOWLEDGMENT" && value !== true) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be acknowledged.` });

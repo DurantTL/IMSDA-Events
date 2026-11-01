@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { withCurrentEvent } from "@/components/staff-navigation";
 import {
   filterGuides,
@@ -25,14 +26,15 @@ export function HelpSearch({ guides, selectedEventId }: { guides: readonly HubGu
   const inputId = useId();
   const countId = useId();
   const filterName = useId();
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [workspace, setWorkspace] = useState<WorkspaceFilter>("all");
   const options = useMemo(() => workspaceFilterOptions(guides), [guides]);
   const shown = useMemo(() => filterGuidesByWorkspace(filterGuides(guides, query), workspace), [guides, query, workspace]);
   const filtered = Boolean(query.trim()) || workspace !== "all";
   const count = `${shown.length} ${shown.length === 1 ? "guide" : "guides"}${filtered ? " match" : " available"}.`;
   const clear = () => {
-    setQuery("");
+    search.setValue("");
     setWorkspace("all");
   };
 
@@ -45,10 +47,9 @@ export function HelpSearch({ guides, selectedEventId }: { guides: readonly HubGu
           autoComplete="off"
           className={styles.searchInput}
           id={inputId}
-          onChange={(event) => setQuery(event.target.value)}
+          {...search.inputProps}
           placeholder="For example: invite, email, import"
           type="search"
-          value={query}
         />
         <p className={styles.count} id={countId} role="status">{count}</p>
       </div>

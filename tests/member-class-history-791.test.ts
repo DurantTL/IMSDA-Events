@@ -96,10 +96,13 @@ describe("class history page access", () => {
   const props = { params: Promise.resolve({ organizationId: "club-1", personId: "person-1" }) };
 
   it("uses the same roster gate as the class-tracking page and loads nothing when it is closed", async () => {
-    for (const state of ["SIGN_IN", "NOT_FOUND", "NO_ROSTER", "MFA_UNLOCK", "OWN_SESSION_REQUIRED"]) {
+    for (const state of ["SIGN_IN", "NOT_FOUND", "MFA_UNLOCK", "OWN_SESSION_REQUIRED"]) {
       mocks.getRosterAccessStateForPage.mockResolvedValue({ state });
       await expect(MemberClassHistoryPage(props)).resolves.toBeNull();
     }
+    // A role without the section is told who to ask, never left with a blank page (rule 14).
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "NO_ROSTER" });
+    await expect(MemberClassHistoryPage(props)).resolves.toMatchObject({ props: { whoToAsk: "your club director" } });
     expect(mocks.rosterFindMany).not.toHaveBeenCalled();
     expect(mocks.getRosterAccessStateForPage).toHaveBeenCalledWith("club-1");
     // The class-tracking page itself checks the same helper.

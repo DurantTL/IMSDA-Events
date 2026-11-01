@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Ban, Copy, MailPlus, RefreshCw, UserPlus } from "lucide-react";
 import {
   INVITATION_STATUSES,
@@ -58,7 +60,8 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
   const router = useRouter();
   const [status, setStatus] = useState<InvitationStatus | "ALL">("ALL");
   const [group, setGroup] = useState<StaffInvitationGroupValue | "ALL">("ALL");
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -187,9 +190,10 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
         </label>
         <label>
           Search
-          <input onChange={(changeEvent) => setQuery(changeEvent.target.value)} placeholder="Name or email" type="search" value={query} />
+          <input {...search.inputProps} placeholder="Name or email" type="search" />
         </label>
       </div>
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} ${visible.length === 1 ? "invitation" : "invitations"} shown.`} />
 
       <div className="panel selection-bar">
         <span role="status">
@@ -268,7 +272,27 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
       )}
 
       {visible.length === 0 ? (
-        <p className="empty-state">{rows.length === 0 ? "Import a CSV above to create the first personal links." : "Nobody matches these filters."}</p>
+        rows.length === 0
+          ? (
+            <EmptyState
+              action={{ label: "Import a CSV", href: "#staff-invite-import-title" }}
+              actionClass="secondary-button"
+              canCreate
+              className="empty-state"
+              title="Nobody is invited yet"
+            >
+              Import a CSV of email addresses above to create the first personal links.
+            </EmptyState>
+          )
+          : (
+            <NoMatchesState
+              className="empty-state"
+              clear={{ onClick: () => { search.setValue(""); setStatus("ALL"); setGroup("ALL"); } }}
+              known={truncated ? undefined : `This list has ${rows.length} ${rows.length === 1 ? "invitation" : "invitations"}.`}
+              noun="invitations"
+              query={query}
+            />
+          )
       ) : (
         <div className="report-table-wrap card-box">
           <table className="report-table staff-invite-table">

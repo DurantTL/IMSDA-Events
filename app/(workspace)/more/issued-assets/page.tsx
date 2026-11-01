@@ -12,7 +12,7 @@ export default async function IssuedAssetsPage({ searchParams }: { searchParams:
   const { event, permissions } = await resolveEventContext(requested);
   // Authorization is decided here on the server, and again by every API route the screen calls.
   if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Issued assets are restricted" detail="Event administrators can set up the keys, keycards and other items this event hands out." />;
+    return <AccessRestricted title="Issued assets are restricted" detail="Event administrators can set up the keys, keycards and other items this event hands out." whoToAsk="your event administrator" />;
   }
   return <IssuedAssetsWorkspace eventId={event.id} eventName={event.name} initialCatalog={await getCatalogView(event.id)} />;
 }

@@ -18,6 +18,10 @@ const saved: PlatformSettingsDraft = {
   invoiceHeaderPhone: "(515) 555-0100",
   publicHelpPhone: "",
   publicHelpEmail: "help@example.test",
+  emailHeaderName: "IMSDA Events",
+  emailClubHeaderName: "IMSDA Events",
+  emailHelpEmail: "support@example.test",
+  emailHelpPhone: "(515) 555-0100",
 };
 
 describe("platform settings change preview (#1076)", () => {

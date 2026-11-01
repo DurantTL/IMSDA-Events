@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_PHONE_LENGTH, validatePhone } from "@/lib/field-validation";
+import { MAX_PHONE_LENGTH, PHONE_FIELD_MESSAGE, validatePhone } from "@/lib/field-validation";
 import { eventContentItemSchema, parseEventContentItems, type EventContentItem } from "@/modules/events/content-schemas";
 import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
@@ -57,7 +57,7 @@ export const emergencyPhoneSchema = z.string().trim().min(1, "Give each contact 
   if (value === "") return z.NEVER;
   const check = validatePhone(value);
   if (!check.ok) {
-    context.addIssue({ code: "custom", message: "Enter a valid phone number, like (515) 555-0100." });
+    context.addIssue({ code: "custom", message: PHONE_FIELD_MESSAGE });
     return z.NEVER;
   }
   return check.value;

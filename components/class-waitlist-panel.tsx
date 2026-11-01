@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { ListPlus } from "lucide-react";
 import { classRequirementGaps, unavailableReason } from "@/modules/honors/class-picker-view";
 import type { ClassSelectionWorkspace } from "@/modules/honors/enrollment-repository";
@@ -37,6 +38,7 @@ export function ClassWaitlistPanel({
 }) {
   const waitlist: Waitlist | null = workspace.waitlist;
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [attendeeId, setAttendeeId] = useState("");
@@ -68,6 +70,20 @@ export function ClassWaitlistPanel({
   const gaps = chosen && attendee ? classRequirementGaps(chosen, attendee) : [];
   const needsConfirmation = gaps.some((gap) => gap.confirmable);
   const needsOverride = gaps.some((gap) => !gap.confirmable);
+
+  async function leave(entryId: string, name: string, where: string, offered: boolean) {
+    const verb = offered ? "Decline" : "Leave";
+    const subject = offered ? `the seat in ${where}` : `the waitlist for ${where}`;
+    if (!(await confirm({
+      title: `${verb} ${subject}?`,
+      body: <p>{offered
+        ? `The seat goes to the next youth in line and can't be held back for ${name}.`
+        : `${name}'s place in line goes to the next youth and can't be held back.`}</p>,
+      confirmLabel: `${verb} ${subject}`,
+      destructive: true,
+    }))) return;
+    void call(`${endpoint}/${encodeURIComponent(entryId)}`, { method: "DELETE" }, offered ? "The seat was declined and goes to the next youth in line." : `${name} is off the waitlist.`);
+  }
 
   async function call(url: string, init: RequestInit, done: string) {
     setBusy(true);
@@ -123,6 +139,7 @@ export function ClassWaitlistPanel({
 
   return (
     <div className="class-waitlist" role="region" aria-label="Class waitlists">
+      {confirmDialog}
       <h3>Class waitlists</h3>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
@@ -164,7 +181,7 @@ export function ClassWaitlistPanel({
                     <button
                       className="secondary-button"
                       disabled={busy}
-                      onClick={() => call(`${endpoint}/${encodeURIComponent(entry.id)}`, { method: "DELETE" }, offered ? "The seat was declined and goes to the next youth in line." : `${name} is off the waitlist.`)}
+                      onClick={() => void leave(entry.id, name, where, offered)}
                       type="button"
                     >
                       {offered ? "Decline the seat" : "Leave the waitlist"}

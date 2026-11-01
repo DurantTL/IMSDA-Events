@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
-import { AlertCircle, CheckCircle2, Save } from "lucide-react";
-import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { Save } from "lucide-react";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
+import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { AttendeeProfileInput } from "@/modules/attendee-accounts/profile-service";
 
 export function AttendeeProfileForm({
@@ -24,6 +28,10 @@ export function AttendeeProfileForm({
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [message, setMessage] = useState("");
   const [needsSecondStep, setNeedsSecondStep] = useState(false);
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  // Unsaved means the typed values differ from the last saved ones, so saving in place turns the warning off (#1452).
+  const dirty = (Object.keys(profile) as Array<keyof AttendeeProfileInput>).some((name) => profile[name] !== savedProfile[name]);
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to your profile. Leave this page and discard them?");
 
   function field(name: keyof AttendeeProfileInput, value: string) {
     setProfile((current) => ({ ...current, [name]: value }));
@@ -36,13 +44,19 @@ export function AttendeeProfileForm({
     if (state === "saving") return;
     setSiteUpdating(false);
     setAttempted(true);
-    if (phoneBlocks("Phone", profile.phone, savedProfile.phone) || phoneBlocks("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone)) {
-      setState("error");
-      setMessage("Fix the highlighted phone number and save again.");
+    const problems = [
+      { targetId: "profile-phone", label: "Phone", message: phoneBlockingMessage("Phone", profile.phone, savedProfile.phone) },
+      { targetId: "profile-emergency-phone", label: "Emergency contact phone", message: phoneBlockingMessage("Emergency contact phone", profile.emergencyContactPhone, savedProfile.emergencyContactPhone) },
+    ].filter((problem) => problem.message);
+    if (problems.length > 0) {
+      setState("idle");
+      setMessage("");
+      showSummary(problems.map((problem) => ({ targetId: problem.targetId, message: summaryMessage(problem.label, problem.message) })));
       return;
     }
+    clearSummary();
     setState("saving");
-    setMessage("Saving profile…");
+    setMessage("");
     setNeedsSecondStep(false);
     try {
       const response = await submitJson("/api/attendee/profile", profile, { method: "PATCH", init: { cache: "no-store" } });
@@ -64,15 +78,18 @@ export function AttendeeProfileForm({
       setProfile(payload.profile);
       setSavedProfile(payload.profile);
       setState("saved");
-      setMessage("Profile saved. New registration forms can use these details.");
+      setMessage(savedMessage("New registration forms can use these details."));
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Your profile could not be saved.");
+      setMessage(notSavedMessage(error instanceof Error ? error.message : "Your profile could not be saved."));
+    } finally {
+      restoreFocusAfterSave("profile-save-button");
     }
   }
 
   return (
-    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" onSubmit={save}>
+    <form aria-busy={state === "saving"} className="public-manage-contact-card profile-details-form" noValidate onChange={(event) => clearSummaryField((event.target as HTMLElement).id)} onSubmit={save}>
+      {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Reusable profile</p>
         <h2>Your usual details</h2>
@@ -98,7 +115,7 @@ export function AttendeeProfileForm({
         </label>
         <label className="public-registration-field public-manage-contact-wide">
           <span className="public-registration-field-label">Phone</span>
-          <PhoneInput label="Phone" showNow={attempted} stored={savedProfile.phone} value={profile.phone} onValueChange={(value) => field("phone", value)} />
+          <PhoneInput id="profile-phone" label="Phone" showNow={attempted} stored={savedProfile.phone} value={profile.phone} onValueChange={(value) => field("phone", value)} />
         </label>
         </div>
       </fieldset>
@@ -146,7 +163,7 @@ export function AttendeeProfileForm({
         </label>
         <label className="public-registration-field public-manage-contact-wide">
           <span className="public-registration-field-label">Phone</span>
-          <PhoneInput autoComplete="section-emergency tel" label="Emergency contact phone" showNow={attempted} stored={savedProfile.emergencyContactPhone} value={profile.emergencyContactPhone} onValueChange={(value) => field("emergencyContactPhone", value)} />
+          <PhoneInput autoComplete="section-emergency tel" id="profile-emergency-phone" label="Emergency contact phone" showNow={attempted} stored={savedProfile.emergencyContactPhone} value={profile.emergencyContactPhone} onValueChange={(value) => field("emergencyContactPhone", value)} />
         </label>
         </div>
       </fieldset>
@@ -168,21 +185,11 @@ export function AttendeeProfileForm({
         </div>
       </fieldset>
       <div className="public-manage-contact-actions">
-        <button disabled={state === "saving"} type="submit">
-          <Save size={17} aria-hidden="true" />
-          {state === "saving" ? "Saving…" : "Save profile"}
-        </button>
-        <p className={state === "error" ? "is-error" : state === "saved" ? "is-saved" : ""} role={state === "error" ? "alert" : "status"} aria-live="polite">
-          {state === "error" && <AlertCircle size={16} aria-hidden="true" />}
-          {state === "saved" && <CheckCircle2 size={16} aria-hidden="true" />}
-          {message}
-          {state === "error" && needsSecondStep && (
-            <>
-              {" "}
-              <Link href="/account/two-step">Finish two-step sign-in</Link>
-            </>
-          )}
-        </p>
+        <SubmitButton className="" id="profile-save-button" icon={<Save size={17} aria-hidden="true" />} label="Save profile" submitting={state === "saving"} submittingLabel="Saving…" />
+        {message && state !== "idle" && state !== "saving" && (
+          <FormMessage tone={state === "error" ? "error" : "success"} message={message} />
+        )}
+        {state === "error" && needsSecondStep && <Link href="/account/two-step">Finish two-step sign-in</Link>}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={state === "saving"} onRetry={() => void save()} />}
       </div>
     </form>

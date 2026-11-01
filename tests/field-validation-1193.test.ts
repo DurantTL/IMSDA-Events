@@ -68,8 +68,9 @@ describe("roster emergency contact inputs (#1193)", () => {
 
   it("does the same in the add-from-form dialog and keeps its literal names", () => {
     const source = read("components/club-form-roster-add.tsx");
-    expect(source).toMatch(/autoComplete="tel"[^>]*inputMode="tel"[^>]*name=\{`g\$\{slot\}Phone`\}[^>]*type="tel"/);
-    expect(source).toMatch(/autoComplete="email"[^>]*inputMode="email"[^>]*name=\{`g\$\{slot\}Email`\}[^>]*type="email"/);
+    // The shared inputs carry the keypad and autofill attributes themselves (#1451).
+    expect(source).toMatch(/<PhoneInput [^>]*name=\{`g\$\{slot\}Phone`\}/);
+    expect(source).toMatch(/<EmailInput [^>]*name=\{`g\$\{slot\}Email`\}/);
   });
 
   it("checks email with the shared validator, so a lookalike the old pattern let through is refused", () => {
@@ -99,7 +100,8 @@ describe("church pastor contact (#1193)", () => {
     const source = read("components/church-pastor-contact.tsx");
     expect(source).toContain('inlinePhoneProblem("Phone", phone');
     expect(source).toContain('inlineFieldProblem("Email", "email"');
-    expect(source).toContain('inputMode="tel"');
+    expect(source).toContain("<PhoneInput");
+    expect(source).toContain("<EmailInput");
     expect(renderToStaticMarkup(createElement(ChurchPastorContact, { organizationId: "church-1", active: null, history: [] }))).toContain('type="tel"');
   });
 });
@@ -148,7 +150,7 @@ describe("staff invitation phone and answers (#1193)", () => {
     expect(markup).toContain('autoComplete="tel"');
     expect(markup).toContain('inputMode="email"');
     // Nothing is shown before the person leaves the field.
-    expect(markup).not.toContain("must be a 10-digit US number");
+    expect(markup).not.toContain("Enter a 10-digit US number");
     expect(read("components/staff-invitation-questions.tsx")).toContain("typedAnswerProblem(field, value)");
     expect(read("components/staff-invitation-registration.tsx")).toContain('inlinePhoneProblem("Phone", phone');
   });
@@ -188,7 +190,8 @@ describe("event contact blocks (#1193)", () => {
     const source = read("components/event-block-editors.tsx");
     expect(source).toContain('valueType="phone"');
     expect(source).toContain('valueType="email"');
-    expect(source).toContain("inlinePhoneProblem(label, value, saved, touched)");
+    expect(source).toContain("<PhoneInput");
+    expect(source).toContain("stored={saved}");
   });
 });
 
@@ -246,7 +249,7 @@ describe("inline note for a typed answer (#1193)", () => {
     expect(typedFieldNote(phone, BAD_PHONE, undefined, false)).toEqual({ message: "", flagged: false, invalid: false });
     const shown = typedFieldNote(phone, BAD_PHONE, undefined, true);
     expect(shown).toMatchObject({ flagged: false, invalid: true });
-    expect(shown.message).toMatch(/^Cell phone must be a 10-digit US number/);
+    expect(shown.message).toMatch(/^Enter a 10-digit US number/);
     expect(shown.message).not.toContain(BAD_PHONE);
     expect(typedFieldNote(phone, GOOD_PHONE, undefined, true).message).toBe("");
   });
@@ -288,8 +291,9 @@ describe("attendee answers form checks phone, email and date as well as numbers 
 
   it("flags every old invalid saved answer for correcting, without echoing it", () => {
     const markup = render({ cell: BAD_PHONE, mail: BAD_EMAIL, when: "someday", extra: "lots" });
-    for (const label of ["Cell phone", "Backup email", "Arrival date", "Extra tickets"]) {
-      expect(markup).toContain(`${label} must be`);
+    // Phone and email read the one shared message (#1451); date and number read after their label.
+    for (const message of ["Enter a 10-digit US number", "Enter a valid email address.", "Arrival date must be", "Extra tickets must be"]) {
+      expect(markup).toContain(message);
     }
     expect(markup.match(/This saved answer needs correcting\./g)?.length).toBe(4);
     // Each message is tied to its input, so a screen reader reads it with the field.

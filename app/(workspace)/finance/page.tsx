@@ -13,7 +13,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const { event: requested, filter, registration } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view payment, refund, and balance details." />;
+    return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view payment, refund, and balance details." whoToAsk="your event administrator" />;
   }
   const [registrations, openChurchFlags] = await Promise.all([listRegistrations(event.id), countOpenChurchSponsorFlags(event.id)]);
   return (

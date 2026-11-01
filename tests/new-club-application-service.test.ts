@@ -74,7 +74,7 @@ function input(overrides: Record<string, unknown> = {}) {
     directorName: "Dana Director",
     directorAddress: "100 Example Road, Sampletown, ZZ 00000",
     directorEmail: "dana.director@example.test",
-    directorHomePhone: "555-0100",
+    directorHomePhone: "(515) 555-0100",
     philosophyAgreed: true,
     pastorSignature: "Pat Pastor",
     headElderSignature: "Hal Elder",
@@ -341,7 +341,7 @@ describe("who can see applications and the attachment", () => {
     await expect(getApplicationAttachment(null, db.applications[0].id)).rejects.toBeInstanceOf(AccessDeniedError);
     for (const viewer of ["SYSTEM_ADMIN", "AREA_COORDINATOR"] as const) {
       const [record] = await listNewClubApplications(viewer, NOW);
-      expect(record).toMatchObject({ clubName: "Synthetic Trailblazers", director: { name: "Dana Director", email: "dana.director@example.test", homePhone: "555-0100" } });
+      expect(record).toMatchObject({ clubName: "Synthetic Trailblazers", director: { name: "Dana Director", email: "dana.director@example.test", homePhone: "(515) 555-0100" } });
       expect(record!.attachment).toMatchObject({ name: "Signed page.pdf", contentType: "application/pdf" });
       await expect(getApplicationAttachment(viewer, db.applications[0].id)).resolves.toMatchObject({ displayName: "Signed page.pdf", contentType: "application/pdf" });
     }

@@ -5,6 +5,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { CommunityModerationWorkspace } from "@/components/community-moderation-workspace";
 import { getStaffCommunity } from "@/modules/community/repository";
 import { resolveEventContext } from "@/modules/events/selection";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: "Attendee community" };
 
@@ -20,12 +21,13 @@ export default async function CommunityPage({
       <AccessRestricted
         title="Community moderation is restricted"
         detail="Only event administrators and communications managers can enable or moderate attendee discussion."
+        whoToAsk="your event administrator"
       />
     );
   }
   const community = await getStaffCommunity(event.id);
   if (!community) {
-    return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
+    return <NotAvailableForEvent reason="The selected event could not be loaded." />;
   }
   return (
     <section className="page-stack community-workspace">

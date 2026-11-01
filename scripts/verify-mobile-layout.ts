@@ -1639,7 +1639,7 @@ async function seedSynthetic(prisma: PrismaClient) {
         pastorName: "Pat Mobilecheck-Pastorsson", directorName: "Dana Mobilecheck-Directorsson-Applicant",
         directorAddress: "1234 Mobilecheck Boulevard of the Extremely Long Street Name, Testville, ZZ 00000",
         directorEmail: `${P}.applicant.with-a-very-long-address-for-wrapping@example.test`,
-        directorHomePhone: "555-0100", directorWorkPhone: "555-0101", philosophyAgreed: true,
+        directorHomePhone: "(515) 555-0100", directorWorkPhone: "(515) 555-0101", philosophyAgreed: true,
         pastorSignature: "Pat Mobilecheck-Pastorsson", headElderSignature: "Hal Mobilecheck-Elder", clerkSignature: "Cleo Mobilecheck-Clerk", directorSignature: "Dana Mobilecheck-Directorsson-Applicant",
         otherBoardMembers: ["Ben Mobilecheck-Board", "Bea Mobilecheck-Board"], applicationDate: new Date("2026-10-07T00:00:00Z"),
         note: "A synthetic note long enough to wrap on a narrow phone screen without causing the page to scroll sideways.",

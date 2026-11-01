@@ -3,6 +3,7 @@
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
+import { savedMessage } from "@/components/form-message";
 import { INSTRUCTOR_EDIT_GRACE_DAYS } from "@/modules/honors/instructor-domain";
 import { classChangeEmailLabels } from "@/modules/honors/class-change-domain";
 
@@ -164,7 +165,7 @@ export function HonorsInstructorsWorkspace({
                   ))}
                 </fieldset>
                 <span className="club-invite-actions">
-                  <button className="secondary-button" disabled={busy || !changed || selected.length === 0} onClick={() => void call(`${base}/${encodeURIComponent(instructor.id)}`, "PATCH", { offeringIds: selected }, () => "Classes saved.")} type="button">
+                  <button className="secondary-button" disabled={busy || !changed || selected.length === 0} onClick={() => void call(`${base}/${encodeURIComponent(instructor.id)}`, "PATCH", { offeringIds: selected }, () => savedMessage())} type="button">
                     <Save aria-hidden="true" size={13} /> Save classes
                   </button>
                   {instructor.status === "INVITED" && (

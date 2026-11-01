@@ -2,6 +2,8 @@
 
 import { useConfirm } from "@/components/use-confirm";
 import { useMemo, useRef, useState } from "react";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { useLocalEditDraft } from "@/components/use-local-edit-draft";
 import { editDraftKey, LOCAL_EDIT_DRAFT_RESTORED_NOTICE } from "@/lib/local-edit-draft";
@@ -97,6 +99,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   const [issues, setIssues] = useState<BuilderIssue[]>(props.draftWarnings ?? []);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -164,11 +167,15 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
 
   /** Saves the draft, unfinished or not. Returns null when the save failed, else the problems still to fix before publishing. */
   async function saveDraft() {
+    setSaving(true);
     const result = await call(`${base}/draft`, {
       method: "PUT",
       body: JSON.stringify({ draft: spec, baseVersion: props.version, expectedDraftUpdatedAt: draftStamp }),
-    }, () => void saveDraft());
-    if (!result) return null;
+    }, () => void saveDraft()).finally(() => setSaving(false));
+    if (!result) {
+      setError((current) => (current ? notSavedMessage(current) : current));
+      return null;
+    }
     const warnings = Array.isArray(result.warnings) ? result.warnings as BuilderIssue[] : [];
     setSaved(specSignature(spec));
     setHasDraft(true);
@@ -177,8 +184,8 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     setIssues(warnings);
     setDraftStamp(typeof result.draftUpdatedAt === "string" ? result.draftUpdatedAt : null);
     setMessage(warnings.length > 0
-      ? `Draft saved with ${warnings.length} thing${warnings.length === 1 ? "" : "s"} to fix before it can be published. Clubs still see the published version.`
-      : "Draft saved. Clubs still see the published version until you publish.");
+      ? savedMessage(`${warnings.length} thing${warnings.length === 1 ? "" : "s"} to fix before it can be published. Clubs still see the published version.`)
+      : savedMessage("Clubs still see the published version until you publish."));
     return warnings;
   }
 
@@ -231,16 +238,14 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
       {confirmDialog}
       <section className="panel form-stack">
         <div className="intro-actions">
-          <button className="primary-button" disabled={busy || !dirty} onClick={() => void saveDraft()} type="button">
-            <Save aria-hidden="true" size={14} /> Save draft
-          </button>
+          <SubmitButton className="primary-button" disabled={busy || !dirty} icon={<Save aria-hidden="true" size={14} />} iconSize={14} label="Save draft" onClick={() => void saveDraft()} submitting={saving} submittingLabel="Saving…" />
           <button className="secondary-button" disabled={busy || (!hasDraft && !dirty)} onClick={() => void publish()} type="button">
             <Send aria-hidden="true" size={14} /> Publish version {props.version + 1}
           </button>
           {hasDraft && <button className="text-button" disabled={busy} onClick={() => void discard()} type="button">Discard draft</button>}
           <small className="quiet-copy">
             Published version {props.version} · {props.enabled ? "on" : "off"} · {props.submissionCount} filled in
-            {dirty ? " · unsaved changes" : hasDraft ? " · draft saved" : ""}
+            {dirty ? " · unsaved changes" : hasDraft ? " · saved" : ""}
           </small>
         </div>
         {editBackup.restored && (
@@ -250,8 +255,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
           </div>
         )}
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={busy} onRetry={() => retryRef.current?.()} />}
-        {message && <div className="inline-notice success" role="status">{message}</div>}
-        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        {error ? <FormMessage message={error} tone="error" /> : message ? <FormMessage message={message} tone="success" /> : null}
         {unplaced.length > 0 && (
           <ul className="club-report-problem" role="alert">
             {unplaced.map((issue, index) => <li key={`${issue.key}-${index}`}>{issue.message}</li>)}

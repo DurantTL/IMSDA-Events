@@ -15,7 +15,7 @@ export default async function ResponsibleAdultsPage({ searchParams }: { searchPa
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_SENSITIVE_DATA")) {
-    return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, so the responsible-adult review is not available." />;
+    return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, so the responsible-adult review is not available." whoToAsk="your event administrator" />;
   }
   const review = await getGuardianReview(event.id);
   return <ResponsibleAdultReview eventId={event.id} review={review} canEdit={permissions.includes("MANAGE_REGISTRATION")} canExport={permissions.includes("VIEW_REPORTS")} />;

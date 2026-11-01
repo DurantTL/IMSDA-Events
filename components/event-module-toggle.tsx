@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 
 /**
  * "Enable" / "Turn off" for one event module (#741 slice 2). Only the Event
@@ -22,9 +23,16 @@ export function EventModuleToggle({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
 
   async function toggle() {
+    if (enabled && !(await confirm({
+      title: `Turn off ${title}?`,
+      body: <p>Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event modules.</p>,
+      confirmLabel: `Turn off ${title}`,
+      destructive: true,
+    }))) return;
     setBusy(true);
     setError("");
     try {
@@ -46,6 +54,7 @@ export function EventModuleToggle({
 
   return (
     <div className="event-module-toggle">
+      {confirmDialog}
       <button
         className={enabled ? "secondary-button" : "primary-button"}
         type="button"

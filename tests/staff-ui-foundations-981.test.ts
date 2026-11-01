@@ -59,7 +59,7 @@ describe("staff UI foundations (#981 batch 1)", () => {
 
   it("lets an event-settings error message keep its colour and weight over the help-text rule", () => {
     expect(css).toContain(".app-shell .form-stack label > small:not(.field-error-message)");
-    expect(css).toMatch(/\.event-settings-panel label > small\.field-error-message \{ color: var\(--danger, #8f3a30\);[^}]*font-weight: 700;/);
+    expect(css).toMatch(/\.event-settings-panel label > small\.field-error-message \{ color: var\(--coral\);[^}]*font-weight: 600;/);
   });
 
   it("leaves classed toggles alone and sizes checkboxes only above 768px, where the phone block does not", () => {

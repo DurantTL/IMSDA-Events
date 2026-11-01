@@ -9,6 +9,8 @@
 - `tests/`: Vitest permission, domain, route, and regression tests.
 - `scripts/`: database-backed `npm run test:*` checks that CI runs.
 - `docs/`: runbooks, decisions (`docs/decisions/`), and readiness evidence.
+- `docs/SITE-RULES.md`: every approved site rule (look, search, setup help,
+  behavior, sign-in, page checks), with its guard test and browser test.
 - `.agents/skills/`: repository-scoped build and review workflows.
 - `.claude/`: Claude Code configuration (session hook, permissions, thin
   wrappers around `.agents/skills/`, and subagents in `.claude/agents/`;
@@ -60,6 +62,13 @@ Then `npm run dev`.
 - **Mobile layout audit:** run it on the affected pages while iterating
   (`MOBILE_LAYOUT_ONLY=...`), then once in full before opening a PR that changes
   UI. Run the eight-width set only for shared layout changes.
+- **Site rules browser check:** every review of a change to a page opens each
+  changed page in a real browser (Playwright, against the app on port 3000 with
+  the seeded database) at 1280 px and 390 px wide, tries each rule in
+  `docs/SITE-RULES.md` that applies to that page, and lists in its report the
+  rule IDs it checked with a result for each (pass, fail, or not applicable
+  with a reason). A build is not done without that list. A newly approved rule
+  goes into `docs/SITE-RULES.md` in the same PR that builds it.
 
 ### Rules that tests and the audit enforce
 
@@ -98,7 +107,10 @@ Then `npm run dev`.
 3. Implement only the issue's acceptance criteria, preserve unrelated changes,
    add proportional tests, and run targeted checks locally. Let the complete
    GitHub CI gate run for every code PR.
-4. Keep the modular monolith: add behavior to the owning `modules/` boundary,
+4. Before reporting done, have the change reviewed with the site rules browser
+   check (see Checks) and put its rules-checked list in the PR body. Pages the
+   change does not touch need no browser check; say so when no page changed.
+5. Keep the modular monolith: add behavior to the owning `modules/` boundary,
    keep event authorization server-side, and use adapters for external systems.
 
 If requirements are unclear and the answer would materially change behavior,

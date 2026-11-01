@@ -3,6 +3,7 @@
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
+import { savedMessage } from "@/components/form-message";
 import { GripVertical, MoveRight, Pencil, Plus, Save, Trash2, TriangleAlert, Users, X } from "lucide-react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import {
@@ -149,7 +150,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
     const ok = await call(`${base}/rooms/${encodeURIComponent(room.id)}`, "PATCH", { name: String(data.get("name") ?? ""), capacity: Number(data.get("capacity")) });
     if (ok) {
       setEditingRoomId(null);
-      setNotice("Room saved.");
+      setNotice(savedMessage());
     }
   }
 
