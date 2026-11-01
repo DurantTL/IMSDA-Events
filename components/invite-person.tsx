@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { UserPlus, X } from "lucide-react";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { CopyApplicationLink } from "@/components/copy-application-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { RoleDetails } from "@/components/role-details";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import { eventRoles, type EventRole } from "@/modules/access/permissions";
@@ -13,7 +16,10 @@ import { roleLabel } from "@/modules/access/role-display";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "./people-directory.module.css";
-import { isLooseEmail } from "@/lib/field-validation";
+import { EmailInput } from "@/components/email-input";
+import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, isEmail } from "@/lib/field-validation";
+
+const FIELD_LABELS = { name: "Name", email: "Email", access: "Access to give", events: "Events", clubs: "Clubs" } as const;
 
 type Option = { id: string; name: string };
 type EventRow = { key: number; eventId: string; role: EventRole };
@@ -61,6 +67,10 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
   const [failure, setFailure] = useState("");
   const [result, setResult] = useState<InviteResult | null>(null);
   const titleId = useId();
+  // Anything typed or chosen in the open invitation form, until it has been sent (#1452).
+  const dirty = open && !result && (name.trim() !== "" || email.trim() !== "" || systemAdmin || clubsAdministrator || areaCoordinator || events.length > 0 || clubs.length > 0);
+  useUnsavedChangesGuard(dirty, "This invitation has not been sent. Leave this page and discard it?");
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
 
   function close() {
     if (busy) return;
@@ -72,14 +82,14 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
 
   function show() {
     setName(""); setEmail(""); setSystemAdmin(false); setClubsAdministrator(false); setAreaCoordinator(false);
-    setEvents([]); setClubs([]); setErrors({}); setFailure(""); setResult(null);
+    setEvents([]); setClubs([]); setErrors({}); setFailure(""); setResult(null); clearSummary();
     setOpen(true);
   }
 
   function validate(): FieldErrors {
     const found: FieldErrors = {};
     if (name.trim().length < 2) found.name = "Enter the person's name.";
-    if (!isLooseEmail(email.trim())) found.email = "Enter a valid email address.";
+    if (!isEmail(email.trim())) found.email = EMAIL_FIELD_MESSAGE;
     if (events.some((row) => !row.eventId)) found.events = "Choose an event for each event row, or remove the row.";
     else if (new Set(events.map((row) => row.eventId)).size !== events.length) found.events = "Each event can be chosen once.";
     if (clubs.some((row) => !row.organizationId)) found.clubs = "Choose a club for each club row, or remove the row.";
@@ -88,12 +98,27 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
     return found;
   }
 
+  /** A changed field (or one inside an access group) drops its own message and summary item. */
+  function fieldChanged(event: FormEvent<HTMLFormElement>) {
+    const target = event.target as HTMLElement;
+    const id = target.closest<HTMLElement>("fieldset[id^='invite-']")?.id ?? target.id;
+    const key = id.replace(/^invite-/, "") as keyof FieldErrors;
+    if (!id.startsWith("invite-")) return;
+    clearSummaryField(id);
+    setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFailure("");
     const found = validate();
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    const problems = (["name", "email", "access", "events", "clubs"] as const).filter((key) => found[key]);
+    if (problems.length > 0) {
+      showSummary(problems.map((key) => ({ targetId: `invite-${key}`, message: summaryMessage(FIELD_LABELS[key], found[key] as string) })));
+      return;
+    }
+    clearSummary();
     setBusy(true);
     try {
       const response = await fetch("/api/admin/people/invite", {
@@ -113,9 +138,14 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
       if (!response.ok) {
         const issue = body.issues?.[0];
         const field = issue?.path?.[0];
-        if (field === "name" || field === "email") setErrors({ [field]: issue?.message ?? "Check this field." });
-        else if (field === "access") setErrors({ access: issue?.message ?? "Check the access you chose." });
-        else setFailure(body.message ?? "The invite could not be sent.");
+        // A server problem with a field goes through the summary like a client one: focus and announcement.
+        const serverProblem: { key: "name" | "email" | "access"; message: string } | null = field === "name" || field === "email"
+          ? { key: field, message: issue?.message ?? "Check this field." }
+          : field === "access" ? { key: field, message: issue?.message ?? "Check the access you chose." } : null;
+        if (serverProblem) {
+          setErrors({ [serverProblem.key]: serverProblem.message });
+          showSummary([{ targetId: `invite-${serverProblem.key}`, message: summaryMessage(FIELD_LABELS[serverProblem.key], serverProblem.message) }]);
+        } else setFailure(body.message ?? "The invite could not be sent.");
         return;
       }
       const done = body as InviteResult;
@@ -157,19 +187,19 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                 </div>
               </div>
             ) : (
-              <form className={styles.inviteForm} noValidate onSubmit={(event) => void submit(event)}>
+              <form className={styles.inviteForm} noValidate onChange={fieldChanged} onSubmit={(event) => void submit(event)}>
+                {summaryItems.length > 0 && <FormErrorSummary items={summaryItems} ref={summaryRef} />}
                 <label className={styles.field}>
                   <span>Name</span>
-                  <input aria-describedby={errors.name ? "invite-name-error" : undefined} aria-invalid={Boolean(errors.name)} autoComplete="off" maxLength={100} onChange={(event) => setName(event.target.value)} value={name} />
-                  {errors.name ? <p className={styles.fieldError} id="invite-name-error" role="alert">{errors.name}</p> : null}
+                  <input {...fieldErrorProps("invite-name-error", errors.name)} autoComplete="off" id="invite-name" maxLength={100} onChange={(event) => setName(event.target.value)} value={name} />
+                  <FieldError id="invite-name-error">{errors.name}</FieldError>
                 </label>
                 <label className={styles.field}>
                   <span>Email</span>
-                  <input aria-describedby={errors.email ? "invite-email-error" : undefined} aria-invalid={Boolean(errors.email)} autoComplete="off" inputMode="email" maxLength={254} onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
-                  {errors.email ? <p className={styles.fieldError} id="invite-email-error" role="alert">{errors.email}</p> : null}
+                  <EmailInput autoComplete="off" error={errors.email} errorId="invite-email-error" id="invite-email" label="Email" maxLength={MAX_EMAIL_LENGTH} onValueChange={setEmail} value={email} />
                 </label>
 
-                <fieldset aria-describedby={errors.access ? "invite-access-error" : undefined}>
+                <fieldset {...fieldErrorProps("invite-access-error", errors.access)} id="invite-access">
                   <legend>Access to give</legend>
                   {full ? (
                     <>
@@ -190,11 +220,11 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                     <span>{systemRoleText.AREA_COORDINATOR.name}<small>{systemRoleText.AREA_COORDINATOR.summary}</small></span>
                   </label>
                   <RoleDetails role={systemRoleText.AREA_COORDINATOR} />
-                  {errors.access ? <p className={styles.fieldError} id="invite-access-error" role="alert">{errors.access}</p> : null}
+                  <FieldError id="invite-access-error">{errors.access}</FieldError>
                 </fieldset>
 
                 {full ? (
-                  <fieldset aria-describedby={errors.events ? "invite-events-error" : undefined}>
+                  <fieldset {...fieldErrorProps("invite-events-error", errors.events)} id="invite-events">
                     <legend>Events</legend>
                     {events.map((row, index) => (
                       <div className={styles.rowPair} key={row.key}>
@@ -214,14 +244,14 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                         <button aria-label={`Remove event ${index + 1}`} className="secondary-button" onClick={() => setEvents(events.filter((entry) => entry.key !== row.key))} type="button">Remove</button>
                       </div>
                     ))}
-                    {errors.events ? <p className={styles.fieldError} id="invite-events-error" role="alert">{errors.events}</p> : null}
+                    <FieldError id="invite-events-error">{errors.events}</FieldError>
                     <div>
                       <button className="secondary-button" onClick={() => { setEvents([...events, { key: nextKey, eventId: "", role: "READ_ONLY_STAFF" }]); setNextKey(nextKey + 1); }} type="button">Add an event</button>
                     </div>
                   </fieldset>
                 ) : null}
 
-                <fieldset aria-describedby={errors.clubs ? "invite-clubs-error" : undefined}>
+                <fieldset {...fieldErrorProps("invite-clubs-error", errors.clubs)} id="invite-clubs">
                   <legend>Clubs</legend>
                   {clubs.map((row, index) => (
                     <div className={styles.rowPair} key={row.key}>
@@ -241,7 +271,7 @@ export function InvitePerson({ scope, eventOptions, clubOptions }: {
                       <button aria-label={`Remove club ${index + 1}`} className="secondary-button" onClick={() => setClubs(clubs.filter((entry) => entry.key !== row.key))} type="button">Remove</button>
                     </div>
                   ))}
-                  {errors.clubs ? <p className={styles.fieldError} id="invite-clubs-error" role="alert">{errors.clubs}</p> : null}
+                  <FieldError id="invite-clubs-error">{errors.clubs}</FieldError>
                   <div>
                     <button className="secondary-button" onClick={() => { setClubs([...clubs, { key: nextKey, organizationId: "", role: "DIRECTOR" }]); setNextKey(nextKey + 1); }} type="button">Add a club</button>
                   </div>

@@ -70,7 +70,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           {view.showAllClubs && <input name="show" type="hidden" value="all" />}
           <label>Search by club or church name<input autoComplete="off" defaultValue={view.query} maxLength={80} name="q" type="search" /></label>
           <button className="secondary-button" type="submit">Search</button>
-          {view.query && <Link className="secondary-button" href={here({ query: null })} prefetch={false}>Clear search</Link>}
+          {view.query && <Link className="secondary-button" href={here({ query: null })} prefetch={false}>Clear filters</Link>}
         </SearchAsYouTypeForm>
         <SearchResultStatus message={`${view.rows.length} ${view.rows.length === 1 ? "club" : "clubs"} shown`} />
         {view.rows.length === 0 ? (

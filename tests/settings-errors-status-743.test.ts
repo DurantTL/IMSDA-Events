@@ -195,8 +195,8 @@ describe("event settings: a field error or a Go to link opens its section (#743)
     // A failed save opens the first problem's block and focuses its field.
     expect(source).toContain("setBlockOpen(first.block, true)");
     expect(source).toContain("pendingFocusRef.current = settingsFieldDomId(first.key)");
-    // Native validation on a field inside a closed block opens that block.
-    expect(source).toContain("onInvalidCapture={openBlockForInvalidField}");
+    // Native validation is off (#1450), so nothing fires `invalid`; a summary link opens the block instead.
+    expect(source).not.toContain("onInvalidCapture");
   });
 
   it("labels a field error with an icon, aria-invalid and aria-describedby", () => {
@@ -221,8 +221,10 @@ describe("event settings: focus and error placement (#743 review)", () => {
     expect(takePendingFocus(ref)).toBeNull();
     const source = read("components/event-settings-workspace.tsx");
     expect(source).toContain("const targetId = takePendingFocus(pendingFocusRef);");
-    expect(source).toContain("if (targetId) goToControl(targetId);");
-    expect(source).not.toContain("errorSummaryRef.current?.focus()");
+    // Rule 7 / #1450 replaced the #743 focus-the-first-field behavior: the summary takes focus, and following a link opens the block.
+    expect(source).toContain("if (targetId) errorSummaryRef.current?.focus();");
+    expect(source).not.toContain("if (targetId) goToControl(targetId);");
+    expect(source).toContain("if (item.targetId) goToControl(item.targetId);");
   });
 
   it("flags and opens More settings for a field the event type moved there", () => {
@@ -251,7 +253,7 @@ describe("event settings: focus and error placement (#743 review)", () => {
   });
 
   it("styles a settings error as an error in every block", () => {
-    expect(block).toMatch(/\.settings-block \.field-error-message[^{]*\{[^}]*font-weight: 700/);
+    expect(block).toMatch(/\.settings-block \.field-error-message[^{]*\{[^}]*font-weight: 600/);
     expect(block).toContain(".empty-state:not(.panel)");
   });
 
@@ -311,15 +313,17 @@ describe("error summary (#743)", () => {
     expect(markup).toContain('href="#public_attendee_a_shirt"');
     expect(markup).toContain("Guest Two — T-shirt size is required.");
     expect(markup).toContain("Archery Basics — pick a time.");
-    expect(markup).toContain("3 problems to fix. Your answers are kept.");
+    expect(markup).toContain("3 things to fix before saving");
     expect(markup).toContain("<svg");
-    expect(errorSummaryHeading(1)).toBe("1 problem to fix. Your answers are kept.");
+    expect(errorSummaryHeading(1)).toBe("1 thing to fix before saving");
+    expect(errorSummaryHeading(2, "signing in")).toBe("2 things to fix before signing in");
   });
 
   it("focuses the summary after a failed submit on the public form and keeps answers", () => {
     const source = read("components/public-registration-form.tsx");
     expect(source).toMatch(/window\.requestAnimationFrame\(\(\) => errorSummaryRef\.current\?\.focus\(\)\)/);
-    expect(source).toContain("errorSummaryHeading(issues.length)");
+    expect(source).toContain("<FormErrorSummary");
+    expect(source).toContain("items={summaryItems}");
     expect(source).toContain('<FieldError className="public-registration-field-error"');
     expect(source).toContain("issueSummaryMessage(issue)");
     // A failed submit never clears the entered answers.
@@ -436,7 +440,7 @@ describe("empty states offer a create action only to an authorized viewer (#743)
 
 describe("success states say what happened and what comes next (#743)", () => {
   it("names the next step after a save, a new code, a new tag and a roster add", () => {
-    expect(read("components/event-settings-workspace.tsx")).toContain("Event settings saved. ${nextStep}");
+    expect(read("components/event-settings-workspace.tsx")).toContain("savedMessage(nextStep)");
     expect(read("components/promo-code-workspace.tsx")).toContain("Next: share it with registrants");
     expect(read("components/tag-configuration-workspace.tsx")).toContain("Next: staff can apply it");
     expect(read("components/club-roster-workspace.tsx")).toContain("Next: they can be chosen when the club registers");

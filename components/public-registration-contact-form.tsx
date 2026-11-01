@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
+import { savedMessage } from "@/components/form-message";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
@@ -21,7 +23,7 @@ type PublicRegistrationContactFormProps = {
 type SaveState =
   | { kind: "idle"; message: "" }
   | { kind: "saving"; message: "Saving contact details…" }
-  | { kind: "saved"; message: "Contact details saved." }
+  | { kind: "saved"; message: string }
   | { kind: "error"; message: string };
 
 export function PublicRegistrationContactForm({
@@ -31,6 +33,7 @@ export function PublicRegistrationContactForm({
   const [contact, setContact] = useState(initialContact);
   // The saved phone (#871): the same number is an old one left alone and never blocks the save.
   const [savedPhone, setSavedPhone] = useState(initialContact.phone);
+  const [savedEmail, setSavedEmail] = useState(initialContact.email);
   const [attempted, setAttempted] = useState(false);
   // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
@@ -51,6 +54,15 @@ export function PublicRegistrationContactForm({
     if (saveState.kind === "saving") return;
     setSiteUpdating(false);
     setAttempted(true);
+    // The browser's required and email checks are off (noValidate); the app says what is missing.
+    if (!contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim()) {
+      setSaveState({ kind: "error", message: "Enter the first name, last name and email address, then save again." });
+      return;
+    }
+    if (emailBlockingMessage("Email", contact.email, savedEmail)) {
+      setSaveState({ kind: "error", message: "Fix the highlighted email address and save again." });
+      return;
+    }
     if (phoneBlocks("Phone", contact.phone, savedPhone)) {
       setSaveState({ kind: "error", message: "Fix the highlighted phone number and save again." });
       return;
@@ -82,8 +94,9 @@ export function PublicRegistrationContactForm({
       if (payload?.registration?.contact) {
         setContact(payload.registration.contact);
         setSavedPhone(payload.registration.contact.phone);
+        setSavedEmail(payload.registration.contact.email);
       }
-      setSaveState({ kind: "saved", message: "Contact details saved." });
+      setSaveState({ kind: "saved", message: savedMessage() });
     } catch (error) {
       setSaveState({
         kind: "error",
@@ -97,6 +110,7 @@ export function PublicRegistrationContactForm({
   return (
     <form
       className="public-manage-contact-card"
+      noValidate
       onSubmit={saveContact}
     >
       <div className="public-manage-card-heading">
@@ -139,14 +153,13 @@ export function PublicRegistrationContactForm({
           <span className="public-registration-field-label">
             Email <span aria-hidden="true">*</span>
           </span>
-          <input
-            autoComplete="email"
-            inputMode="email"
-            maxLength={160}
+          <EmailInput
+            label="Email"
             name="email"
-            onChange={(event) => updateField("email", event.target.value)}
+            onValueChange={(value) => updateField("email", value)}
             required
-            type="email"
+            showNow={attempted}
+            stored={savedEmail}
             value={contact.email}
           />
         </label>

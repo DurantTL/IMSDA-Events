@@ -101,6 +101,24 @@
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkbox {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--green);
+}
+
 .sendRow {
   display: flex;
   flex-wrap: wrap;

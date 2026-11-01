@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { PhoneInput } from "@/components/phone-input";
 import { inlinePhoneProblem } from "@/lib/field-validation";
 import { StaffInvitationQuestions, type StaffAnswers } from "@/components/staff-invitation-questions";
 import type { StaffQuestion } from "@/modules/staff-invitations/event-questions";
@@ -154,8 +155,7 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
           <div className="form-grid two-column">
             <label>Email<input disabled readOnly type="email" value={person.email} /></label>
             <label>Phone (optional)
-              <input aria-describedby={phoneProblem.message ? "staff-invitation-phone-error" : undefined} aria-invalid={phoneProblem.message ? true : undefined} autoComplete="tel" inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} onChange={(changeEvent) => setPhone(changeEvent.target.value)} type="tel" value={phone} />
-              {phoneProblem.message && <small className="field-error" id="staff-invitation-phone-error" role="alert">{phoneProblem.message}</small>}
+              <PhoneInput label="Phone" onValueChange={setPhone} showNow={phoneTouched} value={phone} />
             </label>
           </div>
           {questions.length > 0 && (

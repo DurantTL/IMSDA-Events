@@ -213,9 +213,10 @@ describe("the People list markup", () => {
     expect(html).toContain('id="people-status"');
   });
 
-  it("shows search Clear whenever a search is set, keeping filters", () => {
+  it("shows Clear filters beside the search whenever a search or filter is set, back to the bare list (rule B2, #1456)", () => {
     const html = render(parsePeopleFilters({ role: "club-director" }, "full"), { query: "sam" });
-    expect(html).toContain('class="secondary-button" href="/admin/people?role=club-director"');
+    expect(html).toContain('class="secondary-button" href="/admin/people">Clear filters</a></form>');
+    expect(render(parsePeopleFilters({}, "full"))).not.toContain('href="/admin/people">Clear filters</a></form>');
   });
 
   it("groups roles in the panel with legends", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { useDebouncedCallback, useSearchTicket } from "@/components/search-as-you-type";
 import {
   Bell,
@@ -124,6 +125,7 @@ export function AttendeeCommunityBoard({
   announcements?: AttendeeTimelineAnnouncement[];
 }) {
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,6 +191,16 @@ export function AttendeeCommunityBoard({
     } catch {
       // See draft-recovery note above.
     }
+  }
+
+  async function deleteOwn(id: string, kind: "post" | "reply") {
+    if (!(await confirm({
+      title: `Delete your ${kind}?`,
+      body: <p>{`Your ${kind} is removed from the board.`}</p>,
+      confirmLabel: `Delete ${kind}`,
+      destructive: true,
+    }))) return;
+    void action({ action: "DELETE_POST", postId: id });
   }
 
   async function action(body: Record<string, unknown>, onSuccess?: () => void) {
@@ -303,6 +315,7 @@ export function AttendeeCommunityBoard({
 
   return (
     <section className="public-manage-card attendee-community-board" id="timeline">
+      {confirmDialog}
       <header className="attendee-community-heading">
         <div className="public-manage-card-heading">
           <MessagesSquare size={21} aria-hidden="true" />
@@ -398,7 +411,7 @@ export function AttendeeCommunityBoard({
                 value={searchQuery}
               />
               <button className="secondary-button" type="submit">{searching ? "Searching…" : "Search"}</button>
-              {searchResults && <button className="text-button" onClick={clearSearch} type="button">Clear</button>}
+              {searchResults && <button className="text-button" onClick={clearSearch} type="button">Clear filters</button>}
             </div>
             <small>Searches only visible posts and replies from this event.</small>
           </form>
@@ -466,7 +479,7 @@ export function AttendeeCommunityBoard({
                             <button className="secondary-button" disabled={busy} type="submit">Save changes</button>
                           </form>
                         </details>
-                        <button className="text-button" disabled={busy} onClick={() => void action({ action: "DELETE_POST", postId: post.id })} type="button">
+                        <button className="text-button" disabled={busy} onClick={() => void deleteOwn(post.id, "post")} type="button">
                           <Trash2 size={14} aria-hidden="true" /> Delete
                         </button>
                       </>
@@ -527,7 +540,7 @@ export function AttendeeCommunityBoard({
                                 <button className="secondary-button" disabled={busy} type="submit">Save changes</button>
                               </form>
                             </details>
-                            <button className="text-button" disabled={busy} onClick={() => void action({ action: "DELETE_POST", postId: reply.id })} type="button"><Trash2 size={13} aria-hidden="true" /> Delete</button>
+                            <button className="text-button" disabled={busy} onClick={() => void deleteOwn(reply.id, "reply")} type="button"><Trash2 size={13} aria-hidden="true" /> Delete</button>
                           </div>
                         )}
                         {reply.status === "PUBLISHED" && !reply.authorDeleted && !reply.isOwn && !reply.isReported && (

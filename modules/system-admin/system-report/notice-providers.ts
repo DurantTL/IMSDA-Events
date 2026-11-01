@@ -15,6 +15,8 @@ import {
   type EmailProviderLabel,
   type NoticeFields,
 } from "./notice-signals";
+import { systemSetupFor } from "@/modules/setup-help/system-setup-steps";
+import type { SetupHelp } from "@/modules/setup-help/types";
 import type { SignalMeta } from "./model";
 import type { defineProvider, ReportContext, SignalProvider } from "./providers";
 
@@ -27,7 +29,7 @@ import type { defineProvider, ReportContext, SignalProvider } from "./providers"
 const SQUARE_REJECTED_KEY = "system.payments.webhook-rejected";
 const EMAIL_REJECTED_KEY = "system.email.webhook-rejected";
 
-const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null): SignalMeta => ({ key, name, description, fixHref, fixLabel });
+const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null, setup?: SetupHelp): SignalMeta => ({ key, name, description, fixHref, fixLabel, ...(setup ? { setup } : {}) });
 
 function triedRow(key: string, readAt: Date): NoticeFields {
   return { key, checkedAt: readAt.toISOString(), whenLabel: "Tried", state: "unavailable", resultText: "This could not be read just now. It is not shown as healthy or as zero." };
@@ -71,9 +73,9 @@ async function emailRow(ctx: ReportContext, key: string, provider: EmailProvider
 export function buildNoticeProviders(define: typeof defineProvider): SignalProvider[] {
   return [
     define("notices", [
-      m("square-notices", "Square notices", "The last payment notice Square sent, compared with Square payments completed in the last 24 hours.", "/admin/settings", "Platform settings"),
-      m("resend-notices", "Resend notices", "The last delivery notice Resend sent, compared with email sent in the last 24 hours.", "/admin/email", "Open email settings"),
-      m("ses-notices", "SES notices", "The last delivery notice SES sent, compared with email sent in the last 24 hours.", "/admin/email", "Open email settings"),
+      m("square-notices", "Square notices", "The last payment notice Square sent, compared with Square payments completed in the last 24 hours.", "/admin/settings", "Platform settings", systemSetupFor("square-webhook")),
+      m("resend-notices", "Resend notices", "The last delivery notice Resend sent, compared with email sent in the last 24 hours.", "/admin/email", "Open email settings", systemSetupFor("email-reports")),
+      m("ses-notices", "SES notices", "The last delivery notice SES sent, compared with email sent in the last 24 hours.", "/admin/email", "Open email settings", systemSetupFor("email-reports")),
       m("rejected-notices", "Rejected notices", "Square or Resend notices turned away for a bad signature in the last 7 days, read from the stored alerts.", "/admin/settings", "Platform settings"),
       m("bounces-complaints", "Bounces and complaints", "Addresses stopped after a bounce or a complaint in the last 7 days.", "/admin/email", "Open email settings"),
     ], async (ctx) => {

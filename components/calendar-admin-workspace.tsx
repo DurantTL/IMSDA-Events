@@ -4,7 +4,7 @@ import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
-import { useClientSearch } from "@/components/search-as-you-type";
+import { useAddressParams, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
@@ -16,12 +16,15 @@ import type { PendingReminders } from "@/modules/calendar/deadline-reminders";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import {
   bulkConfirmMessage,
+  defaultEntryDropdownFilters,
+  type EntryDropdownFilters,
   defaultEntryFilters,
   describeEntryCount,
   describeEntrySort,
   filterAndSortEntries,
   maxBulkEntries,
   noCategoryFilter,
+  parseEntryDropdownFilters,
   calendarEntryListLimit,
   selectAllMatching,
   selectedMatchingIds,
@@ -35,6 +38,7 @@ import {
 import { calendarDateIn, calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
+import { savedMessage } from "@/components/form-message";
 
 type ApiResponse = {
   entries?: CalendarAdminEntry[];
@@ -145,8 +149,9 @@ export function CalendarAdminWorkspace({
   // Focus lands here when the edited row is no longer in the list (#869).
   const summaryRef = useRef<HTMLParagraphElement>(null);
   // Entries list (#796): search, filters, sort, and the rows ticked for a bulk action.
-  const [dropdownFilters, setFilters] = useState<EntryFilters>(defaultEntryFilters);
-  const search = useClientSearch(defaultEntryFilters.search);
+  // The filters live in the address (`?q=`, `?category=`, ...), so reload, Back and shared links keep them (rule B2, #1456).
+  const [dropdownFilters, setFilters] = useAddressParams(defaultEntryDropdownFilters, parseEntryDropdownFilters, () => startNewView());
+  const search = useClientSearch(defaultEntryFilters.search, undefined, "q");
   // The list filters on the settled search term, not on every keystroke.
   const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
   const [sort, setSort] = useState<EntrySort>("date");
@@ -172,8 +177,8 @@ export function CalendarAdminWorkspace({
     startNewView();
   }
 
-  function changeFilters(patch: Partial<EntryFilters>) {
-    setFilters((current) => ({ ...current, ...patch }));
+  function changeFilters(patch: Partial<EntryDropdownFilters>) {
+    setFilters(patch);
     startNewView();
   }
 
@@ -260,7 +265,7 @@ export function CalendarAdminWorkspace({
 
   async function saveEdit(body: EntryBody) {
     if (!editing) return false;
-    const ok = await call(`/api/admin/calendar/entries/${encodeURIComponent(editing.id)}`, "PATCH", body, "Saved.");
+    const ok = await call(`/api/admin/calendar/entries/${encodeURIComponent(editing.id)}`, "PATCH", body, savedMessage());
     if (ok) closeEdit();
     return ok;
   }
@@ -364,7 +369,13 @@ export function CalendarAdminWorkspace({
                 feeds={initialFeeds}
                 filters={filters}
                 onChange={changeFilters}
-                onReset={() => { setFilters(defaultEntryFilters); search.setValue(defaultEntryFilters.search); startNewView(); }}
+                onReset={() => {
+                  // One history entry for the whole clearing, so Back brings the filters back.
+                  writeAddressParams({ q: null, category: null, source: null, state: null, time: null, entryType: null }, "push");
+                  setFilters(defaultEntryDropdownFilters);
+                  search.setValue(defaultEntryFilters.search);
+                  startNewView();
+                }}
                 search={search}
                 onSort={(next) => { setSort(next); startNewView(); }}
                 sort={sort}
@@ -549,7 +560,7 @@ export function CalendarAdminWorkspace({
                       onSubmit={(submitEvent) => {
                         submitEvent.preventDefault();
                         const category = String(new FormData(submitEvent.currentTarget).get("category") ?? "");
-                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, "Category saved.");
+                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, savedMessage());
                       }}
                     >
                       <label>
@@ -1033,7 +1044,7 @@ function EntryFiltersBar({
           <option value="category">Category</option>
         </select>
       </label>
-      <div className="filter-bar-actions"><button className="secondary-button" onClick={onReset} type="button">Reset filters</button></div>
+      <div className="filter-bar-actions"><button className="secondary-button" onClick={onReset} type="button">Clear filters</button></div>
       </div>
     </div>
   );

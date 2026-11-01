@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
+import { EmailInput } from "@/components/email-input";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { EMAIL_FIELD_MESSAGE, isEmail } from "@/lib/field-validation";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary } from "@/components/form-error-summary";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
 import {
@@ -90,7 +94,7 @@ export function LoginForm({
   securityCheck?: SecurityCheckConfig;
 }) {
   const check = useRef<SecurityCheckHandle>(null);
-  const emailRef = useRef<HTMLInputElement>(null);
+  const [email, setEmail] = useState(demoCredentials?.email ?? "");
   useEffect(() => {
     // The post-registration offer links here with the address and return path in the fragment,
     // which keeps them out of server logs. Same handling as the attendee form it replaces.
@@ -98,11 +102,18 @@ export function LoginForm({
     attendeeAuthReturnPathFromHash(window.location.hash);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const prefill = attendeeSignUpEmailPrefill(fragment.get("email") ?? undefined);
-    if (prefill && emailRef.current) emailRef.current.value = prefill;
+    const input = document.getElementById("sign-in-email") as HTMLInputElement | null;
+    if (prefill && input) {
+      // Through the input's own setter and an input event, so the controlled email field keeps what was prefilled.
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, prefill);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     removeAttendeeAuthFragment();
   }, [unified]);
   const router = useRouter();
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; code?: string }>({});
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mfa, setMfa] = useState<MfaStep | null>(null);
@@ -114,6 +125,15 @@ export function LoginForm({
    * endpoint that served it would put the secret in another request.
    */
   const [qrDataUrl, setQrDataUrl] = useState("");
+
+  /** A changed field drops its own message and summary item (the summary hides when it empties). */
+  function fieldChanged(event: React.FormEvent<HTMLFormElement>) {
+    const id = (event.target as HTMLElement).id;
+    const key = id === "sign-in-email" ? "email" : id === "sign-in-password" ? "password" : id === "sign-in-code" ? "code" : null;
+    if (!key) return;
+    clearSummaryField(id);
+    setFieldErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+  }
 
   async function callChallenge(body: Record<string, unknown>) {
     const response = await fetch("/api/auth/mfa/challenge", {
@@ -128,10 +148,27 @@ export function LoginForm({
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    // What the browser's required and email checks enforced before noValidate. Wrong-password answers stay general.
+    const typedEmail = String(form.get("email") ?? "").trim();
+    const found: { email?: string; password?: string } = {};
+    if (!typedEmail) found.email = "Enter your email address.";
+    else if (!isEmail(typedEmail)) found.email = EMAIL_FIELD_MESSAGE;
+    if (!String(form.get("password") ?? "")) found.password = "Enter your password.";
+    setFieldErrors(found);
+    const items = [
+      found.email ? { targetId: "sign-in-email", message: summaryMessage("Email address", found.email) } : null,
+      found.password ? { targetId: "sign-in-password", message: summaryMessage("Password", found.password) } : null,
+    ].filter((item) => item !== null);
+    if (items.length > 0) {
+      setError("");
+      showSummary(items);
+      return;
+    }
+    clearSummary();
     if (!check.current?.require("Sign in")) return;
     setBusy(true);
     setError("");
-    const form = new FormData(event.currentTarget);
     try {
       const response = await fetch(unified ? "/api/sign-in" : "/api/auth/login", {
         method: "POST",
@@ -187,9 +224,18 @@ export function LoginForm({
   async function submitCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!mfa) return;
+    const form = new FormData(event.currentTarget);
+    if (!String(form.get("code") ?? "").trim()) {
+      const message = "Enter the code.";
+      setFieldErrors({ code: message });
+      setError("");
+      showSummary([{ targetId: "sign-in-code", message: summaryMessage(mfa.offer ? "Code from your authenticator" : "Six-digit code", message) }]);
+      return;
+    }
+    setFieldErrors({});
+    clearSummary();
     setBusy(true);
     setError("");
-    const form = new FormData(event.currentTarget);
     try {
       const result = await callChallenge({
         challengeToken: mfa.challengeToken,
@@ -236,7 +282,8 @@ export function LoginForm({
 
   if (mfa) {
     return (
-      <form className="auth-form" onSubmit={submitCode}>
+      <form className="auth-form" noValidate onChange={fieldChanged} onSubmit={submitCode}>
+        {summaryItems.length > 0 && <FormErrorSummary action="signing in" items={summaryItems} ref={summaryRef} />}
         {mfa.offer && (
           <div className="auth-success">
             <strong>Set up two-factor authentication</strong>
@@ -264,6 +311,8 @@ export function LoginForm({
         <OneTimeCodeInput
           label={mfa.offer ? "Code from your authenticator" : "Six-digit code"}
           autoFocus
+          id="sign-in-code"
+          error={fieldErrors.code}
         />
         {!mfa.offer && (
           <p className="field-help">
@@ -286,9 +335,10 @@ export function LoginForm({
   }
 
   return (
-    <form className="auth-form" onSubmit={submit}>
-      <label>Email address<input name="email" type="email" autoComplete="username" required defaultValue={demoCredentials?.email} ref={emailRef} /></label>
-      <label>Password<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span></label>
+    <form className="auth-form" noValidate onChange={fieldChanged} onSubmit={submit}>
+      {summaryItems.length > 0 && <FormErrorSummary action="signing in" items={summaryItems} ref={summaryRef} />}
+      <label>Email address<EmailInput autoComplete="username" error={fieldErrors.email} errorId="sign-in-email_error" id="sign-in-email" label="Email address" maxLength={254} name="email" onValueChange={setEmail} required value={email} /></label>
+      <label>Password<span className="password-field"><input id="sign-in-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} {...fieldErrorProps("sign-in-password_error", fieldErrors.password)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span><FieldError id="sign-in-password_error">{fieldErrors.password}</FieldError></label>
       <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label>{unified ? <Link href="/account/forgot-password">Forgot password?</Link> : <Link href="/forgot-password">Forgot password?</Link>}</div>
       {unified && <p className="field-help">Team member who cannot sign in? <Link href="/forgot-password">Reset a team password</Link>.</p>}
       <SecurityCheck config={securityCheck} action="staff-sign-in" handleRef={check} />

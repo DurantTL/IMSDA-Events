@@ -208,9 +208,9 @@ describe("submitting state (#743)", () => {
     expect(submit.match(/finally \{\s*setSubmitting\(false\);/g)?.length).toBe(2);
   });
 
-  it("is wired into event settings (Saving…) and the registration status change", () => {
+  it("is wired into event settings (Saving…) and the registration status change (#1448: a confirm dialog)", () => {
     expect(read("components/event-settings-workspace.tsx")).toMatch(/<SubmitButton[\s\S]*?submitting=\{saving\}[\s\S]*?submittingLabel="Saving…"/);
-    expect(read("components/people-workspace.tsx")).toMatch(/<SubmitButton[\s\S]*?submittingLabel="Updating…"/);
+    expect(read("components/people-workspace.tsx")).toMatch(/<ConfirmDialog[\s\S]*?busy=\{saving\}[\s\S]*?busyLabel="Updating…"/);
   });
 });
 

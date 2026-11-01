@@ -2,13 +2,13 @@
 import { act, createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const nav = vi.hoisted(() => ({ replace: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: vi.fn() }) }));
+const nav = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: nav.push }) }));
 
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
 import { ClubOrderWorkspace } from "@/components/club-order-workspace";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
-import { SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure, useClientSearch } from "@/components/search-as-you-type";
+import { addressModeFor, SEARCH_DEBOUNCE_MS, SearchAsYouTypeForm, SearchDisclosure, useClientSearch } from "@/components/search-as-you-type";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { buttonByText, mount, typeInto, type Mounted } from "./helpers/dom-render";
 
@@ -33,6 +33,7 @@ let mounted: Mounted;
 beforeEach(() => {
   vi.useFakeTimers();
   nav.replace.mockReset();
+  nav.push.mockReset();
   window.history.replaceState(null, "", "/admin/clubs?year=2026&page=3");
 });
 afterEach(async () => {
@@ -56,18 +57,38 @@ describe("SearchAsYouTypeForm in a DOM", () => {
     expect(nav.replace).toHaveBeenCalledWith("/admin/clubs?year=2026&q=eagl&attention=all", { scroll: false });
   });
 
-  it("applies a select change at once, and submit (Enter) at once, cancelling the pending timer", async () => {
+  it("pushes a select change at once (Back undoes it) and a submit (Enter) at once, cancelling the pending timer (rule B2, #1456)", async () => {
     mounted = await mount(form());
     const select = mounted.container.querySelector("select")!;
     await act(async () => { select.value = "needs-attention"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(nav.replace).toHaveBeenCalledTimes(1);
-    expect(nav.replace.mock.calls[0]![0]).toContain("attention=needs-attention");
+    expect(nav.push).toHaveBeenCalledTimes(1);
+    expect(nav.replace).not.toHaveBeenCalled();
+    expect(nav.push.mock.calls[0]![0]).toContain("attention=needs-attention");
 
-    nav.replace.mockClear();
+    nav.push.mockClear();
     await typeInto(q(), "river");
     await act(async () => { mounted.container.querySelector("form")!.requestSubmit(); });
-    expect(nav.replace).toHaveBeenCalledTimes(1);
+    expect(nav.push).toHaveBeenCalledTimes(1);
     await pause(SEARCH_DEBOUNCE_MS * 2);
+    expect(nav.push).toHaveBeenCalledTimes(1);
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it("replaces for typed text (one history entry per search) and pushes for a checkbox", async () => {
+    mounted = await mount(createElement(
+      SearchAsYouTypeForm,
+      { action: "/people/attendees" },
+      createElement("input", { id: "q", name: "q", type: "search" }),
+      createElement("input", { "aria-label": "Dietary", name: "dietary", type: "checkbox", value: "1" }),
+    ));
+    await typeInto(q(), "ann");
+    await pause(SEARCH_DEBOUNCE_MS);
+    expect(nav.replace).toHaveBeenCalledTimes(1);
+    expect(nav.push).not.toHaveBeenCalled();
+    const box = mounted.container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    await act(async () => { box.click(); });
+    expect(nav.push).toHaveBeenCalledTimes(1);
+    expect(nav.push.mock.calls[0]![0]).toBe("/people/attendees?q=ann&dietary=1");
     expect(nav.replace).toHaveBeenCalledTimes(1);
   });
 
@@ -102,6 +123,51 @@ describe("SearchAsYouTypeForm in a DOM", () => {
     await act(async () => { mounted.root.render(form()); });
     expect(q().value).toBe("other");
     expect(select.value).toBe("all");
+  });
+
+  it("on Back or a link the focused box follows the address when it holds no unsaved typing, whatever order events run in", async () => {
+    mounted = await mount(form());
+    q().focus();
+    // The box shows the previous address (no q), so it follows the new one: no popstate listener is involved.
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=fromback");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("fromback");
+    window.history.replaceState(null, "", "/admin/clubs?year=2026");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("");
+
+    // Typing still waiting for its pause is never overwritten.
+    await typeInto(q(), "typing");
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=again");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("typing");
+  });
+
+  it("the typist's own settled search never rewrites the box (a trailing space survives)", async () => {
+    mounted = await mount(form());
+    q().focus();
+    await typeInto(q(), "ma ");
+    await pause(SEARCH_DEBOUNCE_MS * 2);
+    // The settled search lands in the address trimmed, as the router would put it.
+    window.history.replaceState(null, "", "/admin/clubs?year=2026&q=ma");
+    await act(async () => { mounted.root.render(form()); });
+    expect(q().value).toBe("ma ");
+  });
+});
+
+describe("addressModeFor (rule B2, #1456)", () => {
+  const make = (tag: string, type?: string) => {
+    const element = document.createElement(tag);
+    if (type) element.setAttribute("type", type);
+    return element;
+  };
+  it("pushes for a select, checkbox and radio, and replaces for typed text", () => {
+    expect(addressModeFor(make("select"))).toBe("push");
+    expect(addressModeFor(make("input", "checkbox"))).toBe("push");
+    expect(addressModeFor(make("input", "radio"))).toBe("push");
+    expect(addressModeFor(make("input", "search"))).toBe("replace");
+    expect(addressModeFor(make("input", "text"))).toBe("replace");
+    expect(addressModeFor(make("textarea"))).toBe("replace");
   });
 });
 

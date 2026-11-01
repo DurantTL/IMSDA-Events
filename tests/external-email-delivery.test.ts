@@ -200,7 +200,8 @@ describe("external email queue", () => {
         fromEmail: "registration@imsda.org",
         toEmail: "attendee@example.test",
         subject: "Registration received",
-        bodyText: "Your registration is saved.",
+        // The text part always ends with the shared footer block (#1443).
+        bodyText: expect.stringMatching(/^Your registration is saved\.\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
         idempotencyKey: "outbox:message-1",
       }),
       dependencies.configuration,
@@ -245,7 +246,7 @@ describe("external email queue", () => {
 
     expect(payload).not.toBeNull();
     // The text part is flattened to plain text at send time (#1411); the stored snapshot stays as written.
-    expect(payload!.bodyText).toBe("Registration confirmed\n\nHello Avery.");
+    expect(payload!.bodyText).toMatch(/^Registration confirmed\n\nHello Avery\.\n\n--\nSent by IMSDA Events /);
     expect(payload!.bodyHtml).toContain("<!DOCTYPE html>");
     expect(payload!.bodyHtml).toContain("<h1>Registration confirmed</h1>");
     expect(payload!.bodyHtml).toContain("<strong>Avery</strong>");
@@ -274,7 +275,13 @@ describe("external email queue", () => {
     it("sends a row queued before the column existed exactly as before", async () => {
       const legacy = await deliver({});
       expect(legacy).not.toContain("display:none");
-      expect(legacy).toBe(renderEmailHtmlDocument({ title: "Registration received", bodyHtml: "<p>Hello <strong>Avery</strong>.</p>", footer: "IMSDA Events" }));
+      // Event mail keeps the event's own contact (its reply-to) in the footer (#1443).
+      expect(legacy).toBe(renderEmailHtmlDocument({
+        title: "Registration received",
+        bodyHtml: "<p>Hello <strong>Avery</strong>.</p>",
+        whyLine: "You got this because you registered for an event.",
+        helpLine: "Questions about this event? Email help@imsda.org.",
+      }));
       // A null snapshot (a message queued with no line) is the same document.
       expect(await deliver({ preheaderSnapshot: null })).toBe(legacy);
     });
@@ -284,7 +291,7 @@ describe("external email queue", () => {
       expect(html).toContain("display:none");
       expect(html).toContain("Doors open at &lt;b&gt;four&lt;/b&gt; &amp; parking is free");
       expect(html).not.toContain("<b>four</b>");
-      expect(html.indexOf("Doors open")).toBeLessThan(html.indexOf("IMSDA Events</span>"));
+      expect(html.indexOf("Doors open")).toBeLessThan(html.indexOf("<table"));
     });
   });
 
@@ -388,10 +395,10 @@ describe("external email queue", () => {
 
   /**
    * Rows queued before HTML bodies existed have no fragment. Re-deriving one
-   * from their text would re-parse whatever a registrant typed as Markdown, so
-   * they go out as text only.
+   * from their text as Markdown would re-parse whatever a registrant typed, so
+   * the layout (#1443) writes their text as plain escaped paragraphs instead.
    */
-  it("sends a pre-HTML row as text only rather than re-parsing its body", async () => {
+  it("sends a pre-HTML row without re-parsing its body as Markdown", async () => {
     const store = fakeDeliveryStore({
       bodyTextSnapshot: "Hello [Avery](https://malicious.example).",
       bodyHtmlSnapshot: null,
@@ -407,8 +414,15 @@ describe("external email queue", () => {
     });
 
     expect(payload).not.toBeNull();
-    expect(payload!.bodyText).toBe("Hello [Avery](https://malicious.example).");
-    expect(payload!.bodyHtml).toBeNull();
+    expect(payload!.bodyText).toMatch(/^Hello \[Avery\]\(https:\/\/malicious\.example\)\.\n\n--\nSent by /);
+    // The shared layout (#1443) gives it a formatted part too, made from the text as plain paragraphs: the Markdown link
+    // is shown as typed, never as an anchor (only the bare address inside it is linked), and nothing is re-parsed.
+    expect(payload!.bodyHtml).toContain("<!DOCTYPE html>");
+    expect(payload!.bodyHtml).toContain("Hello [Avery](");
+    expect(payload!.bodyHtml).not.toContain(">Avery</a>");
+    // No address outside the site's own origin is ever a link in a text-only body.
+    expect(payload!.bodyHtml).not.toContain("<a ");
+    expect(payload!.bodyHtml).toContain("https://malicious.example");
   });
 
   it("inserts a private link only in the in-memory provider payload", async () => {
@@ -444,7 +458,7 @@ describe("external email queue", () => {
     });
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        bodyText: "Manage: https://events.example.test/manage/private-token",
+        bodyText: expect.stringMatching(/^Manage: https:\/\/events\.example\.test\/manage\/private-token\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
       }),
       dependencies.configuration,
     );
@@ -826,7 +840,7 @@ describe("account email queue", () => {
       expect.objectContaining({
         fromEmail: "no-reply@imsda.org",
         toEmail: "alex@imsda.org",
-        bodyText: "Choose a new one: https://events.imsda.test/reset-password?token=raw",
+        bodyText: expect.stringMatching(/^Choose a new one: https:\/\/events\.imsda\.test\/reset-password\?token=raw\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
       }),
       dependencies.configuration,
     );

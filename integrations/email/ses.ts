@@ -177,11 +177,40 @@ const NETWORK_ERROR_CODES = new Set([
   "EPIPE", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED",
 ]);
 
-/** Turns an SMTP failure into the error the outbox worker understands. Never includes the message or credentials. */
-export function mapSesError(error: unknown): EmailProviderRequestError | EmailProviderConfigurationError {
+/** What the sender knows about how far a failed send got, beyond what the error itself says. */
+export type SesFaultContext = {
+  /**
+   * Whether the whole message (terminating dot included) had been written to the socket when the send failed. Unknown
+   * is treated as true: a fault with no SMTP reply can only be called "not accepted" when it is known to precede it.
+   */
+  dataSent?: boolean;
+};
+
+/**
+ * Turns an SMTP failure into the error the outbox worker understands. Never includes the message or credentials.
+ *
+ * `notAccepted` (#1444) says the backup provider may take over, and is set ONLY where SES cannot have accepted the
+ * message:
+ *  - an SMTP reply of 4xx or 5xx (throttling 454, quota, rejections): the server refused, and a refused message is
+ *    not accepted;
+ *  - a failed login (bad credentials, or a temporary 4xx during AUTH): nothing was sent yet;
+ *  - a connection, DNS, TLS, greeting or timeout fault with no SMTP reply, but only when the message data had not
+ *    been fully written yet.
+ * A socket drop or timeout after the data was written is ambiguous: SES may have accepted it and the 250 may have
+ * been lost, so it stays retryable on SES and never fails over. Nodemailer cannot tell these apart by itself:
+ * `err.command` is "CONN" for every socket, timeout and TLS fault, whether it happened before or after DATA (only
+ * replies carry "MAIL FROM", "RCPT TO" or "DATA"). So `sendEmailWithSes` watches nodemailer's own log: the
+ * `tnx: "message"` entry is written when the terminating dot has been queued, and is passed in as `dataSent`.
+ */
+export function mapSesError(
+  error: unknown,
+  context: SesFaultContext = {},
+): EmailProviderRequestError | EmailProviderConfigurationError {
   const smtp = (error ?? {}) as SmtpError;
   const reply = `${smtp.response ?? ""} ${smtp.message ?? ""}`;
   const status = typeof smtp.responseCode === "number" ? smtp.responseCode : 0;
+  const dataSent = context.dataSent ?? true;
+  const refused = status >= 400 && status < 600;
 
   // A 4xx during AUTH ("454 4.7.0 Temporary authentication failure") is SES being briefly unwell, not wrong credentials.
   if (smtp.code === "EAUTH" && status >= 400 && status < 500) {
@@ -190,6 +219,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       "SES_AUTH_TEMPORARY",
       true,
       status,
+      true,
     );
   }
   if (smtp.code === "EAUTH" || status === 535) {
@@ -199,7 +229,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
   }
   // Before the reply-code branches: a failed STARTTLS upgrade carries the server's 5xx reply but is a transport fault.
   if (smtp.code && NETWORK_ERROR_CODES.has(smtp.code)) {
-    return new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0);
+    return new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0, refused || !dataSent);
   }
   if (/daily message quota exceeded/i.test(reply)) {
     return new EmailProviderRequestError(
@@ -207,6 +237,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       PROVIDER_QUOTA_CODE,
       true,
       status || 454,
+      true,
     );
   }
   if (status === 454 || /maximum sending rate exceeded|throttl/i.test(reply)) {
@@ -215,6 +246,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       "PROVIDER_RATE_LIMITED",
       true,
       status || 454,
+      true,
     );
   }
   if (status >= 400 && status < 500) {
@@ -223,6 +255,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       `SMTP_${status}`,
       true,
       status,
+      true,
     );
   }
   if (/not verified/i.test(reply)) {
@@ -231,6 +264,7 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       "SES_IDENTITY_NOT_VERIFIED",
       false,
       status || 554,
+      true,
     );
   }
   if (status >= 500 && status < 600) {
@@ -241,22 +275,50 @@ export function mapSesError(error: unknown): EmailProviderRequestError | EmailPr
       status === 554 ? "SES_MESSAGE_REJECTED" : `SMTP_${status}`,
       false,
       status,
+      true,
     );
   }
   if (smtp.code === "EENVELOPE" || smtp.code === "EMESSAGE") {
     return new EmailProviderRequestError("The message could not be built for delivery.", "INVALID_MESSAGE", false, 0);
   }
   // A socket, stream or TLS fault (ERR_STREAM_PREMATURE_CLOSE, EADDRNOTAVAIL, ERR_SSL_*...): it has a code but no
-  // SMTP reply, so the message never reached SES's decision and is safe to retry.
+  // SMTP reply, so the message never reached SES's decision and is safe to retry. A local stream fault (ESTREAM, an
+  // attachment that could not be read) is ours, not an outage, so it never fails over.
   if (smtp.code && typeof smtp.responseCode !== "number") {
-    return new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0);
+    return new EmailProviderRequestError("The email provider could not be reached.", "NETWORK_ERROR", true, 0, smtp.code !== "ESTREAM" && !dataSent);
   }
   // No code at all: unknown and uncategorised. Final, as for every other adapter, so it is looked at, not looped.
   return new EmailProviderRequestError("The email provider request failed.", "UNEXPECTED_PROVIDER_ERROR", false, 0);
 }
 
-function createTransport(configuration: SesEmailConfiguration): SesTransport {
+/**
+ * Watches one send through nodemailer's logger. The `tnx: "message"` info entry (with `outByteCount`) is written when
+ * the message stream, terminating dot included, has been handed to the socket: from then on a fault is ambiguous.
+ */
+export function createDataSentTracker() {
+  const state = { dataSent: false };
+  const noop = () => undefined;
+  const logger = {
+    level: "info",
+    trace: noop,
+    debug: noop,
+    warn: noop,
+    error: noop,
+    fatal: noop,
+    info(entry?: unknown) {
+      const tnx = entry && typeof entry === "object" ? (entry as { tnx?: unknown; outByteCount?: unknown }) : null;
+      if (tnx?.tnx === "message" && typeof tnx.outByteCount === "number") state.dataSent = true;
+    },
+  };
+  return { state, logger };
+}
+
+function createTransport(
+  configuration: SesEmailConfiguration,
+  logger?: ReturnType<typeof createDataSentTracker>["logger"],
+): SesTransport {
   return nodemailer.createTransport({
+    ...(logger ? { logger } : {}),
     host: configuration.smtpHost,
     port: configuration.smtpPort,
     // Port 465 is implicit TLS; everything else must upgrade with STARTTLS or the send fails.
@@ -299,7 +361,12 @@ export function messageIdFromResponse(response: string | undefined) {
 export async function sendEmailWithSes(
   input: EmailDeliveryInput,
   configuration: SesEmailConfiguration = getSesEmailConfiguration(),
-  options: { transport?: SesTransport; pace?: (maxSendRate: number) => Promise<void> } = {},
+  options: {
+    transport?: SesTransport;
+    pace?: (maxSendRate: number) => Promise<void>;
+    /** For a supplied transport: whether the data had been fully written when it failed. Unknown means yes (ambiguous). */
+    dataSent?: () => boolean;
+  } = {},
 ): Promise<EmailDeliveryResult> {
   if (!input.fromEmail.trim()) {
     throw new EmailProviderConfigurationError(
@@ -323,12 +390,13 @@ export async function sendEmailWithSes(
   }
   const mail = buildSesMailOptions(input, configuration);
   await (options.pace ?? defaultPacer)(configuration.maxSendRate);
-  const transport = options.transport ?? createTransport(configuration);
+  const tracker = createDataSentTracker();
+  const transport = options.transport ?? createTransport(configuration, tracker.logger);
   let info: { response?: string; messageId?: string };
   try {
     info = await transport.sendMail(mail);
   } catch (error) {
-    throw mapSesError(error);
+    throw mapSesError(error, { dataSent: options.transport ? (options.dataSent?.() ?? true) : tracker.state.dataSent });
   } finally {
     if (!options.transport) (transport as { close?: () => void }).close?.();
   }
@@ -359,7 +427,7 @@ export async function verifySesConnection(configuration: SesEmailConfiguration) 
     await transport.verify();
   } catch (error) {
     // Bad credentials, or an unreachable provider: either way the run should stop before claiming anything.
-    throw mapSesError(error);
+    throw mapSesError(error, { dataSent: false });
   } finally {
     transport.close();
   }

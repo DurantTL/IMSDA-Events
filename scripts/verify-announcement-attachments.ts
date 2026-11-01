@@ -460,7 +460,9 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>, st
   for (const part of [map, ...qrParts]) assert(html.includes(`src="cid:${part.content_id}"`), `the HTML refers to cid:${part.content_id}`);
   assert(!html.includes("msgfile:") && !html.includes("/attendee-passes/") && !html.includes("__IMSDA_PRIVATE"), "no stored reference or sentinel reaches the recipient");
   assert(html.includes('alt="Map of the grounds"') && html.includes('alt="Check-in QR code for Ann Synthetic"'), "alt text is kept");
-  assert(/<table role="presentation"[^>]*>\s*<tr><td align="center" bgcolor="#0f6f8c"/.test(html.replace(/\n/g, "")), "the button is a table");
+  // The shared layout's button (#1443): a table cell with a solid fill, plus the "Button not working?" fallback link.
+  assert(/<table role="presentation"[^>]*>\s*<tr><td align="center" bgcolor="#[0-9a-f]{6}" class="em-btn"/.test(html.replace(/\n/g, "")), "the button is a table");
+  assert(html.includes("Button not working? Paste this link into your browser"), "the button has a pasteable fallback link");
   assert(html.includes("/manage/") && html.includes(">Open my check-in pass</a>"), "the button links to the registration's private page");
   assert(second.text.includes("1st choice: Service"), "the seminar list is in the message");
   const sentRow = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: message.id }, select: { status: true, attemptCount: true } });

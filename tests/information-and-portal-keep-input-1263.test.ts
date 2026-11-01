@@ -120,7 +120,7 @@ describe("registration contact edit (#1263)", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body)).firstName).toBe("Avery Jo");
-    expect(container.textContent).toContain("Contact details saved.");
+    expect(container.textContent).toContain("Saved.");
     expect(container.querySelector(".submit-retry-notice")).toBeNull();
   });
 });

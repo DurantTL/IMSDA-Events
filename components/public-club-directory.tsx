@@ -164,7 +164,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
             {filtered.length === 0 ? (
               <li><EmptyState announce={false} className="empty-state panel" headingLevel={2} icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query.trim()}”`}>
                 Try a different town, ZIP, club or church name.
-                <button className={styles.resetButton} onClick={clearSearch} type="button">Clear search</button>
+                <button className={styles.resetButton} onClick={clearSearch} type="button">Clear filters</button>
               </EmptyState></li>
             ) : (
               filtered.map((club) => {

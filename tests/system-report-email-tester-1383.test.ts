@@ -96,6 +96,16 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe("email tester: the backup option (#1444)", () => {
+  it("answers 409 and queues nothing when the backup email service is not set up on this server", async () => {
+    const response = await post({ to: "me@example.org", backup: true });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "BACKUP_NOT_CONFIGURED" });
+    expect(mocks.outbox.create).not.toHaveBeenCalled();
+    expect(mocks.processAccountEmailQueue).not.toHaveBeenCalled();
+  });
+});
+
 describe("email tester: who may use it", () => {
   it("rejects a cross-origin request before anything else", async () => {
     const response = await post({ to: "me@example.org" }, { origin: "https://evil.test" });

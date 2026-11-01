@@ -14,10 +14,22 @@ import { getSquareConfiguration } from "@/modules/payments/square-config-domain"
  * that are blank. It never holds a value, a prefix of a value or a length, and there is no field to edit one. It is
  * computed on the server and is returned only to a system administrator (`getEnvironmentStatusForViewer`).
  */
+/** Every service this status can report. The System report maps each one to its setup help (`ENVIRONMENT_SERVICE_SETUP`), so a new id here fails the typecheck until it has an entry (#1434). */
+export type EnvironmentServiceId =
+  | "email-provider"
+  | "email-reports"
+  | "account-email"
+  | "payments"
+  | "payment-webhook"
+  | "google-sign-in"
+  | "encryption-key"
+  | "outbox-sweep"
+  | "alert-webhook";
+
 export type EnvironmentStatusValue = "configured" | "not-configured" | "unknown";
 
 export type EnvironmentServiceStatus = {
-  id: string;
+  id: EnvironmentServiceId;
   label: string;
   status: EnvironmentStatusValue;
   /** Variable names (never values) that are blank, for a service that is not configured. */
@@ -33,12 +45,12 @@ type Source = Record<string, string | undefined>;
 const present = (source: Source, key: string) => Boolean(source[key]?.trim());
 
 /** Configured when every required variable is set; otherwise not configured, naming the blank ones. */
-function allOf(source: Source, id: string, label: string, keys: readonly string[]): EnvironmentServiceStatus {
+function allOf(source: Source, id: EnvironmentServiceId, label: string, keys: readonly string[]): EnvironmentServiceStatus {
   const missing = keys.filter((key) => !present(source, key));
   return { id, label, status: missing.length === 0 ? "configured" : "not-configured", missing, note: null };
 }
 
-const unknownService = (id: string, label: string): EnvironmentServiceStatus => ({ id, label, status: "unknown", missing: [], note: null });
+const unknownService = (id: EnvironmentServiceId, label: string): EnvironmentServiceStatus => ({ id, label, status: "unknown", missing: [], note: null });
 
 /** An email provider other than the two known ones is a typo, which this page cannot judge. */
 function emailProviderRecognized(source: Source) {

@@ -54,8 +54,13 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
     void call("/api/admin/club-invites/send", "POST", selection, sentMessage);
   }
 
-  function changeEmail(invite: ClubInviteRecord) {
-    const email = window.prompt(`New email for ${invite.name || "this invite"} (${invite.club.name}):`, invite.email);
+  async function changeEmail(invite: ClubInviteRecord) {
+    const email = await ask({
+      title: `Change email for ${invite.name || "this invite"}?`,
+      body: <p>{`The invite to ${invite.club.name} will be sent to the new address instead.`}</p>,
+      confirmLabel: "Change email",
+      input: { label: `New email for ${invite.name || "this invite"} (${invite.club.name})`, defaultValue: invite.email, type: "email", required: true },
+    });
     if (!email || email.trim().toLowerCase() === invite.email) return;
     void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => "Email changed. The invite is waiting to be sent.");
   }
@@ -73,7 +78,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
   const pending = invites.filter((invite) => invite.status === "PENDING");
   const clubs = [...new Map(invites.map((invite) => [invite.club.id, invite.club])).values()];
 
-  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const { confirm: askConfirm, ask, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
       {confirmDialog}

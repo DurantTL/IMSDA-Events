@@ -6,6 +6,7 @@ import { ActionsMenu } from "@/components/actions-menu";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, MapPin, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
 import { getLocationDateWarnings } from "@/modules/events/readiness";
+import { savedMessage } from "@/components/form-message";
 
 type Draft = {
   name: string;
@@ -79,7 +80,7 @@ export function EventLocationsPanel({
   const [notice, setNotice] = useState("");
   const base = `/api/events/${encodeURIComponent(eventId)}/locations`;
 
-  async function call(url: string, method: string, body?: unknown, success = "Saved.") {
+  async function call(url: string, method: string, body?: unknown, success = savedMessage()) {
     setBusy(true);
     setError("");
     setNotice("");
@@ -108,7 +109,7 @@ export function EventLocationsPanel({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const saved = editingId
-      ? await call(`${base}/${encodeURIComponent(editingId)}`, "PATCH", bodyFrom(draft, coordinatorAtEditStart(locations.find((row) => row.id === editingId))), "Location saved.")
+      ? await call(`${base}/${encodeURIComponent(editingId)}`, "PATCH", bodyFrom(draft, coordinatorAtEditStart(locations.find((row) => row.id === editingId))), savedMessage())
       : await call(base, "POST", bodyFrom(draft), "Location added.");
     if (saved) {
       setAdding(false);
@@ -122,7 +123,7 @@ export function EventLocationsPanel({
     const target = index + offset;
     if (target < 0 || target >= ids.length) return;
     [ids[index], ids[target]] = [ids[target]!, ids[index]!];
-    await call(`${base}/order`, "PUT", { orderedIds: ids }, "Order saved.");
+    await call(`${base}/order`, "PUT", { orderedIds: ids }, savedMessage());
   }
 
   const formOpen = adding || editingId !== null;

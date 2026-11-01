@@ -1,7 +1,9 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState, type FormEvent } from "react";
 import { describeRate, lodgingCategories, lodgingCategoryLabels } from "@/modules/lodging/domain";
+import { savedMessage } from "@/components/form-message";
 import {
   CHURCH_SHARE_AUTOMATIC,
   type ChurchShareFact,
@@ -86,7 +88,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
           collectsPreferences: form.get("collects") === "on",
           preferencesDeadline: deadline === "" ? null : deadline,
           fullBehavior: form.get("fullBehavior"),
-        }), "Settings saved.");
+        }), savedMessage());
       }}>
         <label><input type="checkbox" name="collects" defaultChecked={view.settings.collectsPreferences} /> Registrants choose a lodging type (turn off for club events, where staff assign)</label>
         <label>Last day to change <input type="date" name="deadline" defaultValue={view.settings.preferencesDeadline ?? ""} /></label>
@@ -94,7 +96,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
         <label>When a type is full <select name="fullBehavior" defaultValue={view.settings.fullBehavior}>
           {fullBehaviors.map((value) => <option key={value} value={value}>{value === "SHOW_FULL" ? "Show \"Full\"" : "Show \"Full\" and let guests join a lodging waitlist"}</option>)}
         </select></label>
-        <button className="primary-button" type="submit" disabled={busy}>Save settings</button>
+        <SubmitButton label="Save settings" submitting={busy} submittingLabel="Saving…" />
       </form> : <p>{view.settings.collectsPreferences ? "Registrants choose a lodging type" : "Registrants do not choose lodging (staff assign)"}; changes close after {view.settings.effectiveDeadline}; a full type shows {view.settings.fullBehavior === "WAITLIST" ? "\"Full\" and guests can join a lodging waitlist" : "\"Full\""}. Event administrators change these.</p>}
       <div className="table-wrap"><table className="report-table report-table-auto">
         <caption>Lodging types offered</caption>
@@ -240,7 +242,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
           householdPreference: form.get("householdPreference"),
           ...(view.canSeeSensitive ? { groundFloorNeeded: form.get("groundFloorNeeded") === "on", accessibleRoomNeeded: form.get("accessibleRoomNeeded") === "on" } : {}),
           reason: text("reason") ?? "",
-        }), "Request saved.");
+        }), savedMessage());
       }}>
         <label>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
         <label>First night <input type="date" name="firstNight" defaultValue={request.firstNight ?? ""} /></label>
@@ -256,7 +258,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
         </> : null}
         <label>Reason <input name="reason" required maxLength={300} /></label>
         <span className="field-hint">No medical details.</span>
-        <button className="primary-button" type="submit" disabled={busy}>Save change</button>
+        <SubmitButton label="Save change" submitting={busy} submittingLabel="Saving…" />
       </form>
     </td></tr> : null}
   </>;

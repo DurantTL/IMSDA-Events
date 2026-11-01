@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useState, type InputHTMLAttributes } from "react";
-import { inlinePhoneProblem, inputAttributesFor } from "@/lib/field-validation";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { inlinePhoneProblem, inputAttributesFor, validatePhone } from "@/lib/field-validation";
 
 type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "defaultValue" | "onChange" | "inputMode"> & {
   /** What the message calls the field, for example "Phone". */
@@ -12,6 +13,10 @@ type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "val
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
+  /** A message from the form's own check or the server, shown through the same field message when the input has none of its own. */
+  error?: string;
+  /** The id of the message, when something else (a summary) already points at one. */
+  errorId?: string;
   /** Show the message now, not only after the person leaves the field (a failed save attempt). */
   showNow?: boolean;
 };
@@ -22,24 +27,37 @@ type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "val
  * is flagged "needs correcting" but never blocks. The server decides again from the stored value. The message
  * describes the problem and never repeats the number.
  */
-export function PhoneInput({ label, stored, value, defaultValue = "", onValueChange, showNow = false, ...rest }: PhoneInputProps) {
+export function PhoneInput({ label, stored, value, defaultValue = "", onValueChange, showNow = false, error = "", errorId, ...rest }: PhoneInputProps) {
   const [own, setOwn] = useState(defaultValue);
   const [left, setLeft] = useState(false);
-  const messageId = useId();
+  const generatedId = useId();
+  const messageId = errorId ?? generatedId;
   const current = value ?? own;
   const problem = inlinePhoneProblem(label, current, stored, left || showNow);
   const attributes = inputAttributesFor("phone");
+  const blocking = problem.blocking && Boolean(problem.message);
+  // The input's own message wins; otherwise one handed in from the form or the server.
+  const outside = !blocking && Boolean(error);
+  const shown = blocking ? problem.message : error;
   return (
     <>
       <input
         autoComplete={attributes.autoComplete}
         maxLength={40}
         {...rest}
-        aria-describedby={problem.message ? messageId : rest["aria-describedby"]}
-        aria-invalid={problem.blocking && problem.message ? true : undefined}
+        {...(blocking || outside
+          ? fieldErrorProps(messageId, shown, rest["aria-describedby"])
+          : { "aria-describedby": [rest["aria-describedby"], problem.message ? messageId : ""].filter(Boolean).join(" ") || undefined })}
         inputMode={attributes.inputMode}
         onBlur={(event) => {
           setLeft(true);
+          // Tidy a valid number on leaving the field (#1451): "5155550134" becomes "(515) 555-0134". A number that
+          // does not pass, such as an old saved one, is left exactly as it is.
+          const check = validatePhone(current);
+          if (check.ok && check.value !== current) {
+            setOwn(check.value);
+            onValueChange?.(check.value);
+          }
           rest.onBlur?.(event);
         }}
         onChange={(event) => {
@@ -49,9 +67,17 @@ export function PhoneInput({ label, stored, value, defaultValue = "", onValueCha
         type={attributes.type}
         value={current}
       />
-      {problem.message ? <small className={problem.blocking ? "field-error field-error-message phone-input-message is-error" : "phone-input-message is-notice"} id={messageId} role={problem.blocking ? "alert" : "status"}>{problem.message}</small> : null}
+      {blocking || outside
+        ? <FieldError className="field-error-message phone-input-message is-error" id={messageId}>{shown}</FieldError>
+        : problem.message ? <small className="phone-input-message is-notice" id={messageId} role="status">{problem.message}</small> : null}
     </>
   );
+}
+
+/** The message a changed phone would show on a failed submit, or "" when it passes (for the error summary). */
+export function phoneBlockingMessage(label: string, value: string, stored?: string | null) {
+  const problem = inlinePhoneProblem(label, value, stored, true);
+  return problem.blocking ? problem.message : "";
 }
 
 /** True when a changed phone would fail the shared check, for a submit handler to stop on. */
