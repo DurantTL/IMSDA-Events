@@ -199,7 +199,7 @@ export function ClubHonorsWorkspace({
     setHistory(null);
     setHistoryError("");
     try {
-      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`);
+      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as HistoryResponse;
       if (request !== historyRequest.current) return;
       if (!response.ok) {
@@ -248,7 +248,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       formElement.reset();
@@ -289,7 +289,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       setNotice("Entry voided. It is kept in the audit record.");
@@ -308,7 +308,7 @@ export function ClubHonorsWorkspace({
       <section className="public-manage-card" aria-labelledby="club-honors-heading">
         <div className="public-manage-card-heading club-roster-heading">
           <div>
-            <p className="public-registration-eyebrow">Club year {clubYear}</p>
+            <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
             <h2 id="club-honors-heading">Honors</h2>
           </div>
           {!staff && (

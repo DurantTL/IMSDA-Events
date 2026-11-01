@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
@@ -128,8 +129,8 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
           <p className="public-registration-eyebrow">{event.name}</p>
           <h1><CheckCircle2 aria-hidden="true" size={22} /> We have your registration</h1>
           <p>{done.message}</p>
-          <p><strong>Reference:</strong> {done.confirmationCode}</p>
-          <p>We emailed {person.email} a receipt. Keep this reference if you contact the event office.</p>
+          <p><strong>Reference:</strong> <ExactValue>{done.confirmationCode}</ExactValue></p>
+          <p>We emailed <ExactValue>{person.email}</ExactValue> a receipt. Keep this reference if you contact the event office.</p>
         </section>
       </main>
     );

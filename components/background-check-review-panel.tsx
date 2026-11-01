@@ -85,10 +85,10 @@ export function BackgroundCheckReviewPanel() {
     setError("");
     try {
       const [reviewsResponse, unmatchedResponse, manualResponse, nameOnlyResponse] = await Promise.all([
-        fetch("/api/admin/background-checks/reviews"),
-        fetch("/api/admin/background-checks/unmatched"),
-        fetch("/api/admin/background-checks/manual-matches"),
-        fetch("/api/admin/background-checks/name-only-matches"),
+        fetch("/api/admin/background-checks/reviews", { cache: "no-store" }),
+        fetch("/api/admin/background-checks/unmatched", { cache: "no-store" }),
+        fetch("/api/admin/background-checks/manual-matches", { cache: "no-store" }),
+        fetch("/api/admin/background-checks/name-only-matches", { cache: "no-store" }),
       ]);
       const reviewsResult = await reviewsResponse.json().catch(() => ({}));
       const unmatchedResult = await unmatchedResponse.json().catch(() => ({}));
@@ -214,7 +214,7 @@ export function BackgroundCheckReviewPanel() {
 
   /** One request to the lookup: an empty name lists everyone, a page of rows and a page of people. */
   async function fetchLookup(name: string, rowPage: number, peoplePage: number) {
-    const response = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(name)}&rowPage=${rowPage}&peoplePage=${peoplePage}`);
+    const response = await fetch(`/api/admin/background-checks/lookup?name=${encodeURIComponent(name)}&rowPage=${rowPage}&peoplePage=${peoplePage}`, { cache: "no-store" });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message ?? "That name couldn't be looked up.");
     return (result.lookup ?? null) as LookupResult | null;
@@ -313,7 +313,7 @@ export function BackgroundCheckReviewPanel() {
           <ul>
             {dismissals.map((item) => (
               <li key={item.reviewId}>
-                <span translate="no">{item.name || "A row"}</span>: none of the candidates was chosen.{" "}
+                <span translate={item.name ? "no" : undefined}>{item.name || "A row"}</span>: none of the candidates was chosen.{" "}
                 <button className="text-button" disabled={busyId === item.reviewId} onClick={() => void undoDismissal(item.reviewId)} type="button">
                   <Undo2 aria-hidden="true" size={14} /> Undo dismissal
                 </button>

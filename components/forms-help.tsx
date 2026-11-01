@@ -92,9 +92,9 @@ export function FormsHelpSections({ contact }: { contact: FormsHelpContact }) {
       </details>
       <details className={styles.section}>
         <summary>Need more help?</summary>
-        <div className={styles.body} translate="no">
-          <p><a href={`mailto:${contact.email}`}>{contact.email}</a></p>
-          <p><a href={telHref(contact.phone)}>{contact.phone}</a></p>
+        <div className={styles.body}>
+          <p><a href={`mailto:${contact.email}`} translate="no">{contact.email}</a></p>
+          <p><a href={telHref(contact.phone)} translate="no">{contact.phone}</a></p>
         </div>
       </details>
     </div>

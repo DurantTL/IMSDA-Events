@@ -46,7 +46,7 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent, secu
           </div>
         </header>
         <section className="public-manage-card public-group-flow-card">
-          <p className="public-registration-eyebrow">Team registration · {ready.event.name}</p>
+          <p className="public-registration-eyebrow">{`Team registration · ${ready.event.name}`}</p>
           <h1><UsersRound aria-hidden="true" size={22} /> Register a team without an account</h1>
           <p>
             Club directors can register a team here without signing in. Choose your club from the list on the form and use the email

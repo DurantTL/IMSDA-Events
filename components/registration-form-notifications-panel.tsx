@@ -129,7 +129,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
 
   useEffect(() => {
     let cancelled = false;
-    fetch(base, { headers: { Accept: "application/json" } })
+    fetch(base, { headers: { Accept: "application/json" }, cache: "no-store" })
       .then(async (response) => {
         const result = await response.json().catch(() => null) as (PanelData & { message?: string }) | null;
         if (cancelled) return;
@@ -213,7 +213,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
             const prefix = `${headingId}-${draft.localKey}`;
             return (
               <fieldset className="panel form-stack form-notification-item" key={draft.localKey}>
-                <legend>Notification {index + 1}</legend>
+                <legend>{`Notification ${index + 1}`}</legend>
                 {draft.warnings.map((warning) => <div className="inline-notice error" key={warning} role="alert">{warning}</div>)}
                 <label>
                   <span>Name</span>
@@ -231,7 +231,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                     value={draft.recipientsText}
                   />
                 </label>
-                <p className="field-help" id={`${prefix}-addresses`}>One address per line, up to {FORM_NOTIFICATION_MAX_RECIPIENTS}.</p>
+                <p className="field-help" id={`${prefix}-addresses`}>{`One address per line, up to ${FORM_NOTIFICATION_MAX_RECIPIENTS}.`}</p>
 
                 <label>
                   <span>Send</span>
@@ -329,7 +329,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
               <Save aria-hidden="true" size={14} /> {saving ? "Saving…" : "Save notifications"}
             </button>
           </div>
-          <p className="field-help">Up to {FORM_NOTIFICATIONS_MAX_PER_FORM} notifications per form. Event administrators and system administrators can change them.</p>
+          <p className="field-help">{`Up to ${FORM_NOTIFICATIONS_MAX_PER_FORM} notifications per form. Event administrators and system administrators can change them.`}</p>
         </form>
       )}
     </section>

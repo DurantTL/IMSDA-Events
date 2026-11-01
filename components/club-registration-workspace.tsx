@@ -530,7 +530,7 @@ export function ClubRegistrationWorkspace({
           <p className="public-registration-eyebrow">Step 1 of {totalSteps} · Who&apos;s going</p>
           <h2>Who&apos;s going?</h2>
         </div>
-        <span className="count-badge">{goingCount} chosen</span>
+        <span className="count-badge">{`${goingCount} chosen`}</span>
       </div>
       {locationNote && <p className="field-help" role="status">{locationNote}</p>}
       {multipleTeams && (
@@ -554,7 +554,7 @@ export function ClubRegistrationWorkspace({
       </p>
       {teamRules && (
         <div className={`inline-notice${sizeProblem ? " error" : ""}`} role="status">
-          <strong>{teamMemberCount} team {teamMemberCount === 1 ? "member" : "members"}</strong>
+          <strong>{`${teamMemberCount} team ${teamMemberCount === 1 ? "member" : "members"}`}</strong>
           {sizeLimits ? <> (a team has {sizeLimits}{teamRules.maxAlternates > 0 ? `, including ${teamRules.maxAlternates === 1 ? "the alternate" : `up to ${teamRules.maxAlternates} alternates`}` : ""})</> : null}
           {" · "}{coachCount} {coachCount === 1 ? "coach" : "coaches"}. Coaches are adults who come with the team; they don&apos;t count toward the team.
           {teamRules.maxMemberAge !== null && <> A team member can be at most {teamRules.maxMemberAge} on {ageDateText}.</>}

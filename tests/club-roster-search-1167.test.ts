@@ -220,7 +220,7 @@ describe("what a row says (#1167)", () => {
 
   it("keeps a person's role under their name, so a phone card shows name, role, age and Edit", () => {
     const out = html();
-    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}" translate="no">Role: Pathfinder</span>`);
+    expect(out).toContain(`<span class="${rosterStyles.rosterMemberRole}">Role: Pathfinder</span>`);
     expect(out).toContain('data-label="Age"');
     expect(out).toContain('aria-label="Edit Sam Fixture-a"');
   });

@@ -61,8 +61,8 @@ export function CoordinatorMastheadView({ model }: { model: CoordinatorMastheadM
         <div className="club-masthead-account">
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (
-            <span className="club-masthead-identity" translate="no">
-              <span className="club-masthead-name">{model.identity}</span>
+            <span className="club-masthead-identity">
+              <span className="club-masthead-name" translate="no">{model.identity}</span>
               <span className="club-masthead-role"> · {COORDINATOR_ROLE_LABEL}</span>
             </span>
           )}

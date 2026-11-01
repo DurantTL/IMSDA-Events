@@ -56,7 +56,7 @@ export function ClubYearTiles({
       <div className="club-year-tile">
         <Heading className="club-year-tile-heading"><UsersRound size={16} aria-hidden="true" /> Roster</Heading>
         <p className="club-year-tile-stat">{roster.active}</p>
-        <p className="club-year-tile-detail">active this club year · {roster.staff} staff · {roster.members} members</p>
+        <p className="club-year-tile-detail">{`active this club year · ${roster.staff} staff · ${roster.members} members`}</p>
         {roster.byClass.length > 0 && (
           <ul className="club-year-tile-list">
             {roster.byClass.map((entry) => <li key={entry.classLevel}>{entry.label} {entry.count}</li>)}
@@ -72,8 +72,8 @@ export function ClubYearTiles({
             <p className="club-year-tile-detail">None recorded yet this club year.</p>
           ) : (
             <ul className="club-year-tile-list">
-              {honors.inProgress > 0 && <li>{honors.inProgress} in progress</li>}
-              {honors.completedThisYear > 0 && <li>{honors.completedThisYear} completed this year</li>}
+              {honors.inProgress > 0 && <li>{`${honors.inProgress} in progress`}</li>}
+              {honors.completedThisYear > 0 && <li>{`${honors.completedThisYear} completed this year`}</li>}
             </ul>
           )}
           {honorsHref && <Link className="secondary-button club-year-tile-link" href={honorsHref}>Open honors</Link>}

@@ -63,9 +63,9 @@ export function RegistrationNotesTagsPanel({
     setError("");
     try {
       const [tagsResponse, assignmentsResponse, notesResponse] = await Promise.all([
-        fetch(`/api/events/${eventId}/tags`),
-        fetch(`${basePath}/tags`),
-        fetch(`${basePath}/notes`),
+        fetch(`/api/events/${eventId}/tags`, { cache: "no-store" }),
+        fetch(`${basePath}/tags`, { cache: "no-store" }),
+        fetch(`${basePath}/notes`, { cache: "no-store" }),
       ]);
       const tagsResult = await tagsResponse.json();
       const assignmentsResult = await assignmentsResponse.json();

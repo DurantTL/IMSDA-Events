@@ -100,7 +100,7 @@ export function ClubSupplyStockWorkspace({
           {!embedded && <p className="public-registration-eyebrow">Club supplies</p>}
           {embedded ? <h3>Inventory: supplies on hand</h3> : <h2>Supplies on hand</h2>}
         </div>
-        <span className="count-badge">{stock.filter((row) => row.quantityOnHand > 0).length} in stock</span>
+        <span className="count-badge">{`${stock.filter((row) => row.quantityOnHand > 0).length} in stock`}</span>
       </div>
       {readOnly ? (
         <p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only. The club director or deputy records stock.</p>
@@ -158,7 +158,7 @@ export function ClubSupplyStockWorkspace({
                           className={styles.itemControls}
                           onSubmit={(event) => { event.preventDefault(); void save(row); }}
                         >
-                          <label className="sr-only" htmlFor={inputId}>Quantity on hand: {row.name}</label>
+                          <label className="sr-only" htmlFor={inputId}>{`Quantity on hand: ${row.name}`}</label>
                           <input
                             className={styles.quantity}
                             id={inputId}

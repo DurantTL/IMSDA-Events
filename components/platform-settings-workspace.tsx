@@ -92,7 +92,7 @@ export function PlatformSettingsWorkspace({
       // Fresh counts, so the warning is not stale if someone linked people since the page loaded.
       let counts = signIn.linkCheck;
       try {
-        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in");
+        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in", { cache: "no-store" });
         const data = await fresh.json().catch(() => ({}));
         if (fresh.ok && data.linkCheck) {
           counts = data.linkCheck;

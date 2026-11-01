@@ -1,3 +1,4 @@
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { Building2, Download } from "lucide-react";
 import {
@@ -197,7 +198,7 @@ function GroupPanel({
         </div>
       ))}
       <div className="finance-row">
-        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong>{formatCents(group.owedCents)}</strong></span>
+        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong><Money cents={group.owedCents} /></strong></span>
       </div>
     </section>
   );

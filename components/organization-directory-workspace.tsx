@@ -125,7 +125,7 @@ export function OrganizationDirectoryWorkspace({
     setNotice("");
     setEditor({ kind: "delete", organization, check: null });
     try {
-      const response = await fetch(`/api/admin/organizations/${organization.id}/deletion`);
+      const response = await fetch(`/api/admin/organizations/${organization.id}/deletion`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { check?: OrganizationDeletionCheck; message?: string };
       if (!response.ok || !result.check) throw new Error(result.message ?? "That church or club could not be checked.");
       const check = result.check;

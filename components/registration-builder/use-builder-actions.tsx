@@ -89,7 +89,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
   // Reloads the template list and each form's notice from the server, leaving the editor's draft and unsaved edits alone.
   async function refreshTemplates() {
     try {
-      const response = await fetch(`/api/events/${eventId}/forms`);
+      const response = await fetch(`/api/events/${eventId}/forms`, { cache: "no-store" });
       if (!response.ok) return;
       const result = await response.json() as { forms: FormView[]; templates: BuilderWorkspaceProps["templates"] };
       state.setTemplates(result.templates);
@@ -130,7 +130,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to run this test submission.");
       const issues = result.submission.validation.issues ?? [];
-      const refreshed = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}`);
+      const refreshed = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}`, { cache: "no-store" });
       if (refreshed.ok) syncForm((await refreshed.json()).form, undefined, true);
       setTestIssues(issues);
       if (issues.length > 0) {
@@ -149,7 +149,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     if (!selectedForm || !slugMayNeedSync) { setConfirmingPublish(true); return; }
     setBusy("slug"); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/slug`);
+      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/slug`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to check the web address.");
       if (result.suggestion.needsSync) { setSlugError(""); setSlugPrompt({ offeredSlug: result.suggestion.offeredSlug }); }

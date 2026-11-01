@@ -184,7 +184,7 @@ export function ClubYearEndReportForm({
   return (
     <form className="page-stack club-report-form" noValidate onSubmit={save}>
       <div className="public-manage-card">
-        <p className="public-registration-eyebrow">Pathfinder year {reportYear} · {spanLabel}</p>
+        <p className="public-registration-eyebrow">{`Pathfinder year ${reportYear} · ${spanLabel}`}</p>
         <h2>Year-End Report</h2>
         <p className="field-help">
           Due {dueLabel}. Please report as accurately as possible; your information aids the North America Division.

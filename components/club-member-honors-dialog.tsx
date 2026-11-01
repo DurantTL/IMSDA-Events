@@ -64,8 +64,8 @@ export function ClubMemberHonorsDialog({
   const load = useCallback(async () => {
     try {
       const [historyResponse, honorsResponse] = await Promise.all([
-        fetch(`${base}/roster/${encodeURIComponent(member.id)}/honors`),
-        canRecord ? fetch(`${base}/honors`) : Promise.resolve(null),
+        fetch(`${base}/roster/${encodeURIComponent(member.id)}/honors`, { cache: "no-store" }),
+        canRecord ? fetch(`${base}/honors`, { cache: "no-store" }) : Promise.resolve(null),
       ]);
       const historyBody = await historyResponse.json().catch(() => ({})) as HistoryResponse;
       if (!historyResponse.ok) throw new Error(historyBody.message ?? "Honors could not be loaded.");

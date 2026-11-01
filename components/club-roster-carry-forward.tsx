@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/post-json";
@@ -87,7 +88,7 @@ export function ClubRosterCarryForward({
   if (done) {
     return (
       <div className="inline-notice success" role="status">
-        {done} <a href={`/account/clubs/${organizationId}/roster?year=${encodeURIComponent(toClubYear)}`}>Open the {toClubYear} roster</a>.
+        {done} <a href={`/account/clubs/${organizationId}/roster?year=${encodeURIComponent(toClubYear)}`}>{`Open the ${toClubYear} roster`}</a>.
       </div>
     );
   }
@@ -110,13 +111,13 @@ export function ClubRosterCarryForward({
       </div>
       <div className="report-table-wrap">
         <table className="report-table table-cards">
-          <caption className="sr-only">People on the {fromClubYear} roster</caption>
+          <caption className="sr-only">{`People on the ${fromClubYear} roster`}</caption>
           <thead>
             <tr>
               <th scope="col">Carry forward</th>
               <th scope="col">Name</th>
               <th scope="col">Age</th>
-              <th scope="col">{toClubYear} type</th>
+              <th scope="col">{`${toClubYear} type`}</th>
               <th scope="col">Role</th>
               <th scope="col">Class</th>
             </tr>
@@ -135,8 +136,8 @@ export function ClubRosterCarryForward({
                       type="checkbox"
                     />
                   </td>
-                  <th scope="row" translate="no">
-                    {fullName}
+                  <th scope="row">
+                    <ExactValue>{fullName}</ExactValue>
                     {row.transferring && <small> Transferring to another club</small>}
                     {row.transferWithStaff && <small> Transfer request is with conference staff</small>}
                   </th>

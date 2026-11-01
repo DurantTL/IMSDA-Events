@@ -47,7 +47,7 @@ export function EventHealthSheet({ clubs, clubLinks }: { clubs: HealthClubSheet[
                   {club.attendees.map((attendee) => (
                     <tr key={attendee.attendeeId}>
                       <th scope="row" translate="no">{attendee.name}</th>
-                      <td translate="no">{attendee.dietary ?? "None entered"}</td>
+                      <td translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
                       <td>{attendee.medicalFlag ?? "Not answered"}</td>
                       <td>{HEALTH_TEXT.medicationsValue}</td>
                       <td>

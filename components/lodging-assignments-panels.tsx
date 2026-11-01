@@ -258,7 +258,7 @@ export function ReportsPanel({ eventId }: { eventId: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch(`/api/events/${eventId}/lodging/assignments/reports`);
+        const response = await fetch(`/api/events/${eventId}/lodging/assignments/reports`, { cache: "no-store" });
         const json = await response.json();
         if (!response.ok) throw new Error(json.message ?? "The reports could not be loaded.");
         if (!cancelled) setReports(json.reports as RoomingReports);

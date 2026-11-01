@@ -574,7 +574,7 @@ export function HonorsSetupWorkspace({
             editing.span === "ALL_SESSIONS" && editing.enrolled > 0 ? (
               // Clubs have picked this class, so it can't move: show the site, don't ask for one.
               <p className="field-help" data-testid="class-site-readonly">
-                Site: <strong translate="no">{siteName(editing.locationId) ?? "No site"}</strong> (fixed once clubs have picked this class)
+                Site: <strong translate={siteName(editing.locationId) ? "no" : undefined}>{siteName(editing.locationId) ?? "No site"}</strong> (fixed once clubs have picked this class)
               </p>
             ) : (
               <label>

@@ -287,7 +287,7 @@ export function ClubMeetingNotes({
         <div className="public-manage-card-heading club-roster-heading">
           <div>
             <p className="public-registration-eyebrow">Head counts, with an optional attendance check-off</p>
-            <h2 id="club-notes-heading">Meetings in {monthLabel}</h2>
+            <h2 id="club-notes-heading">{`Meetings in ${monthLabel}`}</h2>
           </div>
           <span className="club-team-invite-actions">
             {exportMonthHref && attendanceAvailable && (
@@ -308,7 +308,7 @@ export function ClubMeetingNotes({
 
         {notes.length === 0 && !formOpen && (
           <>
-            <p className="public-manage-empty">No meetings recorded for {monthLabel} yet.</p>
+            <p className="public-manage-empty">{`No meetings recorded for ${monthLabel} yet.`}</p>
             <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="meeting notes" id="meetings-none" />
           </>
         )}
@@ -359,7 +359,7 @@ export function ClubMeetingNotes({
           <div className="modal-head">
             <div>
               <p className="public-registration-eyebrow">{editingId ? "Edit meeting note" : "New meeting note"}</p>
-              <h2 id="meeting-note-dialog-title">{editingId ? "Edit" : "Add"} meeting note</h2>
+              <h2 id="meeting-note-dialog-title">{`${editingId ? "Edit" : "Add"} meeting note`}</h2>
             </div>
             <button aria-label="Close" className="icon-button modal-close-button" disabled={saving} onClick={requestClose} type="button">
               <X aria-hidden="true" size={18} />
@@ -517,7 +517,7 @@ function AttendanceSection({
         </>
       ) : (
         <>
-          <p className="field-help" role="status">{presentCount} of {totalCount} present. The counts above update as you check people off, and you can still change them.</p>
+          <p className="field-help" role="status">{`${presentCount} of ${totalCount} present. The counts above update as you check people off, and you can still change them.`}</p>
           <div className="intro-actions">
             <button className="secondary-button club-event-action" onClick={() => onMarkAll(true)} type="button">Mark all present</button>
             <button className="secondary-button club-event-action" onClick={() => onMarkAll(false)} type="button">Clear all</button>

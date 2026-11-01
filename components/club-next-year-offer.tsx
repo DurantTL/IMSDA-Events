@@ -18,7 +18,7 @@ export function NextYearRosterOffer({
   return (
     <p className="inline-notice" role="status">
       {count} {count === 1 ? "person is" : "people are"} on the {offer.fromClubYear} roster and not yet on {offer.toClubYear}.{" "}
-      <Link href={`/account/clubs/${organizationId}/roster/next-year`}>Start the {offer.toClubYear} roster</Link>.
+      <Link href={`/account/clubs/${organizationId}/roster/next-year`}>{`Start the ${offer.toClubYear} roster`}</Link>.
     </p>
   );
 }

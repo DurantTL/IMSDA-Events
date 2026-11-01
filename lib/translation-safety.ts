@@ -21,6 +21,28 @@
  * a page nobody translates behaves identically. Values that change while the
  * page is open (names, codes, money) are also marked `translate="no"`, so
  * React keeps updating them instead of a translator's stale copy.
+ *
+ * Where it runs: `instrumentation-client.ts` in the app root, which Next.js
+ * loads before the app becomes interactive on every route (public pages,
+ * the club portal, the staff workspace and the embeds share that one client
+ * bundle). It runs before React hydrates, so React never sees an unpatched DOM.
+ *
+ * What the guard cannot fix: stale text. When a translator replaces a text node
+ * and React later changes that text, React updates the node it still holds,
+ * which is no longer on the page, so the old words stay visible. Two rules in
+ * components keep that from happening (site rule T1, #1445):
+ * - text that changes while the page is open is ONE string child:
+ *   `<span>{`${count} active`}</span>`, not `<span>{count} active</span>`. React
+ *   updates a single string child by replacing the element's content, which
+ *   also replaces whatever the translator put there;
+ * - a value that must stay exact is wrapped by `ExactValue`/`Money`
+ *   (components/exact-value.tsx), which is `translate="no"`.
+ *
+ * `scripts/verify-translation-simulation.ts` (`npm run test:translation-sim`)
+ * rewrites every text node like Google Translate does and drives the key
+ * journeys on Chromium, Firefox and WebKit, so a crash or stale text shows up
+ * in CI. With the guard removed it fails with the removeChild/insertBefore
+ * errors this file exists to prevent.
  */
 
 type PatchableNode = {

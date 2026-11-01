@@ -35,7 +35,7 @@ function PacketHeader({ packet, side }: { packet: ClubPacket; side: 1 | 2 }) {
           </div>
         )}
         <div><dt>Confirmation</dt><dd translate="no">{packet.club.confirmationCode}</dd></div>
-        <div><dt>Side</dt><dd>{side} of 2</dd></div>
+        <div><dt>Side</dt><dd>{`${side} of 2`}</dd></div>
       </dl>
     </header>
   );

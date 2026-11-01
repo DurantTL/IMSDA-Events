@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useId } from "react";
 import {
@@ -157,7 +158,7 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
           <span className={total.month === selectedMonth ? styles.monthSelected : undefined} key={total.month}>{shortMonth(total.month)}</span>
         ))}
       </div>
-      {selectedMonth && <p className={styles.selectedNote}>Outlined: {rows.find((row) => row.total.month === selectedMonth)?.total.label ?? selectedMonth}.</p>}
+      {selectedMonth && <p className={styles.selectedNote}>{`Outlined: ${rows.find((row) => row.total.month === selectedMonth)?.total.label ?? selectedMonth}.`}</p>}
       <ul aria-label="Legend" className={styles.legend}>
         {legend.map((entry) => (
           <li key={entry.key}><span aria-hidden="true" className={`${styles.swatch} ${entry.className}`} />{entry.label}</li>
@@ -176,7 +177,7 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
 function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatusTotals[]; title: string; clubYear: string }) {
   return (
     <table className={`report-table report-table-auto ${styles.table}`}>
-      <caption className="sr-only">{title}, {clubYear}: club counts for each month</caption>
+      <caption className="sr-only">{`${title}, ${clubYear}: club counts for each month`}</caption>
       <thead>
         <tr>
           <th scope="col">Month</th><th scope="col">Reviewed</th><th scope="col">Submitted, not reviewed</th>
@@ -200,7 +201,7 @@ function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatu
 function CoordinatorTable({ totals, title, clubYear }: { totals: readonly CoordinatorMonthTotals[]; title: string; clubYear: string }) {
   return (
     <table className={`report-table report-table-auto ${styles.table}`}>
-      <caption className="sr-only">{title}, {clubYear}: club counts for each month</caption>
+      <caption className="sr-only">{`${title}, ${clubYear}: club counts for each month`}</caption>
       <thead>
         <tr><th scope="col">Month</th><th scope="col">Clubs</th><th scope="col">Submitted</th><th scope="col">Not submitted</th><th scope="col">Not due yet</th></tr>
       </thead>
@@ -251,13 +252,13 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
         {title} <span className={styles.captionYear}>({clubYear}{ranked.length > shown.length ? `, top ${shown.length} of ${ranked.length}` : ""})</span>
       </figcaption>
       <p className="sr-only" id={descId}>{description}</p>
-      {shown.length === 0 ? <p className={styles.empty}>No active clubs for {clubYear}.</p> : (
+      {shown.length === 0 ? <p className={styles.empty}>{`No active clubs for ${clubYear}.`}</p> : (
         <BarList className={compact ? `${styles.bars} ${styles.barsCompact}` : styles.bars}>
           {shown.map((club) => {
             const registration = club.totalPoints - club.reportPoints;
             return (
               <li className={styles.barRow} key={club.id}>
-                <span className={styles.barName} translate="no">{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}{club.name}</span>
+                <span className={styles.barName}>{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}<ExactValue>{club.name}</ExactValue></span>
                 <span aria-hidden="true" className={styles.barTrack}>
                   <span className={styles.barReport} style={{ width: `${(club.reportPoints / max) * 100}%` }} title={`Report points: ${number(club.reportPoints)}`} />
                   <span className={styles.barRegistration} style={{ width: `${(registration / max) * 100}%` }} title={`Yearly registration: ${number(registration)}`} />
@@ -274,13 +275,13 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
       </ul>
       <div className={compact ? styles.footerCompact : styles.footer}>
       {showAllHref && ranked.length > shown.length && (
-        <p className={styles.more}><Link className={styles.moreLink} href={showAllHref}>Show all {number(ranked.length)} clubs</Link></p>
+        <p className={styles.more}><Link className={styles.moreLink} href={showAllHref}>{`Show all ${number(ranked.length)} clubs`}</Link></p>
       )}
       {!hideTable && <details className={styles.details}>
         <summary className={styles.summary}>Show as a table</summary>
         <div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}>
           <table className={`report-table report-table-auto ${styles.table}`}>
-            <caption className="sr-only">{title}, {clubYear}, highest total first</caption>
+            <caption className="sr-only">{`${title}, ${clubYear}, highest total first`}</caption>
             <thead>
               <tr><th scope="col">Rank</th><th scope="col">Club</th><th scope="col">Report points</th><th scope="col">Yearly registration</th><th scope="col">Total</th></tr>
             </thead>

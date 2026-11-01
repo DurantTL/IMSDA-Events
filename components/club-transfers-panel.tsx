@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeftRight, Send } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate, transferEventLabel } from "@/components/transfer-format";
@@ -135,7 +136,7 @@ export function ClubTransferCard({ transfer, onAction }: { transfer: ClubTransfe
         {incoming ? "From " : "To "}<span translate="no">{transfer.otherClubName}</span> · requested <TransferDate iso={transfer.initiatedAt} />
         {"acknowledgeDueAt" in transfer && transfer.status === "PENDING" && <> · answer by <TransferDate iso={transfer.acknowledgeDueAt} /></>}
       </p>
-      <p>Reason: {transfer.reason}</p>
+      <p>{`Reason: ${transfer.reason}`}</p>
       {transfer.events.length > 0 && (
         <ul className="transfer-history" aria-label="History">
           {transfer.events.map((event) => <li key={event.id}>{transferEventLabel(event.type)}, <TransferDate iso={event.createdAt} /></li>)}
@@ -180,11 +181,12 @@ export function ClubTransfersPanel({ organizationId }: { organizationId: string 
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const router = useRouter();
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(transfersEndpoint(organizationId));
+      const response = await fetch(transfersEndpoint(organizationId), { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { incoming?: ClubTransferRecord[]; outgoing?: ClubTransferRecord[]; message?: string };
       if (!response.ok) throw new Error(result.message ?? "Transfers could not be loaded.");
       setData({ incoming: result.incoming ?? [], outgoing: result.outgoing ?? [] });
@@ -220,6 +222,8 @@ export function ClubTransfersPanel({ organizationId }: { organizationId: string 
       setPending(null);
       setNote("");
       await load();
+      // An accepted transfer moves a person on or off the roster above, so re-read the page data (#1445, rule P2).
+      router.refresh();
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "That didn't work. Try again.");
     } finally {
@@ -280,7 +284,7 @@ export function ClubTransfersPanel({ organizationId }: { organizationId: string 
       >
         {pending && (
           <div className="form-stack">
-            <p translate="no">{confirmCopy[pending.action].body(pending.transfer)}</p>
+            <p>{confirmCopy[pending.action].body(pending.transfer)}</p>
             {pending.action !== "accept" && (
               <label>
                 Note for conference staff (optional)

@@ -42,9 +42,9 @@ describe("Forms help content", () => {
     expect(html).toContain("Safari en iPhone");
     expect(html).toContain("Safari on iPhone:</strong> tap aA, then Translate.");
   });
-  it("wraps the contact links in translate=no", () => {
-    expect(html).toMatch(/translate="no"[^>]*><p><a href="mailto:help@example.test">/);
-    expect(html).toContain('href="tel:+15155550100"');
+  it("marks the contact email and phone (the exact values, not their container) translate=no", () => {
+    expect(html).toMatch(/<a href="mailto:help@example.test" translate="no">help@example.test<\/a>/);
+    expect(html).toMatch(/<a href="tel:\+15155550100" translate="no">/);
   });
 });
 

@@ -212,7 +212,7 @@ describe("public front page (#373)", () => {
     });
     const html = await render();
     expect(html).toContain("My registrations");
-    expect(html).toContain("Signed in as Pat Example");
+    expect(html).toContain(`Signed in as <span translate="no">Pat Example</span>`);
   });
 });
 

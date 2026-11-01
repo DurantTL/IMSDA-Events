@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
@@ -238,11 +239,11 @@ export function FinanceWorkspace({
         ]}
       />
       <section className="finance-summary" aria-label="Financial summary">
-        <article className="finance-stat"><span><ReceiptText aria-hidden="true" size={18} /></span><small>Active billed</small><strong>{formatCents(totals.billed)}</strong></article>
-        <article className="finance-stat"><span><Banknote aria-hidden="true" size={18} /></span><small>Net received</small><strong>{formatCents(totals.received)}</strong></article>
-        <article className="finance-stat warning"><span><CircleDollarSign aria-hidden="true" size={18} /></span><small>Outstanding</small><strong>{formatCents(totals.outstanding)}</strong></article>
-        {hasChurchBilled && <article className="finance-stat"><span><Building2 aria-hidden="true" size={18} /></span><small>{hasGroups ? "Billed to churches and group contacts (estimated, all registrations)" : "Billed to churches (estimated, all registrations)"}</small><strong>{formatCents(totals.churchBilled)}</strong></article>}
-        <article className="finance-stat muted"><span><RotateCcw aria-hidden="true" size={18} /></span><small>Refunded</small><strong>{formatCents(totals.refunded)}</strong></article>
+        <article className="finance-stat"><span><ReceiptText aria-hidden="true" size={18} /></span><small>Active billed</small><strong><Money cents={totals.billed} /></strong></article>
+        <article className="finance-stat"><span><Banknote aria-hidden="true" size={18} /></span><small>Net received</small><strong><Money cents={totals.received} /></strong></article>
+        <article className="finance-stat warning"><span><CircleDollarSign aria-hidden="true" size={18} /></span><small>Outstanding</small><strong><Money cents={totals.outstanding} /></strong></article>
+        {hasChurchBilled && <article className="finance-stat"><span><Building2 aria-hidden="true" size={18} /></span><small>{hasGroups ? "Billed to churches and group contacts (estimated, all registrations)" : "Billed to churches (estimated, all registrations)"}</small><strong><Money cents={totals.churchBilled} /></strong></article>}
+        <article className="finance-stat muted"><span><RotateCcw aria-hidden="true" size={18} /></span><small>Refunded</small><strong><Money cents={totals.refunded} /></strong></article>
       </section>
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search financial records</span><input {...search.inputProps} placeholder="Search attendee or payer name, email, or confirmation code" /></label>
@@ -254,7 +255,7 @@ export function FinanceWorkspace({
         {visible.map((registration) => (
           <button className="finance-row finance-row-cards finance-record" type="button" key={registration.id} onClick={() => openDetail(registration)}>
             <span className="meta-stack"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registrationStatusWord({ status: registration.status, attendeeBalanceCents: attendeeBalanceCents(registration), deferredBilling: registration.isDeferredOrganizationBilling })} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.isDeferredOrganizationBilling ? (registration.isGroup ? " · group, billed to the contact" : ` · ${registrationMoneyStatus({ totalCents: 0, balanceCents: 0, deferredBilling: true, audience: "staff" })}`) : ""}</small>{attendeeSummaryLabel(registration) && <small className="finance-attendee-names">{attendeeSummaryLabel(registration)}</small>}</span>
-            <span data-label="Total">{formatCents(registration.totalAmountCents)}</span><span data-label="Received">{formatCents(registration.paidCents)}</span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registrationMoneyStatus({ totalCents: registration.totalAmountCents, balanceCents: 0, deferredBilling: true, isGroup: registration.isGroup, audience: "staff" })}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance">{formatCents(registration.balanceCents)}</span>}<span>View</span>
+            <span data-label="Total"><Money cents={registration.totalAmountCents} /></span><span data-label="Received"><Money cents={registration.paidCents} /></span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registrationMoneyStatus({ totalCents: registration.totalAmountCents, balanceCents: 0, deferredBilling: true, isGroup: registration.isGroup, audience: "staff" })}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance"><Money cents={registration.balanceCents} /></span>}<span>View</span>
           </button>
         ))}
         {visible.length === 0 && <div className="empty-state"><Search aria-hidden="true" size={24} /><h3>No financial records found</h3><p>Search covers the payer, every attendee on the registration, and the confirmation code. Try another term or balance filter.</p></div>}
@@ -279,7 +280,7 @@ export function FinanceWorkspace({
                       ? (selected.deposit.paidInFull
                         ? <><strong>Reservation held — paid in full.</strong></>
                         : <><strong>Reservation held.</strong> {selected.deposit.recordedCents > 0 ? `Deposit recorded: ${formatCents(selected.deposit.recordedCents)}.` : "The deposit amount has been paid."}</>)
-                      : <><strong>Reservation not held yet.</strong> The deposit of {formatCents(selected.deposit.dueCents)} has not been paid.</>}
+                      : <><strong>Reservation not held yet.</strong> The deposit of <Money cents={selected.deposit.dueCents} /> has not been paid.</>}
                     {canManage && !selected.deposit.held && selected.deposit.dueCents > 0 && activeFinancialStatuses.has(selected.status) && (
                       <> <button className="text-button" type="button" onClick={() => { setDepositFirst(true); setError(""); setModal("payment"); }}>Record deposit</button></>
                     )}
@@ -287,7 +288,7 @@ export function FinanceWorkspace({
                 )}
                 <div className="detail-grid">{financeDetailFacts(selected).map((fact) => <span key={fact.value}><small>{fact.label}</small><strong>{fact.value === "payments" ? selected.payments.length : formatCents(fact.value === "total" ? selected.totalAmountCents : fact.value === "received" ? selected.paidCents : selected.balanceCents)}</strong></span>)}</div>
                 <div><p className="eyebrow">Attendees on this registration</p><ul className="finance-attendee-list">{selected.attendees.map((attendee) => <li key={attendee.id}><span><strong>{attendee.firstName} {attendee.lastName}</strong><small>{attendee.attendeeType.toLowerCase()}{attendee.email ? ` · ${attendee.email}` : ""}</small></span></li>)}</ul>{selected.attendees.length === 0 && <p className="quiet-copy">No attendees are recorded on this registration.</p>}</div>
-                <div><p className="eyebrow">Payment history</p>{selected.payments.map((payment) => { const available = payment.amountCents - payment.refundedCents; const squareManaged = payment.method === "CARD_REFERENCE"; return <div className="payment-history" key={payment.id}><span className="payment-icon"><Banknote aria-hidden="true" size={17} /></span><span><strong>{formatCents(payment.amountCents)} · {squareManaged ? "Square card" : payment.method.toLowerCase()}{payment.isDeposit ? " · reservation deposit" : ""}</strong><small>{payment.receivedAt ? new Date(payment.receivedAt).toLocaleString() : "Recorded manually"}{payment.refundedCents ? ` · ${formatCents(payment.refundedCents)} refunded` : ""}{squareManaged && available > 0 ? " · refund through Square Dashboard" : ""}</small></span>{canManage && available > 0 && !squareManaged && <button className="text-button" type="button" onClick={() => { setSelectedPayment(payment); setError(""); setModal("refund"); }}>Refund</button>}</div>; })}{selected.payments.length === 0 && <p className="quiet-copy">No payments have been recorded.</p>}</div>
+                <div><p className="eyebrow">Payment history</p>{selected.payments.map((payment) => { const available = payment.amountCents - payment.refundedCents; const squareManaged = payment.method === "CARD_REFERENCE"; return <div className="payment-history" key={payment.id}><span className="payment-icon"><Banknote aria-hidden="true" size={17} /></span><span><strong><Money cents={payment.amountCents} /> · {squareManaged ? "Square card" : payment.method.toLowerCase()}{payment.isDeposit ? " · reservation deposit" : ""}</strong><small>{payment.receivedAt ? new Date(payment.receivedAt).toLocaleString() : "Recorded manually"}{payment.refundedCents ? <> · <Money cents={payment.refundedCents} /> refunded</> : ""}{squareManaged && available > 0 ? " · refund through Square Dashboard" : ""}</small></span>{canManage && available > 0 && !squareManaged && <button className="text-button" type="button" onClick={() => { setSelectedPayment(payment); setError(""); setModal("refund"); }}>Refund</button>}</div>; })}{selected.payments.length === 0 && <p className="quiet-copy">No payments have been recorded.</p>}</div>
                 {canManage ? <RegistrationMealsHistory key={selected.id} eventId={eventId} registrationId={selected.id} /> : null}
                 {(selected.adjustments.length > 0 || (canManage && activeFinancialStatuses.has(selected.status))) && (
                   <div>
@@ -297,7 +298,7 @@ export function FinanceWorkspace({
                         <span className="payment-icon"><BadgePercent aria-hidden="true" size={17} /></span>
                         <span>
                           <strong>
-                            {adjustment.amountCents < 0 ? "−" : "+"}{formatCents(Math.abs(adjustment.amountCents))} · {adjustmentKindLabels[adjustment.kind]}
+                            {adjustment.amountCents < 0 ? "−" : "+"}<Money cents={Math.abs(adjustment.amountCents)} /> · {adjustmentKindLabels[adjustment.kind]}
                             {adjustment.promoCode ? ` ${adjustment.promoCode}` : ""}
                             {adjustment.attendeeName ? ` · ${adjustment.attendeeName}` : ""}
                             {adjustment.fundAward ? ` · from the scholarship fund${adjustment.fundAward.pledged && !adjustment.fundAward.settled ? " (pledged, not yet received)" : ""}` : ""}
@@ -361,7 +362,7 @@ export function FinanceWorkspace({
             ) : modal === "reverse" ? (
               <form className="form-stack" onSubmit={reverseAdjustment}>
                 <div className="inline-notice">
-                  This adds an opposite line of {formatCents(Math.abs(selectedAdjustment?.amountCents ?? 0))}. The original stays on record.
+                  This adds an opposite line of <Money cents={Math.abs(selectedAdjustment?.amountCents ?? 0)} />. The original stays on record.
                 </div>
                 <label>Reason<textarea name="reason" minLength={3} maxLength={500} rows={3} required placeholder="Why is this being reversed?" /></label>
                 {error && <p className="form-error" role="alert">{error}</p>}
@@ -370,7 +371,7 @@ export function FinanceWorkspace({
             ) : modal === "payment" ? (
               <form className="form-stack" onSubmit={recordPayment}><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={(depositFirst && selected.deposit ? selected.deposit.dueCents : Math.max(selected.balanceCents, 0)) / 100} /></label>{selected.deposit && !selected.deposit.held && <label className="checkbox-row"><input name="isDeposit" type="checkbox" defaultChecked={depositFirst} /> This is the reservation deposit (holds the reservation)</label>}<label>Method<select name="method" defaultValue="CHECK"><option value="CHECK">Check</option><option value="CASH">Cash</option><option value="MANUAL">Other manual payment</option></select></label><label>Reference or note<input name="reference" maxLength={120} placeholder="Check number or staff note" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Record payment"}</button></div></form>
             ) : (
-              <form className="form-stack" onSubmit={reviewRefund}><div className="inline-notice">Refundable on this payment: {formatCents((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0))}</div><label>Refund amount<input name="amount" type="number" min="0.01" max={((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)) / 100} step="0.01" required /></label><label>Reason<textarea name="reason" minLength={3} maxLength={300} rows={4} required placeholder="Why is this refund being recorded?" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>Review refund</button></div></form>
+              <form className="form-stack" onSubmit={reviewRefund}><div className="inline-notice">Refundable on this payment: <Money cents={(selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)} /></div><label>Refund amount<input name="amount" type="number" min="0.01" max={((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)) / 100} step="0.01" required /></label><label>Reason<textarea name="reason" minLength={3} maxLength={300} rows={4} required placeholder="Why is this refund being recorded?" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>Review refund</button></div></form>
             )}
           </section>
         </div>

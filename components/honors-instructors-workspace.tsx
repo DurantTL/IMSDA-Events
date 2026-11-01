@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
@@ -143,7 +144,7 @@ export function HonorsInstructorsWorkspace({
             return (
               <li key={instructor.id}>
                 <span>
-                  <strong translate="no">{instructor.name}{!instructor.sterlingCurrent && <span role="img" aria-label="Sterling Volunteers check not current" title="Sterling Volunteers check not current"> !</span>}</strong>
+                  <strong><ExactValue>{instructor.name}</ExactValue>{!instructor.sterlingCurrent && <span role="img" aria-label="Sterling Volunteers check not current" title="Sterling Volunteers check not current"> !</span>}</strong>
                   <small translate="no">{instructor.email}</small>
                 </span>
                 <span className={`status-chip ${statusTone[instructor.status]}`}>{statusLabels[instructor.status]}</span>

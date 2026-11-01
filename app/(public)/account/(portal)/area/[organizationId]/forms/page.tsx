@@ -77,7 +77,7 @@ export default async function AreaClubFormsPage({ params }: { params: Promise<{ 
               {submissions.map((row) => (
                 <tr key={row.id}>
                   <th scope="row">{row.templateName}</th>
-                  <td translate="no">{row.subjectName || "Not named"}</td>
+                  <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
                   <td>{formatDate(row.submittedAt)}</td>
                   <td><Link className="secondary-button" href={`/account/area/${organizationId}/forms/${row.id}`}>View</Link></td>
                 </tr>

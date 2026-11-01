@@ -1,3 +1,4 @@
+import { liveJson } from "@/lib/live-list-response";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { readRosterJson, rosterApiError } from "@/modules/club-rosters/api-errors";
@@ -25,7 +26,7 @@ async function postHandler(request: Request, context: RouteContext) {
     await refreshBackgroundCheckMatchesSafely(result.personIds);
     const { personIds, ...summary } = result;
     void personIds;
-    return Response.json(summary, { status: 201 });
+    return liveJson(summary, { status: 201 });
   } catch (error) {
     return rosterApiError(error, "Starting the next year's roster");
   }

@@ -52,7 +52,7 @@ export function ClubReportsConference({
     <section className="page-stack">
       <div className="page-intro">
         <div>
-          <p className="eyebrow">Clubs · {clubYear}</p>
+          <p className="eyebrow">{`Clubs · ${clubYear}`}</p>
           <h2>Monthly Records</h2>
           <p>
             Points per club and month. <strong>Missing</strong> means the due date (the 10th of the next month) has passed with no
@@ -69,13 +69,13 @@ export function ClubReportsConference({
         )}
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      <p className="field-help">{clubs.length} active clubs · {missingTotal} missing reports so far.</p>
+      <p className="field-help">{`${clubs.length} active clubs · ${missingTotal} missing reports so far.`}</p>
       {clubs.length === 0 ? (
         <div className="panel"><p className="report-empty">No active clubs yet.</p></div>
       ) : (
         <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue>
           <table role="table" className="report-table table-cards">
-            <caption className="sr-only">Monthly Record points by club for {clubYear}</caption>
+            <caption className="sr-only">{`Monthly Record points by club for ${clubYear}`}</caption>
             <thead role="rowgroup">
               <tr role="row">
                 <th role="columnheader" scope="col">Club</th>

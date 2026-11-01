@@ -1,3 +1,4 @@
+import { liveJson } from "@/lib/live-list-response";
 import { withRequestContext } from "@/lib/request-context";
 import { clubOrderApiError } from "@/modules/club-orders/api-errors";
 import { loadOrderWorkspace } from "@/modules/club-orders/repository";
@@ -22,7 +23,7 @@ async function getHandler(_request: Request, context: RouteContext) {
     const access = await requireClubOrdersAccess(organizationId);
     // Only an editor's visit records new needs; a view-only role reads what's on file.
     if (access.mode === "EDIT") await syncHonorOrderNeeds(organizationId);
-    return Response.json({ ...(await loadOrderWorkspace(organizationId)), canEdit: access.mode === "EDIT" });
+    return liveJson({ ...(await loadOrderWorkspace(organizationId)), canEdit: access.mode === "EDIT" });
   } catch (error) {
     return clubOrderApiError(error, "Loading the order list");
   }

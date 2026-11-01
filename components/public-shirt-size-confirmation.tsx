@@ -133,7 +133,7 @@ export function PublicShirtSizeConfirmation({
             <span className="public-shirt-size-person">
               <span><Shirt aria-hidden="true" size={17} /></span>
               <span>
-                <small>Attendee {index + 1}</small>
+                <small>{`Attendee ${index + 1}`}</small>
                 <strong>{attendee.name}</strong>
               </span>
               <em className={shirtSizeStatus(attendee).isConfirmed ? "is-confirmed" : ""}>

@@ -9,7 +9,7 @@ export function PerPersonPriceNotice({ price, className, showNotice = true }: { 
   if (!showNotice && price.attendeeLines.length === 0 && price.registrationLines.length === 0) return null;
   return (
     <div className={className} data-testid="per-person-price">
-      {showNotice && <p><strong translate="no">{price.notice}</strong></p>}
+      {showNotice && <p><strong>{price.notice}</strong></p>}
       {(price.attendeeLines.length > 0 || price.registrationLines.length > 0) && (
         <ul>
           {price.attendeeLines.map((line, index) => (
@@ -18,7 +18,7 @@ export function PerPersonPriceNotice({ price, className, showNotice = true }: { 
             </li>
           ))}
           {price.registrationLines.map((line, index) => (
-            <li key={`registration-${index}`} translate="no">{registrationLineText(price, line)}</li>
+            <li key={`registration-${index}`}>{registrationLineText(price, line)}</li>
           ))}
         </ul>
       )}

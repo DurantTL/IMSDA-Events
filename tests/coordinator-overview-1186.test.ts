@@ -190,7 +190,7 @@ describe("overview markup (#1186)", () => {
     expect(out).toContain("3 of 6 September records");
     expect(out).toContain("Active clubs");
     for (const column of ["Club / church", "Roster", "Adults &amp; staff", "September 2026 record", "Sterling Volunteers", "Open club"]) expect(out).toContain(column);
-    expect(out).toContain("Director: Dana Sample");
+    expect(out).toContain("Director: <span translate=\"no\">Dana Sample</span>");
     expect(out).toContain("Director: none listed");
     expect(out).toContain("0 not in compliance");
     expect(out).toContain('href="/account/area/c1"');

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { installTranslationSafeDom } from "@/lib/translation-safety";
 
@@ -103,5 +105,21 @@ describe("translation-safe DOM", () => {
     expect(parent.children.map((child) => child.name)).toEqual(["a", "b"]);
     parent.removeChild(a);
     expect(parent.children.map((child) => child.name)).toEqual(["b"]);
+  });
+});
+
+describe("the guard is installed before React hydrates (#1445)", () => {
+  const root = path.resolve(__dirname, "..");
+
+  it("instrumentation-client.ts, in the app root, installs it at load time and never throws", () => {
+    const source = readFileSync(path.join(root, "instrumentation-client.ts"), "utf8");
+    expect(source).toContain('import { installTranslationSafeDom } from "@/lib/translation-safety"');
+    expect(source).toMatch(/try\s*{\s*installTranslationSafeDom\(\);\s*}\s*catch/);
+  });
+
+  it("is not tied to one layout: no route group or layout installs its own copy or skips it", () => {
+    const layout = readFileSync(path.join(root, "app/layout.tsx"), "utf8");
+    expect(layout).not.toContain("translation-safety");
+    expect(layout).toContain('<html lang="en"');
   });
 });

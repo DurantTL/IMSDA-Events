@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { SubmitButton } from "@/components/submit-button";
 import Link from "next/link";
 import { useCallback, useState } from "react";
@@ -153,7 +154,7 @@ export function ClubTeamWorkspace({
           {team.map((member) => (
             <li key={member.id}>
               <span>
-                <strong translate="no">{member.displayName}{member.accountId === viewerAccountId ? " (you)" : ""}</strong>
+                <strong><ExactValue>{member.displayName}</ExactValue>{member.accountId === viewerAccountId ? " (you)" : ""}</strong>
                 <small translate="no">{member.email}</small>
                 {canOpenPeople ? <Link className="secondary-button" href={`/admin/people/account/${member.accountId}`}>See all of this person&apos;s access<span className="sr-only"> ({member.displayName})</span></Link> : null}
               </span>

@@ -198,7 +198,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
     setSearch(value);
     const ticket = (searchTicket.current += 1);
     try {
-      const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}&page=${page}`);
+      const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}&page=${page}`, { cache: "no-store" });
       const json = await response.json();
       if (ticket !== searchTicket.current) return; // a newer search has started; ignore this older answer
       setFound(response.ok ? json.people : []);
@@ -213,7 +213,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
     if (!lookupCode.trim()) return;
     setLookup(null); setError("");
     try {
-      const response = await fetch(`${base}/lookup?code=${encodeURIComponent(lookupCode.trim())}`);
+      const response = await fetch(`${base}/lookup?code=${encodeURIComponent(lookupCode.trim())}`, { cache: "no-store" });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message ?? "Lookup failed.");
       setLookup(json.asset ?? "none");

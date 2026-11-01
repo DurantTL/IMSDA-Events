@@ -31,7 +31,7 @@ export function RegistrationActionDisclosure({
       }}
     >
       <summary>
-        <span>{label}<span className="sr-only"> for {eventName}</span></span>
+        <span>{label}<span className="sr-only">{` for ${eventName}`}</span></span>
         {hint && <span className="attendee-reg-action-hint">{hint}</span>}
         <ChevronDown aria-hidden="true" size={16} />
       </summary>

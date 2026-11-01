@@ -215,7 +215,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   async function discard() {
     if (!(await askConfirm({
       title: "Discard this draft",
-      body: <p>Every unpublished change in this draft is lost. The published version (version {props.version}) is not changed.</p>,
+      body: <p>{`Every unpublished change in this draft is lost. The published version (version ${props.version}) is not changed.`}</p>,
       confirmLabel: "Discard draft",
       destructive: true,
     }))) return;
@@ -295,7 +295,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
         return (
           <section className="panel form-stack" key={section.id} aria-label={`Section ${sectionIndex + 1}`}>
             <div className="intro-actions">
-              <h3>Section {sectionIndex + 1}</h3>
+              <h3>{`Section ${sectionIndex + 1}`}</h3>
               <button aria-label="Move section up" className="text-button" disabled={sectionIndex === 0} onClick={() => edit((s) => moveSection(s, section.id, -1))} type="button"><ArrowUp aria-hidden="true" size={14} /></button>
               <button aria-label="Move section down" className="text-button" disabled={sectionIndex === spec.definition.sections.length - 1} onClick={() => edit((s) => moveSection(s, section.id, 1))} type="button"><ArrowDown aria-hidden="true" size={14} /></button>
               <button
@@ -365,7 +365,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
         <p className="field-help">Every published version is kept. A form that was filled in shows, prints and exports on the version it was filled in on.</p>
         <ul>
           {props.versions.map((entry) => (
-            <li key={entry.version}>Version {entry.version}{entry.version === props.version ? " (current)" : ""} · recorded {formatInConferenceTime(entry.recordedAt)}</li>
+            <li key={entry.version}>{`Version ${entry.version}${entry.version === props.version ? " (current)" : ""} · recorded ${formatInConferenceTime(entry.recordedAt)}`}</li>
           ))}
         </ul>
       </section>

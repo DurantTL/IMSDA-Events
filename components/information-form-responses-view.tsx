@@ -68,8 +68,8 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
         {selected && (
           <article className="information-form-response-detail" aria-label="One response">
             <header>
-              <h3>Response from {formatInConferenceTime(selected.submittedAt, { dateStyle: "medium", timeStyle: "short" })}</h3>
-              <p className="quiet-copy">Form version {selected.versionNumber} · {selected.signedIn ? "Signed in" : "Not signed in"}</p>
+              <h3>{`Response from ${formatInConferenceTime(selected.submittedAt, { dateStyle: "medium", timeStyle: "short" })}`}</h3>
+              <p className="quiet-copy">{`Form version ${selected.versionNumber} · ${selected.signedIn ? "Signed in" : "Not signed in"}`}</p>
             </header>
             {selected.answers.length === 0
               ? <p className="quiet-copy">No questions were answered.</p>
@@ -91,7 +91,7 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
           : (
             <div className="report-table-wrap">
               <table role="table" className="report-table table-cards information-form-table">
-                <caption className="sr-only">Responses to {formName}, newest first</caption>
+                <caption className="sr-only">{`Responses to ${formName}, newest first`}</caption>
                 <thead role="rowgroup">
                   <tr role="row">
                     <th role="columnheader" scope="col">Submitted</th>

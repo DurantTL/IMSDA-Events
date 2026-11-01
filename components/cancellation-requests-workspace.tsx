@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
@@ -89,7 +90,7 @@ export function CancellationRequestsWorkspace({
                   <span translate="no">{row.confirmationCode}</span>
                   <span>{row.statusLabel}</span>
                   <span>{scopeWords[row.scope]}{row.afterDeadline ? ", after deadline" : ""}</span>
-                  <span translate="no">Proposed refund {formatCentsPlain(row.proposedRefundCents)}</span>
+                  <span>Proposed refund <Money cents={row.proposedRefundCents} options={{ grouping: false }} /></span>
                   <small>Asked {when(row.createdAt, timezone)}</small>
                 </Link>
               </li>
