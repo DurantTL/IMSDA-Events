@@ -53,7 +53,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B1 | Every list can be sorted by clicking a column header, and uses the same paging control and "Showing 1–25 of 140" line. | planned (#1440) | planned (#1439) | #1433 |
+| B1 | Every list can be sorted by clicking a column header, and uses the same paging control and "Showing 1–25 of 140" line. Every staff and admin table is sortable except short fixed or set-order lists, which go on an allowlist. | planned (#1440) | planned (#1439) | #1433; Caleb, Nov 1 |
 | B2 | Filters live in the web address (Back and shared links keep them), and every filtered list has a "Clear filters" button. | planned (#1440) | planned (#1439) | #1433 |
 | B3 | On a phone, every table turns into cards the same way. | planned (#1440) | planned (#1439) | #1433 |
 | B4 | Every empty list says why it's empty and offers the next step. | planned (#1440) | planned (#1439) | #1433 |
@@ -62,7 +62,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B5 | Every form either saves automatically or has one clear Save button, with the same "Saved" confirmation either way. | planned (#1440) | planned (#1439) | #1433 |
+| B5 | Every form either saves automatically or has one clear Save button, with the same "Saved" confirmation either way. Forms keep one Save button; autosave only where it already exists; the same "Saved" message everywhere. | planned (#1440) | planned (#1439) | #1433; Caleb, Nov 1 |
 | B6 | Leaving a page with unsaved changes always warns first. | planned (#1440) | planned (#1439) | #1433 |
 | B7 | Errors show the same way everywhere: a short summary at the top, and each problem next to its field. | planned (#1440) | planned (#1439) | #1433 |
 | B8 | Phone numbers, emails and dates are checked and formatted the same way in every form. | planned (#1440) | planned (#1439) | #1433 |
@@ -79,7 +79,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B12 | The same status words mean the same thing everywhere (Pending, Confirmed, Waitlisted, Cancelled, …). | planned (#1440) | planned (#1439) | #1433 |
+| B12 | The same status words mean the same thing everywhere (Pending, Confirmed, Waitlisted, Cancelled, …). The status words are exactly Draft, Submitted, Pending payment, Pending approval, Confirmed, Waitlisted, Cancelled, Refunded. | planned (#1440) | planned (#1439) | #1433; Caleb, Nov 1 |
 | B13 | Names and times display the same way everywhere, with times in Central and labeled. | planned (#1440) | planned (#1439) | #1433 |
 | B14 | "You don't have access" pages all say the same thing and explain who to ask. | planned (#1440) | planned (#1439) | #1433 |
 
