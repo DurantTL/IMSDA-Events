@@ -10,6 +10,7 @@ import { buildEmergencyPlanSnapshot } from "@/modules/emergency-plans/domain";
 import { getEmergencyPlanDraft, getEmergencyPlanEvent, getEmergencyPlanVersion } from "@/modules/emergency-plans/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { buildEmergencyReferenceSheet } from "@/modules/reporting/emergency-reference";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.emergencyPlan };
 export const dynamic = "force-dynamic";
@@ -39,12 +40,12 @@ export default async function EmergencyPlanPrintPage({ searchParams }: { searchP
       return <AccessRestricted title="Draft previews are restricted" detail="Event administrators can preview the unpublished draft. Print a published version instead." whoToAsk="your event administrator" />;
     }
     const [plan, eventRow] = await Promise.all([getEmergencyPlanDraft(event.id), getEmergencyPlanEvent(event.id)]);
-    if (!eventRow) return <AccessRestricted title="Event not found" detail="This event could not be loaded." whoToAsk="your event administrator" />;
+    if (!eventRow) return <NotAvailableForEvent reason="This event could not be loaded." />;
     sheet = buildEmergencyReferenceSheet(buildEmergencyPlanSnapshot(plan, eventRow), null);
   } else {
     const requestedVersion = version === undefined ? undefined : Number(version);
     if (requestedVersion !== undefined && (!Number.isInteger(requestedVersion) || requestedVersion < 1)) {
-      return <AccessRestricted title="Version not found" detail="Choose a published version from the emergency plan page." whoToAsk="your event administrator" />;
+      return <NotAvailableForEvent reason="Choose a published version from the emergency plan page." />;
     }
     const published = await getEmergencyPlanVersion(event.id, requestedVersion);
     if (!published) {

@@ -5,6 +5,7 @@ import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { listEventAwardItems } from "@/modules/earned-awards/event-items";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.eventPatches };
 
@@ -24,7 +25,7 @@ export default async function EventPatchesPage({ searchParams }: { searchParams:
   if (!clubEvent) {
     return (
       <>
-        <AccessRestricted title="Event patches are for club events" detail="This event doesn't take club registrations. Choose a club event to link its patch or pin." whoToAsk="your event administrator" />
+        <NotAvailableForEvent reason="This event doesn't take club registrations. Choose a club event to link its patch or pin." />
       </>
     );
   }

@@ -49,7 +49,7 @@ function registrationSummary(registration: Awaited<ReturnType<typeof listRegistr
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const requested = (await searchParams).event;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions } = await resolveEventContext(requested, { kitchenHomeLanding: true });
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
     return <AccessRestricted title="The dashboard is restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />;

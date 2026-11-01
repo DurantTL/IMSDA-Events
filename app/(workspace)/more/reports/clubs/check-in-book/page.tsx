@@ -9,6 +9,7 @@ import { checkInBookStatuses, parseCheckInBookStatuses } from "@/modules/reporti
 import { getCheckInBookData } from "@/modules/reporting/check-in-book-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.checkInBook };
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function CheckInBookPage({
   }
   const statuses = parseCheckInBookStatuses(status);
   const data = await getCheckInBookData(event.id, { statuses, extraFieldKey: extra, location });
-  if (!data) return <AccessRestricted title="Event not found" detail="This event could not be loaded." whoToAsk="your event administrator" />;
+  if (!data) return <NotAvailableForEvent reason="This event could not be loaded." />;
 
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const downloadParams = new URLSearchParams();

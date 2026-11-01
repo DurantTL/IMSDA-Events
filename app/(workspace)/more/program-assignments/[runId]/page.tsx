@@ -7,6 +7,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
 import { getAppliedAssignmentRoster } from "@/modules/program-assignments/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.assignmentRoster };
 
@@ -38,11 +39,7 @@ export default async function ProgramAssignmentRosterPage({
   const roster = await getAppliedAssignmentRoster(event.id, runId);
   if (!roster) {
     return (
-      <AccessRestricted
-        title="Assignment roster not found"
-        detail="This run does not belong to the selected event, or it is no longer available."
-        whoToAsk="your event administrator"
-      />
+      <NotAvailableForEvent reason="This run does not belong to the selected event, or it is no longer available." />
     );
   }
   const groups = new Map<string, typeof roster.assignments>();

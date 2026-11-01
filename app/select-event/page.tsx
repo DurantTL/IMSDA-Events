@@ -66,11 +66,6 @@ export default async function SelectEventPage({
             ? <p>You can&rsquo;t open that event with this account. Ask your event administrator if you need access, or choose one of your events below.</p>
             : <p>{session.user.email} has access to more than one event. Pick one to continue.</p>}
         </div>
-        {unavailable && (
-          <div className="inline-notice error" role="status">
-            <span>Choose one of your events below to continue.</span>
-          </div>
-        )}
         <SelectEventList
           events={events.map((event) => ({
             id: event.id,

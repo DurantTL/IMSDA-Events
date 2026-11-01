@@ -51,8 +51,24 @@ describe("AccessRestricted names who to ask (rule 14)", () => {
         if (!/\bwhoToAsk=/.test(match[1])) missing.push(`${relative(root, file)}: ${match[0].slice(0, 80)}`);
       }
     }
-    expect(uses).toBeGreaterThan(90);
+    expect(uses).toBeGreaterThan(80);
     expect(missing).toEqual([]);
+  });
+
+  it("renders an h1 and can hide the Help link where Help would loop back", () => {
+    const page = renderToStaticMarkup(createElement(AccessRestricted, { title: "Closed", detail: "Why.", whoToAsk: "a system administrator", headingLevel: 1, showHelpLink: false }));
+    expect(page).toContain("<h1>Closed</h1>");
+    expect(page).not.toContain('href="/help"');
+    expect(renderToStaticMarkup(createElement(AccessRestricted, { title: "Closed", detail: "Why.", whoToAsk: "x" }))).toContain("<h2>Closed</h2>");
+    const noAccess = readFileSync(join(root, "app/no-access/page.tsx"), "utf8");
+    expect(noAccess.match(/headingLevel=\{1\}/g)).toHaveLength(2);
+    expect(noAccess).toContain("showHelpLink={false}");
+  });
+
+  it("uses the plain not-available state, not an ask for access, where nothing was denied", () => {
+    const wrong = ["people/staff-invitations/page.tsx", "people/staff-invitations/approvals/page.tsx"].filter((file) => /AccessRestricted[^>]*aren't used for club events/.test(readFileSync(join(root, "app/(workspace)", file), "utf8")));
+    expect(wrong).toEqual([]);
+    expect(readFileSync(join(root, "app/(workspace)/people/staff-invitations/page.tsx"), "utf8")).toContain("<NotAvailableForEvent");
   });
 
   it("does not repeat the ask inside a detail sentence", () => {

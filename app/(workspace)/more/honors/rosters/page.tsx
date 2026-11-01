@@ -19,6 +19,7 @@ import {
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = {
   title: staffPageTitles.honorsRosters,
@@ -51,7 +52,7 @@ export default async function HonorRostersPage({
     getHonorRosterData(event.id, { includeDietary, includeAdminPlacementReasons: canOverrideSeats, ...(locationId ? { locationId } : {}) }),
     backgroundFlaggedAttendeeIds(event.id),
   ]);
-  if (!data) return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." whoToAsk="your event administrator" />;
+  if (!data) return <NotAvailableForEvent reason="The selected event could not be loaded." />;
 
   const view: View = query.view === "site" || query.view === "clubs" ? query.view : "classes";
   const eventQuery = `event=${encodeURIComponent(event.id)}${site ? `&location=${encodeURIComponent(site.id)}` : ""}`;

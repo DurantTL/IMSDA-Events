@@ -4,6 +4,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { StaffApprovalQueue } from "@/components/staff-approval-queue";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listApprovals } from "@/modules/staff-invitations/repository";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: "Staff registrations waiting for approval" };
 
@@ -25,11 +26,7 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
   }
   if (event.audience !== "GENERAL") {
     return (
-      <AccessRestricted
-        title="Staff invitations aren't used for club events"
-        detail="Personal staff, pastor and volunteer links are for events that are open to everyone."
-        whoToAsk="your event administrator"
-      />
+      <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
     );
   }
   const approvals = await listApprovals(event.id);

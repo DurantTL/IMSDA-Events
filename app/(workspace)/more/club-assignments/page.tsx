@@ -9,6 +9,7 @@ import { listClubAssignments } from "@/modules/club-registrations/assignments-re
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.clubAssignments };
 export const dynamic = "force-dynamic";
@@ -37,11 +38,7 @@ export default async function ClubAssignmentsPage({
   if (!clubEvent) {
     return (
       <>
-        <AccessRestricted
-          title="Club assignments are for club events"
-          detail="This event doesn't take club registrations. Choose a club event to assign campsites, duties, and activities."
-          whoToAsk="your event administrator"
-        />
+        <NotAvailableForEvent reason="This event doesn't take club registrations. Choose a club event to assign campsites, duties, and activities." />
       </>
     );
   }

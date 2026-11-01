@@ -2080,7 +2080,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-form { margin-top: 15px; }
 .forbidden-state { display: grid; min-height: 360px; place-items: center; align-content: center; text-align: center; }
 .forbidden-state > span { display: grid; width: 58px; height: 58px; margin-bottom: 16px; place-items: center; border-radius: 17px; background: var(--imsda-purple-soft); color: var(--imsda-purple); }
-.forbidden-state h2 { margin: 3px 0 7px; }
+.forbidden-state :is(h1, h2) { margin: 3px 0 7px; }
+.forbidden-state h1 { color: var(--ink); font-size: 1.5em; font-weight: 700; letter-spacing: -0.02em; }
 .forbidden-state > p:not(.eyebrow) { max-width: 500px; margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.72rem); }
 .forbidden-state .forbidden-state-action { margin-top: 16px; }
 

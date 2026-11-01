@@ -17,14 +17,14 @@ export function noAccessCopy(input: { from?: string | null; hasEvents: boolean; 
   if (input.from === "event-setup") {
     return {
       heading: "Creating events needs a system administrator",
-      body: "Creating events needs a system administrator.",
+      body: "New events are set up by IMSDA system administrators, and your account is not one.",
       whoToAsk: "a system administrator",
       showEvents: true,
     };
   }
   return {
     heading: "This page needs a system administrator",
-    body: "This page needs a system administrator.",
+    body: "Only IMSDA system administrators can open this page, and your account is not one.",
     whoToAsk: "a system administrator",
     showEvents: true,
   };

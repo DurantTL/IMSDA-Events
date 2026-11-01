@@ -5,6 +5,7 @@ import { StaffInvitationImport } from "@/components/staff-invitation-import";
 import { StaffInvitationList } from "@/components/staff-invitation-list";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listInvitations } from "@/modules/staff-invitations/repository";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: "Staff invitations" };
 
@@ -26,11 +27,7 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
   }
   if (event.audience !== "GENERAL") {
     return (
-      <AccessRestricted
-        title="Staff invitations aren't used for club events"
-        detail="Personal staff, pastor and volunteer links are for events that are open to everyone."
-        whoToAsk="your event administrator"
-      />
+      <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
     );
   }
   const list = await listInvitations(event.id);

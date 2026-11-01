@@ -8,6 +8,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { getClubPacketData } from "@/modules/reporting/club-packet-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
 export const metadata: Metadata = { title: staffPageTitles.clubPacket };
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function StaffClubPacketPage({
   if (!packet) {
     // A team this club never registered (or another club's) is not found.
     if (teamKey) notFound();
-    return <AccessRestricted title="No active registration" detail="This club has no submitted or confirmed registration for this event." whoToAsk="your event administrator" />;
+    return <NotAvailableForEvent reason="This club has no submitted or confirmed registration for this event." />;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
 
