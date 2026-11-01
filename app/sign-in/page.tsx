@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
+import { FormsHelp } from "@/components/forms-help";
 import { LoginForm } from "@/components/login-form";
+import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { AttendeeGoogleButton, attendeeSignInErrorMessage } from "@/components/attendee-google-button";
 import { CombinedPasskeySignInButton } from "@/components/combined-passkey-sign-in-button";
 import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
@@ -73,6 +75,7 @@ export default async function SignInPage({
           <h1>Sign in</h1>
           <p>Use your email and password. Some accounts will be asked for a second step after the password.</p>
         </div>
+        <FormsHelp contact={await getFormsHelpContact()} />
         {staffTimedOut && <p className="form-notice" role="status">{STAFF_TIMED_OUT_NOTICE}</p>}
         {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
         {(googleAvailable || passkeysAvailable) && (

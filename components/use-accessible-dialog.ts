@@ -4,12 +4,31 @@ import { useEffect, useRef } from "react";
 
 const focusableSelector = [
   "a[href]",
+  "summary",
   "button:not([disabled])",
   "input:not([disabled])",
   "select:not([disabled])",
   "textarea:not([disabled])",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+
+/**
+ * Content of a collapsed <details> can't take focus, but browsers still give it an `offsetParent` (#1445). A closed
+ * details' own <summary> stays a stop; everything else inside a closed details is skipped.
+ */
+function insideClosedDetails(element: HTMLElement) {
+  let node: HTMLElement | null = element.parentElement;
+  let child: HTMLElement = element;
+  while (node) {
+    if (node instanceof HTMLDetailsElement && !node.open) {
+      const ownSummary = child.tagName === "SUMMARY" && child.parentElement === node && node.querySelector(":scope > summary") === child;
+      if (!ownSummary) return true;
+    }
+    child = node;
+    node = node.parentElement;
+  }
+  return false;
+}
 
 /**
  * Open dialogs, outermost first. A confirmation opened over an editor dialog
@@ -127,7 +146,7 @@ export function useAccessibleDialog<T extends HTMLElement>(
 
     const focusableElements = () => Array.from(
       dialogElement.querySelectorAll<HTMLElement>(focusableSelector),
-    ).filter((element) => !element.hidden && element.offsetParent !== null);
+    ).filter((element) => !element.hidden && element.offsetParent !== null && !insideClosedDetails(element));
 
     window.requestAnimationFrame(() => {
       const initial = optionsRef.current.initialFocus;

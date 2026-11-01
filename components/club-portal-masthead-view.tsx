@@ -1,9 +1,11 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
+import { FormsHelp } from "@/components/forms-help";
 import styles from "@/components/club-portal-masthead-view.module.css";
 import { Repeat2, UserRound } from "lucide-react";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
+import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 
 export type ClubMastheadModel = {
@@ -43,7 +45,7 @@ export function clubMastheadModel(input: {
 }
 
 /** The masthead markup: no staff or system links. My account goes to /account on purpose; it is not a role picker. */
-export function ClubPortalMastheadView({ model, role }: { model: ClubMastheadModel; role: ClubRole }) {
+export function ClubPortalMastheadView({ model, role, formsHelpContact }: { model: ClubMastheadModel; role: ClubRole; formsHelpContact?: FormsHelpContact }) {
   return (
     <header className="club-masthead">
       <div className="club-masthead-inner">
@@ -60,6 +62,7 @@ export function ClubPortalMastheadView({ model, role }: { model: ClubMastheadMod
             </span>
           )}
           {model.showSwitchClub && <Link className={styles.action} href="/account/clubs"><Repeat2 aria-hidden="true" size={16} />Switch club</Link>}
+          {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} />}
           {model.showMyAccount && <Link className={styles.action} href="/account"><UserRound aria-hidden="true" size={16} />My account</Link>}
           {model.signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={model.signOut === "both"} />}
         </div>
