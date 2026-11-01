@@ -161,6 +161,16 @@ describe("useConfirm reason field (#1448)", () => {
     await expect(answer).resolves.toBe("ok");
   });
 
+  it("a minLength field stays open until the trimmed text is long enough", async () => {
+    const { c, states } = controller();
+    const answer = c.ask({ ...ask, input: { label: "Why?", required: true, minLength: 3 } });
+    c.settle(true, "ab");
+    c.settle(true, " a  ");
+    expect(states.at(-1)).not.toBeNull();
+    c.settle(true, " abc ");
+    await expect(answer).resolves.toBe("abc");
+  });
+
   it("an optional field may be confirmed empty, giving an empty string", async () => {
     const { c } = controller();
     const answer = c.ask({ ...ask, input: { label: "Link", type: "url" } });

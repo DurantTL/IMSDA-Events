@@ -139,7 +139,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
               body: <p>The order is cancelled and credited.</p>,
               confirmLabel: "Cancel order",
               destructive: true,
-              input: { label: "Why is this order being cancelled?", required: true, hint: reasonHint },
+              input: { label: "Why is this order being cancelled?", required: true, minLength: 3, maxLength: 500, hint: reasonHint },
             });
             if (reason) void run(() => call(`${base}/selections/${order.id}`, "POST", { action: "cancel", reason }), "Order cancelled and credited.");
           }}>Cancel</button> : null}</td>
@@ -171,7 +171,7 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
             body: <p>Orders pinned to this meal are credited.</p>,
             confirmLabel: `Cancel ${service.name}`,
             destructive: true,
-            input: { label: "Why is this meal cancelled?", required: true, hint: reasonHint },
+            input: { label: "Why is this meal cancelled?", required: true, minLength: 3, maxLength: 500, hint: reasonHint },
           });
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "cancel", reason }), "Meal service cancelled.");
         }}>Cancel meal</button> : null}
@@ -180,7 +180,7 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
             title: `Reinstate ${service.name}?`,
             body: <p>The meal is offered again.</p>,
             confirmLabel: `Reinstate ${service.name}`,
-            input: { label: "Why is this meal being reinstated?", required: true, hint: reasonHint },
+            input: { label: "Why is this meal being reinstated?", required: true, minLength: 3, maxLength: 500, hint: reasonHint },
           });
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "reinstate", reason }), "Meal service reinstated.");
         }}>Reinstate</button> : null}

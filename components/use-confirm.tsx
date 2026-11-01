@@ -18,6 +18,8 @@ export type ConfirmInput = {
   /** Read by screen readers with the field (aria-describedby) and shown under it. */
   hint?: string;
   maxLength?: number;
+  /** Confirm stays disabled until the trimmed value is at least this long (the server's own minimum). */
+  minLength?: number;
   multiline?: boolean;
 };
 
@@ -35,6 +37,13 @@ export type ConfirmRequest = {
 export type AskRequest = ConfirmRequest & { input: ConfirmInput };
 
 export type PendingConfirm = ConfirmRequest & { resolve: (confirmed: boolean, value?: string) => void };
+
+/** Whether `value` satisfies the field's required and minLength rules (trimmed). */
+export function inputIsValid(input: ConfirmInput, value: string) {
+  const length = value.trim().length;
+  if (input.required && length === 0) return false;
+  return length >= (input.minLength ?? 0) || (!input.required && length === 0);
+}
 
 /**
  * The state machine behind `useConfirm`, free of React so it can be tested
@@ -59,7 +68,7 @@ export function createConfirmController(onChange: (pending: PendingConfirm | nul
     settle(confirmed: boolean, value?: string) {
       const pending = current;
       // A required field can't be confirmed empty, whichever way Confirm was reached.
-      if (confirmed && pending?.input?.required && !(value ?? "").trim()) return;
+      if (confirmed && pending?.input && !inputIsValid(pending.input, value ?? "")) return;
       current = null;
       onChange(null);
       pending?.resolve(confirmed, value);
@@ -86,7 +95,7 @@ export function useConfirm() {
   };
   const settle = controller.settle;
   const input = pending?.input;
-  const valid = !input?.required || value.trim() !== "";
+  const valid = !input || inputIsValid(input, value);
   const submit = () => settle(true, input ? value : undefined);
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -98,6 +107,7 @@ export function useConfirm() {
   const fieldProps = input ? {
     "aria-describedby": input.hint ? hintId : undefined,
     maxLength: input.maxLength,
+    minLength: input.minLength,
     onChange: (event: { target: { value: string } }) => setValue(event.target.value),
     ref: inputRef,
     value,

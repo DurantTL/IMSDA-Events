@@ -112,7 +112,7 @@ export function ClubDirectorsWorkspace({
       body: <p>{`${grant.account.displayName} will lose this club access. The reason is recorded in the audit log.`}</p>,
       confirmLabel: `Revoke access for ${grant.account.displayName}`,
       destructive: true,
-      input: { label: `Why is ${grant.account.displayName} losing access to ${club.name}?`, required: true, maxLength: 500, hint: "At least 3 characters." },
+      input: { label: `Why is ${grant.account.displayName} losing access to ${club.name}?`, required: true, minLength: 3, maxLength: 500, hint: "At least 3 characters." },
     });
     if (reason === null) return;
     setSaving(true);

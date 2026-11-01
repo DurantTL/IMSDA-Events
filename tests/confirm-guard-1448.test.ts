@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 /**
  * Site rule B9 (#1448): a delete or cancel never runs without an in-page confirm, and no browser prompt
  * (`window.prompt` / `window.confirm`) is used, because iOS Safari can swallow them silently (#466).
- * These are source scans, so a new offender fails here before it ships.
+ * These are source scans, so a new offender fails here before it ships. Scope: the delete check is a
+ * file-level heuristic over client components (a file using any confirm dialog passes), and it covers deletes
+ * only, not every cancel or other irreversible action.
  */
 
 const root = path.resolve(__dirname, "..");
@@ -38,7 +40,7 @@ function lineOf(text: string, index: number) {
 /** Every file that may still call a browser dialog, with the reason it is allowed. */
 const browserDialogAllowlist: Record<string, string> = {
   "components/use-unsaved-changes-guard.ts":
-    "Leaving the page with unsaved edits: the browser's own beforeunload-style prompt is the last line of defence, not a delete or cancel.",
+    "A window.confirm shown on in-app link clicks when leaving a page with unsaved edits; it guards lost edits, not a delete or cancel.",
   "components/unsaved-changes-registry.ts":
     "Default confirm for in-app navigation away from unsaved edits; callers inject their own and tests replace it.",
 };
@@ -69,13 +71,15 @@ const unconfirmedDeleteAllowlist: Record<string, string> = {
   "components/more-launcher.tsx": "Turning a module off opens its own in-page 'Turn off' confirmation panel first.",
   "components/organization-directory-workspace.tsx": "Delete opens a type-the-name confirmation form before the request is sent.",
   "components/staff-passkey-manager.tsx": "Removing a passkey goes through startChange, which asks for confirmation and re-authentication first.",
+  "components/question-library-manager.tsx": "Delete swaps the row into an inline 'Delete <name>' / 'Keep it' confirmation with the consequence stated before the request is sent.",
   // Low-stakes by design: nothing is lost and the action is trivially reversible.
   "components/registration-notes-tags-panel.tsx": "Removes one tag chip; re-adding the tag restores it, no data is lost.",
   "components/session-manager.tsx": "Ends sessions only; no data is deleted and the devices can sign in again.",
 };
 
 const confirmMarkers = /\buseConfirm\b|\bConfirmDialog\b|\b(?:Delete|Remove|Archive|Cancel)\w*Dialog\b/;
-const deleteSends = /method\s*:\s*["'`]DELETE["'`]|action\s*:\s*["'`]DELETE_\w*["'`]/g;
+// Any quoted "DELETE" (method: "DELETE", or the helper form call(url, "DELETE", ...)) or an action: "DELETE_…" body.
+const deleteSends = /["'`]DELETE["'`]|action\s*:\s*["'`]DELETE_\w*["'`]/g;
 
 describe("deletes always confirm (#1448, B9)", () => {
   it("every client component that sends a delete also uses a confirm dialog", () => {
@@ -93,5 +97,13 @@ describe("deletes always confirm (#1448, B9)", () => {
     for (const rel of Object.keys(unconfirmedDeleteAllowlist)) {
       expect(files.some((file) => file.rel === rel), `${rel} is allowlisted but missing`).toBe(true);
     }
+  });
+});
+
+describe("lifecycle dialog keeps its opener (#1448)", () => {
+  it("the registration action row stays rendered while the lifecycle dialog is open, so focus can return to its button", () => {
+    const people = files.find((file) => file.rel === "components/people-workspace.tsx")!.text;
+    expect(people).toMatch(/\{canEdit && !addingAttendee && \(/);
+    expect(people).not.toMatch(/canEdit && !addingAttendee && !lifecycleAction/);
   });
 });
