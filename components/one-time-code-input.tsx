@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
 
 /**
  * The field that accepts either a six-digit authenticator code or a recovery
@@ -34,12 +35,18 @@ export function OneTimeCodeInput({
   autoFocus = false,
   disabled = false,
   autoSubmit = true,
+  id,
+  error,
 }: {
   name?: string;
   label: string;
   autoFocus?: boolean;
   disabled?: boolean;
   autoSubmit?: boolean;
+  /** The control's id, so an error summary can link to it. */
+  id?: string;
+  /** The field's own message; with `id` it is announced through `aria-describedby`. */
+  error?: string;
 }) {
   const [value, setValue] = useState("");
 
@@ -62,6 +69,8 @@ export function OneTimeCodeInput({
       {label}
       <input
         name={name}
+        id={id}
+        {...(id ? fieldErrorProps(`${id}_error`, error) : {})}
         value={value}
         onChange={handleChange}
         inputMode="numeric"
@@ -75,6 +84,7 @@ export function OneTimeCodeInput({
         maxLength={32}
         placeholder="123456"
       />
+      {id && <FieldError id={`${id}_error`}>{error}</FieldError>}
     </label>
   );
 }

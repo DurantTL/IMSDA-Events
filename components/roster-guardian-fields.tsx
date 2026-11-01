@@ -1,3 +1,5 @@
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { summaryMessage, type ErrorSummaryItem } from "@/components/form-error-summary";
 import {
   GUARDIAN_SLOTS,
   guardianFieldLabels,
@@ -46,13 +48,13 @@ export function RosterGuardianFields({ errors: guardianErrors, guardianState, re
               </label>
               <label>
                 {guardianFieldLabels.email}
-                <input aria-describedby={emailError ? `roster-g${slot}Email-error` : undefined} aria-invalid={emailError ? true : undefined} autoComplete="email" defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
-                {emailError && <span className="roster-field-error" id={`roster-g${slot}Email-error`} role="alert">{emailError}</span>}
+                <input {...fieldErrorProps(`roster-g${slot}Email-error`, emailError)} autoComplete="email" id={`roster-g${slot}Email`} defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={160} name={`g${slot}Email`} type="email" />
+                <FieldError id={`roster-g${slot}Email-error`}>{emailError}</FieldError>
               </label>
               <label>
                 {guardianFieldLabels.phone}
-                <input aria-describedby={phoneError ? `roster-g${slot}Phone-error` : undefined} aria-invalid={phoneError ? true : undefined} autoComplete="tel" defaultValue={stored.phone} readOnly={guardianState !== "ready"} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="tel" />
-                {phoneError && <span className="roster-field-error" id={`roster-g${slot}Phone-error`} role="alert">{phoneError}</span>}
+                <input {...fieldErrorProps(`roster-g${slot}Phone-error`, phoneError)} autoComplete="tel" id={`roster-g${slot}Phone`} defaultValue={stored.phone} readOnly={guardianState !== "ready"} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="tel" />
+                <FieldError id={`roster-g${slot}Phone-error`}>{phoneError}</FieldError>
               </label>
             </div>
           </div>
@@ -60,4 +62,16 @@ export function RosterGuardianFields({ errors: guardianErrors, guardianState, re
       })}
     </fieldset>
   );
+}
+
+/** Summary items for the emergency contact problems, in slot order, each linking to its box. */
+export function guardianErrorItems(errors: GuardianFormErrors): ErrorSummaryItem[] {
+  const items: ErrorSummaryItem[] = [];
+  for (const slot of [1, 2] as const) {
+    for (const field of ["Email", "Phone"] as const) {
+      const message = errors[`g${slot}${field}`];
+      if (message) items.push({ targetId: `roster-g${slot}${field}`, message: summaryMessage(`${EMERGENCY_CONTACT_TERM.singular} ${slot} ${field.toLowerCase()}`, message) });
+    }
+  }
+  return items;
 }
