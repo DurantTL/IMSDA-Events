@@ -41,7 +41,7 @@ function NoClubs({ query }: { query?: string }) {
   return (
     <>
       <p className="report-empty">{noClubsText(query)}</p>
-      {query ? null : <EventSetupHelp context="the club list" id="staff-no-clubs" systemAdmin />}
+      {query ? null : <EventSetupHelp context="the club list" id="staff-no-clubs" />}
     </>
   );
 }
@@ -234,7 +234,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
 export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
-  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" systemAdmin />}</>;
+  if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" />}</>;
   return (
     <>
       {shownEvents.map((event) => (

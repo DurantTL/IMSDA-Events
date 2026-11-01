@@ -9,7 +9,8 @@
 }
 
 /* Headers keep the staff 14px floor, and the next step gets room on wide screens (#1435). */
-.table th {
+/* Two classes beat the shared `.report-table thead th` so the 14px floor really applies. */
+.table:global(.report-table) thead th {
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 

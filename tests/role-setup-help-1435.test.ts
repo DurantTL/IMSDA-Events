@@ -626,7 +626,12 @@ describe("round A review fixes", () => {
 
   it("styles the Who's missing what headers and next step in its own module", () => {
     const css = read("components/coordinator-whos-missing.module.css");
-    expect(css).toMatch(/\.table th \{[^}]*--type-staff-floor[^}]*0\.875rem/);
+    const rule = css.match(/([^{}]*thead th)\s*\{([^}]*)\}/);
+    expect(rule, "a thead th rule").not.toBeNull();
+    expect(rule![2]).toMatch(/--type-staff-floor[^;]*0\.875rem/);
+    // The shared `.report-table thead th` is (0,1,2); this selector must carry more classes, or the 12px header wins.
+    const classes = (rule![1]!.match(/\.[\w-]+|:global\(\.[\w-]+\)/g) ?? []).length;
+    expect(classes).toBeGreaterThanOrEqual(2);
     expect(css).toMatch(/\.next \{[^}]*min-width/);
   });
 });
@@ -737,5 +742,37 @@ describe("round B review fixes", () => {
     expect(section).toContain("1 listed below match");
     expect(section).toContain("Synthetic Club a");
     expect(section).not.toContain("Synthetic Club b");
+  });
+});
+
+describe("round B re-review fixes", () => {
+  const clubsAdmin: HelpViewer = { isSystemAdmin: false, selectedEventId: "", permissions: [] };
+  const sysAdmin: HelpViewer = { isSystemAdmin: true, selectedEventId: "", permissions: [...eventPermissions] };
+  const html = (id: (typeof EVENT_SETUP_IDS)[number], viewer: HelpViewer, extra: Record<string, unknown> = {}) => renderToStaticMarkup(createElement(EventSetupHelp, { id, viewer, ...extra }));
+
+  it("sends a Clubs administrator to a system administrator, not to a page that refuses them", () => {
+    for (const id of ["staff-club-events-none", "staff-no-clubs", "club-invites-email"] as const) {
+      const out = html(id, clubsAdmin);
+      expect(out, id).toMatch(/Ask a system administrator/);
+      expect(out, id).not.toContain('href="/event-setup"');
+      expect(out, id).not.toContain('href="/admin/system-report"');
+      expect(out, id).not.toContain('href="/admin/clubs/import"');
+    }
+    expect(html("staff-club-events-none", sysAdmin)).toContain('href="/event-setup"');
+    for (const file of ["components/area-clubs-views.tsx", "components/club-invites-workspace.tsx"]) expect(read(file)).not.toMatch(/<EventSetupHelp[^>]*systemAdmin/);
+  });
+
+  it("prefers the page's own event over the shell's selection", () => {
+    const shell: HelpViewer = { isSystemAdmin: false, selectedEventId: "event_shell", permissions: ["MANAGE_CHECK_IN", "CONFIGURE_EVENT"] };
+    const out = html("check-in-no-arrivals", shell, { eventId: "event_page" });
+    expect(out).toContain("/more/event-settings?event=event_page");
+    expect(out).not.toContain("event_shell");
+    expect(html("check-in-no-arrivals", shell)).toContain("event_shell");
+    expect(read("app/(workspace)/more/reports/page.tsx")).toContain("<EventSetupHelp eventId={event.id}");
+  });
+
+  it("keeps arrows inline with their links", () => {
+    expect(read("components/role-setup-help.module.css")).toMatch(/\.help a \{[^}]*display: inline-flex/);
+    expect(read("app/globals.css")).toMatch(/\.setup-checklist-guide \.text-button[^{]*\{[^}]*display: inline-flex/);
   });
 });

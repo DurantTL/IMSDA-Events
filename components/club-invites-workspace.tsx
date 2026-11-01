@@ -104,13 +104,13 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
         <div className="inline-notice error" role="status">Account email isn&apos;t set up on this server, so invites can&apos;t be sent yet.</div>
       )}
       {!emailConfigured && (
-        <EventSetupHelp context="club invites" id="club-invites-email" systemAdmin />
+        <EventSetupHelp context="club invites" id="club-invites-email" />
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {clubs.length === 0 && (
-        <div className="panel"><p className="report-empty">No invites yet. Invites are created when clubs are imported.</p><EventSetupHelp context="club invites" id="club-invites-none" systemAdmin /></div>
+        <div className="panel"><p className="report-empty">No invites yet. Invites are created when clubs are imported.</p><EventSetupHelp context="club invites" id="club-invites-none" /></div>
       )}
 
       {clubs.map((club) => {

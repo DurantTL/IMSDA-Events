@@ -14,3 +14,10 @@
   gap: 6px;
   min-height: 44px;
 }
+
+/* Links here keep their arrow with the last word (an svg is block by default and would wrap alone). */
+.help a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

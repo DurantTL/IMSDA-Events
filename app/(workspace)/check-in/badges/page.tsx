@@ -241,7 +241,7 @@ export default async function PrintableNameBadgesPage({
           <ContactRound aria-hidden="true" size={26} />
           <h3>No badges to print yet</h3>
           <p>Active submitted or confirmed attendees will appear here automatically.</p>
-          <EventSetupHelp context="badges" id="badges-none" />
+          <EventSetupHelp eventId={event.id} context="badges" id="badges-none" />
         </div>
       ) : (
         <div className="badge-sheet-stack">
