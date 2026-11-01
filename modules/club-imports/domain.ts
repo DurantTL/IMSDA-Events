@@ -2,6 +2,7 @@ import { z } from "zod";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { clubYearChoices, clubYearFor, rosterSectionOf, type ClubClassLevel } from "@/modules/club-rosters/domain";
 import { isLooseEmail } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 export { clubYearChoices };
 
@@ -454,7 +455,7 @@ export function skipReasonLabel(reason: ImportSkipReason, clubYear: string) {
 
 function nameKey(firstName: string, lastName: string) {
   // "Faux Jr." and "Faux Jr" (and "Faux, Jr.") are the same name.
-  return `${firstName} ${lastName}`.trim().toLocaleLowerCase("en-US")
+  return formatPersonName({ firstName, lastName }).toLocaleLowerCase("en-US")
     .replace(/,/g, " ")
     .replace(/\b(jr|sr)\./g, "$1")
     .replace(/\s+/g, " ");

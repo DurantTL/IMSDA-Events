@@ -5,6 +5,7 @@ import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { formatPersonName } from "@/lib/person-name";
 
 type Contact = {
   firstName: string;
@@ -120,7 +121,7 @@ export function AttendeeRegistrationContactForm({
       <summary>
         Update registration contact
         <small className="public-manage-contact-current" translate="no">
-          {[`${savedContact.firstName} ${savedContact.lastName}`.trim(), savedContact.email].filter(Boolean).join(" · ")}
+          {[formatPersonName(savedContact), savedContact.email].filter(Boolean).join(" · ")}
         </small>
       </summary>
       <form onSubmit={save}>

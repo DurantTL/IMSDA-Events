@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * One shared set of value types and validators (#855): phone, email, number,
@@ -314,7 +315,7 @@ export function inputAttributesFor(type: FieldValueType, options: { integer?: bo
 type ContactLike = { firstName?: unknown; lastName?: unknown; phone?: unknown };
 
 const contactName = (contact: ContactLike) =>
-  `${String(contact.firstName ?? "").trim()} ${String(contact.lastName ?? "").trim()}`.toLowerCase();
+  formatPersonName({ firstName: String(contact.firstName ?? "").trim(), lastName: String(contact.lastName ?? "").trim() }).toLowerCase();
 
 /**
  * The stored phone an emergency contact's phone is compared against (#855): the

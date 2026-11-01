@@ -28,6 +28,7 @@ import { completedHonorsByPerson } from "@/modules/honors/completed-honors";
 import { compareOfferingRows, offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import { recordClassChanges } from "@/modules/honors/class-change-log";
 import { picksByAttendeeId } from "@/modules/honors/registration-picks";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Honors Weekend class seats (#359). Every rule is checked here, inside one
@@ -450,7 +451,7 @@ async function setOwnerClassSelections(
           if (wrongSite) {
             throw new ClassSelectionError(
               "SELECTION_INVALID",
-              `${attendee.firstName} ${attendee.lastName}: ${differentLocationMessage(wrongSite.honorName, registration.location?.name ?? null)}`.trim(),
+              `${formatPersonName(attendee)}: ${differentLocationMessage(wrongSite.honorName, registration.location?.name ?? null)}`.trim(),
             );
           }
           const attendeeWaivers: RequirementWaivers = {
@@ -459,7 +460,7 @@ async function setOwnerClassSelections(
           };
           const problem = selectionProblem(attendee, offeringIds, offeringsById, currentIds, attendeeWaivers);
           if (problem) {
-            throw new ClassSelectionError("SELECTION_INVALID", `${attendee.firstName} ${attendee.lastName}: ${problem}`.trim());
+            throw new ClassSelectionError("SELECTION_INVALID", `${formatPersonName(attendee)}: ${problem}`.trim());
           }
           const wanted = new Set(offeringIds);
           const dropped = current.filter((enrollment) => !wanted.has(enrollment.offeringId));

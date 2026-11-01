@@ -8,6 +8,7 @@ import { canManageProgramAssignments } from "@/modules/program-assignments/acces
 import { getAppliedAssignmentRoster } from "@/modules/program-assignments/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 export const metadata: Metadata = { title: staffPageTitles.assignmentRoster };
 
@@ -83,7 +84,7 @@ export default async function ProgramAssignmentRosterPage({
               <tbody>
                 {assignments.map((assignment) => (
                   <tr key={assignment.attendeeId}>
-                    <th scope="row">{assignment.lastName}, {assignment.firstName}</th>
+                    <th scope="row">{formatPersonName(assignment)}</th>
                     <td>{assignment.unassignedReason === "NO_RANKED_CHOICES"
                       ? "No ranking submitted"
                       : assignment.unassignedReason === "CAPACITY_FULL"

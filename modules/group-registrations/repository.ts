@@ -62,6 +62,7 @@ import {
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 import { authorizeRegistrationAccessToken } from "@/modules/public-access/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * "Group" registration on a club event (#650). The same per-person flow clubs
@@ -402,7 +403,7 @@ export async function getGroupRegistrationWorkspace(token: string, now = new Dat
 export type GroupRegistrationWorkspace = NonNullable<Awaited<ReturnType<typeof getGroupRegistrationWorkspace>>>;
 
 function snapshotName(snapshot: Record<string, unknown>) {
-  return `${typeof snapshot.firstName === "string" ? snapshot.firstName : ""} ${typeof snapshot.lastName === "string" ? snapshot.lastName : ""}`.trim() || "Someone";
+  return formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" }) || "Someone";
 }
 
 /** The class picks' age and seat rules after the people were changed, inside the amendment's own transaction. */
@@ -559,7 +560,7 @@ export async function amendGroupRegistration(token: string, input: GroupRegistra
       {
         kind: "GROUP_CONTACT",
         personId: registration.accountHolderPersonId,
-        displayName: `${typeof contact.firstName === "string" ? contact.firstName : ""} ${typeof contact.lastName === "string" ? contact.lastName : ""}`.trim() || "Group contact",
+        displayName: formatPersonName({ firstName: typeof contact.firstName === "string" ? contact.firstName : "", lastName: typeof contact.lastName === "string" ? contact.lastName : "" }) || "Group contact",
       },
       now,
       engineOptions,

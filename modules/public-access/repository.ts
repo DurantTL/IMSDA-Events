@@ -43,6 +43,7 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { getAttendeeRosterConfig, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
 import { currentPricingSnapshot, isChurchBilledBillingMode, perPersonPriceFromSnapshot } from "@/modules/club-registrations/per-person-price";
+import { formatPersonName } from "@/lib/person-name";
 
 export { REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 
@@ -1039,7 +1040,7 @@ async function updateRegistrationContactWithClient(
     correlationId,
     transitionKey: `PUBLIC_REGISTRATION_CONTACT_UPDATED:${correlationId}`,
     recipientEmail: input.email,
-    recipientName: `${input.firstName} ${input.lastName}`.trim(),
+    recipientName: formatPersonName(input),
     metadata: {
       source: "PRIVATE_MANAGE_LINK",
       destinationUpdated: true,

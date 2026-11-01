@@ -8,6 +8,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { getEventPackets } from "@/modules/reporting/event-packets-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 export const metadata: Metadata = {
   title: staffPageTitles.groupedPackets,
@@ -123,7 +124,7 @@ export default async function EventPacketsPage({
               <tbody role="rowgroup">{group.attendees.map((attendee) => (
                 <tr key={attendee.id} role="row">
                   <td {...cardCell("Arrived")}>{attendee.checkedIn ? <CheckCircle2 size={16} aria-label="Checked in" /> : <Circle size={16} aria-label="Not checked in" />}</td>
-                  <th role="rowheader" scope="row"><strong>{attendee.lastName}, {attendee.firstName}</strong><br /><small>{attendee.confirmationCode}</small></th>
+                  <th role="rowheader" scope="row"><strong>{formatPersonName(attendee, "sorted")}</strong><br /><small>{attendee.confirmationCode}</small></th>
                   <td {...cardCell("Type")}>{attendee.attendeeType}</td>
                   {sections.shirtSize && <td {...cardCell("Shirt")}>{attendee.shirtSize ?? "Needed"}</td>}
                   {sections.assignedSessions && <td {...cardCell("Assigned sessions")}>{attendee.assignments.length > 0

@@ -15,6 +15,7 @@ import { teamLabel } from "@/modules/club-teams/domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
 import { permissionNotice, type PermissionDecision, type PermissionStatus } from "@/modules/club-teams/permission-domain";
 import { coordinatorGrantActive } from "@/modules/event-locations/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * A team member who is 18 or older on the age date needs the Area Coordinator's permission (#809). The team is registered
@@ -268,7 +269,7 @@ type RowShape = Prisma.ClubTeamMemberPermissionGetPayload<{ select: typeof rowSe
 
 function personName(snapshot: unknown) {
   const record = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? snapshot as Record<string, unknown> : {};
-  return `${typeof record.firstName === "string" ? record.firstName : ""} ${typeof record.lastName === "string" ? record.lastName : ""}`.trim() || "Someone";
+  return formatPersonName({ firstName: typeof record.firstName === "string" ? record.firstName : "", lastName: typeof record.lastName === "string" ? record.lastName : "" }) || "Someone";
 }
 
 function toRow(row: RowShape): TeamPermissionRow {

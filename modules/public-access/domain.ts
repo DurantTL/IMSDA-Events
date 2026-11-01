@@ -1,6 +1,7 @@
 import type { RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { emailAddressSchema } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1_000;
 const recoveryAccessLifetimeMilliseconds = 30 * 60 * 1_000;
@@ -293,5 +294,5 @@ export function publicAttendeeName(
   const snapshot = jsonRecord(snapshotValue);
   const firstName = nonEmptyString(snapshot.firstName) ?? fallback.firstName;
   const lastName = nonEmptyString(snapshot.lastName) ?? fallback.lastName;
-  return `${firstName} ${lastName}`.trim();
+  return formatPersonName({ firstName, lastName });
 }

@@ -1,4 +1,5 @@
 import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The roster page's search, "Details needed" filter, columns and row actions (#1167). All pure: the workspace
@@ -28,7 +29,7 @@ export function normalizeRosterSearch(text: string): string {
 export function matchesRosterSearch(member: NamedMember, query: string): boolean {
   const words = normalizeRosterSearch(query).split(" ").filter(Boolean);
   if (words.length === 0) return true;
-  const haystack = normalizeRosterSearch(`${member.firstName} ${member.lastName}`);
+  const haystack = normalizeRosterSearch(formatPersonName(member));
   return words.every((word) => haystack.includes(word));
 }
 
@@ -121,14 +122,14 @@ export function rosterPersonLabels<T extends NamedMember & { id: string; age?: n
 ): Map<string, string> {
   const groups = new Map<string, T[]>();
   for (const member of members) {
-    const key = normalizeRosterSearch(`${member.firstName} ${member.lastName}`);
+    const key = normalizeRosterSearch(formatPersonName(member));
     groups.set(key, [...(groups.get(key) ?? []), member]);
   }
   const labels = new Map<string, string>();
   for (const group of groups.values()) {
     const first = group[0]!;
     if (group.length === 1) {
-      labels.set(first.id, `${first.firstName} ${first.lastName}`);
+      labels.set(first.id, formatPersonName(first));
       continue;
     }
     const parts = group.map((member) => {
@@ -147,7 +148,7 @@ export function rosterPersonLabels<T extends NamedMember & { id: string; age?: n
     const unique = new Set(resolved).size === group.length;
     group.forEach((member, index) => {
       const detail = resolved[index]!;
-      const own = `${member.firstName} ${member.lastName}`;
+      const own = formatPersonName(member);
       labels.set(member.id, unique ? `${own}, ${detail}` : `${own}, ${detail ? `${detail}, ` : ""}${index + 1} of ${group.length}`);
     });
   }
@@ -156,7 +157,7 @@ export function rosterPersonLabels<T extends NamedMember & { id: string; age?: n
 
 /** What a disambiguated label adds to the plain name, as " (age 12)", or nothing for a name nobody shares. */
 export function rosterLabelDetail(label: string, member: NamedMember): string {
-  const name = `${member.firstName} ${member.lastName}`;
+  const name = formatPersonName(member);
   return label.length > name.length ? ` (${label.slice(name.length + 2)})` : "";
 }
 

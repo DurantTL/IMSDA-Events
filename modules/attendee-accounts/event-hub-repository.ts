@@ -7,6 +7,7 @@ import {
 import { listEventsForUser } from "@/modules/events/repository";
 import { isExactAllAttendeesAudience } from "@/modules/events/public-domain";
 import { publicAttendeeName } from "@/modules/public-access/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 export type AttendeeEventHub = NonNullable<
   Awaited<ReturnType<typeof getAttendeeEventHub>>
@@ -243,7 +244,7 @@ export async function getAttendeeEventHub(
       appliedAt: run.appliedAt.toISOString(),
       assignments: run.assignments.map((assignment) => ({
         attendeeId: assignment.attendeeIdSnapshot,
-        attendeeName: `${assignment.firstNameSnapshot} ${assignment.lastNameSnapshot}`.trim(),
+        attendeeName: formatPersonName({ firstName: assignment.firstNameSnapshot, lastName: assignment.lastNameSnapshot }),
         option: assignment.optionValue,
         preferenceRank: assignment.preferenceRank,
         outcome: assignment.outcome,

@@ -29,6 +29,7 @@ import {
   parseCognitoHealthExport,
   type ParsedHealthEntry,
 } from "@/modules/health-records/import-parser";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Importing the 2026 Pathfinder Health Record from a Cognito Forms export (#878).
@@ -164,7 +165,7 @@ function previewRows({ entries, matches }: Matched): ImportPreviewRow[] {
     return {
       sourceId: entry.sourceId,
       memberId: match.memberId,
-      name: `${entry.firstName} ${entry.lastName}`.trim(),
+      name: formatPersonName(entry),
       clubText: entry.clubText,
       clubName: match.clubName,
       outcome: match.outcome,

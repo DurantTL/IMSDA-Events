@@ -1,4 +1,5 @@
 import type { HealthTabView } from "@/modules/health-records/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Read-only display of an opened Health Record (#611), used by the Health tab
@@ -81,7 +82,7 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
       <section className="public-manage-card">
         <h3>Parent or guardian</h3>
         <dl className="detail-list">
-          <Row label="Name" value={`${str(values, "guardianFirstName")} ${str(values, "guardianLastName")}`.replaceAll("—", "").trim() || "—"} />
+          <Row label="Name" value={formatPersonName({ firstName: str(values, "guardianFirstName"), lastName: str(values, "guardianLastName") }).replaceAll("—", "").trim() || "—"} />
           <Row label="Address" value={str(values, "guardianAddress")} />
           <Row label="Phone" value={str(values, "guardianPhone")} />
           <Row label="Email" value={str(values, "guardianEmail")} />

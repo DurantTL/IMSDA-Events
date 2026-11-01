@@ -3,6 +3,7 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Prisma } from "@prisma/client";
 import type { ClassChangeKind } from "@/modules/honors/class-change-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The change log behind instructor class emails (#1098). Every path that creates or deletes an `HonorEnrollment` (and every
@@ -40,7 +41,7 @@ type SnapshotLike = { firstName?: unknown; lastName?: unknown; ageOnEventDate?: 
 function snapshotParts(value: unknown) {
   const snapshot: SnapshotLike = value && typeof value === "object" && !Array.isArray(value) ? value as SnapshotLike : {};
   const text = (field: unknown) => (typeof field === "string" ? field.trim() : "");
-  const name = `${text(snapshot.firstName)} ${text(snapshot.lastName)}`.trim();
+  const name = formatPersonName({ firstName: text(snapshot.firstName), lastName: text(snapshot.lastName) });
   const age = typeof snapshot.ageOnEventDate === "number" && Number.isInteger(snapshot.ageOnEventDate) && snapshot.ageOnEventDate >= 0 && snapshot.ageOnEventDate < 130
     ? snapshot.ageOnEventDate
     : null;

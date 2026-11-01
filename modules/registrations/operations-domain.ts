@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { formatPersonName } from "@/lib/person-name";
 
 type OperationIdentity = {
   firstName: string;
@@ -76,7 +77,7 @@ export function substitutedFormResponses(
   if (Object.hasOwn(next, "first_name")) next.first_name = replacement.firstName;
   if (Object.hasOwn(next, "last_name")) next.last_name = replacement.lastName;
   for (const key of attendeeFullNameKeys) {
-    if (Object.hasOwn(next, key)) next[key] = `${replacement.firstName} ${replacement.lastName}`.trim();
+    if (Object.hasOwn(next, key)) next[key] = formatPersonName(replacement);
   }
   if (Object.hasOwn(next, "attendee_email")) next.attendee_email = replacement.email || "";
   if (Object.hasOwn(next, "attendee_phone")) next.attendee_phone = replacement.phone || "";

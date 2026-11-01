@@ -10,6 +10,7 @@ import { claimPromoCode, PromoCodeOperationError, PublicPromoCodeError } from "@
 import { getRegistrationById } from "@/modules/registrations/repository";
 import { fundAwardSchema } from "@/modules/scholarship-funds/domain";
 import { recordFundAward } from "@/modules/scholarship-funds/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Staff adjustments to what a registration owes (#396): scholarships,
@@ -113,7 +114,7 @@ function attendeeName(attendee: { profileSnapshot: unknown; person: { firstName:
   const profile = record(attendee.profileSnapshot);
   const first = typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName;
   const last = typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName;
-  return `${first} ${last}`.trim();
+  return formatPersonName({ firstName: first, lastName: last });
 }
 
 /** The sum of every adjustment line on a registration, in cents. */

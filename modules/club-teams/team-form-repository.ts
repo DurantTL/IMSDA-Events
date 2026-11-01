@@ -9,6 +9,7 @@ import { ALTERNATE_FIELD_KEY, isAlternateAnswer } from "@/modules/club-teams/rul
 import { buildTeamForm, type TeamFormFilled, type TeamFormModel } from "@/modules/club-teams/team-form";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { currentRegistrationAnswers } from "@/modules/registrations/amendments-repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /** The release answer as the paper form shows it: only Yes or No (a checkbox form stores true), else blank. */
 function releaseAnswer(value: unknown): "Yes" | "No" | "" {
@@ -100,7 +101,7 @@ export async function loadFilledTeamForm(which: Which): Promise<TeamFormPage | n
   let alternate = "";
   for (const attendee of row.registration.attendees) {
     const snapshot = (attendee.profileSnapshot ?? {}) as Record<string, unknown>;
-    const name = `${text(snapshot.firstName)} ${text(snapshot.lastName)}`.trim();
+    const name = formatPersonName({ firstName: text(snapshot.firstName), lastName: text(snapshot.lastName) });
     if (!name) continue;
     if (snapshot.teamRole === "COACH") { coaches.push(name); continue; }
     // A team member of 18 or older shows where the Area Coordinator's permission stands (#809).

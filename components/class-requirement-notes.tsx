@@ -2,6 +2,7 @@
 
 import { classRequirementGaps } from "@/modules/honors/class-picker-view";
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 type NotedOffering = Parameters<typeof classRequirementGaps>[0] & { id: string; honorName: string };
 
@@ -47,7 +48,7 @@ export function ClassRequirementNotes({
   person: NotedPerson;
   reasons: Readonly<Record<string, string>>;
 }) {
-  const name = `${person.firstName} ${person.lastName}`.trim() || "this person";
+  const name = formatPersonName(person) || "this person";
   const rows = offerings
     .filter((offering) => !heldIds.includes(offering.id))
     .map((offering) => ({ offering, gaps: classRequirementGaps(offering, person) }))

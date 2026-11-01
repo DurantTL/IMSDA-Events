@@ -46,6 +46,7 @@ import {
   type OfferCandidate,
 } from "@/modules/honors/waitlist-domain";
 import { formatInTimeZone } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Honors Weekend class waitlists (#831). A full class has a waitlist of youth in
@@ -90,7 +91,7 @@ async function lockOfferings(tx: Tx, ids: readonly string[]) {
 }
 
 function nameOf(snapshot: Snapshot) {
-  return `${snapshot.firstName ?? ""} ${snapshot.lastName ?? ""}`.trim() || "A youth";
+  return formatPersonName({ firstName: snapshot.firstName ?? "", lastName: snapshot.lastName ?? "" }) || "A youth";
 }
 
 type WaitlistActor = ClassSelectionActor | null;
@@ -118,7 +119,7 @@ export function contactOf(registration: {
     ? registration.contactSnapshot as Record<string, unknown> : {};
   const text = (key: string) => (typeof contact[key] === "string" ? (contact[key] as string).trim() : "");
   const email = (text("email") || registration.accountHolderPerson.normalizedEmail || "").trim().toLowerCase();
-  const name = `${text("firstName") || registration.accountHolderPerson.firstName} ${text("lastName") || registration.accountHolderPerson.lastName}`.trim();
+  const name = formatPersonName({ firstName: text("firstName") || registration.accountHolderPerson.firstName, lastName: text("lastName") || registration.accountHolderPerson.lastName });
   return { email, name };
 }
 
@@ -642,7 +643,7 @@ export async function joinClassWaitlist(organizationId: string, eventId: string,
     if (registration.locationRequired) throw new ClassSelectionError("LOCATION_REQUIRED", chooseLocationFirstMessage);
     const attendee = registration.attendees.find((candidate) => candidate.id === input.attendeeId);
     if (!attendee) throw new ClassSelectionError("ATTENDEE_NOT_FOUND", "That person isn't on your club's registration.");
-    const who = `${attendee.firstName} ${attendee.lastName}`.trim();
+    const who = formatPersonName(attendee);
     if (!attendee.consumesSeat) throw new ClassSelectionError("SELECTION_INVALID", `${who}: staff, adults and underage children don't use a class seat, so they don't use a waitlist spot either.`);
     const offerings = await loadOfferings(tx, eventId);
     const offering = offerings.find((candidate) => candidate.id === input.offeringId);
@@ -742,7 +743,7 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
     }
     const attendee = registration.attendees.find((candidate) => candidate.id === entry.registrationAttendeeId);
     if (!attendee) throw new ClassSelectionError("ATTENDEE_NOT_FOUND", "That person isn't on your club's registration.");
-    const who = `${attendee.firstName} ${attendee.lastName}`.trim();
+    const who = formatPersonName(attendee);
     const offerings = await loadOfferings(tx, eventId);
     const byId = new Map<string, SelectableOffering & (typeof offerings)[number]>(offerings.map((candidate) => [candidate.id, candidate]));
     const offering = byId.get(entry.offeringId);

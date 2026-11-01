@@ -10,6 +10,7 @@ import {
   type ClubComplianceState,
   type ComplianceFilterValue,
 } from "@/modules/background-checks/display";
+import { formatPersonName } from "@/lib/person-name";
 
 // Re-exported so server code keeps importing everything from this module.
 export {
@@ -695,7 +696,7 @@ export function dedupeListRows<T extends { line: number; identityKey: string; fi
     if (earlier) {
       duplicates.push({
         line: earlier.line,
-        name: `${earlier.firstName} ${earlier.lastName}`.trim(),
+        name: formatPersonName(earlier),
         problems: [`Row ${row.line} is the same person, so only row ${row.line} is kept.`],
       });
     }
@@ -735,7 +736,7 @@ export function backgroundCheckIdentityKey(input: {
  * fields the Sterling import stored before #527.
  */
 export function sterlingRowToListRow(row: SterlingCsvRow): BackgroundCheckListRow {
-  const normalizedName = matchableName(`${row.firstName} ${row.lastName}`);
+  const normalizedName = matchableName(formatPersonName(row));
   return {
     line: row.line,
     firstName: row.firstName,
@@ -755,7 +756,7 @@ export function sterlingRowToListRow(row: SterlingCsvRow): BackgroundCheckListRo
 
 /** A roster row (#427) as a list entry. */
 export function rosterRowToListRow(row: RosterBackgroundCsvRow): BackgroundCheckListRow {
-  const normalizedName = matchableName(`${row.firstName} ${row.lastName}`);
+  const normalizedName = matchableName(formatPersonName(row));
   return {
     line: row.line,
     firstName: row.firstName,

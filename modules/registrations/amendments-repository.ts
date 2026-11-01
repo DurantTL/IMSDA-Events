@@ -60,6 +60,7 @@ import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honor
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
 import { holdSignatureAnswers } from "@/modules/signatures/domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
+import { formatPersonName } from "@/lib/person-name";
 
 /** The role answer that maps to a team member (#1050). */
 const MEMBER_ROLE_ANSWER = "Pathfinder";
@@ -484,7 +485,7 @@ export function assertProtectedFieldsUnchanged(
       first_name: current.person.firstName,
       last_name: current.person.lastName,
     };
-    const fullName = `${current.person.firstName} ${current.person.lastName}`.trim();
+    const fullName = formatPersonName(current.person);
     for (const key of protectedAttendeeIdentityKeys) {
       const submitted = attendeeInput.responses[key];
       const matchesCurrentName = typeof submitted === "string"
@@ -493,9 +494,9 @@ export function assertProtectedFieldsUnchanged(
       if (!matchesCurrentName && stableJson(responses[key]) !== stableJson(submitted)) {
         throw new RegistrationAmendmentError(
           "ATTENDEE_IDENTITY_CHANGED",
-          `Use Substitute for a name change to ${current.person.firstName} ${current.person.lastName}. Choices and non-name details can be amended here.`,
+          `Use Substitute for a name change to ${formatPersonName(current.person)}. Choices and non-name details can be amended here.`,
           [],
-          { attendeeId: current.id, attendeeName: `${current.person.firstName} ${current.person.lastName}`.trim() },
+          { attendeeId: current.id, attendeeName: formatPersonName(current.person) },
         );
       }
     }
@@ -727,7 +728,7 @@ function sameFullName(
   right: { firstName: string; lastName: string },
 ) {
   const normalized = (name: { firstName: string; lastName: string }) => (
-    `${name.firstName} ${name.lastName}`.trim().replace(/\s+/g, " ").toLowerCase()
+    formatPersonName(name).replace(/\s+/g, " ").toLowerCase()
   );
   return normalized(left) === normalized(right);
 }
@@ -1195,11 +1196,11 @@ async function prepareAmendment(
   if (blockedRemoval) {
     throw new RegistrationAmendmentError(
       "ATTENDEE_HAS_HISTORY",
-      `${blockedRemoval.person.firstName} ${blockedRemoval.person.lastName} cannot be removed because check-in, substitution or room assignment history is attached. Cancel the registration instead if they are not coming.`,
+      `${formatPersonName(blockedRemoval.person)} cannot be removed because check-in, substitution or room assignment history is attached. Cancel the registration instead if they are not coming.`,
       [],
       {
         attendeeId: blockedRemoval.id,
-        attendeeName: `${blockedRemoval.person.firstName} ${blockedRemoval.person.lastName}`.trim(),
+        attendeeName: formatPersonName(blockedRemoval.person),
       },
     );
   }
@@ -1298,9 +1299,9 @@ async function prepareAmendment(
       if (!sameFullName(attendee.identity, rosterName)) {
         throw new RegistrationAmendmentError(
           "ATTENDEE_IDENTITY_CHANGED",
-          `Use Substitute for a name change to ${current.person.firstName} ${current.person.lastName}.`,
+          `Use Substitute for a name change to ${formatPersonName(current.person)}.`,
           [],
-          { attendeeId: current.id, attendeeName: `${current.person.firstName} ${current.person.lastName}`.trim() },
+          { attendeeId: current.id, attendeeName: formatPersonName(current.person) },
         );
       }
       const snapshot = recordFromJson(current.profileSnapshot);
@@ -1315,9 +1316,9 @@ async function prepareAmendment(
     if (current && !sameName(attendee.identity, current)) {
       throw new RegistrationAmendmentError(
         "ATTENDEE_IDENTITY_CHANGED",
-        `Use Substitute for a name change to ${current.person.firstName} ${current.person.lastName}.`,
+        `Use Substitute for a name change to ${formatPersonName(current.person)}.`,
         [],
-        { attendeeId: current.id, attendeeName: `${current.person.firstName} ${current.person.lastName}`.trim() },
+        { attendeeId: current.id, attendeeName: formatPersonName(current.person) },
       );
     }
   });
@@ -1416,7 +1417,7 @@ async function prepareAmendment(
   }
   const names = prepared.attendees.map((attendee) => (
     attendee.identity
-      ? `${attendee.identity.firstName} ${attendee.identity.lastName}`.trim()
+      ? formatPersonName(attendee.identity)
       : "Attendee"
   ));
   const nextPricingSnapshot = {
@@ -1979,7 +1980,7 @@ async function amendRegistrationInner(
             seminarPreferences: prepared.seminarPreferencesChanged
               ? prepared.prepared.attendees.map((attendee) => ({
                   attendeeName: attendee.identity
-                    ? `${attendee.identity.firstName} ${attendee.identity.lastName}`.trim()
+                    ? formatPersonName(attendee.identity)
                     : "Attendee",
                   fields: prepared.definition.sections
                     .flatMap((section) => section.fields)

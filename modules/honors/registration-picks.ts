@@ -9,6 +9,7 @@ import { clubAttendeeClientId, clubGuestClientId, guestIsAdult } from "@/modules
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
 import { consumesClassSeat, selectionProblem, type SelectableOffering } from "@/modules/honors/enrollment-domain";
 import { sessionVisibleAtLocation } from "@/modules/honors/locations";
+import { formatPersonName } from "@/lib/person-name";
 
 /** The picks as sent by the browser: client id to class ids, for at most 60 people (the same cap as the class save). */
 export const honorSelectionsSchema = z.record(z.string().min(1).max(80), z.array(z.string().min(1).max(64)).max(6))
@@ -124,7 +125,7 @@ export function firstPickProblem(
   const byId = new Map(offerings.map((offering) => [offering.id, offering]));
   for (const attendee of attendees) {
     const problem = selectionProblem(attendee, picks[attendee.clientId] ?? [], byId, new Set(), { confirmed: new Set(confirmations[attendee.clientId] ?? []) });
-    if (problem) return `${attendee.firstName} ${attendee.lastName}: ${problem}`.trim();
+    if (problem) return `${formatPersonName(attendee)}: ${problem}`.trim();
   }
   return null;
 }

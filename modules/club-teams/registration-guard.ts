@@ -12,6 +12,7 @@ import { ageOn } from "@/modules/club-rosters/domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { isAgeFieldKey } from "@/modules/forms/definition";
+import { formatPersonName } from "@/lib/person-name";
 
 type Tx = Prisma.TransactionClient;
 
@@ -68,7 +69,7 @@ export async function peopleOnOtherTeams(
   const others = rows.map((row) => {
     const snapshot = record(row.profileSnapshot);
     return {
-      key: personKey(`${typeof snapshot.firstName === "string" ? snapshot.firstName : ""} ${typeof snapshot.lastName === "string" ? snapshot.lastName : ""}`),
+      key: personKey(formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" })),
       extra: snapshot.temporary === true,
     };
   });
@@ -158,7 +159,7 @@ export async function enforceTeamRegistrationRules(
   for (const attendee of attendees) {
     const snapshot = record(attendee.profileSnapshot);
     const responses = record(attendee.formResponses);
-    const name = `${typeof snapshot.firstName === "string" ? snapshot.firstName : ""} ${typeof snapshot.lastName === "string" ? snapshot.lastName : ""}`.trim();
+    const name = formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" });
     const rosterMember = rosterByPerson.get(attendee.personId);
     // A birth date on the roster gives the age on the age date. Otherwise the age stored by the director's edit; the form's
     // age answer is only the fallback, for a person staff typed in.

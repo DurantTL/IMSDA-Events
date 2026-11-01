@@ -33,6 +33,7 @@ import {
 import { isChurchBilledStatus, notBilledLabel } from "@/modules/club-registrations/church-owed";
 import { currentPricingSnapshot, perPersonPriceFromSnapshot, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
 import { GROUP_BILLING_NOTICE } from "@/modules/group-registrations/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Every registration an account may see: those whose contact address is the
@@ -188,7 +189,7 @@ export async function updateAttendeeRegistrationContact(input: {
       correlationId,
       transitionKey: `ATTENDEE_ACCOUNT_REGISTRATION_CONTACT_UPDATED:${correlationId}`,
       recipientEmail: input.contact.email,
-      recipientName: `${input.contact.firstName} ${input.contact.lastName}`.trim(),
+      recipientName: formatPersonName(input.contact),
       metadata: {
         source: "ATTENDEE_ACCOUNT",
         destinationUpdated: true,

@@ -28,6 +28,7 @@ import { resolveResponsibleOrganization } from "@/modules/forms/definition";
 import { moneyToCents } from "@/modules/payments/square-domain";
 import { storedRegistrationResponses } from "@/modules/registrations/amendments-repository";
 import { everyTermMatches, insensitiveContains, searchTerms } from "@/lib/server-search";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Billing responsibility and organization billing contacts (#165, slice 1). Every function takes
@@ -60,7 +61,7 @@ function isUniqueViolation(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
-const personName = (person: { firstName: string; lastName: string }) => `${person.firstName} ${person.lastName}`.trim() || "Billing contact";
+const personName = (person: { firstName: string; lastName: string }) => formatPersonName(person) || "Billing contact";
 
 const registrationSelect = {
   id: true,

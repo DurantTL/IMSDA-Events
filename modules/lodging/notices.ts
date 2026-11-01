@@ -15,6 +15,7 @@ import { noticeContentHash } from "@/modules/lodging/stays";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import type { Client, Tx } from "@/modules/lodging/preferences-service";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Lodging email (#200): a waitlist offer and a room notice. Both are written to the existing transactional outbox
@@ -75,7 +76,7 @@ export async function lodgingRecipient(client: Client, eventId: string, registra
   const contact = registration.contactSnapshot && typeof registration.contactSnapshot === "object" && !Array.isArray(registration.contactSnapshot) ? registration.contactSnapshot as Record<string, unknown> : {};
   const snapshotText = (key: string) => (typeof contact[key] === "string" ? (contact[key] as string).trim() : "");
   const email = (snapshotText("email") || registration.accountHolderPerson.normalizedEmail || "").trim().toLowerCase();
-  const name = `${snapshotText("firstName") || registration.accountHolderPerson.firstName} ${snapshotText("lastName") || registration.accountHolderPerson.lastName}`.trim();
+  const name = formatPersonName({ firstName: snapshotText("firstName") || registration.accountHolderPerson.firstName, lastName: snapshotText("lastName") || registration.accountHolderPerson.lastName });
   return { email, name, confirmationCode: registration.confirmationCode, eventName: registration.event.name, timezone: registration.event.timezone };
 }
 

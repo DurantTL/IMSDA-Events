@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { refreshBackgroundCheckMatchesSafely } from "@/modules/background-checks/refresh-after-write";
 import { clubYearChoices, importPersonKey, importScope, scopeClubYear } from "@/modules/club-imports/domain";
 import { ImportYearMoveError, type ImportYearConflict, type ImportYearMovePreview } from "@/modules/club-imports/move-year-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 export { ImportYearMoveError };
 
@@ -71,7 +72,7 @@ async function buildPreview(client: Client, organizationId: string, fromYear: st
       },
     }),
   ]);
-  const nameOf = (row: (typeof rows)[number]) => (row.person ? `${row.person.firstName} ${row.person.lastName}`.trim() : "Removed person");
+  const nameOf = (row: (typeof rows)[number]) => (row.person ? formatPersonName(row.person) : "Removed person");
   const personIds = rows.flatMap((row) => (row.personId ? [row.personId] : []));
   // Imports always create new Person rows, so the same person is recognised
   // by name and roster section as well as by id: a director may have added

@@ -40,6 +40,7 @@ import {
   type HealthViewer,
 } from "@/modules/coordinator-health/domain";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
+import { formatPersonName } from "@/lib/person-name";
 
 export class HealthViewError extends Error {
   constructor(
@@ -266,7 +267,7 @@ export async function loadEventHealth(
       nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
     }
     const rows: HealthAttendeeRow[] = row.registration.attendees.map((attendee) => {
-      const name = `${attendee.person.firstName} ${attendee.person.lastName}`.replace(/\s+/g, " ").trim();
+      const name = formatPersonName(attendee.person).replace(/\s+/g, " ").trim();
       const rosterMemberIds = membersByPerson.get(`${organizationId}:${attendee.personId}`) ?? new Set<string>();
       const wanted = normalizeName(attendee.person.firstName, attendee.person.lastName);
       const nameIsShared = (nameCounts.get(wanted) ?? 0) > 1;

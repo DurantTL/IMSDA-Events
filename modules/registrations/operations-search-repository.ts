@@ -25,6 +25,7 @@ import {
   type SearchQuestion,
   type SearchViewer,
 } from "@/modules/registrations/operations-search-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Event-scoped operations search, the database half (#180). Pure rules, filter
@@ -515,7 +516,7 @@ function nameFrom(snapshot: unknown, person: { firstName: string; lastName: stri
   const record = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? snapshot as Record<string, unknown> : {};
   const first = typeof record.firstName === "string" ? record.firstName : person.firstName;
   const last = typeof record.lastName === "string" ? record.lastName : person.lastName;
-  return `${first} ${last}`.trim();
+  return formatPersonName({ firstName: first, lastName: last });
 }
 
 /**

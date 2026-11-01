@@ -15,6 +15,7 @@ import type { ClubCapabilities } from "@/modules/organizations/director-grants-d
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { formatDueDate, isLockedForClub, reportDueDate, reportMonthLabel, reportableMonths } from "@/modules/club-reports/domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { formatPersonName } from "@/lib/person-name";
 
 /** A saved, unsubmitted club form (a DRAFT submission): metadata only, never an answer. */
 export type ClubHomeFormDraft = { id: string; templateName: string; updatedAt: string };
@@ -148,7 +149,7 @@ export function clubHomeRosterPreview(members: readonly ClubHomeMember[], limit 
     total: active.length,
     rows: active.slice(0, limit).map((member) => ({
       id: member.id,
-      name: `${member.firstName} ${member.lastName}`.trim() || "Unnamed person",
+      name: formatPersonName(member) || "Unnamed person",
       detail: member.role?.trim() || clubRosterAttendeeTypeLabels[member.attendeeType],
       age: rosterAgeLabel(member),
     })),

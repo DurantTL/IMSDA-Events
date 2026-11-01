@@ -23,6 +23,7 @@ import {
   recordedDepositCents,
   reservationHeld,
 } from "@/modules/payments/deposit-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
 type RegistrationReadClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
@@ -361,7 +362,7 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         const attendee = registration.attendees.find((candidate) => candidate.id === adjustment.registrationAttendeeId);
         if (!attendee) return null;
         const profile = recordFromJson(attendee.profileSnapshot);
-        return `${typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName} ${typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName}`.trim();
+        return formatPersonName({ firstName: typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName, lastName: typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName });
       })(),
       reversesAdjustmentId: adjustment.reversesAdjustmentId,
       reversed: Boolean(adjustment.reversedBy),
@@ -539,7 +540,7 @@ export async function createRegistration(eventId: string, input: RegistrationInp
         entityType: "Registration",
         entityId: registration.id,
         correlationId: crypto.randomUUID(),
-        summary: `Created registration ${confirmationCode} for ${input.firstName} ${input.lastName}.`,
+        summary: `Created registration ${confirmationCode} for ${formatPersonName(input)}.`,
       },
     });
 
@@ -768,7 +769,7 @@ export async function addRegistrationAttendee(
             entityType: "RegistrationAttendee",
             entityId: attendee.id,
             correlationId: crypto.randomUUID(),
-            summary: `Added ${input.firstName} ${input.lastName} to registration ${registration.confirmationCode}.`,
+            summary: `Added ${formatPersonName(input)} to registration ${registration.confirmationCode}.`,
             metadata: {
               registrationId,
               occupiedBefore: occupied,
