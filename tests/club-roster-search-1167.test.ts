@@ -420,19 +420,19 @@ describe("filters combine and reset together (#1167 review)", () => {
     expect(out).not.toContain("Fixture-c<");
   });
 
-  it("resets the search, Details needed and the compliance filter together, and takes both out of the address", () => {
+  it("resets the search, Details needed and the compliance filter together, in one history entry that takes all three out of the address (rule B2, #1456)", () => {
     expect(clearedRosterFilters()).toEqual({ query: "", detailsOnly: false, complianceFilter: null });
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
     const start = source.indexOf("function clearFilters()");
     const body = source.slice(start, source.indexOf("\n  }\n", start));
     expect(body).toContain("search.setValue(cleared.query)");
-    expect(body).toContain("setDetailsOnly(cleared.detailsOnly)");
-    expect(body).toContain("setComplianceFilter(cleared.complianceFilter)");
-    expect(body).toContain('dropFilterParams("filter", "compliance")');
-    // Only the filter names leave the address; ?year= stays.
-    expect(source).toContain("url.searchParams.delete(name)");
-    expect(source).toContain('window.history.replaceState(null, "",');
-    expect(source).toContain('dropFilterParams("compliance")');
+    expect(body).toContain('setDetailsRaw("")');
+    expect(body).toContain('setComplianceRaw("")');
+    expect(body).toContain('writeAddressParams({ q: null, filter: null, compliance: null }, "push")');
+    // The one address helper leaves every other param (?year=) alone.
+    expect(source).not.toContain("dropFilterParams");
+    expect(source).toContain('useAddressParam("filter"');
+    expect(source).toContain('useClientSearch(initialQuery, undefined, "q")');
   });
 });
 
@@ -455,7 +455,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
 
   it("announces the result politely and only after typing pauses", () => {
     // The announced text follows the shared search term, which settles once typing pauses (#1431).
-    expect(source).toContain("useClientSearch()");
+    expect(source).toContain('useClientSearch(initialQuery, undefined, "q")');
     expect(source).toContain("const query = search.term;");
     expect(source).not.toContain("useDebouncedValue");
     const out = html();

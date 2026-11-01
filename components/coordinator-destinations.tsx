@@ -58,7 +58,7 @@ export function CoordinatorNoMatch({ query, clearHref }: { query: string; clearH
   return (
     <p className="report-empty">
       No club name matches “{query}”.{" "}
-      <Link className="text-button coordinator-inline-link" href={clearHref}>Clear search</Link>
+      <Link className="text-button coordinator-inline-link" href={clearHref}>Clear filters</Link>
     </p>
   );
 }

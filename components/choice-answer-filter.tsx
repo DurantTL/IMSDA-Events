@@ -116,7 +116,7 @@ export function ChoiceAnswerFilter({
             </select>
           </label>
           <button className="secondary-button" type="submit">Show choices</button>
-          {selected && <Link className="text-button" href={clearHref}><X aria-hidden="true" size={14} /> Clear</Link>}
+          {selected && <Link className="text-button" href={clearHref}><X aria-hidden="true" size={14} /> Clear filters</Link>}
         </form>
       </div>
       {selected && (

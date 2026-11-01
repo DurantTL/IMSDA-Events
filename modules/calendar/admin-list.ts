@@ -46,6 +46,28 @@ export type EntryFilters = {
 
 export const defaultEntryFilters: EntryFilters = { search: "", category: "", source: "", state: "all", time: "upcoming", entryType: "" };
 
+/** The select filters of the Entries list, which live in the address (`?category=`, `?source=`, `?state=`, `?time=`, `?entryType=`; rule B2, #1456). The search is `?q=`. */
+export type EntryDropdownFilters = Omit<EntryFilters, "search">;
+export const defaultEntryDropdownFilters: EntryDropdownFilters = { category: "", source: "", state: "all", time: "upcoming", entryType: "" };
+
+const entryStates: readonly EntryStateFilter[] = ["all", "published", "draft", "hidden", "removed"];
+const entryTimes: readonly EntryTimeFilter[] = ["upcoming", "past", "all"];
+const entryTypes: readonly EntryFilters["entryType"][] = ["", "STANDARD", "CLOSURE", "DEADLINE"];
+
+/** The select filters an address says; a missing or unknown value is that filter's default. */
+export function parseEntryDropdownFilters(params: URLSearchParams): EntryDropdownFilters {
+  const state = params.get("state");
+  const time = params.get("time");
+  const entryType = params.get("entryType");
+  return {
+    category: params.get("category") ?? "",
+    source: params.get("source") ?? "",
+    state: entryStates.find((value) => value === state) ?? defaultEntryDropdownFilters.state,
+    time: entryTimes.find((value) => value === time) ?? defaultEntryDropdownFilters.time,
+    entryType: entryTypes.find((value) => value === entryType) ?? "",
+  };
+}
+
 export const entrySortLabels: Record<EntrySort, string> = {
   date: "date, soonest first",
   title: "title, A to Z",

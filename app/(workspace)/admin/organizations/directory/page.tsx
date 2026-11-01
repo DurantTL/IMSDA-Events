@@ -2,6 +2,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { OrganizationListPager, OrganizationSearchControls } from "@/components/organization-search-controls";
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
@@ -83,7 +84,9 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
               <tbody role="rowgroup">
                 {organizations.length === 0 && (
                   <tr role="row"><td colSpan={7} role="cell">
-                    {searching ? "No organizations match your search and filters. Try fewer words or clear the filters." : "No organizations yet."}
+                    {searching
+                      ? <NoMatchesState clear={{ href: "/admin/organizations/directory" }} className="empty-state" noun="organizations" query={query} />
+                      : <EmptyState className="empty-state" title="No organizations yet">Import churches and schools from eAdventist to fill the directory.</EmptyState>}
                   </td></tr>
                 )}
                 {organizations.map((organization) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ListPager } from "@/components/list-pager";
 import { useSearchAsYouType, useSyncSearchField } from "@/components/search-as-you-type";
@@ -21,8 +22,9 @@ export function organizationListHref(basePath: string, state: OrganizationListSt
  * The shared filter bar of the Clubs and churches page and the organization
  * directory (#723): a search box, Kind and Status, and the Filter button. It is
  * a plain GET form, so it works before the script loads and Enter submits it.
- * With script, typing updates the list after a short pause and the query lives
- * in the URL, so Back and shared links keep it.
+ * With script, typing updates the list after a short pause (replace) and a Kind or
+ * Status change adds a history entry (push); the query lives in the URL, so Back and
+ * shared links keep it.
  */
 export function OrganizationSearchControls({
   basePath,
@@ -39,7 +41,7 @@ export function OrganizationSearchControls({
   state: OrganizationListState;
   statusOptions: Option[];
 }) {
-  const { formProps, formRef } = useSearchAsYouType({ ignoreValues: { status: "ALL" }, pathname: basePath });
+  const { formProps, formRef, cancel } = useSearchAsYouType({ ignoreValues: { status: "ALL" }, pathname: basePath });
   useSyncSearchField(formRef, "q", state.q);
   useSyncSearchField(formRef, "kind", state.kind);
   useSyncSearchField(formRef, "status", state.status);
@@ -71,11 +73,15 @@ export function OrganizationSearchControls({
       </label>
       <label className="org-filter-field">
         <span>Status</span>
-        <select defaultValue={state.status} name="status">
+        <select data-default-value="ALL" defaultValue={state.status} name="status">
           {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>
       <button className="secondary-button org-filter-submit" type="submit">Filter</button>
+      {/* Rule B2 (#1456): shown whenever a search or filter is set, and a search still waiting on its pause cannot put it back. */}
+      {(state.q !== "" || state.kind !== "" || state.status !== "ALL") && (
+        <Link className="secondary-button org-filter-submit" href={basePath} onClick={cancel}>Clear filters</Link>
+      )}
     </form>
   );
 }
