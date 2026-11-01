@@ -74,6 +74,9 @@ environment panel:
 CLOUDFLARE_PURGE_WEBHOOK_URL=<the private webhook URL from the hosting panel>   # optional
 ```
 
+The System report shows the same steps (the `cloudflare-purge` entry in
+`modules/setup-help/system-setup-steps.ts`) under **How to set this up**.
+
 This URL is a secret: anyone who has it can clear the cache. Keep it out of
 issues, chat and screenshots. The value must be an `https://` address; anything
 else reads as "Not set up". With it set, the System report's "Security and
@@ -791,6 +794,11 @@ Run `imsda-cleanup` by hand to free space now, and check it with
 `journalctl -u imsda-cleanup.service` and `df -h /`.
 
 ### System report heartbeats
+
+The numbered steps below are also kept in
+`modules/setup-help/system-setup-steps.ts` (the `heartbeat-token` entry), which
+is what the System report shows under **How to set this up** on its "Not
+reporting yet" rows. Change the steps there first.
 
 The System report's "Background jobs" section shows three server jobs:
 auto-deploy, Docker cleanup and the runtime guard. Each run sends one small

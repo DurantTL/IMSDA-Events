@@ -83,6 +83,9 @@ import { buildSelfTestProviders } from "./self-test-providers";
 import { unavailableSignal, type SectionKey, type Signal, type SignalMeta, type SignalState } from "./model";
 import { buildEmailBackupProviders } from "./email-backup-providers";
 import { buildNoticeProviders } from "./notice-providers";
+import { systemSetupFor } from "@/modules/setup-help/system-setup-steps";
+import type { SetupHelp } from "@/modules/setup-help/types";
+import { summarizeServices } from "./service-setup";
 
 /**
  * The System report's signal providers (#1357). Each provider wraps ONE existing module computation and turns it into
@@ -291,7 +294,7 @@ async function pickHealth(ctx: ReportContext, keys: readonly string[]) {
 const READINESS_STATE: Record<AutomaticReadinessRow["status"], SignalState> = { ok: "ok", attention: "attention", info: "info", unknown: "unavailable" };
 
 /** One automatic readiness row. Only its key, status and summary are used: never the names it lists for follow-up. */
-async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: string) {
+async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: string, flagSetup = false) {
   const read = await readiness(ctx);
   if (!read.ok) return { key: signalKey, ...tried(read) };
   const row = read.value.automatic.find((candidate) => candidate.key === rowKey);
@@ -303,6 +306,8 @@ async function readinessRow(ctx: ReportContext, rowKey: string, signalKey: strin
     resultText: row.summary,
     checkedAt: read.value.generatedAt,
     whenLabel: state === "unavailable" ? "Tried" : "Checked",
+    // A "No" reading on a row that is set up on a page or in the environment shows its setup help (#1434).
+    ...(flagSetup && row.status === "attention" ? { needsSetup: true } : {}),
   };
 }
 
@@ -410,7 +415,7 @@ async function rollupIssues(ctx: ReportContext, rollup: IssueRollup) {
 
 /* ---------- The providers ---------- */
 
-const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null): SignalMeta => ({ key, name, description, fixHref, fixLabel });
+const m = (key: string, name: string, description: string, fixHref: string | null = null, fixLabel: string | null = null, setup?: SetupHelp): SignalMeta => ({ key, name, description, fixHref, fixLabel, ...(setup ? { setup } : {}) });
 const serverFix = "Fixed on the server";
 
 export const systemReportProviders: readonly SignalProvider[] = [
@@ -446,24 +451,24 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
   defineProvider("jobs", [
     m("email-sweep", "Email sweep", "The scheduled job that sends queued email succeeded in the last 15 minutes.", null, serverFix),
-    m("backup-r2-database", "Newest database backup", "The newest database backup in the read-only Cloudflare R2 backup bucket is less than 26 hours old.", null, "Set on the server"),
-    m("backup-r2-files", "Newest files backup", "The newest uploaded-files backup in the read-only Cloudflare R2 backup bucket (shown for information).", null, "Set on the server"),
+    m("backup-r2-database", "Newest database backup", "The newest database backup in the read-only Cloudflare R2 backup bucket is less than 26 hours old.", null, "Set on the server", systemSetupFor("r2-backup-read")),
+    m("backup-r2-files", "Newest files backup", "The newest uploaded-files backup in the read-only Cloudflare R2 backup bucket (shown for information).", null, "Set on the server", systemSetupFor("r2-backup-read")),
     m("backup-last", "Last backup", "The last backup succeeded recently and reached its offsite copy.", "/admin/readiness", "Open readiness"),
     m("backup-restore-test", "Restore test", "A backup was restored as a test recently.", "/admin/readiness", "Open readiness"),
     m("calendar-feed-refresh", "Calendar feed refresh", "The imported calendar feeds that came due were refreshed by the last sweep.", "/admin/calendar", "Open calendar"),
     m("message-file-cleanup", "Message file cleanup", "The last sweep's cleanup of message attachments nothing refers to.", "/admin/email", "Open email settings"),
     m("alert-scan", "Alert scan", "The last sweep's scan for problems that need an alert.", null, serverFix),
-    m("alert-delivery", "Alert delivery", "The latest alert reached the alert webhook.", null, serverFix),
+    m("alert-delivery", "Alert delivery", "The latest alert reached the alert webhook.", null, serverFix, systemSetupFor("alert-webhook")),
     m("deadline-reminders", "Deadline reminder preparation", "The last sweep prepared the deadline reminder batches that came due.", "/admin/calendar", "Open calendar"),
-    m("location-waitlist-digest", "Location waitlist digest", "The daily digest of location waitlist changes.", "/admin/email", "Open email settings"),
+    m("location-waitlist-digest", "Location waitlist digest", "The daily digest of location waitlist changes.", "/admin/email", "Open email settings", systemSetupFor("account-email")),
     m("class-waitlists", "Honors class waitlists", "The last sweep passed expired class offers to the next youth in line.", null, serverFix),
     m("instructor-class-emails", "Instructor class emails", "The emails telling instructors who joined or left their classes.", "/admin/email", "Open email settings"),
     m("honor-watch-summaries", "Honor watch summaries", "The daily watch summaries of who joined or left classes.", "/admin/email", "Open email settings"),
     m("health-snapshots", "Sealed health copies", "The sweep that seals event-start health copies and deletes expired ones.", null, serverFix),
     m("retention-cleanups", "Retention clean-ups", "The clean-ups of old community posts, alert feed items and analytics.", null, serverFix),
-    m("server-autodeploy", "Auto-deploy", "The server's deploy timer checked for a new version in the last 30 minutes and the latest run did not fail.", null, serverFix),
-    m("server-docker-cleanup", "Docker cleanup", "The server's daily Docker cleanup ran in the last 30 hours.", null, serverFix),
-    m("server-runtime-guard", "Runtime guard", "The server's check that the app container keeps its settings ran in the last 15 minutes.", null, serverFix),
+    m("server-autodeploy", "Auto-deploy", "The server's deploy timer checked for a new version in the last 30 minutes and the latest run did not fail.", null, serverFix, systemSetupFor("heartbeat-token")),
+    m("server-docker-cleanup", "Docker cleanup", "The server's daily Docker cleanup ran in the last 30 hours.", null, serverFix, systemSetupFor("heartbeat-token")),
+    m("server-runtime-guard", "Runtime guard", "The server's check that the app container keeps its settings ran in the last 15 minutes.", null, serverFix, systemSetupFor("heartbeat-token")),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-sweep"])),
     ...(await offsiteBackupRows(ctx)),
@@ -488,13 +493,13 @@ export const systemReportProviders: readonly SignalProvider[] = [
   defineProvider("email", [
     m("email-delivery", "Delivery problems", "Failed, bounced or spam-marked messages in the last 7 days, and messages stuck in delivery.", "/admin/email", "Review deliveries"),
     m("email-queue", "Email queue", "Messages waiting, processing or given up.", "/admin/email", "Open email settings"),
-    m("email-provider", "Email provider", "An email service is set up.", "/admin/settings", "Platform settings"),
-    m("email-sender", "Sender address", "The sender address is set and is not a placeholder.", "/admin/settings", "Platform settings"),
-    m("email-reachable", "Email service reachable", "A read-only test that the email service answers and accepts our key. It sends nothing.", null, "Press Test connections"),
+    m("email-provider", "Email provider", "An email service is set up.", "/admin/settings", "Platform settings", systemSetupFor("email-provider")),
+    m("email-sender", "Sender address", "The sender address is set and is not a placeholder.", "/admin/settings", "Platform settings", systemSetupFor("email-sender")),
+    m("email-reachable", "Email service reachable", "A read-only test that the email service answers and accepts our key. It sends nothing.", null, "Press Test connections", systemSetupFor("email-provider")),
   ], async (ctx) => [
     ...(await pickHealth(ctx, ["email-delivery", "email-queue"])),
-    await readinessRow(ctx, "email-provider", "email-provider"),
-    await readinessRow(ctx, "email-sender", "email-sender"),
+    await readinessRow(ctx, "email-provider", "email-provider", true),
+    await readinessRow(ctx, "email-sender", "email-sender", true),
     await reachabilityRow(ctx, "email", "email-reachable", EMAIL_REACHABILITY_JOB, () => getEmailAvailability().deliveryConfigured),
   ]),
 
@@ -502,8 +507,8 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("payment-attempts", "Payment attempts", "Failed, or stuck over 15 minutes, on unpaid registrations.", "/more/health", "Open operational health"),
     m("payment-setup", "Payment setup", "Square and its payment notices are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
     m("square-environment", "Square environment", "Whether Square is in test or live mode.", "/admin/settings", "Platform settings"),
-    m("square-reachable", "Square reachable", "A read-only test that Square answers and accepts our token. It charges nothing.", null, "Press Test connections"),
-    m("apple-pay-file-reachable", "Apple Pay domain file", "A read-only test that Square's Apple Pay domain file can be fetched. It sends and changes nothing.", null, "Press Test connections"),
+    m("square-reachable", "Square reachable", "A read-only test that Square answers and accepts our token. It charges nothing.", null, "Press Test connections", systemSetupFor("square-payments")),
+    m("apple-pay-file-reachable", "Apple Pay domain file", "A read-only test that Square's Apple Pay domain file can be fetched. It sends and changes nothing.", null, "Press Test connections", systemSetupFor("apple-pay")),
   ], async (ctx) => {
     const attempts = await rollupIssues(ctx, {
       key: "payment-attempts",
@@ -606,16 +611,16 @@ export const systemReportProviders: readonly SignalProvider[] = [
   ], async (ctx) => pickHealth(ctx, ["open-alerts"])),
 
   defineProvider("setup", [
-    m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings"),
+    m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings", systemSetupFor("encryption-key")),
     m("admin-protection", "Administrator sign-in protection", "System administrators use two-step sign-in or a passkey.", "/admin/readiness", "Open readiness"),
     m("connected-services", "Connected services", "Payments, email, Google sign-in, alerts and the email sweep are set up (this does not prove they work).", "/admin/settings", "Platform settings"),
-    m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections"),
-    m("breach-service-reachable", "Password breach service", "A read-only test that the password breach service answers one fixed, made-up lookup. No password is used.", null, "Press Test connections"),
-    m("security-check", "Security check", "Cloudflare Turnstile on public forms and sign-in has both its keys set (environment names only; no key is shown).", null, serverFix),
+    m("google-keys-reachable", "Google sign-in keys", "A read-only test that Google's public sign-in keys can be fetched. It sends and changes nothing.", null, "Press Test connections", systemSetupFor("google-sign-in")),
+    m("breach-service-reachable", "Password breach service", "A read-only test that the password breach service answers one fixed, made-up lookup. No password is used.", null, "Press Test connections", systemSetupFor("breach-service")),
+    m("security-check", "Security check", "Cloudflare Turnstile on public forms and sign-in has both its keys set (environment names only; no key is shown).", null, serverFix, systemSetupFor("turnstile")),
   ], async (ctx) => {
     const env = await environment(ctx);
     return [
-      await readinessRow(ctx, "encryption-key", "encryption-key"),
+      await readinessRow(ctx, "encryption-key", "encryption-key", true),
       await readinessRow(ctx, "admins-mfa", "admin-protection"),
       !env.ok ? { key: "connected-services", ...tried(env) } : connectedServices(env.value, env.readAt),
       await reachabilityRow(ctx, "google-keys", "google-keys-reachable", GOOGLE_KEYS_REACHABILITY_JOB, isGoogleSignInConfigured),
@@ -739,8 +744,6 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
 /* ---------- Environment status rows ---------- */
 
-type EnvService = EnvironmentStatus["services"][number];
-
 function paymentSetup(status: EnvironmentStatus, readAt: Date) {
   const services = status.services.filter((service) => service.id === "payments" || service.id === "payment-webhook");
   return summarizeServices("payment-setup", services, readAt);
@@ -748,20 +751,4 @@ function paymentSetup(status: EnvironmentStatus, readAt: Date) {
 
 function connectedServices(status: EnvironmentStatus, readAt: Date) {
   return summarizeServices("connected-services", status.services, readAt);
-}
-
-/** "Set up" is a configuration fact, never proof the service works: the labels are fixed names, never values. */
-function summarizeServices(key: string, services: EnvService[], readAt: Date) {
-  const setUp = services.filter((service) => service.status === "configured").length;
-  const notSet = services.filter((service) => service.status === "not-configured");
-  const unknown = services.filter((service) => service.status === "unknown");
-  const common = { key, checkedAt: iso(readAt) };
-  const counted = `${setUp} of ${services.length} set up.`;
-  if (notSet.length > 0) {
-    return { ...common, whenLabel: "Checked", state: "watch" as const, resultText: `${counted} Not set up: ${notSet.map((service) => service.label).join(", ")}.` };
-  }
-  if (unknown.length > 0) {
-    return { ...common, whenLabel: "Tried", state: "unavailable" as const, resultText: `${counted} Could not be read: ${unknown.map((service) => service.label).join(", ")}.` };
-  }
-  return { ...common, whenLabel: "Checked", state: "ok" as const, resultText: `${counted} Set up does not prove a service works.` };
 }

@@ -9,22 +9,15 @@ then it does nothing, so nobody is locked out while you set it up.
 
 ## Turn it on (Caleb)
 
-1. Cloudflare dashboard → **Turnstile** → **Add widget**.
-2. Name: `IMSDA Events`.
-3. Hostname: `events.imsda.org` (the host of `APP_BASE_URL` in production).
-   Add another hostname only if the app is also served from one.
-4. Widget mode: **Managed**. Leave **pre-clearance** off.
-5. Create it, then copy the **Site key** and the **Secret key**. Never paste
-   them into chat, GitHub or a ticket.
-6. In the xCloud environment panel set:
-   - `TURNSTILE_SITE_KEY` = the Site key
-   - `TURNSTILE_SECRET_KEY` = the Secret key
-   - `TURNSTILE_ALLOWED_HOSTNAMES` only if the app is served from more than
-     one host (comma-separated). Blank means the host of `APP_BASE_URL`.
-7. Restart the app (no rebuild is needed; the keys are read at run time).
-8. Open **System report** → Setup. The **Security check** row should read
-   **OK / Configured**. Then open the sign-in page and a registration form and
-   confirm the box shows and a submit works.
+The click-by-click steps (Cloudflare Turnstile widget, then the xCloud
+settings) live in one place: the `turnstile` entry in
+`modules/setup-help/system-setup-steps.ts`. The same steps show in the app, on
+**System report** → Security and setup, under the **Security check** row's
+**How to set this up** panel, so they are not repeated here.
+
+The settings are `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` and, only when
+the app is served from more than one host, `TURNSTILE_ALLOWED_HOSTNAMES`. Blank
+hostnames means the host of `APP_BASE_URL`.
 
 ## What is covered
 

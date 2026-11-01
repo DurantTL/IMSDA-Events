@@ -1,0 +1,63 @@
+/* The shared "Set up" link and "How to set this up" panel (#1434). The disclosure itself is the shared
+   .attendee-reg-action look in app/globals.css; this only lays out what is inside it. */
+.setup {
+  min-width: 0;
+  max-width: 44rem;
+}
+
+.disclosure {
+  background: var(--paper, #fff);
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.75rem;
+  list-style: decimal;
+}
+
+.subhead {
+  margin: 4px 0 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.names code,
+.steps code {
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.done,
+.docs,
+.ask {
+  margin: 0;
+  color: var(--ink, inherit);
+  overflow-wrap: anywhere;
+}
+
+.ask,
+.again {
+  color: var(--muted);
+}
+
+.again {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

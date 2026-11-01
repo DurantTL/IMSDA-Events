@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { CloudOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SetupHelpPanel } from "@/components/setup-help";
+import { systemSetupFor } from "@/modules/setup-help/system-setup-steps";
 import { clockTime, useLimitExpiry } from "./tester-format";
 import styles from "./page.module.css";
 
@@ -63,6 +65,7 @@ export function CloudflarePurgeRow({ configured }: { configured: boolean }) {
             <CloudOff aria-hidden="true" size={14} /> Not set up. Add <code>CLOUDFLARE_PURGE_WEBHOOK_URL</code> in the xCloud settings.
           </span>
         )}
+        {!configured && <SetupHelpPanel setup={systemSetupFor("cloudflare-purge")} context="Clear Cloudflare cache" />}
         <span aria-live="polite" className={message?.tone === "ok" ? styles.purgeOk : styles.purgeBad}>{configured && message ? message.text : ""}</span>
       </div>
       {configured && (
