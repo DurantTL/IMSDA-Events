@@ -6,6 +6,7 @@ import styles from "@/components/club-supplies.module.css";
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { makeSearchMatcher } from "@/lib/search-match";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 
 type SaveResponse = { stock?: { itemId: string; quantityOnHand: number }; error?: string; message?: string; issues?: Array<{ message?: string }> };
 
@@ -42,18 +43,18 @@ export function ClubSupplyStockWorkspace({
   const [saved, setSaved] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [section, setSection] = useState<ClubSupplySection | "">("");
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
   const [onlyInStock, setOnlyInStock] = useState(false);
 
   const groups = useMemo(() => {
-    const matches = makeSearchMatcher(query);
+    const matches = makeSearchMatcher(search.term);
     const visible = stock.filter((row) => (!section || row.section === section)
       && (!onlyInStock || row.quantityOnHand > 0)
       && matches([row.name, row.catalogNumber, row.sizeLabel]));
     return clubSupplySections
       .map((value) => ({ section: value, rows: visible.filter((row) => row.section === value) }))
       .filter((group) => group.rows.length > 0);
-  }, [stock, section, query, onlyInStock]);
+  }, [stock, section, search.term, onlyInStock]);
 
   async function save(row: ClubStockRow) {
     const draft = drafts[row.itemId];
@@ -123,12 +124,13 @@ export function ClubSupplyStockWorkspace({
             </label>
             <label>
               Search
-              <input onChange={(event) => setQuery(event.target.value)} placeholder="Name or catalog number" type="search" value={query} />
+              <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
             </label>
           </div>
           <label className="checkbox-label">
             <input checked={onlyInStock} onChange={(event) => setOnlyInStock(event.target.checked)} type="checkbox" /> Only items in stock
           </label>
+          <SearchResultStatus message={groups.length === 0 ? "No items match." : `${groups.reduce((total, group) => total + group.rows.length, 0)} items shown.`} />
           {groups.length === 0 && <p className="quiet-copy">Nothing matches.</p>}
           {groups.map((group) => (
             <section className={styles.sectionBlock} key={group.section}>
