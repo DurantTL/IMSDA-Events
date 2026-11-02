@@ -20,7 +20,9 @@
  *    records") are L4 "Missing"/"Late" flags too. Event availability ("Open", "Registration closed", ...) and a form's "Done" are not record statuses either.
  *    A chip's detail after " · " ("Draft saved · 2 chosen") is ignored; its first words are the word. Anything else is
  *    reported as a failure naming the word.
- *  - B13 looks for clock times ("3:15 PM"): each must sit next to "CT". Dates alone are not times.
+ *  - B13 looks for clock times ("3:15 PM"): each must sit next to a Central label (CT, CDT, CST: the site prints the short
+ *    zone name). Dates alone are not times. No page the director and coordinator journeys visit shows a clock time yet, so
+ *    B13 is n/a everywhere and SITE-RULES.md does not claim it; the check is ready for a page that does.
  *  - B3 checks `table` elements and their three nearest wrappers for sideways scrolling.
  *  - H3/H4: a text that says something is not set up, missing, blocked or not available yet must have, nearby, a link or
  *    a "How to do this" panel (H3) or name who to ask (H4).
@@ -30,7 +32,8 @@ import type { Page } from "./browser-journeys";
 
 export type Outcome = "pass" | "fail" | "n/a";
 export type RuleResult = { viewport: string; page: string; rule: string; what: string; outcome: Outcome; detail: string; known?: string };
-export type KnownBug = { id: string; description: string; labels: string[]; only?: string };
+/** `checks`: each failing check the bug explains, by its exact label and a substring its failure detail must contain. */
+export type KnownBug = { id: string; description: string; checks: Array<{ label: string; detail: string }>; only?: string };
 
 export const APPROVED_STATUS_WORDS = ["Draft", "Submitted", "Pending payment", "Pending approval", "Confirmed", "Waitlisted", "Cancelled", "Refunded"];
 const OWN_MEANING_WORDS = ["Expired", "Used", "Attached to a club", "Declined", "Completed", "Queued", "Processing", "Captured", "Sent", "Failed", "Suppressed"];
@@ -63,14 +66,17 @@ export class Recorder {
 
   record(page: string, rule: string, what: string, outcome: Outcome, detail: string) {
     const label = Recorder.label(page, rule, what);
-    const known = this.knownBugs.find((bug) => bug.labels.includes(label) && (!bug.only || bug.only === this.viewport));
+    const named = this.knownBugs.find((bug) => bug.checks.some((check) => check.label === label) && (!bug.only || bug.only === this.viewport));
+    // A failure is the known one only when its detail also says what the entry expects; the same check failing for
+    // another reason is a new, real failure.
+    const known = named && (outcome === "pass" || named.checks.some((check) => check.label === label && detail.includes(check.detail))) ? named : undefined;
     const result: RuleResult = { viewport: this.viewport, page, rule, what, outcome, detail };
     if (known) {
       result.known = known.id;
       this.seenKnown.add(known.id);
       if (outcome === "pass") this.unexpected.push(`KNOWN BUG ${known.id} unexpectedly passed (${label}). The site is fixed: remove it from KNOWN_BUGS.`);
     } else if (outcome === "fail") {
-      this.unexpected.push(`${this.viewport}: ${label}: ${detail}`);
+      this.unexpected.push(`${this.viewport}: ${label}: ${detail}${named ? ` (the known bug ${named.id} expects a different failure)` : ""}`);
     }
     this.results.push(result);
     const mark = known && outcome === "fail" ? "expected failure" : outcome;
@@ -151,7 +157,7 @@ async function scanPage(page: Page): Promise<Scan> {
       if (!parent || !timePattern.test(node.nodeValue ?? "") || !visible(parent) || parent.closest("script, style, option")) continue;
       times += 1;
       const around = squash((parent.closest("p, li, td, div, span, time") ?? parent).textContent ?? "");
-      if (!/\b(CT|Central)\b/.test(around)) badTimes.push(squash(node.nodeValue ?? "").slice(0, 80));
+      if (!/\b(CT|CDT|CST|Central)\b/.test(around)) badTimes.push(squash(node.nodeValue ?? "").slice(0, 80));
     }
 
     const tables = [...document.querySelectorAll("table")].filter(visible);
@@ -263,8 +269,12 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     rec.record(name, "S1", `${what} (focus shows full list)`, afterFocus === baseline ? "pass" : "fail", afterFocus === baseline ? "list unchanged on focus" : "the page changed when the box was focused");
     // S4: typing narrows with no Enter.
     await box.pressSequentially("zzqx-no-match-zz", { delay: 15 });
-    const narrowed = await pollPage<string>(page, read, (text) => text !== baseline, 5_000);
-    rec.record(name, "S4", `${what} (typing narrows, no Enter)`, narrowed.ok ? "pass" : "fail", narrowed.ok ? "results changed while typing" : "typed text did not change the results without pressing Enter");
+    // Narrowing means fewer lines of results than before, or a no-match message that was not there before; a different
+    // line somewhere (a counter, an echo of the typed text) is not narrowing.
+    const noMatch = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
+    const baselineCount = baseline.split("\n").length;
+    const narrowed = await pollPage<string>(page, read, (text) => text.split("\n").length < baselineCount || (noMatch.test(text) && !noMatch.test(baseline)), 5_000);
+    rec.record(name, "S4", `${what} (typing narrows, no Enter)`, narrowed.ok ? "pass" : "fail", narrowed.ok ? "fewer results (or a no-match message) while typing" : "typing a string that matches nothing did not narrow the results or show a no-match message without pressing Enter");
     // S1/S2: clearing shows the full list again.
     await box.fill("");
     // Emptying the box brings the whole list back: every line the page showed before is shown again (a page may add

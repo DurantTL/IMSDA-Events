@@ -65,9 +65,10 @@ describe("CI database-script shards (#1233)", () => {
       }
     }
     for (const [script, ids] of placements) {
-      // One job runs a script once, except the club journeys job, which runs it once per width (JOURNEY_SHARD).
-      expect(new Set(ids), script).toHaveProperty("size", 1);
-      expect(ids[0], script).toMatch(SHARD_JOB);
+      // A script runs once, in one shard job. Only the club journeys job may repeat it (once per width, JOURNEY_SHARD).
+      if (ids.length > 1) expect(ids, script).toEqual(ids.map(() => "club-journeys"));
+      else expect(ids, script).toHaveLength(1);
+      for (const id of ids) expect(id, script).toMatch(SHARD_JOB);
     }
     const expected = packageScripts
       .filter((name) => !NOT_IN_CI.has(name))

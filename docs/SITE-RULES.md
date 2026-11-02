@@ -84,7 +84,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
 | B12 | The same status words mean the same thing everywhere (Pending, Confirmed, Waitlisted, Cancelled, …). The status words are exactly Draft, Submitted, Pending payment, Pending approval, Confirmed, Waitlisted, Cancelled, Refunded. Club forms and links, club applications, team permissions, invites, general links, club transfers and merchandise orders use the same words (#1479). Three things keep their own words because they describe something other than a record's status: email delivery states (Queued, Processing, Captured, Sent, Failed, Suppressed) describe delivery of a message; the area coordinator roll-ups "Registered" and "Not registered" describe whether an area has registered; check-in states describe arrival at the event. Words outside the eight that stay: Expired, Used, Attached to a club, Declined (transfers), Completed. | `tests/status-words-1453.test.ts` (#1440 for the page check) | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433; Caleb, Nov 1 |
-| B13 | Names and times display the same way everywhere, with times in Central and labeled. | planned (#1440) | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433 |
+| B13 | Names and times display the same way everywhere, with times in Central and labeled. | planned (#1440) | planned (#1439) | #1433 |
 | B14 | "You don't have access" pages all say the same thing and explain who to ask. | planned (#1440) | planned (#1439) | #1433 |
 
 ## Sign-in

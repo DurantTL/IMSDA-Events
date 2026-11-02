@@ -101,17 +101,18 @@ export class FakeMailServer {
   }
 
   /**
-   * The first message to `to` that matches and arrived after `since` (default: the call), waiting up to `timeoutMs`.
+   * The newest message to `to` that matches and arrived at or after `since` (required, ms since the epoch), waiting up to `timeoutMs`.
    * Polls on a short condition loop, no fixed sleep.
    */
-  async waitForMessage(to: string, matcher: Matcher = () => true, options: { since?: number; timeoutMs?: number } = {}): Promise<CapturedMessage> {
-    const since = options.since ?? 0;
+  async waitForMessage(to: string, matcher: Matcher, options: { since: number; timeoutMs?: number }): Promise<CapturedMessage> {
+    const since = options.since;
     const timeoutMs = options.timeoutMs ?? 45_000;
     const test = typeof matcher === "function" ? matcher : (message: CapturedMessage) => matcher.test(`${message.subject}\n${message.text}`);
     const started = Date.now();
     const key = `${to}:${started}`;
     for (;;) {
-      const found = this.to(to).find((message) => message.receivedAt >= since && test(message));
+      // The newest match, so a resent code or invite wins over the one it replaced.
+      const found = this.to(to).filter((message) => message.receivedAt >= since && test(message)).at(-1);
       if (found) return found;
       const waited = Date.now() - started;
       if (waited > 6_000) await this.nudgeSweep(key);
@@ -124,7 +125,7 @@ export class FakeMailServer {
   }
 
   /** The newest six-digit sign-in code emailed to `to` after `since`. */
-  async waitForCode(to: string, options: { since?: number; timeoutMs?: number } = {}): Promise<string> {
+  async waitForCode(to: string, options: { since: number; timeoutMs?: number }): Promise<string> {
     // The email shows the code in two groups ("805 205"); a password manager would copy it either way.
     const pattern = /\b(\d{3}) ?(\d{3})\b/;
     const message = await this.waitForMessage(to, (candidate) => /code/i.test(candidate.subject) && pattern.test(candidate.text), options);

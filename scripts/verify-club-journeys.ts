@@ -62,53 +62,59 @@ loadEnvConfig(process.cwd());
 /** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
 export const KNOWN_BUGS: KnownBug[] = [
   {
-    id: "club-events-registered-word",
-    description: "Club events: a submitted club registration shows the chip \"Registered · N going\" (components/club-event-list.tsx statusFor), but \"Registered\" is only approved for the area coordinator roll-up; the registration's status word is \"Submitted\" (B12, #1479).",
-    labels: ["Club events (registered) | B12 | status chip words", "Club event: registered | B12 | the submitted registration shows an approved status word"],
-  },
-  {
     id: "monthly-record-unsaved",
     description: "Monthly Records: the Monthly Record form (components/club-report-form.tsx) never uses useUnsavedChangesGuard, so typing in it and then leaving the page (address bar, link, Back) gives no warning (B6).",
-    labels: ["Monthly Record form | B6 | monthly record: leaving with unsaved changes warns"],
+    checks: [{ label: "Monthly Record form | B6 | monthly record: leaving with unsaved changes warns", detail: "without any warning" }],
   },
   {
     id: "year-end-unsaved",
     description: "Year-End Report: components/club-year-end-report-form.tsx never uses useUnsavedChangesGuard, so editing a number and clicking another page leaves with no warning (B6).",
-    labels: ["Year-End Report | B6 | year-end report: leaving with unsaved changes warns"],
+    checks: [{ label: "Year-End Report | B6 | year-end report: leaving with unsaved changes warns", detail: "without any warning" }],
   },
   {
     id: "orders-remove-no-confirm",
     description: "Orders: \"Remove from the list\" (components/club-order-workspace.tsx removeLine) removes the line at once, with no confirmation and no Undo (B9).",
-    labels: ["Orders (with a line) | B9 | remove an order line: asks for confirmation in the shared dialog"],
+    checks: [{ label: "Orders (with a line) | B9 | remove an order line: asks for confirmation in the shared dialog", detail: "nothing asked before the action" }],
   },
   {
     id: "help-no-search",
-    description: "Help: the account Help page (app/(public)/account/(portal)/help/page.tsx) lists the director guides but has no search box (only the staff Help has one), so a director cannot search for a guide (H5, S4).",
-    labels: ["Help | H5 | Help search finds the director guide", "Coordinator: Help | H5 | Help search finds the coordinator guide"],
+    description: "Help: the account Help page (app/(public)/account/(portal)/help/page.tsx) lists the director and coordinator guides but has no search box (only the staff Help has one), so nobody can search for a guide (H5, S4).",
+    checks: [
+      { label: "Help | H5 | Help search finds the director guide", detail: "no search box" },
+      { label: "Coordinator: Help | H5 | Help search finds the coordinator guide", detail: "no search box" },
+    ],
+  },
+  {
+    id: "club-events-registered-word",
+    description: "Club events: a submitted club registration shows the chip \"Registered · N going\" (components/club-event-list.tsx statusFor) and the confirmation card's status says \"Registered\", but \"Registered\" is only approved for the area coordinator roll-up; the registration's status word is \"Submitted\" (B12, #1479).",
+    checks: [
+      { label: "Club events (registered) | B12 | status chip words", detail: "Registered · 2 going" },
+      { label: "Club event: registered | B12 | the registration's status shows an approved word", detail: "\"Registered\"" },
+    ],
   },
   {
     id: "records-grid-scrolls-sideways",
     description: "Coordinator Monthly Records: the \"Monthly Record status by club\" grid (CoordinatorMonthlyRecords) is a 14-column table that scrolls sideways inside its wrapper (scrollWidth 1600 in a 1132px box at 1280px wide) (B3).",
-    labels: ["Coordinator: Monthly Records | B3 | tables do not scroll sideways"],
+    checks: [{ label: "Coordinator: Monthly Records | B3 | tables do not scroll sideways", detail: "div.report-table-wrap" }],
     only: "desktop",
   },
   {
     id: "records-chart-table-scrolls-sideways",
     description: "Coordinator Monthly Records on a phone: the \"Records by month\" table (components/club-report-charts.tsx tableWrap) scrolls sideways (374px of content in a 330px box at 390px wide) instead of turning into cards (B3).",
-    labels: ["Coordinator: Monthly Records | B3 | tables do not scroll sideways"],
+    checks: [{ label: "Coordinator: Monthly Records | B3 | tables do not scroll sideways", detail: "tableWrap" }],
     only: "phone",
   },
   {
     id: "club-profile-unsaved",
     description: "Club settings: the club profile form (components/club-profile-form.tsx) never uses useUnsavedChangesGuard, so editing it and clicking another page leaves with no warning (B6).",
-    labels: ["Club settings | B6 | club profile form: leaving with unsaved changes warns"],
+    checks: [{ label: "Club settings | B6 | club profile form: leaving with unsaved changes warns", detail: "without any warning" }],
   },
   {
     id: "club-form-native-required",
     description: "Club forms: components/club-form-fill-in.tsx puts a native `required` on its fields and no noValidate, so submitting with an answer missing shows only the browser's own tooltip, never the shared summary at the top and a message by the field (B7).",
-    labels: [
-      "Fill in a club form | B7 | required answers missing: error at the top",
-      "Fill in a club form | B7 | required answers missing: error by the field",
+    checks: [
+      { label: "Fill in a club form | B7 | required answers missing: error at the top", detail: "showed no error at all" },
+      { label: "Fill in a club form | B7 | required answers missing: error by the field", detail: "showed no error at all" },
     ],
   },
 ];
@@ -221,6 +227,18 @@ async function signInJourney(ctx: Ctx, page: J.Page, director: Director, options
   }
   await S.enterEmailedCode(page, ctx.mail, { email: director.email, since });
 
+  if (checks) {
+    // A1: with only the emailed code (no two-step yet) the director's own registrations open with no gate, while the
+    // club page sends them to the two-step gate.
+    await S.openPage(page, "/account/registrations");
+    await S.expectHeading(page, /registrations/i);
+    const open = new URL(page.url()).pathname === "/account/registrations";
+    await visited(ctx, page, "My registrations", { rules: checks });
+    await S.openPage(page, club);
+    const gated = /\/account\/two-step/.test(new URL(page.url()).pathname);
+    rec.record("My registrations", "A1", "own registrations open without two-step; a club page needs it", open && gated ? "pass" : "fail", open && gated ? "registrations opened; the club page went to the two-step gate" : `registrations ${open ? "opened" : "did not open"}; the club page ${gated ? "went to the gate" : `opened without two-step (${page.url()})`}`);
+  }
+
   // A club page that needs two-step sends a club director with no two-step to the gate (A1, A3, H3), keeping the way back.
   await S.openPage(page, club);
   await page.getByRole("button", { name: /Set up two-step sign-in/ }).waitFor({ state: "visible", timeout: 20_000 });
@@ -287,7 +305,14 @@ async function rosterJourney(ctx: Ctx, page: J.Page) {
   try {
     await J.openRoster(page, url);
     await visited(ctx, page, "Roster");
-    await J.openRoster(second.page, url);
+    const secondOpen = await second.page.goto(url, { waitUntil: "load" });
+    await J.settleRoster(second.page);
+    // P2: neither the roster page nor its API may be cached (browser, Cloudflare or app).
+    const pageCache = secondOpen?.headers()["cache-control"] ?? "";
+    rec.record("Roster", "P2", "the roster page is never cached", /no-store|no-cache|max-age=0|private/.test(pageCache) && !/public|max-age=[1-9]/.test(pageCache) ? "pass" : "fail", `Cache-Control on the page: "${pageCache}"`);
+    const api = await second.context.request.get(`${J.baseUrl}/api/attendee/clubs/${world.clubId}/roster`);
+    const apiCache = api.headers()["cache-control"] ?? "";
+    rec.record("Roster", "P2", "the roster API is never cached (no-store)", /no-store/.test(apiCache) ? "pass" : "fail", `Cache-Control on the API: "${apiCache}"`);
     const first = "Zed";
     const last = `Journey${world.stamp}-Zulu`;
     const before = await J.activeCount(page);
@@ -305,6 +330,18 @@ async function rosterJourney(ctx: Ctx, page: J.Page) {
     await second.page.reload({ waitUntil: "load" });
     await J.settleRoster(second.page);
     assert(await J.visibleText(second.page, last), "a second browser did not see the new member after a reload");
+    // Not a stored copy either: leave the roster and come Back, and follow an in-app link to it.
+    const home = second.page.getByRole("link", { name: S.exactly("Home") }).first();
+    await home.click();
+    await second.page.waitForURL((u: URL) => u.pathname === S.clubPath(world.clubId), { timeout: 20_000 });
+    await second.page.goBack({ waitUntil: "load" });
+    await J.settleRoster(second.page);
+    assert(await J.visibleText(second.page, last), "a second browser lost the new member when it went Back to the roster");
+    await second.page.getByRole("link", { name: S.exactly("Home") }).first().click();
+    await second.page.waitForURL((u: URL) => u.pathname === S.clubPath(world.clubId), { timeout: 20_000 });
+    await second.page.getByRole("link", { name: S.exactly("Roster") }).first().click();
+    await J.settleRoster(second.page);
+    assert(await J.visibleText(second.page, last), "a second browser did not see the new member after following the Roster link");
 
     // B9: removing asks first (shared dialog); then really remove, and the other browser sees that after a reload.
     const actions = page.locator(`summary[aria-label^="Actions for ${first} ${last}"]`);
@@ -373,10 +410,12 @@ async function eventsJourney(ctx: Ctx, page: J.Page) {
   // The card first says "Loading your registration..."; the settled card has the contact line.
   await page.getByText(/Questions\? Email/).first().waitFor({ state: "visible", timeout: 20_000 });
   await visited(ctx, page, "Club event: registered");
+  // The registration's own status: the eyebrow of the card that says "Your club is registered".
   const approved = ["Draft", "Submitted", "Pending payment", "Pending approval", "Confirmed", "Waitlisted", "Cancelled", "Refunded"];
-  const confirmation = clean(await J.bodyText(page));
-  const shown = approved.find((word) => new RegExp(`\\b${word}\\b`, "i").test(confirmation));
-  ctx.rec.record("Club event: registered", "B12", "the submitted registration shows an approved status word", shown ? "pass" : "fail", shown ? `the page says "${shown}"` : `none of the approved status words is on the page after submitting; it says "${/REGISTERED|Registered/.test(confirmation) ? "Registered" : "something else"}"`);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: /Your club is registered/ }) }).last();
+  const statusText = clean((await card.locator(".public-registration-eyebrow").first().textContent()) ?? "");
+  const shown = approved.find((word) => word.toLowerCase() === statusText.toLowerCase());
+  ctx.rec.record("Club event: registered", "B12", "the registration's status shows an approved word", shown ? "pass" : "fail", shown ? `the registration card's status is "${statusText}"` : `the registration card's status is "${statusText}"`);
   // Back on the list the club's registration shows too (its chip is checked as part of the page).
   await visit(ctx, page, "Club events (registered)", S.clubPath(world.clubId, "/events"));
   assert(await page.locator(".status-chip").filter({ hasText: /going/ }).count(), "the Club events list shows no registration chip after submitting");
@@ -614,6 +653,7 @@ async function coordinatorHelpJourney(ctx: Ctx, page: J.Page) {
 async function keyJourneyVariant(ctx: Ctx, director: Director, mode: "translate" | "blockers") {
   const { world } = ctx;
   const { context, page } = await newDirectorContext(ctx, { translate: mode === "translate", block: mode === "blockers" });
+  const blockedAtStart = blockedRequests;
   try {
     await signInJourney(ctx, page, director, { rules: false });
     const url = `${J.baseUrl}${S.clubPath(director.clubId, "/roster")}`;
@@ -634,7 +674,10 @@ async function keyJourneyVariant(ctx: Ctx, director: Director, mode: "translate"
     await S.saveMonthlyRecordDraft(page);
     await J.assertHealthy(page, `${ctx.viewport.name}: ${mode} monthly record`, problems);
 
-    if (mode === "blockers") console.log(`    (${blockedRequests} request(s) were blocked by the filter lists so far)`);
+    if (mode === "blockers") {
+      console.log(`    (${blockedRequests} request(s) were blocked by the filter lists so far)`);
+      assert(blockedRequests > blockedAtStart, "the blocker lists blocked no request in this journey, so it proved nothing");
+    }
     if (mode === "translate") {
       const exact: string[] = await page.evaluate("window.__translationSimExactValues()");
       assert(exact.length === 0, `translate="no" values were rewritten: ${exact.join(" | ")}`);
